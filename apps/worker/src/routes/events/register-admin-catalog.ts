@@ -230,6 +230,13 @@ events.get('/api/events/admin/events', async (c) => {
              AND s.is_active = 1
              AND s.starts_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now')
          ) AS next_slot_starts_at,
+         (SELECT MAX(s.starts_at)
+            FROM event_slots s
+           WHERE s.event_id = e.id
+             AND s.deleted_at IS NULL
+             AND s.is_active = 1
+             AND s.starts_at < strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         ) AS latest_past_slot_starts_at,
          -- 定員なしの枠が1つでも混ざっていたら合計は出さない(null)。
          -- 編集画面は同じ決め方で「—」と出している。一覧だけ数を出すと、
          -- 残りの判断がずれる。全部が定員なしのときも SUM は null になる。

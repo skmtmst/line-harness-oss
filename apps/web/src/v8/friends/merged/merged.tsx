@@ -6,7 +6,7 @@ import { useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Inbox, ChevronUp, Download, RotateCw } from 'lucide-react';
 
-import { useUsersSummary } from '@/components/users/use-users-summary';
+import { useAccount } from '@/contexts/account-context';
 import { formatDay, formatNumber, formatYmd } from '@/lib/format';
 import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -84,14 +84,14 @@ export default function MergedUsersV8() {
 function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
   const itemHref = useListItemHref()
   usePageTitle('友だち')
-  const u = useMergedUsers()
+  const { selectedAccountId } = useAccount()
+  const u = useMergedUsers(selectedAccountId)
   const staffRole = useStaffRole()
   const canManage = canManageRole(staffRole)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
-  const summary = useUsersSummary()
-  const uniquePeople = summary.stats?.uniquePeople ?? null
+  const uniquePeople = u.memberTotal
 
   const pageCount = Math.max(1, Math.ceil(u.total / u.pageSize))
   const linkedUidCount = u.rows.filter((row) => row.identityKeyKind === 'uid').length
@@ -142,12 +142,11 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
               icon={<Inbox size={16} />}
               title={kpi.title}
               value={kpi.value}
-              valueText={kpi.value == null ? emptyValue('unknown') : `${formatNumber(kpi.value)} 人`}
               unit="人"
-              detail={kpi.key === 'people' ? summary.status === 'loading' ? '読み込んでいます' : summary.status === 'error' ? '読み込めませんでした' : null : null}
-              onRetry={kpi.key === 'people' && summary.status === 'error' ? () => void summary.load() : undefined}
+              detail={kpi.key === 'people' ? u.summaryStatus === 'loading' ? '読み込んでいます' : u.summaryStatus === 'error' ? '読み込めませんでした' : null : null}
+              onRetry={kpi.key === 'people' && u.summaryStatus === 'error' ? () => void u.loadSummary() : undefined}
               retryLabel="再読み込み"
-              help={kpi.key === 'people' && summary.stats ? `${kpi.help} 紐付く友だち：${formatNumber(summary.stats.totalFollowing)}件（各アカウントの友だち登録）` : kpi.help}
+              help={kpi.help}
             />
           ))}
         </KpiBand>
@@ -203,7 +202,6 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
           <section className={styles.panel} aria-labelledby="merged-users-title">
             <div className={styles.panelHead}>
               <h3 id="merged-users-title" className={styles.panelTitle}>統合ユーザー</h3>
-              <p className={styles.panelSub}>{u.loading && u.total === 0 ? '更新中…' : `${formatNumber(u.total)} 人`}</p>
             </div>
             <DataTable className={styles.table}>
               <colgroup>

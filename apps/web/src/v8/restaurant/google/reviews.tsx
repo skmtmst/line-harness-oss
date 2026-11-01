@@ -1,4 +1,7 @@
 'use client'
+
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
 import { useGooglePermission } from './use-google-permission'
 import { notifySaved } from '@/components/shared/toast'
 import ListToolbar, { ListToolbarSort } from '@/components/shared/list-toolbar'
@@ -341,6 +344,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
         <div className={styles.mainColumn}>
           <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
             <SectionHeader size="small" title={<>この返信をGoogleに公開しますか？</>} />
+            <OperationTargetSummary accounts={[{ id: accountId }]} store={data.store} />
             <dl className={styles.facts}>
               <div className={styles.factRow}><dt className={styles.factKey}>返信先の店舗</dt><dd className={styles.factValue}>{storeTitle}</dd></div>
               <div className={styles.factRow}><dt className={styles.factKey}>返信する口コミ</dt><dd className={styles.factValue}>{`${reviewer}（★${review.starRating}・${formatShortStamp(reviewReceivedAt(review))}）`}</dd></div>
@@ -430,7 +434,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       </div>
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        description="このまま移ると、返信文の変更は失われます。下書き保存をしてから移るか、保存せずに移ってください。"
+        subject="返信文の変更"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />

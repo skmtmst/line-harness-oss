@@ -127,16 +127,18 @@ export const commonVarsMethods = {
       fetchApi<ApiResponse<CommonVarExportJob[]>>(
         `/api/common-vars/exports?accountId=${encodeURIComponent(accountId)}`,
       ),
-    createExport: (input: { accountId: string; folderId?: string | null; ungrouped?: boolean }) =>
+    createExport: (input: { accountId: string; folderId?: string | null; ungrouped?: boolean }, stepUpToken?: string) =>
       fetchApi<ApiResponse<CommonVarExportJob>>('/api/common-vars/exports', {
         method: 'POST',
         body: JSON.stringify(input),
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       }),
     exportDetail: (id: string) =>
       fetchApi<ApiResponse<CommonVarExportJob>>(`/api/common-vars/exports/${encodeURIComponent(id)}`),
-    regenerateExport: (id: string) =>
+    regenerateExport: (id: string, stepUpToken?: string) =>
       fetchApi<ApiResponse<CommonVarExportJob>>(`/api/common-vars/exports/${encodeURIComponent(id)}/regenerate`, {
         method: 'POST',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       }),
   },
 }

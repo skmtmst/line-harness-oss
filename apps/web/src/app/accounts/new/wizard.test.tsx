@@ -328,7 +328,7 @@ describe('LINEアカウント作成ウィザード', () => {
     enterCheckStep()
     await runCheck()
     await saveAndFinish()
-    const completeHeading = await screen.findByRole('heading', { name: '準備ができました' })
+    const completeHeading = await screen.findByRole('heading', { name: 'LINEアカウントの登録が完了しました' })
     await waitFor(() => expect(document.activeElement).toBe(completeHeading))
     expect(calls.connect).toHaveBeenCalledWith(expect.objectContaining({
       name: undefined,
@@ -354,7 +354,7 @@ describe('LINEアカウント作成ウィザード', () => {
     enterCheckStep()
     await runCheck()
     await saveAndFinish()
-    await screen.findByText('準備ができました')
+    await screen.findByText('LINEアカウントの登録が完了しました')
     const notice = await screen.findByRole('dialog', { name: '運営からの通知をLINEで受け取る' })
     await screen.findByText('123456')
     fireEvent.click(within(notice).getByRole('button', { name: '閉じる', exact: true }))
@@ -423,6 +423,7 @@ describe('LINEアカウント作成ウィザード', () => {
   })
 
   it('引き継ぎ要求が失敗しても理由を示し、画面を開いている間に再試行する', async () => {
+    calls.followerImportState.mockImplementation(() => new Promise(() => {}))
     calls.connect.mockResolvedValue({
       success: true,
       data: { ...checked.data, id: 'retry-account', followerImport: { capability: 'available', phase: 'importing_ids' } },

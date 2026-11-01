@@ -156,3 +156,42 @@ describe('質問を作る：保存で欄に知らせる', () => {
     expect(document.getElementById('q-name-error')).toBeNull()
   })
 })
+
+
+it('20文字を超す既存のボタン名は消さずその欄へ案内し、直すとエラーが消えて20文字を保存できる', async () => {
+  const long = 'あ'.repeat(25)
+  const name = screen.getByLabelText('テンプレート名') as HTMLInputElement
+  const text = screen.getByLabelText('質問文（160文字まで）') as HTMLInputElement
+  const choice = screen.getAllByLabelText('ボタンの文字（20文字まで）')[1] as HTMLInputElement
+  expect(choice.maxLength).toBe(20)
+  await act(async () => {
+    fireEvent.change(name, { target: { value: '質問の見出し' } })
+    fireEvent.change(text, { target: { value: '続けますか？' } })
+    // 保存済みデータなど、ブラウザーの入力上限を通らない値も失わない。
+    fireEvent.change(choice, { target: { value: long } })
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+  })
+  await frames()
+  expect(templatesApi.create).not.toHaveBeenCalled()
+  expect(choice.value).toBe(long)
+  expect(choice.getAttribute('aria-invalid')).toBe('true')
+  expect(document.getElementById('q-choice-1-error')?.textContent).toBe('ボタンの文字は20文字以内で入力してください。')
+  expect(document.activeElement).toBe(choice)
+  expect(name.value).toBe('質問の見出し')
+  expect(text.value).toBe('続けますか？')
+  await act(async () => { fireEvent.change(choice, { target: { value: 'あ'.repeat(20) } }) })
+  expect(choice.getAttribute('aria-invalid')).toBeNull()
+  expect(document.getElementById('q-choice-1-error')).toBeNull()
+  templatesApi.create.mockResolvedValue({ success: true, data: { publishedVersion: 1, draftRevision: 1 } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+  expect(templatesApi.create).toHaveBeenCalledOnce()
+  expect(templatesApi.create.mock.calls[0][0].question.choices[1].label).toBe('あ'.repeat(20))
+})
+
+it('必須不足は主保存を押せない形と理由にし、欄の検証入口を残す', () => {
+  const save = screen.getByRole('button', { name: '保存して公開' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  expect(screen.getByText('テンプレート名を入力してください。')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '下書きを保存' }).hasAttribute('disabled')).toBe(false)
+  fireEvent.click(save);expect(templatesApi.create).not.toHaveBeenCalled()
+})

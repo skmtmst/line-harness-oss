@@ -1,3 +1,4 @@
+import { firstQuestionChoiceLabelProblem } from '@/components/scenarios/question-choice-label-validation'
 import { messageKindProblem, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
 import { deadAnswerSettings, isUriOnlyBehavior, validateChoiceUris } from '@/components/scenarios/question-editor'
 import { isDeliveryTimeSet } from '@/components/scenarios/step-preview'
@@ -25,6 +26,8 @@ export function validateScenarioStep(stepForm: StepFormState, kindState: Message
       if (stepForm.question.choices.length === 0 || stepForm.question.choices.some((choice) => !choice.label.trim())) {
         return { field: 'question', message: 'すべての選択肢に文字を入力してください' }
       }
+      const labelProblem = firstQuestionChoiceLabelProblem(stepForm.question)
+      if (labelProblem) return { field: 'question', message: labelProblem.message }
       /*
        * SCENARIO-22: URLなどを開くだけの挙動に、届かない通知を待つ設定
        * （返信・タグ・友だち情報）が残っていると保存を止める。消すか

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import RemindersList from './list'
 
-const net = vi.hoisted(() => ({ read: vi.fn(), update: vi.fn(), folders: vi.fn(), stats: vi.fn(), hold: false }))
+const net = vi.hoisted(() => ({ read: vi.fn(), update: vi.fn(), folders: vi.fn(), stats: vi.fn(), hold: false, account: 'account-a' }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, fetchApi: net.read, api: { ...actual.api,
@@ -23,12 +23,12 @@ vi.mock('@/lib/undoable', async original => {
     return scheduled.handle
   } }
 })
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', loading: false }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: net.account, loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }), useSearchParams: () => new URLSearchParams(''), usePathname: () => '/reminders' }))
 const rows = ['r1', 'r2'].map((id, index) => ({ id, name: `お知らせ${index + 1}`, isActive: true, lifecycleStatus: 'published', folderId: null, stepCount: 1, displayOrder: index, createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z', plannedDeliveries: 1 }))
 beforeEach(() => {
-  vi.clearAllMocks(); net.hold = false; verifiedStaffRole('owner')
+  vi.clearAllMocks(); net.hold = false; net.account = 'account-a'; verifiedStaffRole('owner')
   window.history.replaceState(null, '', '/reminders')
   net.read.mockResolvedValue({ success: true, data: { items: rows, total: 2, limit: 20, sort: [] } })
   net.folders.mockResolvedValue({ success: true, data: [{ id: 'folder-a', name: '確認用' }], unfiledCount: 2 })
@@ -74,4 +74,21 @@ it('窓の中で元に戻すと送信0で閉じ、選んだ行を残す', async 
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(net.update).not.toHaveBeenCalled()
   checks.forEach(check => expect(check).toHaveProperty('checked', true))
+})
+
+vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: async () => ({ version: '2.7.0', deploy_env: 'staging' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '二号店' }] }) }))
+
+it('一括停止の窓は操作先を示し、アカウント切替で閉じて古い対象を送らない', async () => {
+  const view = render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  rows.forEach(row => fireEvent.click(within(screen.getByText(row.name).closest('tr')!).getByRole('checkbox')))
+  fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
+  const dialog = await screen.findByRole('dialog', { name: '2件のリマインダを停止しますか？' })
+  await within(within(dialog).getByRole('region', { name: '操作の対象' })).findByText('本店')
+  expect(net.update).not.toHaveBeenCalled()
+  net.account = 'account-b'
+  view.rerender(<RemindersList />)
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(net.update).not.toHaveBeenCalled()
 })

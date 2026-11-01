@@ -8,6 +8,7 @@
  * データ（読み込み・絞り込み・続き・差し込みの解決）は components/chats/template-picker の今の処理を使い、
  * ここは見た目だけを受け持つ。
  */
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { useLayoutEffect, useRef, type RefObject } from 'react'
 import { CornerDownLeft, FolderOpen, Search, Send } from 'lucide-react'
 import { EntityPickerDialog } from '@/components/shared/entity-picker'
@@ -25,6 +26,7 @@ import { formatNumber } from '@/lib/format'
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 
 export type TemplatePickerViewProps = {
+  accountId?: string | null
   onClose: () => void
   channel: 'line' | 'email'
   canPick: boolean
@@ -67,6 +69,7 @@ const PACK_MAX = 5
 
 export default function TemplatePickerView(props: TemplatePickerViewProps) {
   const { side, packMode, packItems } = props
+  const tokenNames = useInsertTokenNames(props.channel === 'line' ? props.accountId ?? null : null)
   const previewTriggers = useRef(new Map<string, HTMLButtonElement>())
   const returnFocus = useRef<string | null>(null)
   useLayoutEffect(() => {
@@ -175,7 +178,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                           ) : null}
                           <span className={styles.tpCardText}>
                             <span className={styles.tpCardName} title={template.name}>{template.name}</span>
-                            <span className={styles.tpCardBody} data-lines={props.channel === 'line' ? '2' : undefined} title={template.content}>{props.channel === 'line' ? <InsertText value={template.content} resolvedValue={props.resolvedPreview?.id === template.id ? props.resolvedPreview.content : undefined} /> : template.content}</span>
+                            <span className={styles.tpCardBody} data-lines={props.channel === 'line' ? '2' : undefined} title={template.content}>{props.channel === 'line' ? <InsertText tokenNames={tokenNames} value={template.content} resolvedValue={props.resolvedPreview?.id === template.id ? props.resolvedPreview.content : undefined} /> : template.content}</span>
                           </span>
                         </button>
                         {props.channel === 'line' ? <IconButton ref={node => { if (node) previewTriggers.current.set(template.id, node); else previewTriggers.current.delete(template.id) }} aria-label={`${template.name}の中身を見る`} title="中身を見る" onClick={() => props.onPreview(template.id)}><Search size={16} aria-hidden="true" /></IconButton> : null}

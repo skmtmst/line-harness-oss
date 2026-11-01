@@ -6,7 +6,7 @@ import { type Area } from '../../../components/rich-menus/area-types'
 import { NEW_MENU_INTENTS_WITH_SWITCH } from '../../../components/rich-menus/rich-menu-create-model'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { SaveErrorField, SaveErrorScope } from '@/components/shared/save-form-errors'
 import SectionHeader from '@/components/shared/section-header'
 import SegmentedControl from '@/components/shared/segmented'
 import TapAreaEditor from '@/components/shared/tap-area-editor'
@@ -30,6 +30,7 @@ type RenderButtonsStepContext = {
   host: RichMenuCreateHost | undefined
   pageImageUrl: string | null
   pages: Page[]
+  publishLabelErrors: ReturnType<typeof useFormErrors>
   selectedArea: Area | null
   selectedAreaId: string | null
   setActivePageId: Dispatch<SetStateAction<string | null>>
@@ -41,7 +42,7 @@ type RenderButtonsStepContext = {
   updateArea: (pageId: string, areaId: string, patch: Partial<Area>) => void
 }
 
-export function renderButtonsStep({ activePage, addArea, areaActionSummary, deleteArea, fields, forms, goToStep, group, host, pageImageUrl, pages, selectedArea, selectedAreaId, setActivePageId, setSelectedAreaId, size, tags, templates, trackedLinks, updateArea }: RenderButtonsStepContext) {
+export function renderButtonsStep({ activePage, addArea, areaActionSummary, deleteArea, fields, forms, goToStep, group, host, pageImageUrl, pages, publishLabelErrors, selectedArea, selectedAreaId, setActivePageId, setSelectedAreaId, size, tags, templates, trackedLinks, updateArea }: RenderButtonsStepContext) {
     if (!activePage) return <div className={styles.stateCard}>ページがありません</div>
     const activeIndex = activePage.areas.findIndex((a) => a.id === selectedAreaId)
     const areaPages = pages
@@ -106,7 +107,7 @@ export function renderButtonsStep({ activePage, addArea, areaActionSummary, dele
             <div {...fields.bind(`area-${selectedArea.id}`)}>
             <Card padding="roomy" layout="vertical">
               <SectionHeader title={`面 ${String.fromCharCode(65 + activeIndex)}「${areaDisplayName(selectedArea, activeIndex)}」の動き`} />
-              <AreaProperties
+              <SaveErrorScope errors={publishLabelErrors}><AreaProperties
                 area={selectedArea}
                 pages={areaPages}
                 tags={tags}
@@ -119,7 +120,7 @@ export function renderButtonsStep({ activePage, addArea, areaActionSummary, dele
                 showManagementDetails={false}
                 allowedIntents={host ? [...HQ_RICH_MENU_INTENTS] : NEW_MENU_INTENTS_WITH_SWITCH}
                 error={fields.error(`area-${selectedArea.id}`)}
-              />
+              /></SaveErrorScope>
               <div>
                 <Button type="button" variant="text" onClick={() => deleteArea(activePage.id, selectedArea.id)}>
                   この面を消す

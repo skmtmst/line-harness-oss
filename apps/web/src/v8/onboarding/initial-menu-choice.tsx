@@ -51,9 +51,15 @@ export function InitialMenuChoice({accountId,style,value,onChange,disabled=false
   </RadioCardGroup></SaveErrorField>
   {value.value==='existing' ? error ? <ListState kind="error" title="メニューを読み込めませんでした" error={error} onRetry={()=>setTick(n=>n+1)}/> : <SaveErrorField names={['resourceId','answers.image.resourceId']}><EntitySelect aria-label="使うリッチメニュー" noun="リッチメニュー" size="full" value={value.resourceId??''} onChange={resourceId=>onChange({value:'existing',resourceId})} disabled={disabled||items===null} disabledReason={disabled?disabledReason:'メニューを読み込んでいます'} options={[{value:'',label:items===null?'読み込んでいます…':items.length?'使うメニューを選ぶ':'使えるメニューがありません'},...(items??[]).map(item=>({value:item.id,label:item.name}))]}/></SaveErrorField> : null}
   {value.value==='simple' ? <>
-   <Card layout="vertical"><CardHeader title="入る画像"/><img className={styles.image} src={initialMenuImageDataUri(style)} alt={menu.buttons.map(button=>button.label).join('・')} width={2500} height={1686}/></Card>
-   <CardHeader title="ボタンを押すと開くページ" meta="URLを貼る操作は不要"/>
-   <GridTable label="メニューの行き先" design={{columns:'minmax(0,0.85fr) minmax(0,1fr) minmax(0,1.4fr)',gap:'16px',rowHeight:'48px',rowPadding:'0 12px',fontSize:'13px'}}><GridHeadRow><GridCell role="columnheader">ボタン</GridCell><GridCell role="columnheader">開くページ</GridCell><GridCell role="columnheader">できること</GridCell></GridHeadRow>{menu.buttons.map(button=><GridRow key={button.target}><GridCell title={button.label}>{button.label}</GridCell><GridCell title={initialMenuDestination(style,button.target)}>{initialMenuDestination(style,button.target)}</GridCell><GridCell title={menuActionDescription(style,button.target)}>{menuActionDescription(style,button.target)}</GridCell></GridRow>)}</GridTable>
+   <div className={styles.preview} data-initial-menu-preview>
+    <div className={styles.layout}>
+     <Card layout="vertical" className={styles.imageCard}><CardHeader title="入る画像"/><img className={styles.image} data-initial-menu-image src={initialMenuImageDataUri(style)} alt={menu.buttons.map(button=>button.label).join('・')} width={2500} height={1686}/></Card>
+     <div className={styles.destinations} data-initial-menu-destinations>
+      <CardHeader title="ボタンを押すと開くページ" meta="URLを貼る操作は不要" size="content"/>
+      <GridTable label="メニューの行き先" presentation="dashboard" design={{columns:'116px minmax(0,1fr)',gap:'12px',rowHeight:'80px',headHeight:'44px',rowPadding:'12px 0',fontSize:'13px',lineHeight:'20px'}}><GridHeadRow><GridCell role="columnheader">ボタン</GridCell><GridCell role="columnheader">開くページ・できること</GridCell></GridHeadRow>{menu.buttons.map(button=><GridRow key={button.target}><GridCell title={button.label}>{button.label}</GridCell><GridCell><span title={initialMenuDestination(style,button.target)}>{initialMenuDestination(style,button.target)}</span><span className={styles.capability}>{menuActionDescription(style,button.target)}</span></GridCell></GridRow>)}</GridTable>
+     </div>
+    </div>
+   </div>
    <Notice tone="info">ページの下書きが入ります。{style==='restaurant'?'席・営業時間と、':''}ページの内容を確認して公開したあと、リッチメニューをLINEに出してください。</Notice>
   </> : null}
  </>

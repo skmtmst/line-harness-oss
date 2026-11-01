@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import { unhandledWorkerError } from '../lib/unhandled-error.js';
-import { FormReferenceAccessError, formReferenceAccount, resolveFormReferences, publicReferenceLayout, validateFormReferences } from '../features/forms/index.js';
+import { FormReferenceAccessError, formReferenceAccount, resolveFormReferences, publicReferenceLayout, validateFormReferences, createFormDraftOnce, FormDraftCreateError } from '../features/forms/index.js';
 import { formWebhookTarget } from '../services/public-https-request.js';
 import { webhookUrlBlockReason } from '../services/outgoing-webhook-delivery.js';
 import { validateLayoutRouting } from '../features/forms/form-routing/index.js';
@@ -399,8 +399,24 @@ export const post__api_forms_drafts_7 = async (c: Context<Env, "/api/forms/draft
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
+  const name = body.name?.trim() || '名称未設定のフォーム';
+  const key = c.req.header('Idempotency-Key');
+  if (key !== undefined) {
+    if (!/^[A-Za-z0-9_-]{16,128}$/.test(key)) return inputError(c, { success: false, error: '作成の操作番号が正しくありません', code: 'invalid_idempotency_key' }, 400, []);
+    const actorId = c.get('staff')?.id;
+    if (!actorId) return c.json({ success: false, error: 'Forbidden' }, 403);
+    try {
+      const data = await createFormDraftOnce(c.env.DB, { accountId: body.accountId, actorId, key, name });
+      return c.json({ success: true, data }, data.replayed ? 200 : 201);
+    } catch (cause) {
+      if (cause instanceof FormDraftCreateError) return c.json({ success: false, code: cause.code,
+        error: cause.code === 'draft_unavailable' ? 'この作成操作の下書きは使えなくなりました。一覧から新しく作成してください。' : '同じ操作番号で別の作成内容が送られました。入力を控えてから一覧で確認してください。',
+      }, cause.code === 'draft_unavailable' ? 410 : 409);
+      throw cause;
+    }
+  }
   const form = await createForm(c.env.DB, {
-    name: body.name?.trim() || '名称未設定のフォーム',
+    name,
     fields: '[]',
     layout: null,
     isActive: false,

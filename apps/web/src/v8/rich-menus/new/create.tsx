@@ -97,7 +97,7 @@ Send,
 Upload
 } from 'lucide-react'
 import { useCallback,useEffect,useRef,useState } from 'react'
-import { describeMenuSummary,isGroupResponse,mediaToFile,parseStoredCondition,projectAreaForDraft } from './create-draft'
+import { describeMenuAudience,describeMenuSummary,isGroupResponse,mediaToFile,parseStoredCondition,projectAreaForDraft } from './create-draft'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
 /* ---------- 本体 ---------- */
@@ -169,7 +169,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
 
   /* 手順③ */
-  const [audience, setAudience] = useState<'all' | 'targeted' | 'none' | 'tag'>('all')
+  const [audience, setAudience] = useState<'all' | 'targeted' | 'none' | 'tag'>(host ? 'targeted' : 'none')
   /* 統括のひな形だけ：「タグが付いた人」のタグ名（配った先の同じ名前の有効なタグで出す）。 */
   const [hqTagName, setHqTagName] = useState(host?.initial?.displayTagName ?? '')
   const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
@@ -496,6 +496,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    */
   saveErrors.define('name', 'メニュー名', () => null, { required: true, reveal: () => setStep('shape') })
   saveErrors.define('chatBarText', 'トーク画面の下の文言', () => null, { required: true, reveal: () => setStep('shape') })
+  const unnamedArea = pages.flatMap(page => page.areas.map(area => ({ page, area }))).find(({ area }) => !area.label?.trim())
+  const publishLabelErrors = useSaveFormErrors()
+  publishLabelErrors.define('label', 'ボタン名', () => null, { reveal: () => {
+    if (!unnamedArea) return
+    setStep('buttons')
+    setActivePageId(unnamedArea.page.id)
+    setSelectedAreaId(unnamedArea.area.id)
+  } })
   const fields = useFormErrors()
   fields.define('name', 'メニュー名', () => (name.trim() ? null : '名前を入力してください'), { required: true, reveal: () => setStep('shape') })
   fields.define('chatbar', 'トーク画面の下の文言', () => (chatBarText.trim() ? null : 'トーク画面の下の文言を入力してください'), { required: true, reveal: () => setStep('shape') })
@@ -582,14 +590,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const currentSummary = describeMenuSummary({
     name,
     chatBarText,
-    audienceAll: audience === 'all',
+    audience,
+    forHq: Boolean(host),
     pages,
   })
   const latestSummary = conflictLatest
     ? describeMenuSummary({
         name: conflictLatest.name,
         chatBarText: conflictLatest.chatBarText,
-        audienceAll: conflictLatest.isDefaultForAll,
+        audience: conflictLatest.targetingEnabled ? 'targeted' : conflictLatest.isDefaultForAll ? 'all' : 'none',
+        forHq: Boolean(host),
         pages: conflictLatest.pages,
       })
     : ''
@@ -943,10 +953,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     },
   })
 
-  function handlePublish() { return publishMenuNow({ audience, group, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing }) }
+  function validatePublishLabels() {
+    if (!unnamedArea) return true
+    publishLabelErrors.fail('label', 'ボタン名（読み上げラベル）を入力してください')
+    return false
+  }
+  function handlePublish() { if (validatePublishLabels()) return publishMenuNow({ audience, group, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing }) }
 
   /** 「公開する」/「予約する」。時刻を決めた公開は予約口へ。 */
   async function handlePublishSubmit() {
+    if (!validatePublishLabels()) return
     const timingIsScheduled = publishPlan.mode !== 'now'
     if (timingIsScheduled) {
       const startsAt = publishPlan.startsAt
@@ -1191,7 +1207,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onReload={acceptLatestAndContinue}
             />
           </div>
-        ) : null} noticeSpacing="band" identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} readOnly={!host && !canOperate} summaries={{ shape: `${name}・${tabCount}タブ`, buttons: `${pages.reduce((total, page) => total + page.areas.length, 0)}個のボタン`, audience: audience === 'all' ? '全員' : '条件に合う友だち' }} />}  preview={(inDialog) => renderRail(inDialog)} previewCompactWhenNarrow footerActions={
+        ) : null} noticeSpacing="band" identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} readOnly={!host && !canOperate} summaries={{ shape: `${name}・${tabCount}タブ`, buttons: `${pages.reduce((total, page) => total + page.areas.length, 0)}個のボタン`, audience: describeMenuAudience(audience, Boolean(host)) }} />}  preview={(inDialog) => renderRail(inDialog)} previewCompactWhenNarrow footerActions={
           !host && !canOperate ? <Button href="/rich-menus">一覧へ戻る</Button> : host ? (
             <>
               <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>
@@ -1402,7 +1418,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   function renderTabImageSlot(index: number) { return renderTabSlot({ accountId, busy, clearPendingImage, group, handlePickedFile, host, pages, setImagePickTarget, setMediaPickerOpen, size, slotImage, tabNameAt }, index) }
 
   /* ======== 手順②：ボタンの動き ======== */
-  function renderButtons() { return renderButtonsStep({ activePage, addArea, areaActionSummary, deleteArea, fields, forms, goToStep, group, host, pageImageUrl, pages, selectedArea, selectedAreaId, setActivePageId, setSelectedAreaId, size, tags, templates, trackedLinks, updateArea }) }
+  function renderButtons() { return renderButtonsStep({ activePage, addArea, areaActionSummary, deleteArea, fields, forms, goToStep, group, host, pageImageUrl, pages, publishLabelErrors, selectedArea, selectedAreaId, setActivePageId, setSelectedAreaId, size, tags, templates, trackedLinks, updateArea }) }
 
   /*
    * ======== 統括の手順③：配る先========

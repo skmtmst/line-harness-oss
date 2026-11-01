@@ -227,6 +227,7 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     act(() => { buttonByText('削除する').click() })
     await flush()
     expect(document.body.textContent).toContain('「会社名」はまだ消せません')
+    expect(document.querySelector('[data-design-node="xxKtW"] [data-detail-value]')?.textContent).toBe('会社名')
     expect(document.body.textContent).toContain('どうしますか')
     const reason = document.querySelector<HTMLInputElement>('input[aria-label="消した理由・止める理由（記録に残ります）"]')
     expect(reason).toBeTruthy()

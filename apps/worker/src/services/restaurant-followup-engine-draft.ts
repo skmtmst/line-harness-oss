@@ -1,3 +1,4 @@
+import { reminderFollowupEditorContent,automationFollowupEditorContent } from './restaurant-followup-editor-content.js';
 import { protectRestaurantFollowupMessageParts } from './restaurant-followup-message-parts.js';
 import {
  getReminderPublishedVersion,getReminderDraftVersion,prepareReminderDraftCreation,prepareReminderDraftSave,parseReminderVersionSettings,
@@ -13,20 +14,28 @@ import { readRestaurantFollowupRows } from './restaurant-followup-rows.js';
 type Timing=RestaurantFollowupTiming;
 export type FollowupDraftInput=RestaurantFollowupEngineDraftInput;
 export class FollowupDraftError extends Error {
- constructor(public code:'version_conflict'|'invalid_followup'|'delivery_unconfirmed'|'line_account_required',message:string){super(message);}
+ constructor(public code:'version_conflict'|'invalid_followup'|'delivery_unconfirmed'|'line_account_required',message:string,public field?:'timing'|'messageBubbles'){super(message);}
 }
 interface Target {engine:'scenario'|'reminder'|'automation';reminder_id:string|null;automation_id:string|null;version:number}
 function conflict(){return new FollowupDraftError('version_conflict','設定が変わりました。読み直してください');}
-function invalid(){return new FollowupDraftError('invalid_followup','送り方と送る内容を確認してください');}
+function invalid(field?:'timing'|'messageBubbles',message='送り方と送る内容を確認してください'){return new FollowupDraftError('invalid_followup',message,field);}
 function validateTiming(trigger:RestaurantFollowupTrigger,timing:Timing){
- if(!timing||typeof timing!=='object')throw invalid();
+ if(!timing||typeof timing!=='object')throw invalid('timing','送る時期を選び直してから保存してください');
  const reminder=['reservation_24h','reservation_2h','anniversary_before'].includes(trigger);
  if(reminder){
   if(timing.mode==='time'&&Number.isSafeInteger(timing.offsetDays)&&timing.offsetDays<=(trigger==='anniversary_before'?-1:0)&&timing.offsetDays>=-365&&/^([01]\d|2[0-3]):[0-5]\d$/.test(timing.sendAtTime))return;
   if(trigger!=='anniversary_before'&&timing.mode==='countdown'&&Number.isSafeInteger(timing.offsetMinutes)&&timing.offsetMinutes<0&&timing.offsetMinutes>=-525600)return;
  }else if(timing.mode==='countdown'&&timing.offsetMinutes===0)return;
  else if((timing.mode==='next_day'&&['post_visit','review_request'].includes(trigger)||timing.mode==='countdown')&&parseAutomationWait(timing.mode==='countdown'?{durationMinutes:timing.offsetMinutes}:timing))return;
- throw invalid();
+ const reason=reminder
+  ?trigger==='anniversary_before'?'記念日の1〜365日前の日数と、00:00〜23:59の時刻を指定してください。'
+   :timing.mode!=='time'&&timing.mode!=='countdown'?'この送り方は日時か、予約の前の時間で指定してください。'
+   :timing.mode==='countdown'?'予約前の時間は1分〜365日で指定してください。'
+   :'送る日は予約の365日前〜当日、時刻は00:00〜23:59で指定してください。'
+  :timing.mode==='next_day'
+   ?['post_visit','review_request'].includes(trigger)?'退店の翌日に送る時刻を00:00〜23:59で指定してください。':'この送り方は「すぐに送る」か、きっかけから待つ時間を指定してください。'
+   :'待つ時間は0以上・365日以内の5分単位で指定してください。';
+ throw invalid('timing',reason);
 }
 /** 同じ実物IDを保ち、停止した下書きと送り手の切替を同じbatchへ収める。 */
 async function saveEngineDraft(db:D1Database,storeId:string,trigger:RestaurantFollowupTrigger,input:FollowupDraftInput,staffId:string){
@@ -76,8 +85,18 @@ async function saveEngineDraft(db:D1Database,storeId:string,trigger:RestaurantFo
   let parts:ReturnType<typeof parseBroadcastMessageParts>;
   try{
    parts=protectRestaurantFollowupMessageParts(trigger,parseBroadcastMessageParts({messageType:'text',messageContent:'',messageBubbles:input.messageBubbles}));
-   buildMessages(parts);for(const part of parts)if(!validateTemplateMessage(part.messageType,part.messageContent).ok)throw invalid();
-  }catch{throw invalid();}
+   for(const part of parts){const validation=validateTemplateMessage(part.messageType,part.messageContent);if(!validation.ok)throw invalid('messageBubbles',validation.error);}
+   buildMessages(parts);
+  }catch(error){
+   if(error instanceof FollowupDraftError)throw error;
+   const code=error instanceof Error?error.message:'';
+   const known:Record<string,string>={
+    'messageBubbles text is required':'本文を入力するか、テンプレートを選んでください。',
+    '文章の自動分割とボタンを合わせて5通までです。本文や吹き出しを減らしてください':'文章の自動分割とボタンを合わせて5通までです。本文や吹き出しを減らしてください',
+    '予約の返事の入口を含めて5つ以内になるよう、吹き出しを減らしてください':'予約の返事の入口を含めて5つ以内になるよう、吹き出しを減らしてください',
+   };
+   throw invalid('messageBubbles',(Object.hasOwn(known,code)?known[code]:undefined)??'本文の形式を読み取れません。テンプレートを選び直すか、テキストを入れて保存し直してください。');
+  }
   const name=`${store.name}：${RESTAURANT_FOLLOWUP_LABELS[trigger]}`;
   if(engine==='reminder'){
    const existing=target?.reminder_id?await getReminderDraftVersion(db,target.reminder_id):null;
@@ -88,6 +107,7 @@ async function saveEngineDraft(db:D1Database,storeId:string,trigger:RestaurantFo
    const timing=input.timing as Exclude<Timing,{mode:'next_day'}>;
    const field=trigger==='anniversary_before'?await db.prepare("SELECT field_id FROM friend_fixed_fields WHERE fixed_key='anniversary'").first<{field_id:string}>():null;
    if(trigger==='anniversary_before'&&!field)throw invalid();
+   if(current&&!reminderFollowupEditorContent(current,trigger,field?.field_id))throw new FollowupDraftError('invalid_followup','この内容は詳しい設定で変更してください');
    const settings:ReminderDraftSettings={name,lineAccountId:account,triggerType:field?'friend_field':'manual',triggerFieldId:field?.field_id??null,repeatYearly:!!field,leapYearPolicy:'feb28',deliveryMode:timing.mode,
     stopConditions:{bookingCancelled:true,friendBlocked:true,supportMarkCompleted:false,daysAfterTarget:0},
     steps:[{stableStepId:current?parseReminderVersionSettings(current).steps[0]?.stableStepId??crypto.randomUUID():crypto.randomUUID(),offsetMinutes:timing.mode==='countdown'?timing.offsetMinutes:0,offsetDays:timing.mode==='time'?timing.offsetDays:null,sendAtTime:timing.mode==='time'?timing.sendAtTime:null,messageType:parts[0].messageType,messageContent:parts[0].messageContent,messageParts:parts.map(part=>({messageType:part.messageType,messageContent:part.messageContent}))}]};
@@ -100,6 +120,7 @@ async function saveEngineDraft(db:D1Database,storeId:string,trigger:RestaurantFo
    if(target?.automation_id){
     const current=await db.prepare(`SELECT d.current_draft_version_id,d.current_published_version_id,v.* FROM automation_definitions d JOIN automation_versions v ON v.id=COALESCE(d.current_draft_version_id,d.current_published_version_id) WHERE d.id=? AND d.line_account_id=?`).bind(target.automation_id,account).first<{id:string;current_published_version_id:string|null;trigger_type:string;trigger_config:string;condition_config:string;action_config:string}>();
     if(!current||await automationRevisionToken(current.id,current)!==input.expectedContentRevision)throw conflict();
+    if(!automationFollowupEditorContent(current,storeId,trigger))throw new FollowupDraftError('invalid_followup','この内容は詳しい設定で変更してください');
     before.push(db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM automation_definitions WHERE id=? AND current_published_version_id IS ?) THEN '{}' ELSE 'FOLLOWUP_VERSION_CONFLICT' END)`).bind(target.automation_id,current.current_published_version_id));
     const draft=await createAutomationDraftFromDefinition(db,{id:target.automation_id,lineAccountId:account,createdBy:staffId});
     await updateAutomationDraft(db,{id:target.automation_id,lineAccountId:account,expectedDraftVersionId:draft.draftVersionId,name,eventType:content.trigger_type,triggerConfig:{storeId},conditions:{},actions,transaction:{before,after:()=>after(target.automation_id)}});

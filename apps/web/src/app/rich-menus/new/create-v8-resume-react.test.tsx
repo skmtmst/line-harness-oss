@@ -118,8 +118,8 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     expect(input).not.toBeNull()
     const created = input as unknown as CreatedInput
     expect(created.pages[0].areas.map((area) => [area.boundsY, area.boundsHeight])).toEqual([[0, 843], [843, 843]])
-    expect(screen.getAllByRole('button', { name: /^面 [AB]、動きは/ })).toHaveLength(2)
-    expect(screen.queryByRole('button', { name: /^面 C、/ })).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^[12]番目のボタン、動きは/ })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /^3番目のボタン、/ })).toBeNull()
   })
 
   it('店：①でタブを2つにすると名前の欄と画像の枠がタブの数だけ出て、作った後に各ページへ画像を上げる', async () => {

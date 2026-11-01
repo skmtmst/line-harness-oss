@@ -1,3 +1,4 @@
+import { countLimitedAudience, storedDeliveryLimit, limitedDeliveryPlan } from './broadcast-delivery-limit.js';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { BROADCAST_APPROVE_KEY } from '@line-crm/shared';
@@ -130,6 +131,7 @@ export async function countApprovalRecipients(
   db: D1Database,
   broadcast: Broadcast,
 ): Promise<number> {
+  if (storedDeliveryLimit(broadcast)) return (await countLimitedAudience(db,broadcast)).candidateCount;
   const raw = broadcast as unknown as Record<string, unknown>;
   if (broadcast.target_type === 'multi-account-dedup') {
     let accountIds: string[] = [];
@@ -310,17 +312,19 @@ export async function enforceBroadcastSendApproval(
   | { allowed: false; status: number; error: string; code: string; recipientCount?: number; threshold?: number }
 > {
   const gate = await evaluateApprovalGate(db, broadcast);
+  const limited = await limitedDeliveryPlan(db, broadcast, {requireConfirmation:false});
+  const confirmedRecipients = limited?.recipientCount ?? gate.recipientCount;
   if (!gate.required) return { allowed: true, gate };
   if (gate.singleOperator) {
     const confirmed = typeof options?.confirmedRecipientCount === 'string'
       && options.confirmedRecipientCount.trim() !== ''
       ? Number(options.confirmedRecipientCount)
       : options?.confirmedRecipientCount;
-    if (typeof confirmed !== 'number' || !Number.isInteger(confirmed) || confirmed !== gate.recipientCount) {
+    if (typeof confirmed !== 'number' || !Number.isInteger(confirmed) || confirmed !== confirmedRecipients) {
       return {
         allowed: false,
         status: 409,
-        error: `送る相手は${gate.recipientCount.toLocaleString('ja-JP')}人です。人数を入れて一致させてください。`,
+        error: `送る相手は${confirmedRecipients.toLocaleString('ja-JP')}人です。人数を入れて一致させてください。`,
         code: 'COUNT_MISMATCH',
         recipientCount: gate.recipientCount,
         threshold: gate.threshold,
@@ -361,7 +365,8 @@ export async function checkScheduledBroadcastApproval(
   if (!fresh || fresh.lock_version !== (broadcast.lock_version ?? 1)) return { sendable: false };
   const status = (fresh?.approval_status ?? 'none') as ReturnType<typeof readApprovalStatus>;
   if (gate.singleOperator) {
-    if (Number(fresh?.approval_confirmed_count) === gate.recipientCount) return { sendable: true };
+    const limited = await limitedDeliveryPlan(db,broadcast);
+    if (limited ? limited.recipientCount <= Number(fresh.approval_confirmed_count) : Number(fresh.approval_confirmed_count) === gate.recipientCount) return { sendable: true };
     // 人数が変わったまま時刻が来た。送らず期限切れにし、依頼主に知らせる。
     const claimed = await db.prepare(
       `UPDATE broadcasts SET approval_status = 'expired'

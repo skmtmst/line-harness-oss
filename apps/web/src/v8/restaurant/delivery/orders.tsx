@@ -46,6 +46,7 @@ import {
   urgencyLabel,
 } from './format'
 import styles from './delivery.module.css'
+import { intakeActionReason } from './intake-access'
 
 const CONNECTION_LABELS: Record<DeliveryConnectionStatus, string> = {
   connected: '接続済み',
@@ -167,9 +168,11 @@ function ServiceCard({
   onStop,
   onResume,
   uberConnectionStatus,
+  intakeDisabledReason,
 }: {
   state: DeliveryServiceState
   uberConnectionStatus: DeliveryConnectionStatus | null
+  intakeDisabledReason?: string
   canManage: boolean
   busy: boolean
   onStop: (service: DeliveryService) => void
@@ -179,6 +182,7 @@ function ServiceCard({
   const preparing = state.service === 'ubereats'
   const connectionStatus = preparing ? uberConnectionStatus : state.connectionStatus
   const stopped = state.intakeStatus === 'stopped'
+  const actionReason = intakeDisabledReason ?? intakeActionReason(state, stopped ? 'resume' : 'stop')
   /* 絵（kDQHr）の札は1行。いつまで止めているかは札の説明に入れ、行を増やさない。 */
   const stopNote = stopped && state.stopUntil ? `${formatClock(state.stopUntil)} まで停止` : undefined
   /* 数は推測しない。取れないときは「—」で、単位も出さない（D021/D024）。 */
@@ -197,8 +201,8 @@ function ServiceCard({
             <Button
               size="compact"
               textTone="accent"
-              disabled={preparing}
-              title={preparing ? PREPARING_WORD : undefined}
+              disabled={Boolean(actionReason) || busy}
+              disabledReason={actionReason}
               busy={busy}
               busyLabel=""
               doneLabel=""
@@ -211,8 +215,8 @@ function ServiceCard({
             <Button
               size="compact"
               textTone="danger"
-              disabled={preparing}
-              title={preparing ? PREPARING_WORD : undefined}
+              disabled={Boolean(actionReason) || busy}
+              disabledReason={actionReason}
               aria-label={`${label}の受付を止める`}
               onClick={() => onStop(state.service)}
             >
@@ -226,11 +230,11 @@ function ServiceCard({
           <StatusBadge tone={connectionStatus ? CONNECTION_TONES[connectionStatus] : 'neutral'} size="delivery">
             {connectionStatus ? CONNECTION_LABELS[connectionStatus] : '接続未確認'}
           </StatusBadge>
-          <span title={preparing ? undefined : stopNote}>
+          {preparing || connectionStatus === 'connected' ? <span title={preparing ? undefined : stopNote}>
             <StatusBadge tone={preparing ? 'neutral' : INTAKE_TONES[state.intakeStatus]} size="delivery">
               {preparing ? PREPARING_WORD : INTAKE_LABELS[state.intakeStatus]}
             </StatusBadge>
-          </span>
+          </span> : null}
         </span>
         <span className={styles.spacer} />
         <div className={styles.serviceStat}>
@@ -408,6 +412,7 @@ export interface OrdersBoardProps {
   busyService: DeliveryService | null
   canManage: boolean
   uberOrderActionsEnabled: boolean
+  intakeDisabledReason?: string
   nowMs: number
   /** まとめて受け付ける相手として選んでいる注文の id。 */
   selected: string[]
@@ -440,6 +445,7 @@ export default function OrdersBoard({
   busyService,
   canManage,
   uberOrderActionsEnabled,
+  intakeDisabledReason,
   nowMs,
   selected,
   bulkBusy,
@@ -488,6 +494,7 @@ export default function OrdersBoard({
         {data.services.map((state) => (
           <ServiceCard
             key={state.service}
+            intakeDisabledReason={intakeDisabledReason}
             state={state}
             uberConnectionStatus={uberConnectionStatus}
             canManage={canManage}

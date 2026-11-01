@@ -1,3 +1,4 @@
+import { readCreatedFormDraft, forgetCreatedFormDraft } from '@/lib/form-draft-session'
 import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /**
@@ -198,6 +199,7 @@ beforeEach(() => {
     } as Storage
   }
   window.localStorage.setItem('lh_staff_role', 'owner')
+  forgetCreatedFormDraft('acc-1', 'form-new')
   store.forms = [formRow('form-1', '流れのフォーム')]
   fetchApiMock.mockImplementation(async (url: string) => {
     if (typeof url === 'string' && url.startsWith('/api/forms')) {
@@ -207,7 +209,7 @@ beforeEach(() => {
   })
   foldersList.mockImplementation(async () => ({ success: true, data: [], unfiledCount: 0 }))
   listStatsGet.mockImplementation(async () => ({ success: true, data: {} }))
-  formsCreateDraft.mockImplementation(async () => ({ success: true, data: { id: 'form-new' } }))
+  formsCreateDraft.mockImplementation(async () => ({ success: true, data: { id: 'form-new', contentRevision: 1 } }))
   formsGet.mockImplementation(async () => ({ success: true, data: { ...apiFormData } }))
   formsUpdate.mockImplementation(async () => ({
     success: true,
@@ -233,7 +235,7 @@ afterEach(() => {
 })
 
 describe('V8 回答フォームの通し：作る→保存→公開→一覧', () => {
-  it('「＋ フォームを作る」で下書きが作られて編集へ進む', async () => {
+  it('「＋ フォームを作る」は保存前の編集を開き、空の下書きを作らない', async () => {
     renderNode(<FormSubmissionsPage />)
     await flush()
     await screen.findByText('流れのフォーム')
@@ -241,8 +243,10 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
     const creates = screen.getAllByRole('button', { name: 'フォームを作る' })
     expect(creates.length).toBeGreaterThan(0)
     fireEvent.click(creates[0])
-    await waitFor(() => expect(formsCreateDraft).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/form-submissions/edit?id=form-new&tab=basic'))
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith(expect.stringMatching(/^\/form-submissions\/edit\?new=[a-f0-9-]{36}&tab=basic$/)))
+    expect(formsCreateDraft).not.toHaveBeenCalled()
+    expect(readCreatedFormDraft('acc-1', 'form-new')).toBeNull()
+    expect(readCreatedFormDraft('other-account', 'form-new')).toBeNull()
   })
 
   it('下書き保存→知らせ→公開→知らせ・一覧に戻ると増えている', async () => {

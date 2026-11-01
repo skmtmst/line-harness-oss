@@ -1,4 +1,5 @@
 'use client'
+import { broadcastSendLabel, type BroadcastSendMode } from './broadcast-schedule'
 
 import dynamic from 'next/dynamic'
 
@@ -8,13 +9,13 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { type BroadcastBubble,type BroadcastPreflight } from '@/lib/api'
+import { type BroadcastBubble } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { abConfirmLine } from '@/v8/broadcast-ab/public/settings/index'
 import { useBroadcastAb } from '@/v8/broadcast-ab/public/use-ab/index'
 import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
 import { Send } from 'lucide-react'
-import type { Dispatch,SetStateAction } from 'react'
+import type { Dispatch,SetStateAction, ReactNode } from 'react'
 import { TYPE_LABELS,formatScheduleTime } from './broadcast-form-model'
 import styles from './broadcast-form-v8.module.css'
 import { type TestSendView } from './test-send-view'
@@ -24,6 +25,8 @@ const TemplateRichVideoEditor = dynamic(() => import('../../v8/template-edit/ric
 const CarouselV8 = dynamic(() => import('../../v8/templates/carousel/index'))
 
 type RenderBroadcastEditorDialogsContext = {
+  confirmationBlocked: boolean
+  confirmationFields: ReactNode
   ab: ReturnType<typeof useBroadcastAb>
   approvalConfigState: "loading" | "error" | "ready" | "idle"
   approvalCountInput: string
@@ -44,8 +47,6 @@ type RenderBroadcastEditorDialogsContext = {
   measureOpens: boolean
   needsApproval: boolean
   needsApprovalSingle: boolean
-  preflight: BroadcastPreflight | null
-  previewConfirmed: boolean
   quotaInsufficient: boolean
   quotaNote: string | null
   save: () => Promise<void>
@@ -53,7 +54,7 @@ type RenderBroadcastEditorDialogsContext = {
   saving: boolean
   scheduledAtIso: () => string | null
   selectedAccountId: string | null
-  sendMode: "now" | "scheduled" | "optimal"
+  sendMode: BroadcastSendMode
   sendWhenLabel: string | null
   setApprovalCountInput: Dispatch<SetStateAction<string>>
   setConfirmOpen: Dispatch<SetStateAction<boolean>>
@@ -74,10 +75,9 @@ type RenderBroadcastEditorDialogsContext = {
   setTestResultOpen?: Dispatch<SetStateAction<boolean>>
   title: string
   trackLinks: boolean
-  unconfirmedCount: number | null
 }
 
-export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, preflight, previewConfirmed, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks, unconfirmedCount }: RenderBroadcastEditorDialogsContext) {
+export function renderBroadcastEditorDialogs({ confirmationBlocked, confirmationFields, ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks }: RenderBroadcastEditorDialogsContext) {
   return (<><div data-design-node="FpgxH">
       <ConfirmDialog
         open={confirmOpen && needsApprovalSingle}
@@ -87,8 +87,9 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
             ? '送る相手・日時・内容を確認し、承認をお願いする人を選んでください。承認されるまで送られません。'
             : sendMode === 'scheduled' ? '送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。' : '送ると友だちに届きます。送信は取り消せません。対象と内容を確認してください。'
         }
-        confirmLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
+        confirmLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : broadcastSendLabel(sendMode)}
         cancelLabel="戻って修正"
+        confirmDisabled={confirmationBlocked}
         busy={saving}
         error={error || undefined}
         onCancel={() => { if (!saving) setConfirmOpen(false) }}
@@ -170,23 +171,7 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
           </Notice>
         )}
 
-        {/*
-          **未確認のまま送らせないのではなく、数えて見せる。**
-          「テスト送信がまだ」は止める理由にならないが、押す前に
-          目に入っていないと、あとから気づけない。
-        */}
-        {unconfirmedCount !== null && unconfirmedCount > 0 ? (
-          <Notice tone="warn" className="mt-3">
-            <p className="font-semibold">配信前チェックに {formatNumber(unconfirmedCount)}件 の未確認があります</p>
-            <ul className="mt-1 list-disc pl-4">
-              {(preflight?.warnings ?? []).filter((w) => w.level === 'warning').map((w) => (
-                <li key={w.message}>{w.message}</li>
-              ))}
-              {testResult?.kind === 'success' ? null : testResult ? <li>テスト送信で届かなかった宛先があります</li> : <li>テスト送信がまだです</li>}
-              {previewConfirmed ? null : <li>LINEプレビューが未確認です</li>}
-            </ul>
-          </Notice>
-        ) : null}
+        {confirmationFields}
 
         {/*
           二者承認（設計 A-1・A-4）。承認が要る人数のときだけ出す。

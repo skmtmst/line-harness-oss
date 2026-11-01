@@ -1,5 +1,7 @@
 'use client'
 
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
+
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AutoLineRule } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -45,6 +47,7 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
   const ref = useRef<InsertTextFieldHandle | null>(null)
   const errors = useSaveFormErrors()
   const kind = rule?.kind
+  const tokenNames = useInsertTokenNames(rule ? accountId : null)
   const ruleKey = rule ? `${rule.kind}:${rule.version}` : ''
 
   useEffect(() => {
@@ -112,7 +115,7 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
             />
           </Field>
           <Field label="本文" required count={{ value: text.length, max: 1000 }}>
-            <InsertTextField ref={ref} aria-label="本文" editorSize="message" maxLength={1000} value={text} onValueChange={setText} />
+            <InsertTextField tokenNames={tokenNames} ref={ref} aria-label="本文" editorSize="message" maxLength={1000} value={text} onValueChange={setText} />
             <MessageInsertRow>
               <MessageInsertButton kind="name" label="名前" onClick={insertName} />
             </MessageInsertRow>

@@ -7,4 +7,5 @@ export { formAvailability } from './form-availability.js';
 export { callFormWebhook, publicFormWebhookData } from './form-webhook.js';
 export { applyFormLayoutEffects, checkFormGates, collectCapacitySlots, layoutEffectStepIds } from './form-layout-effects.js';
 export { writeFormDestinationsOnce } from './form-destination-workflow.js';
+export { createFormDraftOnce, FormDraftCreateError } from './form-draft-create.js';
 export { FormReferenceAccessError, adoptedFormReference, formReferenceAccount, formReferenceImage, resolveFormReferences, publicReferenceLayout, validateFormReferences } from './form-public-references.js';

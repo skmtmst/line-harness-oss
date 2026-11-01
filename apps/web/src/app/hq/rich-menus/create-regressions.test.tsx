@@ -40,7 +40,7 @@ const start = async (count = 'なし') => {
 }
 const saved = (): HqRichMenuSeed => vi.mocked(host.onSave).mock.calls.at(-1)![0]
 const save = async () => { click('下書きを保存'); await waitFor(() => expect(host.onSave).toHaveBeenCalled()) }
-const selectArea = (letter: string) => fireEvent.focus(screen.getByRole('button', { name: new RegExp(`^面 ${letter}、`) }))
+const selectArea = (letter: string) => fireEvent.focus(screen.getByRole('button', { name: new RegExp(`^${letter.charCodeAt(0) - 64}番目のボタン、`) }))
 const pickIntent = (name: string) => {
   fireEvent.click(within(screen.getByRole('group', { name: '押したときの動き' })).getByRole('radio', { name, exact: true }))
 }
@@ -71,10 +71,11 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: '2面メニュー' } })
     click('次へ：ボタンの動き')
     await screen.findByText('画像の上で面を選ぶ')
-    expect(screen.getAllByRole('button', { name: /^面 [AB]、動きは/ })).toHaveLength(2)
-    expect(screen.queryByRole('button', { name: /^面 C、/ })).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^[12]番目のボタン、動きは/ })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /^3番目のボタン、/ })).toBeNull()
     await save()
     expect(saved().pages[0].areas.map((area) => [area.boundsY, area.boundsHeight])).toEqual([[0, 843], [843, 843]])
+    expect(saved().pages[0].areas.map((area) => area.label)).toEqual(['', ''])
   })
   it('作る前は大小を選べ、小さい寸法と面を保存できる', async () => {
     render(<RichMenuCreateV8 host={host} />)
@@ -105,7 +106,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
   })
   it('画像なしでも①の6面を選び、面Aと面Bに別々の動きを保存する', async () => {
     await start()
-    expect(screen.getAllByRole('button', { name: /^面 [A-F]、動きは/ })).toHaveLength(6)
+    expect(screen.getAllByRole('button', { name: /^[1-6]番目のボタン、動きは/ })).toHaveLength(6)
     selectArea('A'); pickIntent('URLを開く')
     fireEvent.change(screen.getByPlaceholderText('例：https://...'), { target: { value: 'https://example.com/booking' } })
     selectArea('B'); pickIntent('テキストを送る')
@@ -200,7 +201,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     click('次へ：ボタンの動き')
     await screen.findByText('画像の上で面を選ぶ')
     fireEvent.click(within(screen.getByRole('group', { name: '直すタブ' })).getByRole('button', { name: /^タブ3「/ }))
-    expect(screen.getAllByRole('button', { name: /^面 [A-F]、動きは/ })).toHaveLength(6)
+    expect(screen.getAllByRole('button', { name: /^[1-6]番目のボタン、動きは/ })).toHaveLength(6)
     await save()
     expect(saved().pages).toHaveLength(3)
   })
@@ -225,7 +226,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     window.history.replaceState(null, '', '/hq/rich-menus?id=store-draft')
     await start('2つ')
     fireEvent.click(within(screen.getByRole('group', { name: '直すタブ' })).getByRole('button', { name: 'タブ2「タブ B」' }))
-    expect(screen.getAllByRole('button', { name: /^面 [A-F]、動きは/ })).toHaveLength(6)
+    expect(screen.getAllByRole('button', { name: /^[1-6]番目のボタン、動きは/ })).toHaveLength(6)
     await save()
     expect(saved().pages).toHaveLength(2)
     expect(fetch).not.toHaveBeenCalled()

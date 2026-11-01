@@ -198,3 +198,38 @@ it('WEB258: 明示的な分散0分を開き直しても30分へ変えない', as
     expect(updateApi.mock.calls[0][1].stealthSpreadMinutes).toBe(0)
   } finally { unmount() }
 })
+
+it.each(['now', 'scheduled'])('古い%sの印より予約の現在日時と分散を使って開く', async (draftSendChoice) => {
+  getApi.mockResolvedValue({ success: true, data: draftRow({ status: 'scheduled', scheduledAt: '2099-01-02T01:00:00.000Z', stealthSpreadMinutes: 45, draftPayload: { draftSendChoice, stealthSpreadMinutes: 0, draftScheduledDate: '2020-01-01', draftScheduledTime: '01:00' } }) })
+  await renderForm()
+  try {
+    expect(container.querySelector<HTMLInputElement>('input[name="broadcast-send-mode"][value="spread"]')!.checked).toBe(true)
+    expect(container.querySelector<HTMLInputElement>('#bc-spread')!.value).toBe('45')
+    expect(container.querySelector<HTMLButtonElement>('#bc-date')!.title).toMatch(/^2099年1月2日/)
+    expect(container.querySelector<HTMLInputElement>('#bc-time')!.value).toBe('10 : 00')
+  } finally { unmount() }
+})
+
+it.each([
+  { label: '旧全員', row: { targetType: 'all', draftPayload: null }, checked: null },
+  { label: '明示した全員', row: { targetType: 'all', draftPayload: { draftTargetMode: 'all' } }, checked: 'all' },
+  { label: '旧全員条件', row: { targetType: 'segment', segmentConditions: { operator: 'AND', rules: [{ type: 'is_following', value: true }] }, draftPayload: null }, checked: null },
+  { label: '明示した全員条件', row: { targetType: 'segment', segmentConditions: { operator: 'AND', rules: [{ type: 'is_following', value: true }] }, draftPayload: { draftTargetMode: 'all' } }, checked: 'all' },
+  { label: 'タグの書きかけ', row: { targetType: 'tag', targetTagId: null, draftPayload: { draftTargetMode: 'tag' } }, checked: 'tag' },
+  { label: '予約済みの全員', row: { targetType: 'all', status: 'scheduled', scheduledAt: '2099-01-01T00:00:00Z', draftPayload: null }, checked: 'all' },
+  { label: '未選択', row: { targetType: 'tag', targetTagId: null, segmentConditions: null, draftPayload: { draftTargetMode: 'unselected' } }, checked: null },
+  { label: '保存済みのタグ', row: { targetType: 'tag', targetTagId: 'tag-1', segmentConditions: null, draftPayload: { draftTargetMode: 'unselected' } }, checked: 'tag' },
+  { label: '保存済みの購読条件', row: { targetType: 'segment', segmentConditions: { operator: 'AND', rules: [{ type: 'is_following', value: true }, { type: 'scenario_subscribed', value: 'scenario-1' }] }, draftPayload: { draftTargetMode: 'unselected' } }, checked: 'scenario' },
+])('$label: 下書きは、実物の宛先を優先し全員へ化けずに戻る', async ({ row, checked }) => {
+  getApi.mockResolvedValue({ success: true, data: draftRow(row) })
+  updateApi.mockResolvedValue({ success: true, data: { id: 'draft-1', version: 8 } })
+  await renderForm()
+  try {
+    const selected = container.querySelector<HTMLInputElement>('input[name="broadcast-target-mode"]:checked')
+    expect(selected?.value ?? null).toBe(checked)
+    if (!checked) {
+      await act(async () => saveButton()!.click()); await flush()
+      expect(updateApi.mock.calls[0][1]).toMatchObject({ saveAsDraft: true, targetType: 'tag', targetTagId: '', draftTargetMode: 'unselected' })
+    }
+  } finally { unmount() }
+})

@@ -11,8 +11,8 @@
   flex-direction: column;
   flex-shrink: 0;
   box-sizing: border-box;
-  width: 330px;
-  height: 690px;
+  width: var(--v8-line-phone-width);
+  height: var(--v8-line-phone-height);
   padding: 10px;
   border-radius: var(--v8-line-shell-radius);
   background: var(--v8-line-shell);
@@ -20,6 +20,7 @@
   outline-offset: -1px;
   box-shadow: var(--v8-line-shell-shadow);
 }
+.phone[data-compact] { height: var(--v8-line-phone-compact-height); }
 
 /* 画面：白い地・角丸42。中身は画面の中に収める。 */
 .screen {
@@ -91,6 +92,7 @@
 .barTitle {
   display: flex;
   flex: 1;
+  min-width: 0;
   flex-direction: column;
   align-items: center;
 }

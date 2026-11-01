@@ -1,10 +1,13 @@
 'use client'
 
+import type { BroadcastDeliveryLimit } from '@line-crm/shared'
 import { jstCalendar as japanCalendar, jstDate as japanDate } from '@/lib/jst-datetime'
 
 import { copyBroadcastDraft,copyRecentBroadcast } from './broadcast-copy-draft'
 
 import { applyBroadcastTemplate } from './broadcast-apply-template'
+import BroadcastCheckAcknowledgement from './broadcast-check-acknowledgement'
+import { useBroadcastFormError } from './use-broadcast-form-error'
 import { confirmBroadcastMessage } from './broadcast-confirm-action'
 import { openBroadcastTest } from './broadcast-open-test'
 import { saveBroadcastTemplate } from './broadcast-save-template'
@@ -69,6 +72,7 @@ import type { Folder,SendConfirmationPreview } from '@line-crm/shared'
 import { AlertTriangle,ArrowRight,CheckCircle2,Eye,Save } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
+import { broadcastSpreadMinutes, broadcastSendLabel, readBroadcastSchedule, type BroadcastSendChoice, type BroadcastSpreadStart } from './broadcast-schedule'
 import type { BroadcastFormProps } from './broadcast-form-props'
 import styles from './broadcast-form-v8.module.css'
 import { MAX_BUBBLES,messageLengthNotice } from './message-limits'
@@ -191,7 +195,7 @@ export default function BroadcastForm({
     .sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0))
     .slice(0, 5).map((template) => template.id)), [messageTemplates])
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
-  const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'scenario')
+  const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'unselected')
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
   const [scenarioId, setScenarioId] = useState('')
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
@@ -264,10 +268,12 @@ export default function BroadcastForm({
   const [preflightKey, setPreflightKey] = useState<string | null>(null)
   // 古い要求の応答で新しい確認を上書きしないための通し番号。
   const preflightSeq = useRef(0)
-  // 何分かけて配るか。0（既定）は一気に送る。
+  // 分散を選んだ時の入力。選んでいない間は配送値に0を渡す。
   const [spreadMinutes, setSpreadMinutes] = useState('30')
-  // 送る時間。設計は「今すぐ / 日時を指定 / 友だちごとの最適な時間」の3つ。
-  const [sendMode, setSendMode] = useState<'now' | 'scheduled' | 'optimal'>(initialScheduledDate ? 'scheduled' : 'now')
+  const [sendChoice, setSendChoice] = useState<BroadcastSendChoice>(initialScheduledDate ? 'scheduled' : 'unselected')
+  const [spreadStartMode, setSpreadStartMode] = useState<BroadcastSpreadStart>('scheduled')
+  const sendMode = sendChoice === 'spread' ? spreadStartMode : sendChoice
+  const effectiveSpreadMinutes = sendChoice === 'spread' ? spreadMinutes : '0'
   const [scheduledDate, setScheduledDate] = useState(initialScheduledDate)
   const [scheduledTime, setScheduledTime] = useState(initialScheduledTime)
   const [saving, setSaving] = useState(false)
@@ -278,6 +284,7 @@ export default function BroadcastForm({
     何人に何をいつ送るのかを読み合わせる場所が無かった。
   */
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [acknowledgementKey, setAcknowledgementKey] = useState<string | null>(null)
   const [preflightDialogOpen, setPreflightDialogOpen] = useState(false)
   const [testDialogOpen, setTestDialogOpen] = useState(false)
   const [testResultOpen, setTestResultOpen] = useState(false)
@@ -298,7 +305,7 @@ export default function BroadcastForm({
   )
   const [testHistory, setTestHistory] = useState<TestSendView[]>([])
   const [previewConfirmed, setPreviewConfirmed] = useState(visualQaAugustCampaign)
-  const [error, setError] = useState('')
+  const { error, setError, setValidationError, resolveValidationError } = useBroadcastFormError()
 
   /*
    * 二者承認（m12a / 設計 A-1・A-4）。確認の窓を開いたときに境目と
@@ -314,6 +321,9 @@ export default function BroadcastForm({
   const [approverId, setApproverId] = useState('')
   const [approvalNote, setApprovalNote] = useState('')
   const [approvalCountInput, setApprovalCountInput] = useState('')
+  const [limitToQuota, setLimitToQuota] = useState(false)
+  const [recipientLimitInput, setRecipientLimitInput] = useState('')
+  const deliveryLimit: BroadcastDeliveryLimit | undefined = limitToQuota || recipientLimitInput.trim() ? { upToRemainingQuota: limitToQuota, ...(recipientLimitInput.trim() ? {maxRecipients:Number(recipientLimitInput)} : {}) } : undefined
 
   /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（互換経路はこれまでの帯）。
      ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。互換経路は今までどおり。 */
@@ -359,6 +369,8 @@ export default function BroadcastForm({
       }
       const copy = duplicateCopy(res.data)
       setTitle(copy.title)
+      setLimitToQuota(res.data.messageOptions?.deliveryLimit?.upToRemainingQuota ?? false)
+      setRecipientLimitInput(res.data.messageOptions?.deliveryLimit?.maxRecipients === undefined ? '' : String(res.data.messageOptions.deliveryLimit.maxRecipients))
       setBubbles(copy.bubbles)
       setDeliveryMethod('duplicate')
     }).catch(() => {
@@ -419,11 +431,15 @@ export default function BroadcastForm({
       setInternalMemo(draft.internalMemo ?? '')
       setTrackLinks(draft.trackLinks)
       setMessageButtons(draft.messageOptions?.buttons ?? [])
+      setLimitToQuota(draft.messageOptions?.deliveryLimit?.upToRemainingQuota ?? false)
+      setRecipientLimitInput(draft.messageOptions?.deliveryLimit?.maxRecipients === undefined ? '' : String(draft.messageOptions.deliveryLimit.maxRecipients))
       setAfterActionVersionId(draft.afterActionVersionId ?? '')
       setFolderId(draft.folderId ?? '')
       setMeasureOpens(draft.measureOpens ?? true)
-      const spread = Number(draft.draftPayload?.stealthSpreadMinutes ?? 30)
-      if (Number.isFinite(spread) && spread >= 0) setSpreadMinutes(String(spread))
+      const schedule = readBroadcastSchedule(draft)
+      setSendChoice(schedule.sendChoice)
+      setSpreadStartMode(schedule.spreadStart)
+      setSpreadMinutes(schedule.spreadMinutes)
 
       // 吹き出し。形が読めないときだけ、従来の平文本文から1枚作る。
       const savedBubbles = draft.messageBubbles?.filter((bubble): bubble is BroadcastBubble => (
@@ -446,16 +462,21 @@ export default function BroadcastForm({
       const userCondition: SegmentCondition | null = stored
         ? { ...stored, rules: (stored.rules ?? []).filter((rule) => rule.type !== 'is_following') }
         : null
-      if (draft.targetType === 'tag' && draft.targetTagId) {
+      if (draft.targetType === 'tag' && !draft.targetTagId && draft.draftPayload?.draftTargetMode === 'unselected') {
+        // 相手をまだ選んでいない下書き。全員へ置き換えない。
+        setTargetMode('unselected')
+      } else if (draft.targetType === 'tag') {
         setTargetMode('tag')
-        setTagId(draft.targetTagId)
+        setTagId(draft.targetTagId ?? '')
       } else if (draft.targetType === 'all') {
-        setTargetMode('all')
+        setTargetMode(draft.status === 'draft' && draft.draftPayload?.draftTargetMode !== 'all' ? 'unselected' : 'all')
       } else {
         const rules = userCondition?.rules ?? []
         const groups = userCondition?.groups ?? []
         // 「シナリオ購読中の全員」で保存された条件は、その選び方へ戻す。
-        if (rules.length === 1 && rules[0]?.type === 'scenario_subscribed' && groups.length === 0) {
+        if (stored && rules.length === 0 && groups.length === 0) {
+          setTargetMode(draft.status === 'draft' && draft.draftPayload?.draftTargetMode !== 'all' ? 'unselected' : 'all')
+        } else if (rules.length === 1 && rules[0]?.type === 'scenario_subscribed' && groups.length === 0) {
           setTargetMode('scenario')
           setScenarioId(String(rules[0].value ?? ''))
         } else {
@@ -468,10 +489,12 @@ export default function BroadcastForm({
       // 予約日時。保存値はUTC、入力は一覧と同じ日本時間（EVENT-05と同じ決めごと）。
       if (draft.scheduledAt) {
         const jst = japanCalendar(new Date(draft.scheduledAt))
-        setSendMode('scheduled')
         setScheduledDate(japanDate(new Date(draft.scheduledAt)))
         setScheduledTime(jst.toISOString().slice(11, 16))
       }
+
+      if (schedule.scheduledDate !== null) setScheduledDate(schedule.scheduledDate)
+      if (schedule.scheduledTime !== null) setScheduledTime(schedule.scheduledTime)
 
       /*
        * このIDを更新として保存するため、下書きIDと版をセッションへ載せる。
@@ -494,11 +517,6 @@ export default function BroadcastForm({
     })
   }, [searchParams, accountLoading, selectedAccountId, draftReloadKey, draftReloadId])
 
-  // 本文や届く時刻を変えたあとは、前の見た目に対する確認を引き継がない。
-  useEffect(() => {
-    if (visualQaAugustCampaign) return
-    setPreviewConfirmed(false)
-  }, [bubbles, scheduledDate, scheduledTime, sendMode, visualQaAugustCampaign])
 
   useEffect(() => {
     api.folders.list('broadcast')
@@ -681,6 +699,7 @@ export default function BroadcastForm({
    */
   const audience = useMemo(
     () => {
+      if (targetMode === 'unselected') return null
       const next = buildAudienceCondition(targetMode, { scenarioId, tagId, condition })
       if (excludeTagId) return { operator: 'AND' as const, rules: [{ type: 'tag_not_exists', value: excludeTagId }], groups: [next] }
       return next
@@ -695,6 +714,7 @@ export default function BroadcastForm({
    * 送信の経路が別（キューに載せずにその場で送る）で、少人数のときに速い。
    */
   const targetPayload = useCallback(() => {
+    if (!audience) return { targetType: 'tag' as const, targetTagId: '', segmentConditions: undefined }
     if (targetMode === 'tag' && tagId && !excludeTagId) {
       return { targetType: 'tag' as const, targetTagId: tagId, segmentConditions: undefined }
     }
@@ -728,7 +748,7 @@ export default function BroadcastForm({
     return () => clearTimeout(timer)
     // runPreflight は毎回作り直されるので依存に入れない。見たいのは中身の変化。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bubbles, tagId, excludeTagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode])
+  }, [bubbles, tagId, excludeTagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode, effectiveSpreadMinutes, limitToQuota, recipientLimitInput])
 
   /*
    * BC-01: 型を切り替えると `emptyBubble` で中身が空になるが、
@@ -782,7 +802,7 @@ export default function BroadcastForm({
    */
   const duplicateCopy = (broadcast: ApiBroadcast) => copyBroadcastDraft(broadcast)
 
-  const duplicateRecent = (broadcast: ApiBroadcast) => copyRecentBroadcast({ duplicateCopy, setBubbles, setDeliveryMethod, setTitle }, broadcast)
+  const duplicateRecent = (broadcast: ApiBroadcast) => copyRecentBroadcast({ duplicateCopy, setBubbles, setDeliveryMethod, setTitle, setLimitToQuota, setRecipientLimitInput }, broadcast)
 
   const openConditionDialog = () => {
     setTargetMode('advanced')
@@ -809,7 +829,8 @@ export default function BroadcastForm({
   /** 検査で落ちたとき。メッセージの段の不備は欄で知らせて移り、ほかの段は帯（［〇〇へ移動］つき）。 */
   const rejectValidation = (validationError: string) => {
     if (validationStep() === 'message' && fields.submit().length > 0) { setError(''); return }
-    setError(validationError)
+    if (validationError === validate()) setValidationError(validationError)
+    else setError(validationError)
   }
 
   /*
@@ -820,16 +841,19 @@ export default function BroadcastForm({
     title,
     titleMax: TITLE_MAX,
     audienceProblem: audienceError(targetMode, { scenarioId, tagId, condition }),
+    audienceUnselected: targetMode === 'unselected',
     bubbleProblem: bubblesError(bubbles),
     // 監査 R206: ボタンの不備は「保存できませんでした」で済ませない。
     buttonProblem: messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) }),
     sendMode,
+    spreadSelected: sendChoice === 'spread',
+    spreadMinutes: effectiveSpreadMinutes,
     scheduledDate,
     scheduledTime,
     scheduledAt: scheduledAtIso(),
     stepped: Boolean(currentStep),
   })
-  const validate = () => broadcastSaveProblem(stepProblems())
+  const validate = () => recipientLimitInput.trim() && (!Number.isSafeInteger(Number(recipientLimitInput)) || Number(recipientLimitInput)<1) ? '上限人数は1以上の整数を入れてください。' : deliveryLimit && ab.enabled ? '人数の上限とA/Bは併用できません。A/Bをオフにしてください。' : broadcastSaveProblem(stepProblems())
   /**
    * R580: いまの入力に対する検査結果が、どの段の不備か。
    * `validate` と同じ結果から読む。送信設定の段は移動の導線を出さない（今のまま）。
@@ -858,6 +882,8 @@ export default function BroadcastForm({
       messageContent: content,
       scheduledAt: scheduledAtIso(),
       messageCount: bubbles.length,
+      deliveryLimit,
+      stealthSpreadMinutes: broadcastSpreadMinutes(effectiveSpreadMinutes),
     }
   }
 
@@ -871,7 +897,11 @@ export default function BroadcastForm({
    * @param silent 自動で走るとき。確認中の表示もエラーも出さない。打っている
    *   最中に「確認中…」が点いたり、書きかけを直せと言われたりすると邪魔になる。
    */
-  const runPreflight = (silent = false) => runBroadcastPreflight({ preflightRequestBody, preflightSeq, saveErrors, setError, setPreflightKey, setPreflightResult, setPreflightStatus }, silent)
+  const runPreflight = async (silent = false) => {
+    const problem = audienceError(targetMode, { scenarioId, tagId, condition })
+    if (problem) { if (!silent) setError(problem); return }
+    await runBroadcastPreflight({ preflightRequestBody, preflightSeq, saveErrors, setError, setPreflightKey, setPreflightResult, setPreflightStatus }, silent)
+  }
 
   /*
    * 文字数は**いちばん長い通**と**合計**の両方を見る。
@@ -916,11 +946,10 @@ export default function BroadcastForm({
   const {
     audienceCount, audienceDisplayCount, confirmAudienceLabel, exclusionNote,
     quota, quotaInsufficient, quotaNote, evaluatedAtLabel, concurrentBroadcasts,
-    scheduledLabel, sendWhenLabel, unconfirmedCount,
+    scheduledLabel, sendWhenLabel,
   } = broadcastPreflightSummary({
     preflight, targetMode, tags, tagId, scenarios, scenariosStatus, audience,
-    excludeTagId, sendMode, scheduledDate, scheduledTime, spreadMinutes,
-    testPassed: testResult?.kind === 'success', previewConfirmed,
+    excludeTagId, sendMode, scheduledDate, scheduledTime, spreadMinutes: effectiveSpreadMinutes,
   })
   const stepProblems = () => broadcastStepProblems({
     ...stepCheckInput(),
@@ -929,8 +958,10 @@ export default function BroadcastForm({
     quotaInsufficient,
   })
   const liveStepProblems = stepProblems()
+  const sendInputProblem = useRef<string | null>(null)
+  sendInputProblem.current = liveStepProblems.audience?.message ?? liveStepProblems.schedule?.message ?? null
 
-  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, selectedAccountId, spreadMinutes, targetPayload, title, trackLinks }, scheduledAt, saveAsDraft, confirmedCount)
+  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, deliveryLimit, selectedAccountId, sendChoice, spreadStartMode, spreadMinutes: effectiveSpreadMinutes, scheduledDate, scheduledTime, targetMode, targetPayload, title, trackLinks }, scheduledAt, saveAsDraft, confirmedCount)
 
   /**
    * テスト後の修正も同じ下書きへ上書きし、予約時に別レコードを作らない。
@@ -1009,9 +1040,10 @@ export default function BroadcastForm({
    * 形になる。`validate` は保存のときと同じものを使う。
    */
   const openConfirm = () => {
-    const validationError = validate()
+    const validationError = validate() || sendInputProblem.current
     if (validationError) { rejectValidation(validationError); return }
     setError('')
+    setAcknowledgementKey(null)
     setConfirmOpen(true)
   }
 
@@ -1144,6 +1176,9 @@ export default function BroadcastForm({
    * サーバー側で断られた文・直した後の古い文では、指す段がずれるので出さない。
    */
   const liveValidationProblem = validate()
+  useEffect(() => {
+    resolveValidationError(liveValidationProblem)
+  }, [liveValidationProblem, resolveValidationError])
   const validationMoveStep: 'basic' | 'audience' | 'message' | null =
     currentStep && error && error === liveValidationProblem ? validationStep() : null
   /*
@@ -1169,13 +1204,13 @@ export default function BroadcastForm({
     section?.querySelector<HTMLElement>('input:not([type="hidden"]), textarea')?.focus()
   }, [currentStep])
 
-  const canConfirm = audienceCount !== null && audienceCount > 0
+  const canConfirm = !liveStepProblems.audience && audienceCount !== null && audienceCount > 0
   /*
    * ［次へ］は、今の段の確かめが通るまで押せない。押せない理由は下の帯の左に1行で出す
    * （title だけだと指を乗せないと見えない）。最終確認の段の止め方（人数・文字数）は今のまま。
    */
   const nextBlockReason = currentStep ? broadcastNextBlockReason(liveStepProblems, currentStep) : null
-  const confirmBlockReason = !canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : null
+  const confirmBlockReason = liveStepProblems.audience?.message ?? liveStepProblems.schedule?.message ?? (!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : null)
   const footerReason = currentStep === 'confirm' ? confirmBlockReason : nextBlockReason
 
   /*
@@ -1184,7 +1219,7 @@ export default function BroadcastForm({
    */
   const needsApproval = audienceCount !== null
     && approvalConfig !== null
-    && audienceCount >= approvalConfig.threshold
+    && (preflight?.deliveryLimit?.candidateCount ?? audienceCount) >= approvalConfig.threshold
   const needsApprovalSingle = needsApproval && approvalConfig?.singleOperator === true
   const approvalCountMatched = needsApprovalSingle
     && approvalCountInput.trim() !== ''
@@ -1217,9 +1252,35 @@ export default function BroadcastForm({
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [confirmOpen, previewSeq])
-  const confirmMessage = () => confirmBroadcastMessage({ onSuccess, scheduledAtIso, sendPreview, setConfirmOpen, setError, setPreviewSeq })
+  // 確認する行と件数は同じ一覧を使い、未実施・未取得を確認済みにしない。
+  const preflightChecks: { key: string; label: string; value: string; done: boolean; step?: BroadcastStepKey; action?: () => void; actionLabel?: string }[] = [
+    { key: 'basic', label: '配信名', value: title.trim() || '配信名を入力してください', done: Boolean(title.trim()) && title.trim().length <= TITLE_MAX, step: 'basic', actionLabel: '基本設定へ戻る' },
+    { key: 'audience', label: '配信対象', value: `${confirmAudienceLabel}・${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}・${exclusionNote ?? '除外の内訳は未取得'}`, done: canConfirm, step: 'audience', actionLabel: '対象を一覧で見る' },
+    { key: 'message', label: 'メッセージ', value: `${formatNumber(bubbles.length)}件・${bubblesError(bubbles) || (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}`, done: !bubblesError(bubbles) && previewConfirmed, step: 'message', actionLabel: 'メッセージへ戻る' },
+    { key: 'schedule', label: '送信設定', value: sendWhenLabel ?? '配信日時が未設定です', done: broadcastStepPassed(stepProblems(), 'schedule'), step: 'schedule', actionLabel: '送信設定へ戻る' },
+    { key: 'quota', label: '送信枠', value: quotaNote ?? '送信枠は未確認です', done: quota?.state === 'available', step: 'schedule', actionLabel: '送信枠を確認する' },
+    { key: 'test', label: 'テスト送信', value: testResult?.kind === 'success' ? 'テスト送信が届きました' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです', done: testResult?.kind === 'success', action: openTestDialog, actionLabel: 'テスト送信する' },
+    ...(preflight?.warnings ?? []).filter(warning => warning.level === 'warning').map((warning, index) => ({ key: `warning-${index}`, label: '追加の確認', value: warning.message, done: false })),
+    ...(concurrentBroadcasts.length > 0 ? [{ key: 'concurrent', label: '同じ時刻の配信', value: `同じ時刻の前後1時間に別の予約配信があります。対象が重なる場合は間隔を空けてください。${concurrentBroadcasts.map(item => `${formatScheduleTime(item.scheduledAt)} ${item.title}`).join('・')}`, done: false }] : []),
+  ]
+  const pendingChecks = preflightChecks.filter(check => !check.done)
+  const unconfirmedCount = preflight ? pendingChecks.length : null
+  // アカウント・保存内容・確認結果が変わったとき、前の了承を使わない。
+  const confirmationKey = JSON.stringify([selectedAccountId, formFingerprint, preflightChecks.map(({ key, value, done }) => ({ key, value, done })), sendPreview.data, previewSeq])
+  const confirmationBlocked = pendingChecks.length > 0 && acknowledgementKey !== confirmationKey
+  const confirmedDeliveryLimit = currentStep && !needsApprovalSingle ? sendPreview.data?.deliveryLimit : preflight?.deliveryLimit
+  const confirmationFields = <>{confirmedDeliveryLimit && <Notice tone="info">配信できる候補{formatNumber(confirmedDeliveryLimit.candidateCount)}人から、無作為に最大{formatNumber(confirmedDeliveryLimit.recipientCount)}人へ送ります。確認後に人数を増やしません。</Notice>}<BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} /></>
+  const confirmMessage = async () => {
+    const problem = sendInputProblem.current
+    if (problem) { rejectValidation(problem); return Promise.resolve() }
+    if (!canConfirm || confirmationBlocked) return
+    return confirmBroadcastMessage({ onSuccess, scheduledAtIso, sendPreview, setConfirmOpen, setError, setPreviewSeq })
+  }
 
-  const save = () => saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, setConfirmOpen, setError, setSaving, submittingRef, validate })
+  const save = async () => {
+    if (confirmOpen && (!canConfirm || confirmationBlocked)) return
+    return saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, deliveryLimited:!!deliveryLimit, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, sendProblem: () => sendInputProblem.current, setConfirmOpen, setError, setSaving, submittingRef, validate })
+  }
 
   /*
    * BROADCAST-17: `?draft=` で開いたとき、読み込み・照合が終わるまで
@@ -1350,19 +1411,14 @@ export default function BroadcastForm({
         {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <Disclosure size="compact" title="ほかの設定" hint="クリックを数える・ボタン" detailsRef={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><SaveErrorField names={["trackLinks","track_links"]}><ToggleField checked={trackLinks} onChange={setTrackLinks}>URLを短縮してクリックを数える</ToggleField></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></Disclosure> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </>}</div>
-        <BroadcastScheduleStep {...{ ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSendMode, setSpreadMinutes, shows, spreadMinutes, targetMode }} />
+        <BroadcastScheduleStep onRetryQuota={() => void runPreflight()} {...{ selectedAccountId, limitToQuota, setLimitToQuota, recipientLimitInput, setRecipientLimitInput, ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, sendChoice, setSendChoice, spreadStartMode, setSpreadStartMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSpreadMinutes, shows, spreadMinutes, targetMode }} />
 
     <div id="broadcast-step-confirm" className={shows('confirm') ? styles.section : 'hidden'}>
       <h3>配信前チェック</h3>
       <div className={styles.checkList}>
-        {([
-          { key: 'basic', label: '配信名', value: title.trim() || '配信名を入力してください', done: Boolean(title.trim()) && title.trim().length <= TITLE_MAX, move: '基本設定へ戻る' },
-          { key: 'audience', label: '配信対象', value: `${confirmAudienceLabel}・${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}・${exclusionNote ?? '除外の内訳は未取得'}`, done: canConfirm, move: '対象を一覧で見る' },
-          { key: 'message', label: 'メッセージ', value: `${formatNumber(bubbles.length)}件・${bubblesError(bubbles) || (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}`, done: !bubblesError(bubbles) && previewConfirmed, move: 'メッセージへ戻る' },
-          { key: 'schedule', label: '送信設定', value: `${sendWhenLabel ?? '未設定'}・${quotaNote ?? '送信枠は未確認'}`, done: sendMode === 'now' || Boolean(scheduledDate && scheduledTime), move: '送信設定へ戻る' },
-        ] as const).map((row) => <div className={styles.checkRow} key={row.key}>
+        {preflightChecks.map((row) => <div className={styles.checkRow} key={row.key} data-preflight-check={row.key} data-check-state={row.done ? 'done' : 'pending'}>
           {row.done ? <CheckCircle2 size={20} className="text-success" aria-hidden /> : <AlertTriangle size={20} className="text-warning" aria-hidden />}
-          <div><strong>{row.label}</strong><p>{row.value}</p></div><Button variant="secondary" className={styles.textButton} size="compact" onClick={() => goToStep(row.key)}>{row.move}</Button>
+          <div><strong>{row.label}</strong><p>{row.value}</p></div>{row.actionLabel ? <Button variant="secondary" className={styles.textButton} size="compact" onClick={row.action ?? (() => { if (row.step) goToStep(row.step) })}>{row.actionLabel}</Button> : null}
         </div>)}
       </div>
       <Notice tone={unconfirmedCount || !canConfirm ? 'warn' : 'info'} action={<Button variant="secondary" className={styles.textButton} size="compact" onClick={() => setPreflightDialogOpen(true)}>配信前チェックを確認</Button>}>
@@ -1378,7 +1434,7 @@ export default function BroadcastForm({
           ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
         ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       </details>
-      {concurrentBroadcasts.length > 0 && <Notice tone="warn">同じ時刻の前後1時間に別の予約配信があります。対象が重なる場合は間隔を空けてください<ul>{concurrentBroadcasts.map((item) => <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>)}</ul></Notice>}
+
       <p className="text-xs text-ink-faint">{sendMode === 'scheduled' ? '予約後も配信開始前までは編集・取消できます。' : '「今すぐ送る」で確認の画面を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
     </div>
     {/*
@@ -1399,7 +1455,7 @@ export default function BroadcastForm({
       </Notice>
     )}
       </StepContent>
-      <BroadcastPreviewRail {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
+      <BroadcastPreviewRail reviewKey={visualQaAugustCampaign ? 'visual-example' : JSON.stringify([bubbles, ab.hasB, ab.b, messageButtons, selectedAccountId, scheduledDate, scheduledTime, sendMode, effectiveSpreadMinutes])} {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
     </CreateColumns>
 
     <StickyBar className={styles.footer} status={currentStep && footerReason ? <span id="broadcast-footer-reason" role="note">{footerReason}</span> : undefined} actions={(
@@ -1416,8 +1472,8 @@ export default function BroadcastForm({
                     : '配信前チェックへ'}
             </Button>
           ) : (
-            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={confirmBlockReason ?? undefined} aria-describedby={confirmBlockReason ? 'broadcast-footer-reason' : undefined} onClick={openConfirm} busy={saving}>
-              {sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
+            <Button variant="primary" disabled={saving || confirmBlockReason !== null} title={confirmBlockReason ?? undefined} aria-describedby={confirmBlockReason ? 'broadcast-footer-reason' : undefined} onClick={openConfirm} busy={saving}>
+              {broadcastSendLabel(sendMode)}
             </Button>
           )}
         </>
@@ -1425,7 +1481,7 @@ export default function BroadcastForm({
         <>
           <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
           {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => openTestDialog()} busy={testSending} busyLabel="送信中…" widthReserve="idle">{'テストを送る'}</Button>}
-          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())} busy={saving} busyLabel="保存中…" widthReserve="idle">{sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (stepProblems().schedule ? void saveDraftNow() : sendMode === 'scheduled' ? openConfirm() : void save())} busy={saving} busyLabel="保存中…" widthReserve="idle">{sendMode === 'scheduled' && !liveStepProblems.schedule ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
       )}
       </>
@@ -1436,7 +1492,7 @@ export default function BroadcastForm({
       「保存して移る」は下書きへ保存できたらそのまま移動し、
       保存できないときはこの画面へ戻って直す。
     */}
-    {renderBroadcastConfirmDialogs({ approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, previewConfirmed, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title })}
-    {renderBroadcastEditorDialogs({ ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, preflight, previewConfirmed, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks, unconfirmedCount })}
+    {renderBroadcastConfirmDialogs({ selectedAccountId, canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title })}
+    {renderBroadcastEditorDialogs({ confirmationBlocked, confirmationFields, ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks })}
   </div></MessageComposerPage></SaveErrorScope>
 }

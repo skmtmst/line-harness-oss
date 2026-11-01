@@ -32,6 +32,7 @@ import {
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
   type DraftState, type PrecheckAnswers, type PrecheckAt, type PrecheckKey, type StepNumber,
 } from './logic'
+import { PROVIDER_MEMBERSHIP_GUIDANCE } from './check-rows'
 import Step1Precheck from './step1-precheck'
 import Step2Connect, { type Step2Field } from './step2-connect'
 import Step4Template from './step4-template'
@@ -157,7 +158,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   }
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
   const importRunning = importPhase === 'importing_ids' || importPhase === 'hydrating_profiles'
-  const importAttention = importRunning && (Boolean(importState?.lastError) || importRequestError || idleSeconds >= 60)
+  const importAttention = (importRunning || importState?.phase === 'completed') && (Boolean(importState?.lastError) || importRequestError || (importRunning && idleSeconds >= 60))
   const basicId = connection?.basicId ?? ''
   const addFriendUrl = basicId ? `https://line.me/R/ti/p/${encodeURIComponent(basicId.startsWith('@') ? basicId : `@${basicId}`)}` : ''
   const shownStep = V8_STEPS[currentStep - 1]
@@ -293,8 +294,10 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
     const poll = async () => {
       try {
         const response = await api.lineAccounts.followerImportState(createdId)
-        if (active && response.success) setImportState((current) => latestFollowerImportState(current, response.data))
-        else if (active) setImportRequestError(true)
+        if (active && response.success) {
+          setImportState((current) => latestFollowerImportState(current, response.data))
+          setImportRequestError(false)
+        } else if (active) setImportRequestError(true)
       } catch {
         if (active) setImportRequestError(true)
       }
@@ -696,6 +699,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続確認">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>接続確認</h2>
+                <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p></Notice>
                 <ul className={styles.checkList}>
                   {checkRows.map((row) => (
                     <li key={row.key} className={styles.checkRow} data-phase={row.phase}>
@@ -734,6 +738,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ためしに友だち追加">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>友だち追加できるか確かめます</h2>
+                <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p></Notice>
                 <div className={styles.qrBlock}>
                   <div className={styles.qrFrame}>
                     {qrDataUrl ? (
@@ -780,7 +785,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               {registrationStyle.error ? <ListState kind="error" title="使い方を確認・保存できませんでした" error={registrationStyle.error} onRetry={registrationStyle.reload} /> : null}
               <Step4Template templateKey={templateKey} onOpen={() => setStyleDialogOpen(true)} />
               <RegistrationStyleDialog
-                accountId={registrationStyle.accountId} menu={registrationStyle.menu} onMenuChange={registrationStyle.setMenu}
+                accountName={form.name.trim() || connection?.displayName?.trim()} accountId={registrationStyle.accountId} menu={registrationStyle.menu} onMenuChange={registrationStyle.setMenu}
                 open={styleDialogOpen}
                 choice={templateKey}
                 busy={registrationStyle.busy}
@@ -795,7 +800,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
           )}
 
           {currentStep === 5 && connection && (
-            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} restaurant={templateKey === 'restaurant'} />
+            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} restaurant={templateKey === 'restaurant'} onRefresh={() => void refreshImport()} refreshing={importRefreshing} />
           )}
 
           {recoveredAccountId ? (

@@ -72,7 +72,7 @@ describe('イベント予約の取り消し確認', () => {
     expect(confirmation.getAttribute('aria-label')).toBe('10/20 19:00 の撮影会をキャンセルしますか');
     expect(within(confirmation).getByText('10/20 19:00 の撮影会をキャンセルしますか')).toBeTruthy();
     expect(within(confirmation).getByText(/キャンセル待ちの方へ順番に案内されます/)).toBeTruthy();
-    expect(within(confirmation).getByText(/前日を過ぎるとここからは変えられません/)).toBeTruthy();
+    expect(within(confirmation).getByText(/開始24時間前になると、ここからは変えられません/)).toBeTruthy();
     expect(within(confirmation).getByRole('button', { name: 'キャンセルする' })).toBeTruthy();
     fireEvent.click(within(confirmation).getByRole('button', { name: '閉じる' }));
     expect(calls.cancel).not.toHaveBeenCalled();

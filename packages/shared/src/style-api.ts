@@ -42,6 +42,7 @@ export type StyleMetric = {
   value: number | null;
   numerator?: number;
   denominator?: number;
+  totalTables?: number;
   status: 'available' | 'insufficient_sample' | 'unconfigured';
   formula: string;
   unit: string;
@@ -60,6 +61,7 @@ export type StyleBooking = {
   status: string;
   staffId: string | null;
   menuId: string | null;
+  menuName?: string | null;
   storeId: string | null;
   slotId: string | null;
   partySize: number;
@@ -110,6 +112,7 @@ export type StyleScheduleEntry = {
   id: string;
   kind: StyleBooking['kind'] | 'class';
   columnIds: string[];
+  tableNames?: string[];
   startsAt: string;
   endsAt: string;
   title: string;

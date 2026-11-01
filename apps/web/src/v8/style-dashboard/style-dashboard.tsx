@@ -1,8 +1,10 @@
 'use client'
 import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog } from '@/v8/dashboard/public/first-steps/index'
 import { canManageRole } from '@/lib/staff-role'
-import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
+import { useSetupWizard } from '@/v8/onboarding/public/setup-wizard/index'
+import { FriendAddLink } from '@/v8/dashboard/public/friend-add/index'
 import CalendarPeriod from '@/components/shared/calendar-period'
 import { formatYen } from '@line-crm/shared';
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -103,26 +105,25 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const { cfg, router, tab, subTab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, reloadRoster, KIND, saveClosure, addNew } = useStyleDashboard(style)
 
   const absence = useEventAbsence({ accountId, scope: JSON.stringify([style, date, rosterId]), onSaved: reloadRoster })
-  const start = useFirstSteps(accountId || null, role, { style })
   const setup = useStyleSetup(accountId || null, role)
   const setupRest = setupSummary(setup.data, !canManageRole(role))
-  const openSetupStep = (step: string | number) => {
-    if (!canManageRole(role)) return
-    const names = setup.data ? ['style', 'image'] : []
-    const target = typeof step === 'number' ? step : step === 'summary' ? 'summary' : Math.max(0, names.indexOf(step))
-    router.push(`/?setup=${target}`)
-  }
+  const wizard = useSetupWizard(accountId || null, setup.data?.state, role, setup.reload)
+  const { openStep: openSetupStep, qrRequested } = wizard
+  const start = useFirstSteps(accountId || null, role, { style, qrOpen: qrRequested })
   const emptyBookingState = today ? bookingEmptyState(style, today) : null
   const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')
   const writeLock = role === null ? undefined : lockUnless(canWrite)
   const viewErrors = useSaveFormErrors()
+  const restaurantStoreReady = Boolean(accountId && !store.loading && !store.error && store.tableDefinition?.accountId === accountId && store.tableDefinition.snapshot === store.snapshot && store.store && store.snapshot?.stores.includes(store.store))
+  const storeLock = restaurantStoreReady ? undefined : !store.loading || store.error ? '店舗情報を確認できません。読み直してからお試しください。' : '店舗情報を読み込んでいます。確認が終わるまでお待ちください。'
+  const reservationLock = cfg.walkIn ? storeLock ?? (!today ? failed ? '予約情報を確認できません。読み直してからお試しください。' : '予約情報を読み込んでいます。確認が終わるまでお待ちください。' : undefined) : undefined
   const headActions = (
     <>
-      {cfg.walkIn && store.store ? <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
+      {cfg.walkIn ? <Button disabled={role === null} lockedReason={writeLock || storeLock} onClick={() => { if (canWrite && restaurantStoreReady) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
       <Button lockedReason={writeLock} {...(canWrite ? { href: '/broadcasts' } : { disabled: role === null })}><MessageCircle size={16} aria-hidden="true" />LINE を送る</Button>
       <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setClosureOpen(true) }}><CalendarX2 size={16} aria-hidden="true" />休みを入れる</Button>
       <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setViewOpen(true) }}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>
-      {today && !hasEmptyBookingAction ? <Button variant="primary" disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
+      {cfg.walkIn || (today && !hasEmptyBookingAction) ? <Button variant="primary" disabled={role === null} lockedReason={writeLock || reservationLock} onClick={() => { if (canWrite && (!cfg.walkIn || (restaurantStoreReady && today))) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
     </>
   )
 
@@ -242,6 +243,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         {absence.dialog}
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         {setup.data ? <SetupWarningBands data={setup.data} configureAllowed={canManageRole(role)} role={role} /> : null}
+        <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
         {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'}
           onRecheck={start.watchExpired ? start.rewatch : undefined}
           onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : !canManageRole(role) ? () => openSetupStep('style') : undefined} configureAllowed={canManageRole(role)}
@@ -268,9 +270,9 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <div className={styles.content}><CalendarPeriod period={view === 'calendar' && today ? range === 'month' ? date.slice(0, 7) : today.week?.days[0]?.date ?? date : ''} scope={`${accountId}/${style}/${view}/${range}`}>{body}</CalendarPeriod></div>
       {style === 'restaurant' && store.store ? (
         <>
-          <PhoneReservationDrawer open={phoneOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setPhoneOpen(false)}
+          <PhoneReservationDrawer tableDefinition={store.tableDefinition} open={phoneOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setPhoneOpen(false)}
             onSaved={({ lineFailed }) => { setPhoneOpen(false); notifyToast(lineFailed ? '予約は入れました。LINE の確認は送れていません。' : '予約を入れました。', lineFailed ? { tone: 'error' } : undefined); void reload() }} />
-          <WalkInDialog open={walkInOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setWalkInOpen(false)}
+          <WalkInDialog tableDefinition={store.tableDefinition} open={walkInOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setWalkInOpen(false)}
             onSaved={({ seated }) => { setWalkInOpen(false); notifyToast(seated ? '入店にしました。' : '席は取りました。来店の印は付けられませんでした。表の［来店］を押してください。', seated ? undefined : { tone: 'error' }); void reload() }} />
         </>
       ) : null}
@@ -316,6 +318,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
           onClose={() => setClassRow(null)} onConfirm={() => { setClassRow(null); preparing.open('休講') }} />
       ) : null}
       {resultRow ? <ResultDialog row={resultRow} busy={busy === 'result'} onClose={() => setResultRow(null)} onSave={(outcome) => void saveResult(resultRow, outcome)} /> : null}
+      {wizard.dialog}
+      {qrRequested ? <FriendAddLink dialogOnly officialProfileUrl={undefined} canManage={canManageRole(role)} /> : null}
     </DashboardPage>
     </KpiValueMotionProvider>
   )

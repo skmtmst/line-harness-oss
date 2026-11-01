@@ -6,6 +6,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ContextMenu from '@/components/shared/context-menu'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Dialog from '@/components/shared/dialog'
+import { useWebhookWriteAccess } from './write-access'
 import EmptyList from '@/components/shared/empty-list'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { Field } from '@/components/shared/form-controls'
@@ -65,7 +66,8 @@ export function tokenUsedAt(value: string | null): string {
 }
 
 export default function WebhooksApiTokensV8() {
-  const { saveErrors, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke } = useApiTokens()
+  const management = useWebhookWriteAccess()
+  const { saveErrors, ownership, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke } = useApiTokens()
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」から入れ替える・止める。止めても、すでに付けたタグは残ります。"}</>}
@@ -73,10 +75,10 @@ export default function WebhooksApiTokensV8() {
       headingSize="regular"
       title="外部連携"
 
-      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button> : undefined}
+      actions={<Button lockedReason={management.reason} {...(management.allowed ? { href: "/webhooks?tab=notify" } : { disabled: true })}><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button>}
       tabs={<WebhookTabs active="api-tokens" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
-        {!canManage ? <ViewerBand /> : null}
+        {ownership.known && !canManage ? <ViewerBand need="owner" /> : null}
         <WebhookBand
           cells={overviewBandCells({
             outgoing: overview.outgoingCount === null ? null : overview.outgoing,
@@ -93,6 +95,8 @@ export default function WebhooksApiTokensV8() {
       overlays={<>
         <Dialog
           open={createOpen}
+          confirmDisabled={!canManage}
+          confirmLockedReason={ownership.reason}
           title="API 接続の鍵を発行する"
           designWidth={540}
           confirmLabel="発行する"
@@ -162,6 +166,8 @@ export default function WebhooksApiTokensV8() {
           title={`「${rotateTarget?.name ?? ''}」の鍵を入れ替えますか？`}
           description="今の鍵はすぐ使えなくなり、新しい鍵が1回だけ表示されます。外の仕組みの鍵を新しいものに書き換えるまで、つなぎ先の操作は止まります。"
           confirmLabel="入れ替える"
+          confirmDisabled={!canManage}
+          confirmLockedReason={ownership.reason}
           busy={mutating}
           error={dialogError}
           onConfirm={() => handleRotate()}
@@ -176,6 +182,8 @@ export default function WebhooksApiTokensV8() {
           title={`「${revokeTarget?.name ?? ''}」の鍵を止めますか？`}
           description="この鍵での外からの操作はすぐ止まります。すでに付けたタグは残ります。この操作は取り消せません。"
           confirmLabel="止める"
+          confirmDisabled={!canManage}
+          confirmLockedReason={ownership.reason}
           destructive
           busy={mutating}
           error={dialogError}
@@ -191,9 +199,7 @@ export default function WebhooksApiTokensV8() {
     >
       <div className={styles.body}>
         <div className={styles.createRow}>
-          {canManage
-            ? <Button variant="primary" onClick={openCreate}><Plus size={16} aria-hidden="true" />API 接続の鍵を発行する</Button>
-            : <span className={styles.createSpace} aria-hidden="true" />}
+          <Button variant="primary" disabled={!canManage} lockedReason={ownership.reason} onClick={openCreate}><Plus size={16} aria-hidden="true" />API 接続の鍵を発行する</Button>
           <span className={styles.spacer} aria-hidden="true" />
           <p className={styles.createRule}>鍵の発行・入れ替え・停止は統括だけができます</p>
         </div>
@@ -251,15 +257,15 @@ export default function WebhooksApiTokensV8() {
             description={canManage ? 'ほかのシステムからこのアカウントを操作するための鍵を発行します。' : '鍵の発行は統括だけができます。'}
             create={{ label: '最初の鍵を発行する', onClick: openCreate }}
             canCreate={canManage}
+            lockedReason={ownership.reason ?? null}
           />
         ) : null}
         {status === 'ready' && tokens.length > 0 ? (
           <>
             <ContextMenu
               label="鍵の操作"
-              items={canManage && ctxToken ? revokeMenuItemsFor(ctxToken) : []}
+              items={ctxToken ? revokeMenuItemsFor(ctxToken) : []}
               shouldOpen={(event) => {
-                if (!canManage) return false
                 const row = (event.target as HTMLElement).closest('[data-ctx-row]')
                 if (!row) return false
                 setCtxId(row.getAttribute('data-ctx-row'))
@@ -291,14 +297,15 @@ export default function WebhooksApiTokensV8() {
                       </Td>
                       {/* 行の右端は「…」1つ（B-253・絵 ralAc）。入れ替える・止めるはその中。 */}
                       <ActionCell>
-                        {canManage ? (
-                          <RowMenu
+                        {<RowMenu
                             appearance="plain"
                             label={`「${token.name}」の操作`}
                             open={menuId === token.id}
                             onOpenChange={(next) => setMenuId(next ? token.id : null)}
                             items={[{
                               id: 'rotate',
+                              disabled: !canManage && !ownership.reason,
+                              lockedReason: ownership.reason,
                               label: '入れ替える',
                               onSelect: () => {
                                 setMenuId(null)
@@ -307,6 +314,8 @@ export default function WebhooksApiTokensV8() {
                               },
                             }, {
                               id: 'revoke',
+                              disabled: !canManage && !ownership.reason,
+                              lockedReason: ownership.reason,
                               label: '止める',
                               tone: 'danger',
                               onSelect: () => {
@@ -315,8 +324,7 @@ export default function WebhooksApiTokensV8() {
                                 setRevokeTarget(token)
                               },
                             }]}
-                          />
-                        ) : null}
+                          />}
                       </ActionCell>
                     </Tr>
                   )

@@ -1,5 +1,8 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
+import Button from '@/components/shared/button'
+import { useInView, useReducedMotion, useTabVisible } from './style-experience-player/use-autoplay'
 import type { AccountStyle } from '@line-crm/shared'
 import Card from '@/components/shared/card'
 import { Field, TextInput } from '@/components/shared/form-controls'
@@ -29,8 +32,25 @@ const content: Record<AccountStyle, { setting: string; operation: string; after:
   ec: { setting: 'お客様を分類するタグを作れます。', operation: '商品の案内を用意します。', after: '注文の数とお問い合わせを確認します。', feature: 'お店の使い方に合わせた見本から始められます。' },
 }
 
-export default function StyleDemoPages({ viewing, page, onPage, chosen, onChoose, disabled }: {
-  viewing: AccountStyle; page: number; onPage: (index: number) => void; chosen: AccountStyle | null
+function FollowupDemoPlayer() {
+  const root = useRef<HTMLElement>(null)
+  const reduced = useReducedMotion(), inView = useInView(root), visible = useTabVisible()
+  const [phase, setPhase] = useState(0), [paused, setPaused] = useState(false)
+  const [seenReduced, setSeenReduced] = useState(reduced)
+  if (seenReduced !== reduced) { setSeenReduced(reduced); if (reduced) setPhase(4) }
+  useEffect(() => {
+    if (reduced || !inView || !visible || paused) return
+    const timer = window.setTimeout(() => setPhase(value => (value + 1) % 5), phase === 0 ? 5000 : 4000)
+    return () => window.clearTimeout(timer)
+  }, [phase, paused, reduced, inView, visible])
+  return <section ref={root} aria-label="LINE来店フォローの操作の見本">
+    {!reduced && <Button onClick={() => setPaused(value => !value)}>{paused ? '再生する' : '止める'}</Button>}
+    <RestaurantFollowupDemo phase={phase} />
+  </section>
+}
+
+export default function StyleDemoPages({ accountName, viewing, page, onPage, chosen, onChoose, disabled }: {
+  accountName?: string; viewing: AccountStyle; page: number; onPage: (index: number) => void; chosen: AccountStyle | null
   onChoose: (style: AccountStyle) => void; disabled: boolean
 }) {
   const labels = labelsFor(viewing)
@@ -45,17 +65,17 @@ export default function StyleDemoPages({ viewing, page, onPage, chosen, onChoose
     <div><h3 data-demo-heading tabIndex={-1} className={styles.heading}>{headings[viewing][page]}</h3><p className={styles.description}>{page === 0 ? 'できることを、見本で紹介します。' : message}</p></div>
     {page === 0 ? <>
       <ul className={styles.can}>{look.can.map(item => <li key={item.text}><Check aria-hidden="true" className={styles.check} />{item.text}</li>)}</ul>
-      <StyleExperiencePlayer script={STYLE_EXPERIENCE_SCRIPT} style={viewing} switcher="external" variant="minimal" data="sample" />
+      <StyleExperiencePlayer accountName={accountName?.trim() || "店名未取得"} script={STYLE_EXPERIENCE_SCRIPT} style={viewing} switcher="external" variant="minimal" data="sample" />
     </> : <>
       {page === 1 ? <StyleSettingDemo key={viewing} style={viewing} /> : page === 2 && viewing === 'restaurant'
-        ? <RestaurantFollowupDemo />
+        ? <FollowupDemoPlayer />
         : page === 2 && viewing === 'standard' ? <Card layout="vertical" padding="default" gap="normal" aria-label="お知らせの見本">
           <strong>一斉配信</strong><Field label="本文"><TextInput value="営業時間のお知らせ" readOnly /></Field><p className={styles.note}>お知らせの文の見本です。</p>
         </Card> : <Card layout="vertical" padding="default" gap="normal" aria-label="使い方の見本">
           <strong>{page === 2 ? '操作の見本' : page === 3 ? '利用の流れ' : '基本の機能'}</strong>
           <p className={styles.description}>{page === 4 ? '配信・タグ・自動応答などの基本も使えます。' : message}</p>
         </Card>}
-      {page === 2 && viewing === 'restaurant' ? <p className={styles.note}>設定のない状態の見本です。実際の初期セットとは異なります。送り始めるには設定・公開・承認が必要です。</p> : null}
+      {page === 2 && viewing === 'restaurant' ? <p className={styles.note}>実際の初期セットとは異なります。送り始めるにはテスト送信と承認が必要です。</p> : null}
     </>}
 
   </section>

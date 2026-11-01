@@ -16,6 +16,7 @@
 /* 帯そのものは共通の save-conflict（動きの点検 16 番）。 */
 
 .root { display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap-outer); min-width: 0; }
+.saveSummary { display: inline-flex; align-items: center; gap: var(--tpl-fe-icon-gap); }
 
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-fe-icon-gap); font-size: var(--text-label); text-decoration: none; }
 
@@ -154,8 +155,6 @@
   padding: var(--tpl-fe-select-pad); border: 0; border-radius: var(--radius-control); background: var(--color-canvas);
   box-shadow: var(--tpl-fe-ring-control); cursor: pointer; font-size: var(--tpl-fe-body-size); font-weight: 500; color: var(--color-ink); text-align: left;
 }
-.wordsHead, .wordsRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-fe-words-gap); }
-.wordsHead { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
 .dialogFields { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); }
 
 /* ---------- 右の列 ---------- */
@@ -169,10 +168,10 @@
 .urlTitle { margin: 0; font-size: var(--tpl-fe-body-size); font-weight: 700; line-height: var(--tpl-fe-body-lh); color: var(--color-ink); }
 .urlRow { display: flex; align-items: center; gap: var(--tpl-fe-field-gap); }
 .urlValue {
-  /* 字は1行のまま、はみ出す分は「…」で省く（flex だと文字の省略の印が出ない。）。 */
-  flex: 1; min-width: 0; height: var(--tpl-fe-choice-h); display: block; line-height: var(--tpl-fe-choice-h); padding: var(--tpl-fe-url-pad);
+  /* 長いURLの詳細は折り返し、対象を識別する末尾も読めるようにする。 */
+  flex: 1; min-width: 0; min-height: var(--tpl-fe-choice-h); display: block; line-height: var(--tpl-fe-small-lh); padding: var(--tpl-fe-url-pad); padding-block: var(--tpl-fe-field-gap);
   border-radius: var(--radius-control); background: var(--color-surface-pearl); font-size: var(--tpl-fe-small-size); color: var(--color-ink-secondary);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: normal; overflow-wrap: anywhere;
 }
 .urlNote { margin: 0; font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--color-ink-faint); }
 .urlTest { display: flex; }
@@ -187,7 +186,6 @@
   .phoneArea { display: none; }
   .testWide { display: none; }
   .testNarrow { display: inline; }
-  .urlValue { white-space: normal; height: auto; min-height: var(--tpl-fe-choice-h); line-height: var(--tpl-fe-small-lh); padding-block: var(--tpl-fe-field-gap); }
   .addCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .addCards[data-writing] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .addCards[data-writing] > * { grid-column: span 3; }

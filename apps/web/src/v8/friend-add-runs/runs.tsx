@@ -9,6 +9,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role';
 
 import { RowNameLink } from '@/components/shared/table';
 
+import ListDateTime from '@/components/shared/list-date-time'
 import SegmentedControl from '@/components/shared/segmented'
 import { runCounts } from './run-counts'
 import { useFeatureAccess } from '@/lib/use-feature-access';
@@ -521,7 +522,7 @@ function FriendAddRunsInner() {
         ) : visibleItems.length === 0 ? (
           <ListState kind="empty" title="条件に合う実行結果はありません" description="絞り込みを変えるか、次の友だち追加を待ってください。" />
         ) : (
-          <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
+          <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <thead>
               <TableHeadRow data-table-layout="columns">
                 <Th className={styles.colWhen}>日時</Th>
@@ -543,7 +544,7 @@ function FriendAddRunsInner() {
                 return (
                   <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colWhen}>
-                      <time dateTime={item.receivedAt} title={formatJstDateTime(item.receivedAt)} className={styles.when}>{jstTime(item.receivedAt)}</time>
+                      <time dateTime={item.receivedAt}><ListDateTime value={item.receivedAt} /></time>
                     </Td>
                     <PersonCell className={styles.colFriend} avatarName={name} name={
                       <RowNameLink href={detailHref(item.id)} title={`${name}（${kindLabel}）`}>{name}</RowNameLink>

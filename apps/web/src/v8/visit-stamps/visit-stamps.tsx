@@ -157,6 +157,7 @@ function VisitStampsScreen() {
   const [settings, setSettings] = useState<VisitStampSettings>(defaultSettings)
   const [accountIds, setAccountIds] = useState<string[]>([])
   const [draftReady, setDraftReady] = useState(false)
+  const [initialDraft, setInitialDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [imageBusy, setImageBusy] = useState(false)
   const [issue, setIssue] = useState<{ field: StampSettingField; message: string } | null>(null)
@@ -180,9 +181,11 @@ function VisitStampsScreen() {
 
   const resetDraft = useCallback((c: VisitStampCard | null) => {
     setIssue(null)
-    setName(c?.name ?? '来店スタンプカード')
-    setSettings(c?.settings ?? defaultSettings())
-    setAccountIds(c?.accountIds ?? (selectedAccountId ? [selectedAccountId] : []))
+    const next = { name: c?.name ?? '来店スタンプカード', settings: c?.settings ?? defaultSettings(), accountIds: c?.accountIds ?? (selectedAccountId ? [selectedAccountId] : []) }
+    setName(next.name)
+    setSettings(next.settings)
+    setAccountIds(next.accountIds)
+    setInitialDraft(JSON.stringify(next))
     setDraftReady(true)
   }, [selectedAccountId])
 
@@ -207,9 +210,11 @@ function VisitStampsScreen() {
     return !base || JSON.stringify(base) !== JSON.stringify({ name, settings, accountIds })
   }, [cards, draftReady, card, name, settings, accountIds])
 
+  const hasUnsavedChanges = !!cards && draftReady && initialDraft !== null && initialDraft !== JSON.stringify({ name, settings, accountIds })
+
   /* ①② の下書きを保存せずに離れるときは確かめる（保存できる人だけ。閲覧のみは変えられない）。 */
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
-    dirty: canManage && !!cards && dirty && !!card,
+    dirty: canManage && hasUnsavedChanges,
     busy: saving,
     samePage: destination => destination.pathname === '/visit-stamps',
   })
@@ -799,7 +804,7 @@ function VisitStampsScreen() {
       {canManage && tab === 'settings' ? (
         <div className={tpl.footer} data-template-region="footer">
           <StickyBar
-            status={dirty ? '保存していない変更があります' : undefined}
+            status={hasUnsavedChanges ? '保存していない変更があります' : cards !== null && draftReady && !card ? 'まだ公開していません' : undefined}
             actions={(
               <>
                 <Button disabled={saving || imageBusy} disabledReason={saving ? '保存しています' : imageBusy ? '画像を登録しています' : undefined} onClick={() => resetDraft(card)}>キャンセル</Button>

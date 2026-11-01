@@ -1,3 +1,5 @@
+import './list-row-tag-first.test.mjs'
+import './insert-token-fit.test.mjs'
 import './short-text.test.mjs'
 import './coupon-preview.test.mjs'
 import './text-button-style.test.mjs'

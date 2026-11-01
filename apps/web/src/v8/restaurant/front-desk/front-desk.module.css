@@ -135,13 +135,6 @@
   line-height: var(--tpl-e1-lh-18);
 }
 
-.drawerFoot {
-  display: flex;
-  justify-content: center;
-  gap: var(--tpl-e1-gap-s);
-  width: 100%;
-}
-
 /* ウォークインの窓 */
 .walkIn {
   display: flex;

@@ -1,5 +1,8 @@
 'use client'
 
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
+
 /*
  * ★V8 デリバリー受注・品切れ一括設定（板 `h7OeT`）と受付の一括停止（窓 `XCVGd`）。
  *
@@ -39,6 +42,8 @@ import {
 import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { DASH, INTAKE_STOP_PRESET_OPTIONS, SERVICE_TONES, formatYen } from './format'
 import styles from './delivery.module.css'
+import { intakeStopSelection } from './intake-stop-selection'
+import { intakeActionReason } from './intake-access'
 import { formatNumber } from '@/lib/format'
 
 /*
@@ -268,12 +273,16 @@ export default function SoldOutBoard({
 /* ── D-6 `XCVGd` 受付の一括停止 ───────────────────────────────── */
 
 export interface IntakeStopDialogProps {
+  accountId?: string | null
+  store?: { id: string; name?: string | null }
+
   open: boolean
   /** サービスの今の状態。すでに停止中のものは「対象外」にする。 */
   services: DeliveryServiceState[]
+  disabledReason?: string
   /** 止める相手として選んでいるもの。 */
   selected: DeliveryService[]
-  preset: DeliveryIntakeStopPreset
+  preset: DeliveryIntakeStopPreset | ''
   busy: boolean
   /** 日本語の案内だけを入れる。 */
   error: string | null
@@ -285,8 +294,9 @@ export interface IntakeStopDialogProps {
 
 /** D-6 `XCVGd`。受付を止めると新しい注文が来なくなるので、対象と時間を見せてから送る。 */
 export function IntakeStopDialog({
-  open,
+  accountId, store, open,
   services,
+  disabledReason,
   selected,
   preset,
   busy,
@@ -297,8 +307,11 @@ export function IntakeStopDialog({
   onSubmit,
 }: IntakeStopDialogProps) {
   const selectedSet = new Set(selected)
-  const stoppable = services.filter((state) => state.intakeStatus === 'open' && state.service !== 'ubereats')
-  const canSubmit = !busy && stoppable.some((state) => selectedSet.has(state.service))
+  const selection = intakeStopSelection(services, selected, preset)
+  const selectionReason = disabledReason
+    ?? selection.services.map(service => intakeActionReason(services.find(state => state.service === service), 'stop')).find(Boolean)
+    ?? selection.problem
+  const canSubmit = !busy && !selectionReason
 
   return (
     <RsDialog
@@ -317,10 +330,11 @@ export function IntakeStopDialog({
       )}
       titleRow="mark"
       plainTitle
-      contentPadding="18px 24px 20px"
       bodyGap={STOP_BODY_GAP}
       footerPlain
       footerGap={STOP_FOOT_GAP}
+      actionsPlacement="footer"
+      footerNote={selectionReason || error ? <DialogNote>{selectionReason ?? error}</DialogNote> : null}
       onCancel={onClose}
       actions={(
         <>
@@ -330,6 +344,7 @@ export function IntakeStopDialog({
             busy={busy}
             busyLabel="停止中…"
             disabled={!canSubmit}
+            aria-description={selectionReason ?? undefined}
             onClick={onSubmit}
           >
             <Pause size={16} aria-hidden="true" />止める
@@ -337,6 +352,7 @@ export function IntakeStopDialog({
         </>
       )}
     >
+      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} store={store ?? { id: '' }} />
       <p className={styles.dialogLead}>
         選んだサービスで新しい注文の受け付けを止めます。すでに受け付けた注文の調理・受け渡しはそのまま続きます。
       </p>
@@ -348,15 +364,14 @@ export function IntakeStopDialog({
           ) : (
             services.map((state) => {
               const label = state.label || DELIVERY_SERVICE_LABELS[state.service]
-              const preparing = state.service === 'ubereats'
-              const stopped = state.intakeStatus === 'stopped'
-              const picked = !preparing && !stopped && selectedSet.has(state.service)
+              const reason = disabledReason ?? intakeActionReason(state, 'stop')
+              const picked = state.intakeStatus !== 'stopped' && selectedSet.has(state.service)
               return (
                 <CheckCard
                   key={state.service}
                   size="row"
                   checked={picked}
-                  disabled={preparing || stopped || busy}
+                  disabled={Boolean(reason) || busy}
                   onChange={(checked) => onToggleService(state.service, checked)}
                   title={(
                     <>
@@ -365,12 +380,17 @@ export function IntakeStopDialog({
                       <StatusBadge tone={SERVICE_TONES[state.service]} size="compact" dot={false}>{label}</StatusBadge>
                     </>
                   )}
-                  note={preparing ? `営業状態の連携は${PREPARING_WORD}` : stopped ? 'すでに停止中・対象外' : `現在 受付中・${formatNumber(state.todayCount)}件対応中`}
+                  note={reason ?? `現在 受付中・${formatNumber(state.todayCount)}件対応中`}
                 />
               )
             })
           )}
         </div>
+        {!disabledReason && services.some(state => selectedSet.has(state.service) && intakeActionReason(state, 'stop')) ? (
+          <Button variant="text" disabled={busy} onClick={() => {
+            for (const state of services) if (selectedSet.has(state.service) && intakeActionReason(state, 'stop')) onToggleService(state.service, false)
+          }}>操作できないサービスの選択を外す</Button>
+        ) : null}
       </DialogField>
 
       {/*
@@ -387,12 +407,11 @@ export function IntakeStopDialog({
             label: option.label,
           }))}
           value={preset}
-          onChange={onPresetChange}
+          onChange={(value) => { if (value) onPresetChange(value) }}
           disabled={busy}
         />
       </DialogField>
 
-      {error ? <DialogNote>{error}</DialogNote> : null}
     </RsDialog>
   )
 }

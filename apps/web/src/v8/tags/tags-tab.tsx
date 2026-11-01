@@ -42,7 +42,6 @@ import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import TagPill from '@/components/shared/tag-pill'
-import { DelayedSkeleton } from '@/components/shared/skeleton';
 import PageSizeSelect from '@/components/shared/page-size-select';
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useLiveReorder } from '@/lib/use-live-reorder';
@@ -552,14 +551,16 @@ export default function TagsTab({
     return list
   }
 
-  /* フォルダの列。数は一覧と同じものを数える。 */
+  const folderItems = items.filter(tag => (tag.status === 'archived') === onlyArchived)
+
+  /* フォルダの列。数は一覧と同じ保管状態を数える。 */
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? items.length : null, color: 'var(--color-accent)', icon: <Inbox size={16} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? folderItems.length : null, color: 'var(--color-accent)', icon: <Inbox size={16} aria-hidden="true" /> },
     ...groups.map((group, index) => ({
       kind: 'folder' as const,
       id: group.id,
       label: group.name,
-      count: ready ? items.filter((tag) => tag.groupId === group.id).length : null,
+      count: ready ? folderItems.filter((tag) => tag.groupId === group.id).length : null,
       color: group.color,
       onEdit: canEdit ? () => { setManageFoldersOpen(false); setFolderDialog(group) } : undefined,
       onMoveUp: canEdit && index > 0 ? () => void moveGroupOrder(group, -1) : undefined,
@@ -567,7 +568,7 @@ export default function TagsTab({
       onDelete: canEdit ? () => { setManageFoldersOpen(false); setDeletingGroup(group) } : undefined,
       deleteNote: '削除しても、中のタグは未分類に残ります。',
     })),
-    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={16} aria-hidden="true" /> },
+    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? folderItems.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={16} aria-hidden="true" /> },
   ]
 
   const folderSelectOptions = [
@@ -692,7 +693,7 @@ export default function TagsTab({
       filteredDescription="検索語・フォルダ・絞り込みを外すと、すべて出ます"
     />
   ) : (
-    <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} aria-busy="true" data-design-node="U0aKD" />}>
+    !ready ? <ListState kind="loading" title="タグを読み込んでいます" data-design-node="U0aKD" /> : <>
       <DataTable className={styles.table} data-design="TagTable">
         <thead>
           <TableHeadRow>
@@ -788,7 +789,7 @@ export default function TagsTab({
         <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り"
           range={{ total: filtered.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, filtered.length) }} />
       </ListPager>
-    </DelayedSkeleton>
+    </>
   )
 
   return (

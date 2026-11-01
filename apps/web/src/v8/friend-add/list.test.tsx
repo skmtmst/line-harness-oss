@@ -236,3 +236,32 @@ it('WEB158: 表にはページ内の番号でなく保存済み優先順位を�
  expect(row.querySelector('td')?.textContent).toContain('21')
  } finally {items[0].priority=1}
 });
+
+
+it.each(['first_time', 'returning'])('共通だけの%sは設定1・有効0と母数を分けて説明する', async kind => {
+  navigation.query = `kind=${kind}`
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+    const url = new URL(String(input))
+    if (url.pathname === '/api/friend-add-rules') return json({ success: true, data: {
+      items: [rule({ isFallback: true, friendKind: kind as 'first_time' | 'returning' })], total: 1, nextCursor: null, folderCounts: [],
+      summary: { rules: 1, active: 0, recentAdds: 0, captured: 0, unknownRoute: 0, delivered: 0, failed: 0 },
+      options: { routes: [], scenarios: [], tags: [], folders: [] },
+    } })
+    return json({ success: true, data: null })
+  })
+  await render()
+  const card = [...host.querySelectorAll('[data-kpi-presentation]')].find(el => el.textContent?.startsWith('初回案内'))!
+  expect(card.textContent).toMatch(/1\s*件/)
+  expect(card.textContent).toMatch(/有効\s*0\s*件（共通は別）/)
+  fireEvent.click(screen.getByRole('button', { name: '初回案内の説明', exact: true }))
+  expect(screen.getByText(/設定数には共通の案内を含みます/)).toBeTruthy()
+})
+
+it('設定の集計が失敗したときは有効0とせず、失敗の理由を残す', async () => {
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL) => new URL(String(input)).pathname === '/api/friend-add-rules'
+    ? new Response(JSON.stringify({ success: false, error: 'offline' }), { status: 503, headers: { 'Content-Type': 'application/json' } })
+    : json({ success: true, data: null }))
+  await render()
+  expect(host.textContent).toContain('読み込めませんでした')
+  expect(host.textContent).not.toContain('有効 0')
+})

@@ -89,6 +89,8 @@ const SAVED_VIEWS = [
 
 export default function ApprovalsTab() {
   const { readonly, narrow, setCount, focusAffiliateId, accountId } = useAffiliateShell()
+  const readAccount = useRef(accountId)
+  readAccount.current = accountId
 
   const [status, setStatus] = useState<ApprovalStatus>('pending')
   const [affiliateFilter, setAffiliateFilter] = useListUrlValue<string | null>('affiliateFilter', null)
@@ -128,25 +130,26 @@ export default function ApprovalsTab() {
     try {
       const statuses = ['pending', 'approved', 'rejected'] as const
       const results = await Promise.all(statuses.map((value) => listAllConversionApprovals(value, 0, { accountId, fresh: options.fresh })))
-      if (!mounted.current) return
+      if (!mounted.current || readAccount.current !== accountId) return
       setItems(results.flatMap((result) => result.items))
       setTruncatedStatuses(statuses.filter((_, index) => results[index].truncated))
       if (!options.preserveSelection) setSelected(new Set())
       setLoadState('ready')
     } catch {
-      if (mounted.current) setLoadState('error')
+      if (mounted.current && readAccount.current === accountId) setLoadState('error')
     }
-  }, [])
+  }, [accountId])
 
   /* 保留期間（KPI）：登録されたアフィリエイターの保留日数のうち、いちばん長いもの。 */
   const loadHoldDays = useCallback(async () => {
+    setHoldDays(null)
     try {
-      const res = await api.affiliates.list()
-      if (!mounted.current || !res.success) return
+      const res = await api.affiliates.list(accountId ?? undefined)
+      if (!mounted.current || readAccount.current !== accountId || !res.success) return
       const days = (res.data as unknown as AffiliateItem[]).map((a) => a.holdDays).filter((d): d is number => typeof d === 'number')
       setHoldDays(days.length > 0 ? Math.max(...days) : null)
     } catch { /* 取れないときは「—」 */ }
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
     void loadItems()

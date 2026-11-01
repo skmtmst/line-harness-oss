@@ -20,7 +20,7 @@ import ReservationsPage from './reservations'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
-import { at, reservation, snapshotOf } from '../booking-kit/test-data'
+import { at, reservation, snapshotOf, tables } from '../booking-kit/test-data'
 
 /* 今日：佐藤（LINE・T1）・山田（食べログ・承認待ち・T3・乳）・押さえ（T4）。 */
 const reservationsToday = () => [
@@ -176,15 +176,18 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     expect(within(row).getAllByRole('button')).toHaveLength(1)
     expect(fixture.updateReservation).not.toHaveBeenCalled()
   })
-  it('電話予約の入力不足は欄で知らせ、最初の欄へ移動し、保存しない', async () => {
+  it('電話予約の入力不足はボタンで止め、フォームを直接送っても欄へ移動して保存しない', async () => {
     const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
     render(<ReservationsPage />)
     await screen.findByText('山田 太郎')
     fireEvent.click(screen.getByRole('button', { name: /電話の予約を入れる/ }))
     const submit = await screen.findByRole('button', { name: /台帳に入れる/ })
-    await waitFor(() => expect(submit.hasAttribute('disabled')).toBe(false))
+    expect(submit.hasAttribute('disabled')).toBe(true)
+    expect(submit.getAttribute('aria-description')).toContain('お客さま')
     fireEvent.click(submit)
     const search = screen.getByRole('searchbox', { name: '名前・電話番号で探す' })
+    expect(fixture.createReservation).not.toHaveBeenCalled()
+    fireEvent.submit(search.closest('form')!)
     await waitFor(() => expect(search.getAttribute('aria-invalid')).toBe('true'))
     await waitFor(() => expect(document.activeElement).toBe(search))
     expect(scroll).toHaveBeenCalledWith({ block: 'center' })
@@ -378,4 +381,16 @@ it('座席表が読めなくても時間と一覧の取得済み予約は残す'
   fireEvent.click(screen.getByRole('button',{name:'一覧',exact:true}))
   expect(await screen.findByRole('button',{name:'山田 太郎',exact:true})).toBeTruthy()
   expect(await screen.findByText('座席表を読み込めませんでした')).toBeTruthy()
+})
+
+it('通常取得の卓定義を電話画面へ渡し、人数が全卓と結合の最大を超える理由を出す（追加取得なし）', async () => {
+  const configured = tables.filter(table => table.is_active).map(table => ({ ...table, max_capacity: Math.min(table.max_capacity, 6) }))
+  fixture.snapshot.mockResolvedValue({ data: snapshotOf({ tables: configured, reservations: [], reservationTotal: 0 }) })
+  fixture.reservationsDay.mockResolvedValue({ data: { reservations: [], closures: [] } })
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: '電話の予約を入れる' }))
+  fireEvent.change(screen.getByLabelText('人数'), { target: { value: '7' } })
+  expect(await screen.findAllByText('結合を含め最大6名のため、7名は入れません。')).toHaveLength(1)
+  expect(fixture.snapshot).toHaveBeenCalledTimes(1)
+  expect(fixture.createReservation).not.toHaveBeenCalled()
 })

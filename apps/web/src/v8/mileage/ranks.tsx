@@ -78,10 +78,13 @@ type Preview = { byTier: Array<{ tierId: string; name: string; count: number }>;
 
 export default function RanksTab() {
   const { readonly, narrow } = useMileageShell()
-  const accountId = useAccountId()
+  const { selectedAccountId: accountId, selectedAccount, accounts } = useAccountContext()
+  const accountName = (selectedAccount?.id === accountId ? selectedAccount.name : accounts?.find(account => account.id === accountId)?.name)?.trim() || "店名未取得"
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState<unknown>(null)
   const [program, setProgram] = useState<RankProgram | null>(null)
+  const [programAccountId,setProgramAccountId]=useState<string|null>(null)
+  const loadEpoch=useRef(0)
   const [preview, setPreview] = useState<Preview | null>(null)
   const [notice, setNotice] = useState('')
   const [edit, setEdit] = useState<{ id: string | null; tier: RankTier | null } | null>(null)
@@ -95,21 +98,24 @@ export default function RanksTab() {
 
   const load = useCallback(async () => {
     if (!accountId) return
-    setStatus('loading')
+    const request=++loadEpoch.current
+    setStatus('loading');setProgramAccountId(null);setPreview(null)
     try {
       const response = await memberRanksApi.program(accountId)
+      if(request!==loadEpoch.current)return
       if (!response.success) throw new Error('program_failed')
-      setProgram(response.data)
+      setProgram(response.data);setProgramAccountId(accountId)
       setStatus('ready')
       const counts = await memberRanksApi.preview(accountId).catch(() => null)
-      setPreview(counts && counts.success ? counts.data : null)
+      if(request===loadEpoch.current)setPreview(counts && counts.success ? counts.data : null)
     } catch (reason) {
+      if(request!==loadEpoch.current)return
       setError(reason)
       setStatus('error')
     }
   }, [accountId])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { void load();return()=>{loadEpoch.current++} }, [load])
 
   const tiers = useMemo(() => program?.tiers ?? [], [program])
   const editingIndex = edit?.id ? tiers.findIndex(tier => tier.id === edit.id) : -1
@@ -202,18 +208,20 @@ export default function RanksTab() {
     </DataTable>
   )
 
-  const sampleTier = tiers[tiers.length > 1 ? 1 : 0]
+  const previewReady=status==='ready'&&programAccountId===accountId
+  const sampleTier = previewReady ? tiers[tiers.length > 1 ? 1 : 0] : undefined
   const messageOf = (list?: Array<{ text: string }>) => list?.map((m) => m.text).join('\n') ?? ''
   const sampleCustom = sample === 'up' ? messageOf(sampleTier?.upgradeMessages) : messageOf(sampleTier?.downgradeMessages)
-  const sampleText = sampleCustom ? sampleCustom : sample === 'up'
-    ? `${sampleTier?.name ?? 'ゴールド'}になりました。いつもありがとうございます。今日からマイルが ${sampleTier?.mileMultiplier ?? 1.5} 倍です。`
-    : `あと 1 回のご来店で、${sampleTier?.name ?? 'ゴールド'}のままです。期限は 14 日後です。`
+  const sampleText = !sampleTier?.name?.trim() ? '' : sampleCustom || (sample === 'up'
+    ? `${sampleTier.name}になりました。いつもありがとうございます。${Number.isFinite(sampleTier.mileMultiplier) ? `今日からマイルが ${sampleTier.mileMultiplier} 倍です。` : 'マイルの倍率は未取得です。'}`
+    : `${sampleTier.name}の条件を下回ると、猶予期間のあとにランクが1つ下がります。`)
+  const previewEmpty = !previewReady ? status==='error' ? 'ランクを読み込めませんでした' : '会員ランクを読み込んでいます' : !sampleTier ? 'ランクを作るとLINEの見本を確認できます' : !sampleText ? 'ランク名が未設定です' : false
 
   const previewBody = (
     <>
       <SegmentedControl aria-label="LINE の見本" options={[{ value: 'up', label: '上がったとき' }, { value: 'down', label: '下がる前' }]} value={sample} onChange={setSample} />
-      <LinePreview title={sample === 'up' ? '上がったときの LINE' : '下がる前の LINE'} fit note="見本です。通知はまだ送れません。" caption="見本">
-        <LinePreviewMessage accountName="お店" avatar="店" time="10:00">{sampleText}</LinePreviewMessage>
+      <LinePreview accountName={accountName} empty={previewEmpty} title={sample === 'up' ? '上がったときの LINE' : '下がる前の LINE'} fit note="見本です。通知はまだ送れません。" caption="見本">
+        <LinePreviewMessage accountName={accountName} avatar={accountName.slice(0,1)} time="10:00">{sampleText}</LinePreviewMessage>
       </LinePreview>
     </>
   )
@@ -334,11 +342,6 @@ export default function RanksTab() {
       </Dialog>
     </MileageFrame>
   )
-}
-
-function useAccountId(): string | null {
-  const { selectedAccountId } = useAccountContext()
-  return selectedAccountId
 }
 
 function TierDialog({ tier, program, prev, next, isFirst, busy, error, blocked, onCancel, onSave }: {

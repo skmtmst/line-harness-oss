@@ -190,7 +190,7 @@ describe('V8 一斉配信の通し', () => {
     expect(screen.queryByRole('dialog', { name: 'テンプレートを選ぶ' })).toBeNull()
   })
 
-  it('作る→下書き保存→知らせ→一覧に戻ると増えている', async () => {
+  it('作る→下書き保存で入力を残す→一覧へ戻ると増えている', async () => {
     await mount(<BroadcastListPage />)
     await screen.findByText('はじめの配信')
     expect(screen.getByText('はじめの配信').closest('[data-template-region="content"]')?.closest('[data-page-template="list"]')).toBeTruthy()
@@ -232,8 +232,15 @@ describe('V8 一斉配信の通し', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     })
-    // 保存の知らせが出て、作る面が閉じて、一覧に戻ると増えている。
+    // 未選択のまま下書きを保存し、入力を残してから自分で一覧へ戻る。
     await screen.findByText('下書きを保存しました。')
+    expect(screen.getByPlaceholderText('例：8月キャンペーンのお知らせ')).toHaveProperty('value', '流れの配信')
+    expect(screen.getByPlaceholderText('テキストを入力')).toHaveProperty('value', 'こんにちは')
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      title: '流れの配信', messageContent: 'こんにちは', lineAccountId: 'acc-1',
+      saveAsDraft: true, draftSendChoice: 'unselected', scheduledAt: null, stealthSpreadMinutes: 0,
+    }), expect.objectContaining({ idempotencyKey: expect.any(String) }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true })) })
     await waitFor(() => expect(screen.queryByPlaceholderText('例：8月キャンペーンのお知らせ')).toBeNull())
     await screen.findByText('流れの配信')
   })

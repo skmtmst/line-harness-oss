@@ -77,14 +77,14 @@ export function ExternalImportWorkspace({
       </div>
 
       {loading ? <ListState kind="loading" title="LINEのメニューを読み込んでいます" /> : null}
-      {!loading && error && !external ? <ListState kind="error" title="LINEのメニューを表示できませんでした" onRetry={onReload} /> : null}
+      {!loading && error ? <ListState kind="error" title="LINEのメニューを表示できませんでした" description={error} onRetry={onReload} /> : null}
       {!loading && !error && unmanaged.length === 0 ? (
         <div className="bg-canvas rounded-card content-card border">
           <ListState kind="empty" title="管理画面の外のメニューはありません" description="LINE側だけにあるメニューが見つかると、ここに表示します。" />
         </div>
       ) : null}
 
-      {!loading && unmanaged.length > 0 ? (
+      {!loading && !error && unmanaged.length > 0 ? (
         <div className={`grid items-start gap-4 ${styles.columns}`}>
           <div className="space-y-4">
             <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">

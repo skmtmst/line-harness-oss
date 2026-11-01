@@ -119,7 +119,8 @@ export function AutomationReview({
           <div>
             <Button
               onClick={() => void askOnePersonTest()}
-              disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()}
+              disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim() || !!savedDraft.followupManagement}
+              disabledReason={savedDraft?.followupManagement?'来店フォローの画面で、登録済みのテスト宛先へ試してください':undefined}
               title={!savedDraft ? '下書きを保存すると試せます' : !testFriendId.trim() ? '試す友だちを入れてください' : undefined}
               busy={preparingTest}
               busyLabel="確認中…"

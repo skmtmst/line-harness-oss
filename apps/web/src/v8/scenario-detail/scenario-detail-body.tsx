@@ -1,5 +1,7 @@
 'use client'
 
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
+
 import { type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
 import Button from '@/components/shared/button'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -104,6 +106,7 @@ export function ScenarioDetailBody({
   shownTpl: TemplateOpt | null
   saveErrors: ReturnType<typeof useSaveFormErrors>
 }) {
+  const tokenNames = useInsertTokenNames(scenario.lineAccountId)
   return (      <div className={styles.body} data-design="Body" data-template-region="body">
         <div className={styles.left}>
           {!canEdit ? (
@@ -309,10 +312,10 @@ export function ScenarioDetailBody({
                           }}
                           title="この通を編集する"
                         >
-                          <InsertText value={title} />
+                          <InsertText tokenNames={tokenNames} value={title} />
                         </button>
                       ) : (
-                        <span className={styles.stepTitle}><InsertText value={title} /></span>
+                        <span className={styles.stepTitle}><InsertText tokenNames={tokenNames} value={title} /></span>
                       )}
                       {step.isDraft === true && <StatusChip status="draft" />}
                       <TagPill size="sm" name={kindLabel} color="var(--color-status-info)" aria-label={`種類「${kindLabel}」`} />

@@ -10,7 +10,7 @@ import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
@@ -25,6 +25,7 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import Select from '@/components/shared/select'
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
+import { canManageWebhooksNow, captureWebhookWriteAccess } from './write-access'
 import styles from './create.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -201,12 +202,13 @@ function WebhooksCreateV8Inner() {
   }
 
   async function save(next: 'draft' | 'active') {
-    if (staffRole !== 'owner') {
+    if (!canManageWebhooksNow()) {
       setError(permissionDeniedMessage('store'))
       return
     }
+    const canContinue = captureWebhookWriteAccess()
     const accountId = selectedAccountId
-    if (!accountId) {
+    if (!accountId || accountRef.current !== accountId) {
       setError('上のバーでLINE公式アカウントを選んでください')
       return
     }
@@ -265,7 +267,10 @@ function WebhooksCreateV8Inner() {
         secret,
         maxRetries: Number(maxRetries) || 0,
       }
-      const create = (stepUpToken?: string) => api.webhooks.outgoing.create(payload, stepUpToken)
+      const create = (stepUpToken?: string) => {
+        if (!canContinue() || accountRef.current !== accountId) throw new Error('権限やLINEアカウントが変わったため中止しました。')
+        return api.webhooks.outgoing.create(payload, stepUpToken)
+      }
       let res
       try {
         res = await create()
@@ -288,6 +293,7 @@ function WebhooksCreateV8Inner() {
         createdActiveRef.current = { id: res.data.id, accountId }
         let stopped = false
         try {
+          if (!canContinue() || accountRef.current !== accountId) throw new Error('権限やLINEアカウントが変わったため中止しました。')
           const stop = await api.webhooks.outgoing.update(res.data.id, accountId, { isActive: false })
           stopped = stop.success
         } catch (saveFailure) {
@@ -314,16 +320,16 @@ function WebhooksCreateV8Inner() {
   const sampleKey = selectedEvents.find((value) => SAMPLES[value]) ?? 'friend_add'
   const sample = SAMPLES[sampleKey]
 
-  /* 作るのは統括だけ（R32）。見るだけの人には押せない物を置かず、一覧へ戻る道だけ出す。 */
-  if (staffRole !== 'owner') {
+  /* 作成の入口の許可は保ち、本人が確定するまでは入力を始めない。 */
+  if (!canManageRole(staffRole)) {
     return (
       <SaveErrorScope errors={saveErrors}><CreatePage
         boardId="hsD8e"
         title="送り先を作る"
         help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
-        readOnly contentSpacing="notice-after-read-only" footerActions={<Button href="/webhooks">一覧へ戻る</Button>} dirty={false}
+        readOnly footerActions={<Button href="/webhooks">一覧へ戻る</Button>} dirty={false}
       >
-        <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
+        {null}
       </CreatePage></SaveErrorScope>
     )
   }

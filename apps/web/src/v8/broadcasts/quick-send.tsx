@@ -1,5 +1,7 @@
 'use client'
 
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
+
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react'
@@ -74,14 +76,15 @@ export default function QuickSendV8({
   const saveErrors = useSaveFormErrors()
   const access = useQuickSendAccess()
   const context = useRef({ open, accountId, active: true })
+  const tokenNames = useInsertTokenNames(open ? accountId : null)
   if (context.current.open !== open || context.current.accountId !== accountId) context.current = { open, accountId, active: true }
   const renderedContext = context.current
   useEffect(() => { const current = context.current; current.active = true; return () => { current.active = false } }, [open, accountId])
   const [text, setText] = useState('')
-  const [target, setTarget] = useState<'all' | 'tag'>('all')
+  const [target, setTarget] = useState<'unselected' | 'all' | 'tag'>('unselected')
   const [tags, setTags] = useState<Tag[]>([])
   const [tagId, setTagId] = useState('')
-  const [when, setWhen] = useState<'now' | 'scheduled'>('now')
+  const [when, setWhen] = useState<'unselected' | 'now' | 'scheduled'>('unselected')
   const [scheduledValue, setScheduledValue] = useState('')
   const [estimate, setEstimate] = useState<Estimate | null>(null)
   const [estimating, setEstimating] = useState(false)
@@ -110,9 +113,9 @@ export default function QuickSendV8({
     sendingRef.current = null
     setPending(false)
     setText('')
-    setTarget('all')
+    setTarget('unselected')
     setTagId('')
-    setWhen('now')
+    setWhen('unselected')
     setScheduledValue('')
     setEstimate(null)
     setApproverId('')
@@ -140,7 +143,7 @@ export default function QuickSendV8({
     const permitted = captureQuickSendAccess()
     const available = () => !cancelled && current === context.current && current.active && permitted('preflight')
     if (estimateTimer.current) clearTimeout(estimateTimer.current)
-    if (!text.trim() || (target === 'tag' && !tagId)) {
+    if (!text.trim() || target === 'unselected' || (target === 'tag' && !tagId)) {
       setEstimate(null)
       return
     }
@@ -150,7 +153,7 @@ export default function QuickSendV8({
         setEstimating(true)
         try {
           const res = await api.broadcasts.preflight({
-            targetType: target === 'tag' ? 'tag' : 'all',
+            targetType: target,
             targetTagId: target === 'tag' ? tagId || null : null,
             lineAccountId: accountId,
             messageContent: text,
@@ -178,17 +181,21 @@ export default function QuickSendV8({
   const needsApproval = estimate !== null && approvalConfig !== null && estimate.count >= approvalConfig.threshold && !approvalConfig.singleOperator
   const countMatched = countInput.trim() !== '' && Number(countInput) === estimate?.count
   const scheduledAt = when === 'scheduled' && scheduledValue ? datetimeLocalJstToUtcIso(scheduledValue) : null
+  const selectionKey = JSON.stringify([target, tagId, when, scheduledValue])
+  const latestSelection = useRef(selectionKey)
+  latestSelection.current = selectionKey
+  const selectionReady = target !== 'unselected' && when !== 'unselected'
   const currentAttempt = pendingRef.current
   const operation: QuickSendOperation = currentAttempt?.needsApproval || (!currentAttempt && needsApproval) ? 'approval'
     : (currentAttempt ? currentAttempt.scheduledAt : when === 'scheduled') ? 'schedule' : 'send'
-  const operationAllowed = canUseQuickSendNow(operation) && (currentAttempt !== null || access.create)
+  const operationAllowed = selectionReady ? canUseQuickSendNow(operation) && (currentAttempt !== null || access.create) : access.create
   const operationReason = access.reason(operationAllowed ? undefined : operation === 'send' && access.session?.impersonation ? 'send' : !currentAttempt && !access.create ? 'create' : operation)
   const editReason = access.reason('create')
   const changeInput = <T,>(change: (value: T) => void) => (value: T) => { if (canUseQuickSendNow('create')) change(value) }
-  const canSend = operationAllowed && text.trim().length > 0
+  const canSend = selectionReady && operationAllowed && text.trim().length > 0
     && text.length <= TEXT_LIMIT
-    && (target === 'all' || tagId !== '')
-    && (when === 'now' || scheduledValue !== '')
+    && (target === 'all' || (target === 'tag' && tagId !== ''))
+    && (when === 'now' || (when === 'scheduled' && scheduledAt !== null))
     && (!needsApproval || approverId !== '')
     && approvalConfig !== null
     && estimate !== null
@@ -196,8 +203,10 @@ export default function QuickSendV8({
     && !busy
   const sendDisabledReason = !text.trim() ? '送る本文を入力してください。'
     : text.length > TEXT_LIMIT ? `本文は${TEXT_LIMIT}文字以内で入力してください。`
-      : target !== 'all' && !tagId ? '送る相手のタグを選んでください。'
-        : when !== 'now' && !scheduledValue ? '送る日時を選んでください。'
+      : target === 'unselected' ? '送る相手を選んでください。'
+        : when === 'unselected' ? '送る時間を選んでください。'
+      : target === 'tag' && !tagId ? '送る相手のタグを選んでください。'
+        : when === 'scheduled' && !scheduledAt ? '送る日時を選んでください。'
           : needsApproval && !approverId ? '承認を頼む相手を選んでください。'
             : approvalConfig === null ? error ? '配信の承認設定を確認できません。もう一度開き直してください。' : '配信の承認設定を確認しています。'
               : estimate === null ? error ? '送る相手の人数を確認できません。本文や宛先を確認してください。' : '送る相手の人数を確認しています。'
@@ -216,7 +225,7 @@ export default function QuickSendV8({
   }
 
   async function handleSend() {
-    if (!canSend || !accountId || sendingRef.current) return
+    if (target === 'unselected' || when === 'unselected' || !canSend || latestSelection.current !== selectionKey || !accountId || sendingRef.current) return
     const current = renderedContext
     const token = {}
     const permitted = captureQuickSendAccess()
@@ -250,7 +259,7 @@ export default function QuickSendV8({
       if (needsCountConfirmation) {
         requireAccess('preflight')
         const current = await api.broadcasts.preflight({
-          targetType: target === 'tag' ? 'tag' : 'all',
+          targetType: target,
           targetTagId: target === 'tag' ? tagId : null,
           lineAccountId: accountId,
           messageContent: text,
@@ -272,7 +281,7 @@ export default function QuickSendV8({
           title: text.trim().slice(0, 20) || 'かんたん送信',
           messageType: 'text',
           messageContent: text,
-          targetType: target === 'tag' ? 'tag' : 'all',
+          targetType: target,
           targetTagId: target === 'tag' ? tagId : null,
           scheduledAt,
           status: scheduledAt ? 'scheduled' : 'draft',
@@ -344,7 +353,7 @@ export default function QuickSendV8({
 
         </DialogActions>)}
     >
-      <div className={styles.body}>{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
+      <div className={styles.body}>{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField tokenNames={tokenNames}
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
@@ -388,7 +397,7 @@ export default function QuickSendV8({
           <div className={styles.estimate} aria-live="polite">
             <Users size={16} aria-hidden="true" className={styles.estimateIcon} />
             <span>
-              {estimating ? '人数を数えています…' : estimate ? estimateText(estimate) : '本文を書くと、届く人数の見込みが出ます'}
+              {estimating ? '人数を数えています…' : estimate ? estimateText(estimate) : '本文を入力し、送る相手を選ぶと、届く人数の見込みが出ます'}
             </span>
           </div>
           {needsCountConfirmation && estimate ? <fieldset className={styles.countFields} disabled={!access.preflight || busy}><SingleOperatorFields recipientCount={estimate.count} value={countInput} onChange={value => { if (canUseQuickSendNow('preflight')) setCountInput(value) }} /></fieldset> : null}

@@ -31,6 +31,12 @@ export function setupSummary(data: StyleSetupData | null, includeComplete = fals
   return summary.rows.length > 0 || includeComplete ? summary : null
 }
 
+/** 標準と業種のホームで、同じ復旧理由と権限に応じた入口を出す。 */
+export function ReservationFormRepairNotices({notices,role}:{notices?:readonly {message:string;href:string}[];role:string|null}){
+  const canRepair=role==='owner'||role==='admin'
+  return <>{notices?.map(item=><Notice key={item.href} tone="warn" action={<Button {...(canRepair?{href:item.href}:{disabled:true})} lockedReason={permissionLockReason(role,canRepair,'manager')}>予約フォームを直す →</Button>}>{item.message}</Notice>)}</>
+}
+
 /** 上の警告の帯（Bdfxm の「帯/注意（行き先つき）」）。機能ごとに 1 本。 */
 export function SetupWarningBands({ data, configureAllowed = true, role }: { data: StyleSetupData; configureAllowed?: boolean; role?: string | null }) {
   const preparing = usePreparingDialog()
@@ -79,17 +85,14 @@ export function SetupTasks({ summary, onOpenStep, heading = false, configureAllo
   return <>
       {heading ? <>
         <CardHeader title="選んだ機能の設定" headingLevel={3} size="content"
-          meta={`質問 ${summary.done} / ${summary.total} 済み・残りの設定 ${summary.rows.length} 件`}
-          help={<HelpTip label="選んだ機能の設定の説明">質問で後回しにした設定です。基本の手順とは別に、使い方の質問の進みと残りの設定を表示します。</HelpTip>} />
-        <ProgressBar appearance="quota" value={summary.done} max={summary.total} label="使い方の設定の進み" />
+          help={<HelpTip label="選んだ機能の設定の説明">質問で後回しにした設定や、動かす前の確認です。上の進みは基本の手順の済み数です。</HelpTip>} />
       </> : null}
       <SetupStepList>
         {summary.rows.map((row) => <SetupRow key={row.key} row={row} onOpenStep={onOpenStep} onPreparing={preparing.open} configureAllowed={configureAllowed} role={role} onView={openSummary} />)}
       </SetupStepList>
       {summary.done > 0 ? (
         <p className={styles.done}>
-          <CircleCheck aria-hidden="true" className={styles.doneIcon} />
-          <span className={styles.doneText}>{doneText}</span>
+          {heading ? null : <><CircleCheck aria-hidden="true" className={styles.doneIcon} /><span className={styles.doneText}>{doneText}</span></>}
           <span className={styles.spacer} />
           <Button variant="text" lockedReason={configureAllowed ? undefined : '中身はオーナーか管理者が見られます'} onClick={() => { if (configureAllowed) onOpenStep(0) }}>済んだ物を見る</Button>
         </p>

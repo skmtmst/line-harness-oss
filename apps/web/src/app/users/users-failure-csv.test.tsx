@@ -16,6 +16,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a>,
 }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', useStaffIdentity: () => ({ name: '試験担当', role: 'owner', accountScope: 'all', permissionKeys: [] }), canManageRole: () => true }))
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -74,19 +75,22 @@ describe('統合ユーザーの失敗と0件（WEB322）', () => {
     expect(fixture.stats).toHaveBeenCalledTimes(2)
   })
 
-  it('友だちの統合タブも、失敗から再試行して実値0と友だち数を確かめられる', async () => {
-    fixture.list.mockResolvedValue({ success: true, data: { rows: [], total: 0 } })
-    fixture.stats.mockResolvedValueOnce({ success: false, error: 'down' }).mockResolvedValue({
-      success: true, data: { uniquePeople: 0, totalFollowing: 7, friendDups: 0 },
+  it('友だちの統合タブは店舗の集計を再試行し、取得した実値0を表示する', async () => {
+    let summaryCalls = 0
+    fixture.list.mockImplementation(async (input: { memberAccountId?: string; pageSize?: number }) => {
+      if (input.pageSize === 1 && ++summaryCalls === 1) throw new Error('down')
+      return { success: true, data: { memberAccountId: input.memberAccountId, rows: [], total: 0 } }
     })
     render(<MergedUsersV8 />)
     await waitFor(() => expect(screen.getByText('読み込めませんでした')).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
     await waitFor(() => expect(screen.queryByText('読み込めませんでした')).toBeNull())
-    expect(screen.getAllByText('0 人').length).toBeGreaterThan(0)
-    fireEvent.click(screen.getByRole('button', { name: '統合ユーザーの説明' }))
-    expect(screen.getByText(/紐付く友だち：7件/)).toBeTruthy()
-    expect(fixture.stats).toHaveBeenCalledTimes(2)
+    const card = screen.getByRole('button', { name: '統合ユーザーの説明' }).closest('[data-kpi-presentation]')!
+    expect(card.querySelector('[data-kpi-number]')?.textContent).toBe('0')
+    expect(within(card as HTMLElement).getByText('人')).toBeTruthy()
+    expect(summaryCalls).toBe(2)
+    expect(fixture.list.mock.calls.every(([input]) => input.memberAccountId === 'a')).toBe(true)
+    expect(fixture.stats).not.toHaveBeenCalled()
   })
 
   it.each(['success', 'failure'] as const)('新しい集計を、古い%sの返答で上書きしない', async (response) => {

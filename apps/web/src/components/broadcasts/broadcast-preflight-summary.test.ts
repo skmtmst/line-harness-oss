@@ -7,15 +7,25 @@ const input = {
   preflight: null,
   targetMode: 'all', tags: [], tagId: '', scenarios: [], scenariosStatus: 'idle',
   audience: null, excludeTagId: '', sendMode: 'now', scheduledDate: '', scheduledTime: '',
-  spreadMinutes: '0', testPassed: false, previewConfirmed: false,
+  spreadMinutes: '0',
 } satisfies Parameters<typeof broadcastPreflightSummary>[0]
 const result = (extra: Partial<BroadcastPreflight> = {}): BroadcastPreflight => ({ audienceCount: 10, hiddenExcluded: 0, warnings: [], ...extra })
 const exclusions = { blocked: 0, hidden: 0, missingDestination: 0, duplicate: 0, paused: null, total: 0 }
 
 describe('配信の事前確認を表示する値', () => {
+  it('確認後すぐの分散送信では、開始と分散する分数の両方を最終確認に出す', () => {
+    expect(broadcastPreflightSummary({ ...input, sendMode: 'now', spreadMinutes: '45' }).sendWhenLabel)
+      .toBe('今すぐ（確認してから送信・45分かけて配信）')
+  })
+
+  it('不正な小数の分数を配送にもまとめにも使わない', () => {
+    expect(broadcastPreflightSummary({ ...input, spreadMinutes: '45.5' }).sendWhenLabel).toBe('今すぐ（確認してから送信）')
+    expect(broadcastPreflightSummary({ ...input, sendMode: 'unselected' }).sendWhenLabel).toBeNull()
+  })
+
   it('未取得は未取得のまま、確認済みの0人・除外なしと区別する', () => {
-    expect(broadcastPreflightSummary(input)).toMatchObject({ audienceCount: null, audienceDisplayCount: null, exclusionNote: null, quotaNote: null, evaluatedAtLabel: null, unconfirmedCount: null })
-    expect(broadcastPreflightSummary({ ...input, preflight: result({ audienceCount: 0, exclusions }) })).toMatchObject({ audienceCount: 0, audienceDisplayCount: 0, exclusionNote: '除外なし', unconfirmedCount: 2 })
+    expect(broadcastPreflightSummary(input)).toMatchObject({ audienceCount: null, audienceDisplayCount: null, exclusionNote: null, quotaNote: null, evaluatedAtLabel: null })
+    expect(broadcastPreflightSummary({ ...input, preflight: result({ audienceCount: 0, exclusions }) })).toMatchObject({ audienceCount: 0, audienceDisplayCount: 0, exclusionNote: '除外なし' })
   })
 
   it('シナリオ候補が未取得なら削除済みと断定せず、取得後は名前か削除済みを表示する', () => {
@@ -48,11 +58,10 @@ describe('配信の事前確認を表示する値', () => {
     expect(broadcastPreflightSummary(input).sendWhenLabel).toBe('今すぐ（確認してから送信）')
   })
 
-  it('予約日時・分散時間を示し、警告と未確認の試送信・見本だけを残件数へ数える', () => {
-    const summary = broadcastPreflightSummary({ ...input, sendMode: 'scheduled', scheduledDate: '2030-10-05', scheduledTime: '10:00', spreadMinutes: '30', testPassed: true, preflight: result({ warnings: [{ level: 'warning', message: '確認項目' }, { level: 'info', message: '案内' }] }) })
+  it('予約日時と分散時間を示し、日時がない設定を確認済みにしない', () => {
+    const summary = broadcastPreflightSummary({ ...input, sendMode: 'scheduled', scheduledDate: '2030-10-05', scheduledTime: '10:00', spreadMinutes: '30', preflight: result({ warnings: [{ level: 'warning', message: '確認項目' }, { level: 'info', message: '案内' }] }) })
     expect(summary.scheduledLabel).toBe('2030/10/05 10:00（30分かけて配信）')
     expect(summary.sendWhenLabel).toBe(summary.scheduledLabel)
-    expect(summary.unconfirmedCount).toBe(2)
     expect(broadcastPreflightSummary({ ...input, sendMode: 'optimal' }).sendWhenLabel).toBeNull()
   })
 })

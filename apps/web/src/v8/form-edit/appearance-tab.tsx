@@ -1,9 +1,5 @@
 'use client'
 import TextLink from '@/components/shared/text-link'
-import { requiredText } from '@/lib/form-requirement'
-export const formNameRequirement = requiredText('フォーム名を入力してください')
-
-
 import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import { useRef, useState } from 'react'
@@ -37,6 +33,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import { FormNameField } from './form-name-field'
 
 /*
  * 「受付と見た目」のタブ。受付のきまり・色と文字・背景とリンクの見え方・
@@ -243,15 +240,10 @@ export function AppearanceTab(props: Props) {
         <div className={styles.cardHeadText}>
           <h2 className={styles.cardTitle}>ボタンの言葉</h2>
         </div>
-        <div className={styles.wordsHead} aria-hidden="true">
-          <span>前へ</span>
-          <span>次へ</span>
-          <span>送る</span>
-        </div>
         <SettingsFormRow layout="columns" columns={3}>
-          <SaveErrorField names={["prevLabel","options.prevLabel","prev_label","options.prev_label"]}><TextField aria-label="前へボタンの文字" value={options.prevLabel ?? ''} placeholder="前へ" onChange={(e) => onChangeOptions({ prevLabel: e.target.value })} /></SaveErrorField>
-          <SaveErrorField names={["nextLabel","options.nextLabel","next_label","options.next_label"]}><TextField aria-label="次へボタンの文字" value={options.nextLabel ?? ''} placeholder="次へ" onChange={(e) => onChangeOptions({ nextLabel: e.target.value })} /></SaveErrorField>
-          <SaveErrorField names={["submitLabel","options.submitLabel","submit_label","options.submit_label"]}><TextField aria-label="送るボタンの文字" value={options.submitLabel ?? ''} placeholder="送信する" onChange={(e) => onChangeOptions({ submitLabel: e.target.value })} /></SaveErrorField>
+          <Field label="前へ" htmlFor="fe-prev-label"><SaveErrorField names={["prevLabel","options.prevLabel","prev_label","options.prev_label"]}><TextField id="fe-prev-label" aria-label="前へボタンの文字" value={options.prevLabel ?? ''} placeholder="前へ" onChange={(e) => onChangeOptions({ prevLabel: e.target.value })} /></SaveErrorField></Field>
+          <Field label="次へ" htmlFor="fe-next-label"><SaveErrorField names={["nextLabel","options.nextLabel","next_label","options.next_label"]}><TextField id="fe-next-label" aria-label="次へボタンの文字" value={options.nextLabel ?? ''} placeholder="次へ" onChange={(e) => onChangeOptions({ nextLabel: e.target.value })} /></SaveErrorField></Field>
+          <Field label="送る" htmlFor="fe-submit-label"><SaveErrorField names={["submitLabel","options.submitLabel","submit_label","options.submit_label"]}><TextField id="fe-submit-label" aria-label="送るボタンの文字" value={options.submitLabel ?? ''} placeholder="送信する" onChange={(e) => onChangeOptions({ submitLabel: e.target.value })} /></SaveErrorField></Field>
         </SettingsFormRow>
       </Card>
 
@@ -260,8 +252,7 @@ export function AppearanceTab(props: Props) {
           <h2 id="fe-about-title" className={styles.cardTitle}>フォームのこと</h2>
           <p className={styles.cardNote}>名前は一覧と題に出ます。覚え書きはお客さまには出ません。</p>
         </div>
-        <div className={styles.field}><Field label="フォーム名" htmlFor="fe-name" requirement={formNameRequirement}><SaveErrorField names={["name","props.name"]}><TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onBlur={props.onBlurName} onChange={(e) => props.onChangeName(e.target.value)} /></SaveErrorField>
-{props.nameError ? <p role="alert" className={styles.fieldError}>{props.nameError}</p> : null}</Field></div>
+        <FormNameField value={props.name} error={props.nameError} onChange={props.onChangeName} onBlur={props.onBlurName} />
         <div className={styles.field}><Field label="覚え書き" htmlFor="fe-desc"><SaveErrorField names={["description","props.description"]}><TextArea id="fe-desc" rows={2} value={props.description} onChange={(e) => props.onChangeDescription(e.target.value)} /></SaveErrorField></Field></div>
       </Card>
 

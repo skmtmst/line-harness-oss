@@ -14,10 +14,12 @@ export interface V06CheckRow { key: V8CheckRow['key']; title: string; detail: st
 
 type RowKey = V8CheckRow['key']
 
-/** ③Step1の5行の見出し。承認済みの Lwxyh／EKLKb の文のまま。 */
+export const PROVIDER_MEMBERSHIP_GUIDANCE = 'プロバイダーの所属は自動では照合していません。LINE Developersで、Messaging APIとLINEログインのチャネルが同じプロバイダー内にあることを確認してください。'
+
+/** 接続確認の見出し。認証の合否と、未照合のプロバイダー所属を区別する。 */
 const V06_ROW_TITLES: Record<RowKey, string> = {
   channel: 'LINEとつながるかの確認',
-  provider: '同じプロバイダーかの確認',
+  provider: '2つのチャネルの認証',
   webhook: 'Webhook URL の登録',
   lineId: 'アカウント名・@ID・アイコンの取り込み',
   addUrl: '友だち追加の窓口（LIFF）の用意',
@@ -26,7 +28,7 @@ const V06_ROW_TITLES: Record<RowKey, string> = {
 /** 押す前（EKLKb）の説明文。 */
 const V06_ROW_IDLE: Record<RowKey, string> = {
   channel: 'いただいた4項目で、2つのチャネルに接続できるか試します。',
-  provider: '別のプロバイダーに作られていると、ここで分かります。',
+  provider: '両方のチャネルの認証結果を確認します。',
   webhook: 'musubo のURLを自動で登録して、テスト送信まで行います。',
   lineId: 'LINEから読み取って自動で表示します。入力はいりません。',
   addUrl: '友だち追加のURLとQRコードを自動で作ります。',
@@ -35,7 +37,7 @@ const V06_ROW_IDLE: Record<RowKey, string> = {
 /** 通ったとき（V9Jbn）の説明文。 */
 const V06_ROW_OK: Record<RowKey, string> = {
   channel: '2つのチャネルに接続できました。',
-  provider: '同じプロバイダーの中にありました。',
+  provider: '両方のチャネルで認証できました。',
   webhook: 'Webhook URL を登録しました。',
   lineId: 'アカウント名・@ID・アイコンを取り込みました。',
   addUrl: '友だち追加の窓口（LIFF）を作りました。',
@@ -44,7 +46,7 @@ const V06_ROW_OK: Record<RowKey, string> = {
 /** 止まったとき（eqJbD／Tn6tJ）の説明文。 */
 const V06_ROW_ERROR: Record<RowKey, string> = {
   channel: '2つのチャネルに接続できませんでした。チャネルIDとチャネルシークレットを確認してください。',
-  provider: 'LINEログインのチャネルが、Messaging API と別のプロバイダーにありました。',
+  provider: '2つのチャネルの認証を完了できませんでした。チャネルIDとチャネルシークレットを確認してください。',
   webhook: 'URLは登録できましたが、「Webhookの利用」がOFFのままです。上の案内のとおりONにしてください。',
   lineId: 'アカウント名・@ID・アイコンを取り込めませんでした。',
   addUrl: '友だち追加の窓口（LIFF）を作れませんでした。',
@@ -63,7 +65,7 @@ const V06_PENDING = '前の確認が終わってから行います。'
  * ③Step1の5行。合否は connectCheck の1回の返事がすべて持っている。
  * 上から順に出すのは画面側の見せ方で、カーソルより手前は実際の合否、カーソルの行は「確認中」、
  * 後ろは「待機中」。返事が来る前はカーソル0の行だけが「確認中」になる。
- * 説明文は承認済みの Lwxyh の5状態（押す前・確認中・すべてOK・WebhookがOFF・プロバイダーが別）から選ぶ。
+ * 説明文は押す前・確認中・すべてOK・WebhookがOFF・認証失敗の状態から選ぶ。
  */
 export function toV06CheckRows(connection: LineAccountConnectData | null, view: { running: boolean; cursor: number }): V06CheckRow[] {
   const base = toV8CheckRows(connection)
@@ -117,7 +119,7 @@ export interface CheckNotice { tone: 'info' | 'danger'; title: string; body: str
 
 /**
  * 5行の上に出す案内箱。承認済みの Lwxyh では
- * WebhookがOFF（eqJbD）は青い箱、プロバイダーが別（Tn6tJ）は赤い箱。
+ * WebhookがOFFのときは案内、認証が止まったときはエラーを出す。
  */
 export function checkErrorText(stage: CheckStage, rows: V06CheckRow[]): CheckNotice | null {
   if (stage !== 'error' && stage !== 'webhookOff') return null
@@ -132,8 +134,8 @@ export function checkErrorText(stage: CheckStage, rows: V06CheckRow[]): CheckNot
   if (stopped?.key === 'provider') {
     return {
       tone: 'danger',
-      title: 'LINEログインのチャネルを同じプロバイダーに作り直してください',
-      body: 'いま入れていただいたLINEログインのチャネルは、Messaging API とは別のプロバイダーにありました。同じプロバイダーの中にLINEログインのチャネルを作り、そのチャネルIDとチャネルシークレットを入れ直してください。入力済みの内容はそのまま残っています。',
+      title: '2つのチャネルの認証情報を確認してください',
+      body: 'Messaging APIとLINEログインのチャネルID・チャネルシークレットをLINE Developersで確認して、もう一度確かめてください。所属が違うかどうかは、この結果だけでは分かりません。入力済みの内容はそのまま残っています。',
     }
   }
   return {

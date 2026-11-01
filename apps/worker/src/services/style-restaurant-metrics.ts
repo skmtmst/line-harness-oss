@@ -150,5 +150,6 @@ export async function restaurantMetrics(context:StyleAnalyticsContext) {
       '有効卓のうち現在の予約が重なっていない卓',
       '卓',
     );
+    metrics.freeTables.totalTables = tables.filter(t => !query.store_id || t.store_id === query.store_id).length;
   }
 }

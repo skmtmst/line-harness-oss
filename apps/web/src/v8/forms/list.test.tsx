@@ -1,7 +1,7 @@
 
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
@@ -24,6 +24,7 @@ vi.hoisted(() => {
 const fetchApi = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const unarchive = vi.hoisted(() => vi.fn())
+const deleteImpact = vi.hoisted(() => vi.fn())
 const listStats = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const narrow = vi.hoisted(() => ({ value: false }))
@@ -34,7 +35,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return {
     ...actual,
     fetchApi,
-    api: { ...api, forms: { ...api.forms, unarchive }, folders: { ...api.folders, list: listFolders }, listStats: { get: listStats } },
+    api: { ...api, forms: { ...api.forms, unarchive, deleteImpact }, folders: { ...api.folders, list: listFolders }, listStats: { get: listStats } },
   }
 });
 
@@ -116,6 +117,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'localStorage', { value: storage, configurable: true })
   window.localStorage.setItem('lh_staff_role', 'owner')
   narrow.value = false
+  deleteImpact.mockReset()
   unarchive.mockReset()
   unarchive.mockResolvedValue({ success: true, data: { status: 'active', revision: 2, isActive: false } })
   fetchApi.mockReset()
@@ -369,4 +371,55 @@ it('質問数は配置の入力欄を数え、見出し・説明を数えず、�
   const layout = fieldsToLayout(fields)
   expect(formQuestionCount({ fields: [], layout })).toBe(1)
   expect(formQuestionCount({ fields, layout: undefined } as unknown as Form)).toBe(1)
+})
+
+
+describe('フォームを片付ける時の案内', () => {
+  const impact = {
+    form: { id: 'f-1', name: '来店アンケート', isActive: false, status: 'active' },
+    submissionCount: 0, openCount: 0, references: [], referenceCount: 0,
+    answerUrl: 'https://liff.line.me/liff-a/?page=form&id=f-1',
+    revision: 4, contentRevision: 3, checkedAt: '2026-10-31T12:00:00Z',
+    canDelete: true, canArchive: true, recommendedAction: 'delete', blockers: [],
+  }
+  async function openCleanup() {
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」のその他の操作' }))
+    await flush()
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    await flush()
+    return within(screen.getByRole('dialog', { name: '「来店アンケート」をどうしますか' }))
+  }
+  it('削除できる未公開フォームは削除を勧め、開けなくなる公開URLを出さない', async () => {
+    deleteImpact.mockResolvedValue({ success: true, data: impact })
+    const dialog = await openCleanup()
+    expect(dialog.getByText('削除する（おすすめ）')).toBeTruthy()
+    expect(dialog.queryByText('アーカイブする（おすすめ）')).toBeNull()
+    expect(dialog.queryByText(/開けなくなる公開URL/)).toBeNull()
+    expect((dialog.getByRole('button', { name: '削除する' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+  it('公開した受付停止フォームはアーカイブを勧め、公開URLの影響を残す', async () => {
+    deleteImpact.mockResolvedValue({ success: true, data: { ...impact, canDelete: false, recommendedAction: 'archive', blockers: ['published'] } })
+    const dialog = await openCleanup()
+    expect(dialog.getByText('アーカイブする（おすすめ）')).toBeTruthy()
+    expect(dialog.queryByText('削除する（おすすめ）')).toBeNull()
+    expect(dialog.getByText(/開けなくなる公開URL/)).toBeTruthy()
+    expect((dialog.getByRole('button', { name: '削除する' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+  it('未公開でも利用先がある時は削除を許可せず、利用先の注意を保つ', async () => {
+    deleteImpact.mockResolvedValue({ success: true, data: { ...impact, canDelete: false, recommendedAction: 'archive', blockers: ['in_use'], referenceCount: 1,
+      references: [{ kind: 'rich_menu', name: 'お知らせ', href: '/rich-menus/edit?id=menu-a', state: 'available' }] } })
+    const dialog = await openCleanup()
+    expect(dialog.getByText('アーカイブする（おすすめ）')).toBeTruthy()
+    expect(dialog.queryByText(/開けなくなる公開URL/)).toBeNull()
+    expect(dialog.getByText(/このフォームを開きます/)).toBeTruthy()
+    expect(dialog.queryByTitle(/開けなくなる公開URL/)).toBeNull()
+    expect((dialog.getByRole('button', { name: '削除する' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+  it('影響を確認できない時は削除もアーカイブも実行できない', async () => {
+    deleteImpact.mockRejectedValue(new Error('offline'))
+    const dialog = await openCleanup()
+    expect(dialog.getByText(/影響を確認できませんでした/)).toBeTruthy()
+    for (const name of ['削除する', 'アーカイブする']) expect((dialog.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(true)
+  })
 })

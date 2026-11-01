@@ -8,8 +8,8 @@
  * 管理画面 の画面と ★V8 の画面（`users-v8.tsx`）が同じ口を使う。
  * 絞り込み・ページ・再計算・CSV はここでだけ変える。
  */
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useListUrlState, useListUrlValue } from '@/components/shared/list-url-state'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import type { UserRowData } from '@/components/users/users-types'
@@ -24,10 +24,49 @@ export interface UsersAccountOption {
   name: string
 }
 
-export function useMergedUsers() {
+export function useMergedUsers(memberAccountId: string | null) {
+  const scope = useMemo(() => ({ memberAccountId }), [memberAccountId])
+  const currentScope = useRef<typeof scope | null>(scope)
+  useLayoutEffect(() => {
+    currentScope.current = scope
+    return () => { if (currentScope.current === scope) currentScope.current = null }
+  }, [scope])
+  const [loadedScope, setLoadedScope] = useState<typeof scope | null>(null)
+  const summaryRequestRef = useRef(0)
+  const [summary, setSummary] = useState<{ scope: typeof scope; total: number | null; status: 'loading' | 'ready' | 'error' } | null>(null)
+  const loadSummary = useCallback(async (forceRefresh = false) => {
+    if (currentScope.current !== scope) return
+    const seq = ++summaryRequestRef.current
+    if (!memberAccountId) { setSummary(null); return }
+    setSummary({ scope, total: null, status: 'loading' })
+    try {
+      const res = await api.usersGrouped.list({ memberAccountId, page: 1, pageSize: 1, forceRefresh: forceRefresh || undefined })
+      if (seq !== summaryRequestRef.current || currentScope.current !== scope) return
+      if (!res.success || res.data.memberAccountId !== memberAccountId || !Number.isFinite(res.data.total)) throw new Error('summary unavailable')
+      setSummary({ scope, total: res.data.total, status: 'ready' })
+    } catch {
+      if (seq === summaryRequestRef.current && currentScope.current === scope) setSummary({ scope, total: null, status: 'error' })
+    }
+  }, [memberAccountId, scope])
+  useEffect(() => {
+    void loadSummary()
+    return () => { summaryRequestRef.current += 1 }
+  }, [loadSummary])
   const [rows, setRows] = useState<UserRowData[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useListUrlValue('page', 1)
+  const [urlScope, setUrlScope] = useListUrlState({ memberAccount: '', page: '1' })
+  // 引き継ぎ確認で本文が作り直されても、ページと店舗の組を照合する。
+  useEffect(() => {
+    if (!memberAccountId || urlScope.memberAccount === memberAccountId) return
+    setUrlScope({ memberAccount: memberAccountId, page: urlScope.memberAccount ? '1' : String(page) })
+  }, [memberAccountId, urlScope.memberAccount, page, setUrlScope])
+  const previousMemberAccount = useRef(memberAccountId)
+  useEffect(() => {
+    if (!memberAccountId) return
+    if (previousMemberAccount.current && previousMemberAccount.current !== memberAccountId) setPage(1)
+    previousMemberAccount.current = memberAccountId
+  }, [memberAccountId, setPage])
   const [pageSize, setPageSizeState] = useListUrlValue<number>('pageSize', USERS_PAGE_SIZE)
   const setPageSize = useCallback((size: number) => {
     setPageSizeState(size)
@@ -58,10 +97,12 @@ export function useMergedUsers() {
     }
   }, [q])
 
+  const filterKey = JSON.stringify([debouncedQ, onlyDups, account, uid])
+  const previousFilters = useRef(filterKey)
   useEffect(() => {
-    // FRIEND-09: UID条件も含めて条件変更時は1ページへ戻す。
-    setPage(1)
-  }, [debouncedQ, onlyDups, account, uid])
+    if (previousFilters.current !== filterKey) setPage(1)
+    previousFilters.current = filterKey
+  }, [filterKey, setPage])
 
   // アカウント候補は LINE アカウント API から取得（ページ依存させない）。
   // /api/users-grouped は inactive を除外して集計するので、候補も active のみ。
@@ -79,23 +120,31 @@ export function useMergedUsers() {
   }, [])
 
   const load = useCallback(async () => {
+    if (currentScope.current !== scope) return
     const seq = ++requestSeqRef.current
+    if (!memberAccountId) {
+      setRows([]); setTotal(0); setError(''); setLoading(false); setLoadedScope(scope)
+      return
+    }
     setLoading(true)
     setError('')
     const force = pendingForceRefresh
-    if (force) setRefreshing(true)
+    if (force) { setRefreshing(true); void loadSummary(true) }
     try {
       const res = await api.usersGrouped.list({
         q: debouncedQ || undefined,
         onlyDups: onlyDups || undefined,
         account: account || undefined,
+        memberAccountId: memberAccountId || undefined,
         // FRIEND-09: UID絞り込みはサーバーへ渡し、全件へ適用する。
         uid: uid === 'linked' || uid === 'unlinked' ? uid : undefined,
         page,
         pageSize,
         forceRefresh: force || undefined,
       })
-      if (seq !== requestSeqRef.current) return // stale 応答は無視
+      if (seq !== requestSeqRef.current || currentScope.current !== scope) return // stale 応答は無視
+      if (res.success && (res.data.memberAccountId !== memberAccountId || res.data.rows.some(row => !row.accounts.some(account => account.accountId === memberAccountId)))) throw new Error('member scope unavailable')
+      setLoadedScope(scope)
       if (res.success) {
         setRows(res.data.rows)
         setTotal(res.data.total)
@@ -106,12 +155,13 @@ export function useMergedUsers() {
         setError('取得に失敗しました。もう一度読み込んでください。')
       }
     } catch {
-      if (seq !== requestSeqRef.current) return
+      if (seq !== requestSeqRef.current || currentScope.current !== scope) return
+      setLoadedScope(scope)
       setRows([])
       setTotal(0)
       setError('取得に失敗しました。もう一度読み込んでください。')
     } finally {
-      if (seq === requestSeqRef.current) {
+      if (seq === requestSeqRef.current && currentScope.current === scope) {
         setLoading(false)
         if (force) {
           setRefreshing(false)
@@ -119,10 +169,11 @@ export function useMergedUsers() {
         }
       }
     }
-  }, [debouncedQ, onlyDups, account, uid, page, pageSize, pendingForceRefresh])
+  }, [debouncedQ, onlyDups, account, uid, page, pageSize, pendingForceRefresh, memberAccountId, scope, loadSummary])
 
   useEffect(() => {
-    load()
+    void load()
+    return () => { requestSeqRef.current += 1 }
   }, [load])
 
   /*
@@ -135,7 +186,8 @@ export function useMergedUsers() {
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const exportCsv = async () => {
-    if (exporting) return
+    if (exporting || !memberAccountId || currentScope.current !== scope || loadedScope !== scope || loading) return
+    const exportScope = scope
     setExporting(true)
     setExportError('')
     try {
@@ -143,6 +195,7 @@ export function useMergedUsers() {
         q: debouncedQ || undefined,
         onlyDups: onlyDups || undefined,
         account: account || undefined,
+        memberAccountId: memberAccountId || undefined,
         uid: uid === 'linked' || uid === 'unlinked' ? uid : undefined,
       } as const
       const all: UserRowData[] = []
@@ -150,11 +203,13 @@ export function useMergedUsers() {
       // 上限は途中で件数が増えても無限に追い続けないための安全弁。
       for (let p = 1; all.length < exportTotal && p <= 500; p += 1) {
         const res = await api.usersGrouped.list({ ...filters, page: p, pageSize: 200 })
-        if (!res.success) throw new Error('fetch failed')
+        if (currentScope.current !== exportScope) return
+        if (!res.success || res.data.memberAccountId !== memberAccountId || res.data.rows.some(row => !row.accounts.some(account => account.accountId === memberAccountId))) throw new Error('fetch failed')
         all.push(...res.data.rows)
         exportTotal = res.data.total
         if (res.data.rows.length === 0) break
       }
+      if (currentScope.current !== exportScope) return
       const lines = [
         ['統合ユーザー', '連絡先', '紐付くアカウント', 'UID', '最終接触'].map(csvCell).join(','),
         ...all.map((row) => [
@@ -172,15 +227,18 @@ export function useMergedUsers() {
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
-      setExportError('CSVを書き出せませんでした。時間をおいてやり直してください。')
+      if (currentScope.current === exportScope) setExportError('CSVを書き出せませんでした。時間をおいてやり直してください。')
     } finally {
       setExporting(false)
     }
   }
 
   return {
-    rows,
-    total,
+    rows: loadedScope === scope ? rows : [],
+    total: loadedScope === scope ? total : 0,
+    memberTotal: summary?.scope === scope && summary.status === 'ready' ? summary.total : null,
+    summaryStatus: !memberAccountId ? 'idle' : summary?.scope === scope ? summary.status : 'loading',
+    loadSummary,
     page,
     setPage,
     pageSize,
@@ -193,8 +251,8 @@ export function useMergedUsers() {
     setAccount,
     uid,
     setUid,
-    loading,
-    error,
+    loading: loadedScope === scope ? loading : Boolean(memberAccountId),
+    error: loadedScope === scope ? error : '',
     accountOptions,
     refreshing,
     setPendingForceRefresh,

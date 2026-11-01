@@ -379,6 +379,7 @@
   - 確認の実行を左、取消を中央に分ける場合は `confirmPlacement="start"`。通常の文字幅は `actionWidthReserve="idle"` で指定し、既定の結果文の幅予約は保つ。
   - 独自の処理を持つ窓でも操作は `DialogActions` に渡す。`footerAlign` だけを指定して本文にボタンを直置きしない。
   - 補助操作がある帯は、共通部品が左の最大ボタン幅を左右とも確保し、主操作を中央で折り返す。理由の行が増えても左は最初のボタン行へそろえる。実幅が左右同幅の配置に足りない場合は、共通部品で補助操作を上・中央の組を下へ積み、間を8px以上にする。画面側で幅や上下位置を補正しない。
+  - 未保存の確認は `UnsavedLeaveDialog` を使う。保存・破棄の意味が異なる場合のみ `saveLabel` / `discardLabel` / `error` / `onSavedLeave` を渡し、保存成功後の移動と破棄の処理を分ける。破棄だけの権限は `discardDisabled` / `discardLockedReason` で保存から分け、保持した操作も現在の権限を守る。省略時の表示と動きは変えない。
   - 参照だけの窓は右上の×で閉じ、下の帯に閉じるボタンを置かない。操作の帯は取消と主操作を中央、脇の操作を `leadingAction` へ。理由などの入力は本文に置く。全画面の検査は `scripts/visual-qa/dialog-footer-contract.test.ts`。
   - 読む変数：`--polish-radius-dialog`・`--polish-window-*`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
@@ -699,6 +700,7 @@
 ## notice 知らせ（トースト・Notice）
 
 - **役目**：保存できた＝トースト1つ。失敗は欄の赤か帯。種類は info・success・warn・danger
+- **帯をまとめる配置**：`NoticeStack`（`notice.tsx`）が複数のNoticeと閲覧のみの帯を12px間隔に並べる。帯自身の外側の余白と段間を二重に足さない。通常のNotice単体は変えない。
 - **持ち主（コード）**：`apps/web/src/components/shared/toast.tsx`・`apps/web/src/components/shared/toast.module.css`・`apps/web/src/components/shared/notice.tsx`・`apps/web/src/components/shared/notice.module.css`（部品 `Notice`・`notifyToast`・`Toast`）
 - **持ち主（Pen）**：`Q6cQB`「知らせ/うまくいった」・`tnWX9`「知らせ/できなかった」・`ThDed`「帯/案内」
 - **見つけ方（コード）**：
@@ -1192,7 +1194,9 @@
 - 役目：使い方のスタイルを「見る」切り替えと「選ぶ」ボタンを分け、見本の枠で中身を見せて選ばせる（SPEC-11・SPEC-12 の共通節 S）。
 - 持ち主：`apps/web/src/v8/onboarding/style-choice-step.tsx` の `StyleChoiceStep`（下の帯の 1 行は `StyleChoiceStatus`）。切り替えは共通 `SegmentedControl`、枠は共通 `Card`、選んだ印は `StatusBadge`。
 - 見本の枠の中は style-experience スタイル体験プレビュー（`StyleExperiencePlayer`・口は S-4）。枠の大きさはプレイヤーが持ち、並べた時は最小版と全部版で同じ高さ、白い板が 1100 未満では縦に積む。
-- 使用先：はじめの質問の 1 問目（ダッシュボードの窓）。登録の画面の④はまだ今の選ぶカードのまま。
+- 使用先：はじめの質問の 1 問目（ダッシュボードの窓）と登録④・登録再開。
+- 最初のメニュー選択は `onboarding/initial-menu-choice.tsx` の `InitialMenuChoice` が画像・行き先・できることを持つ。登録・再開・はじめの質問・選び直しで共通。画像内の文字は12px以上、欄が800px以上なら見本と説明を左右に並べる。狭い欄は縦に積む。
+- 初期メニューの読みやすさと配置は `scripts/visual-qa/initial-menu-layout.mjs` で実際の表示寸法を見張る。
 
 <a id="style-experience"></a>
 ## style-experience スタイル体験プレビュー
@@ -1236,11 +1240,17 @@
 ### 初期設定の共通カードと選んだ機能の設定
 
 - 持ち主：`v8/dashboard/first-steps.tsx`の`FirstStepsCard`。選んだ機能の行は`v8/onboarding/setup-card.tsx`の`SetupTasks`、取得は`useStyleSetup`を使う。
-- 使用先：標準・ECの共通ダッシュボードと、飲食・サロン・面談・教室の専用ダッシュボード。基本の手順と質問の進みは分け、同じカードに差し込む。
-- 操作：既存の質問・まとめへ開く。権限のない設定入口は共通の灰色と理由で残し、質問の書き込みを許可しない。
+- 使用先：標準・ECの共通ダッシュボードと、飲食・サロン・面談・教室の専用ダッシュボード。カードの数と進み線は基本の手順にそろえ、選んだ機能の案内と操作を同じカードへ差し込む。
+- 操作：質問・まとめは`v8/onboarding/use-setup-wizard.tsx`（公開名`public/setup-wizard`）で選択中のホームに開く。QRは`v8/dashboard/friend-add.tsx`（公開名`public/friend-add`）をカードと窓だけの両方で使い、選択アカウントの経路だけを読む。権限のない設定入口は共通の灰色と理由で残し、質問の書き込みを許可しない。
 
 ### 初期設定の共通の行
 
 - 持ち主：`components/shared/setup-step-row.tsx` と同名のCSS。`SetupStepList` / `SetupStepRow` / `SetupStepLabel` を基本の手順と選んだ機能の設定で共用する。
 - 高さ・間隔・左右の余白・済みと次の状態はこの部品に集める。説明がある行もない行も同じ高さを保つ。
 - 閲覧だけでも欄は出し、既存のGETで取得できた内容だけ表示する。変更操作は共通の灰色と理由、内容の参照は保存や有効化を伴わない窓で行う。
+
+## 操作する対象の要約
+
+持ち主は `components/shared/operation-target-summary.tsx`。呼び出し側が実際の操作先のIDと名前を渡し、既存の詳細項目の型でLINEアカウント・店舗（店舗の操作のみ）・動いている環境を表示する。名前と環境を推測しない。正本は [操作する対象の確認](v8-requirements/confirmation-targets.md)。
+
+- スタンプのマスの数と描画用データは visit-stamps/public/preview が公開し、既存displayのslotCount/previewSlotsを再利用する。別のマス数の計算を作らない。

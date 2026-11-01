@@ -16,7 +16,7 @@ import { fireEvent } from '@testing-library/react'
 import { formatDateTime } from '@/lib/format'
 import type { BroadcastPreflight } from '@/lib/api'
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
+const mocks = vi.hoisted(() => ({ params: '', get: vi.fn(), preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   const empty = async () => ({ success: true, data: [] })
@@ -31,7 +31,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 vi.mock('@/lib/api/helpers/gap1', () => ({ chatSafetyApi: { sendPreview: mocks.preview, confirmBroadcast: mocks.confirm } }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/broadcasts/new', useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/broadcasts/new', useSearchParams: () => new URLSearchParams(mocks.params) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }) }))
 import BroadcastForm from './broadcast-form'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -65,12 +65,16 @@ function definitions(scope: ParentNode): Record<string, string> {
   return Object.fromEntries(Array.from(scope.querySelectorAll('dt')).map((dt) => [dt.textContent?.trim() ?? '', dt.nextElementSibling?.textContent?.trim() ?? '']))
 }
 
-type RenderOptions = { step?: 'confirm' | 'audience' | null; scheduled?: boolean; filled?: boolean }
-async function render({ step = 'confirm', scheduled = false, filled = true }: RenderOptions = {}) {
+type RenderOptions = { step?: 'confirm' | 'audience' | null; scheduled?: boolean; filled?: boolean; untested?: boolean }
+async function render({ step = 'confirm', scheduled = false, filled = true, untested = false }: RenderOptions = {}) {
+  if (untested) {
+    mocks.params = 'duplicateFrom=source'
+    mocks.get.mockResolvedValue({ success: true, data: { id: 'source', version: 2, status: 'draft', title: '試験のお知らせ', messageType: 'text', messageContent: 'お知らせの本文です。' } })
+  }
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   await act(async () => {
     root.render(<BroadcastForm
-      visualQaAugustCampaign={filled}
+      visualQaAugustCampaign={filled && !untested}
       initialScheduledDate={scheduled ? '2099-10-05' : undefined}
       initialScheduledTime={scheduled ? '10:00' : undefined}
       currentStep={step ?? undefined}
@@ -81,13 +85,14 @@ async function render({ step = 'confirm', scheduled = false, filled = true }: Re
     />)
   })
   await flush()
+  if (!scheduled) await act(async () => { fireEvent.click(container.querySelector('input[name=broadcast-send-mode][value=now]')!) })
   await settle()
 }
 
 /** 1人運用の店で、人数を打ち込んで確かめる窓（確認の中身をすべて並べる窓）を開く。 */
-async function openSingleOperatorDialog() {
+async function openSingleOperatorDialog(untested = false) {
   mocks.config.mockResolvedValue({ success: true, data: { threshold: 5, singleOperator: true } })
-  await render()
+  await render({ untested })
   await click('今すぐ送る', container)
   await settle(200)
   const opened = dialog()
@@ -96,7 +101,7 @@ async function openSingleOperatorDialog() {
 }
 
 beforeEach(() => {
-  vi.useFakeTimers(); vi.clearAllMocks()
+  vi.useFakeTimers(); vi.clearAllMocks(); mocks.params = ''
   mocks.get.mockResolvedValue({ success: true, data: { id: 'draft', version: 2, status: 'sending' } })
   mocks.create.mockResolvedValue({ success: true, data: { id: 'draft', version: 1 } })
   mocks.update.mockResolvedValue({ success: true, data: { id: 'draft', version: 2 } })
@@ -145,6 +150,7 @@ describe('人数は配信前チェックが数えた数だけを使う', () => {
     await render()
     expect(button('今すぐ送る', container).disabled).toBe(true)
     expect(container.textContent).toContain('人数を確認してから送れます')
+    expect(container.textContent).not.toMatch(/\d+件の確認が残っています/)
     const inPage = definitions(container.querySelector('#broadcast-step-confirm details')!)
     expect(inPage['対象']).toMatch(/—$/)
     expect(inPage['対象']).not.toContain('0人')
@@ -176,6 +182,7 @@ describe('確認の窓に並べるもの', () => {
     mocks.send.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
     const opened = await openSingleOperatorDialog()
     await act(async () => { fireEvent.change(opened.querySelector('input#approval-count')!, { target: { value: '37' } }) }); await flush()
+    await act(async () => { fireEvent.click(Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))!) }); await flush()
     await act(async () => { fireEvent.click(button('今すぐ送る', opened)) }); await flush()
     expect(mocks.send).toHaveBeenCalledTimes(1)
     expect(opened.getAttribute('aria-busy')).toBe('true')
@@ -242,5 +249,69 @@ describe('条件が変わったら古い確認を使わない', () => {
     await act(async () => { finishOld({ success: true, data: { ...PREFLIGHT, audienceCount: 99 } }) }); await flush()
     expect(container.textContent).toContain('この条件で送る人数20人')
     expect(container.textContent).not.toContain('99人')
+  })
+})
+
+
+describe('確認が残る配信の了承', () => {
+  it('1人運用でも確認しましたを選ぶまで送れず、選ぶと人数の確認後に送れる', async () => {
+    const opened = await openSingleOperatorDialog(true)
+    await act(async () => { fireEvent.change(opened.querySelector('input#approval-count')!, { target: { value: '37' } }) }); await flush()
+    expect(button('今すぐ送る', opened).disabled).toBe(true)
+    await act(async () => { fireEvent.click(button('今すぐ送る', opened)) }); await flush()
+    expect(mocks.send).not.toHaveBeenCalled()
+    const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find((input) => input.labels?.[0]?.textContent?.includes('確認しました'))
+    expect(acknowledgement).toBeDefined()
+    await act(async () => { fireEvent.click(acknowledgement!) }); await flush()
+    await click('今すぐ送る', opened)
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('通常の確認でも了承が必要で、窓を開き直すと了承は外れる', async () => {
+    await render()
+    await click('今すぐ送る', container); await settle(200)
+    const opened = dialog()!
+    expect(button('37 人に送る', opened).disabled).toBe(true)
+    const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find((input) => input.labels?.[0]?.textContent?.includes('確認しました'))
+    expect(acknowledgement).toBeDefined()
+    await act(async () => { fireEvent.click(acknowledgement!) }); await flush()
+    expect(button('37 人に送る', opened).disabled).toBe(false)
+    await click('戻る', opened)
+    await click('今すぐ送る', container); await settle(200)
+    expect(button('37 人に送る', dialog()!).disabled).toBe(true)
+    expect(mocks.confirm).not.toHaveBeenCalled()
+  })
+
+  it('窓を開いたまま内容を変えると、前の了承では予約できない', async () => {
+    await render({ step: null, scheduled: true })
+    await click('配信を予約する', container); await settle(200)
+    const opened = dialog()!
+    const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))!
+    await act(async () => { fireEvent.click(acknowledgement) }); await flush()
+    expect(button('37 人に 10/5 10:00 で予約する', opened).disabled).toBe(false)
+    const titleInput = container.querySelector<HTMLInputElement>('input[placeholder="例：8月キャンペーンのお知らせ"]') ?? Array.from(container.querySelectorAll<HTMLInputElement>('input')).find(input => input.value === '8月キャンペーンのお知らせ')
+    expect(titleInput).toBeDefined()
+    await act(async () => { fireEvent.change(titleInput!, { target: { value: '変更後の配信名' } }) }); await flush()
+    expect(acknowledgement.checked).toBe(false)
+    expect(button('37 人に 10/5 10:00 で予約する', opened).disabled).toBe(true)
+    expect(mocks.confirm).not.toHaveBeenCalled()
+  })
+
+  it('確認できない送信枠とテスト送信を行に出し、要確認の件数と警告の行数をそろえる', async () => {
+    mocks.preflight.mockResolvedValue({ success: true, data: { ...PREFLIGHT, quota: { ...PREFLIGHT.quota, state: 'unavailable' } } })
+    await render({ untested: true })
+    await click('配信イメージを見る', container)
+    const section = container.querySelector('#broadcast-step-confirm')!
+    const rows = Array.from(section.querySelectorAll('[data-preflight-check]'))
+    expect(rows.length).toBeGreaterThanOrEqual(6)
+    const pending = rows.filter(row => row.getAttribute('data-check-state') === 'pending')
+    expect(pending).toHaveLength(3)
+    for (const row of rows) {
+      const icon = row.querySelector('svg')!
+      expect(icon.classList.contains(row.getAttribute('data-check-state') === 'pending' ? 'text-warning' : 'text-success')).toBe(true)
+    }
+    expect(pending.map(row => row.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('送信枠'), expect.stringContaining('テスト送信')]))
+    expect(section.textContent).toContain(`${pending.length}件の確認が残っています`)
+    expect(rows.find(row => row.textContent?.includes('送信枠'))?.getAttribute('data-check-state')).toBe('pending')
   })
 })

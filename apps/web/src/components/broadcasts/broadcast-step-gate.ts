@@ -1,3 +1,4 @@
+import type { BroadcastSendMode } from './broadcast-schedule'
 import type { BroadcastStepKey } from './broadcast-steps'
 
 /**
@@ -8,9 +9,9 @@ import type { BroadcastStepKey } from './broadcast-steps'
  * 形になる。
  *
  * 不備には2つの重さがある。
- * - 保存も止める不備（`blocksSave`）：配信名・宛先・吹き出し・ボタン・予約日時の未入力。
+ * - 保存も止める不備（`blocksSave`）：配信名・宛先・吹き出し・ボタン。
  *   今の保存・自動保存・テスト送信の検査と同じ文・同じ順。
- * - 先へ進むのだけ止める不備：文字数の超え・過ぎた予約日時・送信枠の不足。
+ * - 先へ進むのだけ止める不備：送る時間の未選択・書きかけの日時と分数・宛先の未選択・文字数の超え・過ぎた予約日時・送信枠の不足。
  *   書きかけを下書きに残せるよう、保存は止めない。
  */
 export type BroadcastGateStep = Exclude<BroadcastStepKey, 'confirm'>
@@ -27,13 +28,17 @@ export interface BroadcastStepCheckInput {
   titleMax: number
   /** `audienceError` の結果。空文字なら宛先は決まっている。 */
   audienceProblem: string
+  /** 相手をまだ選んでいない書きかけは下書きに残せる。 */
+  audienceUnselected?: boolean
   /** `bubblesError` の結果。 */
   bubbleProblem: string
   /** `messageButtonsError` の結果。 */
   buttonProblem: string
   /** 文字数の上限を超えているときの理由（`messageLengthNotice` の error）。 */
   lengthProblem: string | null
-  sendMode: 'now' | 'scheduled' | 'optimal'
+  sendMode: BroadcastSendMode
+  spreadSelected?: boolean
+  spreadMinutes?: string
   scheduledDate: string
   scheduledTime: string
   /** 予約日時を UTC に直したもの。予約でなければ null。 */
@@ -42,7 +47,7 @@ export interface BroadcastStepCheckInput {
   now: number
   /** 配信前チェックで送信枠が足りないと分かったとき。分からない間は false。 */
   quotaInsufficient: boolean
-  /** 段ごとの画面のとき。予約日時の未入力は段ごとの画面でだけ保存を止める（今の検査のまま）。 */
+  /** 段ごとの表示か。書きかけの日時はどちらの表示でも下書きに残せる。 */
   stepped: boolean
 }
 
@@ -61,7 +66,7 @@ export function broadcastStepProblems(input: BroadcastStepCheckInput): Broadcast
       : null
   // 宛先が空のまま進めると、絞ったつもりで全員に届く。
   const audience: BroadcastStepProblem | null = input.audienceProblem
-    ? { message: input.audienceProblem, blocksSave: true }
+    ? { message: input.audienceProblem, blocksSave: !input.audienceUnselected }
     : null
   const message: BroadcastStepProblem | null = input.bubbleProblem
     ? { message: input.bubbleProblem, blocksSave: true }
@@ -74,10 +79,17 @@ export function broadcastStepProblems(input: BroadcastStepCheckInput): Broadcast
 }
 
 function scheduleProblem(input: BroadcastStepCheckInput): BroadcastStepProblem | null {
+  if (input.sendMode === 'unselected') return { message: SEND_TIME_MISSING_MESSAGE, blocksSave: false }
+  if (input.spreadSelected) {
+    const minutes = Number(input.spreadMinutes)
+    if (!input.spreadMinutes?.trim() || !Number.isInteger(minutes) || minutes < 1 || minutes > 720) {
+      return { message: '分散する時間を1〜720の整数で入力してください', blocksSave: false }
+    }
+  }
   if (input.sendMode === 'optimal') return { message: SEND_TIME_MISSING_MESSAGE, blocksSave: false }
   if (input.sendMode === 'scheduled') {
     if (!input.scheduledDate || !input.scheduledTime) {
-      return { message: '予約する日付と時刻を入力してください', blocksSave: input.stepped }
+      return { message: '予約する日付と時刻を入力してください', blocksSave: false }
     }
     const at = input.scheduledAt ? Date.parse(input.scheduledAt) : Number.NaN
     if (!Number.isFinite(at) || at <= input.now) return { message: SCHEDULE_PAST_MESSAGE, blocksSave: false }

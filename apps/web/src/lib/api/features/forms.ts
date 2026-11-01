@@ -63,9 +63,10 @@ export const formsMethods = {
         method: 'POST',
         body: JSON.stringify({ ...data, accountId }),
       }),
-    createDraft: (accountId: string, name?: string) =>
-      fetchApi<ApiResponse<{ id: string; isActive: boolean }>>('/api/forms/drafts', {
+    createDraft: (accountId: string, name?: string, requestKey?: string) =>
+      fetchApi<ApiResponse<{ id: string; isActive: boolean; contentRevision?: number }>>('/api/forms/drafts', {
         method: 'POST',
+        ...(requestKey ? { headers: { 'Idempotency-Key': requestKey } } : {}),
         body: JSON.stringify({ name, accountId }),
       }),
     /**

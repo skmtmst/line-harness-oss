@@ -61,7 +61,7 @@ export default function AbsenceSheet({ booking, onClose, onDone }: {
           </div>
         </div>
         {eligible ? <p className="text-[13px] leading-5 text-liff-sub">今月の上限に達している場合は振替が付きません。欠席はできます。</p> : null}
-        <p className="text-[13px] leading-5 text-liff-sub">振替先はこのあと選べます。あとで選んでも大丈夫です。</p>
+        {eligible ? <p className="text-[13px] leading-5 text-liff-sub">振替が付いた場合、振替先はこのあと選べます。あとで選んでも大丈夫です。</p> : null}
         {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
         <Button variant="primary" disabled={busy} onClick={() => void run()}>欠席する</Button>
         <div className="flex justify-center"><Button variant="text" disabled={busy} onClick={onClose}>やめる</Button></div>

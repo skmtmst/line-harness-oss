@@ -18,12 +18,13 @@ const mondayOf = (date: string) => { const d = new Date(`${date}T00:00:00Z`); re
  * 週のカレンダーで日を選び、同じ種類・期限内・空きのある回だけを並べる。満席の回は選べない。
  * 選ぶ前に空きを確かめ直し、埋まっていたらその旨を出す（振替は残る）。［振替先はあとで選ぶ］で閉じても振替は残る。
  */
-export default function MakeupPicker({ credit, source, onUsed, onLater }: {
+export default function MakeupPicker({ credit, source, onUsed, onLater, onBusyChange }: {
   credit: MakeupCredit;
   /** 欠席した回（日時と教室名）。帯の 1 行目に書く。口が返さない間は、予約の一覧から探して渡す。 */
   source?: { startsAt: string; name: string | null } | null;
   onUsed: () => void;
   onLater?: () => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [clock, setClock] = useState(Date.now);
   const expires = Date.parse(credit.expires_at);
@@ -47,6 +48,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
   const key = useRef(crypto.randomUUID());
   const generation = useRef(0);
   const request = useRequestGeneration(credit.id);
+  useEffect(() => () => { onBusyChange?.(false); }, [onBusyChange]);
 
   const load = useCallback(() => {
     const version = ++generation.current;
@@ -77,7 +79,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
 
   async function use() {
     if (!chosen || chosen.full || busy || credit.status !== 'open' || !Number.isFinite(expires) || Date.now() >= expires || Date.parse(chosen.starts_at) > expires || Date.parse(chosen.starts_at) <= Date.now()) return;
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); onBusyChange?.(true);
     const version = request.begin();
     try { await api.useMakeup(credit.id, chosen.slot_id, key.current); if (request.isCurrent(version)) onUsed(); }
     catch (e) {
@@ -86,7 +88,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
       const code = (e as { body?: { error?: string } }).body?.error;
       if (code === 'makeup_slot_unavailable' || code === 'slot_full' || code === 'slot_conflict') { requireChoice.current = true; setPicked(null); setShowNearby(true); key.current = crypto.randomUUID(); setError('この回は埋まりました。ほかの回を選んでください。振替は残っています。'); load(); }
       else setError('振替を予約できませんでした。振替は残っています。もう一度お試しください。');
-    } finally { if (request.isCurrent(version)) setBusy(false); }
+    } finally { if (request.isCurrent(version)) { setBusy(false); onBusyChange?.(false); } }
   }
 
   if (!usable) return <StatusView icon="calendar-x" title={credit.status !== 'open' ? 'この振替は使えません' : Number.isFinite(expires) ? '振替の期限を過ぎています' : '振替の期限を読み込めませんでした'} body="教室にLINEでご連絡ください。" />;

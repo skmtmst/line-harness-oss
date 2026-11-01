@@ -12,6 +12,8 @@
  *   - 不備がある段自身では移動を出さない（同じ場所にいるため）
  */
 import React, { act } from 'react'
+import { setTextControlValue } from '@/test-utils/text-control'
+import { ApiError } from '@/lib/api'
 import { createRoot, type Root } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -202,5 +204,89 @@ describe('吹き出しの不備は欄で知らせる', () => {
     } finally {
       unmount()
     }
+  })
+})
+
+describe('入力と失敗表示の対応', () => {
+  function nameField() {
+    return container.querySelector<HTMLInputElement>('input[placeholder="例：8月キャンペーンのお知らせ"]')!
+  }
+
+  async function edit(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
+    await act(async () => { setTextControlValue(field, value) })
+    await flush()
+  }
+
+  async function save() {
+    await act(async () => { saveDraftButton().click() })
+    await flush()
+  }
+
+  it('配信名の不備は別の欄の編集では残り、名前が有効なら消えて次の段にも残らない', async () => {
+    await renderForm('basic')
+    try {
+      await save()
+      expect(errorText()).toBeTruthy()
+      await edit(container.querySelector<HTMLTextAreaElement>('textarea[aria-label="社内メモ"]')!, '担当者へのメモ')
+      expect(errorText()).toBeTruthy()
+      await edit(nameField(), '秋のお知らせ')
+      expect(errorText()).toBeNull()
+      expect(nameField().value).toBe('秋のお知らせ')
+      const next = [...container.querySelectorAll('button')].find(button => button.textContent?.trim() === '対象設定へ')!
+      expect(next.disabled).toBe(false)
+      await act(async () => { next.click() })
+      expect(onStepChange).toHaveBeenCalledWith('audience')
+      for (const step of ['audience', 'message'] as const) {
+        await act(async () => {
+          root.render(<BroadcastForm tags={[]} onSuccess={() => {}} onCancel={() => {}} currentStep={step} onStepChange={onStepChange} />)
+        })
+        await flush()
+        expect(errorText()).toBeNull()
+        expect(nameField().value).toBe('秋のお知らせ')
+        if (step === 'audience') {
+          const audienceNext = [...container.querySelectorAll('button')].find(button => button.textContent?.trim() === 'メッセージ設定へ')!
+          expect(audienceNext.disabled).toBe(true)
+        }
+      }
+      expect(createApi).not.toHaveBeenCalled()
+      expect(updateApi).not.toHaveBeenCalled()
+    } finally { unmount() }
+  })
+
+  it('長すぎる配信名の理由は不備がある間は残り、上限内なら消える', async () => {
+    await renderForm('basic')
+    try {
+      await edit(nameField(), 'あ'.repeat(62))
+      await save()
+      const reason = () => [...container.querySelectorAll('[role="alert"]')].find(item => item.textContent?.includes('配信名は60文字までにしてください'))
+      expect(reason()).toBeTruthy()
+      await edit(nameField(), 'あ'.repeat(61))
+      expect(reason()).toBeTruthy()
+      await edit(nameField(), 'あ'.repeat(60))
+      expect(reason()).toBeUndefined()
+      expect(nameField().value).toBe('あ'.repeat(60))
+      expect(createApi).not.toHaveBeenCalled()
+    } finally { unmount() }
+  })
+
+  it('保存の通信失敗は配信名を編集しても残し、保存を自動で送り直さない', async () => {
+    createApi.mockRejectedValueOnce(new ApiError(503, '保存できませんでした', 'SERVICE_UNAVAILABLE'))
+    await renderForm(null)
+    try {
+      await edit(nameField(), '秋のお知らせ')
+      await edit(container.querySelector<HTMLTextAreaElement>('[role="textbox"][placeholder="テキストを入力"]')!, 'お知らせの本文')
+      await save()
+      expect(createApi).toHaveBeenCalledTimes(1)
+      const alerts = () => [...container.querySelectorAll('[role="alert"]')].map(item => item.textContent)
+      const failure = alerts()
+      expect(failure.length).toBeGreaterThan(0)
+      await edit(nameField(), '冬のお知らせ')
+      expect(alerts()).toEqual(failure)
+      expect(nameField().value).toBe('冬のお知らせ')
+      await edit(nameField(), '')
+      expect(alerts()).toEqual(failure)
+      expect(createApi).toHaveBeenCalledTimes(1)
+      expect(updateApi).not.toHaveBeenCalled()
+    } finally { unmount() }
   })
 })

@@ -17,6 +17,7 @@ import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
 
+import { useAccount } from '@/contexts/account-context'
 import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
 import { ArrowRight, Hourglass, Info, Play } from 'lucide-react'
 import { SetupIcon } from './icons'
@@ -42,6 +43,8 @@ const BOOKING_PLACE: Record<AccountStyle, string> = {
 export default function StyleSetupWizard({ accountId, state, initialStep = 0, onClose }: Props) {
   const { style, answers, step, setStep, dirty, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, discard, saveAndClose, saveStyleMode, chooseStyle, activate } = useWizard({ accountId, state, initialStep, onClose })
 
+  const { accounts, selectedAccount } = useAccount()
+  const accountName = accounts?.find(account => account.id === accountId)?.name ?? (selectedAccount?.id === accountId ? selectedAccount.name : undefined)
   const label = styleLabel(style)
   /* 1 問目で「見ている」スタイル。選んでいるスタイル（choice）とは別に持つ（共通節 S-3）。 */
   const [viewing, setViewing] = useState<AccountStyle>(() => initialViewingStyle(state))
@@ -91,7 +94,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   if (step === 0) {
     body = (
       <>
-        <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} switcher="external" detail={demoOpen} onDetailChange={setDemoOpen} demoPage={demoPage} onDemoPage={setDemoPage} />
+        <StyleChoiceStep accountName={accountName} viewing={viewing} onView={setViewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} switcher="external" detail={demoOpen} onDetailChange={setDemoOpen} demoPage={demoPage} onDemoPage={setDemoPage} />
         {where(`あとから変えられます（設定 › アカウント）。友だち・配信は残ります。前の予約は${BOOKING_PLACE[state.style]}から見られます。`)}
       </>
     )

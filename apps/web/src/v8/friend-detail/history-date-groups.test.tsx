@@ -28,7 +28,7 @@ describe('履歴の日付の区切り', () => {
     expect(dateRows(table).map(row => row.textContent)).toEqual(['8月14日（金）', '8月13日（木）'])
     expect(summaries(table)).toEqual(['夜', '朝', '店頭から追加されました', '前日'])
     expect(items).toEqual(original)
-    expect(screen.getByText('3 件')).toBeTruthy()
+    expect(screen.getByText('4 件')).toBeTruthy()
   })
   it('日本時間の午前0時と同時刻を保ち、年の異なる同じ月日を分ける', () => {
     render(<HistoryTab friend={friend} friendId="f" data={state([
@@ -42,16 +42,19 @@ describe('履歴の日付の区切り', () => {
     const loadHistory = vi.fn(), first = [item('先頭', '2026-08-14T21:00:00+09:00')]
     const { rerender } = render(<HistoryTab friend={friend} friendId="f" data={state(first, { historyNextCursor: 'next', loadHistory })} />)
     expect(screen.queryByText('友だち追加')).toBeNull()
+    expect(screen.getByText('1 件を表示中')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'さらに読み込む' }))
     expect(loadHistory).toHaveBeenCalledWith('next')
     rerender(<HistoryTab friend={friend} friendId="f" data={state([...first, item('続き', '2026-08-14T00:30:00+09:00')])} />)
     expect(dateRows(screen.getByRole('table')).length).toBe(1)
     expect(summaries(screen.getByRole('table'))).toEqual(['先頭', '続き', '店頭から追加されました'])
+    expect(screen.getByText('3 件')).toBeTruthy()
   })
   it('種類の切り替えで日付の空見出しを残さず、受信と送信には追加記録を混ぜない', () => {
     render(<HistoryTab friend={friend} friendId="f" data={state([item('受信記録', '2026-08-14T21:00:00+09:00'), item('送信記録', '2026-08-13T21:00:00+09:00', 'message_sent'), item('システム記録', '2026-08-14T20:00:00+09:00', 'tag_change')])} />)
     fireEvent.click(screen.getByRole('button', { name: '受信' }))
     expect(summaries(screen.getByRole('table'))).toEqual(['受信記録'])
+    expect(screen.getByText('1 件')).toBeTruthy()
     expect(dateRows(screen.getByRole('table')).length).toBe(1)
     fireEvent.click(screen.getByRole('button', { name: '送信' }))
     expect(summaries(screen.getByRole('table'))).toEqual(['送信記録'])
@@ -66,6 +69,7 @@ describe('履歴の日付の区切り', () => {
     for (const historyStatus of ['loading', 'error'] as const) {
       rerender(<HistoryTab friend={friend} friendId="f" data={state([], { historyStatus })} />)
       expect(screen.queryByText('友だち追加')).toBeNull()
+      expect(screen.queryByText(/件を表示中$/)).toBeNull()
       expect(dateRows(screen.getByRole('table')).length).toBe(0)
     }
   })

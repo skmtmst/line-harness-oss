@@ -238,7 +238,7 @@ describe('止める・再開する', () => {
   it('止める理由（500文字まで）と確認キーを専用の停止口へ送る', async () => {
     renderList(); await flush()
     openMenu('営業時間外の自動返信', '止める')
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await screen.findByRole('dialog', { name: '「営業時間外の自動返信」を止める' })
     const reason = within(dialog).getByLabelText(/止める理由/) as HTMLInputElement
     expect(reason.maxLength).toBe(500)
     fireEvent.change(reason, { target: { value: 'キャンペーンが終わったので' } })
@@ -388,4 +388,25 @@ describe('行の詳細パネル', () => {
     expect(panel.textContent).toContain('「営業時間」「休み」ほか1つ')
     for (const chip of ['09:00〜18:00', '月・水・金曜のみ', '同じ人に1回だけ']) expect(panel.textContent).toContain(chip)
   })
+})
+
+vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: async () => ({ version: '2.7.0', deploy_env: 'staging' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '二号店' }] }) }))
+
+it('一括停止は選んだ操作先を表示し、切替後は新しいアカウント名へ置き換えず送信を止める', async () => {
+  renderList(); await flush()
+  fireEvent.click(within(screen.getByText('営業時間外の自動返信').closest('tr')!).getByRole('checkbox'))
+  fireEvent.click(screen.getByRole('button', { name: 'まとめて止める', exact: true }))
+  const dialog = await screen.findByRole('dialog', { name: '1 件の自動応答を止めますか？' })
+  const target = within(within(dialog).getByRole('region', { name: '操作の対象' }))
+  await target.findByText('本店')
+  accountState.selectedAccountId = 'account-b'
+  renderList(); await flush()
+  expect(target.getByText('本店')).toBeTruthy()
+  expect(target.queryByText('二号店')).toBeNull()
+  const stop = within(dialog).getByRole('button', { name: '止める', exact: true })
+  expect(stop).toHaveProperty('disabled', true)
+  fireEvent.click(stop)
+  expect(net.stop).not.toHaveBeenCalled()
+  expect(net.update).not.toHaveBeenCalled()
 })

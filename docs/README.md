@@ -1083,3 +1083,44 @@
 - [反映履歴：窓の下の操作帯](release-log/unreleased/2012-kenta-dialog-leading.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [反映履歴：UID移行の行き先確認](release-log/unreleased/2012-kenta-uid-safety.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [配信メニューの表示名](release-log/unreleased/2013-masato-friend-add-label.md) — 反映履歴、確認 2026-10-31。
+- [反映履歴：未保存の確認・設定の安全性・表示の改善](release-log/unreleased/2015-kenta-train-1031d.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [設定の入口からお客さまのデザインを開く](release-log/unreleased/2014-masato-settings-entry-customer-look.md) — 反映履歴、確認2026-10-31。
+
+- [受信箱の選択アカウント別バッジ](release-log/unreleased/2016-masato-inbox-account-badge.md) — 反映履歴。確認 2026-10-31。
+
+- [検証環境の自動配備手順の反映履歴](release-log/unreleased/2017-masato-cf-staging-deploy-doc.md) — 反映履歴、確認 2026-10-31。
+
+- [反映履歴：フォームの下書き・配信前確認・設定の表示](release-log/unreleased/2019-kenta-train-1031e.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [検証配備で未適用のDB変更だけを確認する](release-log/unreleased/2018-masato-cf-staging-deploy-pending.md) — 反映履歴、確認 2026-11-01。
+
+- [検証管理画面のPages Git連携の手順](release-log/unreleased/2020-masato-cf-pages-doc.md) — 反映履歴、確認 2026-11-01。
+
+- [検証配備でCloudflare混雑時に待って再試行する](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 反映履歴、確認 2026-11-01。
+
+- [操作する対象の確認](v8-requirements/confirmation-targets.md) — 危険な操作の直前に出す対象と環境の正本、確認2026-11-01。
+
+- [反映履歴：LINE来店フォロー・配信イメージ・閲覧と入力の守り](release-log/unreleased/2022-kenta-train-1031f.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [反映履歴：配信の人数と時期・来店フォロー・予約の一覧](release-log/unreleased/2023-kenta-train-1031g.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [反映履歴：通知・受付・回答フォーム・受信と教室の一覧](release-log/unreleased/2024-kenta-train-1031h.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [反映履歴：送る相手・操作先・登録案内・一覧の数字と会員の入口](release-log/unreleased/2025-kenta-train-1031i.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [列車1031Jの修正](release-log/unreleased/2026-kenta-train-1031j.md) — 反映履歴、確認 2026-11-01。
+
+- [列車1031Qの変更](release-log/unreleased/2033-kenta-train-1031q.md)
+- [列車1031K：フォーム・タグ・率と登録結果](release-log/unreleased/2027-kenta-train-1031k.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [列車1031L：CSV・受付停止とお客さまの予約画面](release-log/unreleased/2028-kenta-train-1031l.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [電話予約・残席・見本の表示改善](release-log/unreleased/2029-kenta-train-1031m.md) — 反映履歴、確認 2026-11-01。
+
+- [価格・削除確認・卓とフォームの表示改善](release-log/unreleased/2030-kenta-train-1031n.md) — 反映履歴、確認 2026-11-01。
+
+- [予約操作・取込と入力案内の改善](release-log/unreleased/2031-kenta-train-1031o.md) — 反映履歴、確認 2026-11-01。
+
+- [予約操作・読込中と配信前の案内](release-log/unreleased/2032-kenta-train-1031p.md) — 反映履歴、確認 2026-11-01。
+
+- [振替券・空き待ちと入力表示の改善](release-log/unreleased/2034-kenta-train-1031r.md) — 反映履歴、確認 2026-11-01。

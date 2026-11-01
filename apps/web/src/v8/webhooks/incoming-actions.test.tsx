@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import type { IncomingWebhookDetail } from '@/lib/api'
 const mocks = vi.hoisted(() => ({ resources: vi.fn(), save: vi.fn() }))
 vi.mock('@/lib/api', async original => {
@@ -13,6 +14,7 @@ const identity = { methods: [{ kind: 'harness_friend_id' as const, path: 'custom
 const detail = { id: 'hook-1', version: 7, identityMatching: identity, actions: [{ refKind: 'tag', refId: 'tag-old', refVersionId: null, displayName: '前のタグ' }] } as IncomingWebhookDetail
 const resources = { tags: [{ id: 'tag-new', name: '新しいタグ' }], templates: [], scenarios: [], webhooks: [], richMenus: [], commonActions: [], supportMarks: [] }
 const saved = vi.fn()
+beforeEach(() => verifiedStaffRole('owner'))
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 async function addTag() {
   await waitFor(() => expect(mocks.resources).toHaveBeenCalledWith('owner-account'))
@@ -41,9 +43,12 @@ it('保存失敗でも追加した行を残し、再試行できる', async () =
   fireEvent.click(screen.getByRole('button', { name: '行うことを保存する' }))
   await waitFor(() => expect(saved).toHaveBeenCalledTimes(1)); expect(mocks.save).toHaveBeenCalledTimes(2)
 })
-it('閲覧だけの人には変更・保存を出さない', () => {
+it('閲覧だけの人には変更を理由付きで残し、保存しない', () => {
+  verifiedStaffRole('viewer')
   render(<IncomingActions detail={detail} accountId="owner-account" readOnly onSaved={saved} onGuardReady={() => {}} />)
-  expect(screen.getByText('前のタグ')).toBeTruthy(); expect(screen.queryByRole('button', { name: '行うことを足す' })).toBeNull()
+  expect(screen.getByText('前のタグ')).toBeTruthy(); expect(screen.getByRole('button', { name: '行うことを足す' }).getAttribute('aria-disabled')).toBe('true')
+  fireEvent.click(screen.getByRole('button', { name: '行うことを足す' }))
+  expect(mocks.save).not.toHaveBeenCalled()
   expect(screen.queryByRole('button', { name: '行うことを保存する' })).toBeNull(); expect(mocks.resources).not.toHaveBeenCalled()
 })
 it('未変更の間は保存を出さず、変更すると保存を出して押せる', async () => {

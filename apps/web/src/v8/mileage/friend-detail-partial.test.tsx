@@ -16,13 +16,13 @@ vi.mock('next/link', () => ({ default: ({ href, children, ...props }: React.Anch
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc', loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 
-const today = new Date().toISOString()
+const today = '2026-10-15T03:00:00.000Z'
 let rank: string | null = null
 let rankLoaded = false
 let pendingBalance = 0
 let historyCount = 340
 let connections: Array<{ accountId: string; accountName: string }> | undefined
-beforeEach(() => { rank = null; rankLoaded = false; connections = undefined; pendingBalance = 0; historyCount = 340 })
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(today)); rank = null; rankLoaded = false; connections = undefined; pendingBalance = 0; historyCount = 340 })
 const entry = (id: string) => ({
   id, entryType: 'grant', status: 'available', amount: 10, reason: '来店', source: 'rule', hasSourceEvent: false,
   sourceReferenceId: null, ruleName: null, mode: 'automatic', executedByStaffName: null, lineAccountId: 'acc',
@@ -50,7 +50,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import FriendDetailV8 from './friend-detail'
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.useRealTimers() })
 
 test('最新100件より多いとき、今月の数は「数えられません」、件数は一部と書く', async () => {
   render(<FriendDetailV8 />)

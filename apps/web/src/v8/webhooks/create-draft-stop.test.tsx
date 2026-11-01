@@ -6,7 +6,7 @@ import { getPageAction } from '@/test-utils/page-action'
  */
 import React, { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -27,6 +27,8 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
   return { ...actual, useStaffRole: () => 'owner' }
 })
 
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+beforeEach(() => verifiedStaffRole('owner'))
 import WebhooksCreateV8 from './create'
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); nav.push.mockReset() })
 

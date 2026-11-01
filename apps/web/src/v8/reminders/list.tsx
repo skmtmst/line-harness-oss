@@ -1,4 +1,7 @@
 'use client'
+
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
 import StatusBadge from '@/components/shared/status-badge'
 import { DetailContent, DetailField } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
@@ -101,6 +104,7 @@ const SORT_OPTIONS = [
 ]
 const STATUS_CHIPS = ['有効', '下書き', '停止中', '失敗あり'] as const
 interface ReminderRow {
+  followupManagement?:import('@line-crm/shared').RestaurantFollowupManagement
   id: string
   name: string
   description: string | null
@@ -129,6 +133,7 @@ interface ReminderRow {
 type StatusKey = 'draft' | 'stopped' | 'active'
 
 function statusKeyOf(row: ReminderRow): StatusKey {
+  if(row.followupManagement)return row.followupManagement.effectiveSendingStatus==='active'?'active':'stopped'
   if (row.lifecycleStatus === 'draft') return 'draft'
   if (row.lifecycleStatus === 'stopped' || !row.isActive) return 'stopped'
   return 'active'
@@ -200,6 +205,8 @@ export default function RemindersListV8() {
 
   /* 窓・まとめての帯の状態。 */
   const [bulkPauseIds, setBulkPauseIds] = useState<string[] | null>(null)
+  const [bulkPauseAccountId, setBulkPauseAccountId] = useState(selectedAccountId)
+  useEffect(() => { setBulkPauseIds(null) }, [selectedAccountId])
   const [pauseTarget, setPauseTarget] = useState<ReminderRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -982,14 +989,7 @@ export default function RemindersListV8() {
                       </div>} folder={folderDotOf(row)}
                     />
                     <Td>
-                      <span
-                        className={`${styles.statePill} ${
-                          view.status === 'active' ? styles.statePillActive : styles.statePillStopped
-                        }`}
-                      >
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}
-                      </span>
+                      <StatusBadge tone={view.status==='active'?'success':'neutral'} help={row.followupManagement?`来店フォロー（${row.followupManagement.storeName}）で管理しています。${row.followupManagement.reason??'承認された内容で送っています'}`:undefined} helpHref={row.followupManagement?.path}>{view.status==='active'?'有効':view.status==='draft'?'下書き':'停止中'}</StatusBadge>
                         {row.hasFailure || (row.failedCount ?? 0) > 0 ? (
                           <button
                             type="button"
@@ -1075,7 +1075,7 @@ export default function RemindersListV8() {
                     setPanelId(null);
                     requestDelete(panelRow);
                 } }])], secondaryAllowed: canEdit }}
-               status={<StatusBadge tone={view.status === 'active' ? 'success' : 'neutral'}>{view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}</StatusBadge>}>
+               status={<StatusBadge tone={view.status === 'active' ? 'success' : 'neutral'} help={panelRow.followupManagement?`来店フォローで管理しています。${panelRow.followupManagement.reason??'承認された内容で送っています'}`:undefined} helpHref={panelRow.followupManagement?.path}>{view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}</StatusBadge>}>
 <DetailContent><DetailField label="これから送る">{planned}</DetailField><DetailField label="次に送る">{nextSend}</DetailField></DetailContent>
 </DetailPanel>
             )
@@ -1089,7 +1089,7 @@ export default function RemindersListV8() {
               variant="secondary"
               disabled={stoppableIds.length === 0}
               title={stoppableIds.length === 0 ? '有効なリマインダが選ばれていません' : undefined}
-              onClick={() => setBulkPauseIds(stoppableIds)}
+              onClick={() => { setBulkPauseAccountId(selectedAccountId); setBulkPauseIds(stoppableIds) }}
             >
               <Square size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               止める
@@ -1165,8 +1165,8 @@ export default function RemindersListV8() {
         busy={stopBusy} error={stopError || undefined}
         confirmDisabled={!canEdit} confirmLockedReason={moveLockedReason}
         onSuccess={() => setBulkPauseIds(null)}
-        onConfirm={() => bulkPauseIds ? stopConfirmed(bulkPauseIds, bulkPauseIds) : undefined}
-      />
+        onConfirm={() => bulkPauseIds && bulkPauseAccountId === selectedAccountId ? stopConfirmed(bulkPauseIds, bulkPauseIds) : undefined}
+      ><OperationTargetSummary accounts={[{ id: bulkPauseAccountId ?? '' }]} /></ConfirmDialog>
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
         open={pauseTarget !== null}

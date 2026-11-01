@@ -46,7 +46,7 @@ import styles from './edit.module.css'
  */
 
 type Period = 'lunch' | 'dinner' | 'both'
-type Draft = { kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string }
+type Draft = { kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string; status: 'draft' | 'active' }
 const LIST_HREF = '/restaurant-test/menu'
 
 
@@ -54,12 +54,12 @@ function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
 }
 function draftOf(item: RestaurantMenuItem | null): Draft {
-  if (!item) return { kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '' }
+  if (!item) return { kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '', status: 'draft' }
   const periods = storedStringList(item.service_periods_json)
   return {
     kind: item.kind, name: item.name, price: String(item.price),
     period: periods.length > 1 ? 'both' : periods[0] === 'lunch' ? 'lunch' : 'dinner',
-    effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '),
+    effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '), status: item.status === 'draft' ? 'draft' : 'active',
   }
 }
 
@@ -81,6 +81,7 @@ function MenuEditBody() {
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [confirmingPrice, setConfirmingPrice] = useState(false)
+  const [confirmingPublish, setConfirmingPublish] = useState(false)
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -114,7 +115,7 @@ function MenuEditBody() {
   const contextKey = JSON.stringify([selectedAccountId, id, storeParam])
   const mutationContext = useRef<{ key: string; menuSignature: string | null }>({ key: contextKey, menuSignature: null })
   if (mutationContext.current.key !== contextKey) mutationContext.current = { key: contextKey, menuSignature: null }
-  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setError(null) }, [contextKey])
+  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setError(null) }, [contextKey])
 
   async function save() {
     if (!canEdit || !selectedAccountId || !valid) return
@@ -131,9 +132,10 @@ function MenuEditBody() {
     }
     try {
       if (editing) {
-        const signature = JSON.stringify([editing.id, body])
+        const updateBody = { ...body, ...(editing.status === 'draft' && draft.status === 'active' ? { status: 'active' } : {}) }
+        const signature = JSON.stringify([editing.id, updateBody])
         if (attempt.menuSignature !== signature) {
-          await restaurantTestApi.updateMenu(selectedAccountId, editing.id, body)
+          await restaurantTestApi.updateMenu(selectedAccountId, editing.id, updateBody)
           attempt.menuSignature = signature
         }
         if (editing.kind === 'course') await payment.save(editing.id)
@@ -141,9 +143,9 @@ function MenuEditBody() {
         notifySaved(priceChanged ? (priceStartsLater ? '価格変更を確定しました。指定した開始日時に反映します。' : '価格を変更しました。') : 'メニューを更新しました。')
       } else {
         if (!storeId) throw new Error('store_missing')
-        await restaurantTestApi.createMenu(selectedAccountId, { storeId, ...body })
+        await restaurantTestApi.createMenu(selectedAccountId, { storeId, ...body, status: draft.status })
         if (!stillHere()) return
-        notifySaved('メニューを追加しました。')
+        notifySaved(draft.status === 'draft' ? '下書きのメニューを追加しました。' : 'メニューを公開しました。')
       }
       if (!stillHere()) return
       setSaved(draft)
@@ -212,13 +214,16 @@ function MenuEditBody() {
         destructive={canEdit && draftItem ? <Button variant="danger" onClick={() => { setError(null); setDeleting(true) }} disabled={busy}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => { setError(null); if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => { setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
         {canEdit ? (
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="基本" />
+            {!editing || draftItem ? <Field label="保存する状態" help="下書きは、お客さまに見せるメニューには出ません。内容を確かめてから公開できます。">
+              <SaveErrorField names={['status', 'draft.status']}><Select aria-label="保存する状態" size="full" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value === 'active' ? 'active' : 'draft' })} options={[{ value: 'draft', label: '下書き' }, { value: 'active', label: '公開' }]} /></SaveErrorField>
+            </Field> : null}
             <SettingsFormRow layout="columns" columns={3}>
               <Field label={course ? 'コースの名前' : 'メニューの名前'} htmlFor="rs-menu-name" required>
                 <SaveErrorField names={['name', 'draft.name']}><TextField id="rs-menu-name" aria-label="メニュー名" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></SaveErrorField>
@@ -274,6 +279,8 @@ function MenuEditBody() {
       <ConfirmDialog open={confirmingPrice} title="価格変更を確定しますか？"
         description={`${editing?.name ?? 'メニュー'}の価格を${formatYen(editing?.price ?? 0)}から${formatYen(Number(draft.price))}へ変更します。${priceStartsLater && priceStartsAt ? `${polishFormatDateTime(priceStartsAt)}に新価格を反映します。` : '保存後すぐに新価格を反映します。'}`}
         confirmLabel="確定して保存する" busy={busy} onCancel={() => setConfirmingPrice(false)} error={error || undefined} confirmDisabled={Boolean(payment.conflict.conflict)} confirmDisabledReason="閉じてお支払いの最新の内容と比べてください。" onSuccess={() => setConfirmingPrice(false)} onConfirm={() => save()} />
+      <ConfirmDialog open={confirmingPublish} title="このメニューを公開しますか？" description="保存すると、予約などで使えるメニューになります。名前・価格・提供時間を確かめてください。価格の変更は指定した開始日時から反映されます。"
+        confirmLabel={editing ? '公開して保存する' : '公開して追加する'} busy={busy} error={error || undefined} onCancel={() => setConfirmingPublish(false)} onSuccess={() => setConfirmingPublish(false)} onConfirm={() => { if (priceChanged) { setConfirmingPrice(true); return true }; return save() }} />
     </SaveErrorScope>
   )
 }

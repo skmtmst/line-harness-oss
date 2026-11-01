@@ -1,3 +1,5 @@
+import { readRestaurantReservationFormHealth } from '../services/restaurant-reservation-form.js';
+import { readLegacyFollowupEditorContents } from '../services/restaurant-followup-editor-content.js';
 import type { Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import { inputError } from '../lib/input-errors.js';
@@ -25,7 +27,10 @@ function draftInput(value:unknown):value is FollowupDraftInput{
   &&!!body.timing&&typeof body.timing==='object'&&Array.isArray(body.messageBubbles);
 }
 function failure(c:Context<Env>,error:unknown){
- if(error instanceof FollowupDraftError)return c.json({success:false,code:error.code,error:error.message},error.code==='invalid_followup'?422:409);
+ if(error instanceof FollowupDraftError){
+  const payload={success:false,code:error.code,error:error.message};
+  return error.code==='invalid_followup'?inputError(c,payload,422,error.field?[error.field]:[]):c.json(payload,409);
+ }
  if(error instanceof NotificationDeliveryIncomplete&&error.blockedReason){
   if(error.blockedReason==='sending_stopped')return c.json({success:false,code:'sending_stopped',error:'いまは送信を止めています。停止が解除されてから、もう一度テストしてください'},409);
   return c.json({success:false,code:'test_precondition_changed',error:'内容か宛先が変わりました。読み直してからもう一度テストしてください'},409);
@@ -42,7 +47,7 @@ export async function getRestaurantFollowupEngines(c:Context<Env>){
  const access=await scope(c);if(access.response)return access.response;
  const store=await access.db!.prepare('SELECT line_account_id FROM rt_stores WHERE id=?').bind(access.storeId).first<{line_account_id:string|null}>();
  const recipient=store?.line_account_id?await resolveReminderTestRecipient(access.db!,store.line_account_id,{staffId:c.get('staff')?.id}):null;
- return c.json({success:true,data:{engines:await readRestaurantFollowupEngineStates(access.db!,access.storeId!),testRecipient:recipient}});
+ return c.json({success:true,data:{engines:await readRestaurantFollowupEngineStates(access.db!,access.storeId!),legacyContents:await readLegacyFollowupEditorContents(access.db!,access.storeId!),testRecipient:recipient,...(store?.line_account_id?{reservationForm:await readRestaurantReservationFormHealth(access.db!,access.storeId!,store.line_account_id)}:{})}});
 }
 export async function initializeRestaurantFollowupEngines(c:Context<Env>){
  const access=await scope(c);if(access.response)return access.response;

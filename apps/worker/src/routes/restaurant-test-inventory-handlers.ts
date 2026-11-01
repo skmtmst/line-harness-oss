@@ -188,7 +188,7 @@ export const post__api_restaurant_test_media_10 = async (c: Context<Env, "/api/r
 
 export const get__api_restaurant_test_media_links_11 = async (c: Context<Env, "/api/restaurant-test/media-links">) => {
   const org=await organizationFor(c),storeId=c.req.query('storeId')||'';
-  if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'店舗を確認してください'},400);
+  if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,code:'restaurant_store_mismatch',error:'店舗を確認してください'},400);
   const data=await dbFor(c.env,storeId).prepare(`SELECT m.code,m.name,m.accepts_reservations AS acceptsReservations,
     l.page_url AS pageUrl,l.login_url AS loginUrl,COALESCE(l.close_on_booking,0) AS closeOnBooking,COALESCE(l.version,0) AS version
     FROM rt_media m LEFT JOIN rt_store_media_links l ON l.media_id=m.id AND l.store_id=? ORDER BY m.name`).bind(storeId).all();
@@ -198,7 +198,7 @@ export const get__api_restaurant_test_media_links_11 = async (c: Context<Env, "/
 export const put__api_restaurant_test_media_links_code_12 = async (c: Context<Env, "/api/restaurant-test/media-links/:code">) => {
   const b=await c.req.json<{storeId:string;pageUrl:unknown;loginUrl:unknown;closeOnBooking:boolean;expectedVersion:number}>().catch(()=>null);
   const org=await organizationFor(c);
-  if(!b||!org||typeof b.storeId!=='string'||!await storeBelongsTo(c,org.id,b.storeId))return inputError(c, {success:false,error:'店舗を確認してください'}, 400, ["storeId"]);
+  if(!b||!org||typeof b.storeId!=='string'||!await storeBelongsTo(c,org.id,b.storeId))return inputError(c, {success:false,code:'restaurant_store_mismatch',error:'店舗を確認してください'}, 400, ["storeId"]);
   const page=safeRestaurantHttpsUrl(b.pageUrl),login=safeRestaurantHttpsUrl(b.loginUrl);
   const media=await dbFor(c.env).prepare('SELECT id,accepts_reservations FROM rt_media WHERE code=?').bind(c.req.param('code')).first<{id:string;accepts_reservations:number}>();
   if(!media||page===undefined||login===undefined||typeof b.closeOnBooking!=='boolean'||(!media.accepts_reservations&&b.closeOnBooking)||!Number.isSafeInteger(b.expectedVersion)||b.expectedVersion<0)

@@ -30,6 +30,8 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   measureOpens?: boolean;
   /** 友だちには見せない運用メモ。 */
   internalMemo?: string | null;
+  /** 現在の配送に保存された分散の分数。旧Workerでは省略。 */
+  stealthSpreadMinutes?: number;
   /** 途中保存した編集段。 */
   draftStep?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm' | null;
   /** 途中保存した入力一式。 */

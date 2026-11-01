@@ -323,12 +323,6 @@
   font-size: var(--text-caption);
 }
 
-.skeleton {
-  min-height: var(--tpl-starter-card-h);
-  margin: 0 var(--tpl-toolbar-pad-side);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas-sunken);
-}
 
 /* フォルダの窓（右のパネル）。 */
 .formField {

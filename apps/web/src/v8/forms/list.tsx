@@ -144,8 +144,6 @@ export default function FormsListV8() {
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState('')
   const [restoringId, setRestoringId] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState('')
   /** 数の帯。取れないときは全部「—」（0 とは言わない）。 */
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
@@ -251,22 +249,9 @@ export default function FormsListV8() {
     samePageUrl.replace(listHref(next))
   }
 
-  const createDraft = async () => {
-    if (creating || !selectedAccountId) return
-    setCreating(true)
-    setCreateError('')
-    try {
-      const res = await api.forms.createDraft(selectedAccountId)
-      if (!res.success) throw new Error(res.error)
-      router.push(`/form-submissions/edit?id=${encodeURIComponent(res.data.id)}&tab=basic`)
-    } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-      setCreateError('フォームの下書きを作れませんでした。もう一度お試しください。') }
-    } finally {
-      setCreating(false)
-    }
+  const createDraft = () => {
+    if (!selectedAccountId) return
+    router.push(`/form-submissions/edit?new=${crypto.randomUUID()}&tab=basic`)
   }
 
   /* ===== 詳細パネル（行の名前→右から出る） ===== */
@@ -829,9 +814,6 @@ export default function FormsListV8() {
       variant="primary"
       className={full ? 'v8-folder-create w-full' : undefined}
       onClick={createDraft}
-      disabled={creating}
-      busy={creating}
-      busyLabel="下書きを作成中"
     >
       <Plus size={16} aria-hidden="true" />フォームを作る
     </Button>
@@ -1013,13 +995,12 @@ export default function FormsListV8() {
         description="アンケートや申し込みを LINE の中で受け付け、答えを友だち情報に保存します。"
         canCreate={canEditForms}
         action={
-          <Button type="button" variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">
+          <Button type="button" variant="primary" onClick={createDraft}>
             <Plus size={16} aria-hidden="true" />最初のフォームを作る
           </Button>
         }
         filtered={filterActive}
         onClearFilters={clearFilters}
-        filteredDescription="「公開中」「下書き」「情報欄に保存」や検索を外すと、すべて出ます"
         data-design-node="I3L41O-empty"
       />
     )
@@ -1204,11 +1185,6 @@ export default function FormsListV8() {
                 <p><strong>管理者確認中のフォーム</strong> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>
                 <p>担当の割り当ては後続の対応で行います。この画面では割り当て操作はできません。</p>
               </Notice>
-            ) : null}
-            {createError ? (
-              <Notice tone="danger" action={<>
-                <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setCreateError('')}>閉じる</Button>
-              </>}>{createError}</Notice>
             ) : null}
           </>
         )}

@@ -1,4 +1,5 @@
 'use client'
+import { requiredInputReason } from '@/lib/required-input-reason'
 
 import { displayText, isEditableQuestion, choiceActionText, choiceActionIcon } from './question-choice-summary'
 export { choiceActionText } from './question-choice-summary'
@@ -156,7 +157,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   fields.define('text', '質問文', () => (question.text.trim() ? null : '質問文を入力してください。'), { required: true })
   question.choices.forEach((choice, index) => {
     fields.define(`extras-${index}`, `選択肢 ${index + 1} の追加処理`, () => tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))
-    fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (choice.label.trim() ? null : 'ボタンの文字を入力してください。'), { required: true })
+    fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (!choice.label.trim() ? 'ボタンの文字を入力してください。' : choice.label.length > 20 ? 'ボタンの文字は20文字以内で入力してください。' : null), { required: true })
   })
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
 
@@ -234,6 +235,11 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     )
   }
 
+  const inputReason = requiredInputReason([
+    { label: 'テンプレート名', value: name },
+    { label: '質問文', value: question.text },
+    ...question.choices.map((choice, index) => ({ label: `選択肢 ${index + 1} のボタンの文字`, value: choice.label })),
+  ])
   const busy = saving || publishing || Boolean(host?.busy)
   const phone = (
     <LinePreview title={null} note="質問の見え方（山田 太郎さんの場合）" caption="配信日 10:00">
@@ -250,6 +256,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   return (
     <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
+        inputReason={inputReason}
         boardId="l87p1J"
         title={id ? '質問を編集' : '質問を作る'}
         description="ボタンで答えてもらい、答えでタグなどを付ける"
@@ -266,7 +273,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(inputReason)} disabledReason={inputReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >
@@ -317,7 +324,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               <div key={choice.key ?? index} className={styles.choice}>
                 <div className={styles.choiceHead}>
                   <span className={styles.choiceNo}>{`選択肢 ${index + 1}`}</span>
-                  <Button type="button" variant="text" disabled={question.choices.length <= 1} title={question.choices.length <= 1 ? '選択肢は1つ以上必要です。' : undefined} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を削除する`}><Trash2 size={16} aria-hidden="true" />削除する</Button>
+                  <Button type="button" variant="text" textTone="danger" disabled={question.choices.length <= 1} title={question.choices.length <= 1 ? '選択肢は1つ以上必要です。' : undefined} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を削除する`}><Trash2 size={16} aria-hidden="true" />削除する</Button>
                 </div>
                 <Field label="ボタンの文字（20文字まで）" requirement={fields.requirement(`choice-${index}`)}><SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><TextField {...fields.bind(`choice-${index}`)} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} /></SaveErrorField></Field>
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
