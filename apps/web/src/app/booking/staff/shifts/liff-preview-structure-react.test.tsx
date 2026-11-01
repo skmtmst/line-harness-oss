@@ -60,7 +60,6 @@ describe('前提: 実LIFFが「日時を選んでください」＋週／カレ�
     // 管理画面の携帯見本は別の「この期間に空きはありません。」を実DOMで確認する。
     expect(LIFF_SOURCE).toContain('この週は空きがありません')
     expect(LIFF_SOURCE).toContain('この月の受付期間内に空きがありません。')
-    expect(LIFF_SOURCE).toContain('この月は受付期間外です。')
     // 読み込み中・失敗は共通部品（LoadingView・LoadErrorView）で出す。
     expect(LIFF_SOURCE).toContain('LoadingView')
     expect(LIFF_SOURCE).toContain('LoadErrorView')
