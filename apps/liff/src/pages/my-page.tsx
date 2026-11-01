@@ -255,9 +255,9 @@ export default function MyPage() {
             {next ? (
               <NextBookingCard booking={next} payment={nextPayment} onChange={() => go('/booking/history')} onDetail={() => go('/booking/history')} />
             ) : style !== 'ec' ? (
-              <Card className="flex items-center justify-between gap-3 p-3.5">
+              <Card className="space-y-3 p-3.5">
                 <p className="text-sm text-ink-secondary">次の予約はありません</p>
-                {style !== 'lesson' ? <Button variant="compact-secondary" className="w-auto shrink-0" onClick={() => go('/booking')}>予約する</Button> : null}
+                {style !== 'lesson' ? <Button variant="compact-secondary" onClick={() => go('/booking')}>予約する</Button> : null}
               </Card>
             ) : null}
 

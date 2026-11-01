@@ -143,3 +143,59 @@ it('閲覧のみの行の操作には複製とフォルダ移動を出さない'
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+
+describe('保存した開催回の日時表示', () => {
+  function response(overrides: Record<string, unknown>) {
+    fetchApi.mockResolvedValue({ items: [{ ...event, ...overrides }], total: 1, summary: null })
+  }
+  const row = () => host.querySelector('[data-row-id="ev-1"]')!
+
+  it.each([
+    { is_published: 0, lifecycle_status: 'draft', state: '下書き' },
+    { is_published: 1, lifecycle_status: 'published', state: '終了' },
+  ])('過去の保存回を直近の回として表示し、$state の判定と定員を保つ', async ({ state, ...status }) => {
+    response({ ...status, next_slot_starts_at: null, latest_past_slot_starts_at: '2000-11-02T05:00:00.000Z', total_capacity: 23, total_active: 0 })
+    await render()
+    expect(row().textContent).toContain('11/2（木）14:00直近の回')
+    expect(row().textContent).toContain('0 / 23')
+    expect(row().textContent).toContain(state)
+    expect(row().textContent).not.toContain('日時未設定')
+  })
+
+  it('過去の回もあっても次の回の日時と説明を優先する', async () => {
+    response({ next_slot_starts_at: '2099-10-12T06:00:00.000Z', latest_past_slot_starts_at: '2000-11-02T05:00:00.000Z' })
+    await render()
+    expect(row().textContent).toContain('15:00次の回')
+    expect(row().textContent).not.toContain('直近の回')
+    expect(row().textContent).not.toContain('14:00')
+  })
+
+  it.each([undefined, null, '', 'not-a-date', '2026', '2000-02-31T05:00:00.000Z', '2000-11-02T24:00:00Z'])('旧応答・未取得・不正な過去日時を推測しない（%s）', async (past) => {
+    response({ next_slot_starts_at: null, ...(past === undefined ? {} : { latest_past_slot_starts_at: past }) })
+    await render()
+    expect(row().textContent).toContain('日時未設定')
+    expect(row().textContent).not.toContain('直近の回')
+  })
+
+  it('時差付きの有効な過去日時は日本時間で表示する', async () => {
+    response({ next_slot_starts_at: null, latest_past_slot_starts_at: '2000-11-02T14:00:00+09:00' })
+    await render()
+    expect(row().textContent).toContain('11/2（木）14:00直近の回')
+  })
+
+  it('同じ行の詳細見出しにも保存済みの過去日時を表示する', async () => {
+    const previousUrl = window.location.href
+    try {
+      window.history.replaceState(null, '', '/events?event=ev-1')
+      response({ next_slot_starts_at: null, latest_past_slot_starts_at: '2000-11-02T05:00:00.000Z' })
+      await render()
+      const panel = screen.getByRole('dialog', { name: '秋のしつけ教室' })
+      const description = document.getElementById(panel.getAttribute('aria-describedby')!)
+      expect(description?.textContent).toContain('11/2（木）14:00')
+      expect(description?.textContent).not.toContain('日時未設定')
+    } finally {
+      window.history.replaceState(null, '', previousUrl)
+    }
+  })
+})

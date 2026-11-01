@@ -48,3 +48,16 @@ describe('V8 リッチメニューのエラー表示', () => {
     expect(richMenuErrorAll(new ApiError(403, 'Forbidden'), 'load')).toBe(richMenuError(new ApiError(403, 'Forbidden'), 'load'))
   })
 })
+
+
+describe('LINE読取の理由の言い分け', () => {
+  it.each([
+    [new ApiError(500, 'API error: 500', 'INVALID_LINE_ACCESS_TOKEN'), 'LINE連携の認証情報を確認できません。連携の設定を確認してください。'],
+    [new ApiError(500, 'API error: 500', 'LINE_RATE_LIMITED'), 'LINEへの問い合わせが集中しています。少し待ってから、もう一度読み込んでください。'],
+    [new ApiError(429), '管理画面への操作が集中しています。少し待ってから、もう一度読み込んでください。'],
+    [new ApiError(403, 'Forbidden'), 'このLINEアカウントのメニューを見る権限がありません。オーナーか管理者に頼んでください。'],
+    [new Error('D1_ERROR: private-token'), 'LINE上のメニューを読み込めませんでした。LINE公式アカウントの連携状態を確認し、もう一度読み込んでください。'],
+  ])('LINE読取の理由は安全な案内へ変換する（%s）', (error, expected) => {
+    expect(richMenuError(error, 'externalLoad')).toBe(expected)
+  })
+})
