@@ -724,7 +724,7 @@ export default function DateTimePicker({
             </span>
             <p className="text-lg font-bold text-ink">この週は空きがありません</p>
             <p className="text-[13px] leading-[21px] text-pretty text-liff-sub">
-              次の週を見るか、担当を「指名なし」にすると見つかることがあります。
+              {staff.is_designation_optional === 0 ? '次の週を見るか、担当を「指名なし」にすると見つかることがあります。' : '次の週を見るか、担当を選び直してください。'}
             </p>
             <div className="flex w-full max-w-55 flex-col gap-2">
               <Button
