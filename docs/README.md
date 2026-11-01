@@ -1118,4 +1118,4 @@
 
 - [価格・削除確認・卓とフォームの表示改善](release-log/unreleased/2030-kenta-train-1031n.md) — 反映履歴、確認 2026-11-01。
 
-- [予約操作・取込と入力案内の改善](release-log/unreleased/0000-kenta-train-1031o.md) — 反映履歴、確認 2026-11-01。
+- [予約操作・取込と入力案内の改善](release-log/unreleased/2031-kenta-train-1031o.md) — 反映履歴、確認 2026-11-01。
