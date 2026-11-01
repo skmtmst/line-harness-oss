@@ -18,12 +18,12 @@ import { fireEvent } from '@testing-library/react'
 import { broadcastSteps, type BroadcastStepKey } from './broadcast-steps'
 import { TITLE_MAX } from './broadcast-form-model'
 
-const mocks = vi.hoisted(() => ({ preflight: vi.fn() }))
+const mocks = vi.hoisted(() => ({ preflight: vi.fn(), accountId: 'acc-1' as string | null, push: vi.fn(), create: vi.fn(async () => ({ success: true, data: { id: 'draft', version: 1 } })), update: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   const empty = async () => ({ success: true, data: [] })
   return { ...actual, api: { ...actual.api,
-    broadcasts: { ...actual.api.broadcasts, create: vi.fn(async () => ({ success: true, data: { id: 'draft', version: 1 } })), update: vi.fn(), get: vi.fn(), list: empty, preflight: mocks.preflight,
+    broadcasts: { ...actual.api.broadcasts, create: mocks.create, update: mocks.update, get: vi.fn(), list: empty, preflight: mocks.preflight,
       approval: { config: async () => ({ success: true, data: { threshold: 1000, singleOperator: false } }), request: vi.fn(), candidates: empty } },
     folders: { list: empty }, scenarios: { list: empty }, commonVars: { list: empty }, friendFields: { list: empty },
     broadcastMessageAssets: { list: empty }, templates: { list: empty },
@@ -32,8 +32,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   } }
 })
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/broadcasts/new', useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }), usePathname: () => '/broadcasts/new', useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: mocks.accountId, loading: false }) }))
 import BroadcastForm from './broadcast-form'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -62,6 +62,7 @@ async function render({ step = 'basic', scheduled = false, filled = true }: Rend
 }
 
 beforeEach(() => {
+  mocks.accountId = 'acc-1'
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
   mocks.preflight.mockResolvedValue({ success: true, data: { audienceCount: 37, hiddenExcluded: 0, warnings: [] } })
 })
@@ -149,5 +150,94 @@ describe('撮影用の完成状態', () => {
     const title = container.querySelector('input[placeholder="例：8月キャンペーンのお知らせ"]') as HTMLInputElement
     expect(title.value).toBe('')
     expect(document.body.textContent).not.toContain('テスト送信しました（2件）')
+  })
+})
+
+describe('配信前チェックの状態と設定へのリンク', () => {
+  async function openChecks() {
+    await act(async () => { fireEvent.click(buttons('配信前チェックを確認')[0]) }); await flush()
+    const dialog = document.querySelector<HTMLElement>('[data-design-node="vW4Es"] [role="dialog"]')!
+    expect(dialog).toBeTruthy()
+    return dialog
+  }
+  function icon(dialog: HTMLElement) { return dialog.querySelector('h2 svg')! }
+  function settingsLink(dialog: HTMLElement) { return [...dialog.querySelectorAll('a')].find(a => a.textContent?.includes('LINEの接続設定を見る')) }
+  function quota(state: 'available' | 'unavailable' | 'insufficient') {
+    return { state, monthlyUsed: state === 'unavailable' ? null : 100, monthlyLimit: state === 'unavailable' ? null : 1000, remaining: state === 'unavailable' ? null : state === 'insufficient' ? 10 : 900, planned: 37, reason: state === 'unavailable' ? 'LINEの接続用の鍵が受け付けられていません。' : null }
+  }
+  function setQuota(state: 'available' | 'unavailable' | 'insufficient') {
+    mocks.preflight.mockResolvedValue({ success: true, data: { audienceCount: 37, hiddenExcluded: 0, warnings: [], quota: quota(state) } })
+  }
+
+  it('全行を確認できた窓だけ成功の印を示し、接続設定へのリンクは出さない', async () => {
+    setQuota('available'); await render({ step: 'confirm', scheduled: true })
+    const dialog = await openChecks()
+    expect([...container.querySelectorAll('[data-preflight-check]')].every(row => row.getAttribute('data-check-state') === 'done')).toBe(true)
+    expect(icon(dialog).classList.contains('lucide-circle-check')).toBe(true)
+    expect(settingsLink(dialog)).toBeUndefined()
+    expect(dialog.textContent).toContain('確認結果です')
+  })
+
+  it.each(['unavailable', 'insufficient'] as const)('送信枠が%sの窓では警告の印と行をそろえる', async state => {
+    setQuota(state); await render({ step: 'confirm', scheduled: true })
+    const dialog = await openChecks()
+    expect(icon(dialog).classList.contains('lucide-triangle-alert')).toBe(true)
+    const pending = [...container.querySelectorAll('[data-check-state="pending"]')]
+    expect(pending.length).toBeGreaterThan(0)
+    expect([...dialog.querySelectorAll('li')].filter(row => row.textContent?.startsWith('⚠'))).toHaveLength(pending.length)
+    expect(container.querySelector('#broadcast-step-confirm')?.textContent).toContain(`${pending.length}件の確認が残っています`)
+    if (state === 'unavailable') {
+      expect(dialog.textContent).toContain('LINEの接続用の鍵が受け付けられていません。')
+      expect(settingsLink(dialog)?.getAttribute('href')).toBe('/accounts/detail?id=acc-1')
+    } else {
+      expect(dialog.textContent).toContain('現在の送信枠では37通を送信できません')
+      expect(settingsLink(dialog)).toBeUndefined()
+    }
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('送信枠を取得できていない窓は成功と断定しない（取得失敗=%s）', async failed => {
+    if (failed) mocks.preflight.mockRejectedValue(new Error('fixture failure'))
+    await render({ step: 'confirm', scheduled: true })
+    const dialog = await openChecks()
+    expect(icon(dialog).classList.contains('lucide-triangle-alert')).toBe(true)
+    expect(dialog.textContent).toContain('送信枠は未確認です')
+    expect(dialog.textContent).not.toContain('対象・メッセージ・日時・送信枠を確認しました')
+    expect(settingsLink(dialog)?.getAttribute('href')).toBe('/accounts/detail?id=acc-1')
+  })
+
+  it.each([['acc /?&', '/accounts/detail?id=acc%20%2F%3F%26'], [null, '/accounts']])('設定へのリンクは選択中のアカウントだけを使う（%s）', async (account, href) => {
+    mocks.accountId = account; await render({ step: 'confirm' })
+    const dialog = await openChecks()
+    expect(settingsLink(dialog)?.getAttribute('href')).toBe(href)
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it('窓を開いたままアカウントを切り替えると設定への行き先も新しい対象へ追従する', async () => {
+    setQuota('unavailable'); await render({ step: 'confirm' })
+    expect(settingsLink(await openChecks())?.getAttribute('href')).toBe('/accounts/detail?id=acc-1')
+    mocks.accountId = 'acc-2'
+    await act(async () => {
+      root.render(<BroadcastForm visualQaAugustCampaign currentStep="confirm" tags={[]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={() => {}} onCancel={() => {}} />)
+    }); await flush()
+    const dialog = document.querySelector<HTMLElement>('[data-design-node="vW4Es"] [role="dialog"]') ?? await openChecks()
+    expect(settingsLink(dialog)?.getAttribute('href')).toBe('/accounts/detail?id=acc-2')
+    expect(settingsLink(dialog)?.getAttribute('href')).not.toContain('acc-1')
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it('未保存の入力がある設定リンクは移動の確認を通し、閉じても入力を保持する', async () => {
+    setQuota('unavailable'); await render({ step: 'confirm' })
+    const input = container.querySelector<HTMLInputElement>('input[placeholder="例：8月キャンペーンのお知らせ"]')!
+    await act(async () => { setTextControlValue(input, '入力を保持する配信') }); await flush()
+    const dialog = await openChecks(), link = settingsLink(dialog)!
+    expect(link).toBeTruthy()
+    await act(async () => { fireEvent.click(link) }); await flush()
+    const leave = [...document.querySelectorAll<HTMLElement>('[role="dialog"],[role="alertdialog"]')].find(el => el.querySelector('h2')?.textContent?.includes('保存していない変更があります'))!
+    expect(leave).toBeTruthy()
+    expect(mocks.push).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(leave.querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')!) }); await flush()
+    expect(input.value).toBe('入力を保持する配信')
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.push).not.toHaveBeenCalled()
   })
 })
