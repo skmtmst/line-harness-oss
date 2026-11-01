@@ -56,11 +56,11 @@ afterEach(cleanup)
 describe('前提: 実LIFFが「日時を選んでください」＋週／カレンダー切替＋3列時刻ボタンの構造', () => {
   it('LIFF側の文言と構造が変わっていない（変わったらプレビューも追随が必要）', () => {
     expect(LIFF_SOURCE).toContain('日時を選んでください')
-    // ★V8（板 ・）：空きなしは週「この週は空きがありません」、
-    // 月「この月は空きがありません。」（管理画面 の「この期間に空きはありません。」は
-    // ★V8 で週・月の分かれた案内へ変わった。#1203 で契約を更新）。
+    // LIFF は週の空きなし、月の受付期間内の空きなし、月全体が受付期間外をそれぞれ案内する（両文が同時表示される場合もある）。
+    // 管理画面の携帯見本は別の「この期間に空きはありません。」を実DOMで確認する。
     expect(LIFF_SOURCE).toContain('この週は空きがありません')
-    expect(LIFF_SOURCE).toContain('この月は空きがありません。')
+    expect(LIFF_SOURCE).toContain('この月の受付期間内に空きがありません。')
+    expect(LIFF_SOURCE).toContain('この月は受付期間外です。')
     // 読み込み中・失敗は共通部品（LoadingView・LoadErrorView）で出す。
     expect(LIFF_SOURCE).toContain('LoadingView')
     expect(LIFF_SOURCE).toContain('LoadErrorView')
