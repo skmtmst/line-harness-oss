@@ -1117,3 +1117,5 @@
 - [電話予約・残席・見本の表示改善](release-log/unreleased/2029-kenta-train-1031m.md) — 反映履歴、確認 2026-11-01。
 
 - [共通情報の削除確認](release-log/unreleased/0000-kenta-common-vars-delete-confirmation.md)
+
+- [反映履歴：回答フォームの見本の題](release-log/unreleased/0000-kenta-form-preview-heading.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。

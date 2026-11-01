@@ -1,6 +1,7 @@
 'use client'
 import { usePhonePreviewScale } from './use-phone-preview-scale'
 import { PhonePreviewScale } from './phone-preview-scale'
+import TruncatedText from './truncated-text'
 import type { AriaRole, CSSProperties, ReactNode } from 'react'
 import { BatteryFull, Signal, Wifi, X, MoreHorizontal } from 'lucide-react'
 import styles from './liff-phone-frame.module.css'
@@ -14,7 +15,7 @@ export default function LiffPhoneFrame({ scaleToFit=false,compact=false,children
       {/* 本物のスマホの形（LINE の見え方と同じ器：330×690・黒い縁・黒い島。Pen cfVyj・fZrjX）。 */}
       <div className={styles.screen}>
       <div className={styles.status}><span className={styles.time}>9:41</span><span className={styles.island} aria-hidden="true" /><span className={styles.statusIcons} aria-hidden="true"><Signal size={16} strokeWidth={1.8}/><Wifi size={16} strokeWidth={1.8}/><BatteryFull size={20} strokeWidth={1.8}/></span></div>
-      <div className={styles.bar}><X size={16} aria-hidden="true"/><span className={styles.barTitle}><span className={styles.barMain}>{title}</span><span className={styles.barShop}>{accountName}</span></span><MoreHorizontal size={20} aria-hidden="true"/></div>
+      <div className={styles.bar}><X size={16} aria-hidden="true"/><span className={styles.barTitle}><TruncatedText className={styles.barMain} value={title} /><span className={styles.barShop}>{accountName}</span></span><MoreHorizontal size={20} aria-hidden="true"/></div>
       {step !== undefined ? <div className={styles.steps} aria-label="予約の進み具合">{steps.map((name, i) => <span key={name} className={styles.step} data-state={i + 1 < step ? 'done' : i + 1 === step ? 'now' : 'idle'} aria-current={i + 1 === step ? 'step' : undefined}><span className={styles.stepLine}/><span className={styles.stepLabel}>{i + 1} {name}</span></span>)}</div> : null}
       <div className={styles.content}>{children}</div>
       {footer}
