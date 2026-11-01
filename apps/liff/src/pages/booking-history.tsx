@@ -316,7 +316,7 @@ export default function BookingHistory() {
         open={pendingChange !== null}
         title={pendingChange ? `「${pendingChange.booking.menu_name}」の日時を変えますか` : ''}
         description="空いている日時から選びます。新しい日時を取れたときだけ、今の予約が変わります。"
-        confirmLabel="この日時に変える"
+        confirmLabel="日時を変える"
         cancelLabel="閉じる"
         busy={busy}
         error={pendingChange?.error ?? undefined}
