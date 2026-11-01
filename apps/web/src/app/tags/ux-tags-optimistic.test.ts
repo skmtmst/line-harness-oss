@@ -40,11 +40,11 @@ describe('UXタグ B 楽観的＋元に戻す', () => {
 
 /*
  * A: 待ちは共通の骨組み（DelayedSkeleton＋表の行の骨組み）。
- * 4タブの一覧すべてで使う。
+ * タグは tags-loading-delay.test.tsx の実DOMで、ほか3タブはここで確認する。
  */
 describe('UXタグ A 共通の骨組み', () => {
-  it('4タブの一覧が共通の骨組みを使っている', () => {
-    for (const src of [TAB, MARKS, SEARCHES, FIELDS]) {
+  it('マーク・検索条件・情報項目の一覧が共通の骨組みを使っている', () => {
+    for (const src of [MARKS, SEARCHES, FIELDS]) {
       expect(src).toContain('DelayedSkeleton')
       expect(src).toContain('skeleton=')
       expect(src).toContain('aria-busy="true"')

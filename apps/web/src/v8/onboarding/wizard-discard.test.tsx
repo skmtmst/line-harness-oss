@@ -16,7 +16,8 @@ vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: {
 } }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'test-store', accounts: [{id:'test-store',name:'Test store'}], selectedAccount: {id:'test-store',name:'Test store'} }) }))
 vi.mock('@/hooks/use-account-style', () => ({ accountStyleUpdated: calls.updated }))
-vi.mock('@/components/shared/list-navigation', () => ({
+vi.mock('@/components/shared/list-navigation', async importOriginal => ({
+  ...await importOriginal<typeof import('@/components/shared/list-navigation')>(),
   default: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a>,
   useListNavigationRouter: () => ({ push: calls.push }),
 }))

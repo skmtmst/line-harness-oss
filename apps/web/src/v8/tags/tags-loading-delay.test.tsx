@@ -34,6 +34,16 @@ it('タグ初回の保留中は共通の読み込み状態を出し、0件の空
   render(<TagsTab accountId="A" canEdit={false} narrow={false} csvOpen={false} onCsvClose={() => {}} />)
   await act(async () => { await vi.advanceTimersByTimeAsync(300) })
   expect(document.querySelector('[data-list-state="loading"]')).not.toBeNull()
+  const loading = document.querySelector('[data-list-state="loading"][aria-busy="true"][aria-label="タグを読み込んでいます"]')
+  expect(loading).not.toBeNull()
+  const bones = loading?.querySelectorAll('[data-skeleton]')
+  expect(bones?.length).toBeGreaterThan(0)
+  for (const bone of bones ?? []) {
+    expect(bone.closest('[data-skeleton-reserve]')).toBeNull()
+    expect(getComputedStyle(bone).visibility).not.toBe('hidden')
+    expect(getComputedStyle(bone).display).not.toBe('none')
+  }
+  expect(document.querySelector('[data-list-state="error"]')).toBeNull()
   expect(screen.queryByText('まだタグがありません')).toBeNull()
 })
 

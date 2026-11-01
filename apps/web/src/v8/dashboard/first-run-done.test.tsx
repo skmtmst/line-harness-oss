@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const net = vi.hoisted(() => ({ progress: vi.fn(), dismiss: vi.fn(), starterSet: vi.fn(), starterItems: vi.fn() }))
 vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get: net.progress, dismiss: net.dismiss } } }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { starterSet: net.starterSet, starterItems: net.starterItems } }))
-vi.mock('@/components/shared/list-navigation', () => ({
+vi.mock('@/components/shared/list-navigation', async importOriginal => ({
+  ...await importOriginal<typeof import('@/components/shared/list-navigation')>(),
   default: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a>,
 }))
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
