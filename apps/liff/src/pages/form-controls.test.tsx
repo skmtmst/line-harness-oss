@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { emptyLayout, type FormInputBlock } from '@line-crm/shared'
 import Form from './form'
+import { LiffApiError } from '../lib/api-error.js'
 
 vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }))
 vi.mock('../lib/api.js', () => ({ api: { getForm: vi.fn(), getMyLatestFormAnswer: vi.fn(), submitForm: vi.fn(), uploadFormFile: vi.fn(), liffConfig: vi.fn().mockResolvedValue({ success: true, data: {} }) } }))
@@ -98,5 +99,52 @@ describe('本人確認の新規受付停止', () => {
       expect(vi.mocked(api.submitForm).mock.calls[0][1].data).not.toHaveProperty('file')
     }
     expect(api.uploadFormFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('添付の失敗からの再試行', () => {
+  const retryMessage = 'ファイルを送れませんでした。時間をおいて、もう一度ファイルを選んでください。'
+  it.each([
+    ['一時障害', new LiffApiError(503, { error: 'Service unavailable' }), retryMessage],
+    ['混雑', new LiffApiError(429, { error: 'Too many requests' }), retryMessage],
+    ['通信の失敗', new TypeError('Failed to fetch'), retryMessage],
+    ['原因不明の失敗', new Error('document_upload_response_missing'), retryMessage],
+    ['容量の制限', new LiffApiError(400, { error: '1ファイル10MBまでです' }), '1ファイル10MBまでです'],
+    ['形式の制限', new LiffApiError(400, { error: 'この質問で受け取れる形式を選んでください' }), 'この質問で受け取れる形式を選んでください'],
+    ['安全確認の拒否', new LiffApiError(422, { code: 'file_scan_blocked', error: '安全を確認できませんでした。別のファイルを選んでください' }), '安全を確認できませんでした。別のファイルを選んでください'],
+  ])('添付の%sでは原因に合う案内を出し、ほかの入力を残す', async (_kind, failure, message) => {
+    await open({ fileKinds: ['image', 'pdf'] })
+    fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '入力を残す' } })
+    vi.mocked(api.uploadFormFile).mockRejectedValueOnce(failure)
+    fireEvent.change(screen.getByLabelText('添付画像', { selector: 'input' }), { target: { files: [new File(['qa'], 'sample.pdf', { type: 'application/pdf' })] } })
+    await screen.findByText(message as string)
+    expect((screen.getByLabelText('お名前') as HTMLInputElement).value).toBe('入力を残す')
+    expect((screen.getByLabelText('添付画像', { selector: 'input' }) as HTMLInputElement).disabled).toBe(false)
+    expect(api.uploadFormFile).toHaveBeenCalledOnce()
+    expect(api.submitForm).not.toHaveBeenCalled()
+  })
+
+  it('追加の失敗でも先の添付と入力を保ち、選び直して成功すると失敗の案内を消す', async () => {
+    await open({ fileKinds: ['pdf'], fileMaxCount: 2 })
+    fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '入力を残す' } })
+    const first = { fileId: 'file-a', filename: 'first.pdf', mimeType: 'application/pdf', state: 'ready' as const, side: 'single' as const }
+    const second = { ...first, fileId: 'file-b', filename: 'second.pdf' }
+    vi.mocked(api.uploadFormFile).mockResolvedValueOnce({ success: true, data: { file: first } })
+      .mockRejectedValueOnce(new LiffApiError(503, { error: 'Service unavailable' }))
+      .mockResolvedValueOnce({ success: true, data: { file: second } })
+    const choose = (filename: string) => fireEvent.change(screen.getByLabelText('添付画像', { selector: 'input' }), { target: { files: [new File(['qa'], filename, { type: 'application/pdf' })] } })
+    choose('first.pdf')
+    await screen.findByRole('button', { name: 'first.pdfを外す' })
+    choose('second.pdf')
+    await screen.findByText(retryMessage)
+    expect(screen.getByRole('button', { name: 'first.pdfを外す' })).toBeTruthy()
+    expect((screen.getByLabelText('お名前') as HTMLInputElement).value).toBe('入力を残す')
+    choose('second.pdf')
+    await screen.findByRole('button', { name: 'second.pdfを外す' })
+    expect(screen.queryByText(retryMessage)).toBeNull()
+    expect(screen.getByRole('button', { name: 'first.pdfを外す' })).toBeTruthy()
+    expect((screen.getByLabelText('お名前') as HTMLInputElement).value).toBe('入力を残す')
+    expect(api.uploadFormFile).toHaveBeenCalledTimes(3)
+    expect(api.submitForm).not.toHaveBeenCalled()
   })
 })
