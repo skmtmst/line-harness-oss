@@ -702,11 +702,13 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
         description="予約を受けないグルメ媒体（口コミ・紹介のサイトなど）を足します。予約メールは取り込みません。足したら行の「…」から URL を入れます。"
         confirmLabel="足す"
         busy={addBusy}
+        confirmDisabled={!addName.trim()}
+        confirmDisabledReason="媒体の名前を入れてください"
         onConfirm={() => addMedium()}
         onCancel={() => setAdding(false)}
         error={addError || undefined}
       >
-        <Field label="媒体の名前" htmlFor="media-name" error={addNameError}>
+        <Field label="媒体の名前" htmlFor="media-name" required error={addNameError}>
           <SaveErrorField names={["addName","add_name"]}><TextField id="media-name" value={addName} onChange={(event) => { setAddName(event.target.value); setAddNameError('') }} placeholder="例：OZmall" maxLength={100} /></SaveErrorField>
         </Field>
       </Dialog>
