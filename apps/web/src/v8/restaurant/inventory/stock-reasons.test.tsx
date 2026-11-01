@@ -62,7 +62,7 @@ describe('在庫を直すための案内', () => {
     fireEvent.click(screen.getByRole('button', { name: /開ける時間と配分を保存/ }))
     await waitFor(() => expect(screen.queryByText(missingHours)).toBeNull())
     expect(api.saveOpeningHours).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', expectedVersion: 0 }))
-    expect(generate().disabled).toBe(false)
+    await waitFor(() => expect(generate().disabled).toBe(false))
   })
 
   it('保存済みで全曜日が休みでも既存の生成可否と送る値を変えない', async () => {
