@@ -1124,3 +1124,4 @@
 - [予約操作・読込中と配信前の案内](release-log/unreleased/2032-kenta-train-1031p.md) — 反映履歴、確認 2026-11-01。
 
 - [振替券・空き待ちと入力表示の改善](release-log/unreleased/2034-kenta-train-1031r.md) — 反映履歴、確認 2026-11-01。
+- [リッチメニューの入力案内](release-log/unreleased/0000-kenta-rich-menu-validation-copy.md)：必須入力の案内文末の整形。確認日：2026-11-01。
