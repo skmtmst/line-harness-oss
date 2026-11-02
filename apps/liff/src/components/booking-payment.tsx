@@ -26,12 +26,14 @@ export default function BookingPayment({
   initialAmount,
   slot,
   durationMinutes,
+  onClose,
 }: {
   bookingId: string;
   menuName: string;
   initialAmount: number;
   slot: SlotPick;
   durationMinutes: number;
+  onClose?: () => void;
 }) {
   const [phase, setPhase] = useState<PayPhase>('confirm');
   const [amount, setAmount] = useState(initialAmount);
@@ -135,10 +137,13 @@ export default function BookingPayment({
     }
   }
 
+  const closeAction = onClose ? <Button variant="secondary" onClick={onClose}>閉じる</Button> : null;
+
   if (phase === 'unknown') return <div className="space-y-3.5">
     <PaymentPreparingNote />
     <p role="status" className="text-sm leading-6 text-ink">{PAYMENT_UNKNOWN}</p>
-    <BottomBar><Button variant="primary" onClick={() => liff.closeWindow()}>LINEに戻る</Button></BottomBar>
+    {onClose && <div className="pb-40" aria-hidden="true" />}
+    <BottomBar><Button variant="primary" onClick={() => liff.closeWindow()}>LINEに戻る</Button>{closeAction}</BottomBar>
   </div>;
 
   if (phase === 'paid') {
@@ -165,6 +170,7 @@ export default function BookingPayment({
           <Button variant="primary" onClick={() => liff.closeWindow()}>
             LINEに戻る
           </Button>
+          {closeAction}
         </BottomBar>
       </div>
     );
@@ -184,6 +190,7 @@ export default function BookingPayment({
           <Button variant="primary" onClick={() => liff.closeWindow()}>
             LINEに戻る
           </Button>
+          {closeAction}
         </BottomBar>
       </div>
     );
@@ -218,6 +225,7 @@ export default function BookingPayment({
           <Button variant="primary" onClick={refreshStatus} disabled={checking}>
             {checking ? '確認中…' : '支払いの状態を確認する'}
           </Button>
+          {closeAction}
         </BottomBar>
       </div>
     );
@@ -246,6 +254,7 @@ export default function BookingPayment({
         <Button variant="primary" onClick={handleStart} disabled={starting || !ready}>
           {starting ? '準備中…' : `${formatYen(amount)}の試験へ進む`}
         </Button>
+        {closeAction}
       </BottomBar>
     </div>
   );

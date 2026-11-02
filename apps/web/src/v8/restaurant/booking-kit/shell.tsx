@@ -43,7 +43,7 @@ export interface RestaurantV8Context {
   selectedStoreId: string
   busy: boolean
   /** 書き込み操作の共通処理。成功したら取り直して帯を出す。 */
-  mutate: (action: () => Promise<unknown>, success: string, options?: { rethrow?: (error: unknown) => boolean; onCommitted?: () => boolean }) => Promise<boolean>
+  mutate: (action: () => Promise<unknown>, success: string, options?: { rethrow?: (error: unknown) => boolean; onCommitted?: () => boolean } | ((message: string) => void)) => Promise<boolean>
   reload: () => Promise<void>
 }
 
@@ -201,27 +201,26 @@ export default function RestaurantShell({ initialStoreId = '', boardId, title, d
   }, [selectedAccountId, query, begin, accept, initialStoreId])
   useEffect(() => { void load() }, [load])
 
-  const mutate = useCallback(async (action: () => Promise<unknown>, success: string, options?: { rethrow?: (error: unknown) => boolean; onCommitted?: () => boolean }) => {
+  const mutate = useCallback(async (action: () => Promise<unknown>, success: string, options?: { rethrow?: (error: unknown) => boolean; onCommitted?: () => boolean } | ((message: string) => void)) => {
     setBusy(true)
     try {
       await action()
-      if (options?.onCommitted) {
+      if (typeof options !== 'function' && options?.onCommitted) {
         if (!options.onCommitted()) return true
         setNotice({ tone: 'success', text: '保存しました。最新の表示を読み込んでいます。' })
       }
       const refreshed = await load()
       if (refreshed) {
-        if (options?.onCommitted) setNotice(null)
+        if (typeof options !== 'function' && options?.onCommitted) setNotice(null)
         notifySaved(success)
       } else setSavedButUnread(true)
       return true
     } catch (error) {
-      if (options?.rethrow?.(error)) { setNotice(null); throw error }
+      if (typeof options !== 'function' && options?.rethrow?.(error)) { setNotice(null); throw error }
       if (error instanceof QuietError) { setNotice(null); return false }
-      setNotice({
-        tone: 'error',
-        text: phoneReservationFailure(error, role) || describeApiFailure(error, '保存'),
-      })
+      const message = phoneReservationFailure(error, role) || describeApiFailure(error, '保存')
+      if (typeof options === 'function') { setNotice(null); options(message) }
+      else setNotice({ tone: 'error', text: message })
       return false
     } finally {
       setBusy(false)

@@ -484,7 +484,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
               // 描くのは見えている行だけ（窓分け）。中身はその時に作る。
               render: () => {
                 const isSelected = selectedChatId === chat.id
-                const operatorName = operators.find((operator) => operator.id === chat.operatorId)?.name ?? null
+                const operatorName = operators.find((operator) => operator.id === chat.operatorId)?.name ?? chat.operatorName ?? (chat.operatorId ? '担当者不明' : null)
                 // 「真の自発（要対応）」= chat.status='unread'。webhook 側で auto_reply に
                 // マッチしなかった incoming のみ unread に設定される。auto_reply trigger
                 // (キーワード "コスト比較" 等) は matched 扱いで unread 化しない。

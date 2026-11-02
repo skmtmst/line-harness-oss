@@ -47,6 +47,7 @@ export interface ScheduledChatSend {
 /** `GET /api/chats` が返す、受信箱一覧専用の会話行。 */
 export type ChatListItem = Chat & {
   friendName: string
+  operatorName?: string | null
   friendPictureUrl: string | null
   lastMessageContent: string | null
   lastMessageDirection: 'incoming' | 'outgoing' | null
@@ -63,6 +64,7 @@ export type ChatDetail = Pick<ChatListItem,
 > & {
   friendName: string
   friendRealName: string | null
+  operatorName?: string | null
   friendPictureUrl: string | null
   isAttention: boolean
   lastMessageContent?: string | null

@@ -34,7 +34,7 @@ import { getAuthorizedLineAccount, getVisibleLineAccountEntry } from './line-acc
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
-import { readCapacity, normalizeOptionalString, validateLoginChannelPair } from './line-accounts-input.js';
+import { readCapacity, normalizeOptionalString, validateLoginChannelPair, readConnectBody, type ConnectBody } from './line-accounts-input.js';
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
 
 const lineAccounts = new Hono<Env>();
@@ -975,38 +975,6 @@ function duplicateAccountError(
   return { status: 409, error: 'channelId already registered' };
 }
 
-type ConnectBody = {
-  style?: unknown;
-  tagIds?: unknown; staffIds?: unknown; parentLineAccountId?: unknown; liffId?: unknown;
-  name?: unknown;
-  channelId?: unknown;
-  channelSecret?: unknown;
-  loginChannelId?: unknown;
-  loginChannelSecret?: unknown;
-};
-
-function readConnectBody(body: ConnectBody):
-  | { ok: true; value: { style?: AccountStyle; name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
-  | { ok: false; error: string } {
-  if (body.style !== undefined && !ACCOUNT_STYLES.includes(body.style as AccountStyle)) return { ok: false, error: 'invalid_style' };
-  const name = typeof body.name === 'string' ? body.name.trim() : '';
-  const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
-  const channelSecret = typeof body.channelSecret === 'string' ? body.channelSecret.trim() : '';
-  const loginChannelId = typeof body.loginChannelId === 'string' ? body.loginChannelId.trim() : '';
-  const loginChannelSecret = typeof body.loginChannelSecret === 'string' ? body.loginChannelSecret.trim() : '';
-  if (name.length > 40) return { ok: false, error: '表示名は40文字以内で入力してください' };
-  if (!/^\d+$/.test(channelId)) return { ok: false, error: 'Messaging APIのチャネルIDは半角数字で入力してください' };
-  if (!channelSecret) return { ok: false, error: 'Messaging APIのチャネルシークレットを入力してください' };
-  if (!/^\d+$/.test(loginChannelId)) return { ok: false, error: 'LINE LoginのチャネルIDは半角数字で入力してください' };
-  if (!loginChannelSecret) return { ok: false, error: 'LINE Loginのチャネルシークレットを入力してください' };
-  const id=(v:unknown):v is string=>typeof v==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(v);
-  if (Array.isArray(body.tagIds) && body.tagIds.length > 30) return { ok: false, error: '登録前のタグは30件以内で指定してください' };
-  for(const value of [body.tagIds,body.staffIds]) if(value!==undefined && (!Array.isArray(value)||value.length>50||value.some(v=>!id(v))||new Set(value).size!==value.length)) return {ok:false,error:'タグ・担当者の指定を確認してください'};
-  if(body.parentLineAccountId!==undefined && body.parentLineAccountId!==null && !id(body.parentLineAccountId)) return {ok:false,error:'親アカウントを確認してください'};
-  if(body.liffId!==undefined && (typeof body.liffId!=='string'||!/^\d+-[A-Za-z0-9_-]+$/.test(body.liffId))) return {ok:false,error:'LIFF IDを確認してください'};
-  return { ok: true, value: { style: body.style as AccountStyle | undefined, name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:(body.tagIds ?? []) as string[],staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
-}
-
 async function readConnectRequest(c: Context<Env>) {
   try {
     const parsed = readConnectBody(await c.req.json<ConnectBody>());
@@ -1125,6 +1093,10 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner', 'admi
       data: publicConnectData(prepared, prepared.steps, { capability: 'unknown', phase: 'not_started' }),
     });
   }
+  if (!parsed.value.importFriends) return c.json({
+    success: true,
+    data: publicConnectData(prepared, [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed', '友だちは引き継ぎません。')], { capability: 'unknown', phase: 'not_started' }),
+  });
   const capability = await probeFollowerCapability(prepared.channelAccessToken);
   const finalStep = capability === 'unknown'
     ? lineConnectStep(5, 'failed', '認証状態を確認できませんでした。時間をおいて、もう一度お試しください。')
@@ -1194,12 +1166,12 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
       lineProfileSyncedAt: jstNow(),
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
 
-    const followerState = await detectFollowerImportCapability(
+    const followerState = parsed.value.importFriends ? await detectFollowerImportCapability(
       c.env.DB,
       new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient,
       account.id,
-    );
-    if (followerState.capability === 'unknown') {
+    ) : await getFollowerImportState(c.env.DB, account.id);
+    if (parsed.value.importFriends && followerState.capability === 'unknown') {
       throw new Error('FOLLOWER_CAPABILITY_UNKNOWN');
     }
 
@@ -1232,11 +1204,11 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
     });
 
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
-    const started = followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
+    const started = parsed.value.importFriends && followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
     savingStyle = true;
     await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style,starterCatalogRuntime(c));
-    savingStyle = false; try { scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
-    const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
+    savingStyle = false; try { if (parsed.value.importFriends) scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
+    const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed', parsed.value.importFriends ? undefined : '友だちは引き継ぎません。')];
     return c.json({
       success: true,
       data: publicConnectData(prepared, steps, {

@@ -360,3 +360,20 @@ describe('卓の停止で移す予約と残す来店履歴', () => {
     expect(fixture.updateTable).not.toHaveBeenCalled()
   })
 })
+
+it.each([400, 409, 500])('卓の追加が%sで失敗したら窓の中に理由を出し、入力を残したまま再試行できる', async (status) => {
+  fixture.createTable.mockRejectedValueOnce(new ApiError(status)).mockResolvedValueOnce({ success: true })
+  render(<TablesPage />)
+  await screen.findByText('卓の詳細')
+  fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
+  const dialog = document.querySelector('[data-design-node="gBrCz"]') as HTMLElement
+  fireEvent.change(within(dialog).getByLabelText('卓番'), { target: { value: 'K1' } })
+  fireEvent.change(within(dialog).getByLabelText('表示名'), { target: { value: '試験卓' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: /^追加する$/ }))
+  await waitFor(() => expect(within(dialog).getByRole('alert').textContent?.trim()).toBeTruthy())
+  expect((within(dialog).getByLabelText('卓番') as HTMLInputElement).value).toBe('K1')
+  expect((within(dialog).getByLabelText('表示名') as HTMLInputElement).value).toBe('試験卓')
+  fireEvent.click(within(dialog).getByRole('button', { name: /^追加する$/ }))
+  await waitFor(() => expect(document.querySelector('[data-design-node="gBrCz"]')).toBeNull())
+  expect(fixture.createTable).toHaveBeenCalledTimes(2)
+})

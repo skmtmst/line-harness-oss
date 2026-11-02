@@ -37,6 +37,17 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
+it('媒体の取得に失敗しても読み直すと対象店舗の媒体一覧を表示する', async () => {
+  net.channels.mockRejectedValueOnce(new Error('人工取得失敗'))
+  render(<BookingMedia />)
+  const error = await screen.findByText('媒体を読み込めませんでした')
+  fireEvent.click(within(error.closest('[data-list-state="error"]') as HTMLElement).getByRole('button', { name: /もう一度/ }))
+  expect(await screen.findByText('人工媒体')).toBeTruthy()
+  expect(net.media).toHaveBeenLastCalledWith('a', 'current')
+  expect(net.channels).toHaveBeenCalledTimes(2)
+  noWrites()
+})
+
 it('503の理由は一つの帯だけで示し、同じLINEの設定へ案内しコピーしない', async () => {
   net.account = 'a /?&店'; net.link.mockRejectedValue(new ApiError(503, 'fixture'))
   render(<BookingMedia />)

@@ -96,6 +96,7 @@ it('確認前・確認成功・模擬保存後も、所属の手動確認を読�
   expect(screen.getByText('両方のチャネルの認証結果を確認します。')).toBeTruthy()
   expect(document.body.textContent).not.toMatch(unsupportedClaim)
   expect(calls.check).not.toHaveBeenCalled(); expect(calls.connect).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await waitFor(() => expect((screen.getByRole('button', { name: '登録する' }) as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 })
   expectManualGuidance(); expect(document.body.textContent).not.toMatch(unsupportedClaim)
@@ -111,7 +112,9 @@ it.each([1, 4])('段%sの認証が失敗した画面でも手動確認を示し�
   if (order === 1) connection.verification!.tokenOk = false
   else connection.verification!.loginOk = false
   calls.check.mockResolvedValue({ success: true, data: connection })
-  confirmation(); fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
+  confirmation();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
+  fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await screen.findByRole('button', { name: 'もう一度確かめる' }, { timeout: 5000 })
   expectManualGuidance(); expect(document.body.textContent).not.toMatch(unsupportedClaim)
   const register = screen.queryByRole('button', { name: '登録する' }) as HTMLButtonElement | null

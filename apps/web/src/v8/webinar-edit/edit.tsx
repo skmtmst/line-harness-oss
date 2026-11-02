@@ -21,6 +21,7 @@ import { ArrowRight } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
 import { RowMenu } from '@/components/shared/row-actions'
 import TargetMissing from '@/components/shared/target-missing'
@@ -436,7 +437,7 @@ function EditInner() {
       {pane === 'analytics' ? <AnalyticsPane ctx={ctx} chrome={detailChrome} /> : null}
       {keep('comments', <CommentsPane ctx={ctx} chrome={detailChrome} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} />)}
       {leaveDialog}
-      <Dialog open={pauseVersion !== null} title={`「${webinar.title}」を停止しますか？`} description={`公開中の版 ${pauseVersion ?? editor.version} を止めます。公開ページでの申し込みと視聴ができなくなります。あとで公開し直せます。`} tone="destructive" confirmation confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => void pause()} onCancel={() => { if (!pausing) setPauseVersion(null) }} />
+      <Dialog open={pauseVersion !== null} title={`「${webinar.title}」を停止しますか？`} description={`公開中の版 ${pauseVersion ?? editor.version} を止めます。公開ページでの申し込みと視聴ができなくなります。あとで公開し直せます。`} tone="destructive" confirmation confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => void pause()} onCancel={() => { if (!pausing) setPauseVersion(null) }}><OperationTargetSummary accounts={[{ id: webinar.accountId ?? '', name: account?.name }]} /></Dialog>
     </StepContent></SaveErrorScope>
   )
 }

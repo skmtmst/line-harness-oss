@@ -61,10 +61,12 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
 
   useEffect(() => {
     let cancelled = false
+    setOperators([])
+    if (!selectedAccountId) return () => { cancelled = true }
       ; (async () => {
         try {
           const res = await fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
-            '/api/operators',
+            `/api/operators${selectedAccountId ? `?lineAccountId=${encodeURIComponent(selectedAccountId)}` : ''}`,
           )
           if (!cancelled && res.success) setOperators(res.data)
         } catch {
@@ -74,7 +76,7 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     let cancelled = false
@@ -86,12 +88,7 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
     setAssigneeUnreadStatus('loading')
       ; (async () => {
         try {
-          /*
-            この口はアカウント引数を取らない（担当者の見える範囲で絞る作り）。
-            **新しい契約は足さない。** 切り替えのたびに読み直して、
-            前のアカウントの数を残さないことだけを守る。
-          */
-          const res = await api.chatStats.get()
+          const res = await api.chatStats.get(selectedAccountId)
           if (cancelled) return
           /* 失敗の返事を成功として読まない。`—` のままにする。 */
           if (!res.success) throw new Error('failed')

@@ -2,7 +2,7 @@ import { deferImpersonationSnapshot, forgetSessionSnapshot } from '@/lib/session
 import type { OpsImpersonation } from '@/lib/api'
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
@@ -25,6 +25,8 @@ const fixture = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string | null) => role === 'owner' || role === 'admin' }))
 vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: fixture }))
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'a', name: '対象LINE' }] })) }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 // Keep the actual button's DOM and lock behavior; capture the feature's raw callback to check its own guard too.
 vi.mock('@/components/shared/button', async (original) => {
@@ -156,7 +158,12 @@ it('オーナーは作成と行操作、設定の確認を開けるが、確認�
   view.unmount(); role('owner')
   render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: '接続を解除する' }))
-  expect(await screen.findByRole('alertdialog')).toBeTruthy(); expect(fixture.disconnect).not.toHaveBeenCalled()
+  const dialog = await screen.findByRole('alertdialog')
+  expect(dialog.textContent).toContain('LINEアカウント')
+  await waitFor(() => expect(dialog.textContent).toContain('対象LINE'))
+  expect(dialog.textContent).toContain('合成店')
+  expect(dialog.textContent).toContain('検証環境')
+  expect(fixture.disconnect).not.toHaveBeenCalled()
 })
 it('接続の確認を開いた後に権限が落ちても、灰色の確認とhandlerで解除を止める', async () => {
   const view = render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
@@ -167,6 +174,17 @@ it('接続の確認を開いた後に権限が落ちても、灰色の確認とh
   expect(buttons.every(button => button.getAttribute('aria-disabled') === 'true')).toBe(true)
   await act(async () => { for (const button of buttons) fireEvent.click(button) })
   expect(fixture.disconnect).not.toHaveBeenCalled()
+})
+it('Googleの接続先を変える前に元と移行先・LINE・店舗・環境を確認する', async () => {
+  render(<SettingsBoard accountId="a" data={connection('pending_location')} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole('radio', { name: /別の合成店/ }))
+  fireEvent.click(screen.getByRole('button', { name: 'この店舗に切り替える' }))
+  const dialog = within(await screen.findByRole('alertdialog'))
+  expect(dialog.getByText(/「合成店」から「別の合成店」へ切り替え/)).toBeTruthy()
+  expect(await dialog.findByText('対象LINE')).toBeTruthy()
+  expect(dialog.getByText('合成店', { exact: true })).toBeTruthy()
+  expect(dialog.getByText('検証環境')).toBeTruthy()
+  expect(fixture.selectLocation).not.toHaveBeenCalled()
 })
 it('編集の鍵を持つ担当者だけが機能を変えられ、管理者専用の操作は許可しない', () => {
   role('staff')

@@ -7,6 +7,8 @@ import { api, type FollowerImportState, type LineAccountConnectData } from '@/li
 import { styleApi } from '@/lib/api/helpers/styles'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useStaffRole } from '@/lib/staff-role'
+import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates/steps'
 import Button from '@/components/shared/button'
@@ -14,6 +16,8 @@ import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import Step5Completion from './step5-completion'
 import { handoverProgress, latestFollowerImportState } from './logic'
+import { registrationImportChoiceKey, registrationStorageKey } from './registration-storage'
+import { REGISTRATION_STYLE_KEY } from './use-registration-style'
 import styles from './register.module.css'
 
 const LABELS = ['事前確認', 'アカウント接続', '接続確認', '使い方を選ぶ', '完了'] as const
@@ -26,16 +30,19 @@ export default function ResumeFollowerHandover() {
   usePageTitle('LINEアカウントを登録')
   const router = useRouter()
   const accountId = useSearchParams().get('accountId') ?? ''
+  useStaffRole()
+  const choiceKey = registrationImportChoiceKey(registrationStorageKey(REGISTRATION_STYLE_KEY, readStaffIdentity()), accountId)
   const { accounts, setSelectedAccountId } = useAccount()
   const account = accounts.find((item) => item.id === accountId)
   const [state, setState] = useState<FollowerImportState | null>(null)
+  const skipped = stateChoice(choiceKey) === false && state?.phase === 'not_started'
   const [readError, setReadError] = useState(false)
   const [stepError, setStepError] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [styleLabel, setStyleLabel] = useState('')
   const running = state?.phase === 'importing_ids' || state?.phase === 'hydrating_profiles'
-  const complete = state?.phase === 'completed'
+  const complete = state?.phase === 'completed' || skipped
 
   const refresh = useCallback(async () => {
     if (!accountId) return
@@ -122,7 +129,7 @@ export default function ResumeFollowerHandover() {
   }
 
   return <PageFrame kind="wizard" boardId="Plmq1">
-    <PageHeading title="LINEアカウントを登録" help="いまの友だちを引き継いでいます。終わると完了です。" steps={<Steps
+    <PageHeading title="LINEアカウントを登録" help={skipped ? '友だちの引き継ぎは選択されていません。' : 'いまの友だちを引き継いでいます。終わると完了です。'} steps={<Steps
       label="登録の進捗" summaryLayout="aligned" currentKey="5"
       summaries={{ '1': '事前確認済み', '2': 'LINEの接続設定を確認済み', '3': '', '4': styleLabel }}
       steps={LABELS.map((label, index) => ({ key: String(index + 1), label, order: index + 1, state: index < 4 ? 'done' as const : 'todo' as const }))}
@@ -130,15 +137,20 @@ export default function ResumeFollowerHandover() {
     <div className={styles.body}>
       {!accountId ? <ListState kind="error" title="アカウントを確認できません" />
         : readError && !state ? <ListState kind="error" title="引き継ぎの状態を確認できません" onRetry={() => void refresh()} />
-        : state?.phase === 'not_started' ? <ListState kind="error" title="引き継ぎが開始されていません" onRetry={() => void refresh()} />
+        : state?.phase === 'not_started' && !skipped ? <ListState kind="error" title="引き継ぎが開始されていません" onRetry={() => void refresh()} />
         : <Step5Completion connection={connection} accountName={account?.name ?? ''} createdId={accountId}
-          importRunning={running || !state} importFriends importState={state} handover={progress}
+          importRunning={running || !state} importFriends={!skipped} importState={state} handover={progress}
           idleSeconds={idleSeconds} requestError={readError || stepError} restaurant={styleLabel === '飲食店'} onRefresh={() => void refresh()} refreshing={refreshing} />}
       <StickyBar presentation="account-registration" actions={<>
-        {(readError || stepError || idleSeconds >= 60) && <Button type="button" variant="primary" busy={refreshing} busyLabel="確認中…" onClick={() => void refresh()}>状態を再確認</Button>}
+        {(readError || stepError || (running && idleSeconds >= 60)) && <Button type="button" variant="primary" busy={refreshing} busyLabel="確認中…" onClick={() => void refresh()}>状態を再確認</Button>}
         {complete && <Button type="button" variant="primary" onClick={enter}>アカウントに入る</Button>}
         <Button href="/hq" variant={complete || readError || stepError ? 'secondary' : 'primary'}><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>
       </>} />
     </div>
   </PageFrame>
+}
+
+function stateChoice(key: string | null): boolean | null {
+  try { const value = key ? localStorage.getItem(key) : null; return value === 'true' ? true : value === 'false' ? false : null }
+  catch { return null }
 }

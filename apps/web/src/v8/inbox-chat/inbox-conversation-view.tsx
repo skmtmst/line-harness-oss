@@ -83,7 +83,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
             attention={{ on: Boolean(chatDetail.isAttention), saving: attentionSaving, disabled: !staffRole, lockedReason: staffRole ? lockReason(canEditFeature('/friends', staffRole)) : undefined, onToggle: () => void handleAttentionUpdate() }}
             operator={{
               value: chatDetail.operatorId ?? 'unassigned',
-              operators,
+              operators: chatDetail.operatorId && chatDetail.operatorName && !operators.some(o => o.id === chatDetail.operatorId) ? [{ id: chatDetail.operatorId, name: chatDetail.operatorName, disabled: true }, ...operators] : operators,
               onChange: (next) => { void handleOperatorUpdate(next === 'unassigned' ? null : next) },
             }}
             status={{ value: chatDetail.status as ChatStatus, onChange: (next) => void handleStatusUpdate(next as Chat['status']) }}

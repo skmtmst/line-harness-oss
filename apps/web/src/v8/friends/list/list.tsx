@@ -379,7 +379,7 @@ export default function FriendsListV8() {
     try {
       const [tagResponse, operatorResponse, scenarioResponse] = await Promise.all([
         api.tags.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
-        loadOperators(),
+        loadOperators(requestedAccountId),
         api.scenarios.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
       ])
       if (loadContextRef.current.accountId !== requestedAccountId) return
