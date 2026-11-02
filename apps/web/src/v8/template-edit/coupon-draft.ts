@@ -13,7 +13,7 @@ const object = (value: unknown): Record<string, unknown> => value && typeof valu
 export function initialCouponDraft(payload?: Record<string, unknown>, visual = false): CouponDraft {
   const discount = object(payload?.discount), code = object(payload?.code)
   return {
-    couponType: payload ? payload.couponType === 'discount' ? 'discount' : 'none' : 'discount',
+    couponType: payload ? payload.couponType === 'discount' ? 'discount' : 'none' : visual ? 'discount' : 'none',
     mode: payload ? ['amount', 'percent', 'price'].includes(String(discount.mode)) ? discount.mode as CouponDraft['mode'] : 'none' : visual ? 'percent' : 'amount',
     amount: number(discount.amountYen), percent: payload ? number(discount.percent) : visual ? '20' : '',
     before: number(discount.beforeYen), after: number(discount.afterYen),
