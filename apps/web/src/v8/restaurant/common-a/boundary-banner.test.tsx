@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { BoundaryBanner as CommonBanner } from './frame'
 import { BoundaryBanner as BookingBanner } from '../booking-kit/shell'
@@ -22,7 +22,8 @@ it.each([['共通画面', CommonBanner], ['予約画面', BookingBanner]])('%s�
   for (const value of ['production', null]) {
     environment.value = value
     const { unmount, container } = render(<Banner />)
-    await waitFor(() => expect(container.textContent).toBe(''))
+    await act(async () => { await Promise.resolve() })
+    expect(container.textContent).toBe('')
     unmount()
   }
 })
