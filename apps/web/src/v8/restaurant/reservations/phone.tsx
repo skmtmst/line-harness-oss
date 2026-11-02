@@ -31,6 +31,7 @@ import { useAccount } from '@/contexts/account-context'
 import { restaurantTestApi, type RestaurantMenuItem, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
+import { openTimes } from '../front-desk/slots'
 import styles from './reservations.module.css'
 
 import { formatYen as polishFormatYen, formatNumber } from '@/lib/format'
@@ -52,8 +53,6 @@ import FriendMatchRow from '@/components/shared/friend-match-row'
  */
 
 const STAY_MINUTES = 120
-const FALLBACK_START = 17 * 60
-const FALLBACK_END = 21 * 60
 
 type Person = { name: string; phone: string; lineUid: string }
 
@@ -134,7 +133,7 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
   fields.define('phone', '電話番号', () => kind !== 'customer' ? null : phoneProblem(person?.phone || manualPhone) || null)
   fields.define('date', '日付', () => /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(`${date}T00:00:00`)) ? null : '日付を選んでください。', { required: true })
   fields.define('count', '人数', () => Number.isInteger(guests) && guests >= 1 && guests <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
-  fields.define('time', '時間', () => time && times.includes(time) ? null : '空いている時間を選んでください。', { required: true })
+  fields.define('time', '時間', () => time && openTimes(date, hours ?? []).includes(time) ? null : '空いている時間を選んでください。', { required: true })
   fields.define('hold', '仮押さえの期限（分）', () => kind !== 'hold' || (Number.isInteger(Number(holdMinutes)) && Number(holdMinutes) >= 1 && Number(holdMinutes) <= 120) ? null : '期限は1〜120分で入れてください。', { required: true })
 
 
@@ -189,21 +188,11 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
   const activeTables = useMemo(() => tables.filter((t) => t.is_active).sort(floorOrder), [tables])
   const courses = useMemo(() => menuItems.filter((m) => m.status === 'active' && m.kind === 'course'), [menuItems])
 
-  /* 受けられる時間：その曜日の開ける時間のうち、2時間いられる始まり（無ければ 17:00〜21:00）。 */
-  const times = useMemo(() => {
-    const [y, m, d] = date.split('-').map(Number)
-    const weekday = y && m && d ? new Date(y, m - 1, d).getDay() : -1
-    const periods = hours?.find((day) => day.weekday === weekday)?.periods
-    const list: number[] = []
-    if (periods && periods.length > 0) {
-      for (const period of periods) {
-        for (let t = toMinutes(period.opensAt); t + STAY_MINUTES <= toMinutes(period.closesAt); t += 30) list.push(t)
-      }
-    } else if (!hours) {
-      for (let t = FALLBACK_START; t <= FALLBACK_END; t += 30) list.push(t)
-    }
-    return list.map(slotLabel)
-  }, [date, hours])
+  /* 受けられる時間：その曜日の開ける時間のうち、2時間いられる始まり。今日は過ぎた時刻を出さない。
+   * 開ける時間が読めない・全部休みのときは出さない（予約枠・在庫の「全部休み」と同じ前提。飛び込みの窓と共通の決まり）。
+   * 描画ごとの分の区切りも見るので、開いたまま時刻が過ぎたら次の描画で候補から外れる。保存時の検査はつど今の時刻で見る。 */
+  const nowMinute = Math.floor(Date.now() / 60000)
+  const times = useMemo(() => openTimes(date, hours ?? [], new Date(nowMinute * 60000)), [date, hours, nowMinute])
   const freeAt = (label: string) => activeTables.some((t) => t.min_capacity <= guests && t.max_capacity >= guests && !overlaps(date, label, t.id, dayRows))
 
   const recommended = useMemo(
