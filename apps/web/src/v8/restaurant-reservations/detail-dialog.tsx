@@ -56,7 +56,7 @@ function historyText(history: History): string {
 }
 
 export default function ReservationDetailDialog({ reservation, accountId, tables, courses, busy, canWrite, onClose, onCancel, onRestore, onEdit, onAttendance, inline = false }: {
-  onAttendance?:(id:string,action:'visited'|'depart'|'undo_departure'|'undo_visit')=>void
+  onAttendance?:(id:string,action:'visited'|'depart'|'undo_departure'|'undo_visit'|'no_show')=>void
   inline?: boolean
   reservation: RestaurantReservation | null
   accountId: string
@@ -101,8 +101,12 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const course = reservation.course_id ? courses.find((c) => c.id === reservation.course_id) ?? null : null
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
 
-  const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'visited')}]:[]
-  const attendance=canWrite&&attendanceItems.length?<RowActions subjectName={reservation.customer_name} menuItems={attendanceItems}/>:null
+  const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'visited')},{id:'no-show',label:'無断にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'no_show')}]:[]
+  /* 来店・退店・無断は「…」の奥ではなく窓の下に直接置く（R1-20）。訂正だけ「…」に残す。 */
+  const quickAttendance=attendanceItems.filter((item)=>item.id==='visit'||item.id==='depart'||item.id==='no-show')
+  const undoAttendance=attendanceItems.filter((item)=>item.id==='undo-depart'||item.id==='undo-visit')
+  const attendance=canWrite&&undoAttendance.length?<RowActions subjectName={reservation.customer_name} menuItems={undoAttendance}/>:null
+  const quickButtons=canWrite?quickAttendance.map((item)=><Button key={item.id} type="button" disabled={busy} onClick={item.onSelect}>{item.label}</Button>):null
   const dining=<ReservationDining entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
   if (inline) return <DetailPreview title="予約の詳細"
     description={`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}・${table?.code ?? '未配席'}`}
@@ -131,6 +135,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
       onCancel={onClose}
       actions={(
         <>
+          {quickButtons}
           {attendance}
           <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
           {canWrite ? (

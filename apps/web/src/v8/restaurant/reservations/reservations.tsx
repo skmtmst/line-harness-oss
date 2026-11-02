@@ -156,9 +156,9 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     return ok
   }, [mutate, reload])
 
-  const attendance=(id:string,action:'visited'|'depart'|'undo_departure'|'undo_visit')=>{
+  const attendance=(id:string,action:'visited'|'depart'|'undo_departure'|'undo_visit'|'no_show')=>{
     const row=rows.find(r=>r.id===id)??data.reservations.find(r=>r.id===id);if(!row)return;
-    void save(async()=>{const result=await restaurantTestApi.attendance(accountId,id,{action,expectedVersion:row.customer_version??1,requestId:crypto.randomUUID()});if(action==='visited')notifyToast(result.data.stamp.status==='recorded'?`来店スタンプ ${result.data.stamp.count} 個を確認しました。`:'スタンプは会計待ち・停止中・未連携の場合には増えません。');return result},action==='visited'?'来店にしました。':action==='depart'?'退店にしました。卓が空きました。':'来店・退店の記録を訂正しました。');
+    void save(async()=>{const result=await restaurantTestApi.attendance(accountId,id,{action,expectedVersion:row.customer_version??1,requestId:crypto.randomUUID()});if(action==='visited')notifyToast(result.data.stamp.status==='recorded'?`来店スタンプ ${result.data.stamp.count} 個を確認しました。`:'スタンプは会計待ち・停止中・未連携の場合には増えません。');return result},action==='visited'?'来店にしました。':action==='depart'?'退店にしました。卓が空きました。':action==='no_show'?'無断にしました。':'来店・退店の記録を訂正しました。');
   }
   const opened = rows.find((r) => r.id === openId) ?? data.reservations.find((r) => r.id === openId) ?? null
   const detailed = rows.find((r) => r.id === detailId) ?? data.reservations.find((r) => r.id === detailId) ?? null

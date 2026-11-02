@@ -118,6 +118,38 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(screen.queryByRole('button', { name: /に予約を入れる$/ })).toBeNull()
   })
 
+  it('来店・無断は窓の下に直接置き、無断は no_show を送る（R1-20）', async () => {
+    const attendance = vi.fn()
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    render(<ReservationDetailDialog reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
+      busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
+    const dialog = await screen.findByRole('dialog', { name: '鈴木 真理さん・4名' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '無断にする' }))
+    expect(attendance).toHaveBeenCalledWith('r1', 'no_show')
+    fireEvent.click(within(dialog).getByRole('button', { name: '来店にする' }))
+    expect(attendance).toHaveBeenCalledWith('r1', 'visited')
+  })
+  it('埋込のメニューにも無断があり no_show を送る（R1-20）', async () => {
+    const attendance = vi.fn()
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    render(<ReservationDetailDialog inline reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
+      busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
+    const panel = await screen.findByRole('region', { name: '予約の詳細' })
+    fireEvent.click(within(panel).getByRole('button', { name: '詳細のその他操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '無断にする' }))
+    expect(attendance).toHaveBeenCalledWith('r1', 'no_show')
+  })
+  it('来店済みは退店にするを直接置き、無断は置かない（R1-20）', async () => {
+    const attendance = vi.fn()
+    const visited = reservation('r3', { customer_name: '佐藤 健', status: 'visited', guest_count: 2 })
+    const data = snapshotOf({ reservations: [visited], reservationTotal: 1 })
+    render(<ReservationDetailDialog reservation={visited} accountId="account-1" tables={data.tables} courses={data.menuItems}
+      busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
+    const dialog = await screen.findByRole('dialog', { name: '佐藤 健さん・2名' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '退店にする' }))
+    expect(attendance).toHaveBeenCalledWith('r3', 'depart')
+    expect(within(dialog).queryByRole('button', { name: '無断にする' })).toBeNull()
+  })
   it('連絡先が無い予約は来店を数えない（口を呼ばない）', async () => {
     fixture.reservationsDay.mockResolvedValue({ data: { date: '', reservations: [{ ...today[0], customer_phone: null }] } })
     const dialog = await openDetail()
