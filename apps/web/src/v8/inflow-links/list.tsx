@@ -773,7 +773,7 @@ export default function InflowListV8({
           </DataTable>
         </div>
 
-        <BulkBar count={selectedRouteIds.size} total={selectableIds.length} onSelectAll={() => setSelectedRouteIds(new Set(selectableIds))} hint="まとめて操作できるのは登録済みの経路だけです">
+        <BulkBar count={selectedRouteIds.size} onClear={() => setSelectedRouteIds(new Set())} total={selectableIds.length} onSelectAll={() => setSelectedRouteIds(new Set(selectableIds))} hint="まとめて操作できるのは登録済みの経路だけです">
           <Button onClick={() => setBulkAction('pause')}>まとめて止める</Button>
           <Button onClick={() => setBulkAction('resume')}>まとめて再開する</Button>
           <Button onClick={() => setBulkAction('move')}>フォルダへ移す</Button>
