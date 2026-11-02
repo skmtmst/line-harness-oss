@@ -54,3 +54,10 @@ it('取得の失敗を未設定にせず、同じ欄から読み直せる', () =
   fireEvent.click(screen.getByRole('button'))
   expect(retry).toHaveBeenCalledTimes(1)
 })
+
+it('設定の確認を開く操作は、押した先の設定内容を示す', () => {
+  const onOpenStep = vi.fn()
+  render(<SetupTasks summary={setupSummary(data())!} role="admin" onOpenStep={onOpenStep} />)
+  fireEvent.click(screen.getByRole('button', { name: '設定を確認する' }))
+  expect(onOpenStep).toHaveBeenCalledWith(0)
+})

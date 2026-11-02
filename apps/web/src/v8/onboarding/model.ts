@@ -283,7 +283,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
       action: preparing ? { label: '決まりを入れる', preparing } : { label: '決まりを入れる', href: featureHref(warning.feature, warning.href, state.style) },
     })
   }
-  if (!state.styleSelected && state.styleMode !== 'manual') rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '選ぶ', step: 'style' } })
+  if (!state.styleSelected && state.styleMode !== 'manual') rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: '未選択' }, action: { label: '選ぶ', step: 'style' } })
   for (const question of questions) {
     if (state.style === 'ec' && question.key === 'stamps') continue
     const answer = answers[question.key]
@@ -293,7 +293,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
       key: question.key,
       title: question.todo.title,
       note: question.todo.note,
-      badge: { tone: 'neutral', label: answer.mode === 'manual' ? '手動' : 'あとで' },
+      badge: { tone: 'neutral', label: answer.mode === 'manual' ? '手動' : '未設定' },
       action: question.preparing ? { label: question.todo.action, preparing: question.preparing } : { label: question.todo.action, href: question.manualHref },
     })
   }
@@ -307,9 +307,9 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
     rows.push({key:'initial-menu',title:'最初のメニューの内容を確かめる',note:words.initialMenu,badge:{tone:'neutral',label:'下書き'},action:{label:'確かめる',href:'/getting-started/rich-menu'}})
   }
   if (look?.mode === 'configured' && (look.value === 'keep' || look.value === 'change')) {
-    rows.push({ key: 'images', title: words.images, note: '見本の画像のままです', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '画像を変える', href: '/rich-menus' } })
+    rows.push({ key: 'images', title: words.images, note: '見本の画像のままです', badge: { tone: 'neutral', label: '見本' }, action: { label: '画像を変える', href: '/rich-menus' } })
   } else if (look && look.mode !== 'configured') {
-    rows.push({ key: 'image', title: 'リッチメニューなどの見た目を決める', note: '見本を使うか、画像を変えるかを選びます', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '決める', step: 'image' } })
+    rows.push({ key: 'image', title: 'リッチメニューなどの見た目を決める', note: '見本を使うか、画像を変えるかを選びます', badge: { tone: 'neutral', label: '未設定' }, action: { label: '決める', step: 'image' } })
   }
   const firstOpen = steps.findIndex((step) => !doneKeys.includes(step.key))
   return {
