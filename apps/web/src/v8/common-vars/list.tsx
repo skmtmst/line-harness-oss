@@ -351,8 +351,13 @@ function CommonVarsListInner() {
   /** 使用先が多いときは畳む（板  の「ほか 5か所・すべて見る」）。 */
   const [usageExpanded, setUsageExpanded] = useState(false)
   const deleteRequestRef = useRef({ accountId: selectedAccountId, itemId: null as string | null, generation: 0 })
+  const deleteWindow = useRef<object>({})
+  const deleteWindowAccount = useRef(selectedAccountId)
+  if (deleteWindowAccount.current !== selectedAccountId) deleteWindow.current = {}
+  deleteWindowAccount.current = selectedAccountId
+  const renderedDeleteWindow = deleteWindow.current
 
-  const openDelete = (item: CommonVar) => openCommonVarDelete({ deleteRequestRef, saveErrors, selectedAccountId, setDeleteChoice, setDeleteError, setDeleteImpact, setDeletePhase, setDeleteReason, setDeleteTarget, setReplacementCandidates, setReplacementId, setReplacementImpact, setReplacementPhase, setTypedKey, setUsageExpanded }, item)
+  const openDelete = (item: CommonVar) => { deleteWindow.current = {}; return openCommonVarDelete({ deleteRequestRef, saveErrors, selectedAccountId, setDeleteChoice, setDeleteError, setDeleteImpact, setDeletePhase, setDeleteReason, setDeleteTarget, setReplacementCandidates, setReplacementId, setReplacementImpact, setReplacementPhase, setTypedKey, setUsageExpanded }, item) }
 
   const selectReplacement = async (nextId: string) => {
     if (!deleteTarget || !selectedAccountId)
@@ -386,6 +391,7 @@ function CommonVarsListInner() {
 
   /** 窓の中身を空にする。処理中は `closeDelete` が止めるので、成功時はこっちを使う。 */
   const resetDeleteState = () => {
+    deleteWindow.current = {}
     deleteRequestRef.current = {
       accountId: selectedAccountId,
       itemId: null,
@@ -411,8 +417,10 @@ function CommonVarsListInner() {
     resetDeleteState()
   }
 
+  useEffect(() => { resetDeleteState(); return () => { deleteWindow.current = {} } }, [selectedAccountId])
+
   const confirmReplacement = async () => {
-    if (!deleteTarget || !selectedAccountId || !replacementImpact?.canReplace || deleteBusy) return
+    if (!deleteTarget || !selectedAccountId || deleteWindow.current !== renderedDeleteWindow || deleteTarget.lineAccountId !== selectedAccountId || latestAccountRef.current !== selectedAccountId || !replacementImpact?.canReplace || deleteBusy) return
     if (reasonRequirement.check(deleteReason)) {
       setDeleteError('消した理由を入力してください。')
       return
@@ -454,7 +462,7 @@ function CommonVarsListInner() {
   }
 
   const confirmDirectDelete = async () => {
-    if (!deleteTarget || !selectedAccountId || deleteBusy) return
+    if (!deleteTarget || !selectedAccountId || deleteWindow.current !== renderedDeleteWindow || deleteTarget.lineAccountId !== selectedAccountId || latestAccountRef.current !== selectedAccountId || deleteBusy) return
     const request = {
       accountId: selectedAccountId,
       itemId: deleteTarget.id,
@@ -500,7 +508,7 @@ function CommonVarsListInner() {
 
   /** 「消さずに止める」を選んだとき。理由を止める理由として使う。 */
   const confirmStopInstead = async () => {
-    if (!deleteTarget || !selectedAccountId || deleteBusy) return
+    if (!deleteTarget || !selectedAccountId || deleteWindow.current !== renderedDeleteWindow || deleteTarget.lineAccountId !== selectedAccountId || latestAccountRef.current !== selectedAccountId || deleteBusy) return
     if (reasonRequirement.check(deleteReason)) {
       setDeleteError('止める理由を入力してください。')
       return

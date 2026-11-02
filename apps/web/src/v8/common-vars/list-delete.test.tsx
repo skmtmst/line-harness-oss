@@ -218,6 +218,8 @@ describe('行の削除の窓（xxKtW）', () => {
     expect(deleteImpact).toHaveBeenCalledTimes(1)
     expect(deleteImpact).toHaveBeenCalledWith('v-notice', 'account-a')
     expect(deleteDialog().textContent).toContain('「臨時のお知らせ」を削除しますか？')
+    expect(deleteDialog().textContent).toContain('LINEアカウント')
+    expect(deleteDialog().textContent).toContain('環境')
     expect(deleteDialog().querySelector('[data-detail-value]')?.textContent).toBe('臨時のお知らせ')
   })
 
@@ -243,6 +245,24 @@ describe('行の削除の窓（xxKtW）', () => {
     await click(button('このまま削除'))
     expect(deleteVar).toHaveBeenCalledWith('v-notice', 'account-a', '期間が終わったため')
     expect(listVars.mock.calls.length).toBe(listCalls + 1)
+    expect(document.querySelector('[data-design-node="xxKtW"]')).toBeNull()
+  })
+
+  it('アカウント切替後に古い確定を保持しても削除しない', async () => {
+    await render()
+    await openRowDelete('臨時のお知らせ')
+    const dialog = deleteDialog()
+    await type(inputByPlaceholder('店舗情報の変更のため', dialog), '期間が終わったため')
+    await type(inputByPlaceholder('{{var.temp_notice}}', dialog), '{{var.temp_notice}}')
+    const target = button('このまま削除', dialog)
+    const key = Object.keys(target).find(item => item.startsWith('__reactProps$'))!
+    const handler = (target as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    account.id = 'account-b'
+    await render()
+    account.id = 'account-a'
+    await render()
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: target, target }) })
+    expect(deleteVar).not.toHaveBeenCalled()
     expect(document.querySelector('[data-design-node="xxKtW"]')).toBeNull()
   })
 

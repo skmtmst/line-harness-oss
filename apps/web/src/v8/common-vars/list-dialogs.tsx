@@ -8,6 +8,7 @@ import type { CommonVarDeleteImpactItem } from '@line-crm/shared'
 
 import Button from '@/components/shared/button'
 import ConfirmDialog, { deleteConfirmationTitle } from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import DetailPanel from '@/components/shared/detail-panel'
 import Dialog,{ DialogActions } from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
@@ -162,7 +163,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
 
       {/* 削除の窓（板 `xxKtW`）。使われているものは差し替えか止めるへ導く。 */}
       <Dialog
-        open={deleteTarget !== null}
+        open={deleteTarget !== null && deleteTarget.lineAccountId === selectedAccountId}
         designNode="xxKtW"
         designWidth={480}
         designTop={240}
@@ -215,6 +216,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
       >
         {deleteTarget ? (
           <div className={`${styles.dialogBody} ${styles.deleteBody}`}>
+            <OperationTargetSummary accounts={[{ id: deleteTarget.lineAccountId ?? '' }]} />
             <DetailField label="削除する共通情報" multiline>{deleteTarget.name}</DetailField>
             {/* 絵 xxKtW：説明は窓の横いっぱい（×の列の下まで）。共通の窓の説明は×の左までなので本文側に置く。 */}
             <p className={styles.deleteLead}>
