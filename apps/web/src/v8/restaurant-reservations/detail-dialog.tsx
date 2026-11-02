@@ -13,7 +13,9 @@ import {seatBoardEntry, withHonorific } from '@line-crm/shared'
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useState } from 'react'
-import { Pencil, X } from 'lucide-react'
+import { Pencil, TriangleAlert, UserRoundX, X } from 'lucide-react'
+import { useStaffRole } from '@/lib/staff-role'
+import { permissionLockReason } from '@/components/shared/permission-lock'
 import {RowActions} from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -74,6 +76,8 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   /** 変更する：今の変更の窓へ。 */
   onEdit: (id: string) => void
 }) {
+  const role = useStaffRole()
+  const permissionReason = role === null ? undefined : permissionLockReason(role, canWrite)
   const [confirmNoShow, setConfirmNoShow] = useState<string | null>(null)
   const [history, setHistory] = useState<History>({ state: 'loading' })
   const id = reservation?.id ?? ''
@@ -103,21 +107,23 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const course = reservation.course_id ? courses.find((c) => c.id === reservation.course_id) ?? null : null
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
 
-  const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'visited')},{id:'no-show',label:'無断にする',disabled:busy,onSelect:()=>canWrite&&setConfirmNoShow(reservation.id)}]:[]
+  const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'visited')},{id:'no-show',label:'無断にする',disabled:busy,onSelect:()=>canWrite&&reservation.status!=='pending'&&setConfirmNoShow(reservation.id)}]:[]
   /* 来店・退店・無断は「…」の奥ではなく窓の下に直接置く。訂正だけ「…」に残す。 */
   const quickAttendance=attendanceItems.filter((item)=>item.id==='visit'||item.id==='depart'||item.id==='no-show')
   const undoAttendance=attendanceItems.filter((item)=>item.id==='undo-depart'||item.id==='undo-visit')
-  const attendance=canWrite&&undoAttendance.length?<RowActions subjectName={reservation.customer_name} menuItems={undoAttendance}/>:null
-  const quickButtons=canWrite?quickAttendance.map((item)=><Button key={item.id} type="button" disabled={busy} onClick={item.onSelect}>{item.label}</Button>):null
+  const noShowReason = reservation.status === 'pending' ? '承認してから無断にしてください。' : undefined
+  const buttonFor = (item: typeof attendanceItems[number]) => <Button key={item.id} type="button" disabled={busy || !canWrite} lockedReason={permissionReason ?? (item.id === 'no-show' ? noShowReason : undefined)} onClick={item.onSelect}>{item.label}</Button>
+  const attendance=undoAttendance.length?<RowActions subjectName={reservation.customer_name} menuItems={undoAttendance.map(item => ({...item, lockedReason: permissionReason, disabled: busy || !canWrite}))}/>:null
+  const quickButtons=quickAttendance.map(buttonFor)
   const dining=<ReservationDining entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
-  const confirmation = <ConfirmDialog open={canWrite && confirmNoShow === reservation.id} title="無断にしますか？" description="間違えた場合は予約を有効に戻せます。" confirmLabel="無断にする" onConfirm={() => { onAttendance?.(reservation.id, 'no_show'); setConfirmNoShow(null) }} onCancel={() => setConfirmNoShow(null)} />
+  const confirmation = <ConfirmDialog open={canWrite && reservation.status === 'confirmed' && confirmNoShow === reservation.id} title="無断にしますか？" description={`${withHonorific(reservation.customer_name)}・${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}。卓が空いていれば予約を有効に戻せます。送信済みの連絡は取り消せません。`} destructive titleIcon={<TriangleAlert size={20} />} confirmIcon={<UserRoundX size={16} />} confirmVariant="danger" confirmLabel="無断にする" onConfirm={() => { if (canWrite && reservation.status === 'confirmed') onAttendance?.(reservation.id, 'no_show'); setConfirmNoShow(null) }} onCancel={() => setConfirmNoShow(null)} />
   if (inline) return <><DetailPreview title="予約の詳細"
     description={`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}・${table?.code ?? '未配席'}`}
     headerActions={<><Button size="inline" variant="text" aria-label="予約の詳細を閉じる" onClick={onClose}><X size={16} aria-hidden="true" /></Button></>}
     actions={{
-      primary: canWrite && quickAttendance[0] ? <Button disabled={busy} onClick={quickAttendance[0].onSelect}>{quickAttendance[0].label}</Button> : null,
-      secondary: canWrite && quickAttendance[1] ? <Button disabled={busy} onClick={quickAttendance[1].onSelect}>{quickAttendance[1].label}</Button> : null,
-      menuItems: canWrite ? [...undoAttendance, {id: 'edit-reservation', label: '内容を変える', disabled: busy, onSelect: () => onEdit(reservation.id)}, ...(!inactive ? [{id: 'change-table', label: '卓を変える', disabled: busy, onSelect: () => onEdit(reservation.id)}] : []), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}] : [],
+      primary: quickAttendance[0] ? buttonFor(quickAttendance[0]) : null,
+      secondary: quickAttendance[1] ? buttonFor(quickAttendance[1]) : null,
+      menuItems: [...undoAttendance.map(item => ({...item, allowed: canWrite})), {id: 'edit-reservation', label: '内容を変える', allowed: canWrite, disabled: busy, onSelect: () => { if (canWrite) onEdit(reservation.id) }}, ...(!inactive ? [{id: 'change-table', label: '卓を変える', allowed: canWrite, disabled: busy, onSelect: () => { if (canWrite) onEdit(reservation.id) }}] : []), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}],
     }}>
     <DetailField label="お客さま">{withHonorific(reservation.customer_name, 'さま', { space: true })}</DetailField>
     <DetailField label="予約元"><ReservationSource value={reservation.source} note={reservation.note} /></DetailField>
@@ -141,18 +147,16 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
           {quickButtons}
           {attendance}
           <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
-          {canWrite ? (
-            inactive ? (
-              <Button type="button" disabled={busy} onClick={() => onRestore(reservation.id)}>予約を有効に戻す</Button>
+          {inactive ? (
+              <Button type="button" disabled={busy || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onRestore(reservation.id) }}>予約を有効に戻す</Button>
             ) : (
               <>
-                <Button type="button" disabled={busy} onClick={() => onCancel(reservation.id)}>取り消す</Button>
-                <Button type="button" variant="primary" disabled={busy} onClick={() => onEdit(reservation.id)}>
+                <Button type="button" disabled={busy || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onCancel(reservation.id) }}>取り消す</Button>
+                <Button type="button" variant="primary" disabled={busy || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onEdit(reservation.id) }}>
                   <Pencil size={16} aria-hidden="true" />内容を変える
                 </Button>
               </>
-            )
-          ) : null}
+            )}
         </>
       )}
     >

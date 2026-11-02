@@ -106,15 +106,40 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(screen.queryByRole('button', { name: '内容を変える' })).toBeNull()
   })
 
-  it('閲覧のみには 取り消す・変更する・卓を変える・予約を入れる を置かない', async () => {
+  it('閲覧のみは詳細の変更操作を理由付きで押せない', async () => {
     role.value = 'viewer'
     const dialog = await openDetail()
     expect(within(dialog).getAllByRole('button', { name: '閉じる' }).length).toBe(2)
-    expect(within(dialog).queryByRole('button', { name: '取り消す' })).toBeNull()
-    expect(within(dialog).queryByRole('button', { name: '内容を変える' })).toBeNull()
+    expect(within(dialog).getByRole('button', { name: '取り消す' }).getAttribute('aria-disabled')).toBe('true')
+    expect(within(dialog).getByRole('button', { name: '内容を変える' }).getAttribute('aria-disabled')).toBe('true')
     expect(screen.queryByRole('button', { name: '卓を変える' })).toBeNull()
     expect(screen.queryByRole('button', { name: /電話の予約を入れる/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /に予約を入れる$/ })).toBeNull()
+  })
+
+  it.each([false, true])('閲覧のみの詳細は来店・無断を理由付きで押せない（埋込=%s）', async (inline) => {
+    role.value = 'viewer'
+    const attendance = vi.fn()
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    render(<ReservationDetailDialog inline={inline} reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
+      busy={false} canWrite={false} onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
+    const area = inline ? screen.getByRole('region', { name: '予約の詳細' }) : screen.getByRole('dialog', { name: '鈴木 真理さん・4名' })
+    for (const name of ['来店にする', '無断にする']) {
+      const button = within(area).getByRole('button', { name })
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(button)
+    }
+    expect(attendance).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('閲覧のみのため変更できません')
+  })
+
+  it('承認待ちは無断にできず、承認が必要な理由を出す', () => {
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    render(<ReservationDetailDialog reservation={{...today[0], status: 'pending'}} accountId="account-1" tables={data.tables} courses={data.menuItems}
+      busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={() => {}} />)
+    const button = screen.getByRole('button', { name: '無断にする' })
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    expect(document.body.textContent).toContain('承認してから')
   })
 
   it('来店・無断は窓の下に直接置き、無断は確認後に送る', async () => {
@@ -125,10 +150,15 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const dialog = await screen.findByRole('dialog', { name: '鈴木 真理さん・4名' })
     fireEvent.click(within(dialog).getByRole('button', { name: '無断にする' }))
     expect(attendance).not.toHaveBeenCalled()
-    fireEvent.click(within(await screen.findByRole('dialog', { name: '無断にしますか？' })).getByRole('button', { name: 'キャンセル' }))
+    const confirm = await screen.findByRole('alertdialog', { name: '無断にしますか？' })
+    expect(confirm.textContent).toContain('鈴木 真理さん')
+    expect(confirm.textContent).toContain('19:00')
+    expect(confirm.textContent).toContain('送信済みの連絡は取り消せません')
+    expect(within(confirm).getByRole('button', { name: '無断にする' }).getAttribute('data-variant')).toBe('danger')
+    fireEvent.click(within(confirm).getByRole('button', { name: 'キャンセル' }))
     expect(attendance).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: '無断にする' }))
-    fireEvent.click(within(await screen.findByRole('dialog', { name: '無断にしますか？' })).getByRole('button', { name: '無断にする' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog', { name: '無断にしますか？' })).getByRole('button', { name: '無断にする' }))
     expect(attendance).toHaveBeenCalledWith('r1', 'no_show')
     fireEvent.click(within(dialog).getByRole('button', { name: '来店にする' }))
     expect(attendance).toHaveBeenCalledWith('r1', 'visited')
@@ -141,7 +171,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const panel = await screen.findByRole('region', { name: '予約の詳細' })
     fireEvent.click(within(panel).getByRole('button', { name: '無断にする' }))
     expect(attendance).not.toHaveBeenCalled()
-    fireEvent.click(within(await screen.findByRole('dialog', { name: '無断にしますか？' })).getByRole('button', { name: '無断にする' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog', { name: '無断にしますか？' })).getByRole('button', { name: '無断にする' }))
     expect(attendance).toHaveBeenCalledWith('r1', 'no_show')
   })
   it('来店済みは退店にするを直接置き、無断は置かない', async () => {
