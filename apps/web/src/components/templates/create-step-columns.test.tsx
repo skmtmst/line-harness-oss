@@ -5,6 +5,12 @@ import { CreateStepColumns } from './create-step-columns'
 
 afterEach(cleanup)
 
+it('見出しが文章でも、確認ボタンの言葉を別に指定できる', () => {
+  render(<CreateStepColumns previewTitle="ここで登録します" previewLabel="登録内容を見る" preview={<p>内容</p>}><p>入力</p></CreateStepColumns>)
+  expect(screen.getByRole('button', { name: '登録内容を見る' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'ここで登録しますを見る' })).toBeNull()
+})
+
 it.each([false, true])('単独の面=%sでも右欄と同じ内容を窓で読み、閉じたあと入力を保つ', (standalone) => {
   render(<CreateStepColumns standalone={standalone} previewTitle="登録内容" preview={<p>担当：店長</p>}><input aria-label="表示名" defaultValue="入力前" /></CreateStepColumns>)
   const input = screen.getByRole('textbox', { name: '表示名' }) as HTMLInputElement

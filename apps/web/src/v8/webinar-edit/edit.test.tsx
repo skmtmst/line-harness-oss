@@ -34,6 +34,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', name: '本店' }, accounts: [{ id: 'account-a', name: '本店', liffId: 'liff-1' }], loading: false }),
 }));
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -413,6 +414,10 @@ it('WEB-166：公開中は編集の…から版を確認して停止する', asy
   const pause = ([...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '停止') ?? querySupplementaryPageAction('停止')) as HTMLElement
   expect(pause.textContent).toContain('停止')
   await act(async () => { pause.click() })
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')
+  expect(dialog?.textContent).toContain('LINEアカウント')
+  expect(dialog?.textContent).toContain('本店')
+  expect(dialog?.textContent).toContain('検証環境')
   const confirm = (buttons().find(b => b.textContent?.trim() === '停止する') ?? querySupplementaryPageAction('停止する'))!
   expect(confirm).toBeTruthy()
   await act(async () => { confirm.click() })

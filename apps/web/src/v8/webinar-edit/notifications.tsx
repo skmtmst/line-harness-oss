@@ -10,6 +10,7 @@ import { Plus, Send } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -438,6 +439,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       {testResult ? <p role="status" className={form.previewNote}>{testResult}</p> : null}
 
       <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} error={testResult || undefined} onSuccess={() => setTestOpen(false)} onConfirm={() => runTest()}>
+        <OperationTargetSummary accounts={[{ id: webinar.accountId ?? '' }]} />
         <p className={form.cardNote}>{dirty ? '保存していない設定を保存してから送ります。' : ''}{`対象：「${webinar.title}」の入っている通知。本文は設定済みのものを送ります。`}</p>
       </ConfirmDialog>
     </CreatePage></SaveErrorScope>

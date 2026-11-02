@@ -8,6 +8,7 @@ import type { CommonVarDeleteImpactItem } from '@line-crm/shared'
 
 import Button from '@/components/shared/button'
 import ConfirmDialog, { deleteConfirmationTitle } from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import DetailPanel from '@/components/shared/detail-panel'
 import Dialog,{ DialogActions } from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
@@ -94,7 +95,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
     <>
       {/* 止める窓（板 `Hhl9M`）。下の窓を隠すため、削除の窓とは同時に出さない。 */}
       <Dialog
-        open={statusTarget !== null && deleteTarget === null && !panelStatus}
+        open={statusTarget !== null && statusTarget.lineAccountId === selectedAccountId && deleteTarget === null && !panelStatus}
         designNode="Hhl9M"
         designWidth={480}
         designLayout="stacked"
@@ -135,6 +136,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
       >
         {statusTarget ? (
           <div className={styles.dialogBody}>
+            <OperationTargetSummary accounts={[{ id: statusTarget.lineAccountId ?? '' }]} />
             {statusAction === 'stop' && statusTarget.nextSchedule ? (
               <Notice tone="warn" role="note" icon={<TriangleAlert size={16} aria-hidden="true" />}>
                 <span>
@@ -162,7 +164,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
 
       {/* 削除の窓（板 `xxKtW`）。使われているものは差し替えか止めるへ導く。 */}
       <Dialog
-        open={deleteTarget !== null}
+        open={deleteTarget !== null && deleteTarget.lineAccountId === selectedAccountId}
         designNode="xxKtW"
         designWidth={480}
         designTop={240}
@@ -215,6 +217,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
       >
         {deleteTarget ? (
           <div className={`${styles.dialogBody} ${styles.deleteBody}`}>
+            <OperationTargetSummary accounts={[{ id: deleteTarget.lineAccountId ?? '' }]} />
             <DetailField label="削除する共通情報" multiline>{deleteTarget.name}</DetailField>
             {/* 絵 xxKtW：説明は窓の横いっぱい（×の列の下まで）。共通の窓の説明は×の左までなので本文側に置く。 */}
             <p className={styles.deleteLead}>
@@ -367,7 +370,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
       </Dialog>
 
       <ConfirmDialog
-        open={deleteTargets.length > 0}
+        open={deleteTargets.length > 0 && deleteTargets.every(item => item.lineAccountId === selectedAccountId)}
         title={deleteTargets.length === 1
           ? `「${deleteTargets[0]?.name ?? ''}」を削除しますか？`
           : `「${deleteTargets[0]?.name ?? ''}」ほか${deleteTargets.length - 1} 件を削除しますか？`}
@@ -388,6 +391,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
           setDeleteTargets([])
         }}
       >
+        <OperationTargetSummary accounts={[...new Set(deleteTargets.map(item => item.lineAccountId ?? ''))].map(id => ({ id }))} />
         <Field label="消した理由" requirement={reasonRequirement}><SaveErrorField names={["batchReason","batch_reason"]}><SharedTextField
             value={batchReason}
             onChange={(e) => setBatchReason(e.target.value)}
@@ -439,8 +443,9 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                 ? `${formatListDate(activeItem.updatedAt)} ／ ${formatStamp(activeItem.nextSchedule.effectiveFrom)}に変更`
                 : `${formatListDate(activeItem.updatedAt)} ／ 予定なし`}
              </DetailField>
-            {panelStatus && statusTarget?.id === activeItem.id ? (
+            {panelStatus && statusTarget?.id === activeItem.id && statusTarget.lineAccountId === selectedAccountId ? (
               <>
+                <OperationTargetSummary accounts={[{ id: statusTarget.lineAccountId ?? '' }]} />
                 <p className={styles.panelLabel}>
                   {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
                 </p>

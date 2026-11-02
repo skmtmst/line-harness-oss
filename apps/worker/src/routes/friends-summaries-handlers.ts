@@ -295,9 +295,10 @@ export const get__api_friends_id_5 = async (c: Context<Env, "/api/friends/:id">)
        */
       db
         .prepare(
-          `SELECT c.status, c.notes, o.name AS operator_name
+          `SELECT c.status, c.notes, CASE WHEN c.assignee_staff_id IS NOT NULL THEN COALESCE(sm.name, '担当者不明') WHEN c.operator_id IS NOT NULL THEN COALESCE(o.name, '担当者不明') END AS operator_name
              FROM chats c
              LEFT JOIN operators o ON o.id = c.operator_id
+             LEFT JOIN staff_members sm ON sm.id = c.assignee_staff_id
             WHERE c.friend_id = ?
             LIMIT 1`,
         )

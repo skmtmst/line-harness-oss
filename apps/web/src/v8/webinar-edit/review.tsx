@@ -6,6 +6,7 @@ import { Check, Globe, Play, Send } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
@@ -210,7 +211,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         </dl>
       </Card>
 
-      <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} error={notice || undefined} onSuccess={() => setNotifyConfirm(false)} onConfirm={() => testNotify()} />
+      <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} error={notice || undefined} onSuccess={() => setNotifyConfirm(false)} onConfirm={() => testNotify()}><OperationTargetSummary accounts={[{ id: webinar.accountId ?? '' }]} /></ConfirmDialog>
     </CreatePage></SaveErrorScope>
   )
 }

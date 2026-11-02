@@ -117,6 +117,14 @@ export type AnalyticsUsageOverview = AnalyticsEnvelope<{
     unused: AnalyticsMetric<number>
     brokenReferences: AnalyticsMetric<number>
     lastUsedAt: AnalyticsMetric<string>
+    breakdown?: Array<{
+      key: 'tags' | 'fields'
+      label: string
+      href: string
+      created: AnalyticsMetric<number>
+      inUse: AnalyticsMetric<number>
+      unused: AnalyticsMetric<number>
+    }>
   }>
   /**
    * 全任意機能の利用状況（N-448）。共有カタログの featureId で機械照合する。

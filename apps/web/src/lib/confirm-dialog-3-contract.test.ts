@@ -182,14 +182,14 @@ describe('共通情報編集の削除', () => {
   it('二度押しを止め、409は使用先を読み直す', () => {
     const body = fnBody(code(src), 'const remove = async')
     expect(body, '二度押し・切替後を止めていない').toContain(
-      'if (!deleteTarget || deleting || deleteAccountSwitched) return',
+      'if (!deleteTarget || deleting || deleteAccountSwitched || latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return',
     )
     expect(body, '使用先を読めていないのに消せる').toContain(
       "if (deletePhase !== 'ready' || !deleteImpact?.canDelete) return",
     )
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '409を読み直していない').toContain('api.commonVars.deleteImpact(')
-    expect(body, '処理中の印を戻していない').toMatch(/finally\s*\{\s*setDeleting\(false\)/)
+    expect(body, '同じアカウントと窓では処理中の印を戻していない').toContain('if (latestAccountRef.current === deleteTarget.accountId && deleteWindow.current === deleteTarget.window) setDeleting(false)')
     expect(body, '生のAPIエラーを出している').not.toMatch(/setDeleteError\(e\b/)
   })
 

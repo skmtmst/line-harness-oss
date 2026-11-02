@@ -2,6 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ResumeFollowerHandover from './resume-handover'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity, readStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
+import { registrationStorageKey } from './registration-storage'
+import { REGISTRATION_STYLE_KEY } from './use-registration-style'
 
 const mocks = vi.hoisted(() => ({
   state: vi.fn(), step: vi.fn(), select: vi.fn(), push: vi.fn(), replace: vi.fn(),
@@ -27,13 +31,46 @@ const importState = (over: Record<string, unknown> = {}) => ({
 })
 
 beforeEach(() => {
+  localStorage.clear(); sessionStorage.clear()
+  verifiedStaffRole('owner')
+  rememberStaffIdentity({ ...readStaffIdentity()!, id: 'owner-a', tenantId: 'tenant-a' })
   vi.clearAllMocks()
   mocks.state.mockResolvedValue({ success: true, data: importState() })
   mocks.step.mockImplementation(() => new Promise(() => {}))
 })
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); forgetStaffIdentity() })
 
 describe('統括から友だち引き継ぎへ戻る画面', () => {
+  it('引き継がず登録した人は未開始をエラーにせず完了へ進める', async () => {
+    const key = registrationStorageKey(REGISTRATION_STYLE_KEY, readStaffIdentity())!
+    localStorage.setItem(`${key}:import:${encodeURIComponent('the-shed')}`, 'false')
+    mocks.state.mockResolvedValue({ success: true, data: importState({ phase: 'not_started', updatedAt: '2000-01-01T00:00:00Z' }) })
+    render(<ResumeFollowerHandover />)
+    await screen.findByText('LINEアカウントの登録が完了しました')
+    expect(screen.getByText(/引き継ぎはオフ/)).toBeTruthy()
+    expect(screen.queryByText('引き継ぎが開始されていません')).toBeNull()
+    expect(screen.queryByRole('button', { name: '状態を再確認' })).toBeNull()
+    expect(mocks.step).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'アカウントに入る' }))
+    expect(mocks.select).toHaveBeenCalledWith('the-shed')
+  })
+  it('別の本人の選択を読み込まず、未開始のままなら確認を求める', async () => {
+    const foreign = registrationStorageKey(REGISTRATION_STYLE_KEY, { id: 'owner-b', tenantId: 'tenant-a' })!
+    localStorage.setItem(`${foreign}:import:the-shed`, 'false')
+    mocks.state.mockResolvedValue({ success: true, data: importState({ phase: 'not_started' }) })
+    render(<ResumeFollowerHandover />)
+    await screen.findByText('引き継ぎが開始されていません')
+    expect(screen.queryByRole('button', { name: 'アカウントに入る' })).toBeNull()
+    expect(mocks.step).not.toHaveBeenCalled()
+  })
+  it('登録時はオフでも、その後始めた処理は実際の進捗を表示する', async () => {
+    const key = registrationStorageKey(REGISTRATION_STYLE_KEY, readStaffIdentity())!
+    localStorage.setItem(`${key}:import:the-shed`, 'false')
+    render(<ResumeFollowerHandover />)
+    await screen.findByText('友だちを確認しています', { selector: 'h2' })
+    await waitFor(() => expect(mocks.step).toHaveBeenCalledWith('the-shed'))
+    expect(screen.queryByText(/引き継ぎはオフ/)).toBeNull()
+  })
   it('Penの探索中カードを表示して実際のジョブを進める', async () => {
     render(<ResumeFollowerHandover />)
     await screen.findByText('友だちを確認しています', { selector: 'h2' })

@@ -18,6 +18,7 @@ import Card from '@/components/shared/card'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Th, Tr, Td, TableStateRow } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
@@ -441,6 +442,10 @@ export default function AccountHandoverV8() {
     && handover.declaredFriendTotal !== handover.counts.sourceTotal
   const executeDisabled = unresolved > 0 || handover.status === 'completed' || editCount > 0 || declaredMismatch
   const destinationName = destination?.name ?? '受け取り先'
+  const handoverTargets = [
+    { id: handover.fromAccountId ?? '', name: handover.fromAccountId === account.id ? account.name : undefined, label: '移し元のLINEアカウント' },
+    { id: handover.toAccountId ?? '', name: destination?.name, label: '移し先のLINEアカウント' },
+  ]
 
   return <SaveErrorScope errors={saveErrors}>{frame(`乗り換え（${account.name} → ${destination?.name ?? emptyValue('unknown')}）`, '引き継ぎコードで両方のアカウントをつなぎました。「要確認」を全部決めるまで本実行できません。', (
     <>
@@ -616,7 +621,7 @@ export default function AccountHandoverV8() {
         error={executeError}
         onConfirm={() => executeHandover()}
         onCancel={() => { if (!executing) { setConfirmOpen(false); setExecuteError('') } }}
-      />
+      ><OperationTargetSummary accounts={handoverTargets} /></ConfirmDialog>
       <ConfirmDialog
         open={cancelOpen}
         title="この引き継ぎを取り消しますか？"
@@ -626,7 +631,7 @@ export default function AccountHandoverV8() {
         busy={cancelling}
         error={executeError || undefined} onSuccess={() => setCancelOpen(false)} onConfirm={() => runCancel()}
         onCancel={() => { if (!cancelling) setCancelOpen(false) }}
-      />
+      ><OperationTargetSummary accounts={handoverTargets} /></ConfirmDialog>
       <ConfirmDialog
         open={rollbackOpen}
         title="移した友だちを元へ戻しますか？"
@@ -637,7 +642,7 @@ export default function AccountHandoverV8() {
         error={rollbackError}
         onConfirm={() => runRollback()}
         onCancel={() => { if (!rollingBack) { setRollbackOpen(false); setRollbackError('') } }}
-      />
+      ><OperationTargetSummary accounts={handoverTargets} /></ConfirmDialog>
     </>
   ))}</SaveErrorScope>
 }

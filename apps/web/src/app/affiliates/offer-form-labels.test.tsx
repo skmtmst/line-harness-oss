@@ -109,3 +109,65 @@ describe('R286 案件編集の入力欄は項目名で一意に特定できる',
     expect(input.labels?.[0].control).toBe(input)
   })
 })
+
+describe('案件の未保存', () => {
+  test('入力後のリンク移動を止め、編集を続けると入力が残る', async () => {
+    const modal = await openOfferEdit()
+    await waitFor(() => expect((modal.getByLabelText('数える期間（日）', { exact: true }) as HTMLInputElement).value).toBe('30'))
+    fireEvent.change(modal.getByLabelText('案件名', { exact: true }), { target: { value: '新しい案件名' } })
+    const link = document.createElement('a')
+    link.href = '/templates'
+    document.body.appendChild(link)
+    fireEvent.click(link)
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect((modal.getByLabelText('案件名', { exact: true }) as HTMLInputElement).value).toBe('新しい案件名')
+    link.remove()
+  })
+
+  test('決まりを読み込んだだけでは確認せず、変更すると戻るを止める', async () => {
+    const modal = await openOfferEdit()
+    const input = modal.getByLabelText('数える期間（日）', { exact: true }) as HTMLInputElement
+    await waitFor(() => expect(input.value).toBe('30'))
+    const clean = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(clean)
+    expect(clean.defaultPrevented).toBe(false)
+    fireEvent.change(input, { target: { value: '31' } })
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    fireEvent.popState(window)
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(go).toHaveBeenCalledWith(1)
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect(input.value).toBe('31')
+    go.mockRestore()
+  })
+
+  test('入力を元に戻すと離脱確認は出ない', async () => {
+    const modal = await openOfferEdit()
+    await waitFor(() => expect((modal.getByLabelText('数える期間（日）', { exact: true }) as HTMLInputElement).value).toBe('30'))
+    const input = modal.getByLabelText('案件名', { exact: true }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: '変更後' } })
+    fireEvent.change(input, { target: { value: '案件A' } })
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+
+  test('入力後に決まりの取得が終わっても入力を保護する', async () => {
+    const { api } = await import('@/lib/api')
+    let complete!: (value: Awaited<ReturnType<typeof api.affiliateOffers.capStatus>>) => void
+    const spy = vi.spyOn(api.affiliateOffers, 'capStatus').mockReturnValue(new Promise(resolve => { complete = resolve }))
+    const modal = await openOfferEdit()
+    fireEvent.change(modal.getByLabelText('案件名', { exact: true }), { target: { value: '先に入力' } })
+    await act(async () => { complete({ success: true, data: { version: { windowDays: 30, capTotal: null, capMonthlyPerAffiliate: null, receptionFrom: null, receptionTo: null } } } as Awaited<ReturnType<typeof api.affiliateOffers.capStatus>>) })
+    const input = modal.getByLabelText('数える期間（日）', { exact: true }) as HTMLInputElement
+    await waitFor(() => expect(input.value).toBe('30'))
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+    expect((modal.getByLabelText('案件名', { exact: true }) as HTMLInputElement).value).toBe('先に入力')
+    spy.mockRestore()
+  })
+
+})

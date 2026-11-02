@@ -20,6 +20,8 @@ const calls = vi.hoisted(() => ({
   putAnswer: new Map<string, (progress: (value: number) => void) => Promise<string>>(),
 }))
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
@@ -57,6 +59,7 @@ import MediaUploadDialog from './media-upload-dialog'
 let root: Root
 let host: HTMLDivElement
 let onComplete = vi.fn()
+let onClose = vi.fn()
 
 beforeEach(() => {
   calls.prepare.length = 0
@@ -64,6 +67,7 @@ beforeEach(() => {
   calls.complete.length = 0
   calls.putAnswer.clear()
   onComplete = vi.fn()
+  onClose = vi.fn()
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -79,7 +83,7 @@ const settle = async () => {
 }
 const render = async () => {
   await act(async () => root.render(
-    <MediaUploadDialog open accountId="account-a" folders={[]} initialFolderId="" onClose={() => {}} onComplete={onComplete} />,
+    <MediaUploadDialog open accountId="account-a" folders={[]} initialFolderId="" onClose={onClose} onComplete={onComplete} />,
   ))
   await settle()
 }
@@ -155,4 +159,75 @@ describe('メディアを入れる窓', () => {
     expect(calls.prepare.at(-1)?.files.map((file) => file.filename)).toEqual(['b.png'])
     expect(calls.complete.map(([session]) => session)).toEqual(['session-a.png', 'session-b.png'])
   })
+
+  it('登録前のファイルを選んで移動すると確認し、続けると選択を残す', async () => {
+    await render()
+    await pick(png('draft.png'))
+    const link = document.createElement('a')
+    link.href = '/templates'
+    document.body.appendChild(link)
+    await act(async () => { link.click() })
+    await settle()
+    const confirmation = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].find(element => element.textContent?.includes('保存していない変更があります'))
+    expect(confirmation).toBeTruthy()
+    const keep = [...confirmation!.querySelectorAll('button')].find(button => button.textContent?.includes('編集を続ける'))!
+    await act(async () => { keep.click() })
+    expect(dialog().textContent).toContain('draft.png')
+    expect(calls.prepare).toHaveLength(0)
+    link.remove()
+  })
+
+
+  it('選択中のファイルがあれば戻るを止める', async () => {
+    await render()
+    await pick(png('draft.png'))
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+    expect(go).toHaveBeenCalledWith(1)
+    expect(document.body.textContent).toContain('保存していない変更があります')
+    go.mockRestore()
+  })
+
+  it('閉じる時も未登録ファイルの破棄を確認する', async () => {
+    await render()
+    await pick(png('draft.png'))
+    await act(async () => { dialog().querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')!.click() })
+    await settle()
+    const confirmation = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].find(element => element.textContent?.includes('入力を破棄しますか？'))
+    expect(confirmation).toBeTruthy()
+    expect(document.body.textContent).not.toContain('保存していない変更があります')
+    const discard = [...confirmation!.querySelectorAll('button')].find(button => button.textContent?.trim() === '破棄する')!
+    await act(async () => { discard.click() })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(calls.prepare).toHaveLength(0)
+  })
+
+  it('全ファイルの登録後は離脱確認しない', async () => {
+    await render()
+    await pick(png('done.png'))
+    await press('1件を登録する')
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+
+  it('登録中は戻るを止め、応答後に離脱確認を解除する', async () => {
+    let release: () => void = () => {}
+    calls.putAnswer.set('draft.png', () => new Promise(resolve => { release = () => resolve('etag') }))
+    await render()
+    await pick(png('draft.png'))
+    await press('1件を登録する')
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+    expect(go).toHaveBeenCalledWith(1)
+    expect(document.body.textContent).not.toContain('保存していない変更があります')
+    await act(async () => { release() })
+    await settle()
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    go.mockRestore()
+  })
+
 })
