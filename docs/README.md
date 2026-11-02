@@ -701,6 +701,7 @@
 - [pending-kenta-one-f2x-j7-1015.md](release-log/unreleased/pending-kenta-one-f2x-j7-1015.md)
 - [pending-kenta-testfix-1015.md](release-log/unreleased/pending-kenta-testfix-1015.md)
 - [pending-kenta-train40-evening.md](release-log/unreleased/pending-kenta-train40-evening.md)
+- [H-18 作成途中の復元](release-log/unreleased/2049-kenta-form-draft-restore.md)
 - [pending-kenta-fix1-bugs-1025.md](release-log/unreleased/pending-kenta-fix1-bugs-1025.md)
 - [1781-kenta-cleanup-f01.md](release-log/unreleased/1781-kenta-cleanup-f01.md)
 - [1775-masato-line-webhook-v07.md](release-log/unreleased/1775-masato-line-webhook-v07.md)

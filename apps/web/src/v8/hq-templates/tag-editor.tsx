@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import type { HqTemplateFolder, Tag, TagGroup } from '@line-crm/shared'
 import type { TagDefinition } from '@/lib/hq-templates-api'
 import { TagEditForm } from '@/v8/tag-edit/public/edit/index'
@@ -14,8 +14,18 @@ import styles from './tag-editor.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { formatNumber } from '@/lib/format'
 
+function TagDraftObserver({ definition, onChange }: { definition: TagDefinition; onChange?: (next: TagDefinition) => void }) {
+  const snapshot = JSON.stringify(definition)
+  useEffect(() => {
+    onChange?.(definition)
+    // 入力が変わったときだけ記録し、親の通知の再描画で繰り返さない。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot])
+  return null
+}
+
 /** 店のV8編集フォームの入力・並べ替え・マイルと、統括の保存先をつなぐ。店のAPIは呼ばない。 */
-export default function HqTagEditorV8({ definition, folders = [], onCreateFolder, editing, saving, readOnly = false, conflict = false, error, notice, conflictNotice, onDraftChange, onReloadLatest, onCancel, onSave, onSaveDraft }: {
+export default function HqTagEditorV8({ definition, folders = [], onCreateFolder, editing, saving, readOnly = false, conflict = false, error, notice, draftNotice, conflictNotice, onDraftChange, onReloadLatest, onCancel, onSave, onSaveDraft }: {
   definition: TagDefinition
   /** 統括のフォルダ（左の列と同じ）。所属フォルダはここから選ぶ。 */
   folders?: HqTemplateFolder[]
@@ -30,6 +40,7 @@ export default function HqTagEditorV8({ definition, folders = [], onCreateFolder
   onReloadLatest?: () => void
   error?: string
   notice?: string
+  draftNotice?: ReactNode
   onCancel: () => void
   onSaveDraft?: (definition: TagDefinition) => Promise<void>
   onSave: (definition: TagDefinition, andAnother?: boolean) => Promise<void>
@@ -62,7 +73,6 @@ export default function HqTagEditorV8({ definition, folders = [], onCreateFolder
     await onSave(withFolder(hqTagEditorToDefinition(definition, values)), another)
   }
   const preview = (values: TagEditorValues) => {
-    onDraftChange?.(withFolder(hqTagEditorToDefinition(definition, values)))
     const folder = groups.find((group) => group.id === values.groupId)
     const steps = [
       definition.tag.manualAssignmentAllowed === false ? 'このタグは手で付けず、連携や自動処理から付けます。' : '一覧・チャット・CSV から、このタグを手で付けられます。',
@@ -70,14 +80,14 @@ export default function HqTagEditorV8({ definition, folders = [], onCreateFolder
       values.linked && values.multiplierBps ? `今後の獲得マイルは ${values.multiplierBps / 10000} 倍になります。` : '今後の獲得マイルは変わりません。',
       values.linked && values.actions.length ? `${formatNumber(values.actions.length)} 件の連動アクションを上から順に実行します。` : '配信の絞り込み・シナリオの開始条件・自動応答の付与先として選べます。',
     ]
-    return <div className={styles.preview}>
+    return <><TagDraftObserver definition={withFolder(hqTagEditorToDefinition(definition, values))} onChange={onDraftChange} /><div className={styles.preview}>
       <h3 className={styles.title}>できあがるタグ</h3>
       <div className={styles.chips}><TagPill name={values.name || 'タグ名'} color={folder ? folderDisplayColor(folder) : null} /><span className={styles.folder}>{folder?.name ?? '未分類'}</span></div>
       <p className={styles.copy}>このタグは、配信の絞り込み・シナリオの開始条件・自動応答の付与先として使えます。</p>
       <h3 className={`${styles.title} ${styles.effectsTitle}`}>この設定で起きること</h3>
       <ol className={styles.steps}>{steps.map((text, index) => <li key={index}><span className={styles.number}>{index + 1}</span><span>{text}</span></li>)}</ol>
       <Notice tone="warn" icon={null}><div className={styles.warning}><strong>保存しただけでは、まだ誰にも届きません</strong><p>ひな形を保存しても各アカウントにはまだ作られません。一覧の［配る］で選んだアカウントへ配ると、そのアカウントのタグになります。</p></div></Notice>
-    </div>
+    </div></>
   }
   return <TagEditForm
     tag={tag} groups={groups} onCreateGroup={readOnly ? undefined : onCreateFolder} dependencies={null} accountId="" readOnly={readOnly}
@@ -87,7 +97,7 @@ export default function HqTagEditorV8({ definition, folders = [], onCreateFolder
     host={{ initialValues, title: editing ? 'タグのひな形を編集' : 'タグのひな形を作る',
       saveLabel: onSaveDraft ? '保存する' : editing ? '変更を保存する' : 'タグを作る',
       onSaveDraft: onSaveDraft ? (values) => { void onSaveDraft(withFolder(hqTagEditorToDefinition(definition, values))) } : undefined,
-      notice: conflictNotice ?? (conflict && error ? <Notice tone="warn" message={error} action={onReloadLatest ? <Button disabled={saving} onClick={onReloadLatest}>最新の内容を読み込む</Button> : undefined} /> : undefined),
+      notice: <>{draftNotice}{conflictNotice ?? (conflict && error ? <Notice tone="warn" message={error} action={onReloadLatest ? <Button disabled={saving} onClick={onReloadLatest}>最新の内容を読み込む</Button> : undefined} /> : undefined)}</>,
       description: notice ?? '保存したひな形は、一覧の［配る］で各 LINE アカウントへ配ります。',
       preview, onSaveAnother: (values) => { void save(values, true) }, allowedActionTypes: ['テキスト送信', 'マイル付与'] }}
   />

@@ -271,7 +271,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       pageFromUrl.current = true
       setPage(index)
       setSelectedBlockId(params.get('block') ?? firstInputBlockId(loaded.layout.sections[index]?.blocks ?? []))
-      savedSnapshot.current = JSON.stringify(loaded)
+      const baseline = hosted.baseline
+      savedSnapshot.current = JSON.stringify(baseline ? {
+        ...loaded, name: baseline.name, description: baseline.description, layout: baseline.layout, onSubmitTagId: baseline.onSubmitTagId,
+      } : loaded)
       setFormLoaded(true)
       setLoading(false)
       return
@@ -488,10 +491,16 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   currentSnapshotRef.current = currentSnapshot
   const dirty = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
 
+  useEffect(() => {
+    if (loading || readOnly) return
+    hostRef.current?.onDraftChange?.({ name, description, layout, onSubmitTagId })
+  }, [loading, readOnly, name, description, layout, onSubmitTagId])
+
   const discardChanges = useCallback(() => {
     const snapshot = savedSnapshot.current
     if (!snapshot) return
     const saved = JSON.parse(snapshot) as Snapshot
+    hostRef.current?.onDraftChange?.({ name: saved.name, description: saved.description, layout: saved.layout, onSubmitTagId: saved.onSubmitTagId })
     setName(saved.name)
     setDescription(saved.description)
     setIsActive(saved.isActive)
