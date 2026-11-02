@@ -1,4 +1,4 @@
-> 文書：32 運用状態 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+> 文書：32 運用状態 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-11-02（日本時間）
 
 # 32 運用状態 操作と挙動（受け入れ）
 
@@ -97,6 +97,8 @@
 8. 「いますぐ確かめる」は役割に関係なく出るが、口はオーナー・管理者だけ（担当・閲覧のみは押すと 403）。決まり「押せないボタンは隠す」とも合わない。根拠：apps/web/src/v8/settings/emergency/screen.tsx:84-87、apps/worker/src/routes/operations.ts:331。
 9. 配備の記録の「かかった時間」が常に `—`。要件 §11-2 は開始・完了・停止時間を残す（口は downtimeSeconds を受け取って保存している）。根拠：apps/web/src/v8/settings/emergency/history.tsx:159、apps/worker/src/routes/operations.ts:924-925。
 10. 停止中に別の物を追加で止める（例：シナリオを止めている間に一斉配信も止める）と 409 になる。止めている間は新しい停止を受け付けない。要件 §9 は停止中の扱いをこの形では書いていない（下の「仕様が無い」2）。 → 決定 B-337 Q-53。根拠：packages/db/src/operations.ts:319（current.activeIncidentId があれば失敗）。
+
+11. LINE の配信枠が上限なしで、musubo のプラン指定もない場合、運用状態は「未確認」としている。一方、ダッシュボードの DB-43 は上限なしのプランを「上限なし」と表示する。画面間の表現の扱いはオーナー判断待ち。根拠：apps/worker/src/services/operations-health.ts（message_quota）、[01 ダッシュボード](01-dashboard.md) DB-43。
 
 ### 仕様が無い
 
