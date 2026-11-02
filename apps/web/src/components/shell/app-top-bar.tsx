@@ -89,7 +89,10 @@ export function finishPageCrumbs<T extends { label: string; href?: string }>(pat
     const rest = (next ?? []).filter((crumb) => crumb.label !== 'ホーム' && crumb.label !== SETTINGS_CRUMB.label && crumb.href?.split('?')[0] !== '/settings')
     next = [SETTINGS_CRUMB, ...rest]
   }
-  return next && next.length > 0 ? next : null
+  // 呼び出し元が行き先なしの「設定」を渡すことがある（会員詳細など区画外の画面）。
+  // 見た目と件数は変えず、行き先だけ正規の段にそろえる。
+  const normalized = (next ?? []).map((crumb) => crumb.label === SETTINGS_CRUMB.label && !crumb.href ? { ...crumb, href: SETTINGS_CRUMB.href } : crumb)
+  return normalized.length > 0 ? normalized : null
 }
 
 /**
