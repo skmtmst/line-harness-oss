@@ -194,6 +194,11 @@ function deferred() {
 const okCreate = () => Promise.resolve({ success: true as const, data: { id: 'tpl-new', name: '保存済み' } })
 const okUpdate = () => Promise.resolve({ success: true as const, data: { id: 'tpl-new' } })
 
+it('新規カルーセルは下の帯に未保存の状態を出す', async () => {
+  await mountAt('')
+  expect(container.querySelector('[data-template-region="footer"]')?.textContent).toContain('下書きはまだ保存していません')
+})
+
 beforeEach(() => {
   forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   routing.pushed = []

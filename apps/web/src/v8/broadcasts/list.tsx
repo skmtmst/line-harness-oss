@@ -1229,7 +1229,7 @@ export default function BroadcastListV8() {
             /* 絵  の分け方：かんたんに送る（1画面・板 ）と詳しく作る（5つの手順 `/broadcasts/new`）。
                テンプレートから作るは絵に無いが今ある機能なので、その下に残す。 */
             { id: 'create-quick', label: 'かんたんに送る', description: '文字1通を、全員かタグで。1画面で送れる', onSelect: withCurrentEdit(() => { setCreateMenuOpen(false); setQuickSendOpen(true) }, '作成') },
-            { id: 'create-new', label: '詳しく作る', description: '画像・カード・細かい絞り込み・承認（5つの手順）', onSelect: withCurrentEdit(() => { setCreateMenuOpen(false); router.push('/broadcasts/new') }, '作成') },
+            { id: 'create-new', label: '詳しく作る', description: '画像・カード・絞り込み・承認（5手順）', onSelect: withCurrentEdit(() => { setCreateMenuOpen(false); router.push('/broadcasts/new') }, '作成') },
             { id: 'create-template', label: 'テンプレートから作る', onSelect: () => openCreate(true) },
           ])}
         />

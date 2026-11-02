@@ -394,7 +394,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     expect(labels[0]).toContain('かんたんに送る')
     expect(labels[0]).toContain('文字1通を、全員かタグで。1画面で送れる')
     expect(labels[1]).toContain('詳しく作る')
-    expect(labels[1]).toContain('画像・カード・細かい絞り込み・承認（5つの手順）')
+    expect(labels[1]).toContain('画像・カード・絞り込み・承認（5手順）')
     routerPush.mockClear()
     act(() => { (items[1] as HTMLElement).click() })
     expect(routerPush).toHaveBeenCalledWith('/broadcasts/new')
