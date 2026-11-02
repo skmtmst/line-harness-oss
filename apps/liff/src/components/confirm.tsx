@@ -153,7 +153,7 @@ export default function Confirm({
   useEffect(() => { onRegisterBack?.(() => backRef.current()); return () => onRegisterBack?.(null); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
-    if (submitting || !policyReady || missingMeetingMode || missingPaymentChoice || (policy !== null && !accepted)) return;
+    if (recurrence === 'checking' || submitting || !policyReady || missingMeetingMode || missingPaymentChoice || (policy !== null && !accepted)) return;
     if (party && party.size > 1) { setPreparing('2 人以上でのご予約'); return; }
     if (recurrence) { setPreparing('毎週の続けての予約'); return; }
     const generation = request.begin();
@@ -323,11 +323,11 @@ export default function Confirm({
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
         {(policy && (policy.cardRequired !== false || (policy.deposit?.amount ?? 0) > 0)) || onlinePayment ? <PaymentPreparingNote /> : null}
-        <Button variant="primary" onClick={handleSubmit} disabled={submitting || !policyReady || missingMeetingMode || missingPaymentChoice || (policy !== null && !accepted)}>
+        <Button variant="primary" onClick={handleSubmit} disabled={recurrence === 'checking' || submitting || !policyReady || missingMeetingMode || missingPaymentChoice || (policy !== null && !accepted)}>
           {submitting ? '送信中…'
             : policy?.deposit ? `${yen(policy.deposit.amount)}の試験で予約する`
               : policy && policy.cardRequired !== false ? '試験のカードを登録して予約する'
-                : recurrence ? `${recurrence.made} 回分を予約する` : immediateConfirmation ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
+                : recurrence === 'checking' ? '空きを確認してください' : recurrence ? `${recurrence.made} 回分を予約する` : immediateConfirmation ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
         </Button>
       </BottomBar>
     </div>
