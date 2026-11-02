@@ -2,7 +2,10 @@
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
 import { api, type AffiliateOffer } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
@@ -76,6 +79,21 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
   // 決まりの欄（#823）。編集では今の版で埋める。読み込めるまでは
   // 差分に含めない（読み込めないまま保存して上限を消さないため）。
   const [terms, setTerms] = useState<OfferTermsFieldValues>(EMPTY_TERMS)
+  const initialFields = useRef(JSON.stringify({ name, description, rewardAmount, rewardMiles, lineAccountId, tagId, scenarioId, isActive }))
+  const initialTerms = useRef(JSON.stringify(EMPTY_TERMS))
+  const dirty = initialFields.current !== JSON.stringify({ name, description, rewardAmount, rewardMiles, lineAccountId, tagId, scenarioId, isActive }) || initialTerms.current !== JSON.stringify(terms)
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: dirty || submitting, busy: submitting, onDiscard: onClose })
+  const current = useRef({ submitting, target: guard.leaveTarget })
+  current.current = { submitting, target: guard.leaveTarget }
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const discardAndLeave = () => {
+    const target = guard.leaveTarget
+    if (!alive.current || current.current.submitting || !target || current.current.target !== target) return
+    current.current.target = null
+    guard.disarm(); guard.confirmLeave()
+  }
   const [termsBase, setTermsBase] = useState<ParsedOfferTerms | null>(null)
   const [termsLoaded, setTermsLoaded] = useState(!initial)
   /* WEB207：決まりの読み込みが失敗したことを黙らない。読み直せる。 */
@@ -104,13 +122,15 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
         }
         if (cancelled) return
         setTermsBase(base)
-        setTerms({
+        const loadedTerms = {
           windowDays: String(base.windowDays ?? 30),
           capTotal: base.capTotal != null ? String(base.capTotal) : '',
           capMonthly: base.capMonthlyPerAffiliate != null ? String(base.capMonthlyPerAffiliate) : '',
           receptionFrom: toDateInput(base.receptionFrom),
           receptionTo: toDateInput(base.receptionTo),
-        })
+        }
+        initialTerms.current = JSON.stringify(loadedTerms)
+        setTerms(loadedTerms)
         setTermsLoaded(true)
       })
       .catch(() => {
@@ -327,6 +347,6 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
           /></SaveErrorField>
         )}
       </div>
-    </Dialog></SaveErrorScope>
+    </Dialog><OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="案件の入力内容" busy={submitting} onConfirm={discardAndLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></SaveErrorScope>
   )
 }

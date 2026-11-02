@@ -49,6 +49,7 @@ const GUARDED = [
   'v8/inflow-links/ad-mapping-dialog.tsx',
   'v8/affiliate-offer-new/create.tsx',
   'v8/affiliates/create.tsx',
+  'v8/affiliates/offer-form.tsx',
   'app/analytics/reports/new/page.tsx',
   'v8/auto-replies/edit/wizard.tsx',
   'app/booking/menus/new/page.tsx',
@@ -359,8 +360,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 LINEアカウントの詳細から開く窓（送受信を止める・資格情報の差し替え・アーカイブ・登録の内容を編集）。入力はすべて窓の中で、閉じると戻る',
   'v8/affiliates/drawer.tsx':
     '★V8 アフィリエイターの詳細の引き出し（tnTn9）。支払いの取り決め3欄は引き出しの中の小さな欄で「取り決めを保存する」で確定し、引き出しを閉じると戻る',
-  'v8/affiliates/offer-form.tsx':
-    '★V8 案件を作る・編集する窓（app/affiliates/tabs.tsx の写し）。入力はすべて窓の中で、閉じると戻る',
   'v8/booking-staff/shifts.tsx':
     'app/booking/staff/shifts/staff-detail-v8.tsx と同じ画面の★V8版（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定する。元の画面と同じ扱い',
   'v8/common-vars/list.tsx':
