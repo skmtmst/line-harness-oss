@@ -148,8 +148,9 @@ export function RestaurantAfterDemo() {
 }
 
 /**
- * サロンの来店後の見本の値。来店後の送信は設定・公開・承認が必要で、
- * 保存しただけでは始まらない。実データの読み書き・送信はしない。
+ * サロンの来店後の見本の値。お礼を自動で送る機能の有無と条件は確認中。
+ * 時刻と停止状態も見本であり、実際の設定値や送り始める手順は示さない。
+ * 実データの読み書き・送信はしない。
  */
 const SALON_AFTER_SAMPLE = {
   visit: { time: '11:30–12:30', name: '見本 みお', menu: 'カット', staff: '見本 あおい' },
@@ -172,10 +173,109 @@ export function SalonAfterDemo() {
         </ul>
       </section>
       <section aria-label="お礼の見本">
-        <p className={styles.description}>LINEのお礼（{SALON_AFTER_SAMPLE.thanks.when}・停止中）</p>
+        <p className={styles.description}>LINEのお礼の見本（{SALON_AFTER_SAMPLE.thanks.when}・停止中）</p>
         <p className={styles.description}>{SALON_AFTER_SAMPLE.thanks.text}</p>
       </section>
-      <p className={styles.note}>名前・数は架空です。送り始めるには設定と承認が必要で、保存しただけでは始まりません。</p>
+      <p className={styles.note}>名前・数は架空です。お礼を自動で送る機能の有無と条件は確認中のため、「翌日 12:00」や「停止中」を含め、この見本では送り始める手順を示しません。実際の設定は変わりません。</p>
+    </Card>
+  </section>
+}
+
+/**
+ * 面談・相談の相談後の見本の値。相談後の送信は設定・公開・承認が必要で、
+ * 保存しただけでは始まらない。実データの読み書き・送信はしない。
+ */
+const CONSULT_AFTER_SAMPLE = {
+  result: { time: '10:00–10:45', name: '見本 ひな', meet: 'オンライン', staff: '見本 かい' },
+  thanks: { when: '翌日 12:00', text: '昨日はご相談ありがとうございました。次のご案内をお待ちください。' },
+}
+
+/** 面談・相談4ページ目「相談のあとも、つながりが続く」の静止見本。保存・送信はしない。 */
+export function ConsultAfterDemo() {
+  return <section aria-label="相談のあとの見本">
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="相談のあと">
+      <strong>相談のあと（見本）</strong>
+      <section aria-label="面談の結果">
+        <p className={styles.description}>面談の結果の確認</p>
+        <ul className={styles.can}>
+          <li>
+            <StatusBadge tone="success">実施済み</StatusBadge>
+            <span>{CONSULT_AFTER_SAMPLE.result.time} {CONSULT_AFTER_SAMPLE.result.name} さま・{CONSULT_AFTER_SAMPLE.result.meet}・担当 {CONSULT_AFTER_SAMPLE.result.staff}</span>
+          </li>
+        </ul>
+      </section>
+      <section aria-label="次のご案内の見本">
+        <p className={styles.description}>次のご案内（{CONSULT_AFTER_SAMPLE.thanks.when}・停止中）</p>
+        <p className={styles.description}>{CONSULT_AFTER_SAMPLE.thanks.text}</p>
+      </section>
+      <p className={styles.note}>名前・数は架空です。お礼を自動で送る機能の有無と条件は確認中のため、「翌日 12:00」や「停止中」を含め、この見本では送り始める手順を示しません。実際の設定は変わりません。</p>
+    </Card>
+  </section>
+}
+
+/**
+ * 教室のレッスン後の見本の値。参加後の送信は設定・公開・承認が必要で、
+ * 保存しただけでは始まらない。実データの読み書き・送信はしない。
+ */
+const LESSON_AFTER_SAMPLE = {
+  attendance: { time: '9:00–10:00', name: '朝のヨガ', note: '出席 12人' },
+  thanks: { when: '翌日 12:00', text: '昨日はご参加ありがとうございました。ご質問がありましたら、このトークでお知らせください。' },
+}
+
+/** 教室・レッスン4ページ目「レッスンのあとも、つながりが続く」の静止見本。保存・送信はしない。 */
+export function LessonAfterDemo() {
+  return <section aria-label="レッスンのあとの見本">
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="レッスンのあと">
+      <strong>レッスンのあと（見本）</strong>
+      <section aria-label="出席の記録">
+        <p className={styles.description}>名簿の出席記録</p>
+        <ul className={styles.can}>
+          <li>
+            <StatusBadge tone="success">出席済み</StatusBadge>
+            <span>{LESSON_AFTER_SAMPLE.attendance.time} {LESSON_AFTER_SAMPLE.attendance.name}・{LESSON_AFTER_SAMPLE.attendance.note}</span>
+          </li>
+        </ul>
+      </section>
+      <section aria-label="参加のお礼の見本">
+        <p className={styles.description}>参加のお礼（{LESSON_AFTER_SAMPLE.thanks.when}・停止中）</p>
+        <p className={styles.description}>{LESSON_AFTER_SAMPLE.thanks.text}</p>
+      </section>
+      <p className={styles.note}>名前・数は架空です。お礼を自動で送る機能の有無と条件は確認中のため、「翌日 12:00」や「停止中」を含め、この見本では送り始める手順を示しません。実際の設定は変わりません。</p>
+    </Card>
+  </section>
+}
+
+/**
+ * 標準の問い合わせ後の見本の値。返事の送信は行わず、下書きの見本だけを示す。
+ * 実データの読み書き・送信はしない。
+ */
+const STANDARD_AFTER_SAMPLE = {
+  inbox: { unreplied: 2, latest: { name: '見本 さくら', topic: '見学のご相談' } },
+  reply: { text: 'お問い合わせありがとうございます。担当者からご返事します。' },
+}
+
+/** 標準4ページ目「問い合わせのあとも、つながりが続く」の静止見本。保存・送信はしない。 */
+export function StandardAfterDemo() {
+  return <section aria-label="問い合わせのあとの見本">
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="問い合わせのあと">
+      <strong>問い合わせのあと（見本）</strong>
+      <section aria-label="受信箱の見本">
+        <p className={styles.description}>受信箱・未返信 {STANDARD_AFTER_SAMPLE.inbox.unreplied}件（最新の1件の見本）</p>
+        <ul className={styles.can}>
+          <li>
+            <StatusBadge tone="caution">未返信</StatusBadge>
+            <span>{STANDARD_AFTER_SAMPLE.inbox.latest.name} さま・{STANDARD_AFTER_SAMPLE.inbox.latest.topic}</span>
+          </li>
+        </ul>
+      </section>
+      <section aria-label="返事の下書きの見本">
+        <p className={styles.description}>返事の下書き（送信しません）</p>
+        <p className={styles.description}>{STANDARD_AFTER_SAMPLE.reply.text}</p>
+      </section>
+      <p className={styles.note}>名前・数は架空です。見本のため実際の設定は変わらず、何も送信しません。</p>
     </Card>
   </section>
 }
