@@ -108,9 +108,13 @@ function EditCommonVarV8Inner() {
 
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
   const [clearSchedulesOpen, setClearSchedulesOpen] = useState(false)
+  const [clearScope, setClearScope] = useState<{ accountId: string; itemId: string; scheduleIds: string[]; window: object } | null>(null)
+  const clearWindow = useRef<object>({})
+  useEffect(() => { setClearSchedulesOpen(false); setClearSchedulesBusy(false); return () => { clearWindow.current = {} } }, [selectedAccountId])
   const [addingSchedule, setAddingSchedule] = useState(false)
   const [clearSchedulesBusy, setClearSchedulesBusy] = useState(false)
   const [clearSchedulesError, setClearSchedulesError] = useState('')
+  const [clearSchedulesNeedsReview, setClearSchedulesNeedsReview] = useState(false)
 
   useEffect(() => { setValueFieldError('') }, [value])
   useEffect(() => { setFallbackFieldError('') }, [fallbackValue])
@@ -424,22 +428,33 @@ function EditCommonVarV8Inner() {
   }
 
   const clearSchedules = async () => {
-    if (!item || !selectedAccountId) return
+    if (!item || !selectedAccountId || !clearScope || clearScope.itemId !== item.id || clearScope.accountId !== selectedAccountId || latestAccountRef.current !== clearScope.accountId || clearScope.window !== clearWindow.current || clearSchedulesBusy || clearSchedulesNeedsReview) return
+    if (schedules.length !== clearScope.scheduleIds.length || schedules.some(schedule => !clearScope.scheduleIds.includes(schedule.id))) {
+      setClearSchedulesError('予定が変わりました。閉じて、予定を確認してからやり直してください。')
+      setClearSchedulesNeedsReview(true)
+      return
+    }
     setClearSchedulesBusy(true)
     setClearSchedulesError('')
     try {
-      for (const schedule of schedules) {
-        await api.commonVars.deleteSchedule(item.id, schedule.id, selectedAccountId)
+      for (const scheduleId of clearScope.scheduleIds) {
+        if (latestAccountRef.current !== clearScope.accountId || clearWindow.current !== clearScope.window) return
+        const response = await api.commonVars.deleteSchedule(item.id, scheduleId, selectedAccountId)
+        if (!response.success) throw new Error('schedule_delete_failed')
       }
+      if (latestAccountRef.current !== clearScope.accountId || clearWindow.current !== clearScope.window) return
+      setClearSchedulesBusy(false); clearWindow.current = {}
       setClearSchedulesOpen(false)
       await refreshBaseline(item.id, selectedAccountId)
     } catch (saveFailure) {
+      if (latestAccountRef.current !== clearScope.accountId || clearWindow.current !== clearScope.window) return
+      setClearSchedulesNeedsReview(true)
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setClearSchedulesError('消せなかった予定があります。通信を確かめて、もう一度お試しください。') }
     } finally {
-      setClearSchedulesBusy(false)
+      if (latestAccountRef.current === clearScope.accountId && clearWindow.current === clearScope.window) setClearSchedulesBusy(false)
     }
   }
 
@@ -589,7 +604,7 @@ function EditCommonVarV8Inner() {
 
   const fieldsGroup = renderValueFields({ canWrite, expiryBehavior, fallbackFieldError, fallbackValue, folderId, folders, foldersError, item, loadFolders, memo, name, nameFieldError, periodFieldError, selectedAccountId, setExpiryBehavior, setFallbackValue, setFolderId, setFolders, setMemo, setName, setNameFieldError, setPeriodFieldError, setSaved, setValidFrom, setValidUntil, validFrom, validUntil })
 
-  const scheduleCard = renderScheduleCard({ canWrite, item, loadSchedules, removeSchedule, schedules, schedulesError, selectedAccountId, setClearSchedulesError, setClearSchedulesOpen, setDraft, value })
+  const scheduleCard = renderScheduleCard({ canWrite, item, loadSchedules, removeSchedule, schedules, schedulesError, selectedAccountId, setClearSchedulesError, setClearSchedulesOpen: () => { if (!selectedAccountId || !item) return; clearWindow.current = {}; setClearSchedulesNeedsReview(false); setClearScope({ accountId: selectedAccountId, itemId: item.id, scheduleIds: schedules.map(schedule => schedule.id), window: clearWindow.current }); setClearSchedulesOpen(true) }, setDraft, value })
 
   const historyCard = item ? (
     <section className={styles.sideCard} aria-labelledby="cv-edit-history-heading">
@@ -978,16 +993,18 @@ function EditCommonVarV8Inner() {
       </Dialog>
 
       <ConfirmDialog
-        open={clearSchedulesOpen}
+        open={clearSchedulesOpen && clearScope?.accountId === selectedAccountId && clearScope.window === clearWindow.current}
         title={schedules.length > 1 ? "更新の予定をすべて消しますか？" : "更新の予定を消しますか？"}
         description="予定の時刻に値が変わる設定をすべて取り消します。いま入力中の内容はそのまま残ります。"
         confirmLabel="すべて削除する"
         destructive
         busy={clearSchedulesBusy}
+        confirmDisabled={clearSchedulesNeedsReview}
+        confirmDisabledReason="閉じて予定を読み直してからやり直してください。"
         error={clearSchedulesError || undefined}
         onConfirm={clearSchedulesBusy ? undefined : () => clearSchedules()}
-        onCancel={() => { if (!clearSchedulesBusy) setClearSchedulesOpen(false) }}
-      />
+        onCancel={() => { if (!clearSchedulesBusy) { clearWindow.current = {}; setClearSchedulesOpen(false); if (clearSchedulesNeedsReview && clearScope && latestAccountRef.current === clearScope.accountId) { setSchedulesError(true); void loadSchedules(clearScope.itemId, clearScope.accountId) } } }}
+      ><OperationTargetSummary accounts={[{ id: clearScope?.accountId ?? '' }]} /></ConfirmDialog>
 
       {/* 違いを比べる窓（板 `piWhz`）。いまの版と自分の入力を見せる。 */}
       <Dialog
