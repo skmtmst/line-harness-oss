@@ -129,7 +129,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
               const allergens = safeArray(item.allergens_json)
               return (
                 <Tr data-row-id={item.id} key={item.id} data-table-layout="columns" onOpen={() => openEdit(item)}>
-                  <NameCell grow name={<RowNameButton title={item.name} onClick={() => openEdit(item)}>{item.name}</RowNameButton>} />
+                  <NameCell grow name={<RowNameButton title={item.name} onClick={() => openEdit(item)}>{item.name}</RowNameButton>} description={pending ? `${item.priceChangeStatus === 'approved' ? '変更後' : '申請価格'} ${formatYen(item.pendingPrice ?? 0)}・${item.pendingEffectiveAt ? polishFormatDateTime(new Date(item.pendingEffectiveAt)) : '日時未定'}` : undefined} />
                   <Td className={styles.colKind}>{item.kind === 'course' ? 'コース' : '単品'}</Td>
                   <Td className={styles.colPrice} align="right">{formatYen(item.price)}</Td>
                   <Td collapseAt="narrow" className={styles.colPeriod}>{periodLabel(safeArray(item.service_periods_json))}</Td>

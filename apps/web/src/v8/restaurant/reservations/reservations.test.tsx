@@ -48,6 +48,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); verifiedStaffRole(null); forgetSessionSnapshot(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
+  it('今日のこれからの予約を現在進行中と誤表示しない', async () => {
+    render(<ReservationsPage />)
+    await screen.findByText('山田 太郎')
+    const heading = screen.getByRole('heading', { name: '次の予約' })
+    expect(heading.parentElement?.textContent).toContain('今日これからの予約')
+    expect(heading.parentElement?.textContent).not.toContain('いま')
+  })
+
   it('その日が臨時休業・貸切なら、帯と「休業日・貸切を見る」を出す（予約は取り消さない）', async () => {
     fixture.reservationsDay.mockResolvedValue({ data: { date: '', reservations: today, closures: [
       { id: 'cl-1', storeId: 'store-1', startDate: '2026-10-20', endDate: '2026-10-20', allDay: false, startTime: '18:00', endTime: '22:00', kind: 'private_event', memo: null, tableIds: ['pa', 't1'], createdBy: null, createdByName: null, createdAt: '', updatedAt: '', version: 1 },

@@ -394,3 +394,21 @@ it('変更額が無い承認済みの記録だけでは開始待ちとせず有�
   const card = document.querySelector('[data-kpi-label][title="開始待ち"]')?.closest('[data-kpi-presentation]')
   expect(card?.querySelector('[data-kpi-number]')?.textContent).toBe('0')
 })
+
+
+it('変更予定の価格と日時を一覧に表示する', async () => {
+  const data = snapshotOf()
+  data.menuItems = [{ ...data.menuItems[0], pendingPrice: 9900, pendingEffectiveAt: '2099-01-01T00:00:00Z', priceChangeStatus: 'approved' }]
+  fixture.snapshot.mockResolvedValue({ data })
+  render(<MenuPage />)
+  const row = await screen.findByRole('row', { name: /秋の鹿肉コース/ })
+  expect(within(row).getByText(/変更後 ¥9,900/)).toBeTruthy()
+  expect(within(row).getByText(/2099/)).toBeTruthy()
+})
+
+it('変更できない所要時間は押せない入力として表示する', async () => {
+  nav.params = new URLSearchParams('id=m1')
+  render(<MenuEditPage />)
+  const duration = await screen.findByRole('textbox', { name: '時間' }) as HTMLInputElement
+  expect(duration.disabled).toBe(true)
+})
