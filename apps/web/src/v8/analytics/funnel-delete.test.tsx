@@ -61,3 +61,16 @@ it('アカウントを切り替えた後の古い削除確定は送らない', a
   await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button })
   expect(net.setStatus).not.toHaveBeenCalled()
 })
+
+it('削除が完了した後に保持した古い確定は再送しない', async () => {
+  render(<FunnelV8 accountId="a" canManage />)
+  fireEvent.click(await screen.findByText('定義の操作と集計の詳細', { exact: true }))
+  fireEvent.click(screen.getByRole('button', { name: '削除する', exact: true }))
+  const button = within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する', exact: true })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+  fireEvent.click(button)
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button })
+  expect(net.setStatus).toHaveBeenCalledTimes(1)
+})

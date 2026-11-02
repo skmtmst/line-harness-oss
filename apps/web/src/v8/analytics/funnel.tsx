@@ -235,7 +235,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
     try {
       const res = await api.analytics.v6Funnels.setStatus(accountId, statusTarget.funnel.id, { status: statusTarget.to, expectedStatus: statusTarget.funnel.status })
       if (!res.success) { setRunError(explainStartError(res.error, '状態を変えられませんでした')); return }
-      setStatusTarget(null)
+      statusWindow.current = {}; setStatusTarget(null)
       notifyToast(statusTarget.to === 'archived' ? '計測の流れを削除しました。過去の結果は残ります。' : '状態を変更しました')
       await reloadFunnels()
     } catch (saveFailure) {
