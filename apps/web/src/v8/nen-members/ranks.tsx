@@ -292,6 +292,23 @@ export default function RankSettingsV8({
     }
   }
 
+  const initialize = async () => {
+    const target = activeAccount.current
+    if (readonly || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = await nenRanksApi.initialize(accountId)
+      if (activeAccount.current !== target) return
+      if (!res.success) throw new Error(res.error)
+      onSaved(accountId, res.data)
+    } catch (caught) {
+      if (activeAccount.current === target) setError(describeApiFailure(caught, '初期ランクの作成', { scope: 'store' }))
+    } finally {
+      if (activeAccount.current === target) setBusy(false)
+    }
+  }
+
   /* 競合の帯。保存した人の名前は API に無いので「ほかの人」と時刻で伝える。 */
   const conflictAt = conflict?.latest.rules ? shortTime(conflict.latest.rules.updatedAt) : null
   useEffect(() => {
@@ -310,6 +327,14 @@ export default function RankSettingsV8({
   if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} /></SaveErrorScope>
   if (!settings) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="ランク設定を読み込んでいます" /></SaveErrorScope>
 
+  if (settings.ranks.length === 0) return <SaveErrorScope errors={saveErrors}>
+    {error ? <Notice tone="danger">{error}</Notice> : null}
+    <ListState kind="empty" title="ランクは未設定です" description="初期ランクを作成してから、内容を変更できます。" action={
+      <Button variant="primary" onClick={() => void initialize()} busy={busy} busyLabel="作成中…" lockedReason={readonly ? '閲覧のみのため、管理者に頼んでください。' : undefined}>初期ランクを作る</Button>
+    } />
+  </SaveErrorScope>
+
+  const missingTags = settings.ranks.some((rank) => !rank.tagName)
   const rules = settings.rules
   const removeRow = removeTarget !== null ? drafts[removeTarget] : null
   const removeCandidates = removeRow ? drafts.filter((row) => row.id && row.id !== removeRow.id) : []
@@ -318,6 +343,7 @@ export default function RankSettingsV8({
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.rankBody}>
+      {missingTags ? <Notice tone="warn">ランクのタグが見つかりません。ランク設定を保存すると作り直します。</Notice> : null}
       {notice || error ? (
         <div className={styles.messages}>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
@@ -427,7 +453,7 @@ export default function RankSettingsV8({
       {readonly ? null : (
         <div className={styles.saveRow}>
           <Button variant="secondary" onClick={cancel} disabled={busy || !dirty} title={busy ? '処理しています' : !dirty ? '変更がありません' : undefined}>キャンセル</Button>
-          <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty} title={busy ? '処理しています' : !dirty ? '変更がありません' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
+          <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || (!dirty && !missingTags)} title={busy ? '処理しています' : !dirty && !missingTags ? '変更がありません' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
             <Check size={16} aria-hidden="true" />{conflict ? '比べてから保存' : '保存して EC へ同期'}
           </Button>
         </div>

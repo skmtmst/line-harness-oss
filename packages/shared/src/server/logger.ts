@@ -3,7 +3,7 @@ import { SCHEDULED_JOB_CODES, type ScheduledJobCode, type ScheduledFailureKind }
 
 const scheduledJobs = new Set<string>([...Object.values(SCHEDULED_JOB_CODES), 'unknown']);
 const failureKinds = new Set<string>(['error','type_error','syntax_error','aborted']);
-type Metrics = { status?: number; durationMs?: number; scheduledJob?: ScheduledJobCode; failureKind?: ScheduledFailureKind; upstreamCode?: number; upstreamSubcode?: number };
+type Metrics = { failedCount?: number; status?: number; durationMs?: number; scheduledJob?: ScheduledJobCode; failureKind?: ScheduledFailureKind; upstreamCode?: number; upstreamSubcode?: number };
 
 type Level = 'log' | 'info' | 'warn' | 'error' | 'debug';
 /** 固定イベント名・数値・許可済み分類だけ。例外、URL、本文、任意の文字列をログへ流さない。 */
@@ -15,6 +15,7 @@ function write(level: Level, code: string, metrics: Metrics = {}): void {
     ...(metrics.scheduledJob && scheduledJobs.has(metrics.scheduledJob) ? {scheduledJob: metrics.scheduledJob} : {}),
     ...(metrics.failureKind && failureKinds.has(metrics.failureKind) ? {failureKind: metrics.failureKind} : {}),
     requestId: context?.requestId ?? null, invocationId: context?.invocationId ?? null, source: context?.source ?? 'background',
+    ...(Number.isInteger(metrics.failedCount) && metrics.failedCount! >= 0 ? { failedCount: metrics.failedCount } : {}),
     ...(Number.isInteger(metrics.status) && metrics.status! >= 100 && metrics.status! <= 599 ? { status: metrics.status } : {}),
     ...(Number.isInteger(metrics.upstreamCode) && metrics.upstreamCode! >= 0 && metrics.upstreamCode! <= 999999999 ? { upstreamCode: metrics.upstreamCode } : {}),
     ...(Number.isInteger(metrics.upstreamSubcode) && metrics.upstreamSubcode! >= 0 && metrics.upstreamSubcode! <= 999999999 ? { upstreamSubcode: metrics.upstreamSubcode } : {}),

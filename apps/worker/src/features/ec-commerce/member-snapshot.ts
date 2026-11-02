@@ -181,7 +181,7 @@ const nonNegativeInt = (value: unknown): number | null =>
  * `membership` が届いていればその値を正にする（通年・ライフタイム・ランク・残高）。
  * 届いていない（EC側が未対応・古い注文イベント）ときは、暫定として
  * ライフタイム＝これまでの足し算、残高＝ポイント残高だけを追いかけ、
- * ランクキーは触らない（設定としきい値から画面側で求める）。
+ * ランクキーは触らず、画面側も金額から推測しない。
  */
 async function applyMembership(
   db: D1Database,
@@ -200,6 +200,7 @@ async function applyMembership(
               lifetime_miles_yen = COALESCE(?, lifetime_miles_yen),
               member_rank_key = COALESCE(?, member_rank_key),
               member_rank = COALESCE(?, member_rank),
+              ec_member_rank_name = CASE WHEN ? IS NULL THEN ec_member_rank_name WHEN ? IS NOT member_rank_key THEN ? ELSE COALESCE(?, ec_member_rank_name) END,
               mile_rate_percent = COALESCE(?, mile_rate_percent),
               rank_valid_until = COALESCE(?, rank_valid_until),
               mile_balance = COALESCE(?, mile_balance),
@@ -211,6 +212,7 @@ async function applyMembership(
       nonNegativeInt(membership.lifetime_miles_yen),
       rankKey,
       rankName,
+      rankKey, rankKey, rankName, rankName,
       rate,
       typeof membership.rank_valid_until === 'string' ? membership.rank_valid_until.slice(0, 32) : null,
       nonNegativeInt(membership.mile_balance),

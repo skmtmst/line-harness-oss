@@ -9,6 +9,7 @@ import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { ensureNenRankDefaults } from '@line-crm/db';
 
 const liffAuth = vi.hoisted(() => ({
   verifyCallerLineIdentity: vi.fn(),
@@ -22,7 +23,7 @@ const { nenMembers } = await import('./nen-members.js');
 let sql: Database.Database;
 let db: D1Database;
 
-beforeEach(() => {
+beforeEach(async () => {
   const created = createTestD1();
   sql = created.raw;
   db = created.db;
@@ -38,6 +39,7 @@ beforeEach(() => {
       ('friend-a', '10877', 5, 96800, 1120, 'ゴールド', '2026-09-16', 72400, 96800, 'gold', 2, 1120, '2027-12-31'),
       ('friend-b', '11402', 3, 34200, 640, '会員', '2026-09-16', 0, 0, NULL, NULL, 0, NULL);
   `);
+  await ensureNenRankDefaults(db, 'account-nen');
 });
 
 function app(lineUserId: string) {
@@ -85,14 +87,15 @@ describe('GET /api/liff/nen/member membership', () => {
     expect(JSON.stringify(body.data.membership)).not.toContain('ポイント');
   });
 
-  it('ECのランク未着の友だちは、設定のしきい値と暫定の累計からランクを求める', async () => {
+  it('ECのランクキー未着では金額からランクを推測しない', async () => {
     const body = await member('U-b');
-    expect(body.data.membership).toMatchObject({ rankKey: 'silver', rankName: 'シルバー', mileRatePercent: 1.5, annualMilesYen: 34_200, lifetimeMilesYen: 34_200, mileBalance: 640 });
+    expect(body.data.membership).toMatchObject({ rankKey: null, rankName: '未設定', mileRatePercent: null, annualMilesYen: 34_200, lifetimeMilesYen: 34_200, mileBalance: 640 });
   });
 
-  it('連携前の友だちはレギュラーで 0', async () => {
+  it('連携前の友だちはランク未設定で 0', async () => {
     const body = await member('U-c');
-    expect(body.data.membership).toMatchObject({ rankKey: 'regular', rankName: 'レギュラー', annualMilesYen: 0, lifetimeMilesYen: 0, mileBalance: 0, next: { name: 'シルバー' } });
+    expect(body.data.commerce.rank).toBe('未設定');
+    expect(body.data.membership).toMatchObject({ rankKey: null, rankName: '未設定', annualMilesYen: 0, lifetimeMilesYen: 0, mileBalance: 0, next: null });
   });
   it('写真の同意と実際のサイト掲載を分け、採用点を返す',async()=>{
     sql.prepare("INSERT INTO nen_pet_profiles(id,friend_id,name,created_at,updated_at) VALUES('p','friend-a','犬','2026-01-01','2026-01-01')").run();
