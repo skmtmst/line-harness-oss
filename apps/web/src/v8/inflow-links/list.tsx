@@ -27,6 +27,8 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { ListPage, ListPagePagination } from '@/components/templates';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import EmptyList from '@/components/shared/empty-list'
 import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
@@ -43,7 +45,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import BulkBar from '@/components/shared/bulk-bar'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
-import { loadFailureCopy, permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { describeApiFailure, japaneseDetailOf, loadFailureCopy, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { notifyToast } from '@/components/shared/toast';
 import EditRouteDialog from './edit-route-dialog'
 import GenreDialog from './genre-dialog'
@@ -150,6 +152,8 @@ export default function InflowListV8({
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
   const [poolMemberNames, setPoolMemberNames] = useState<Record<string, string[]>>({})
   const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(() => new Set())
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; accountId: string | null } | null>(null)
+  const [deleteName, setDeleteName] = useState('')
   const [stopTarget, setStopTarget] = useState<{ id: string; name: string } | null>(null)
   const toggleLocks = useRef(new Set<string>())
   const [bulkAction, setBulkAction] = useState<BulkRouteAction | null>(null)
@@ -236,6 +240,8 @@ export default function InflowListV8({
     setSelectedRouteIds(new Set())
     setBulkAction(null)
     setStopTarget(null)
+    setDeleteTarget(null)
+    setDeleteName('')
     setOpenMenuRefCode(null)
     setPresetOpen(false)
     setAdConnected(null)
@@ -476,6 +482,10 @@ export default function InflowListV8({
           onSelect: () => { setOpenMenuRefCode(null); router.push(`/inflow-links/edit?id=${encodeURIComponent(target.id)}`) },
         })
       }
+      if (target && canManageRole(role)) items.push({
+        id: 'delete', label: '削除する', tone: 'danger',
+        onSelect: () => { setOpenMenuRefCode(null); setDeleteName(''); setDeleteTarget({ id: target.id, name: target.name, accountId: selectedAccountId }) },
+      })
       items.push(row.isActive === false
         ? {
           id: 'resume',
@@ -909,6 +919,30 @@ export default function InflowListV8({
             return toggleRouteActive(stopTarget.id, false, stopTarget.name, true)
           }}
         />
+        <ConfirmDialog
+          open={deleteTarget !== null}
+          title={`「${deleteTarget?.name ?? ''}」を削除しますか？`}
+          description="利用履歴がない経路だけ完全に削除できます。URL・QRコードから開けなくなり、元には戻せません。友だちや付いたタグは消えません。"
+          confirmLabel="削除する" destructive
+          confirmDisabled={!deleteTarget || deleteName !== deleteTarget.name || !canManageRole(role)}
+          confirmDisabledReason="経路名を正確に入力してください。"
+          onCancel={() => { setDeleteTarget(null); setDeleteName('') }}
+          onSuccess={() => { setDeleteTarget(null); setDeleteName(''); void load() }}
+          onConfirm={async () => {
+            if (!deleteTarget || !canManageRole(role) || deleteTarget.accountId !== latestAccountRef.current || deleteName !== deleteTarget.name) return false
+            try {
+              const response = await fetchApi<{ success: boolean; error?: string }>(`/api/entry-routes/${encodeURIComponent(deleteTarget.id)}`, { method: 'DELETE', body: JSON.stringify({ confirmationName: deleteName }) })
+              if (!response.success) return { status: 'failed' as const, message: response.error || '削除できませんでした。' }
+              return true
+            } catch (error) {
+              return { status: 'failed' as const, message: japaneseDetailOf(error) || describeApiFailure(error, '削除') }
+            }
+          }}
+        >
+          <Field label={`完全削除するには「${deleteTarget?.name ?? ''}」と入力`}>
+            <TextField value={deleteName} onChange={event => setDeleteName(event.target.value)} autoComplete="off" />
+          </Field>
+        </ConfirmDialog>
         {routeEditor}
         {editingGenre ? (
           <GenreDialog
