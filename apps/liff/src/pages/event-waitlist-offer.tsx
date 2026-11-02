@@ -1,5 +1,5 @@
 import { useCustomerWords } from '../components/customer-style-scope.js';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import liff from '@line/liff';
 import { api, type EventWaitlistOfferDetail } from '../lib/api.js';
@@ -11,6 +11,8 @@ import Icon from '../components/ui/icon.js';
 import LiffHeader from '../components/ui/liff-header.js';
 import LiffLookScope from '../components/liff-look-scope.js';
 import StatusView from '../components/ui/status-view.js';
+import LoadingView from '../components/loading-view.js';
+import LoadErrorView from '../components/load-error-view.js';
 
 /** 繰上げ案内の token だけを外した query（ほかの値は残す）。 */
 export function searchWithoutOfferToken(search: string): string {
@@ -20,7 +22,7 @@ export function searchWithoutOfferToken(search: string): string {
   return rest ? `?${rest}` : '';
 }
 
-type State = 'ready' | 'submitting' | 'confirmed' | 'expired' | 'unavailable' | 'error';
+type State = 'loading' | 'loadError' | 'ready' | 'submitting' | 'confirmed' | 'expired' | 'unavailable' | 'error';
 
 /**
  * キャンセル待ちの繰上げ承諾。LINE の案内から token で開く。
@@ -29,39 +31,98 @@ type State = 'ready' | 'submitting' | 'confirmed' | 'expired' | 'unavailable' | 
  * 見た目だけ ★管理画面 (主ボタン1つ・札の代わりに印＋文)。
  */
 export default function EventWaitlistOffer({ token }: { token: string }) {
+  return <EventWaitlistOfferCard key={token} token={token} />;
+}
+
+function EventWaitlistOfferCard({ token }: { token: string }) {
   const words = useCustomerWords();
-  const [state, setState] = useState<State>('ready');
+  const [state, setState] = useState<State>('loading');
   const navigate = useNavigate();
   // ?liffId=... を引き継ぐ (再読み込みで失わない)。
   const { search } = useLocation();
 
-  // 案内の中身 (枠の日時・席の数・取っておく残り時間)。読めなければ本文だけ出す。
+  // 現在の案内の詳細を読み終えるまで、承諾の操作は出さない。
   const [offer, setOffer] = useState<EventWaitlistOfferDetail | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const deadline = useRef<number | null>(null);
+  const mounted = useRef(false);
+  const generation = useRef(0);
+  const loading = useRef(false);
+  const phase = useRef<State>('loading');
+  const detail = useRef<EventWaitlistOfferDetail | null>(null);
+  const changeState = useCallback((next: State) => {
+    phase.current = next;
+    setState(next);
+  }, []);
+  const loadDetail = useCallback(async () => {
+    if (!mounted.current || loading.current || (phase.current !== 'loading' && phase.current !== 'loadError')) return;
+    loading.current = true;
+    const mine = ++generation.current;
+    detail.current = null;
+    deadline.current = null;
+    setOffer(null);
+    changeState('loading');
+    try {
+      const res = await api.eventWaitlistOffer(token);
+      if (!mounted.current || mine !== generation.current) return;
+      if (!res?.data) throw new Error('Offer detail is missing');
+      const remaining = Number.isFinite(res.data.remainingSeconds) ? Math.max(0, res.data.remainingSeconds) : 0;
+      deadline.current = Date.now() + remaining * 1000;
+      setRemainingSeconds(remaining);
+      detail.current = res.data;
+      setOffer(res.data);
+      changeState('ready');
+    } catch (error) {
+      if (!mounted.current || mine !== generation.current) return;
+      logFailure('event-waitlist-offer-detail', error);
+      changeState('loadError');
+    } finally {
+      if (mounted.current && mine === generation.current) loading.current = false;
+    }
+  }, [token, changeState]);
   useEffect(() => {
-    let alive = true;
-    api
-      .eventWaitlistOffer(token)
-      .then((res) => {
-        if (alive) setOffer(res.data);
-      })
-      .catch((e) => logFailure('event-waitlist-offer-detail', e));
+    mounted.current = true;
+    void loadDetail();
     return () => {
-      alive = false;
+      mounted.current = false;
+      generation.current++;
+      loading.current = false;
     };
-  }, [token]);
+  }, [loadDetail]);
+
+  useEffect(() => {
+    if (!offer || (state !== 'ready' && state !== 'submitting')) return;
+    const update = () => {
+      if (deadline.current === null) return;
+      const left = Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000));
+      setRemainingSeconds(previous => Math.min(previous, left));
+    };
+    update();
+    const timer = window.setInterval(update, 1000);
+    window.addEventListener('focus', update);
+    document.addEventListener('visibilitychange', update);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', update);
+      document.removeEventListener('visibilitychange', update);
+    };
+  }, [offer, state]);
 
   const accept = async () => {
-    if (state === 'submitting' || state === 'confirmed') return;
-    setState('submitting');
+    if (!mounted.current || !detail.current || (phase.current !== 'ready' && phase.current !== 'error')) return;
+    const mine = generation.current;
+    changeState('submitting');
     try {
       await api.acceptEventWaitlistOffer(token);
-      setState('confirmed');
+      if (!mounted.current || mine !== generation.current) return;
+      changeState('confirmed');
     } catch (error) {
+      if (!mounted.current || mine !== generation.current) return;
       logFailure('accept-event-waitlist-offer', error);
       const status = (error as { status?: number }).status;
-      if (status === 410) setState('expired');
-      else if (status === 404 || status === 409) setState('unavailable');
-      else setState('error');
+      if (status === 410) changeState('expired');
+      else if (status === 404 || status === 409) changeState('unavailable');
+      else changeState('error');
     }
   };
 
@@ -75,7 +136,11 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
     <LiffLookScope className="min-h-screen bg-canvas" designNode="BjcuB">
       <LiffHeader title={words.event} />
       <main className="mx-auto flex min-h-[calc(100dvh-44px)] w-full max-w-md flex-col justify-center gap-4 px-6 pb-[142px]">
-        {state === 'confirmed' ? (
+        {state === 'loading' ? (
+          <LoadingView />
+        ) : state === 'loadError' ? (
+          <LoadErrorView compact onRetry={loadDetail} />
+        ) : state === 'confirmed' ? (
           <div className="space-y-4">
             <StatusView
               icon="calendar"
@@ -128,18 +193,18 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
         ) : (
           <>
             {/* ★V8 (BjcuB)：上の帯と下の帯の間の真ん中に、丸・題・本文・取っておく残り時間を置く。
-                案内の中身 (GET /api/liff/events/waitlist/:token) が読めないときは本文だけ。 */}
-            <div className="flex flex-col items-center justify-center">
+                案内の中身を取得できたときだけ、対象と承諾の操作を表示する。 */}
+            <div className="flex flex-col items-center justify-center [overflow-wrap:anywhere]">
               <StatusView
                 large
                 icon="party-popper"
                 tone="success"
                 title="空きが出ました"
-                body={`${offer ? `${formatJstEventAt(offer.startsAt)}〜 に ${offer.partySize} 席あります。` : ''}下のボタンを押すまで、予約にはなりません。`}
+                body={`${offer ? [offer.eventName.trim(), offer.venueName?.trim() ? `会場：${offer.venueName.trim()}` : '', `${formatJstEventAt(offer.startsAt)}〜 に ${offer.partySize} 席あります。`].filter(Boolean).join('\n') : ''}下のボタンを押すまで、予約にはなりません。`}
               >
-                {offer && offer.remainingSeconds > 0 && (
-                  <p className="text-[13px] font-bold whitespace-nowrap text-liff-wait-ink">{`あと ${formatHoldLeft(offer.remainingSeconds)} 取っておきます`}</p>
-                )}
+                {offer && (remainingSeconds > 0 ? (
+                  <p className="text-[13px] font-bold whitespace-nowrap text-liff-wait-ink">{`あと ${remainingSeconds < 60 ? `${remainingSeconds}秒` : formatHoldLeft(remainingSeconds)} 取っておきます`}</p>
+                ) : <p className="text-[13px] font-bold text-liff-wait-ink">回答期限を確認してください。期限を過ぎた場合は予約できません。</p>)}
               </StatusView>
             </div>
             <BottomBar>
