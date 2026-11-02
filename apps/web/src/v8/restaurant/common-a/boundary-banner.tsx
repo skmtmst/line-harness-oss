@@ -15,5 +15,5 @@ export function BoundaryBanner({ note, noteAlways = false }: { note?: string; no
     return () => { active = false }
   }, [])
   if (!staging && !(noteAlways && note)) return null
-  return <Notice tone="info">{staging ? <span>検証環境です。予約サイトへは送りません</span> : null}{note && (staging || noteAlways) ? <span>{staging ? ' ' : null}{note}</span> : null}</Notice>
+  return <Notice tone="info">{staging ? <span>検証環境です。予約サイトへは送りません{note ? '。' : null}</span> : null}{note && (staging || noteAlways) ? <span>{staging ? ' ' : null}{note}</span> : null}</Notice>
 }
