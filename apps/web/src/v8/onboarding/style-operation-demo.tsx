@@ -180,6 +180,39 @@ export function SalonAfterDemo() {
   </section>
 }
 
+/**
+ * 面談・相談の相談後の見本の値。相談後の送信は設定・公開・承認が必要で、
+ * 保存しただけでは始まらない。実データの読み書き・送信はしない。
+ */
+const CONSULT_AFTER_SAMPLE = {
+  result: { time: '10:00–10:45', name: '見本 ひな', meet: 'オンライン', staff: '見本 かい' },
+  thanks: { when: '翌日 12:00', text: '昨日はご相談ありがとうございました。次のご案内をお待ちください。' },
+}
+
+/** 面談・相談4ページ目「相談のあとも、つながりが続く」の静止見本。保存・送信はしない。 */
+export function ConsultAfterDemo() {
+  return <section aria-label="相談のあとの見本">
+    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="相談のあと">
+      <strong>相談のあと（見本）</strong>
+      <section aria-label="面談の結果">
+        <p className={styles.description}>面談の結果の確認</p>
+        <ul className={styles.can}>
+          <li>
+            <StatusBadge tone="success">実施済み</StatusBadge>
+            <span>{CONSULT_AFTER_SAMPLE.result.time} {CONSULT_AFTER_SAMPLE.result.name} さま・{CONSULT_AFTER_SAMPLE.result.meet}・担当 {CONSULT_AFTER_SAMPLE.result.staff}</span>
+          </li>
+        </ul>
+      </section>
+      <section aria-label="次のご案内の見本">
+        <p className={styles.description}>次のご案内（{CONSULT_AFTER_SAMPLE.thanks.when}・停止中）</p>
+        <p className={styles.description}>{CONSULT_AFTER_SAMPLE.thanks.text}</p>
+      </section>
+      <p className={styles.note}>名前・数は架空です。送り始めるには設定と承認が必要で、保存しただけでは始まりません。</p>
+    </Card>
+  </section>
+}
+
 /** EC3ページ目「商品の案内を用意する」の静止見本。保存・送信はしない。 */
 export function EcOperationDemo() {
   return <section aria-label="商品の案内の見本">

@@ -119,6 +119,22 @@ it('サロンでは来店のあとの見本を見せ、選ばずに戻れる', (
   expect(screen.getByText('送り始めるには設定と承認が必要で、保存しただけでは始まりません。', { exact: false })).toBeTruthy()
   expect(choose).not.toHaveBeenCalled()
 })
+it('面談・相談では相談のあとの見本を見せ、選ばずに戻れる', () => {
+  const choose = vi.fn()
+  function Subject() {
+    const [viewing, setViewing] = useState<AccountStyle>('consult')
+    return <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={null} onChoose={choose} />
+  }
+  render(<Subject />)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  fireEvent.click(screen.getByRole('button', { name: '相談のあともに進む' }))
+  expect(screen.getByRole('heading', { name: '相談のあとも、つながりが続く' })).toBeTruthy()
+  expect(screen.getByRole('region', { name: '相談のあと' })).toBeTruthy()
+  expect(screen.getByText('10:00–10:45 見本 ひな さま・オンライン・担当 見本 かい')).toBeTruthy()
+  expect(screen.getByText('昨日はご相談ありがとうございました。次のご案内をお待ちください。')).toBeTruthy()
+  expect(screen.getByText('送り始めるには設定と承認が必要で、保存しただけでは始まりません。', { exact: false })).toBeTruthy()
+  expect(choose).not.toHaveBeenCalled()
+})
 it('スタイルを変えると最初のページに戻り、標準ではお知らせを見せる', () => {
   function Subject() {
     const [viewing, setViewing] = useState<AccountStyle>('restaurant')
