@@ -1175,6 +1175,43 @@ describe('W: 運用状態の確認項目の追加（-32）', () => {
     expect(item).toMatchObject({ status, summary, source: 'line_messaging_api' });
     if (status === 'unknown') expect(item?.value?.sendable ?? null).toBeNull();
   });
+  it.each([
+    { plan: 'light', line: 'fail', used: 4250, planned: 0, status: 'warning' },
+    { plan: 'light', line: 'fail', used: 4800, planned: 0, status: 'danger' },
+    { plan: 'light', line: 'fail', used: 4800, planned: 500, status: 'danger' },
+    { plan: 'unknown-plan', line: 'low', used: 0, planned: 0, status: 'unknown' },
+    { plan: 'unknown-plan', line: 'high', used: 0, planned: 0, status: 'warning' },
+    { plan: 'unknown-plan', line: 'high', used: 0, planned: 500, status: 'danger' },
+  ])('片側不明の $plan / $line / $used / $planned を判定する', async ({ plan, line, used, planned, status }) => {
+    testDb.raw.prepare("INSERT INTO tenants (id, name, plan_key, plan_status) VALUES ('tenant-1', '統括', ?, 'active')").run(plan);
+    testDb.raw.prepare("UPDATE line_accounts SET tenant_id = 'tenant-1' WHERE id = 'account-1'").run();
+    testDb.raw.prepare("INSERT INTO friends (id, line_account_id, line_user_id, display_name) VALUES ('f-1', 'account-1', 'U-f1', '友人1')").run();
+    const add = testDb.raw.prepare("INSERT INTO messages_log (id, friend_id, direction, message_type, content, line_account_id, created_at) VALUES (?, 'f-1', 'outgoing', 'text', '{}', 'account-1', '2026-09-10T10:00:00')");
+    for (let n = 0; n < used; n += 1) add.run(`m-${n}`);
+    if (planned) testDb.raw.prepare("INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, scheduled_at, created_at, line_account_id, total_count) VALUES ('bc', '予定', 'text', '{}', 'all', 'scheduled', '2026-09-16T01:00:00Z', '2026-09-15T01:00:00Z', 'account-1', ?)").run(planned);
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => String(input).endsWith('/quota/consumption')
+      ? Response.json({ totalUsage: line === 'high' ? 850 : 10 })
+      : line === 'fail' ? new Response(null, { status: 503 }) : Response.json({ type: 'limited', value: 1000 })));
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    const checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T05:00:00.000Z' });
+    expect(checked.run.results.find((item) => item.checkKey === 'message_quota')).toMatchObject({ status, value: { sendable: null } });
+  });
+  it('候補DBで配信枠の失敗を挟んでも受領済みの注意を維持する', async () => {
+    let fail = false;
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      if (fail) return new Response(null, { status: 503 });
+      return String(input).endsWith('/quota/consumption') ? Response.json({ totalUsage: 850 }) : Response.json({ type: 'limited', value: 1000 });
+    }));
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    const run = (now: string) => runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now });
+    await run('2026-09-15T05:00:00Z');
+    testDb.raw.prepare("UPDATE operation_alerts SET status = 'acknowledged', acknowledged_by_id = 'owner-1' WHERE line_account_id = 'account-1' AND check_key = 'message_quota'").run();
+    fail = true;
+    await run('2026-09-15T05:05:00Z');
+    fail = false;
+    await run('2026-09-15T05:10:00Z');
+    expect(testDb.raw.prepare("SELECT status, severity, acknowledged_by_id FROM operation_alerts WHERE line_account_id = 'account-1' AND check_key = 'message_quota'").get()).toMatchObject({ status: 'acknowledged', severity: 'warning', acknowledged_by_id: 'owner-1' });
+  });
   it.each(['exempt', 'trialing'])('プラン未設定の %s は LINE の枠で判定する', async (planStatus) => {
     testDb.raw.prepare("INSERT INTO tenants (id, name, plan_key, plan_status) VALUES ('tenant-1', '統括', NULL, ?)").run(planStatus);
     testDb.raw.prepare("UPDATE line_accounts SET tenant_id = 'tenant-1' WHERE id = 'account-1'").run();
