@@ -254,6 +254,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
       </InboxListHeadline>
       <SegmentedControl<'all' | 'reply' | 'overdue'>
         aria-label="受信箱のクイック絞り込み"
+        equalWidth={false}
         value={quickFilter}
         onChange={(next) => { setQuickFilter(next); dropSavedViewParam() }}
         options={[
