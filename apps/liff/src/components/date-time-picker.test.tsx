@@ -298,7 +298,7 @@ describe('カレンダー', () => {
     expect(screen.getByRole('button', { name: '前の月' }).hasAttribute('disabled')).toBe(false);
     expect(screen.getByRole('button', { name: '次の月' }).hasAttribute('disabled')).toBe(true);
     // 11-05 以降は期間の外で押せない。
-    expect(screen.getByRole('button', { name: '11月5日 選択できません' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: '11月5日 受付期間外' }).hasAttribute('disabled')).toBe(true);
     // 戻れる。
     fireEvent.click(screen.getByRole('button', { name: '前の月' }));
     expect(await screen.findByText('2026年10月')).toBeTruthy();
@@ -331,7 +331,7 @@ describe('カレンダー', () => {
     renderPicker();
     await screen.findByText('2026年10月');
     expect(
-      await screen.findByText('この月は空きがありません。'),
+      await screen.findByText('この月の受付期間内に空きがありません。'),
     ).toBeTruthy();
   });
 });
@@ -447,7 +447,7 @@ describe('カレンダーの最初の月と月送り', () => {
     // 12月に空きは無い（受付期限は12-14）。
     fireEvent.click(screen.getByRole('button', { name: '次の月' }));
     expect(await screen.findByText('2026年12月')).toBeTruthy();
-    expect(await screen.findByText('この月は空きがありません。')).toBeTruthy();
+    expect(await screen.findByText('この月の受付期間内に空きがありません。')).toBeTruthy();
   });
 });
 
@@ -517,7 +517,7 @@ describe('dayStateLabel', () => {
     expect(dayStateLabel('2026-10-01', 'open')).toBe('10月1日 空きあり');
     expect(dayStateLabel('2026-10-22', 'few')).toBe('10月22日 残りわずか');
     expect(dayStateLabel('2026-10-07', 'closed')).toBe('10月7日 お休み');
-    expect(dayStateLabel('2026-09-30', 'off')).toBe('9月30日 選択できません');
+    expect(dayStateLabel('2026-09-30', 'off')).toBe('9月30日 受付期間外');
     expect(dayStateLabel('2026-10-14', 'past')).toBe('10月14日 過ぎた日');
     expect(dayStateLabel('2026-10-02', 'empty')).toBe('10月2日 空きなし');
   });
