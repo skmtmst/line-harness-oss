@@ -35,6 +35,7 @@ it('サロンでは担当ごとの予定の見本を見せ、選ばずに戻れ�
   expect(screen.getByText('見本 あおい・次の空き 14:00')).toBeTruthy()
   expect(screen.getByText('11:30–12:30 見本 みお さま・カット')).toBeTruthy()
   expect(screen.getByText('見本のため実際の設定は変わりません。', { exact: false })).toBeTruthy()
+  expect(screen.queryByText('画面と操作の見本です', { exact: false })).toBeNull()
   expect(choose).not.toHaveBeenCalled()
 })
 it('面談・相談では相談の予定の見本を見せ、選ばずに戻れる', () => {
@@ -51,6 +52,7 @@ it('面談・相談では相談の予定の見本を見せ、選ばずに戻れ�
   expect(screen.getByText('見本 かい・次の空き 11:00')).toBeTruthy()
   expect(screen.getByText('10:00–10:45 見本 ひな さま・オンライン')).toBeTruthy()
   expect(screen.getByText('見本のため実際の設定は変わりません。', { exact: false })).toBeTruthy()
+  expect(screen.queryByText('画面と操作の見本です', { exact: false })).toBeNull()
   expect(choose).not.toHaveBeenCalled()
 })
 it('教室・レッスンではクラスの予定の見本を見せ、選ばずに戻れる', () => {
@@ -68,6 +70,7 @@ it('教室・レッスンではクラスの予定の見本を見せ、選ばず�
   expect(screen.queryByText('回数券')).toBeNull()
   expect(screen.queryByText('月謝')).toBeNull()
   expect(screen.getByText('見本のため実際の設定は変わりません。', { exact: false })).toBeTruthy()
+  expect(screen.queryByText('画面と操作の見本です', { exact: false })).toBeNull()
   expect(choose).not.toHaveBeenCalled()
 })
 it('ECでは商品の案内の見本を見せ、選ばずに戻れる', () => {
@@ -103,7 +106,7 @@ it('飲食店では来店のあとの見本を見せ、選ばずに戻れる', (
   expect(screen.getByText('18:00–20:00 見本 たろう さま・2名・テーブル席')).toBeTruthy()
   expect(screen.getByText('昨日はありがとうございました。またのお越しをお待ちしています。')).toBeTruthy()
   expect(screen.getByText('送り始めるには設定と承認が必要で、保存しただけでは始まりません。', { exact: false })).toBeTruthy()
-  expect(screen.queryByText('画面と操作の見本です')).toBeNull()
+  expect(screen.queryByText('画面と操作の見本です', { exact: false })).toBeNull()
   expect(choose).not.toHaveBeenCalled()
 })
 it('サロンでは来店のあとの見本を見せ、選ばずに戻れる', () => {

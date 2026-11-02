@@ -46,7 +46,7 @@ const CONSULT_BOARD_SAMPLE: ConsultColumn[] = [
 /** サロン3ページ目「担当ごとの予定を確認する」の静止見本。保存・送信はしない。 */
 export function SalonOperationDemo() {
   return <section aria-label="担当ごとの予定の見本">
-    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
     <Card layout="vertical" padding="default" gap="normal" aria-label="担当ごとの予定">
       <strong>担当ごとの予定（見本）</strong>
       {SALON_BOARD_SAMPLE.map(column => (
@@ -82,7 +82,7 @@ const LESSON_BOARD_SAMPLE: LessonEntry[] = [
 /** 面談・相談3ページ目「相談の予定を確認する」の静止見本。保存・送信はしない。 */
 export function ConsultOperationDemo() {
   return <section aria-label="相談の予定の見本">
-    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
     <Card layout="vertical" padding="default" gap="normal" aria-label="相談の予定">
       <strong>相談の予定（見本）</strong>
       {CONSULT_BOARD_SAMPLE.map(column => (
@@ -201,7 +201,7 @@ export function EcOperationDemo() {
 /** 教室・レッスン3ページ目「クラスの予定を確認する」の静止見本。保存・送信はしない。 */
 export function LessonOperationDemo() {
   return <section aria-label="クラスの予定の見本">
-    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
     <Card layout="vertical" padding="default" gap="normal" aria-label="クラスの予定">
       <strong>クラスの予定（見本）</strong>
       <ul className={styles.can}>
