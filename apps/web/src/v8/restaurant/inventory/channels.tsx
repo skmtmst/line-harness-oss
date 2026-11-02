@@ -10,7 +10,6 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
 import { CircleHelp, Copy, FlaskConical, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { ReservationSource } from '@/components/shared/reservation-board'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useStaffRole } from '@/lib/staff-role'
@@ -180,7 +179,6 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit: allow
   const received = automaticChannels.some((channel) => channel.todayCount === null)
     ? null : automaticChannels.reduce((sum, channel) => sum + (channel.todayCount ?? 0), 0)
 
-  const methodLabel = (channel: RestaurantChannel) => (channel.status === 'preparing' && channel.receiveMethod === 'email_forward' ? 'メール転送（未設定）' : METHOD_LABEL[channel.receiveMethod])
   const rowItems = (channel: RestaurantChannel) => channel.receiveMethod === 'manual'
     ? [{ id: 'ledger', label: '予約台帳で入れる', onSelect: () => router.push('/restaurant-test/reservations') }]
     : channel.status === 'preparing'
@@ -236,8 +234,8 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit: allow
             const preparing = channel.status === 'preparing'
             return (
               <Tr key={channel.id} data-row-id={channel.id}>
-                <Td><ReservationSource value={channel.code} label={channel.name} /></Td>
-                <Td><TruncatedText value={methodLabel(channel)} /></Td>
+                <Td><TruncatedText value={channel.name} /></Td>
+                <Td><TruncatedText value={METHOD_LABEL[channel.receiveMethod]} /></Td>
                 <Td><Status value={state.value} label={state.label} /></Td>
                 <Td>{preparing || channel.todayCount === null ? emptyValue('unknown') : channel.todayCount}</Td>
                 <Td>{preparing ? emptyValue('unknown') : formatAt(channel.lastReceivedAt, timezone)}</Td>

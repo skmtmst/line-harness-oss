@@ -134,13 +134,13 @@ function grantedMiles30d(rule: MileageEarningRuleV6) {
 }
 
 /* 有効期間・失効の1行（板：1年・12/31）。 */
-function validityText(rule: MileageEarningRuleV6): string {
+function validityText(rule: MileageEarningRuleV6): { miles: string; rule: string } {
   const days = rule.draft.expiresAfterDays
   const span = days == null ? '失効なし' : days >= 365 && days % 365 === 0
     ? `${days / 365}年`
     : `${formatMileageNumber(days)}日`
   const until = rule.draft.validUntil ? formatMileageMonthDay(rule.draft.validUntil) : '期限なし'
-  return `${span}・${until}`
+  return { miles: `マイル：${span}`, rule: `ルール：${until}` }
 }
 
 type SortKey = 'order' | 'granted' | 'name' | 'amount'
@@ -822,6 +822,7 @@ export default function EarningRulesTab() {
           {visible.map((rule) => {
             const active = rule.published.status === 'published'
             const orderIndex = ruleOrder.indexOf(rule.id)
+            const validity = validityText(rule)
             return (
               <Tr key={rule.id} data-table-layout="columns" data-row-id={rule.id}>
                 <Td grow>
@@ -837,7 +838,7 @@ export default function EarningRulesTab() {
                   <span className={styles.cellSub}>{rule.draft.initialStatus === 'pending' ? '確定待ち' : 'すぐ使える'}</span>
                 </Td>
                 <Td align="right" className={styles.colMiles}><span className={styles.cellMain}>{formatMileageNumber(rule.draft.amount)}</span></Td>
-                <Td collapseAt="narrow" className={styles.colValidity}><span className={styles.cellMain}>{validityText(rule)}</span></Td>
+                <Td collapseAt="narrow" className={styles.colValidity}><span className={styles.cellMain} title={validity.miles}>{validity.miles}</span><span className={styles.cellSub} title={validity.rule}>{validity.rule}</span></Td>
                 <Td align="right" className={styles.colRecent} data-list-number="">
                   <span className={styles.cellMain}>{formatMileageNumber(grantedMiles30d(rule))}</span>
                   <span className={styles.cellSub}>{`対象外 ${formatMileageNumber(rule.metrics30d.excluded)} 回`}</span>
