@@ -13,7 +13,7 @@ import {
 } from '@line-crm/db';
 
 
-import { fetchQuota } from '../features/broadcasts/broadcast-quota-guard/index.js';
+import { fetchQuotaDetails } from '../features/broadcasts/broadcast-quota-guard/index.js';
 import { findPlan } from './billing-plans.js';
 import { hasLineTokenRefreshFailure } from './line-token-notices.js';
 import { collectOperationDispatchHealth } from './operation-dispatch-health.js';
@@ -176,7 +176,7 @@ async function collectChecks(
       // 予定済み配信の見込み通数を引いた forecast も返す（-32 §5-2）。
       const { monthStart, monthEnd, resetAt } = jstMonthBounds(observedAt);
       const [quota, harnessUsedRow, tenantRow, scheduledRow] = await Promise.all([
-        fetchQuota(account.channel_access_token),
+        fetchQuotaDetails(account.channel_access_token),
         db.prepare(
           `SELECT COUNT(*) AS used FROM messages_log
             WHERE line_account_id = ? AND direction = 'outgoing'
@@ -201,16 +201,18 @@ async function collectChecks(
       const scheduledPlanned = Number(scheduledRow?.planned ?? 0);
 
       if (quota.limit === null && harnessLimit === null) {
-        return result('message_quota', 'unknown', '配信上限を確認できませんでした（LINE・musubo）', 'line_messaging_api', observedAt);
+        return result('message_quota', 'unknown', '配信上限を確認できませんでした', 'line_messaging_api', observedAt);
       }
       const lineRemaining = quota.limit === null || quota.used === null
         ? null : Math.max(0, quota.limit - quota.used);
       const harnessRemaining = harnessLimit === null
         ? null : Math.max(0, harnessLimit - harnessUsed);
       // 実際に送れる残数は小さい方。片側だけの「余裕あり」はしない。
-      const sendable = lineRemaining === null ? harnessRemaining
-        : harnessRemaining === null ? lineRemaining
-        : Math.min(lineRemaining, harnessRemaining);
+      const lineKnown = quota.unlimited || lineRemaining !== null;
+      const limitsKnown = lineKnown && harnessRemaining !== null;
+      const sendable = !limitsKnown ? null
+        : quota.unlimited ? harnessRemaining
+        : Math.min(lineRemaining!, harnessRemaining!);
       const lineRatio = quota.limit === null || quota.used === null ? null
         : quota.limit === 0 ? 1 : Number(quota.used) / Number(quota.limit);
       const harnessRatio = harnessLimit === null ? null
@@ -220,15 +222,21 @@ async function collectChecks(
       // 正常↔注意を5分ごとに往復する（通知のばたつきの原因）。
       const ratios = [lineRatio, harnessRatio].filter((ratio): ratio is number => ratio !== null);
       const bindingRatio = ratios.length === 0 ? null : Math.max(...ratios);
+      const knownRemaining = lineRemaining === null ? harnessRemaining
+        : harnessRemaining === null ? lineRemaining
+        : Math.min(lineRemaining, harnessRemaining);
       const forecastRemaining = sendable === null ? null : sendable - scheduledPlanned;
+      const knownForecastExceeded = knownRemaining !== null && knownRemaining < scheduledPlanned;
       const status: OperationHealthStatus = bindingRatio === null
         ? 'unknown'
-        : bindingRatio >= 0.95 || (forecastRemaining !== null && forecastRemaining < 0) ? 'danger'
+        : bindingRatio >= 0.95 || knownForecastExceeded ? 'danger'
         : bindingRatio >= 0.8 ? 'warning'
+        : !limitsKnown ? 'unknown'
         : 'normal';
       return result('message_quota', status,
-        status === 'normal' ? '今月の配信枠に余裕があります'
-          : forecastRemaining !== null && forecastRemaining < 0
+        status === 'unknown' ? '配信上限を確認できませんでした'
+          : status === 'normal' ? '今月の配信枠に余裕があります'
+          : knownForecastExceeded
             ? '予定済みの配信を送ると、今月の配信枠を超える見込みです'
             : '今月の配信枠が少なくなっています',
         'line_messaging_api', observedAt,

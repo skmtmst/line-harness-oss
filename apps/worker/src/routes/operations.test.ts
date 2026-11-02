@@ -1150,19 +1150,29 @@ describe('停止不可理由の機械コード(N-453/N-455)', () => {
 });
 
 describe('W: 運用状態の確認項目の追加（-32）', () => {
-  it.each(['unavailable', 'unlimited'])('配信上限が数値で分からない場合は確認できないと案内する（%s）', async (lineState) => {
+  it.each([
+    { quota: 'fail', consumption: 'ok', tenant: false, status: 'unknown', summary: '配信上限を確認できませんでした' },
+    { quota: 'unlimited', consumption: 'ok', tenant: false, status: 'unknown', summary: '配信上限を確認できませんでした' },
+    { quota: 'limited', consumption: 'fail', tenant: false, status: 'unknown', summary: '配信上限を確認できませんでした' },
+    { quota: 'fail', consumption: 'ok', tenant: true, status: 'unknown', summary: '配信上限を確認できませんでした' },
+    { quota: 'limited', consumption: 'fail', tenant: true, status: 'unknown', summary: '配信上限を確認できませんでした' },
+    { quota: 'unlimited', consumption: 'ok', tenant: true, status: 'normal', summary: '今月の配信枠に余裕があります' },
+    { quota: 'unlimited', consumption: 'fail', tenant: true, status: 'normal', summary: '今月の配信枠に余裕があります' },
+    { quota: 'limited', consumption: 'high', tenant: false, status: 'warning', summary: '今月の配信枠が少なくなっています' },
+  ])('配信枠の取得状態を区別する: $quota / $consumption / tenant=$tenant', async ({ quota, consumption, tenant, status, summary }) => {
+    if (tenant) {
+      testDb.raw.prepare("INSERT INTO tenants (id, name, plan_key, plan_status) VALUES ('tenant-1', '統括', 'light', 'active')").run();
+      testDb.raw.prepare("UPDATE line_accounts SET tenant_id = 'tenant-1' WHERE id = 'account-1'").run();
+    }
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      if (String(input).endsWith('/quota/consumption')) return Response.json({ totalUsage: 10 });
-      return lineState === 'unlimited' ? Response.json({ type: 'none' }) : new Response(null, { status: 503 });
+      if (String(input).endsWith('/quota/consumption')) return consumption === 'fail' ? new Response(null, { status: 503 }) : Response.json({ totalUsage: consumption === 'high' ? 850 : 10 });
+      return quota === 'fail' ? new Response(null, { status: 503 }) : Response.json(quota === 'unlimited' ? { type: 'none' } : { type: 'limited', value: 1000 });
     }));
     const { runOperationHealthChecks } = await import('../services/operations-health.js');
     const checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T05:00:00.000Z' });
-    expect(checked.run.results.find((item) => item.checkKey === 'message_quota')).toMatchObject({
-      status: 'unknown',
-      summary: '配信上限を確認できませんでした（LINE・musubo）',
-      source: 'line_messaging_api',
-      value: null,
-    });
+    const item = checked.run.results.find((entry) => entry.checkKey === 'message_quota');
+    expect(item).toMatchObject({ status, summary, source: 'line_messaging_api' });
+    if (status === 'unknown') expect(item?.value?.sendable ?? null).toBeNull();
   });
   it('月間配信数はLINEとHarnessの小さい方を送れる数にし、予定分と翌月1日(JST)のresetを返す', async () => {
     const now = '2026-09-15T05:00:00.000Z';
