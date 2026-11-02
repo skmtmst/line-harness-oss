@@ -61,7 +61,9 @@ describe('V8 会員一覧の並び順', () => {
     )
     await waitFor(() => expect(screen.getByText('山田')).toBeTruthy())
     expect(calls.members).toHaveBeenCalledWith('acc-1', expect.objectContaining({ sort: 'annual_desc' }))
+    expect(screen.getByRole('columnheader', { name: '年間の購入額' })).toBeTruthy()
     fireEvent.click(screen.getByLabelText('並び順'))
+    expect(await screen.findByRole('button', { name: '年間の購入額が多い順' })).toBeTruthy()
     fireEvent.click(await screen.findByRole('button', { name: '最終購入が新しい順' }))
     await waitFor(() => expect(calls.members).toHaveBeenCalledWith(
       'acc-1',

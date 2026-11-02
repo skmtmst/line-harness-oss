@@ -14,11 +14,13 @@ const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('共通Pagination', () => {
-  it('ページ数に応じてPencilの5枠へ省略する', () => {
+  it('7ページまでは省略せず、多い場合も先頭・現在・末尾へ移動できる', () => {
     expect(paginationItems(1, 12)).toEqual([1, 2, 3, 'ellipsis', 12])
     expect(paginationItems(6, 12)).toEqual([1, 'ellipsis', 6, 'ellipsis', 12])
     expect(paginationItems(12, 12)).toEqual([1, 'ellipsis', 10, 11, 12])
     expect(paginationItems(2, 4)).toEqual([1, 2, 3, 4])
+    expect(paginationItems(1, 6)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(paginationItems(4, 7)).toEqual([1, 2, 3, 4, 5, 6, 7])
   })
 
   it('現在地と前後の無効状態を出す', () => {
