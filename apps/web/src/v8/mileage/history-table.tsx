@@ -49,9 +49,8 @@ export default function HistoryTable({ items, readonly, menuId, setMenuId, openP
                 }} data-row-id={item.id}
               >
                 <Td grow><FolderDotName>
-                  <span  title={`${viewName(item)}・${formatMileageShortDateTime(item.occurredAt)}`}>{viewName(item)}</span>
-
-                </FolderDotName></Td>
+                  <span title={`${viewName(item)}・${formatMileageShortDateTime(item.occurredAt)}`}>{viewName(item)}</span>
+                </FolderDotName><time className={styles.cellSub} dateTime={item.occurredAt}>{formatMileageShortDateTime(item.occurredAt)}</time></Td>
                 <Td align="right" className={styles.colDelta}><span className={styles.cellMain}>{formatMileageChange(item.amount)}</span></Td>
                 <Td className={styles.colWhy}>
                   <span

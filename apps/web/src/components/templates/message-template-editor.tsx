@@ -27,12 +27,12 @@ export const MESSAGE_TEMPLATE_TYPES = [
 ] as const
 
 const DATE_OPTIONS = [
-  { value: '{{date}}', label: '月日と曜日（8月20日(水)）' },
-  { value: '{{date:ymd_w}}', label: '年月日と曜日（2026年8月20日(水)）' },
+  { value: '{{date}}', label: '月日と曜日（8月20日(木)）' },
+  { value: '{{date:ymd_w}}', label: '年月日と曜日（2026年8月20日(木)）' },
   { value: '{{date:md}}', label: '月日（8月20日）' },
   { value: '{{date:ymd}}', label: '年月日（2026年8月20日）' },
-  { value: '{{date:slash_md_w}}', label: '月日と曜日（8/20(水)）' },
-  { value: '{{date:slash_ymd_w}}', label: '年月日と曜日（2026/8/20(水)）' },
+  { value: '{{date:slash_md_w}}', label: '月日と曜日（8/20(木)）' },
+  { value: '{{date:slash_ymd_w}}', label: '年月日と曜日（2026/8/20(木)）' },
   { value: '{{date:slash_md}}', label: '月日（8/20）' },
   { value: '{{date:slash_ymd}}', label: '年月日（2026/8/20）' },
 ]

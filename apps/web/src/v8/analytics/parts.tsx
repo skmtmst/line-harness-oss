@@ -11,6 +11,8 @@ import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { AnalyticsMetric, AnalyticsMetricState } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
+import Button, { type ButtonProps } from '@/components/shared/button'
+import styles from './analytics.module.css'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { formatYen as polishFormatYen } from '@/lib/format'
@@ -27,17 +29,22 @@ export function downloadCsv(filename: string, rows: Array<Array<string | number 
 }
 
 /** 板の頭の「CSVで書き出す」へ、いま開いている見かたの書き出しを登録する。 */
-export type ExportAction = { onClick: () => void; disabled: boolean }
+export type ExportAction = { onClick: () => void; disabled: boolean; disabledReason?: string }
 export const AnalyticsExportContextV8 = createContext<((action: ExportAction | null) => void) | null>(null)
 
-export function useRegisterExport(onClick: () => void, disabled: boolean) {
+export function useRegisterExport(onClick: () => void, disabled: boolean, disabledReason?: string) {
   const register = useContext(AnalyticsExportContextV8)
   const action = useRef(onClick)
   action.current = onClick
   useEffect(() => {
-    register?.({ onClick: () => action.current(), disabled })
+    register?.({ onClick: () => action.current(), disabled, disabledReason })
     return () => register?.(null)
-  }, [register, disabled])
+  }, [register, disabled, disabledReason])
+}
+
+/** CSV と共通 Button の理由だけを同じ組に置く。可否と実行は呼び出し元が持つ。 */
+export function CsvExportButton(props: ButtonProps) {
+  return <span className={styles.csvAction} data-blocked={props.disabled && Boolean(props.disabledReason) || undefined}><Button {...props} /></span>
 }
 
 export const RANGES = [7, 30, 90]

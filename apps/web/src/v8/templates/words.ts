@@ -98,7 +98,7 @@ function broadcastStatusText(status: string): string {
 export interface UsageDetail {
   autoReplies?: Array<{ id: string; keyword: string; lineAccountId: string | null; templateVersion: number | null }>
   automations?: Array<{ id: string; name: string; eventType: string }>
-  scenarioSteps?: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number; templateVersion: number | null }>
+  scenarioSteps?: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number; displayOrder?: number; templateVersion: number | null }>
   reminderSteps?: Array<{ reminderId: string; reminderName: string; stepId: string }>
   richMenuAreas?: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>
   trackedLinks?: Array<{ id: string; name: string }>
@@ -137,7 +137,7 @@ export function usageRows(detail: UsageDetail): UsageRow[] {
     ...(detail.scenarioSteps ?? []).map((u) => ({
       key: `scenario-${u.stepId}`,
       kind: 'シナリオ配信',
-      name: `${u.scenarioName}・${u.stepOrder} 通目`,
+      name: `${u.scenarioName}・${u.displayOrder ?? u.stepOrder} 通目`,
       href: `/scenarios/detail?id=${u.scenarioId}`,
     })),
     ...(detail.reminderSteps ?? []).map((u) => ({

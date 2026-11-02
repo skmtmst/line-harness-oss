@@ -365,3 +365,13 @@ describe('段ごとの確かめで［次へ］を止める', () => {
     }
   })
 })
+
+it('送信設定からメッセージへ直接戻れる', async () => {
+  await renderForm('schedule')
+  try {
+    const back = button('メッセージへ戻る')
+    await click(back)
+    expect(onStepChange).toHaveBeenCalledWith('message')
+    expect(createApi).not.toHaveBeenCalled()
+  } finally { unmount() }
+})

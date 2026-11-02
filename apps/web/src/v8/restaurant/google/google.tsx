@@ -211,7 +211,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       <div className={styles.noticeStack} data-google-notices>
         {!accountLoading && !loading && !error && Boolean(data) && known && !(tab === 'profile' ? canManage : canEdit)
           ? <ReadOnlyNotice need={tab === 'profile' ? 'manager' : 'feature'} /> : null}
-        <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : undefined} />
+        <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : undefined} noteAlways={boardId === 'j0Wcg'} />
       </div>
       {body}
     </RestaurantPage></SaveErrorScope>

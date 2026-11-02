@@ -19,7 +19,7 @@ import { api, type AnalyticsReportRun, type AnalyticsReportSchedule, type Recent
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { formatNumber } from '@/lib/format'
 import { StatePill, shortDateTime, shortDay } from './common'
-import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
+import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport, CsvExportButton } from './parts'
 import styles from './analytics.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
@@ -263,7 +263,9 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
     ])
   }
   const exportDisabled = visibleItems.length === 0
-  useRegisterExport(exportSaved, exportDisabled)
+  const exportReason = loading ? '保存した分析を読み込んでいます。' : error || (query.trim() ? '条件に合う分析がありません。' : '保存した分析はまだありません。')
+  const snapshotExportReason = snapshotLoading ? '結果の履歴を読み込んでいます。' : snapshotError || '保存された結果はありません。'
+  useRegisterExport(exportSaved, exportDisabled, exportReason)
   const failed = error ? '読み込めませんでした' : null
   const crossCount = items.filter((item) => item.kind === 'cross').length
 
@@ -283,7 +285,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       {loading ? <ListState kind="loading" title="保存した分析を読み込んでいます" />
         : error && items.length === 0 ? <ListState kind="error" title="保存した分析を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setSavedReload((n) => n + 1)} />
         : items.length === 0 ? <ListState kind="empty" title="保存した分析はまだありません" description="クロス分析かファネルを集計し、その結果を保存してください。" />
-        : <DetailColumns presentation="analysis" variant="analysis-history" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={<DetailPreview titleId="saved-history-title" title={selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'} description={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${formatNumber(schedules.filter(schedule => schedule.savedAnalysisIds.includes(selected.id)).length)}件`}` : undefined} actions={{ primary: (selected ? <Button variant="primary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={16} aria-hidden="true"/>内容を変える</Button> : null), secondary: (selected ? <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={16} aria-hidden="true"/>CSVで書き出す</Button> : null), primaryAllowed: canManage }}>
+        : <DetailColumns presentation="analysis" variant="analysis-history" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={<DetailPreview titleId="saved-history-title" title={selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'} description={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${formatNumber(schedules.filter(schedule => schedule.savedAnalysisIds.includes(selected.id)).length)}件`}` : undefined} actions={{ primary: (selected ? <Button variant="primary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={16} aria-hidden="true"/>内容を変える</Button> : null), secondary: (selected ? <CsvExportButton variant="secondary" disabled={snapshots.length === 0} disabledReason={snapshotExportReason} onClick={exportSnapshots}><Download size={16} aria-hidden="true"/>CSVで書き出す</CsvExportButton> : null), primaryAllowed: canManage }}>
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
             {snapshotError ? <Notice tone="danger" className={styles.captionNoticePlacement} >結果の履歴を読み込めませんでした。<Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</Button></Notice> : null}
             {snapshotLoading ? <p data-card-footer className={styles.caption}>結果を読み込んでいます</p>

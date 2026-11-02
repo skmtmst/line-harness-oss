@@ -65,3 +65,11 @@ it('「…」の確定するも同じ保存口を呼ぶ', async () => {
   fireEvent.click(await screen.findByRole('menuitem', { name: '確定する' }))
   expect(openPending).toHaveBeenCalledWith('confirm', expect.objectContaining({ id: 'h1' }))
 })
+
+
+it('D-07: 名前と日本時間の日時がセルに見える', () => {
+  setup(base)
+  const cell = screen.getByText('田中').closest('td')!
+  expect(cell.textContent).toContain('10/01 09:00')
+  expect(cell.querySelector('time')?.getAttribute('datetime')).toBe(base.occurredAt)
+})

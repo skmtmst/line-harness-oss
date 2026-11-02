@@ -675,7 +675,13 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const busy = Boolean(busyAction) || registrationStyle.busy
   // 登録したあとは戻らない（③の2つめから先）。
   const canBack = !createdId && (currentStep > 1 || sub > 1 || (currentStep === 1 && precheckBack(precheckAt, precheck) !== null))
+  const missingConnectionReason = currentStep !== 2 ? null
+    : sub === 1 && (!form.channelId.trim() || !form.channelSecret.trim()) ? 'チャネルIDとチャネルシークレットを入力してください。'
+    : sub === 2 && !form.providerId.trim() ? 'プロバイダーIDを入力してください。'
+    : sub === 4 && (!form.loginChannelId.trim() || !form.loginChannelSecret.trim()) ? 'LINEログインのチャネルIDとチャネルシークレットを入力してください。'
+    : null
   const nextBlocked = (currentStep === 1 && precheckBlocked(precheckAt, precheck, acks))
+    || Boolean(missingConnectionReason)
     || (currentStep === 2 && sub === 3 && !allAcked(WEBHOOK_ACKS, acks))
     || (currentStep === 2 && sub === 4 && !allAcked(LOGIN_ACKS, acks))
     || (currentStep === 3 && sub === 1 && (!rowsOk || !providerConfirmed))
@@ -882,7 +888,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
             {canBack
               ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
-            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" variant="primary" disabled={busy || nextBlocked} disabledReason={currentStep === 3 && sub === 1 && !providerConfirmed ? PROVIDER_CONFIRMATION_REASON : undefined} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
+            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" variant="primary" disabled={busy || nextBlocked} disabledReason={currentStep === 3 && sub === 1 && !providerConfirmed ? PROVIDER_CONFIRMATION_REASON : missingConnectionReason} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
           </>} />
       </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
