@@ -33,7 +33,7 @@ test.each([
   expect(Boolean(sheet.querySelector('.nm-gauge-value'))).toBe(known);
   if (known) expect(sheet.textContent).toContain('ゴールドまで あと');
   else {
-    expect(sheet.textContent).toContain('ランクの位置を確認できません');
+    expect(sheet.textContent).toContain('ランクは未設定です');
     expect(sheet.textContent).not.toMatch(/ゴールド|レギュラー|最高ランク|まで あと/);
   }
 });

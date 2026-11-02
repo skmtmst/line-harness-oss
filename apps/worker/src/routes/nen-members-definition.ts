@@ -330,8 +330,7 @@ export type MilestoneLookup = { threshold_yen: number; title: string };
 
 export async function loadRankSetup(db: D1Database, lineAccountId: string | null): Promise<{ ranks: RankLookup[]; milestones: MilestoneLookup[]; rankConfigured: boolean }> {
   if (!lineAccountId) return { ranks: [], milestones: [], rankConfigured: false };
-  try {
-    // 丸ごと mock された @line-crm/db は、無い名前を読むだけで投げる。読み出しごと try に入れる。
+  {
     const pkg = dbPackage as {
       getNenRankSettings?: (db: D1Database, id: string) => Promise<RankLookup[]>;
       getNenLifetimeMilestones?: (db: D1Database, id: string) => Promise<MilestoneLookup[]>;
@@ -343,8 +342,6 @@ export async function loadRankSetup(db: D1Database, lineAccountId: string | null
     // D-48：ランク表が空のときは決めていない予備のランクで組み立てない。呼び出し側が EC の値だけを使う。
     if (!ranks.length) return { ranks: [], milestones, rankConfigured: false };
     return { ranks, milestones, rankConfigured: true };
-  } catch {
-    return { ranks: [], milestones: [], rankConfigured: false };
   }
 }
 
@@ -352,7 +349,7 @@ export async function buildMembership(db: D1Database, lineAccountId: string | nu
   const { ranks, milestones, rankConfigured } = await loadRankSetup(db, lineAccountId);
   const num = (value: unknown) => (Number.isFinite(Number(value)) ? Math.max(0, Math.round(Number(value))) : 0);
   const ecRankKey = typeof snapshot?.member_rank_key === 'string' && snapshot.member_rank_key ? snapshot.member_rank_key : null;
-  const ecRankName = typeof snapshot?.member_rank === 'string' && snapshot.member_rank.trim() ? snapshot.member_rank : null;
+  const ecRankName = typeof snapshot?.ec_member_rank_name === 'string' && snapshot.ec_member_rank_name.trim() ? snapshot.ec_member_rank_name : null;
   const annualMilesYen = num(snapshot?.annual_miles_yen) || (ecRankKey ? 0 : num(snapshot?.purchase_amount));
   const lifetimeMilesYen = Math.max(num(snapshot?.lifetime_miles_yen), num(snapshot?.purchase_amount));
   const mileBalance = num(snapshot?.mile_balance) || num(snapshot?.point_balance);
@@ -367,7 +364,7 @@ export async function buildMembership(db: D1Database, lineAccountId: string | nu
     rankConfigured,
     rankPositionKnown,
     rankKey: ecRankKey ?? rank?.rank_key ?? null,
-    rankName: ecRankName ?? rank?.name ?? '未設定',
+    rankName: rank?.name ?? (ecRankKey ? ecRankName : null) ?? '未設定',
     mileRatePercent: Number.isFinite(Number(snapshot?.mile_rate_percent)) && snapshot?.mile_rate_percent != null
       ? Number(snapshot.mile_rate_percent)
       : rank?.mile_rate_percent ?? null,

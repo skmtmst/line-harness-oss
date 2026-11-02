@@ -10,7 +10,7 @@ import { dbTableExists, jstNow } from './utils.js';
  * - マイル：お客様に見せる呼び名。EC内部のポイントと同じもの。画面に「ポイント」は出さない。
  *
  * 計算（通年・ライフタイム・ランク・残高）はEC側で行い、結果を nen_ec_member_snapshots に受け取る。
- * ECの値が無い友だちには、ここの設定と暫定の累計から画面用にランクを求める（`resolveRank`）。
+ * ECのランクキーが無い友だちは、金額からランクを推測せず未設定として扱う。
  */
 
 export const NEN_RANK_NAME_MAX = 20;
@@ -336,6 +336,7 @@ export interface NenMemberListRow {
   picture_url: string | null;
   customer_id: string | null;
   member_rank: string;
+  ec_member_rank_name: string | null;
   member_rank_key: string | null;
   mile_rate_percent: number | null;
   annual_miles_yen: number;
@@ -415,7 +416,7 @@ export async function listNenMembers(
     WHERE ${where.join(' AND ')}`;
   const total = await db.prepare(`SELECT COUNT(*) AS count ${base}`).bind(...binds).first<{ count: number }>();
   const rows = await db.prepare(
-    `SELECT s.friend_id, f.line_account_id, f.display_name, f.picture_url, s.customer_id, s.member_rank, s.member_rank_key,
+    `SELECT s.friend_id, f.line_account_id, f.display_name, f.picture_url, s.customer_id, s.member_rank, s.ec_member_rank_name, s.member_rank_key,
             s.mile_rate_percent, s.annual_miles_yen, s.lifetime_miles_yen, s.mile_balance, s.rank_valid_until,
             s.last_purchased_at, s.purchase_count, s.synced_at,
             (SELECT COUNT(*) FROM nen_pet_profiles p WHERE p.friend_id = f.id) AS pet_count,

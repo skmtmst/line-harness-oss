@@ -89,7 +89,7 @@ describe('GET /api/liff/nen/member membership', () => {
 
   it('ECのランクキー未着では金額からランクを推測しない', async () => {
     const body = await member('U-b');
-    expect(body.data.membership).toMatchObject({ rankKey: null, rankName: '会員', mileRatePercent: null, annualMilesYen: 34_200, lifetimeMilesYen: 34_200, mileBalance: 640 });
+    expect(body.data.membership).toMatchObject({ rankKey: null, rankName: '未設定', mileRatePercent: null, annualMilesYen: 34_200, lifetimeMilesYen: 34_200, mileBalance: 640 });
   });
 
   it('連携前の友だちはランク未設定で 0', async () => {

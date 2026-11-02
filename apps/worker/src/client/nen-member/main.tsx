@@ -701,7 +701,7 @@ function MembershipSheet({ membership, ownerName }: { membership: Membership; ow
             ? <strong>{membership.next.name}まで あと {yen(membership.next.remainingYen)}</strong>
             : positionKnown
               ? <strong>最高ランクです</strong>
-              : <strong>ランクの位置を確認できません</strong>}
+              : <strong>ランクは未設定です</strong>}
           {membership.validUntil ? <span>{membership.rankName}は {displayDate(membership.validUntil)} まで維持</span> : null}
         </div>
       </div>
