@@ -13,6 +13,7 @@ import { usePermissionLockReason } from '@/components/shared/use-permission-lock
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
 import { TextArea } from '@/components/shared/text-field'
@@ -117,6 +118,7 @@ function AbsenceDialog({ accountId, target, allowed, lockedReason, onCancel, onS
       confirmLabel="欠席にする" busyLabel="受け付けています…" onCancel={onCancel} onConfirm={() => void save()}
       dirty={dirty} busy={busy} confirmDisabled={!allowed || loadState !== 'ready' || missingReason}
       confirmDisabledReason={missingReason ? '振替を渡す理由を入れると欠席にできます' : undefined} confirmLockedReason={lockedReason} error={error}>
+      <OperationTargetSummary accounts={[{ id: accountId }]} />
       {loadState === 'loading' ? <p role="status">振替の決まりを確認しています…</p> : loadState === 'error' ? <Notice tone="warn" message="振替の決まりを読み込めませんでした。欠席はまだ受け付けていません。"
         action={<Button onClick={() => setAttempt(value => value + 1)}>もう一度読み込む</Button>} /> : rule ? <>
         <SaveErrorField names={['grantMakeup', 'grant_makeup']}><ToggleField checked={grant} disabled={!allowed || busy || !rule.enabled} onChange={setGrant}>振替を1回渡す</ToggleField></SaveErrorField>

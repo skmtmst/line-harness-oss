@@ -55,7 +55,7 @@ async function showForm(required: boolean) {
     onFunnelEvent={() => {}} onClose={() => {}} onSubmitted={() => {}}
   />);
   await page.setContent(`<html><head>${styles.map(css => `<style>${css}</style>`).join('')}</head><body class="wb-active">${content}</body></html>`);
-  return page.getByRole('button', { name: required ? 'あと1項目を選択' : '回答を送信して相談日時を選ぶ', exact: true });
+  return page.getByRole('button', { name: required ? 'あと1項目を選択' : '回答を送信する', exact: true });
 }
 
 it('送信できるフォームの主操作は背景と文字を見分けられる', async () => {

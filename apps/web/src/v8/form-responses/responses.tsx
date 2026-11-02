@@ -12,6 +12,7 @@ import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Pagination from '@/components/shared/pagination'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -157,6 +158,13 @@ function Responses() {
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [exportProgress, setExportProgress] = useState('')
+  const scopeKey = `${selectedAccountId ?? ''}:${formId}`
+  const scope = useRef({ key: scopeKey, generation: 0 })
+  if (scope.current.key !== scopeKey) scope.current = { key: scopeKey, generation: scope.current.generation + 1 }
+  const loadedScope = useRef(-1)
+  const canDeleteRef = useRef(canDeleteResponse)
+  canDeleteRef.current = canDeleteResponse
+  const [deletionScope, setDeletionScope] = useState<{ accountId: string; generation: number } | null>(null)
   const loadRequest = useRef(0)
   const queryRef = useRef(query)
   queryRef.current = query
@@ -170,6 +178,7 @@ function Responses() {
       setLoading(false)
       return
     }
+    const generation = scope.current.generation
     const request = ++loadRequest.current
     setLoading(true)
     setError('')
@@ -184,7 +193,8 @@ function Responses() {
         fetchApi<{ success: boolean; data: SubmissionPage }>(`/api/forms/${formId}/submissions?page=${nextPage}&limit=${nextLimit}&${account}${search}&period=${periodRef.current}`),
       ])
       if (!formResult.success || !responseResult.success) throw new Error('load_failed')
-      if (request !== loadRequest.current) return
+      if (request !== loadRequest.current || generation !== scope.current.generation) return
+      loadedScope.current = generation
       setForm(formResult.data)
       setItems(responseResult.data.items.map(normalizedSubmission))
       setSummary(responseResult.data.summary ?? null)
@@ -193,7 +203,8 @@ function Responses() {
       setPageSize(responseResult.data.limit)
       setSelectedId(null)
     } catch (caught) {
-      if (request !== loadRequest.current) return
+      if (request !== loadRequest.current || generation !== scope.current.generation) return
+      loadedScope.current = -1
       if (caught instanceof ApiError && caught.status === 404) setFormMissing(true)
       else if (classifyApiFailure(caught) === 'forbidden') setFormForbidden(true)
       else setError('集まった回答を読み込めませんでした。')
@@ -201,15 +212,23 @@ function Responses() {
       setSummary(null)
       setTotal(null)
     } finally {
-      if (request === loadRequest.current) setLoading(false)
+      if (request === loadRequest.current && generation === scope.current.generation) setLoading(false)
     }
   }, [formId, selectedAccountId])
 
-  const deletion = useCustomerDeletion(async () => { await load(page, pageSize) })
+  const deletion = useCustomerDeletion(async () => { if (deletionScope?.generation === scope.current.generation) await load(page, pageSize) })
   const openDeletion = (item: Submission) => {
-    if (!canDeleteResponse || !selectedAccountId) return
+    if (!canDeleteResponse || !selectedAccountId || loadedScope.current !== scope.current.generation) return
+    setDeletionScope({ accountId: selectedAccountId, generation: scope.current.generation })
     deletion.open({ id: item.id, name: `${item.friendName ?? '不明'}（${formatDateTime(item.createdAt)}）の回答`, kind: 'form_response', path: `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(item.id)}?account_id=${encodeURIComponent(selectedAccountId)}` })
   }
+
+  useEffect(() => {
+    deletion.close()
+    setDeletionScope(null)
+    // The scope change invalidates any confirmation from the previous account or form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey])
 
   useEffect(() => {
     void load(1, 20)
@@ -592,10 +611,12 @@ function Responses() {
             </Card>
           )}
       </DetailColumns>
-      <ConfirmDialog open={deletion.target !== null} title="回答を削除しますか？" deleteName="この回答"
+      <ConfirmDialog open={deletion.target !== null && deletionScope?.generation === scope.current.generation} title="回答を削除しますか？" deleteName="この回答"
         description={`${deletion.target?.name ?? 'この回答'}と添付した写真・PDF・本人確認書類を削除します。元に戻せません。すでに行った送信やタグの変更は取り消されません。`}
         destructive confirmDisabled={deletion.blocked} busy={deletion.busy} busyLabel="削除中…" error={deletion.error}
-        onConfirm={deletion.confirm} onCancel={deletion.close} />
+        onConfirm={() => { if (deletionScope?.generation === scope.current.generation && canDeleteRef.current) void deletion.confirm() }} onCancel={deletion.close}>
+        {deletionScope ? <OperationTargetSummary accounts={[{ id: deletionScope.accountId }]} /> : null}
+      </ConfirmDialog>
     </DetailPage>
   )
 }

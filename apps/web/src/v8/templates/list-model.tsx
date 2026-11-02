@@ -1,7 +1,7 @@
 'use client'
 
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
-import { type BroadcastAssetKind,type TemplateQuestion } from '@/lib/api'
+import { type BroadcastAssetKind,type BroadcastBubble,type TemplateQuestion } from '@/lib/api'
 import { contentExcerpt } from '@/lib/broadcast-summary'
 import { formatNumber } from '@/lib/format'
 import { ClipboardList,GalleryHorizontalEnd,HelpCircle,LayoutGrid,MessageSquare,Ticket,Video } from 'lucide-react'
@@ -30,6 +30,8 @@ export interface Template {
   category: string
   messageType: string
   messageContent: string
+  messageBubbles?: BroadcastBubble[] | null
+  draftMessageBubbles?: BroadcastBubble[] | null
   /** 最新の下書き本文。公開版だけのときは null。 */
   draftMessageContent?: string | null
   /** 置き場。未分類は null。 */
@@ -78,7 +80,7 @@ export const KIND_CARDS: Array<{
   cannot: string
   href: string
 }> = [
-  { key: 'message', title: 'メッセージ', icon: MessageSquare, desc: 'テキスト・カード型・画像。差し込みも使える', useFor: 'いちばんよく使う', cannot: 'できない：答えを集める（→ 質問・リサーチ）', href: '/templates/edit' },
+  { key: 'message', title: 'メッセージ', icon: MessageSquare, desc: 'テキスト。差し込みも使える', useFor: 'いちばんよく使う', cannot: 'できない：答えを集める（→ 質問・リサーチ）', href: '/templates/edit' },
   { key: 'card_message', title: 'カルーセル', icon: GalleryHorizontalEnd, desc: '横にめくるカードを最大10枚', useFor: '商品の紹介に', cannot: 'できない：1枚の画像を面に分ける（→ リッチ）', href: '/templates/carousel' },
   { key: 'rich_message', title: 'リッチメッセージ', icon: LayoutGrid, desc: '1枚の画像を面に分けて、押すと動く', useFor: 'キャンペーンの告知に', cannot: 'できない：文字だけの本文（→ メッセージ）', href: '/templates/edit?kind=rich_message' },
   { key: 'rich_video', title: 'リッチビデオ', icon: Video, desc: 'トーク画面で自動で流れる動画。見終わったらボタンで案内', useFor: '新商品・お店の紹介に', cannot: 'できない：画像を面に分ける（→ リッチメッセージ）', href: '/templates/edit?kind=rich_video' },
@@ -121,4 +123,9 @@ export function publishStateOf(t: Template): { label: string; tone: 'live' | 'ch
 export function isRichVideoTemplate(template: Template): boolean {
   if (template.messageType !== 'imagemap') return false
   try { return Boolean(JSON.parse(latestContentOf(template)).video) } catch { return false }
+}
+
+/** 本文の空行やカルーセルは複数メッセージではない。公開版か下書きのいずれかに複数通があるかを見る。 */
+export function hasMultipleMessages(t: Template): boolean {
+  return (t.messageBubbles?.length ?? 0) > 1 || (t.hasDraft && (t.draftMessageBubbles?.length ?? 0) > 1) === true
 }

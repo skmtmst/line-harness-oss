@@ -78,3 +78,25 @@ describe('イベント変更の入力確認', () => {
     expect(screen.getByRole('button', { name: '会場・オンラインの URL も変える' }).getAttribute('data-variant')).toBe('text')
   })
 })
+
+
+it('終了済みの回は現在の終了状態と保存されている受付設定を区別する', () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-13T00:00:00Z'))
+  try {
+    render(<ChangeReview />)
+    expect(screen.getByText('終了')).toBeTruthy()
+    expect(screen.getByText(/現在は開催終了のため受付できません/)).toBeTruthy()
+    expect((screen.getByRole('radio', { name: '受付する' }) as HTMLInputElement).checked).toBe(true)
+  } finally { vi.useRealTimers() }
+})
+
+it('開催前の回には終了の説明を出さない', () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-11T00:00:00Z'))
+  try {
+    render(<ChangeReview />)
+    expect(screen.queryByText(/現在は開催終了のため受付できません/)).toBeNull()
+    expect((screen.getByRole('radio', { name: '受付する' }) as HTMLInputElement).checked).toBe(true)
+  } finally { vi.useRealTimers() }
+})

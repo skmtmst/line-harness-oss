@@ -377,3 +377,20 @@ it.each([400, 409, 500])('卓の追加が%sで失敗したら窓の中に理由�
   await waitFor(() => expect(document.querySelector('[data-design-node="gBrCz"]')).toBeNull())
   expect(fixture.createTable).toHaveBeenCalledTimes(2)
 })
+
+it('停止中の卓は総席数と結合可能な組に含めない', async () => {
+  fixture.snapshot.mockResolvedValue({ data: snapshotOf({ tables: tables.map(table => ({ ...table, is_active: 0 })) }) })
+  render(<TablesPage />)
+  await screen.findByText('卓の詳細')
+  const value = (label: string) => document.querySelector(`[data-kpi-label][title="${label}"]`)?.closest('[data-kpi-presentation]')?.querySelector('[data-kpi-number]')?.textContent
+  expect(value('総席数')).toBe('0')
+  expect(value('結合可能')).toBe('0')
+})
+
+it('稼働中の卓だけを総席数に数える', async () => {
+  fixture.snapshot.mockResolvedValue({ data: snapshotOf({ tables }) })
+  render(<TablesPage />)
+  await screen.findByText('卓の詳細')
+  const value = document.querySelector('[data-kpi-label][title="総席数"]')?.closest('[data-kpi-presentation]')?.querySelector('[data-kpi-number]')?.textContent
+  expect(value).toBe('20')
+})

@@ -73,7 +73,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater, onBusyCh
   useEffect(() => { load(); return () => { generation.current++; }; }, [load]);
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
-  const rows = (options ?? []).filter((o) => !day || jstDate(o.starts_at) === day);
+  const rows = (options ?? []).filter((o) => { const date = jstDate(o.starts_at); return day ? date === day : date >= week && date <= addDays(week, 6); });
   const chosen = (options ?? []).find((o) => o.slot_id === picked) ?? null;
   const nearby = showNearby ? (options ?? []).filter((o) => !o.full).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at) || a.slot_id.localeCompare(b.slot_id)).slice(0, 3) : [];
 
@@ -122,6 +122,8 @@ export default function MakeupPicker({ credit, source, onUsed, onLater, onBusyCh
         {failed ? <p role="alert" className="text-[13px] text-danger">空いている回を読み込めませんでした。<Button variant="link" onClick={load}>もう一度</Button></p> : null}
         {options !== null && options.length === 0 ? (
           <p className="text-[13px] leading-5 text-liff-sub">期限内に空いている回がありません。教室にご相談ください。</p>
+        ) : options !== null && !day && rows.length === 0 ? (
+          <p className="text-[13px] leading-5 text-liff-sub">この週に振替できる回はありません。ほかの週を選んでください。</p>
         ) : (
           <ul className="space-y-2">
             {rows.map((o) => {

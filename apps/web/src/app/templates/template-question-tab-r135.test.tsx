@@ -7,6 +7,7 @@
  */
 
 import React from 'react'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
@@ -62,6 +63,9 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
     setItem: () => {},

@@ -8,10 +8,11 @@
  * - 閲覧のみ・スタッフは［変える］を出さない（yUK7Z）
  */
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Bot, Sparkles, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
@@ -37,9 +38,16 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
   const mode: AiMode = settings?.mode ?? 'off'
   const [choosing, setChoosing] = useState(false)
   const [pending, setPending] = useState<Choice | null>(null)
+  const accountScope = useRef({ accountId })
+  if (accountScope.current.accountId !== accountId) accountScope.current = { accountId }
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  const [pendingTarget, setPendingTarget] = useState<{ accountId: string; scope: object } | null>(null)
+  const choose = (choice: Choice) => { if (accountId) { setPendingTarget({ accountId, scope: accountScope.current }); setPending(choice) } }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+  useEffect(() => { setPending(null); setPendingTarget(null); setBusy(false); setError(''); setStepUp(null); setChoosing(false) }, [accountId])
   const saveErrors = useSaveFormErrors()
   /* 組2 の今の段では Q&A の自動応答は使えない（autoReplyAvailable:false）。選ぶ欄に出さない。 */
   const autoUnavailable = settings?.autoReplyAvailable === false
@@ -48,27 +56,31 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
 
   const close = () => { if (busy) return; setPending(null); setError('') }
   const save = async (next: Choice, stepUpToken?: string) => {
+    const target = pendingTarget
+    if (!mounted.current || !target || target.scope !== accountScope.current || busy) return
     setBusy(true)
     setError('')
     try {
-      const res = await aiReplyApi.saveSettings(accountId, { mode: next, expectedVersion: settings?.version ?? 0 }, stepUpToken)
+      const res = await aiReplyApi.saveSettings(target.accountId, { mode: next, expectedVersion: settings?.version ?? 0 }, stepUpToken)
+      if (!mounted.current || target.scope !== accountScope.current) return
       onChanged(res.data)
       setPending(null)
       setChoosing(false)
       notifyToast(next === 'auto_qa' ? '自動で答えるをオンにしました' : next === 'draft_only' ? '返信案だけにしました' : 'AI を使わないにしました')
     } catch (caught) {
+      if (!mounted.current || target.scope !== accountScope.current) return
       if (!stepUpToken && isStepUpRequired(caught)) {
         setStepUp({ purpose: AI_SETTINGS_STEP_UP, action: '自動で答えるをオンにする', retry: (token) => save(next, token) })
       } else {
         if (!saveErrors.capture(caught)) setError(describeApiFailure(caught, 'AI の使い方の変更'))
       }
     } finally {
-      setBusy(false)
+      if (mounted.current && target.scope === accountScope.current) setBusy(false)
     }
   }
 
   const action = mode === 'off'
-    ? (choices.includes('draft_only') ? <Button onClick={() => setPending('draft_only')}>使ってみる</Button> : null)
+    ? (choices.includes('draft_only') ? <Button onClick={() => choose('draft_only')}>使ってみる</Button> : null)
     : choices.length > 0 && !choosing
       ? <Button onClick={() => setChoosing(true)}>変える</Button>
       : null
@@ -88,7 +100,7 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
             notifyToast('Q&A を 1 件以上公開すると選べます')
             return
           }
-          setPending(next)
+          choose(next)
         }}
       />
       <Button variant="text" onClick={() => setChoosing(false)}>閉じる</Button>
@@ -114,7 +126,7 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
       </Notice>
 
       <ConfirmDialog
-        open={pending === 'draft_only' || pending === 'off'}
+        open={(pending === 'draft_only' || pending === 'off') && pendingTarget?.scope === accountScope.current}
         title={pending === 'off' ? 'AI を使わないにしますか？' : mode === 'auto_qa' ? '自動で答えるを止めますか？' : 'AI の返信案を使いますか？'}
         description={pending === 'off'
           ? '受信箱の要約と返信案を出さなくなります。自動で答えるのも止まります。あとから戻せます。'
@@ -126,11 +138,13 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
         error={error || undefined}
         onConfirm={() => { if (pending) void save(pending) }}
         onCancel={close}
-      />
+      >
+        {pendingTarget ? <OperationTargetSummary accounts={[{ id: pendingTarget.accountId }]} /> : null}
+      </ConfirmDialog>
 
       <AutoAnswerConfirmDialog
-        open={pending === 'auto_qa'}
-        accountId={accountId}
+        open={pending === 'auto_qa' && pendingTarget?.scope === accountScope.current}
+        accountId={pendingTarget?.accountId ?? ''}
         accountName={accountName}
         published={published}
         drafts={settings?.draftQaCount ?? 0}
@@ -197,6 +211,7 @@ export function AutoAnswerConfirmDialog({ open, accountId, accountName, publishe
       onConfirm={onConfirm}
       onCancel={onCancel}
     >
+      <OperationTargetSummary accounts={[{ id: accountId }]} />
       <dl className={styles.rows}>
         {rows.map((row) => (
           <div key={row.label} className={styles.row}>

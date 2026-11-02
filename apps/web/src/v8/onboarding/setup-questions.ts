@@ -58,7 +58,7 @@ export const Q: Record<string, Question> = {
     ),
     recommended: { consult: 'false' },
     where: '来店スタンプ', manualHref: '/visit-stamps', manualNote: '来店スタンプの画面を開きます',
-    todo: { title: '来店スタンプの決まりを入れる', note: 'リッチメニューにボタンがあるのに中身が未設定です', action: '決まりを入れる' },
+    todo: { title: '来店スタンプを設定する', note: 'リッチメニューにボタンがあるのに中身が未設定です', action: '来店スタンプを設定する' },
     skipped: `リッチメニューの「スタンプ」は、お客さまには「${PREPARING_WORD}」と出ます`,
   },
   coupons: {

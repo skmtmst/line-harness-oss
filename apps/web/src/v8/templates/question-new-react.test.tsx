@@ -12,6 +12,9 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const notifySaved = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shared/toast', async original => ({ ...await original<typeof import('@/components/shared/toast')>(), notifyToast: notifySaved }))
+const navigationPush = vi.hoisted(() => vi.fn())
 const templatesApi = vi.hoisted(() => ({ get: vi.fn(), create: vi.fn(), update: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -31,7 +34,7 @@ vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => React.createElement('a', { href, ...rest }, children),
 }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useRouter: () => ({ push: navigationPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -203,4 +206,18 @@ it('必須不足は主保存を押せない形と理由にし、欄の検証入�
   expect(screen.getByText('テンプレート名を入力してください。')).toBeTruthy()
   expect(screen.getByRole('button', { name: '下書きを保存' }).hasAttribute('disabled')).toBe(false)
   fireEvent.click(save);expect(templatesApi.create).not.toHaveBeenCalled()
+})
+
+
+it('E-20: 質問を保存した後は質問タブに戻り、成功を知らせる', async () => {
+  templatesApi.create.mockResolvedValue({success:true,data:{publishedVersion:0,draftRevision:1}})
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('テンプレート名'), {target:{value:'質問'}})
+    fireEvent.change(screen.getByLabelText('質問文（160文字まで）'), {target:{value:'続けますか？'}})
+    fireEvent.click(screen.getByRole('button',{name:'下書きを保存'}))
+  })
+  await frames()
+  expect(templatesApi.create).toHaveBeenCalled()
+  expect(navigationPush).toHaveBeenCalledWith('/templates?tab=question')
+  expect(notifySaved).toHaveBeenCalledWith('質問を保存しました', {tone:'success'})
 })

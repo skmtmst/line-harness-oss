@@ -12,8 +12,8 @@ it.each([[false, false, 18000], [true, false, 19000], [true, true, 20000]] as co
   expect(sum.price).toBe(price);
   expect(sum.rows.map(row => row.price)).toEqual([9000, 9000]);
   expect(sum.rows.map(row => row.minutes)).toEqual([75, 75]);
-  expect(sum.minutes).toBe(150);
-  expect(sum.sequential).toBe(true);
+  expect(sum.minutes).toBe(first && second ? 150 : 75);
+  expect(sum.sequential).toBe(first && second);
 });
 
 it.each([0, undefined])('指名料が%sでも担当別価格と時間は残す', nomination_fee => {

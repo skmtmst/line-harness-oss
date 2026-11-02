@@ -43,7 +43,7 @@ export default function Step1Precheck({
         <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="この5段でやること">
         <h2 className={styles.asideH2}>この5段でやること</h2>
         <p className={styles.asideP}>① 事前確認：ご利用環境のかんたんな確認</p>
-        <p className={styles.asideP}>② アカウント接続：5つのステップで1つずつ（LINE の管理画面の値を入れる）</p>
+        <p className={styles.asideP}>② アカウント接続：4つのステップで1つずつ（LINE の管理画面の値を入れる）</p>
         <p className={styles.asideP}>③ 接続確認：確認がすべて通るまで登録しない</p>
         <p className={styles.asideP}>④ 使い方を選ぶ：お店に合う使い方を選ぶ（あとから変えられる）</p>
         <p className={styles.asideP}>⑤ 完了：友だちを引き継ぎ、選んだ使い方で始める</p>

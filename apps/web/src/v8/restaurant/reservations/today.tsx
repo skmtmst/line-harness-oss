@@ -149,7 +149,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
         </div>
         <div className={styles.side}>
           <Card frame="raised" layout="vertical" padding="roomy" gap="11px" aria-labelledby="rs-next-title">
-            <SectionHeader description={isToday?'いま':'選んだ日の次の予約'} title={<span id="rs-next-title">次の予約</span>}/>
+            <SectionHeader description={nextOtherDay ? '次の日以降の予約' : isToday ? '今日これからの予約' : '選んだ日の次の予約'} title={<span id="rs-next-title">次の予約</span>}/>
             {next ? (
               <>
                 <div className={styles.nextBox}>

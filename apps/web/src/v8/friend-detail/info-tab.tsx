@@ -224,10 +224,11 @@ export default function InfoTab({ friendId, group, data, perms }: {
           {perms.saveFields ? (
             <div className={styles.saveBar}>
               {data.saveError ? <p className={styles.saveNote}><span className={styles.danger} role="alert">{data.saveError}</span></p>
-                : data.saveNotice ? <p className={styles.saveNote}><span className={styles.success} role="status">{data.saveNotice}</span></p> : null}
+                : data.saveNotice ? <p className={styles.saveNote}><span className={styles.success} role="status">{data.saveNotice}</span></p>
+                : !dirty && !data.saving ? <p className={styles.saveNote}>変更した項目はありません。</p> : null}
               <div className={styles.saveActions}>
                 <Button variant="secondary" onClick={resetValues} disabled={data.saving || !dirty}>キャンセル</Button>
-                <Button variant="primary" onClick={() => void data.saveFields()} disabled={data.saving} busy={data.saving} busyLabel="保存中…">保存する</Button>
+                <Button variant="primary" onClick={() => void data.saveFields()} disabled={data.saving || !dirty} busy={data.saving} busyLabel="保存中…">保存する</Button>
               </div>
             </div>
           ) : (

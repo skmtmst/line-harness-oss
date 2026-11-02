@@ -10,7 +10,7 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { TestSendDialog } from './scenario-dialogs'
+import { FriendPlanStepRow, TestSendDialog } from './scenario-dialogs'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -138,4 +138,14 @@ describe('g2UNV 送り先を選ぶ段', () => {
     await act(async () => { fireEvent.click(again) })
     expect(send).toHaveBeenCalledTimes(2)
   })
+})
+
+
+it('過去版の配信予定はAPIが返した通の表示順を使い、旧APIでは推測しない', () => {
+  const step = { stepId: 's', stepOrder: 8, displayOrder: 3, scheduledAt: null, outcome: 'deliver' as const, reason: null, dynamic: false }
+  const view = render(<ul><FriendPlanStepRow step={step} /></ul>)
+  expect(screen.getByText('3通目')).toBeTruthy()
+  expect(screen.queryByText('8通目')).toBeNull()
+  view.rerender(<ul><FriendPlanStepRow step={{ ...step, displayOrder: undefined }} /></ul>)
+  expect(screen.getByText('通の順番は未取得')).toBeTruthy()
 })

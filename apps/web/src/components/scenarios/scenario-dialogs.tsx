@@ -645,6 +645,7 @@ export function OnCompleteDialog({
 export interface TestSendStep {
   id: string
   stepOrder: number
+  displayOrder?: number
   timing: string
   kind: string
 }
@@ -882,14 +883,15 @@ export function TestSendDialog({
   // 送る通。呼び出し側から steps が来ないときは preview の実データで組み立てる。
   const confirmSteps =
     steps.length > 0
-      ? steps.map((row) => ({ stepOrder: row.stepOrder, timing: row.timing, kind: row.kind }))
+      ? steps.map((row) => ({ stepOrder: row.stepOrder, displayOrder: row.displayOrder ?? row.stepOrder, timing: row.timing, kind: row.kind }))
       : Object.entries(stepBodies)
           .map(([order, body]) => ({
             stepOrder: Number(order),
+            displayOrder: 0,
             timing: '',
             kind: TEST_MESSAGE_TYPE_LABEL[body.messageType] ?? body.messageType,
           }))
-          .sort((a, b) => a.stepOrder - b.stepOrder)
+          .sort((a, b) => a.stepOrder - b.stepOrder).map((row, index) => ({ ...row, displayOrder: index + 1 }))
 
   const contentConfirmed = bodiesStatus === 'ready' && confirmSteps.length > 0 && confirmSteps.every((step) => Boolean(stepBodies[step.stepOrder]))
 
@@ -950,7 +952,7 @@ export function TestSendDialog({
             <section><h2 className="text-ink text-xl font-bold">選択した1名へ実際に送信</h2><p className="text-ink-secondary mt-1 text-sm">選んだ友だちのLINEへ、実際のメッセージが届きます。操作者専用の宛先ではありません。</p>
               <div className="border-hairline mt-5 rounded-panel border p-5"><h3 className="font-semibold">テスト対象</h3><dl className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">LINEアカウント</dt><dd className="font-semibold">{accountName ?? '取得できていません'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">送信先</dt><dd className="font-semibold">{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">区分</dt><dd className="font-semibold">{recipientLabel}</dd></div></dl></div>
               <div className="border-hairline mt-4 rounded-panel border p-5"><h3 className="font-bold">テスト内容</h3><p className="text-ink-secondary mt-2 text-sm">{confirmSteps.length > 1 ? `選択した${confirmSteps.length}通を、通と通のあいだの待機を省略して順番に送信します。` : 'この1通だけを送信します。'}</p>
-                <ul className="mt-4 space-y-2 text-sm">{confirmSteps.map((row) => (<li key={row.stepOrder} className="flex flex-wrap items-baseline gap-x-3"><span className="text-ink shrink-0 font-medium tabular-nums">{row.stepOrder}通目</span>{row.timing ? <span className="text-ink-secondary shrink-0">{row.timing}</span> : null}<span className="text-ink-secondary min-w-0 flex-1 truncate">{row.kind}</span></li>))}</ul>
+                <ul className="mt-4 space-y-2 text-sm">{confirmSteps.map((row) => (<li key={row.stepOrder} className="flex flex-wrap items-baseline gap-x-3"><span className="text-ink shrink-0 font-medium tabular-nums">{row.displayOrder}通目</span>{row.timing ? <span className="text-ink-secondary shrink-0">{row.timing}</span> : null}<span className="text-ink-secondary min-w-0 flex-1 truncate">{row.kind}</span></li>))}</ul>
                 <p className="text-ink-faint mt-2 text-xs">タグ・情報欄の変更などのアクションは実行しません。購読の登録も増えません。</p></div>
             </section>
             <aside className="space-y-4"><div className="border-hairline rounded-panel border p-5"><h3 className="font-medium">設定サマリー</h3><p className="text-ink-faint mt-1 text-xs">テスト送信の内容を確認します。選んだ相手のLINEへ実際に届きます。</p><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt>送信先</dt><dd>{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt>送る通</dt><dd>{confirmSteps.length}通</dd></div></dl></div><div className="border-hairline rounded-panel border p-5"><h3 className="font-medium">メッセージプレビュー</h3><p className="text-ink-faint mt-1 text-xs">{friendName}さんへの表示例。名前などの差し込みは送信時に実値へ置き換わります。</p>
@@ -960,7 +962,7 @@ export function TestSendDialog({
                   const body = stepBodies[row.stepOrder]
                   return (
                     <div key={row.stepOrder} className="mt-4">
-                      <p className="text-ink-faint text-xs">{row.stepOrder}通目</p>
+                      <p className="text-ink-faint text-xs">{row.displayOrder}通目</p>
                       <div className="bg-info-bg mt-1 whitespace-pre-wrap rounded-panel p-4 text-sm">
                         {body && body.messageType === 'text'
                           ? expandTestPreviewBody(body.content, selectedFriend)
@@ -1047,7 +1049,7 @@ export function TestSendDialog({
                 key={row.id}
                 className="border-hairline text-ink-secondary flex flex-wrap items-baseline gap-x-3 border-b px-4 py-2 text-xs last:border-b-0"
               >
-                <span className="text-ink shrink-0 tabular-nums">{row.stepOrder}通目</span>
+                <span className="text-ink shrink-0 tabular-nums">{row.displayOrder ?? row.stepOrder}通目</span>
                 <span className="shrink-0">{row.timing}</span>
                 <span className="min-w-0 flex-1 truncate">{row.kind}</span>
                 {/* 1通ごとの結果は返ってこない（口が返すのは送った合計だけ）。
@@ -1379,7 +1381,7 @@ function FriendPlanStepRow({ step }: { step: ScenarioFriendPlanStep }) {
   return (
     <li className="border-hairline border-b px-4 py-2.5 text-sm last:border-b-0">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-ink shrink-0 font-medium tabular-nums">{step.stepOrder}通目</span>
+        <span className="text-ink shrink-0 font-medium tabular-nums">{step.displayOrder ? `${step.displayOrder}通目` : '通の順番は未取得'}</span>
         <span className="text-ink-secondary shrink-0 tabular-nums">
           {step.scheduledAt ?? '—'}
         </span>

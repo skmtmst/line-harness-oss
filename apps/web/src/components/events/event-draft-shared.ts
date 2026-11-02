@@ -77,6 +77,18 @@ export function resolveEventMultiAccountIds(
   return ids.includes(accountId) ? ids : [accountId, ...ids]
 }
 
+/** 保存済みの対象だけを表示する。不正または欠落した共有先は推測しない。 */
+export function eventOperationAccounts(event: Pick<EventDetail, 'target_type' | 'account_ids'>, accountId: string): Array<{ id: string }> {
+  if (event.target_type === 'single') return [{ id: accountId }]
+  if (event.target_type !== 'multi-account-dedup') return [{ id: '' }]
+  let raw: unknown = event.account_ids
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw) } catch { return [{ id: '' }] }
+  }
+  if (!Array.isArray(raw) || raw.length === 0 || raw.some(id => typeof id !== 'string' || !id.trim())) return [{ id: '' }]
+  return [...new Set(raw as string[])].map(id => ({ id }))
+}
+
 /**
  * 締切・取消期限の選択肢（追加47件 EVENT-03 / EVENT-04）。
  *

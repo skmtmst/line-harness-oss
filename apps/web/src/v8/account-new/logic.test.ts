@@ -267,7 +267,7 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     ])
     // Webhook が OFF（eqJbD）：後ろの2行は Webhook 待ちの言い方。
     const off = toV06CheckRows(connection('failed'), { running: false, cursor: 5 })
-    expect(off[2].detail).toBe('URLは登録できましたが、「Webhookの利用」がOFFのままです。上の案内のとおりONにしてください。')
+    expect(off[2].detail).toBe('URLは登録できましたが、「Webhookの利用」がOFFのままです。下の案内のとおりONにしてください。')
     expect(off[3].detail).toBe('Webhookの確認が終わってから取り込みます。')
     expect(off[4].detail).toBe('Webhookの確認が終わってから作ります。')
   })

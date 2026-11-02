@@ -264,10 +264,10 @@ export default function ScenarioResultsV8() {
     /* 到達率の分母は集計（stats）の参加人数で統一する（#495 軽19）。 */
     const rows = [
       ['ステップ', '配信時期', '到達人数', '到達率', '開封率', 'クリック率'],
-      ...sortedSteps.map((step) => {
+      ...sortedSteps.map((step, index) => {
         const result = statsByOrder.get(step.stepOrder)
         return [
-          `${step.stepOrder}通目`, scheduleLabel(step), result?.reachedCount ?? emptyValue('unknown'),
+          `${index + 1}通目`, scheduleLabel(step), result?.reachedCount ?? emptyValue('unknown'),
           result ? percentLabel(result.reachedCount, stats.enrolledTotal) : emptyValue('unknown'), '—', '—',
         ]
       }),
@@ -435,7 +435,7 @@ export default function ScenarioResultsV8() {
               <ListState kind="empty" title="配信内容がまだありません" description="シナリオ編集からメッセージを追加してください。" />
             ) : (
               <Card padding="none"><GridTable label="通ごとの反応" framed={false} design={{ columns: "minmax(0, 1fr)", gap: "var(--polish-space-row)", rowPadding: "0 var(--tpl-list-inset)", fontSize: "var(--polish-text-body)" }}>
-                {sortedSteps.map((step) => {
+                {sortedSteps.map((step, index) => {
                   const run = runsByOrder.get(step.stepOrder)
                   const reached = reachedOf(step)
                   const pct = reached !== null && stats.enrolledTotal > 0
@@ -446,7 +446,7 @@ export default function ScenarioResultsV8() {
                   return (
                     <GridRow key={step.id}><GridCell className={styles.stepRow}>
                       <div className={styles.stepTop}>
-                        <span className={styles.stepNo}>{step.stepOrder} 通目</span>
+                        <span className={styles.stepNo}>{index + 1} 通目</span>
                         <span className={styles.stepWhen}>{scheduleLabel(step)}</span>
                         <span className={styles.stepReach}>{reached === null ? emptyValue('unknown') : `${formatNumber(reached)}人に届いた`}</span>
                         <span className={styles.stepMeta}>
@@ -454,7 +454,7 @@ export default function ScenarioResultsV8() {
                         </span>
 
                       </div>
-                      <progress className={styles.stepBar} max={100} value={pct} aria-label={`${step.stepOrder} 通目の届いた率`} />
+                      <progress className={styles.stepBar} max={100} value={pct} aria-label={`${index + 1} 通目の届いた率`} />
                     </GridCell></GridRow>
                   )
                 })}
@@ -578,7 +578,7 @@ export default function ScenarioResultsV8() {
                         <GridCell title={sub.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : undefined}>
                           {sub.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>}
                         </GridCell>
-                        <GridCell>{`${sub.currentStepOrder} 通目まで`}</GridCell>
+                        <GridCell>{sub.currentDisplayOrder !== undefined ? (sub.currentDisplayOrder === null ? '—' : `${sub.currentDisplayOrder} 通目まで`) : sortedSteps.some((step) => step.stepOrder === sub.currentStepOrder) ? `${sortedSteps.findIndex((step) => step.stepOrder === sub.currentStepOrder) + 1} 通目まで` : '—'}</GridCell>
                         <GridCell><TruncatedText value={nextLabel(sub)} /></GridCell>
                         <GridCell>
                           <Button

@@ -27,6 +27,7 @@ import { api } from '@/lib/api'
 import { describeApiFailure, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import QuestionEditor, { emptyQuestion, newChoiceKey, type QuestionChoice, type ScenarioQuestion } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
+import { notifyToast } from '@/components/shared/toast'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { EntityPickerSummary } from '@/components/shared/entity-picker'
@@ -209,7 +210,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       setSaving(false)
     }
   }
-  const leaveToList = () => { disarm(); router.push('/templates') }
+  const leaveToList = () => { disarm(); notifyToast('質問を保存しました', { tone: 'success' }); router.push('/templates?tab=question') }
   const onSaveDraft = async () => { if (await save('draft')) leaveToList() }
   /* 使われている質問を公開すると利用先へ新しい内容が届くので、使用先があれば確認の窓を挟む。 */
   const onPublish = async () => {

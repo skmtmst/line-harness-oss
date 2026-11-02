@@ -14,7 +14,7 @@ vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }));
 vi.mock('./event-bookings.js', () => ({ default: Probe }));
 vi.mock('../lib/api.js', () => ({
   api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
-    eventWaitlistOffer: vi.fn().mockRejectedValue(new Error('offline')),
+    eventWaitlistOffer: vi.fn().mockResolvedValue({ data: { waitlistId: 'w', eventId: 'e', slotId: 's', partySize: 2, status: 'offered', expiresAt: '2030-11-01T01:00:00Z', eventName: '見本のイベント', startsAt: '2030-11-20T01:00:00Z', endsAt: '2030-11-20T02:00:00Z', venueName: null, remainingSeconds: 3600, canAccept: true } }),
     acceptEventWaitlistOffer: vi.fn().mockRejectedValue(Object.assign(new Error('gone'), { status: 410 })),
     liffConfig: vi.fn().mockResolvedValue({ success: true, data: {} }),
     bookingSettings: vi.fn().mockResolvedValue({ liff_date_view: 'list', booking_window_days: 60 }),

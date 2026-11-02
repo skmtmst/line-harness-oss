@@ -38,11 +38,11 @@ it('実APIで読んだ仮担当は非指名のまま、明示した人だけに�
   const summary = () => view.container.querySelector('[data-party-summary]')!;
   expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
   expect(latest.members.every(member => !member.designated)).toBe(true);
-  expect(summary().textContent).toContain('2 人・続けて 150 分・¥18,000');
+  expect(summary().textContent).toContain('2 人・同時に 75 分・¥18,000');
   expect(summary().textContent).not.toContain('指名料');
   expect(summary().textContent?.match(/指名なし/g)).toHaveLength(2);
   fireEvent.click(within(screen.getByRole('group', { name: '1 人目（あなた）の担当' })).getByRole('button', { name: /見本の担当/ }));
-  expect(summary().textContent).toContain('2 人・続けて 150 分・¥19,000');
+  expect(summary().textContent).toContain('2 人・同時に 75 分・¥19,000');
   expect(summary().textContent?.match(/指名料/g)).toHaveLength(1);
   fireEvent.click(within(screen.getByRole('group', { name: '2 人目（お連れさま）の担当' })).getByRole('button', { name: /見本の担当/ }));
   expect(summary().textContent).toContain('2 人・続けて 150 分・¥20,000');
@@ -71,7 +71,7 @@ it.each([[false, false, '¥18,000'], [true, false, '¥19,000'], [true, true, '¥
   expect(rows[0].textContent).toBe(`見本の施術・${first ? staff.display_name : '指名なし'}`);
   expect(rows[1].textContent).toBe(`見本の施術・${second ? staff.display_name : '指名なし'}`);
   expect(screen.getByText(`${price}（目安）`)).toBeTruthy();
-  expect(screen.getByText(/10:00〜12:30/)).toBeTruthy();
+  expect(screen.getByText(first && second ? /10:00〜12:30/ : /10:00〜11:15/)).toBeTruthy();
   fireEvent.click(primary());
   await screen.findByText('現在準備中です');
   expect(api.createRequest).not.toHaveBeenCalled();

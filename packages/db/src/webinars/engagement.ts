@@ -194,6 +194,7 @@ export async function getWebinarFormFunnelStats(
 export async function insertWebinarUserComment(
   db: D1Database,
   input: {
+    id?: string;
     webinarId: string;
     friendId: string;
     sessionStartAt: number;
@@ -205,10 +206,10 @@ export async function insertWebinarUserComment(
     .prepare(
       `INSERT INTO webinar_user_comments
          (id, webinar_id, friend_id, session_start_at, at_seconds, body, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
     )
     .bind(
-      crypto.randomUUID(), input.webinarId, input.friendId, input.sessionStartAt,
+      input.id ?? crypto.randomUUID(), input.webinarId, input.friendId, input.sessionStartAt,
       input.atSeconds, input.body, jstNow(),
     )
     .run();

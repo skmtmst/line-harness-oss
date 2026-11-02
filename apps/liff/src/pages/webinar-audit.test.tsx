@@ -8,7 +8,7 @@ import type { WebinarState } from '../lib/api.js';
  * 監査 L7・L8・L9（ウェビナー）。
  * L7 日本語の変換を確定する Enter ではコメントを送らない。
  * L8 開始時刻を過ぎた後の読み直しは、取得中に重ねず、失敗したら止める。
- * L9 コメントが送れなかったら行に出し、書いた文を入力欄へ戻す。
+ * L9 結果不明のコメントは行に残し、同じ要求として再送する。
  */
 
 vi.mock('@line/liff', () => ({ default: { isInClient: () => false, openWindow: vi.fn() } }));
@@ -154,21 +154,26 @@ describe('共通の頭・読み込み・失敗の表示', () => {
   });
 });
 
-describe('監査 L9：送れなかったコメント', () => {
-  it('行に「送れませんでした」を出し、書いた文を入力欄へ戻す', async () => {
+describe('監査 L9：送信結果を確認できなかったコメント', () => {
+  it('送信結果が不明な文を行に残し、同じ要求として再送する', async () => {
     webinarState.mockResolvedValue(LIVE);
     webinarComment.mockRejectedValue(new TypeError('Failed to fetch'));
     open();
     const input = (await screen.findByRole('textbox', { name: 'コメントを書く' })) as HTMLInputElement;
     fireEvent.change(input, { target: { value: '質問です' } });
     fireEvent.click(screen.getByRole('button', { name: '送信する' }));
-    expect(await screen.findByText('（送れませんでした）')).toBeTruthy();
-    expect(input.value).toBe('質問です');
+    expect(await screen.findByText('（送信結果を確認できませんでした）')).toBeTruthy();
+    expect(screen.getByText(/質問です/)).toBeTruthy();
+    expect(input.value).toBe('');
     webinarComment.mockResolvedValue({ ok: true });
     fireEvent.click(screen.getByRole('button', { name: '再送する' }));
     await waitFor(() => expect(webinarComment).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByText('（送れませんでした）')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('（送信結果を確認できませんでした）')).toBeNull());
     expect(webinarComment.mock.calls[1]![3]).toBe('質問です');
+    const bodies = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/comments')).map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]).toEqual(bodies[0]);
+    expect(bodies[0].requestId).toMatch(/^u-/);
     expect(input.value).toBe('');
   });
 });
