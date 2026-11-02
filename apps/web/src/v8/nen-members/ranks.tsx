@@ -292,6 +292,23 @@ export default function RankSettingsV8({
     }
   }
 
+  const initialize = async () => {
+    const target = activeAccount.current
+    if (readonly || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = await nenRanksApi.initialize(accountId)
+      if (activeAccount.current !== target) return
+      if (!res.success) throw new Error(res.error)
+      onSaved(accountId, res.data)
+    } catch (caught) {
+      if (activeAccount.current === target) setError(describeApiFailure(caught, '初期ランクの作成', { scope: 'store' }))
+    } finally {
+      if (activeAccount.current === target) setBusy(false)
+    }
+  }
+
   /* 競合の帯。保存した人の名前は API に無いので「ほかの人」と時刻で伝える。 */
   const conflictAt = conflict?.latest.rules ? shortTime(conflict.latest.rules.updatedAt) : null
   useEffect(() => {
@@ -309,6 +326,13 @@ export default function RankSettingsV8({
   if (status === 'forbidden') return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" /></SaveErrorScope>
   if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} /></SaveErrorScope>
   if (!settings) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="ランク設定を読み込んでいます" /></SaveErrorScope>
+
+  if (settings.ranks.length === 0) return <SaveErrorScope errors={saveErrors}>
+    {error ? <Notice tone="danger">{error}</Notice> : null}
+    <ListState kind="empty" title="ランクは未設定です" description="初期ランクを作成してから、内容を変更できます。" action={
+      <Button variant="primary" onClick={() => void initialize()} busy={busy} busyLabel="作成中…" lockedReason={readonly ? '閲覧のみのため、管理者に頼んでください。' : undefined}>初期ランクを作る</Button>
+    } />
+  </SaveErrorScope>
 
   const rules = settings.rules
   const removeRow = removeTarget !== null ? drafts[removeTarget] : null
