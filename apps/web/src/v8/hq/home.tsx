@@ -664,6 +664,7 @@ export default function HqHomeV8() {
   return (
     <KpiValueMotionProvider scope={`hq-accounts:${jstDate().slice(0, 7)}`}>
     <SaveErrorScope errors={saveErrors}><ListPage
+      tableInset={view === 'table'}
       boardId="JKjsE"
       title="統括のアカウント"
       help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前を変えられます。アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです（「戻す」を使えるのはオーナーだけです。本人確認のあと、アカウントは「停止中」になります）。`}</>}
