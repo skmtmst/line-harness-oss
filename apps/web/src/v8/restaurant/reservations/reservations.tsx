@@ -18,9 +18,9 @@ import { useAccount } from '@/contexts/account-context'
 import { restaurantTestApi,type ReservationQuery,type RestaurantClosure,type RestaurantReservation } from '@/lib/restaurant-test-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { Lock,Phone } from 'lucide-react'
-import { useCallback,useEffect,useMemo,useState,type ReactNode } from 'react'
+import { useCallback,useEffect,useMemo,useRef,useState,type ReactNode } from 'react'
 import { ReservationDetailDialog } from '@/v8/restaurant-reservations/index'
-import { RestaurantShell, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { QuietError, RestaurantShell, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import { KIND_LABEL, dayTitle, scopeText } from '@/v8/restaurant/closures/public/format/index'
 import { CancelReservationDialog,EditReservationDialog,InboundTrialDialog,type ReservationPatch } from './dialogs'
 import { dayRange,monthRange,sameDay,toYmd,weekRange,type LedgerView } from './format'
@@ -29,6 +29,7 @@ import PhoneReservation from './phone'
 import styles from './reservations.module.css'
 import TodayView,{ type PhonePreset } from './today'
 import SeatWaitlistDialog from './waitlist'
+import { isReservationInputError } from './edit-save-result'
 
 /** 予約を変えられる役割か（口は owner・admin・staff。閲覧のみは 403）。読めるまでは出す（最後の守りは口の 403）。 */
 function canWriteRole(role: string | null | undefined): boolean {
@@ -101,7 +102,19 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const [todayRows, setTodayRows] = useState<RestaurantReservation[] | null>(null)
   /* その日（今日の見方は選んだ日・ほかの見方は今日）の臨時休業・貸切。日の読み出しの口に入っている。 */
   const [dayClosures, setDayClosures] = useState<{ day: string; closures: RestaurantClosure[] } | null>(null)
-  const [openId, setOpenId] = useState('')
+  const [editTarget, setEditTarget] = useState<{ id: string; accountId: string; storeId: string; sequence: number } | null>(null)
+  const editSequence = useRef(0)
+  const editContext = useRef({ target: editTarget, accountId, storeId })
+  editContext.current = { target: editTarget, accountId, storeId }
+  const setOpenId = useCallback((id: string) => {
+    const target = id ? { id, accountId, storeId, sequence: ++editSequence.current } : null
+    editContext.current = { target, accountId, storeId }
+    setEditTarget(target)
+  }, [accountId, storeId])
+  const openId = editTarget?.accountId === accountId && editTarget.storeId === storeId ? editTarget.id : ''
+  useEffect(() => {
+    if (editTarget && (editTarget.accountId !== accountId || editTarget.storeId !== storeId)) setOpenId('')
+  }, [accountId, storeId, editTarget, setOpenId])
   const [detailId, setDetailId] = useState('')
   useEffect(()=>{const id=new URLSearchParams(window.location.search).get('id');if(id)setDetailId(id)},[])
   const [cancelId, setCancelId] = useState('')
@@ -258,15 +271,36 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         onEdit={(id) => { setDetailId(''); setOpenId(id) }}
       />
       <EditReservationDialog
+        key={editTarget?.sequence ?? 0}
         reservation={opened}
         tables={tables}
         courses={menuItems}
         busy={busy}
         canWrite={canWrite}
         onClose={() => setOpenId('')}
-        onSave={(patch: ReservationPatch) => {
-          if (!opened) return
-          void save(() => restaurantTestApi.updateReservation(accountId, opened.id, {...patch, expectedVersion: opened.customer_version ?? 1}), '予約を変更しました。').then((ok) => { if (ok) setOpenId('') })
+        onSave={async (patch: ReservationPatch) => {
+          const target = editTarget
+          const current = () => editContext.current.target === target && editContext.current.accountId === accountId && editContext.current.storeId === storeId
+          if (!opened || !target || !current()) return { saved: false }
+          let inputError: unknown
+          const saved = await mutate(async () => {
+            try {
+              const result = await restaurantTestApi.updateReservation(accountId, opened.id, { ...patch, expectedVersion: opened.customer_version ?? 1 })
+              if (!current()) throw new QuietError()
+              return result
+            } catch (error) {
+              if (!current()) throw new QuietError()
+              if (isReservationInputError(error)) {
+                inputError = error
+                throw new QuietError()
+              }
+              throw error
+            }
+          }, '予約を変更しました。')
+          if (!current()) return { saved: false }
+          if (saved) setOpenId('')
+          else if (inputError === undefined) void reload()
+          return { saved, inputError }
         }}
         onCancelReservation={(id) => { setOpenId(''); setCancelId(id) }}
         onRestore={(id) => {
