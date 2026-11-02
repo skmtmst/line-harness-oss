@@ -89,6 +89,7 @@ it('新版の保存後も編集を保ち、続けて保存すると新しい版�
   ], segment: null, comparisonGroups: [], expectedVersionNumber: 1 }} onCancel={() => {}} onCreated={done} />)
   fireEvent.click(screen.getByRole('button', { name: '新版として保存する' }))
   await waitFor(() => expect(done).toHaveBeenCalledOnce())
+  await waitFor(() => expect((screen.getByRole('button', { name: '新版として保存する' }) as HTMLButtonElement).disabled).toBe(false))
   expect((screen.getByLabelText('名前', { exact: true }) as HTMLInputElement).value).toBe('編集中')
   const anchor = document.createElement('a'); anchor.href = '/templates'; document.body.appendChild(anchor)
   const navigation = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
