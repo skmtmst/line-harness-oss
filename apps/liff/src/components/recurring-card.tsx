@@ -8,7 +8,7 @@ import Card from './ui/card.js';
 import Icon from './ui/icon.js';
 
 export type RecurrenceChoice = { index: number; action: 'keep' | 'skip' | 'alternative'; alternative_starts_at?: string };
-export type RecurrenceValue = { count: number; choices: RecurrenceChoice[]; made: number } | null;
+export type RecurrenceValue = { count: number; choices: RecurrenceChoice[]; made: number } | 'checking' | null;
 
 type Occurrence = { index: number; starts_at: string; available: boolean; reason?: string; alternatives: string[] };
 const jstDay = (iso: string) => japanDate(new Date(iso));
@@ -37,7 +37,7 @@ export default function RecurringCard({ menu, staff, startsAt, onChange }: {
   useEffect(() => {
     if (!on) { setList(null); onChange(null); return; }
     let alive = true;
-    setList(null); setFailed(false);
+    setList(null); setFailed(false); onChange('checking');
     api.seriesPreview({ menu_id: menu.id, staff_id: staff.id, starts_at: startsAt, freq: 'weekly', count })
       .then((r) => { if (alive) { setList(r.occurrences); setPicks({}); } })
       .catch((e) => { logFailure('series-preview', e); if (alive) setFailed(true); });
@@ -67,7 +67,7 @@ export default function RecurringCard({ menu, staff, startsAt, onChange }: {
       <Card className="space-y-3 p-3.5">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-bold text-ink">毎週この時間で続ける</p>
-          <Button variant="switch" selected={on} role="switch" aria-checked={on} aria-label="毎週この時間で続ける" onClick={() => setOn((v) => !v)}>
+          <Button variant="switch" selected={on} role="switch" aria-checked={on} aria-label="毎週この時間で続ける" onClick={() => { onChange(on ? null : 'checking'); setOn((v) => !v); }}>
             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-canvas shadow transition-all ${on ? 'left-[22px]' : 'left-0.5'}`} />
           </Button>
         </div>
@@ -76,9 +76,9 @@ export default function RecurringCard({ menu, staff, startsAt, onChange }: {
             <div className="flex items-center justify-between gap-3">
               <span className="text-[13px] text-liff-sub">回数</span>
               <span className="flex items-center gap-4 rounded-(--liff-radius) px-1 outline-1 -outline-offset-1 outline-liff-line-strong">
-                <Button variant="icon" aria-label="回数を減らす" disabled={count <= 2} onClick={() => setCount((n) => Math.max(2, n - 1))}>−</Button>
+                <Button variant="icon" aria-label="回数を減らす" disabled={count <= 2} onClick={() => { onChange('checking'); setList(null); setCount((n) => Math.max(2, n - 1)); }}>−</Button>
                 <span className="liff-num min-w-10 text-center text-sm font-bold text-ink" aria-live="polite">{`${count} 回`}</span>
-                <Button variant="icon" aria-label="回数を増やす" disabled={count >= max} onClick={() => setCount((n) => Math.min(max, n + 1))}>＋</Button>
+                <Button variant="icon" aria-label="回数を増やす" disabled={count >= max} onClick={() => { onChange('checking'); setList(null); setCount((n) => Math.min(max, n + 1)); }}>＋</Button>
               </span>
             </div>
             {failed ? <p role="alert" className="text-[13px] text-danger">空きを確かめられませんでした。<Button variant="link" onClick={() => setRetry((n) => n + 1)}>もう一度</Button></p> : null}
