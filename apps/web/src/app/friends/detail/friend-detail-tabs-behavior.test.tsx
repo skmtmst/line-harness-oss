@@ -188,6 +188,20 @@ describe('概要の行き先リンク', () => {
 })
 
 describe('タブの切り替え（Q5F2QE）', () => {
+  it('通常のタブは内容のあるものに絞り、回数券・月謝を内容に合う名前で出す', async () => {
+    await open('id=friend-1')
+    const labels = [...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim())
+    expect(labels).toEqual(['概要', '履歴', '情報欄', '回答フォーム', '回数券・月謝', 'マイル'])
+    expect(hrefOf('回数券・月謝')).toBe('/friends/detail?id=friend-1&tab=orders')
+  })
+
+  it('案内をURLから直接開いたときは内容と選択中のタブを表示する', async () => {
+    await open('id=friend-1&tab=scenario')
+    const selected = [...host.querySelectorAll('[role="tab"][aria-selected="true"]')].map((tab) => tab.textContent?.trim())
+    expect(selected).toEqual(['配信・シナリオ'])
+    expect(hrefOf('シナリオ一覧を見る ↗')).toBe('/scenarios')
+  })
+
   it('板の印を付け、URL の tab ごとに概要・履歴・回答フォーム・情報欄の中身を出す', async () => {
     fx.fetchApi.mockImplementation(async (path: string) => ({
       success: true,

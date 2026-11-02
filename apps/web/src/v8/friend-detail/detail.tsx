@@ -49,24 +49,25 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  *
  * 入口は app/friends/detail/page.tsx（V8 のときだけこの画面）。
  * データの口・権限・失敗の扱いは今の画面と同じ（BEHAVIOR.md）。見せ方だけ絵どおり：
- * 板の頭（顔・名前・札・補足／…・個別操作・受信箱で開く）→ タブ10個 → タブの中身。
+ * 板の頭（顔・名前・札・補足／…・個別操作・受信箱で開く）→ タブ → タブの中身。
  * タブの中身はタブごとのファイルに分けた。
  */
 
-/** タブ10個（並びと URL の値は今の画面と同じ）。 */
+/** 直接開くURLも含めたタブの定義。 */
 export const FRIEND_DETAIL_TABS = [
   { key: 'timeline', label: '概要' },
   { key: 'history', label: '履歴' },
   { key: 'info', label: '情報欄' },
   { key: 'forms', label: '回答フォーム' },
   { key: 'scenario', label: '配信・シナリオ' },
-  { key: 'orders', label: '予約' },
+  { key: 'orders', label: '回数券・月謝' },
   { key: 'reminders', label: 'リマインダ' },
   { key: 'actions', label: 'アクション' },
   { key: 'miles', label: 'マイル' },
   { key: 'richmenu', label: 'リッチメニュー' },
 ] as const
 type TabKey = (typeof FRIEND_DETAIL_TABS)[number]['key']
+const LINK_ONLY_TABS: readonly TabKey[] = ['scenario', 'reminders', 'actions', 'richmenu']
 
 function FriendDetailV8Inner() {
   const params = useSearchParams()
@@ -78,7 +79,8 @@ function FriendDetailV8Inner() {
   const { selectedAccountId, selectedAccount } = useAccount()
   // 情報欄タブは friend_fields の画面。オフのアカウントではタブごと出さない。
   const fieldsEnabled = useFeatureVisibility(selectedAccountId).enabled('friend_fields')
-  const visibleTabs = fieldsEnabled ? FRIEND_DETAIL_TABS : FRIEND_DETAIL_TABS.filter((t) => t.key !== 'info')
+  const visibleTabs = FRIEND_DETAIL_TABS.filter((t) =>
+    (fieldsEnabled || t.key !== 'info') && (!LINK_ONLY_TABS.includes(t.key) || t.key === tab))
   const data = useFriendDetail(friendId, selectedAccountId, tab)
   const perms = useFriendDetailPermissions()
   const { friend } = data
