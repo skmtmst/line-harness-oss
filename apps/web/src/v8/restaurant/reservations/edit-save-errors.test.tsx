@@ -107,7 +107,7 @@ it.each([
   [409, undefined, '同じ卓に重なる時間の予約があるため変更できません'],
   [409, 'version_conflict', '最新の予約を確認してください'],
   [403, undefined, '権限がありません'], [500, undefined, '内部の失敗'],
-] as const)('対象外の失敗%s/%sは従来どおり知らせて読み直す', async (status, code, message) => {
+] as const)('対象外の失敗%s/%sは知らせて読み直し入力を残す', async (status, code, message) => {
   const { dialog, input, readsBefore } = await rejectEdit(new ApiError(status, message, code))
   await waitFor(() => expect(fixture.snapshot).toHaveBeenCalledTimes(readsBefore + 1))
   await waitFor(() => expect(input.value).toBe('9'))
@@ -260,4 +260,17 @@ it('今日以外の予約を詳細リンクから開いても編集できる', a
     expect((within(dialog).getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(false)
     expect(within(dialog).queryByText(/別の操作で予約が変更されたか/)).toBeNull()
   } finally { window.history.replaceState({}, '', '/') }
+})
+
+
+it('画面に失敗を表示した後の入力エラーでは古い知らせを消す', async () => {
+  const { dialog } = await openEdit()
+  fixture.updateReservation.mockRejectedValueOnce(new ApiError(500, '内部の失敗'))
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '保存する' })); await Promise.resolve() })
+  const outsideNotices = () => [...document.querySelectorAll('[data-design-part=notice]')].filter(node => !dialog.contains(node))
+  await waitFor(() => expect(outsideNotices()).toHaveLength(1))
+  fixture.updateReservation.mockRejectedValueOnce(new ApiError(422, '人数を確認してください'))
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '保存する' })); await Promise.resolve() })
+  await waitFor(() => expect(within(dialog).getByText(/人数を確認してください/)).toBeTruthy())
+  expect(outsideNotices()).toHaveLength(0)
 })

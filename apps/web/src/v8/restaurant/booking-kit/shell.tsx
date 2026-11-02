@@ -205,7 +205,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
       else setSavedButUnread(true)
       return true
     } catch (error) {
-      if (options?.rethrow(error)) throw error
+      if (options?.rethrow(error)) { setNotice(null); throw error }
       if (error instanceof QuietError) { setNotice(null); return false }
       setNotice({
         tone: 'error',
