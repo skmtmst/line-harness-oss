@@ -932,10 +932,10 @@ export default function InflowListV8({
             if (!deleteTarget || !canManageRole(role) || deleteTarget.accountId !== latestAccountRef.current || deleteName !== deleteTarget.name) return false
             try {
               const response = await fetchApi<{ success: boolean; error?: string }>(`/api/entry-routes/${encodeURIComponent(deleteTarget.id)}`, { method: 'DELETE', body: JSON.stringify({ confirmationName: deleteName }) })
-              if (!response.success) return { status: 'failed' as const, message: response.error || '削除できませんでした。' }
+              if (!response.success) return { status: 'failed' as const, error: response.error, message: response.error || '削除できませんでした。' }
               return true
             } catch (error) {
-              return { status: 'failed' as const, message: japaneseDetailOf(error) || describeApiFailure(error, '削除') }
+              return { status: 'failed' as const, error, message: japaneseDetailOf(error) || describeApiFailure(error, '削除') }
             }
           }}
         >
