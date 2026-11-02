@@ -1,3 +1,4 @@
+import {canAssignChatTo} from './chat-assignees.js';
 import type { Env } from '../worker-env.js';
 import {toAuthenticatedStaff} from '../middleware/auth.js';
 import {canAccessAllLineAccounts} from './account-access.js';
@@ -12,6 +13,7 @@ export async function deliverOperatorPush(db:D1Database,env:Partial<Env['Binding
  if(input.kind!=='test'&&(!await canAccessAllLineAccounts(db,auth,[input.account])||!(['owner','admin'].includes(auth.role)||auth.permissionKeys?.includes('/chats')||auth.viewPermissionKeys?.includes('/chats'))))return {sent:0,failed:0};
  const preference=await db.prepare('SELECT kinds_json,quiet_start,quiet_end FROM operator_push_preferences WHERE staff_id=?').bind(input.staffId).first<{kinds_json:string;quiet_start:string;quiet_end:string}>();if(input.kind!=='test'&&preference&&!(JSON.parse(preference.kinds_json) as string[]).includes(input.kind))return {sent:0,failed:0};
  if(input.kind==='assigned_reply'){
+  if(!await canAssignChatTo(db,input.staffId,input.account))return {sent:0,failed:0};
   const assignment=await db.prepare('SELECT c.assignee_staff_id assigned_staff_id FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.id=? AND f.line_account_id=?').bind(input.chatId,input.account).first<{assigned_staff_id:string|null}>();if(assignment?.assigned_staff_id!==input.staffId)return {sent:0,failed:0};
  }
  const conversation=input.kind==='test'?null:await db.prepare('SELECT friend_id FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.id=? AND f.line_account_id=?').bind(input.chatId,input.account).first<{friend_id:string}>();if(input.kind!=='test'&&!conversation)return {sent:0,failed:0};
@@ -42,7 +44,7 @@ export async function sweepOperatorPush(db:D1Database,env:Partial<Env['Bindings'
   const pending=(await db.prepare("SELECT id,line_account_id,ref_id FROM operator_push_deliveries WHERE subscription_id=? AND kind=? AND status='suppressed_quiet'").bind(group.subscription_id,group.kind).all<{id:string;line_account_id:string|null;ref_id:string}>()).results;
   const ids:string[]=[],excluded:string[]=[];
   for(const row of pending){
-   const allowed=chatAllowed&&(!pref||JSON.parse(pref.kinds_json).includes(group.kind))&&row.line_account_id&&await canAccessAllLineAccounts(db,auth,[row.line_account_id]);
+   const allowed=chatAllowed&&(!pref||JSON.parse(pref.kinds_json).includes(group.kind))&&row.line_account_id&&await canAccessAllLineAccounts(db,auth,[row.line_account_id])&&(group.kind!=='assigned_reply'||await canAssignChatTo(db,group.staff_id,row.line_account_id));
    const chat=allowed?await db.prepare('SELECT c.assignee_staff_id AS operator_id FROM messages_log m JOIN chats c ON c.friend_id=m.friend_id WHERE m.id=? AND m.line_account_id=?').bind(row.ref_id,row.line_account_id).first<{operator_id:string|null}>():null;
    if(!chat||group.kind==='assigned_reply'&&chat.operator_id!==group.staff_id)excluded.push(row.id);else ids.push(row.id);
   }
@@ -64,6 +66,7 @@ export async function retryOperatorPush(db:D1Database,env:Partial<Env['Bindings'
  for(const row of due){
   const member=await db.prepare('SELECT * FROM staff_members WHERE id=? AND is_active=1').bind(row.staff_id).first();if(!member)continue;
   const staff=toAuthenticatedStaff(member as never);if(row.kind!=='test'&&(!row.line_account_id||!await canAccessAllLineAccounts(db,staff,[row.line_account_id])||!(['owner','admin'].includes(staff.role)||staff.permissionKeys?.includes('/chats')||staff.viewPermissionKeys?.includes('/chats'))))continue;
+  if(row.kind==='assigned_reply'&&(!row.line_account_id||!await canAssignChatTo(db,row.staff_id,row.line_account_id)))continue;
   const pref=await db.prepare('SELECT kinds_json,quiet_start,quiet_end FROM operator_push_preferences WHERE staff_id=?').bind(row.staff_id).first<{kinds_json:string;quiet_start:string;quiet_end:string}>();
   if(row.kind!=='test'&&pref&&(!(JSON.parse(pref.kinds_json) as string[]).includes(row.kind)||pushIsQuiet(pref.quiet_start,pref.quiet_end,now)))continue;
   const conversation=row.kind==='test'?null:await db.prepare('SELECT c.friend_id,c.assignee_staff_id AS operator_id FROM messages_log m JOIN chats c ON c.friend_id=m.friend_id WHERE m.id=? AND m.line_account_id=?').bind(row.ref_id,row.line_account_id).first<{friend_id:string;operator_id:string|null}>();

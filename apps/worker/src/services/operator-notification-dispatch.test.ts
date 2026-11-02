@@ -110,6 +110,31 @@ describe('運用者通知の自動発火と登録簿', () => {
     expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
   });
 
+  it('担当への返事は担当本人だけへ送り、権限を失ったら送らない', async () => {
+    testDb.raw.exec(`
+      INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES ('staff-2','account-1','2026');
+      UPDATE staff_members SET permission_keys='["/chats"]' WHERE id='staff-2';
+      INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES ('friend','line-friend','友だち','account-1');
+      INSERT INTO chats(id,friend_id,assignee_staff_id,created_at,updated_at) VALUES ('chat','friend','staff-2','2026','2026');
+      INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES ('msg','friend','incoming','text','本文','account-1');
+    `);
+    const rule = await createNotificationRule(testDb.db, { lineAccountId:'account-1', name:'担当への返事', eventType:'inbox_assigned_reply', conditions:{recipientIds:['owner-1','staff-2']}, channels:['line','email'] });
+    await updateNotificationRule(testDb.db, rule.id, 'account-1', { isActive:true });
+    await dispatchOperatorEvent(testDb.db, env, {lineAccountId:'account-1',eventType:'inbox_assigned_reply',sourceEventId:'msg',executionMode:'automatic'});
+    expect(testDb.raw.prepare('SELECT DISTINCT recipient_id FROM notification_deliveries').all()).toEqual([{recipient_id:'staff-2'}]);
+    testDb.raw.exec("UPDATE staff_members SET access_level='read_only' WHERE id='staff-2'; INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES ('msg2','friend','incoming','text','本文','account-1')");
+    await dispatchOperatorEvent(testDb.db, env, {lineAccountId:'account-1',eventType:'inbox_assigned_reply',sourceEventId:'msg2',executionMode:'automatic'});
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM notification_deliveries').get()).toEqual({n:2});
+    testDb.raw.exec("UPDATE staff_members SET access_level='full' WHERE id='staff-2'; INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES ('msg3','friend','incoming','text','本文','account-1')");
+    pushMessageWithRequestId.mockResolvedValueOnce({data:{}});
+    await dispatchOperatorEvent(testDb.db, env, {lineAccountId:'account-1',eventType:'inbox_assigned_reply',sourceEventId:'msg3',executionMode:'automatic'});
+    testDb.raw.exec("UPDATE staff_members SET access_level='read_only' WHERE id='staff-2'; UPDATE notification_deliveries SET next_retry_at='2000-01-01T00:00:00Z' WHERE status='retry_wait'");
+    pushMessageWithRequestId.mockClear();
+    const swept = await sweepOperatorNotifications(testDb.db, env, {lineAccountId:'account-1'});
+    expect(swept.excluded).toBeGreaterThan(0);
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+  });
+
   it('未登録のきっかけは発火しない', async () => {
     await expect(dispatchOperatorEvent(testDb.db, env, {
       lineAccountId: 'account-1', eventType: 'not_registered',

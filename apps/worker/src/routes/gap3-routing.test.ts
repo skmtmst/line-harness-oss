@@ -33,3 +33,9 @@ test.each(['even','priority','random_weighted'])('SLA-01/03/04: %s は対象者�
  expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'),()=>strategy==='random_weighted'?0.999:0)).toBe(true);
  expect(d.raw.prepare("SELECT assignee_staff_id FROM chats WHERE id='c'").get()).toEqual({assignee_staff_id:strategy==='priority'?'s':'o'});
 });
+test('自動割当の設定後にトークの権限を失った担当者は選ばない',async()=>{
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ d.raw.exec("UPDATE staff_members SET permission_keys='[]' WHERE id='s'");
+ expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'))).toBe(false);
+ expect(d.raw.prepare("SELECT assignee_staff_id FROM chats WHERE id='c'").get()).toEqual({assignee_staff_id:null});
+});

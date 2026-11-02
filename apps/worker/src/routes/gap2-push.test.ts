@@ -44,3 +44,37 @@ test('G4-12: 5xxだけ上限つきで再試行し、成功した物は繰り返�
  const fail=vi.fn(async(_s:unknown,_p:unknown)=>({ok:false,status:503}));await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'new_inquiry',refId:'retry-msg',chatId:'chat'},fail);expect(d.raw.prepare('SELECT status,attempts FROM operator_push_deliveries').get()).toEqual({status:'failed',attempts:1});
  const send=vi.fn(async(_s:unknown,_p:unknown)=>({ok:true,status:201})),future=new Date(Date.now()+120000);await retryOperatorPush(d.db,{},future,send);await retryOperatorPush(d.db,{},future,send);expect(send).toHaveBeenCalledTimes(1);expect(d.raw.prepare('SELECT status,attempts FROM operator_push_deliveries').get()).toEqual({status:'sent',attempts:2});expect(JSON.stringify(send.mock.calls)).not.toContain('秘密の本文');
 });
+test('旧名簿と同じIDでも新しい担当でなければ担当通知を送らない',async()=>{
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
+ d.raw.exec("INSERT INTO operators(id,name,email) VALUES ('o','旧担当','old@example.test'); UPDATE chats SET operator_id='o',assignee_staff_id=NULL WHERE id='chat'");
+ const send=vi.fn(async()=>({ok:true,status:201}));
+ await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'assigned_reply',refId:'collision',chatId:'chat'},send);
+ expect(send).not.toHaveBeenCalled();
+});
+test.each(['quiet','retry'])('旧名簿のIDが同じでも%sでは新担当に通知しない',async(mode)=>{
+ const {sweepOperatorPush,retryOperatorPush}=await import('../services/operator-push.js');
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
+ d.raw.exec("INSERT INTO operators(id,name,email) VALUES ('o','旧担当','old@example.test'); UPDATE chats SET operator_id='o',assignee_staff_id='o' WHERE id='chat'; INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES('pending-msg','f','incoming','text','本文','a')");
+ if(mode==='quiet') await gapCall(gapApp(d,[operatorPush]),'/api/me/push/preferences','PUT',{kinds:['assigned_reply'],quietStart:'00:00',quietEnd:'23:59',quietAllowCritical:false,expectedVersion:0});
+ const send=vi.fn(async()=>({ok:false,status:503}));
+ await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'assigned_reply',refId:'pending-msg',chatId:'chat'},send);
+ d.raw.exec("UPDATE chats SET assignee_staff_id=NULL WHERE id='chat'; UPDATE operator_push_preferences SET quiet_start='22:00',quiet_end='08:00'");
+ send.mockClear();
+ if(mode==='quiet') await sweepOperatorPush(d.db,{},new Date('2026-11-20T00:00:00Z'),send);
+ else await retryOperatorPush(d.db,{},new Date(Date.now()+120000),send);
+ expect(send).not.toHaveBeenCalled();
+});
+test.each(['immediate','quiet','retry'])('担当が閲覧のみになったら%sの通知を送らない',async(mode)=>{
+ const {sweepOperatorPush,retryOperatorPush}=await import('../services/operator-push.js');
+ await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
+ d.raw.exec("UPDATE chats SET assignee_staff_id='o' WHERE id='chat'; INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES('revoked-msg','f','incoming','text','本文','a')");
+ if(mode==='quiet') await gapCall(gapApp(d,[operatorPush]),'/api/me/push/preferences','PUT',{kinds:['assigned_reply'],quietStart:'00:00',quietEnd:'23:59',quietAllowCritical:false,expectedVersion:0});
+ const send=vi.fn(async()=>({ok:false,status:503}));
+ if(mode!=='immediate') await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'assigned_reply',refId:'revoked-msg',chatId:'chat'},send);
+ d.raw.exec("UPDATE staff_members SET access_level='read_only' WHERE id='o'; UPDATE operator_push_preferences SET quiet_start='22:00',quiet_end='08:00'");
+ send.mockClear();
+ if(mode==='immediate') await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'assigned_reply',refId:'revoked-msg',chatId:'chat'},send);
+ if(mode==='quiet') await sweepOperatorPush(d.db,{},new Date('2026-11-20T00:00:00Z'),send);
+ if(mode==='retry') await retryOperatorPush(d.db,{},new Date(Date.now()+120000),send);
+ expect(send).not.toHaveBeenCalled();
+});

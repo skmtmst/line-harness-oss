@@ -1,3 +1,4 @@
+import { assigneeFilter } from '../services/chat-assignees.js';
 import { chatAssigneeId } from '../services/chat-assignees.js';
 import { slaChatList, enrichSlaChats } from '../services/inbox-sla-list.js';
 import { refreshInboxSla } from '../services/inbox-sla.js';
@@ -151,11 +152,9 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       conditionBindings.push(status);
     }
     if (operatorId) {
-      if (operatorId === 'unassigned') conditions.push("COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) IS NULL");
-      else {
-        conditions.push("COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) = ?");
-        conditionBindings.push(operatorId);
-      }
+      const filter = assigneeFilter('c', operatorId, true);
+      conditions.push(filter.sql);
+      conditionBindings.push(...filter.binds);
     }
     if (unreadOnly) {
       conditions.push(`EXISTS (

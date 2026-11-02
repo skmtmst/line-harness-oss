@@ -1,4 +1,6 @@
+import { assigneeFilter } from '../services/chat-assignees.js';
 import { listChatAssignees } from '../services/chat-assignees.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 
@@ -16,9 +18,9 @@ export const get__api_operators_1 = async (c: Context<Env, "/api/operators">) =>
     const requested = c.req.query('lineAccountId');
     if (requested && !scope.allowedAccountIds.includes(requested)) return c.json({success:false,error:'アカウントが見つかりません'}, 404);
     if (c.req.query('channel') === 'email' && !scope.canSeeUnassigned) return c.json({success:false,error:'受信箱が見つかりません'}, 404);
-    const accounts = c.req.query('channel') === 'email' ? [null] : requested ? [requested] : scope.allowedAccountIds;
-    const groups = await Promise.all(accounts.map(account => listChatAssignees(c.env.DB, account)));
-    const items = [...new Map(groups.flat().map(item => [item.id, item])).values()];
+    const sharedInbox = c.req.query('channel') === 'email';
+    const accounts = requested ? [requested] : scope.allowedAccountIds;
+    const items = await listChatAssignees(c.env.DB, c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID, accounts, sharedInbox);
     return c.json({
       success: true,
       data: items.map((o) => ({
@@ -137,11 +139,9 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
         conditionBindings.push(status);
       }
       if (operatorId) {
-        if (operatorId === 'unassigned') conditions.push("COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) IS NULL");
-        else {
-          conditions.push("COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) = ?");
-          conditionBindings.push(operatorId);
-        }
+        const filter = assigneeFilter('c', operatorId, true);
+        conditions.push(filter.sql);
+        conditionBindings.push(...filter.binds);
       }
       if (unreadOnly) {
         conditions.push(`EXISTS (

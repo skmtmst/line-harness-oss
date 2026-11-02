@@ -114,3 +114,55 @@ test('空文字の担当IDは受け付けず旧記録を残す', async () => {
   expect(res.status).toBe(400);
   expect(fixture.raw.prepare('SELECT operator_id FROM chats WHERE id=?').get('chat')).toEqual({operator_id:'old'});
 });
+test('候補一覧の問い合わせ数は人や店舗の数で増えない', async () => {
+  const prepare = fixture.db.prepare.bind(fixture.db);
+  let count = 0;
+  fixture.db.prepare = ((query: string) => { count++; return prepare(query) }) as D1Database['prepare'];
+  fixture.raw.exec(`INSERT INTO tenants(id,name) VALUES('foreign-tenant','別会社');`);
+  for (let i=0;i<30;i++) fixture.raw.prepare(`INSERT INTO staff_members(id,name,role,api_key,tenant_id,account_scope,permission_keys) VALUES (?,?,?,?,?,?,?)`).run(`external-${i}`,'別会社','staff',`external-key-${i}`,'foreign-tenant','all','["/chats"]');
+  for (let i=0;i<8;i++) fixture.raw.prepare(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES (?,?,?,?,?)`).run(`shop-${i}`,`channel-${i}`,'店舗','x','x');
+  const res = await app().request('/api/operators',{}, {DB:fixture.db});
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as {data:{id:string}[]}).data.map(x=>x.id).sort()).toEqual(['staff:a-only','staff:actor','staff:b-only']);
+  expect(count).toBeLessThanOrEqual(8);
+  count = 0;
+  const single = await app().request('/api/operators?lineAccountId=shop-a',{}, {DB:fixture.db});
+  expect(single.status).toBe(200);
+  expect(count).toBeLessThanOrEqual(8);
+});
+test('担当の絞り込みは担当列を直接使い索引で探す', async () => {
+  const prepare = fixture.db.prepare.bind(fixture.db);
+  const queries: string[] = [];
+  fixture.db.prepare = ((query: string) => { queries.push(query); return prepare(query) }) as D1Database['prepare'];
+  const res = await app().request('/api/chats?operatorId=staff%3Aactor', {}, {DB:fixture.db});
+  expect(res.status).toBe(200);
+  expect(queries.some(sql => /c\.assignee_staff_id\s*=\s*\?/.test(sql))).toBe(true);
+  const plan = fixture.raw.prepare('EXPLAIN QUERY PLAN SELECT * FROM chats WHERE assignee_staff_id = ?').all('actor') as {detail:string}[];
+  expect(plan.some(row => row.detail.includes('idx_chats_assignee_staff'))).toBe(true);
+  const legacy = fixture.raw.prepare('EXPLAIN QUERY PLAN SELECT * FROM chats WHERE operator_id = ? AND assignee_staff_id IS NULL').all('old') as {detail:string}[];
+  expect(legacy.some(row => row.detail.includes('idx_chats_operator'))).toBe(true);
+});
+test('招待中と停止中の利用者は割り当て候補に入らない', async () => {
+  fixture.raw.exec(`UPDATE staff_members SET invite_status='pending_email' WHERE id='a-only';`);
+  const response = await app().request('/api/operators?lineAccountId=shop-a',{}, {DB:fixture.db});
+  expect(((await response.json()) as {data:{id:string}[]}).data.map(x=>x.id)).toEqual(['staff:actor']);
+  fixture.raw.exec(`INSERT INTO tenants(id,name,status) VALUES('paused','停止会社','suspended');
+    INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES ('paused-shop','paused-channel','停止店','x','x','paused');
+    INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES ('paused-user','停止中','owner','paused-key','paused');`);
+  const { canAssignChatTo } = await import('../services/chat-assignees.js');
+  expect(await canAssignChatTo(fixture.db,'paused-user','paused-shop')).toBe(false);
+});
+test('新しく会話を作る時も別店舗の担当を拒む', async () => {
+  fixture.raw.exec("INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES ('new-friend','line-new','友だち','shop-a')");
+  const res = await app().request('/api/chats',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({friendId:'new-friend',operatorId:'staff:b-only'})},{DB:fixture.db});
+  expect(res.status).toBe(400);
+  expect(fixture.raw.prepare("SELECT COUNT(*) n FROM chats WHERE friend_id='new-friend'").get()).toEqual({n:0});
+});
+test('保存済みの複数担当条件は大量でも束ねて比較する', async () => {
+  fixture.raw.exec(`INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES ('filter-friend','line-filter','友だち','shop-a');
+    INSERT INTO chats(id,friend_id,assignee_staff_id,status,created_at,updated_at) VALUES ('filter-chat','filter-friend','a-only','unread','2026','2026');`);
+  const { countInboxSavedViewMatches } = await import('./inbox-saved-view-matches.js');
+  const assignees = [...Array.from({length:200},(_,i)=>`staff:missing-${i}`),'staff:a-only'];
+  const result = await countInboxSavedViewMatches(fixture.db,{lineAccountId:'shop-a',staffId:'actor',canSeeUnassigned:false,conditions:{version:1,query:'',channels:['line'],statuses:['unread','in_progress','on_hold','resolved'],assignees,unread:'all',quickFilter:'all',messageTypes:[],receivedFrom:null,receivedTo:null,sort:'newest',due:'all'}});
+  expect(result.matchCount).toBe(1);
+});

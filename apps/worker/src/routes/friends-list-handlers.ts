@@ -1,3 +1,4 @@
+import { assigneeFilter } from '../services/chat-assignees.js';
 import { logger } from '@line-crm/shared/server';
 import { readFriendListCursor, friendListCursor, type FriendListCursor } from './friend-list-cursor.js';
 import { idChunks } from '@line-crm/db/id-queries';
@@ -208,13 +209,9 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       );
     }
     if (operatorId) {
-      conditions.push(
-        `EXISTS (
-          SELECT 1 FROM chats c
-          WHERE c.friend_id = f.id AND COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) = ?
-        )`,
-      );
-      binds.push(operatorId);
+      const filter = assigneeFilter('c', operatorId);
+      conditions.push(`EXISTS (SELECT 1 FROM chats c WHERE c.friend_id = f.id AND ${filter.sql})`);
+      binds.push(...filter.binds);
     }
     if (scenarioId) {
       conditions.push(

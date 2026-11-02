@@ -126,6 +126,17 @@ function ruleVersion(rule: NotificationRuleRow): number {
   return Number.isInteger(version) && version > 0 ? version : 1;
 }
 
+import { canAssignChatTo } from './chat-assignees.js';
+
+async function assignedReplyRecipient(db: D1Database, accountId: string, sourceEventId: string): Promise<string | null> {
+  const row = await db.prepare(`SELECT c.assignee_staff_id FROM messages_log m
+    JOIN chats c ON c.friend_id = m.friend_id JOIN friends f ON f.id = c.friend_id
+    WHERE m.id = ? AND m.line_account_id = ? AND f.line_account_id = ?`)
+    .bind(sourceEventId, accountId, accountId).first<{assignee_staff_id:string|null}>();
+  const id = row?.assignee_staff_id;
+  return id && await canAssignChatTo(db, id, accountId) ? id : null;
+}
+
 export async function operatorRecipients(
   db: D1Database,
   lineAccountId: string,
@@ -603,9 +614,13 @@ export async function dispatchOperatorRule(
     conditions,
     channels,
   });
-  const recipients = await operatorRecipients(
+  let recipients = await operatorRecipients(
     db, input.lineAccountId, input.recipientIds ?? await operatorRuleRecipientIds(db, input.lineAccountId, conditions),
   );
+  if (rule.event_type === 'inbox_assigned_reply' && input.executionMode !== 'test') {
+    const assignee = await assignedReplyRecipient(db, input.lineAccountId, input.sourceEventId);
+    recipients = recipients.filter(recipient => recipient.id === assignee);
+  }
   const token = channels.includes('line') ? await accountToken(db, input.lineAccountId) : null;
   let accepted = 0;
   let excluded = 0;
@@ -812,7 +827,9 @@ export async function sweepOperatorNotifications(
     const teamConditions = metadata.conditions as OperatorRuleConditions | undefined;
     const inTeam = row.execution_mode === 'test' || !teamConditions?.teamId
       || (await operatorRuleRecipientIds(db, row.line_account_id, teamConditions))?.includes(row.recipient_id);
-    if (!recipient || recipient.is_active !== 1 || !sameTenant || !inScope || !inTeam) {
+    const assigned = instance.source_event_type !== 'inbox_assigned_reply' || row.execution_mode === 'test'
+      || await assignedReplyRecipient(db, row.line_account_id, instance.source_event_id) === row.recipient_id;
+    if (!recipient || recipient.is_active !== 1 || !sameTenant || !inScope || !inTeam || !assigned) {
       await finishOperatorDelivery(db, {
         id: row.id,
         lineAccountId: row.line_account_id,

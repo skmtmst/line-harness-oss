@@ -1,3 +1,4 @@
+import { assigneeFilter } from './chat-assignees.js';
 import {buildSegmentWhere} from '@line-crm/db/src/segment-conditions.js';
 import type { SavedSearchCondition, SavedSearchConditions } from '@line-crm/shared';
 
@@ -155,12 +156,9 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
       if (condition.op !== 'eq' && condition.op !== 'ne') {
         return '担当者で使えない比較方法が指定されています';
       }
-      return {
-        sql: `${condition.op === 'ne' ? 'NOT ' : ''}EXISTS (
-          SELECT 1 FROM chats sac WHERE sac.friend_id = f.id AND COALESCE(CASE WHEN sac.assignee_staff_id IS NOT NULL THEN 'staff:' || sac.assignee_staff_id END, sac.operator_id) = ?
-        )`,
-        binds: [value],
-      };
+      { const filter = assigneeFilter('sac', value);
+        return { sql: `${condition.op === 'ne' ? 'NOT ' : ''}EXISTS (SELECT 1 FROM chats sac WHERE sac.friend_id = f.id AND ${filter.sql})`, binds: filter.binds };
+      }
 
     case 'chat_status':
       if (!value || !['unread', 'in_progress', 'on_hold', 'resolved'].includes(value)) {
