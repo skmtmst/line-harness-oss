@@ -5,7 +5,7 @@
 | 対象 | 参照元 |
 | --- | --- |
 | 卓 | `rt_reservations.table_id`, `rt_reservation_table_links.table_id`（結合卓）, `rt_seat_waitlist.table_id`, `rt_seat_waitlist_table_links.table_id`（結合卓） |
-| 卓 | `booking_assignment_settings.resources_json.resourceId`（卓の割り当て設定） |
+| 卓 | `booking_assignment_settings.resources_json.resourceId`（有効な卓の割り当て設定。停止中は削除と同時に設定から外す） |
 | 卓 | `rt_closures.table_ids_json`, `rt_closure_close_tasks.table_ids_json`（休業・通知の保存済み対象） |
 | メニュー | `rt_reservations.course_id`, `rt_reservations.dining_snapshot_json.courseId`（予約時の写し） |
 | メニュー | `rt_menu_change_requests.menu_id`, `rt_approval_requests.payload_json.menuId`（価格変更） |

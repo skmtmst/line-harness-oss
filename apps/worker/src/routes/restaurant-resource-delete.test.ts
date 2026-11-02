@@ -352,6 +352,51 @@ describe('参照のない卓とメニューの削除', () => {
     }
   });
 
+  it('停止中の未参照卓を削除すると同時に割り当てから外し、他の卓と版を保つ', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO rt_tables(id,store_id,code,label,seat_type,min_capacity,max_capacity,is_active) VALUES('remove-table','store-ginza','X','停止卓','table',1,4,0),('keep-table','store-ginza','Y','別の卓','table',1,4,1);
+      INSERT INTO booking_assignment_settings(scope_kind,scope_id,method,balance_period,resources_json,version) VALUES('table','store-ginza','balanced','day','[{"resourceId":"remove-table","priority":"normal","dailyLimit":null,"sortOrder":0},{"resourceId":"keep-table","priority":"preferred","dailyLimit":2,"sortOrder":1}]',3);`);
+    const response = await requestWithMethod('/api/restaurant-test/tables/remove-table?account_id=account-1','DELETE');
+    expect(response.status).toBe(200);
+    expect(testDb.raw.prepare("SELECT id FROM rt_tables WHERE id='remove-table'").get()).toBeUndefined();
+    const row = testDb.raw.prepare("SELECT resources_json,version FROM booking_assignment_settings WHERE scope_kind='table' AND scope_id='store-ginza'").get() as {resources_json:string;version:number};
+    expect(JSON.parse(row.resources_json)).toEqual([{resourceId:'keep-table',priority:'preferred',dailyLimit:2,sortOrder:1}]);
+    expect(row.version).toBe(4);
+    const { d1AssignmentSettingsStore } = await import('../features/booking/booking-assignment-settings.js');
+    expect((await d1AssignmentSettingsStore(testDb.db).read({kind:'table',id:'store-ginza'})).resources).toEqual([{resourceId:'keep-table',priority:'preferred',dailyLimit:2,sortOrder:1}]);
+  });
+
+  it('停止中でも予約が残る卓は設定を変更せず削除しない', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec(`UPDATE rt_tables SET is_active=0 WHERE id='table-ginza';
+      INSERT INTO booking_assignment_settings(scope_kind,scope_id,method,balance_period,resources_json,version) VALUES('table','store-ginza','balanced','day','[{"resourceId":"table-ginza"}]',3);`);
+    const floorBefore = testDb.raw.prepare("SELECT version FROM rt_floors WHERE id='floor-store-ginza'").get();
+    const response = await requestWithMethod('/api/restaurant-test/tables/table-ginza?account_id=account-1','DELETE');
+    expect(response.status).toBe(409);
+    expect(testDb.raw.prepare("SELECT version FROM rt_floors WHERE id='floor-store-ginza'").get()).toEqual(floorBefore);
+    expect(testDb.raw.prepare("SELECT id FROM rt_tables WHERE id='table-ginza'").get()).toBeTruthy();
+    expect(testDb.raw.prepare("SELECT resources_json,version FROM booking_assignment_settings WHERE scope_kind='table' AND scope_id='store-ginza'").get()).toEqual({resources_json:'[{"resourceId":"table-ginza"}]',version:3});
+  });
+
+  it('設定にない停止卓を消しても割り当ての版は変えない', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO rt_tables(id,store_id,code,label,seat_type,min_capacity,max_capacity,is_active) VALUES('unassigned-table','store-ginza','X','停止卓','table',1,4,0);
+      INSERT INTO booking_assignment_settings(scope_kind,scope_id,method,balance_period,resources_json,version) VALUES('table','store-ginza','balanced','day','[{"resourceId":"table-ginza","priority":"normal","dailyLimit":null,"sortOrder":0}]',3);`);
+    expect((await requestWithMethod('/api/restaurant-test/tables/unassigned-table?account_id=account-1','DELETE')).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT version FROM booking_assignment_settings WHERE scope_kind='table' AND scope_id='store-ginza'").get()).toEqual({version:3});
+  });
+
+  it('割り当て更新が失敗したら卓の削除も戻す', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO rt_tables(id,store_id,code,label,seat_type,min_capacity,max_capacity,is_active) VALUES('rollback-table','store-ginza','X','停止卓','table',1,4,0);
+      INSERT INTO booking_assignment_settings(scope_kind,scope_id,method,balance_period,resources_json,version) VALUES('table','store-ginza','balanced','day','[{"resourceId":"rollback-table"}]',3);
+      CREATE TRIGGER fail_assignment_update BEFORE UPDATE OF resources_json ON booking_assignment_settings BEGIN SELECT RAISE(ABORT,'forced failure'); END;`);
+    const response = await requestWithMethod('/api/restaurant-test/tables/rollback-table?account_id=account-1','DELETE');
+    expect(response.status).toBe(500);
+    expect(testDb.raw.prepare("SELECT id FROM rt_tables WHERE id='rollback-table'").get()).toBeTruthy();
+    expect(testDb.raw.prepare("SELECT resources_json,version FROM booking_assignment_settings WHERE scope_kind='table' AND scope_id='store-ginza'").get()).toEqual({resources_json:'[{"resourceId":"rollback-table"}]',version:3});
+  });
+
   it('削除済みの卓を使った古い割り当て設定は保存できない', async () => {
     seedRestaurantFixture();
     const {d1AssignmentSettingsStore} = await import('../features/booking/booking-assignment-settings.js');

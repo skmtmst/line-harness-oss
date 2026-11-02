@@ -94,12 +94,19 @@ export const delete__api_restaurant_test_tables_id = async (c: Context<Env, "/ap
         AND NOT EXISTS (SELECT 1 FROM rt_reservation_table_links WHERE table_id=rt_tables.id)
         AND NOT EXISTS (SELECT 1 FROM rt_seat_waitlist WHERE table_id=rt_tables.id)
         AND NOT EXISTS (SELECT 1 FROM rt_seat_waitlist_table_links WHERE table_id=rt_tables.id)
-        AND NOT EXISTS (SELECT 1 FROM booking_assignment_settings a, json_each(a.resources_json) j WHERE a.scope_kind='table' AND a.scope_id=rt_tables.store_id AND json_extract(j.value,'$.resourceId')=rt_tables.id)
+        AND (is_active=0 OR NOT EXISTS (SELECT 1 FROM booking_assignment_settings a, json_each(a.resources_json) j WHERE a.scope_kind='table' AND a.scope_id=rt_tables.store_id AND json_extract(j.value,'$.resourceId')=rt_tables.id))
         AND NOT EXISTS (SELECT 1 FROM rt_closures c WHERE c.store_id=rt_tables.store_id AND (NOT json_valid(c.table_ids_json) OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(c.table_ids_json) THEN c.table_ids_json ELSE '[]' END) WHERE value=rt_tables.id)))
         AND NOT EXISTS (SELECT 1 FROM rt_closure_close_tasks c WHERE c.store_id=rt_tables.store_id AND (NOT json_valid(c.table_ids_json) OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(c.table_ids_json) THEN c.table_ids_json ELSE '[]' END) WHERE value=rt_tables.id)))`).bind(table.id,table.store_id),
       db.prepare("UPDATE rt_floors SET version=version+1 WHERE id=? AND changes()=1").bind(table.floor_id),
+      db.prepare(`UPDATE booking_assignment_settings SET resources_json=(
+        SELECT COALESCE(json_group_array(json(j.value)), '[]') FROM json_each(resources_json) j
+        WHERE json_extract(j.value,'$.resourceId') IS NOT ?
+      ), version=version+1, updated_at=datetime('now')
+      WHERE scope_kind='table' AND scope_id=?
+        AND NOT EXISTS (SELECT 1 FROM rt_tables WHERE id=?)
+        AND EXISTS (SELECT 1 FROM json_each(resources_json) j WHERE json_extract(j.value,'$.resourceId')=?)`).bind(table.id,table.store_id,table.id,table.id),
     ]);
-    if (!result[0].meta.changes) return c.json({success:false,code:'resource_in_use',error:'予約や休業・卓の割り当て設定などで使われている卓は削除できません。停止してください'},409);
+    if (!result[0].meta.changes) return c.json({success:false,code:'resource_in_use',error:'割り当て設定にある有効な卓は先に停止すると削除できます。予約や休業などで使われている卓は停止中でも削除できません。'},409);
     auditLog(c,'restaurant.table.delete',{id:table.id,kind:'rt_table'});
     return c.json({success:true,data:{id:table.id}});
   } finally { await releaseLock(db,key,owner); }
