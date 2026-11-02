@@ -1,3 +1,4 @@
+import { currentListLocation, flushListUrlState } from '@/components/shared/list-url-state'
 import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
@@ -90,6 +91,9 @@ function openMenuAndDelete(name: string) {
 }
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   document.documentElement.dataset.theme = 'v8'
   role.value = verifiedStaffRole('owner')
   listTemplates.mockResolvedValue({ success: true, data: [used, unused] })
@@ -336,4 +340,16 @@ it('C-10: 保存された複数通だけを絞り込み、複数通の下書き�
   fireEvent.click(within(screen.getByRole('group', { name: 'メッセージの数' })).getByRole('button', { name: '複数通' }))
   expect(screen.getByText('複数通の下書き')).toBeTruthy()
   expect(screen.queryByText('予約前日のご案内')).toBeNull()
+})
+
+
+it('E-20: 質問タブのURLから開き、タブ切替もURLに残す', async () => {
+  window.history.replaceState(null, '', '/templates?tab=question')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+  listTemplates.mockResolvedValue({success:true,data:[used,{...unused,id:'q',name:'質問の内容',question:{type:'single'}}]})
+  await renderList()
+  expect(screen.getByRole('tab',{name:/^質問/}).getAttribute('aria-selected')).toBe('true')
+  expect(screen.getByText('質問の内容')).toBeTruthy()
+  fireEvent.click(screen.getByRole('tab',{name:/^メッセージ/}))
+  expect(new URLSearchParams(currentListLocation().search).get('tab')).not.toBe('question')
 })

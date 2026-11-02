@@ -74,9 +74,12 @@ export default function TemplatesListV8() {
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
-  const [activeSection, setActiveSection] = useState<Section>('message')
-  /* フォルダの数を数えるタブの種類。カルーセル・リッチメッセージのタブでは前のテンプレートのタブのまま。 */
-  const [folderSection, setFolderSection] = useState<FolderCountSection>('message')
+  const [urlView, setUrlView] = useListUrlState({ q: '', folder: 'all', chips: '', view: '', size: '20', page: '1', tab: 'message' })
+  const knownSections: Section[] = ['message', 'question', 'rich_video', 'card_message', 'rich_message', 'coupon', 'research']
+  const activeSection: Section = knownSections.includes(urlView.tab as Section) ? urlView.tab as Section : 'message'
+  /* フォルダの数は、テンプレート以外のタブでは最後の種類を保つ。 */
+  const [folderSection, setFolderSection] = useState<FolderCountSection>(() => activeSection === 'question' || activeSection === 'rich_video' ? activeSection : 'message')
+  useEffect(() => { if (activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video') setFolderSection(activeSection) }, [activeSection])
   /* 古いタブの答えが後から届いても数を上書きしない。 */
   const folderRequestRef = useRef(0)
   const [templates, setTemplates] = useState<Template[]>([])
@@ -87,7 +90,6 @@ export default function TemplatesListV8() {
    * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
    * テンプレートを開いて「戻る」と同じ一覧に戻る。
    */
-  const [urlView, setUrlView] = useListUrlState({ q: '', folder: 'all', chips: '', view: '', size: '20', page: '1' })
   const templateQuery = urlView.q
   const setTemplateQuery = useCallback((next: string) => setUrlView({ q: next, page: '1' }), [setUrlView])
   const chips = useMemo<Record<ChipKey, boolean>>(() => {
@@ -908,9 +910,8 @@ export default function TemplatesListV8() {
 
   const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
   const switchSection = (next: Section) => {
-    setActiveSection(next)
+    setUrlView({ tab: next, page: '1' })
     if (next === 'message' || next === 'question' || next === 'rich_video') setFolderSection(next)
-    setPage(1)
     setSelectedIds(new Set())
   }
 
