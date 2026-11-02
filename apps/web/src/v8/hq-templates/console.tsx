@@ -40,6 +40,7 @@ import { fetchHqDistributionTargets } from '@/lib/api/helpers/hq-distribution-ta
 import { hqMediaApi } from '@/lib/api/helpers/hq-media'
 import { formatNumber } from '@/lib/format'
 import { HqRichMenuCompatibilityError,hqRichMenuDefinitionFromSeed,hqRichMenuSeedFromDefinition } from '@/lib/hq-rich-menu-create'
+import { readScenarioEditorDraft } from '@/lib/hq-scenario-editor-draft'
 import { readFormEditorDraft } from '@/lib/hq-form-editor-draft'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import { clearCreationAttempt,clearEditorDraft,loadCreationAttempt,loadEditorDraft,persistCreationAttempt,persistEditorDraft,sameCreationScope,type CreationAttempt,type CreationScope,type EditorDraftContent } from '@/lib/hq-template-create-attempt'
@@ -335,6 +336,20 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       persistEditorDraft(window.sessionStorage, scope, 'tag', TAG_DRAFT_KIND, { kind: TAG_DRAFT_KIND, name: draftName, definition: next })
     } catch { /* 下書きの保存失敗は本機能を止めない */ }
   }
+  const clearScenarioCreateDraft = () => {
+    if (type === 'scenario' && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, 'scenario', 'scenario')
+  }
+  useEffect(() => {
+    const scope = creationScope.current
+    if (type !== 'scenario' || stage !== 'edit' || !canEdit || !scope || detail || createUncertain || createAttempt.current) return
+    try {
+      if (JSON.stringify({ name, description, definition, folderId }) === editBaseline.current) {
+        clearEditorDraft(window.sessionStorage, scope, 'scenario', 'scenario')
+        return
+      }
+      persistEditorDraft(window.sessionStorage, scope, 'scenario', 'scenario', { kind: 'scenario', name, description, definition, folderId })
+    } catch { /* 一時保存できなくても入力を続けられる。 */ }
+  }, [type, stage, canEdit, detail, createUncertain, name, description, definition, folderId])
   const clearFormCreateDraft = () => {
     if (type === 'form' && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, 'form', 'form')
   }
@@ -387,7 +402,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : [])
     createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false); setRestoreDraft(null)
     /* 下書きは新規作成の分だけ消す。editKind は一覧の描画では未初期化のため kind を使う（新規では同値）。 */
-    if (!detail && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); if (!detail) clearFormCreateDraft()
+    if (!detail && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); if (!detail) { clearFormCreateDraft(); clearScenarioCreateDraft() }
     flushListUrlState()
     entryHandled.current = ''
     window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref))
@@ -443,6 +458,14 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         setKind(restored.kind); setRestoreDraft(restored.draft); setDetail(null); setFolderId(null); setName(''); setDescription(''); setStage('edit'); setError(''); setConflict(false)
         return
       }
+      if (type === 'scenario' && creation) {
+        const draft = readScenarioEditorDraft(loadEditorDraft(window.sessionStorage, creation, 'scenario', 'scenario'))
+        if (draft) {
+          editBaseline.current = JSON.stringify({ name: '', description: '', definition: freshDefinition('scenario'), folderId: null })
+          setDetail(null); setFolderId(draft.folderId); setName(draft.name); setDescription(draft.description); setDefinition(draft.definition); setStage('edit'); setError(''); setConflict(false)
+          return
+        }
+      }
       if (type === 'form' && creation) {
         const loaded = loadEditorDraft(window.sessionStorage, creation, 'form', 'form')
         if (readFormEditorDraft(loaded)) {
@@ -475,7 +498,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }, [ready, busy, location, canEdit])
   const startCreate = () => {
     createAttempt.current = null; sessionUploads.current = []; setMenuTargets([]); setRestoreDraft(null)
-    if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); clearFormCreateDraft()
+    if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); clearFormCreateDraft(); clearScenarioCreateDraft()
     const fresh = freshDefinition(type), nextFolder = folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null
     if (type === 'form') freshFormBaseline.current = fresh as FormDefinition
     editBaseline.current = JSON.stringify({ name: '', description: '', definition: fresh, folderId: nextFolder })
@@ -492,7 +515,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     const preparedDefinition = definitionForName(type, sourceDefinition, sourceName.trim(), sourceDescription.trim())
     const validation = !sourceName.trim() ? 'ひな形の名前を入力してください。' : definitionError(type, preparedDefinition, creationScope.current?.tenantId)
     if (validation) throw new Error(validation)
-    const input = { type, name: sourceName.trim(), description: sourceDescription.trim(), folderId: options.folderId !== undefined ? options.folderId : folderId, definition: preparedDefinition } as TemplateInput
+    const createFolderId = type === 'scenario' && !detail && foldersReady && !folderLoadFailed && !folders.some(folder => folder.id === folderId) ? null : folderId
+    const input = { type, name: sourceName.trim(), description: sourceDescription.trim(), folderId: options.folderId !== undefined ? options.folderId : createFolderId, definition: preparedDefinition } as TemplateInput
     let saved: TemplateDetail
     let continueToAccounts = distribute
     if (detail) {
@@ -540,6 +564,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         createSettlement.current = { kind: 'saved', detail: saved }
       }
       clearReceipt()
+      clearScenarioCreateDraft()
       if (type === 'form') { clearFormCreateDraft(); setRestoreDraft(null) }
       createSettlement.current = null
     }
