@@ -74,7 +74,6 @@ export default function TemplatesListV8() {
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
-  const [activeSection, setActiveSection] = useState<Section>('message')
   /* フォルダの数を数えるタブの種類。カルーセル・リッチメッセージのタブでは前のテンプレートのタブのまま。 */
   const [folderSection, setFolderSection] = useState<FolderCountSection>('message')
   /* 古いタブの答えが後から届いても数を上書きしない。 */
@@ -87,7 +86,11 @@ export default function TemplatesListV8() {
    * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
    * テンプレートを開いて「戻る」と同じ一覧に戻る。
    */
-  const [urlView, setUrlView] = useListUrlState({ q: '', folder: 'all', chips: '', view: '', size: '20', page: '1' })
+  const [urlView, setUrlView] = useListUrlState({ tab: 'message', q: '', folder: 'all', chips: '', view: '', size: '20', page: '1' })
+  const activeSection = (['message', 'card_message', 'rich_message', 'rich_video', 'question', 'coupon', 'research'] as Section[]).find((section) => section === urlView.tab) ?? 'message'
+  useEffect(() => {
+    if (activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video') setFolderSection(activeSection)
+  }, [activeSection])
   const templateQuery = urlView.q
   const setTemplateQuery = useCallback((next: string) => setUrlView({ q: next, page: '1' }), [setUrlView])
   const chips = useMemo<Record<ChipKey, boolean>>(() => {
@@ -908,9 +911,8 @@ export default function TemplatesListV8() {
 
   const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
   const switchSection = (next: Section) => {
-    setActiveSection(next)
+    setUrlView({ tab: next, page: '1' })
     if (next === 'message' || next === 'question' || next === 'rich_video') setFolderSection(next)
-    setPage(1)
     setSelectedIds(new Set())
   }
 
