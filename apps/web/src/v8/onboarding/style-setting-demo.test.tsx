@@ -16,10 +16,15 @@ it('操作が進み、停止と場面の指定ができる', () => {
   expect(screen.getByText('卓を作る', { selector: 'strong' })).toBeTruthy()
   expect(screen.getByRole('progressbar', { name: '操作の進み' }).getAttribute('value')).toBe('2')
 })
-it('動きを減らすと最後の場面を表示する', () => {
+it.each([
+  ['standard', '作成を確定する'],
+  ['salon', '変更を保存する'],
+] as const)('動きを減らすと%sの最後の場面を表示する', (style, lastStep) => {
   setTestReducedMotion(true)
-  render(<StyleSettingDemo style="standard" />)
-  expect(screen.getByText('変更を保存する', { selector: 'strong' })).toBeTruthy()
+  render(<StyleSettingDemo style={style} />)
+  expect(screen.getByText(lastStep, { selector: 'strong' })).toBeTruthy()
+  const progress = screen.getByRole('progressbar', { name: '操作の進み' })
+  expect(progress.getAttribute('value')).toBe(progress.getAttribute('max'))
   expect(screen.queryByText('自動再生なし')).toBeNull()
   expect(screen.getByText(/実際の入力や保存は行いません/)).toBeTruthy()
 })
