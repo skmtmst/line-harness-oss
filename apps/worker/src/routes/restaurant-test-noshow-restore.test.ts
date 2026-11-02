@@ -59,6 +59,12 @@ const restore = (id: string) => app().request(
     headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
     body: JSON.stringify({ status: 'confirmed', expectedVersion: versionOf(id) }),
   }, env);
+const patch = (id: string, body: Record<string, unknown>) => app().request(
+  `/api/restaurant-test/reservations/${id}?account_id=account-1`, {
+    method: 'PATCH',
+    headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedVersion: versionOf(id), ...body }),
+  }, env);
 const row = (id: string) => testDb.raw.prepare(
   'SELECT status,customer_version FROM rt_reservations WHERE id=?').get(id) as { status: string; customer_version: number };
 const marks = (id: string) => testDb.raw.prepare(
@@ -167,5 +173,65 @@ describe('無断→有効に戻す→来店→訂正', () => {
         body: JSON.stringify({ action: 'undo_visit', expectedVersion: 1, requestId: 'noshow-restore-missing' }),
       }, env);
     expect(missing.status).toBe(404);
+  });
+
+  it('印のない無断（PATCH直送・旧記録）も来店取消口で有効に戻す', async () => {
+    seedRestaurantData(testDb);
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        storeId: store.id, customerName: '無断 客', guestCount: 2,
+        startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z',
+      }),
+    }, env);
+    expect(created.status).toBe(201);
+    const { data: { id } } = await created.json() as { data: { id: string } };
+
+    /* PATCHで直接無断にした予約には印が無い。 */
+    expect((await patch(id, { status: 'no_show' })).status).toBe(200);
+    expect(marks(id)).toEqual([]);
+
+    const undone = await attend(id, 'undo_visit');
+    expect(undone.status).toBe(200);
+    expect(row(id)).toEqual({ status: 'confirmed', customer_version: 3 });
+    expect(marks(id)).toEqual([]);
+
+    /* 取消は来店取消口では戻せない（通常復活のまま）。 */
+    expect((await patch(id, { status: 'cancelled' })).status).toBe(200);
+    const cancelledUndo = await attend(id, 'undo_visit');
+    expect(cancelledUndo.status).toBe(404);
+
+    /* 古い版の取消は競合で拒否する。 */
+    const stale = await app().request(
+      `/api/restaurant-test/reservations/${id}/attendance?account_id=account-1`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'undo_visit', expectedVersion: 1, requestId: 'noshow-restore-stale' }),
+      }, env);
+    expect(stale.status).toBe(409);
+  });
+
+  it('複数の履歴があっても最新の印から順に戻す', async () => {
+    seedRestaurantData(testDb);
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        storeId: store.id, customerName: '無断 客', guestCount: 2,
+        startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z',
+      }),
+    }, env);
+    expect(created.status).toBe(201);
+    const { data: { id } } = await created.json() as { data: { id: string } };
+
+    expect((await attend(id, 'visited')).status).toBe(200);
+    expect((await attend(id, 'undo_visit')).status).toBe(200);
+    expect((await attend(id, 'no_show')).status).toBe(200);
+    expect((await attend(id, 'undo_visit')).status).toBe(200);
+    expect(row(id).status).toBe('confirmed');
+    expect(marks(id)).toEqual([{ kind: 'visited', undone: 1 }, { kind: 'no_show', undone: 1 }]);
   });
 });
