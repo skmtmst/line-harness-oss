@@ -1236,7 +1236,7 @@ describe('V8-B メニューの価格確定', () => {
     expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 8800 });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS total FROM rt_menu_change_requests').get()).toEqual({ total: 1 });
   });
-  it('未公開の下書きだけ削除でき、公開後に下書きへ戻しても削除できない', async () => {
+  it('参照がなければ公開後に下書きへ戻したメニューも削除できる', async () => {
     seedRestaurantFixture();
     const create = () => request('/api/restaurant-test/menu?account_id=account-1', { storeId: 'store-ginza', kind: 'course', name: '下書き', price: 1000, status: 'draft' });
     const first = (await (await create()).json() as any).data.id;
@@ -1245,7 +1245,7 @@ describe('V8-B メニューの価格確定', () => {
     const path = `/api/restaurant-test/menus/${id}?account_id=account-1`;
     await requestWithMethod(path, 'PATCH', { status: 'active' });
     await requestWithMethod(path, 'PATCH', { status: 'draft' });
-    expect((await requestWithMethod(path, 'DELETE')).status).toBe(409);
+    expect((await requestWithMethod(path, 'DELETE')).status).toBe(200);
     expect((await requestWithMethod(menuPath, 'DELETE')).status).toBe(409);
   });
   it('他店舗からの申請・削除を拒否する', async () => {
