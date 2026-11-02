@@ -4,6 +4,7 @@ import { Minus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -81,6 +82,13 @@ export default function MileageAdjustDialog({
   initialDirection?: 'increase' | 'decrease'
 }) {
   const saveErrors = useSaveFormErrors()
+  const target = useRef({ wasOpen: false, accountId, friendId, changed: false })
+  if (open && !target.current.wasOpen) target.current = { wasOpen: true, accountId, friendId, changed: false }
+  else if (open && (target.current.accountId !== accountId || target.current.friendId !== friendId)) target.current.changed = true
+  else if (!open) target.current.wasOpen = false
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const targetIsCurrent = () => alive.current && target.current.wasOpen && !target.current.changed && Boolean(target.current.accountId)
   const [direction, setDirection] = useState<Direction>(initialDirection ?? 'increase')
   const [amountText, setAmountText] = useState('100')
   const [reasonCategory, setReasonCategory] = useState<ReasonCategory>('customer_support')
@@ -111,6 +119,7 @@ export default function MileageAdjustDialog({
 
   useEffect(() => {
     if (!open) return
+    let cancelled = false
     setDirection(initialDirection ?? 'increase')
     setAmountText('100')
     setReasonCategory('customer_support')
@@ -130,10 +139,11 @@ export default function MileageAdjustDialog({
     setPolicyLoading(true)
     void api.mileage.adjustmentPolicy(accountId)
       .then((response) => {
-        if (response.success) setPolicy(response.data)
+        if (!cancelled && response.success) setPolicy(response.data)
       })
-      .catch((caught) => setError(mileageAdjustmentErrorMessage(caught)))
-      .finally(() => setPolicyLoading(false))
+      .catch((caught) => { if (!cancelled) setError(mileageAdjustmentErrorMessage(caught)) })
+      .finally(() => { if (!cancelled) setPolicyLoading(false) })
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ（fields は描画ごとに新しい）
   }, [accountId, initialDirection, open])
 
@@ -167,6 +177,7 @@ export default function MileageAdjustDialog({
   const valid = inputError === null
 
   const submit = async () => {
+    if (!targetIsCurrent()) return
     if (fields.submit().length > 0) {
       setError('')
       return
@@ -224,7 +235,7 @@ export default function MileageAdjustDialog({
   }
 
   const retryNotification = async () => {
-    if (!completedResult) return
+    if (!targetIsCurrent() || !completedResult) return
     setRetrying(true)
     setError('')
     try {
@@ -248,6 +259,7 @@ export default function MileageAdjustDialog({
   }
 
   const configurePolicy = async () => {
+    if (!targetIsCurrent()) return
     const threshold = Number(policyThresholdText)
     if (!Number.isInteger(threshold) || threshold <= 0) {
       setError('別のオーナー承認が必要になるマイル数を、1以上の整数で入力してください')
@@ -279,7 +291,7 @@ export default function MileageAdjustDialog({
 
   return (
     <SaveErrorScope errors={saveErrors}><Dialog
-      open={open}
+      open={open && !target.current.changed}
       designNode="M8zhjL"
       designWidth={600}
       designTop={75}
@@ -299,6 +311,7 @@ export default function MileageAdjustDialog({
           </Button>
         </DialogActions>) : undefined}
     >
+      {step !== 'input' ? <OperationTargetSummary accounts={[{ id: target.current.accountId }]} /> : null}
       {step === 'completed' ? (
         <section aria-label="変更結果">
           {completedResult?.notificationStatus === 'failed' ? (
@@ -354,6 +367,7 @@ export default function MileageAdjustDialog({
         </section>
       ) : (
         <div className={`${styles.dlgBody} ${styles.adjustBody}`}>
+          <OperationTargetSummary accounts={[{ id: target.current.accountId }]} />
           <p className={styles.dlgCaption}>だれのマイルを動かしますか</p>
           <div className={styles.dlgPerson}>
             <span className={styles.dlgAvatar} aria-hidden="true">{friendName.slice(0, 1)}</span>

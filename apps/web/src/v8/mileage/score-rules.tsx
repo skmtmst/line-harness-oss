@@ -12,6 +12,7 @@ import { EC_EVENT_LABELS, EC_EVENT_TYPES } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import DateTimeField from '@/components/shared/date-time-field'
@@ -39,7 +40,7 @@ import { formatDay, formatNumber } from '@/lib/format'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
-type ConfirmAction = { kind: 'publish'; draftVersionId: string } | { kind: 'stop' } | null
+type ConfirmAction = ({ kind: 'publish'; draftVersionId: string } | { kind: 'stop' }) & { accountId: string; generation: number } | null
 
 /*
  * N-239: ここに出せるきっかけは、実際にスコアへ届く出来事だけ。
@@ -143,6 +144,11 @@ export default function ActionScoreRulesPage() {
   usePageTitle('スコアのルール')
   usePageCrumbs([{ label: 'マイル', href: '/mileage' }, { label: '行動スコア', href: '/mileage?tab=score' }])
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const scope = useRef({ id: selectedAccountId, generation: 0 })
+  if (scope.current.id !== selectedAccountId) scope.current = { id: selectedAccountId, generation: scope.current.generation + 1 }
+  const loadedScope = useRef(-1)
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const latestAccountRef = useRef(selectedAccountId)
   useEffect(() => {
     latestAccountRef.current = selectedAccountId
@@ -155,6 +161,8 @@ export default function ActionScoreRulesPage() {
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
   const canEdit = canManageRole(useStaffRole())
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [editRuleIndex, setEditRuleIndex] = useState<number | null>(null)
   // ほかの一覧と同じく、削除は「…」の中へ入れ、押した先で確認を出す。
@@ -197,6 +205,7 @@ export default function ActionScoreRulesPage() {
 
   const load = useCallback(async () => {
     const accountAtRequest = selectedAccountId
+    const requestScope = scope.current.generation
     if (!accountAtRequest) {
       setConfiguration(null)
       setBundle(null)
@@ -208,9 +217,10 @@ export default function ActionScoreRulesPage() {
     setLoadError('')
     try {
       const response = await api.actionScores.rules(accountAtRequest)
-      if (accountAtRequest !== latestAccountRef.current) return
+      if (accountAtRequest !== latestAccountRef.current || requestScope !== scope.current.generation) return
       if (!response.success) throw new Error(response.error)
       setConfiguration(response.data)
+      loadedScope.current = requestScope
       setBundle(cloneBundle(response.data))
       setTestScore(String(response.data.editableVersion.bands.normalMin))
     } catch (error) {
@@ -332,6 +342,7 @@ export default function ActionScoreRulesPage() {
   const saveDraft = async () => {
     if (!selectedAccountId || !bundle) return null
     const accountAtRequest = selectedAccountId
+    const requestScope = scope.current.generation
     // M505: 同じ内容のやり直しは同じ要求キーで送る。応答消失後の再送は
     // 保存済みの結果として復帰し、「ほかの人が先に保存」の輪にならない。
     const fingerprint = JSON.stringify(bundle)
@@ -347,7 +358,7 @@ export default function ActionScoreRulesPage() {
         expectedDraftVersionId: configuration?.currentDraftVersionId ?? null,
         configuration: bundle,
       }, { idempotencyKey: requestKey })
-      if (accountAtRequest !== latestAccountRef.current) return null
+      if (accountAtRequest !== latestAccountRef.current || requestScope !== scope.current.generation || !alive.current) return null
       if (!response.success) throw new Error(response.error)
       setConfiguration(response.data)
       setBundle(cloneBundle(response.data))
@@ -367,9 +378,11 @@ export default function ActionScoreRulesPage() {
   }
 
   const preparePublish = async () => {
+    if (!selectedAccountId || !canEditRef.current || loadedScope.current !== scope.current.generation) return
+    const target = { accountId: selectedAccountId, generation: scope.current.generation }
     const saved = await saveDraft()
-    if (saved?.currentDraftVersionId) {
-      setConfirmAction({ kind: 'publish', draftVersionId: saved.currentDraftVersionId })
+    if (saved?.currentDraftVersionId && alive.current && canEditRef.current && target.generation === scope.current.generation) {
+      setConfirmAction({ kind: 'publish', draftVersionId: saved.currentDraftVersionId, ...target })
     }
   }
 
@@ -494,7 +507,7 @@ export default function ActionScoreRulesPage() {
 </> : null}
       hidePreviewWhenNarrow
       status={bundle && configuration ? <p className="text-xs text-ink-faint">{versionLabel}。公開後に起きたことから新しい点数が付きます。</p> : null}
-      footerActions={bundle && configuration && canEdit ? <>          {configuration.currentPublishedVersionId ? <Button onClick={() => setConfirmAction({ kind: 'stop' })} disabled={busy}>公開中のルールを停止</Button> : null}
+      footerActions={bundle && configuration && canEdit ? <>          {configuration.currentPublishedVersionId ? <Button onClick={() => { if (selectedAccountId && loadedScope.current === scope.current.generation && canEditRef.current) setConfirmAction({ kind: 'stop', accountId: selectedAccountId, generation: scope.current.generation }) }} disabled={busy}>公開中のルールを停止</Button> : null}
           <Button onClick={() => void saveDraft()} disabled={busy}>下書きを保存する</Button>
           <Button variant="primary" onClick={() => void preparePublish()} disabled={busy || bundle.rules.every((rule) => !rule.enabled)}>スコアのルールを公開</Button></> : null}
     >
@@ -643,7 +656,7 @@ export default function ActionScoreRulesPage() {
       })() : null}
 
       <ConfirmDialog
-        open={confirmAction?.kind === 'publish'}
+        open={confirmAction?.kind === 'publish' && confirmAction.generation === scope.current.generation}
         title="この版を公開しますか"
         description="公開後の行動から、新しいルールで点数が変わります。過去の履歴は書き換えません。公開した版自体も編集できません。"
         confirmLabel="この版を公開"
@@ -651,11 +664,11 @@ export default function ActionScoreRulesPage() {
         error={actionError}
         onCancel={() => !busy && setConfirmAction(null)}
         onConfirm={() => {
-          if (confirmAction?.kind === 'publish') void publish(confirmAction.draftVersionId)
+          if (alive.current && canEditRef.current && confirmAction?.kind === 'publish' && confirmAction.generation === scope.current.generation) void publish(confirmAction.draftVersionId)
         }}
-      />
+      >{confirmAction ? <OperationTargetSummary accounts={[{ id: confirmAction.accountId }]} /> : null}</ConfirmDialog>
       <ConfirmDialog
-        open={confirmAction?.kind === 'stop'}
+        open={confirmAction?.kind === 'stop' && confirmAction.generation === scope.current.generation}
         title="公開中のルールを停止しますか"
         description="これ以降の行動では点数を変えません。現在の点数と過去の履歴はそのまま残ります。"
         confirmLabel="公開中のルールを停止"
@@ -663,8 +676,8 @@ export default function ActionScoreRulesPage() {
         busy={busy}
         error={actionError}
         onCancel={() => !busy && setConfirmAction(null)}
-        onConfirm={() => void stop()}
-      />
+        onConfirm={() => { if (alive.current && canEditRef.current && confirmAction?.kind === 'stop' && confirmAction.generation === scope.current.generation) void stop() }}
+      >{confirmAction ? <OperationTargetSummary accounts={[{ id: confirmAction.accountId }]} /> : null}</ConfirmDialog>
       <ConfirmDialog
         open={deleteRuleIndex !== null}
         title={`「${deleteRuleIndex !== null ? bundle?.rules[deleteRuleIndex]?.name ?? '' : ''}」を削除しますか？`}

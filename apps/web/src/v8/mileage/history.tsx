@@ -36,17 +36,25 @@ import { csvFileName } from '@/lib/csv-file-name'
 
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { TextArea as SharedTextArea } from '@/components/shared/text-field'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 export default function HistoryTab() {
   const { readonly, narrow } = useMileageShell()
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const scope = useRef({ id: selectedAccountId, generation: 0 })
+  if (scope.current.id !== selectedAccountId) scope.current = { id: selectedAccountId, generation: scope.current.generation + 1 }
+  const loadedScope = useRef(-1)
+  const readonlyRef = useRef(readonly)
+  readonlyRef.current = readonly
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const requestRef = useRef(0)
   const [result, setResult] = useState<MileageAdminHistory | null>(null)
   const [periodResult, setPeriodResult] = useState<MileageAdminHistory | null>(null)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [exportError, setExportError] = useState('')
-  const [pendingAction, setPendingAction] = useState<{ kind: 'confirm' | 'void'; item: MileageAdminHistoryItem } | null>(null)
+  const [pendingAction, setPendingAction] = useState<{ kind: 'confirm' | 'void'; item: MileageAdminHistoryItem; accountId: string; generation: number } | null>(null)
   const [pendingReason, setPendingReason] = useState('')
   const [pendingBusy, setPendingBusy] = useState(false)
   const [pendingError, setPendingError] = useState('')
@@ -95,6 +103,7 @@ export default function HistoryTab() {
 
   const load = useCallback(async () => {
     const request = ++requestRef.current
+    const requestScope = scope.current.generation
     setLoading(true)
     setError(false)
     setExportError('')
@@ -119,7 +128,7 @@ export default function HistoryTab() {
         limit: pageSize,
         offset: (page - 1) * pageSize,
       }), api.mileage.history({ accountId: selectedAccountId ?? '', from: daysAgo(29), to: daysAgo(0), limit: 1, offset: 0 }).catch(() => null)])
-      if (request !== requestRef.current) return
+      if (request !== requestRef.current || requestScope !== scope.current.generation) return
       if (!response.success) throw new Error(response.error)
       /* 「使った・取り消しのみ」は口に種類の絞り込みが無いので、付けた分を手元で除く。 */
       if (spentOnly) {
@@ -128,13 +137,14 @@ export default function HistoryTab() {
       setPeriodResult(period?.success ? period.data : null)
       setResult(response.data)
       setLoadedAccountId(selectedAccountId)
+      loadedScope.current = requestScope
     } catch (caught) {
-      if (request !== requestRef.current) return
+      if (request !== requestRef.current || requestScope !== scope.current.generation) return
       setResult(null); setPeriodResult(null)
       if (caught instanceof ApiError && caught.status === 400) setInputRejected('入力した条件を確認してください。開始日は終了日より前の日付を入力してください。')
       else setError(true)
     } finally {
-      if (request === requestRef.current) setLoading(false)
+      if (request === requestRef.current && requestScope === scope.current.generation) setLoading(false)
     }
   }, [entryTypeFilter, from, modeFilter, page, pageSize, search, selectedAccountId, spentOnly, to, customStatus])
 
@@ -191,7 +201,7 @@ export default function HistoryTab() {
   }, [canExport, items])
 
   const runPendingAction = async () => {
-    if (!pendingAction || pendingBusy || !selectedAccountId) return
+    if (!pendingAction || pendingBusy || !alive.current || readonlyRef.current || pendingAction.generation !== scope.current.generation || pendingAction.accountId !== scope.current.id) return
     const reason = pendingReason.trim()
     if (!reason) {
       setPendingError('理由を入力してください。')
@@ -201,13 +211,15 @@ export default function HistoryTab() {
     setPendingError('')
     try {
       const response = pendingAction.kind === 'confirm'
-        ? await api.mileage.confirmMileageEntry(pendingAction.item.id, { accountId: selectedAccountId, reason })
-        : await api.mileage.voidMileageEntry(pendingAction.item.id, { accountId: selectedAccountId, reason })
+        ? await api.mileage.confirmMileageEntry(pendingAction.item.id, { accountId: pendingAction.accountId, reason })
+        : await api.mileage.voidMileageEntry(pendingAction.item.id, { accountId: pendingAction.accountId, reason })
+      if (!alive.current || pendingAction.generation !== scope.current.generation) return
       if (!response.success) throw new Error(response.error)
       setPendingAction(null)
       setPendingReason('')
       await load()
     } catch (caught) {
+      if (!alive.current || pendingAction.generation !== scope.current.generation) return
       setPendingError(describeApiFailure(caught, '保存'))
     } finally {
       setPendingBusy(false)
@@ -215,7 +227,8 @@ export default function HistoryTab() {
   }
 
   const openPending = (kind: 'confirm' | 'void', item: MileageAdminHistoryItem) => {
-    setPendingAction({ kind, item })
+    if (!selectedAccountId || readonlyRef.current || loadedScope.current !== scope.current.generation) return
+    setPendingAction({ kind, item, accountId: selectedAccountId, generation: scope.current.generation })
     setPendingReason('')
     setPendingError('')
   }
@@ -346,7 +359,7 @@ export default function HistoryTab() {
           </div>
         </Dialog>
         <Dialog
-          open={pendingAction !== null}
+          open={pendingAction !== null && pendingAction.generation === scope.current.generation}
           title={pendingAction?.kind === 'confirm' ? 'このマイルを確定しますか？' : 'このマイルを取り消しますか？'}
           description={pendingAction?.kind === 'confirm'
             ? '確定待ちから利用可能に変わります。'
@@ -358,6 +371,7 @@ export default function HistoryTab() {
           onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
           onConfirm={() => runPendingAction()}
         >
+          {pendingAction ? <OperationTargetSummary accounts={[{ id: pendingAction.accountId }]} /> : null}
           <Field label="理由" required><SaveErrorField names={["pendingReason","pending_reason"]}><SharedTextArea
               className={styles.textarea}
               value={pendingReason}

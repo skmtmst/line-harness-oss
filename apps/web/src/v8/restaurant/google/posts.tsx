@@ -122,7 +122,12 @@ function instagramFact(ig: NonNullable<GooglePost['instagram']>): string {
   return ig.caption ? 'Google と同時に出します（Instagram 用の文章あり）' : 'Google と同時に出します（本文をそのまま使います）'
 }
 
-export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav }) {
+export function PostsBoard({ accountId, go, store, googleLocation }: { accountId: string; go: GoogleNav; store?: { id: string; name?: string | null }; googleLocation?: string | null }) {
+  const scope = useRef({ id: accountId, generation: 0 })
+  if (scope.current.id !== accountId) scope.current = { id: accountId, generation: scope.current.generation + 1 }
+  const loadedScope = useRef(-1)
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const [filter, setFilter] = useListUrlValue<GooglePostFilter>('filter', 'all')
   const [kind, setKind] = useState<'all' | GooglePostKind>('all')
   const [page, setPage] = useListUrlValue('page', 1)
@@ -132,22 +137,30 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
   const [loadError, setLoadError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<GooglePost | null>(null)
+  const [removeScope, setRemoveScope] = useState<{ id: string; generation: number; store?: { id: string; name?: string | null }; googleLocation?: string | null } | null>(null)
   const [actionError, setActionError] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const { allowed: canPublish, lockedReason: publishReason, canView } = useGooglePermission('manager', data?.permissions?.canPublish ?? false)
+  const canPublishRef = useRef(canPublish)
+  canPublishRef.current = canPublish
 
   useEffect(() => { if (!canView) setMenuFor(null) }, [canView])
 
   const load = useCallback(async () => {
+    const requestScope = scope.current.generation
     setLoading(true)
     setLoadError('')
     try {
-      setData(await restaurantGoogleApi.posts(accountId, { filter, kind, page, perPage }))
+      const result = await restaurantGoogleApi.posts(accountId, { filter, kind, page, perPage })
+      if (!alive.current || requestScope !== scope.current.generation) return
+      setData(result)
+      loadedScope.current = requestScope
     } catch (err) {
+      if (!alive.current || requestScope !== scope.current.generation) return
       setData(null)
       setLoadError(errorMessage(err, '投稿を読み込めませんでした。'))
     } finally {
-      setLoading(false)
+      if (alive.current && requestScope === scope.current.generation) setLoading(false)
     }
   }, [accountId, filter, kind, page, perPage])
 
@@ -210,7 +223,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
     if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', group: 'view', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
-    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublish) { setActionError(''); setConfirmRemove(post) } } })
+    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation }); setConfirmRemove(post) } } })
     if (!canView) return items.map(item => ({ ...item, disabled: true, lockedReason: undefined }))
     return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
   }
@@ -270,16 +283,16 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
       <ConfirmDialog
         confirmDisabled={!canPublish}
         confirmLockedReason={publishReason}
-        open={confirmRemove !== null}
+        open={confirmRemove !== null && removeScope?.generation === scope.current.generation}
         title="この投稿をGoogleから削除しますか？"
         deleteName={confirmRemove?.title || confirmRemove?.summary || 'この投稿'}
         description="削除すると元に戻せません。もう一度公開するには、新しく投稿を作り直してください。"
         confirmLabel="削除する"
         destructive
         busy={busyId === confirmRemove?.id}
-        error={actionError || undefined} onSuccess={() => setConfirmRemove(null)} onConfirm={() => removePost()}
+        error={actionError || undefined} onSuccess={() => setConfirmRemove(null)} onConfirm={() => { if (alive.current && canPublishRef.current && removeScope?.generation === scope.current.generation) return removePost() }}
         onCancel={() => setConfirmRemove(null)}
-      />
+      >{removeScope ? <OperationTargetSummary accounts={[{ id: removeScope.id }]} store={removeScope.store} externalTarget={{ label: 'Googleの店舗', name: removeScope.googleLocation }} /> : null}</ConfirmDialog>
     </>
   )
 }

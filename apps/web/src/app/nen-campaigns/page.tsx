@@ -51,6 +51,9 @@ function isTab(value: string | null): value is NenTab {
 export default function NenCampaignsPage() {
   usePageTitle('NEN配信')
   const { selectedAccountId } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const [loadedAccountScope, setLoadedAccountScope] = useState<number | null>(null)
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
   const [tab, setTab] = useState<NenTab>('auto')
@@ -100,6 +103,7 @@ export default function NenCampaignsPage() {
   */
   const loadTab = useCallback(async (next: NenTab) => {
     const sequence = ++loadSequence.current
+    const generation = accountScope.current.generation
     setLoading(true)
     if (!selectedAccountId) {
       setSettings([]); setColumns([]); setColumnsTotal(null); setKpis(null)
@@ -136,9 +140,10 @@ export default function NenCampaignsPage() {
         api.nenCampaigns.deliveries(selectedAccountId, { from: lastMonth.from, to: lastMonth.to, limit: 1 }),
         api.nenCampaigns.birthdayCoupon(selectedAccountId),
       ])
-      if (sequence !== loadSequence.current) return false
+      if (sequence !== loadSequence.current || generation !== accountScope.current.generation) return false
       if (!settingRes.success || !columnRes.success || !flowRes.success || !columnMetricRes.success || !thisMonthRes.success || !lastMonthRes.success) return false
       setSettings(settingRes.data); setColumns(columnRes.data)
+      setLoadedAccountScope(generation)
       setColumnsTotal(columnRes.pagination?.total ?? columnRes.data.length)
       setFlowMetrics(flowRes.data); setColumnMetrics(columnMetricRes.data)
       if (couponRes.success) setCoupon(couponRes.data)
@@ -505,7 +510,7 @@ export default function NenCampaignsPage() {
         tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
         kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
         flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
-        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
+        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId} currentAccountData={loadedAccountScope === accountScope.current.generation}
         loading={loading} notice={notice}
         saving={saving} testing={testing}
         previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}

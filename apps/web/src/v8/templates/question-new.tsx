@@ -29,6 +29,7 @@ import QuestionEditor, { emptyQuestion, newChoiceKey, type QuestionChoice, type 
 import Button from '@/components/shared/button'
 import { notifyToast } from '@/components/shared/toast'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import { EntityPickerSummary } from '@/components/shared/entity-picker'
 import LinePreview from '@/components/shared/line-preview'
@@ -71,6 +72,12 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   /* 統括の入口（host）では店のテンプレートを読まない（新しく作るだけ）。 */
   const id = host ? null : params.get('id')
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const scopeKey = JSON.stringify([id, selectedAccountId])
+  const scope = useRef({ key: scopeKey, generation: 0 })
+  if (scope.current.key !== scopeKey) scope.current = { key: scopeKey, generation: scope.current.generation + 1 }
+  const loadedScope = useRef(-1)
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   usePageTitle(host ? 'テンプレート' : id ? '質問を編集' : '質問を作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'テンプレート', href: '/templates' }], !host)
   /* 統括の編集（host.initialContent）：保存してある質問から始める。形が合わなければ空から。 */
@@ -96,8 +103,10 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
-  const [publishConfirm, setPublishConfirm] = useState(false)
+  const [publishTarget, setPublishTarget] = useState<{ accountId: string; generation: number } | null>(null)
   const canMutate = useFeatureAccess('templates')
+  const canMutateRef = useRef(canMutate)
+  canMutateRef.current = canMutate
   const [savedSnapshot, setSavedSnapshot] = useState(() => snapshotOf({ name: hostInitial?.name ?? '', category: '未分類', folderId: null, question: initialQuestion }))
 
   const folderAccountId = id ? templateAccountId : selectedAccountId
@@ -126,11 +135,12 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   useEffect(() => {
     if (!id || !selectedAccountId) return
     let cancelled = false
+    const requestScope = scope.current.generation
     setLoading(true)
     setError('')
     void api.templates.get(id)
       .then((template) => {
-        if (cancelled) return
+        if (cancelled || requestScope !== scope.current.generation) return
         if (!template.success || !template.data.question || !isEditableQuestion(template.data.question)) {
           setError('質問テンプレートを読み込めませんでした。')
           return
@@ -138,6 +148,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         editVersion.current = { expectedVersion: template.data.publishedVersion, expectedDraftRevision: template.data.draftRevision }
         setName(template.data.name)
         setTemplateAccountId(template.data.accountId ?? null)
+        loadedScope.current = requestScope
         setCategory(template.data.category || '未分類')
         setFolderId(template.data.folderId ?? null)
         setQuestion(template.data.question)
@@ -214,7 +225,12 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const onSaveDraft = async () => { if (await save('draft')) leaveToList() }
   /* 使われている質問を公開すると利用先へ新しい内容が届くので、使用先があれば確認の窓を挟む。 */
   const onPublish = async () => {
-    if (id && usageCount > 0) { setPublishConfirm(true); return }
+    if (id && templateAccountId && templateAccountId !== selectedAccountId) return
+    if (id && usageCount > 0) {
+      if (!selectedAccountId || !canMutateRef.current || loadedScope.current !== scope.current.generation) return
+      setPublishTarget({ accountId: templateAccountId ?? '', generation: scope.current.generation })
+      return
+    }
     setPublishing(true)
     try { if (await save('published')) leaveToList() } finally { setPublishing(false) }
   }
@@ -250,6 +266,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     { label: '質問文', value: question.text },
     ...question.choices.map((choice, index) => ({ label: `選択肢 ${index + 1} のボタンの文字`, value: choice.label })),
   ])
+  const publishReason = inputReason || (!host && id && templateAccountId && templateAccountId !== selectedAccountId ? 'この質問のLINEアカウントを選んでから公開してください。' : undefined)
   const busy = saving || publishing || Boolean(host?.busy)
   const phone = (
     <LinePreview title={null} note="質問の見え方（山田 太郎さんの場合）" caption="配信日 10:00">
@@ -283,7 +300,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(inputReason)} disabledReason={inputReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(publishReason)} disabledReason={publishReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >
@@ -372,7 +389,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         )
       })() : null}
       <ConfirmDialog
-        open={publishConfirm}
+        open={publishTarget !== null && publishTarget.generation === scope.current.generation}
         title="この質問を公開しますか？"
         description={`この質問は ${usageCount}か所で使われています。公開すると、シナリオや一斉配信へ新しい内容が届きます。`}
         confirmLabel="公開する"
@@ -380,15 +397,16 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         error={error || undefined}
         designNode="cuR8I"
         onConfirm={async () => {
+          if (!alive.current || !canMutateRef.current || !publishTarget || publishTarget.generation !== scope.current.generation) return
           setPublishing(true)
           try {
-            if (await save('published')) { setPublishConfirm(false); leaveToList() }
+            if (await save('published')) { setPublishTarget(null); leaveToList() }
           } finally {
             setPublishing(false)
           }
         }}
-        onCancel={() => setPublishConfirm(false)}
-      />
+        onCancel={() => setPublishTarget(null)}
+      >{publishTarget ? <OperationTargetSummary accounts={[{ id: publishTarget.accountId }]} /> : null}</ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="質問への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </></SaveErrorScope>
   )

@@ -25,6 +25,7 @@ import Card from '@/components/shared/card'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Drawer from '@/components/shared/drawer'
 import Dialog from '@/components/shared/dialog'
 import ColumnPreview, { replaceCampaignSamples } from './preview'
@@ -89,6 +90,7 @@ export type NenCampaignsListProps = {
   testFriendId: string
   onTestFriendChange: (id: string) => void
   accountId: string | null
+  currentAccountData?: boolean
   loading: boolean
   tabError?: string
   onRetryTab?: () => void
@@ -292,6 +294,13 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [savedOpen, setSavedOpen] = useState(false)
   const [stopTarget, setStopTarget] = useState<NenCampaignSetting | null>(null)
+  const scope = useRef({ id: props.accountId, generation: 0 })
+  if (scope.current.id !== props.accountId) scope.current = { id: props.accountId, generation: scope.current.generation + 1 }
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const [stopScope, setStopScope] = useState<{ id: string; generation: number } | null>(null)
   const [stopTried, setStopTried] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
 
@@ -333,7 +342,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
       items.push({ id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestSend(setting) })
       if (setting.campaignKey === 'birthday_coupon') items.push({ id: 'coupon', label: 'クーポンの決めごと', onSelect: () => props.onCouponOpenChange(true) })
       items.push(setting.isEnabled
-        ? { id: 'stop', label: '止める', disabled: props.saving === setting.campaignKey, onSelect: () => { setStopTried(false); setStopTarget(setting) } }
+        ? { id: 'stop', label: '止める', disabled: props.saving === setting.campaignKey || props.currentAccountData === false, onSelect: () => { if (!props.accountId || !canEditRef.current || props.currentAccountData === false) return; setStopScope({ id: props.accountId, generation: scope.current.generation }); setStopTried(false); setStopTarget(setting) } }
         : { id: 'start', label: '動かす', disabled: props.saving === setting.campaignKey, onSelect: () => props.onToggleSetting(setting) })
     } else if (setting.campaignKey === 'birthday_coupon') {
       items.push({ id: 'coupon', label: 'クーポンの決めごと', onSelect: () => props.onCouponOpenChange(true) })
@@ -437,10 +446,10 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
           <p className={styles.hint}>{canEdit ? '行の「…」から 編集・テスト送信・止める・送った履歴を見る。' : '行の「…」から 中身・送った履歴を見る。'}</p>
         </>
       )}
-      <ConfirmDialog open={stopTarget !== null} title={`「${stopTarget?.label ?? ''}」を止めますか？`}
+      <ConfirmDialog open={stopTarget !== null && stopScope?.generation === scope.current.generation} title={`「${stopTarget?.label ?? ''}」を止めますか？`}
         description="止めると、そのあとの注文・発送・誕生日などのきっかけでは、この自動配信を送りません。すでに送った配信は取り消されません。"
         confirmLabel="止める" destructive busy={Boolean(stopTarget && props.saving === stopTarget.campaignKey)}
-        error={stopTried && props.notice?.tone === 'error' ? props.notice.text : undefined} onSuccess={() => setStopTarget(null)} onCancel={() => setStopTarget(null)} onConfirm={() => { if (!stopTarget) return; setStopTried(true); return props.onToggleSetting(stopTarget) }} />
+        error={stopTried && props.notice?.tone === 'error' ? props.notice.text : undefined} onSuccess={() => setStopTarget(null)} onCancel={() => setStopTarget(null)} onConfirm={() => { if (!stopTarget || !stopScope || !alive.current || !canEditRef.current || stopScope.generation !== scope.current.generation) return; setStopTried(true); return props.onToggleSetting(stopTarget) }} >{stopScope ? <OperationTargetSummary accounts={[{ id: stopScope.id }]} /> : null}</ConfirmDialog>
       <CampaignPreviewDrawer {...props} canEdit={canEdit} />
     </>
   )
@@ -788,7 +797,14 @@ function LoadMoreColumnsButton({ onLoadMore }: { onLoadMore: () => Promise<void>
 function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
   const { columns, selectedColumnId, plan, audienceCount, introDraft, canEdit } = props
   const selected = columns.find((column) => column.id === selectedColumnId) ?? null
-  const [confirm, setConfirm] = useState<{ column: NenColumn; scheduledAt?: string } | null>(null)
+  const scopeKey = JSON.stringify([props.accountId, selectedColumnId])
+  const scope = useRef({ key: scopeKey, generation: 0 })
+  if (scope.current.key !== scopeKey) scope.current = { key: scopeKey, generation: scope.current.generation + 1 }
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const [confirm, setConfirm] = useState<{ column: NenColumn; scheduledAt?: string; accountId: string; generation: number } | null>(null)
   const [deliverTried, setDeliverTried] = useState(false)
   if (!selected) return null
   const scheduledIso = plan.when === 'schedule' ? publishedAtIso(plan.scheduledAt) : null
@@ -839,19 +855,19 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
         <div className={styles.selectFoot}>
           <TestRecipientPicker friends={props.friends} value={props.testFriendId} onChange={props.onTestFriendChange} accountId={props.accountId} />
           <Button type="button" disabled={!props.testFriendId || props.testing !== null} busy={props.testing === selected.id} busyLabel="送信中…" onClick={() => props.onTestColumn(selected)}><Send size={16} aria-hidden="true" />自分にテストを送る</Button>
-          <Button type="button" variant="primary" disabled={!columnEnabled || scheduleInvalid} onClick={() => { setDeliverTried(false); setConfirm({ column: selected, scheduledAt: scheduledIso ?? undefined }) }}>配信を予約する</Button>
+          <Button type="button" variant="primary" disabled={!columnEnabled || scheduleInvalid || props.currentAccountData === false} disabledReason={props.currentAccountData === false ? '選択中のLINEアカウントの情報を読み直してください。' : undefined} onClick={() => { if (!props.accountId || !canEditRef.current || props.currentAccountData === false) return; setDeliverTried(false); setConfirm({ column: selected, scheduledAt: scheduledIso ?? undefined, accountId: props.accountId, generation: scope.current.generation }) }}>配信を予約する</Button>
         </div>
       ) : null}
       <ConfirmDialog
-        open={confirm !== null}
+        open={confirm !== null && confirm.generation === scope.current.generation}
         title={confirm?.scheduledAt ? `「${confirm.column.title}」を配信予約しますか？` : `「${confirm?.column.title ?? ''}」を今すぐ配信しますか？`}
         description={confirm?.scheduledAt
           ? `${jstDateTime(confirm.scheduledAt)}（日本時間）に、${audienceCount == null ? '対象' : `約${num(audienceCount)} 人`}の友だちへ送ります。`
           : `すぐに配信待ちに入り、${audienceCount == null ? '対象' : `約${num(audienceCount)} 人`}の友だちへ送られます。`}
         confirmLabel={confirm?.scheduledAt ? '予約する' : '送る'}
-        error={deliverTried && props.notice?.tone === 'error' ? props.notice.text : undefined} onSuccess={() => setConfirm(null)} onConfirm={() => { if (!confirm) return; setDeliverTried(true); return props.onDeliverColumn(confirm.column, confirm.scheduledAt) }}
+        error={deliverTried && props.notice?.tone === 'error' ? props.notice.text : undefined} onSuccess={() => setConfirm(null)} onConfirm={() => { if (!confirm || !alive.current || !canEditRef.current || confirm.generation !== scope.current.generation) return; setDeliverTried(true); return props.onDeliverColumn(confirm.column, confirm.scheduledAt) }}
         onCancel={() => setConfirm(null)}
-      />
+      >{confirm ? <OperationTargetSummary accounts={[{ id: confirm.accountId }]} /> : null}</ConfirmDialog>
     </Card>
   )
 }

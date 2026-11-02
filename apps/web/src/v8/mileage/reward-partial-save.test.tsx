@@ -7,17 +7,17 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {fireEvent} from '@testing-library/react';
 import {beforeEach,afterEach,it,expect,vi} from 'vitest';
-const f=vi.hoisted(()=>({push:vi.fn(),create:vi.fn(),test:vi.fn(),save:vi.fn(),publish:vi.fn(),role:'owner' as string|null}));
+const f=vi.hoisted(()=>({push:vi.fn(),create:vi.fn(),test:vi.fn(),save:vi.fn(),publish:vi.fn(),role:'owner' as string|null,account:'synthetic-account'}));
 vi.mock('@/lib/staff-role',async original=>({...await original<typeof import('@/lib/staff-role')>(),useStaffRole:()=>f.role}));
 vi.mock('next/link',()=>({default:({children,...props}:React.ComponentProps<'a'>)=><a {...props}>{children}</a>}));
 vi.mock('next/navigation',()=>({useRouter:()=>({push:f.push,replace:vi.fn()}),useSearchParams:()=>new URLSearchParams('')}));
-vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'synthetic-account',accounts:[],loading:false})}));
+vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:f.account,accounts:[],loading:false})}));
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}));
 vi.mock('@/lib/api',async(importOriginal)=>({...await importOriginal<typeof import('@/lib/api')>(),api:{featureSettings:{visibility:async()=>({success:true,data:{features:{}}})},commonActions:{resources:async()=>({success:true,data:{commonActions:[]}})},mileage:{createReward:f.create,testReward:f.test,saveRewardDraft:f.save,publishReward:f.publish}}}));
 import Editor from '@/v8/mileage/reward-edit';
 let root:ReturnType<typeof createRoot>,host:HTMLDivElement;
 beforeEach(()=>{
- vi.clearAllMocks();f.role = verifiedStaffRole('owner');let n=0;
+ vi.clearAllMocks();f.role = verifiedStaffRole('owner');f.account='synthetic-account';let n=0;
  f.create.mockImplementation(async(_account,draft)=>({success:true,data:{id:`synthetic-${++n}`,status:'draft',currentDraftVersionId:`v-${n}`,currentVersion:{revision:1},...draft}}));
  f.save.mockResolvedValue({success:true,data:{id:'synthetic-1',currentDraftVersionId:'v-1',currentVersion:{revision:2}}});
  f.test.mockResolvedValue({success:true,data:{canDeliver:true,requiredMiles:100}});
@@ -69,6 +69,42 @@ it('公開だけ失敗したら下書きを重ねず、入力変更後は新し�
  expect(f.publish.mock.calls.map(call=>call.slice(0,4))).toEqual([
   ['synthetic-1','synthetic-account','v-1',1],['synthetic-1','synthetic-account','v-2',2],
  ])
+})
+
+it('公開確認に操作対象を表示する',async()=>{
+ await act(async()=>root.render(<Editor/>))
+ await input('reward-name','人工の特典');await input('reward-miles','100')
+ await click('保存して出す')
+ const dialog = document.querySelector('[role="dialog"]')
+ expect(dialog?.textContent).toContain('LINEアカウント')
+ expect(dialog?.textContent).toContain('環境')
+})
+
+it('確認後にアカウントを切り替えて戻しても古い確定では公開しない',async()=>{
+ await act(async()=>root.render(<Editor/>))
+ await input('reward-name','人工の特典');await input('reward-miles','100')
+ await click('保存して出す')
+ const confirm=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開')!
+ const key=Object.keys(confirm).find(item=>item.startsWith('__reactProps$'))!
+ const oldConfirm=(confirm as unknown as Record<string,{onClick:()=>void}>)[key].onClick
+ await act(async()=>{f.account='other-account';root.render(<Editor/>)})
+ await act(async()=>{f.account='synthetic-account';root.render(<Editor/>)})
+ await act(async()=>oldConfirm())
+ expect(f.create).not.toHaveBeenCalled();expect(f.publish).not.toHaveBeenCalled()
+})
+
+it('下書き保存の応答を待つ間にアカウントが変わったら公開しない',async()=>{
+ let resolve!: (value: unknown) => void
+ f.create.mockImplementationOnce(()=>new Promise(r=>{resolve=r}))
+ await act(async()=>root.render(<Editor/>))
+ await input('reward-name','人工の特典');await input('reward-miles','100')
+ await click('保存して出す')
+ const confirm=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開')!
+ await act(async()=>{confirm.click()})
+ await act(async()=>{f.account='other-account';root.render(<Editor/>)})
+ await act(async()=>{f.account='synthetic-account';root.render(<Editor/>)})
+ await act(async()=>{resolve({success:true,data:{id:'synthetic-1',currentDraftVersionId:'v-1',currentVersion:{revision:1}}})})
+ expect(f.publish).not.toHaveBeenCalled()
 })
 
 afterEach(() => { verifiedStaffRole(null) })
