@@ -14,6 +14,8 @@ vi.hoisted(() => {
 })
 
 const duplicate = vi.hoisted(() => vi.fn())
+const remove = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ id: 'account-a' }))
 const fetchApi = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
@@ -21,7 +23,7 @@ const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   const api = (actual as unknown as { api: Record<string, object> }).api
-  return { ...actual, fetchApi, eventsApi: { ...actual.eventsApi, duplicate }, api: { ...api, folders: { ...api.folders, list: listFolders } } }
+  return { ...actual, fetchApi, eventsApi: { ...actual.eventsApi, duplicate, deleteEvent: remove }, api: { ...api, folders: { ...api.folders, list: listFolders } } }
 })
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
@@ -32,8 +34,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, loading: false }),
 }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '対象の店' }, { id: 'account-b', name: 'もう一つの店' }] })) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -53,8 +56,39 @@ const event = {
   cancel_deadline_hours_before: 24, reminder_day_before_enabled: 1, reminder_hours_before: null, is_published: 1,
   lifecycle_status: 'published', folderId: 'folder-class', sort_order: 1, created_at: '2026-09-01', updated_at: '2026-09-02',
   version: 1, next_slot_starts_at: '2099-10-12T05:00:00.000Z', total_capacity: 20, total_active: 18, pending_count: 2,
-  visible_tag_id: null, visible_tag_name: null,
+  visible_tag_id: null, visible_tag_name: null, target_type: 'single',
 }
+
+it('共有イベントの削除では全アカウントの名前と件数を示す', async () => {
+  fetchApi.mockImplementation(async () => ({ items: [{ ...event, target_type: 'multi-account-dedup', account_ids: '["account-a","account-b"]' }], total: 1, summary: null }))
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: /秋のしつけ教室.*操作/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  expect(await screen.findByText('もう一つの店')).toBeTruthy()
+  expect(screen.getByText('2件')).toBeTruthy()
+})
+
+it('イベント削除の確認に操作先と環境を示す', async () => {
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: /秋のしつけ教室.*操作/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  expect(screen.getByText('LINEアカウント')).toBeTruthy()
+  expect(screen.getByText('環境')).toBeTruthy()
+  expect(await screen.findByText('対象の店')).toBeTruthy()
+})
+
+it('アカウントを切り替えて戻しても古いイベント削除は送らない', async () => {
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: /秋のしつけ教室.*操作/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  const button = screen.getByRole('button', { name: '削除する', exact: true })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+  account.id = 'account-b'; await render()
+  account.id = 'account-a'; await render()
+  await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+  expect(remove).not.toHaveBeenCalled()
+})
 
 async function render() {
   await act(async () => {
@@ -67,6 +101,8 @@ async function render() {
 }
 
 beforeEach(() => {
+  account.id = 'account-a'
+  remove.mockReset()
   duplicate.mockReset()
   fetchApi.mockReset()
   fetchApi.mockImplementation(async () => ({ items: [event], total: 1, summary: null }))

@@ -24,6 +24,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: accountId, selectedAccount: { id: accountId, name: accountId }, accounts: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '支店' }], loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '支店' }] })) }))
 let role = 'owner'
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -148,6 +149,19 @@ describe('読み込み・空・失敗を分け、未取得を0件と見せない
 })
 
 describe('結果が分からない失敗を無条件に送り直さない', () => {
+  it('アカウントを切り替えて戻しても古い送り直しの確定は送らない', async () => {
+    items = [interaction({ failureReasonCode: 'unknown' })]
+    await render()
+    await openContents()
+    await act(async () => { buttonByText('届いたか確かめてから送り直す', designDialog()!)!.click() })
+    const button = buttonByText('確かめたので送り直す')!
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    accountId = 'account-b'; await render()
+    accountId = 'account-a'; await render()
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(retries()).toHaveLength(0)
+  })
   it('結果不明の行は、相手先で確かめた確認を挟んでから confirmed 付きで送る', async () => {
     items = [interaction({ failureReasonCode: 'unknown' })]
     route = (url, method) => method === 'POST' && url.includes('/retry') ? json({ success: true, data: { status: 'succeeded' } }) : undefined
@@ -159,6 +173,9 @@ describe('結果が分からない失敗を無条件に送り直さない', () =
     const confirm = buttonByText('確かめたので送り直す')!
     expect(confirm).toBeTruthy()
     expect(document.body.textContent).toContain('「予約台帳」へ届いたかどうか分かっていません。')
+    expect(document.body.textContent).toContain('LINEアカウント')
+    expect(document.body.textContent).toContain('環境')
+    await vi.waitFor(() => expect(document.body.textContent).toContain('本店'))
     await act(async () => { confirm.click() })
     expect(retries().map((call) => [call.url, call.body])).toEqual([
       [`${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/interactions/wi-1/retry?lineAccountId=account-a`, { confirmed: true }],

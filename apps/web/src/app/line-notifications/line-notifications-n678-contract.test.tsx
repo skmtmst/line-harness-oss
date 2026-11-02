@@ -1368,6 +1368,7 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
     expect(fixture.testSend).not.toHaveBeenCalled()
     await waitFor(() => expect(fixture.getTestRecipients).toHaveBeenCalledWith('account-a'))
     expect(await screen.findByText('account-aのLINEアカウント')).toBeTruthy()
+    expect(within(screen.getByRole('dialog')).getByText('環境')).toBeTruthy()
     expect(screen.getByText('「注文を受け付けました」')).toBeTruthy()
     expect(await screen.findByText('テスト 一郎・テスト 二郎（2名）')).toBeTruthy()
 

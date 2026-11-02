@@ -23,6 +23,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: accountId, selectedAccount: { id: accountId, name: accountId }, accounts: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '支店' }], loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '支店' }] })) }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
 let role = verifiedStaffRole('owner')
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
@@ -140,6 +141,10 @@ describe('削除は共通の確認窓を通し、対象アカウントで削除�
     expect(box.textContent).toContain('この宛先への送信が止まり')
     expect(box.textContent).toContain('すでに送った記録は残ります。')
     expect(box.textContent).toContain('この操作は取り消せません。')
+    expect(box.textContent).toContain('LINEアカウント')
+    expect(box.textContent).toContain('環境')
+    await vi.waitFor(() => expect(box.textContent).toContain('本店'))
+    expect(box.textContent).not.toContain('支店')
     await act(async () => { confirmButton('削除する').click() })
     expect(deletes().map((call) => call.url)).toEqual([`${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/outgoing/out-1?lineAccountId=account-a`])
     await vi.waitFor(() => expect(dialog()).toBeNull())
@@ -154,6 +159,9 @@ describe('削除は共通の確認窓を通し、対象アカウントで削除�
     const box = dialog()!
     expect(box.getAttribute('role')).toBe('alertdialog')
     expect(box.textContent).toContain('「申込フォーム」を削除しますか？')
+    expect(box.textContent).toContain('LINEアカウント')
+    expect(box.textContent).toContain('環境')
+    await vi.waitFor(() => expect(box.textContent).toContain('本店'))
     expect(box.textContent).toContain('このURLへの通知を受け取らなくなります。')
     expect(box.textContent).toContain('すでに受け取った記録は残ります。')
     expect(box.textContent).toContain('この操作は取り消せません。')
@@ -225,6 +233,18 @@ describe('アカウントを替えたら、前のアカウントの応答・窓�
     expect(dialog()?.textContent).toContain('LINEアカウントが切り替わりました。削除する送り先を選び直してください。')
   })
 
+  it('送る：アカウントを切り替えて戻しても古い削除確定を送らない', async () => {
+    await render(outgoingScreen())
+    await askDeleteOutgoing()
+    const button = confirmButton('削除する')
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    accountId = 'account-b'; await render(outgoingScreen())
+    accountId = 'account-a'; await render(outgoingScreen())
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(deletes()).toHaveLength(0)
+  })
+
   it('送る：削除の返事が来る前にアカウントが替わったら、前の失敗を新しいアカウントに出さない', async () => {
     let respond: (response: Response) => void = () => {}
     route = (_url, method) => method === 'DELETE' ? new Promise<Response>((resolve) => { respond = resolve }) : undefined
@@ -251,6 +271,18 @@ describe('アカウントを替えたら、前のアカウントの応答・窓�
     await render(<WebhooksIncomingV8 />)
     await vi.waitFor(() => expect(dialog()).toBeNull())
     expect(writes()).toHaveLength(0)
+  })
+
+  it('受け取る：アカウントを切り替えて戻しても古い削除確定を送らない', async () => {
+    await render(<WebhooksIncomingV8 />)
+    await askDeleteIncoming()
+    const button = confirmButton('削除する')
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    accountId = 'account-b'; await render(<WebhooksIncomingV8 />)
+    accountId = 'account-a'; await render(<WebhooksIncomingV8 />)
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(deletes()).toHaveLength(0)
   })
 
   it('受け取る：新しいアカウントの一覧がまだ届かない間は、前の口の切り替えを送らない', async () => {
@@ -384,6 +416,28 @@ describe('権限と失敗の言葉', () => {
     expect(dialog()?.textContent).not.toContain('通信を確かめて')
   })
 
+  it('受け取り口の合言葉更新窓に操作先と環境を示す', async () => {
+    await render(<WebhooksIncomingV8 />)
+    await act(async () => { byText('合言葉を更新する')!.click() })
+    const box = dialog()!
+    expect(box.textContent).toContain('LINEアカウント')
+    expect(box.textContent).toContain('環境')
+    await vi.waitFor(() => expect(box.textContent).toContain('本店'))
+    expect(writes()).toHaveLength(0)
+  })
+  it('受け取り口の古い合言葉更新は切替後に送らない', async () => {
+    await render(<WebhooksIncomingV8 />)
+    await act(async () => { byText('合言葉を更新する')!.click() })
+    await act(async () => { confirmButton('自動生成').click() })
+    const button = confirmButton('保存する')
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    accountId = 'account-b'; await render(<WebhooksIncomingV8 />)
+    accountId = 'account-a'; await render(<WebhooksIncomingV8 />)
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(writes()).toHaveLength(0)
+  })
+
   it('合言葉の更新が断られたら、原因どおりの言葉を窓に出す', async () => {
     route = (_url, method) => method === 'PUT' || method === 'PATCH' ? json({ success: false, error: 'forbidden' }, 403) : undefined
     await render(<WebhooksIncomingV8 />)
@@ -397,6 +451,41 @@ describe('権限と失敗の言葉', () => {
 })
 
 describe('試し送信は送り先を確かめてから送る', () => {
+  it('送り先の鍵を作り直す窓に操作先と環境を示す', async () => {
+    await render(outgoingScreen())
+    await openRowMenu('顧客台帳')
+    await chooseMenuItem('鍵を作り直す')
+    const box = dialog()!
+    expect(box.textContent).toContain('LINEアカウント')
+    expect(box.textContent).toContain('環境')
+    await vi.waitFor(() => expect(box.textContent).toContain('本店'))
+    expect(writes()).toHaveLength(0)
+  })
+  it('アカウントを切り替えて戻しても古い鍵の確定を送らない', async () => {
+    await render(outgoingScreen())
+    await openRowMenu('顧客台帳')
+    await chooseMenuItem('鍵を作り直す')
+    await act(async () => { confirmButton('自動生成').click() })
+    const button = confirmButton('保存する')
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    accountId = 'account-b'; await render(outgoingScreen())
+    accountId = 'account-a'; await render(outgoingScreen())
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(writes()).toHaveLength(0)
+  })
+  it('開いた後にアカウントを切り替えて戻しても古い試し送信を送らない', async () => {
+    await render(outgoingScreen())
+    await openRowMenu('顧客台帳')
+    await chooseMenuItem('試しに送る')
+    const button = confirmButton('この送り先へ送る')
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    accountId = 'account-b'; await render(outgoingScreen())
+    accountId = 'account-a'; await render(outgoingScreen())
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(writes()).toHaveLength(0)
+  })
   it('「試しに送る」は確認窓に実際のURLを省略せず出し、確定するまで送らない', async () => {
     await render(outgoingScreen())
     await openRowMenu('顧客台帳')
@@ -404,6 +493,9 @@ describe('試し送信は送り先を確かめてから送る', () => {
     expect(writes()).toHaveLength(0)
     const box = dialog()!
     expect(box.textContent).toContain('試し送信をします')
+    expect(box.textContent).toContain('LINEアカウント')
+    expect(box.textContent).toContain('環境')
+    await vi.waitFor(() => expect(box.textContent).toContain('本店'))
     expect(box.querySelector('code')?.textContent).toBe('https://crm.example.com/line/hook?token=secret-path')
     route = (url, method) => method === 'POST' && url.includes('/test') ? json({ success: true, data: { delivered: true, responseStatus: 200 } }) : undefined
     await act(async () => { confirmButton('この送り先へ送る').click() })

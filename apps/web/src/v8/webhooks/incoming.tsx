@@ -24,6 +24,7 @@ import { TextField, TextArea } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
@@ -174,11 +175,11 @@ export default function WebhooksIncomingV8() {
   const [creating, setCreating] = useState(false)
   const [createdSecret, setCreatedSecret] = useState<{ name: string; secret: string } | null>(null)
 
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; accountId: string; scope: object } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const [rotateTarget, setRotateTarget] = useState<{ id: string; name: string } | null>(null)
+  const [rotateTarget, setRotateTarget] = useState<{ id: string; name: string; accountId: string; scope: object } | null>(null)
   const [rotateSecret, setRotateSecret] = useState('')
   const [rotateError, setRotateError] = useState('')
   const [rotating, setRotating] = useState(false)
@@ -195,8 +196,10 @@ export default function WebhooksIncomingV8() {
     setCreating(false)
     setCreatedSecret(null)
     setDeleteTarget(null)
+    setDeleting(false)
     setDeleteError('')
     setRotateTarget(null)
+    setRotating(false)
     setRotateSecret('')
     setRotateError('')
     setStepUp(null)
@@ -358,8 +361,8 @@ export default function WebhooksIncomingV8() {
   const runDelete = async () => {
     if (!canManageWebhooksNow(true)) { setDeleteError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     if (!deleteTarget || deleting) return
-    const accountId = selectedAccountId
-    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId) {
+    const accountId = deleteTarget.accountId
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== deleteTarget.scope) {
       setDeleteError('LINEアカウントが切り替わりました。削除する受け取り口を選び直してください。')
       return
     }
@@ -368,11 +371,11 @@ export default function WebhooksIncomingV8() {
     try {
       const res = await api.webhooks.incoming.delete(deleteTarget.id, accountId)
       if (!res.success) throw new Error(res.error)
-      if (accountRef.current !== accountId) return
+      if (accountRef.current !== accountId || accountScopeRef.current !== deleteTarget.scope) return
       setDeleteTarget(null)
       await reload()
     } catch (caught) {
-      if (accountRef.current !== accountId) return
+      if (accountRef.current !== accountId || accountScopeRef.current !== deleteTarget.scope) return
       const fieldFailure = saveErrors.capture(caught);
 
       const forbidden = caught instanceof ApiError && caught.status === 403
@@ -381,7 +384,7 @@ export default function WebhooksIncomingV8() {
         ? permissionDeniedMessage('store')
         : 'この受け取り口を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setDeleting(false)
+      if (accountScopeRef.current === deleteTarget.scope) setDeleting(false)
     }
   }
 
@@ -391,9 +394,9 @@ export default function WebhooksIncomingV8() {
     const canContinue = captureWebhookWriteAccess(true)
     if (rotating) return
     setRotateError('')
-    const accountId = selectedAccountId
     if (!rotateTarget) return
-    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId) {
+    const accountId = rotateTarget.accountId
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== rotateTarget.scope) {
       setRotateError('LINEアカウントの一覧を読み直してください')
       return
     }
@@ -404,7 +407,7 @@ export default function WebhooksIncomingV8() {
     setRotating(true)
     try {
       const res = await api.webhooks.incoming.update(rotateTarget.id, accountId, { secret: rotateSecret }, stepUpToken)
-      if (accountRef.current !== accountId) return
+      if (accountRef.current !== accountId || accountScopeRef.current !== rotateTarget.scope) return
       if (!res.success) {
         setRotateError(res.error)
         return
@@ -413,10 +416,11 @@ export default function WebhooksIncomingV8() {
       setRotateSecret('')
       void reload()
     } catch (caught) {
+      if (accountRef.current !== accountId || accountScopeRef.current !== rotateTarget.scope) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: async (token) => { if (canContinue() && accountRef.current === accountId) return runRotate(token); setRotateError('権限やLINEアカウントが変わったため中止しました。') } });
+        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: async (token) => { if (canContinue() && accountRef.current === accountId && accountScopeRef.current === rotateTarget.scope) return runRotate(token); setRotateError('権限やLINEアカウントが変わったため中止しました。') } });
 
         return
       }
@@ -426,7 +430,7 @@ export default function WebhooksIncomingV8() {
         scope: 'store',
       })) }
     } finally {
-      setRotating(false)
+      if (accountScopeRef.current === rotateTarget.scope) setRotating(false)
     }
   }
 
@@ -693,7 +697,7 @@ export default function WebhooksIncomingV8() {
               <span className={styles.fieldLabel}>合言葉（署名）</span>
               <span className={styles.valueBox}>{selected.hasSecret ? '設定済み（再表示しません）' : 'まだ設定していません'}</span>
             </div>
-            {<Button disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true)) return; setRotateError(''); setRotateSecret(''); setRotateTarget({ id: selected.id, name: selected.name }) }}>
+            {<Button disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true) || !selectedAccountId || loadedAccountId !== selectedAccountId) return; setRotateError(''); setRotateSecret(''); setRotateTarget({ id: selected.id, name: selected.name, accountId: selectedAccountId, scope: accountScopeRef.current }) }}>
                 <RefreshCw size={16} aria-hidden="true" />合言葉を更新する
               </Button>}
           </div>
@@ -843,7 +847,7 @@ export default function WebhooksIncomingV8() {
           </div>
         </Card>
         {<div className={styles.dangerRow}>
-            <Button variant="text" disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true)) return; setDeleteError(''); setDeleteTarget({ id: selected.id, name: selected.name }) }}>
+            <Button variant="text" disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true) || !selectedAccountId || loadedAccountId !== selectedAccountId) return; setDeleteError(''); setDeleteTarget({ id: selected.id, name: selected.name, accountId: selectedAccountId, scope: accountScopeRef.current }) }}>
               <Trash2 size={16} aria-hidden="true" />この受け取り口を削除する
             </Button>
           </div>}
@@ -977,7 +981,9 @@ export default function WebhooksIncomingV8() {
           error={deleteError || undefined}
           onConfirm={() => runDelete()}
           onCancel={() => { if (!deleting) { setDeleteTarget(null); setDeleteError('') } }}
-        />
+        >
+          {deleteTarget ? <OperationTargetSummary accounts={[{ id: deleteTarget.accountId }]} /> : null}
+        </ConfirmDialog>
 
         <Dialog
           open={rotateTarget !== null}
@@ -991,6 +997,7 @@ export default function WebhooksIncomingV8() {
           confirmDisabled={!ownership.allowed}
           confirmLockedReason={ownership.reason}
         >
+          {rotateTarget ? <OperationTargetSummary accounts={[{ id: rotateTarget.accountId }]} /> : null}
           <div className={styles.fieldRow}>
             <SaveErrorField names={["rotateSecret","secret","rotate_secret"]}><TextField
               value={rotateSecret}

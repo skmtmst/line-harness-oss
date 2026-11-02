@@ -11,6 +11,7 @@ const mock = vi.hoisted(() => ({ role: 'staff' as string | null, get: vi.fn(), s
 vi.mock('@/lib/api', async original => ({ ...await original<typeof import('@/lib/api')>(), eventsApi: { getEvent: mock.get } }))
 vi.mock('@/lib/api/helpers/gap2', () => ({ bookingMakeupApi: { absenceByStore: mock.save } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => mock.role }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'a', name: '対象のアカウント' }] })) }))
 vi.mock('@/components/shared/use-permission-lock-reason', () => ({ usePermissionLockReason: (allowed: boolean) => allowed ? undefined : '閲覧のみのため変更できません。' }))
 vi.mock('@/lib/use-unsaved-guard', () => ({ useUnsavedGuard: (state: unknown) => { mock.guard(state); return { leaveTarget: null, confirmLeave: vi.fn(), cancelLeave: vi.fn(), disarm: vi.fn() } } }))
 const now = Date.parse('2030-06-01T00:00:00Z')
@@ -38,6 +39,9 @@ async function open() {
 
 it('スタッフは締め内の振替が選ばれた窓から欠席を送り、最後の予約がなくなっても結果が残る', async () => {
   render(<Harness />); const dialog = await open()
+  expect(dialog.getByText('LINEアカウント')).toBeTruthy()
+  expect(dialog.getByText('環境')).toBeTruthy()
+  expect(await dialog.findByText('対象のアカウント')).toBeTruthy()
   expect(dialog.getByRole('switch').getAttribute('aria-checked')).toBe('true')
   fireEvent.click(dialog.getByRole('button', { name: '欠席にする' }))
   await screen.findByText('予約はありません')
