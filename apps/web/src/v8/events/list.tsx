@@ -483,7 +483,7 @@ export default function EventsListV8() {
           <Th>
             <span className={styles.headWithTip}>
               状態
-              <HelpTip label="状態の見方の説明">
+              <HelpTip label="状態の見方の説明" placement="above">
                 下書き・公開中・一時停止・終了・中止は保存した状態です。満席と申し込みが少ないは、その都度数えた目印で、状態ではありません。
               </HelpTip>
             </span>
