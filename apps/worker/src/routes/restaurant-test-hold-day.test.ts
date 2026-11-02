@@ -161,4 +161,3 @@ describe('V8 仮押さえ・日付・来店履歴', () => {
     for (const body of [{ ...hold, holdMinutes: 0 }, { ...hold, storeId: 'other' }]) expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', body)).status).toBe(400);
   });
 });
-
