@@ -168,7 +168,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'confirmed', expectedVersion: 1 }))
   })
 
-  it('無断の行の復活は来店取消口へ送り、通常復活は呼ばない（R1-20）', async () => {
+  it('無断の行の復活は予約の復旧を行う', async () => {
     today[0].status = 'no_show'
     fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 3 }) })
     render(<ReservationsPage />)
@@ -177,8 +177,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     const row = (await screen.findByRole('button', { name: '佐藤 健' })).closest('tr')!
     fireEvent.click(within(row).getByRole('button', { name: '佐藤 健のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '予約を有効に戻す' }))
-    await waitFor(() => expect(fixture.attendance).toHaveBeenCalledWith('account-1', 'r1', expect.objectContaining({ action: 'undo_visit', expectedVersion: 1 })))
-    expect(fixture.updateReservation).not.toHaveBeenCalled()
+    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'confirmed', expectedVersion: 1 }))
   })
 
   it('閲覧者の一覧は予約を読めても行の変更メニューを出さない', async () => {

@@ -160,10 +160,8 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     const row=rows.find(r=>r.id===id)??data.reservations.find(r=>r.id===id);if(!row)return;
     void save(async()=>{const result=await restaurantTestApi.attendance(accountId,id,{action,expectedVersion:row.customer_version??1,requestId:crypto.randomUUID()});if(action==='visited')notifyToast(result.data.stamp.status==='recorded'?`来店スタンプ ${result.data.stamp.count} 個を確認しました。`:'スタンプは会計待ち・停止中・未連携の場合には増えません。');return result},action==='visited'?'来店にしました。':action==='depart'?'退店にしました。卓が空きました。':action==='no_show'?'無断にしました。':'来店・退店の記録を訂正しました。');
   }
-  /* 無断の復活だけ既存の来店取消口へ送り、印も取り消す。取消の通常復活は変えない。 */
   const restoreReservation=(id:string)=>{
     const target=rows.find(r=>r.id===id)??data.reservations.find(r=>r.id===id);
-    if(target?.status==='no_show')return restaurantTestApi.attendance(accountId,id,{action:'undo_visit',expectedVersion:target.customer_version??1,requestId:crypto.randomUUID()});
     return restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:target?.customer_version??1});
   }
   const opened = rows.find((r) => r.id === openId) ?? data.reservations.find((r) => r.id === openId) ?? null

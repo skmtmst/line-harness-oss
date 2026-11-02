@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react'
 import { Pencil, X } from 'lucide-react'
 import {RowActions} from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import {
@@ -73,6 +74,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   /** 変更する：今の変更の窓へ。 */
   onEdit: (id: string) => void
 }) {
+  const [confirmNoShow, setConfirmNoShow] = useState<string | null>(null)
   const [history, setHistory] = useState<History>({ state: 'loading' })
   const id = reservation?.id ?? ''
   const storeId = reservation?.store_id ?? ''
@@ -101,20 +103,21 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const course = reservation.course_id ? courses.find((c) => c.id === reservation.course_id) ?? null : null
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
 
-  const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'visited')},{id:'no-show',label:'無断にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'no_show')}]:[]
-  /* 来店・退店・無断は「…」の奥ではなく窓の下に直接置く（R1-20）。訂正だけ「…」に残す。 */
+  const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'visited')},{id:'no-show',label:'無断にする',disabled:busy,onSelect:()=>canWrite&&setConfirmNoShow(reservation.id)}]:[]
+  /* 来店・退店・無断は「…」の奥ではなく窓の下に直接置く。訂正だけ「…」に残す。 */
   const quickAttendance=attendanceItems.filter((item)=>item.id==='visit'||item.id==='depart'||item.id==='no-show')
   const undoAttendance=attendanceItems.filter((item)=>item.id==='undo-depart'||item.id==='undo-visit')
   const attendance=canWrite&&undoAttendance.length?<RowActions subjectName={reservation.customer_name} menuItems={undoAttendance}/>:null
   const quickButtons=canWrite?quickAttendance.map((item)=><Button key={item.id} type="button" disabled={busy} onClick={item.onSelect}>{item.label}</Button>):null
   const dining=<ReservationDining entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
-  if (inline) return <DetailPreview title="予約の詳細"
+  const confirmation = <ConfirmDialog open={canWrite && confirmNoShow === reservation.id} title="無断にしますか？" description="間違えた場合は予約を有効に戻せます。" confirmLabel="無断にする" onConfirm={() => { onAttendance?.(reservation.id, 'no_show'); setConfirmNoShow(null) }} onCancel={() => setConfirmNoShow(null)} />
+  if (inline) return <><DetailPreview title="予約の詳細"
     description={`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}・${table?.code ?? '未配席'}`}
     headerActions={<><Button size="inline" variant="text" aria-label="予約の詳細を閉じる" onClick={onClose}><X size={16} aria-hidden="true" /></Button></>}
     actions={{
-      primary: <Button variant="primary" disabled={busy} onClick={() => { if (canWrite) onEdit(reservation.id) }}><Pencil size={16} aria-hidden="true" />内容を変える</Button>, primaryAllowed: canWrite,
-      secondary: inactive ? null : <Button variant="secondary" disabled={busy} onClick={() => { if (canWrite) onEdit(reservation.id) }}>卓を変える</Button>, secondaryAllowed: canWrite,
-      menuItems: [...attendanceItems.map(item => ({...item, allowed: canWrite})), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}],
+      primary: canWrite && quickAttendance[0] ? <Button disabled={busy} onClick={quickAttendance[0].onSelect}>{quickAttendance[0].label}</Button> : null,
+      secondary: canWrite && quickAttendance[1] ? <Button disabled={busy} onClick={quickAttendance[1].onSelect}>{quickAttendance[1].label}</Button> : null,
+      menuItems: canWrite ? [...undoAttendance, {id: 'edit-reservation', label: '内容を変える', disabled: busy, onSelect: () => onEdit(reservation.id)}, ...(!inactive ? [{id: 'change-table', label: '卓を変える', disabled: busy, onSelect: () => onEdit(reservation.id)}] : []), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}] : [],
     }}>
     <DetailField label="お客さま">{withHonorific(reservation.customer_name, 'さま', { space: true })}</DetailField>
     <DetailField label="予約元"><ReservationSource value={reservation.source} note={reservation.note} /></DetailField>
@@ -122,13 +125,13 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
     <DetailField label="電話">{maskPhone(reservation.customer_phone) || '電話未登録'}</DetailField>
     <ReservationDining dense presentation="detail" entry={seatBoardEntry(reservation as unknown as Record<string, unknown>)} />
     <DetailField label="来店"><span title={historyText(history)}>{history.state === 'ready' ? `${polishFormatNumber(history.count)}回` : '—'}</span></DetailField>
-  </DetailPreview>
+  </DetailPreview>{confirmation}</>
 
   return (
-    <RsDialog
+    <><RsDialog
       open
       title={`${withHonorific(reservation.customer_name)}・${reservation.guest_count}名`}
-      width={560}
+      width={680}
       top={160}
       busy={busy}
       designNode="AjZhH"
@@ -161,6 +164,6 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
         <p className={styles.fact}>{historyText(history)}</p>
         {inactive ? <p className={styles.fact}>{reservation.status === 'no_show' ? '無断で来なかった予約です' : '取り消した予約です'}</p> : null}
       </div>
-    </RsDialog>
+    </RsDialog>{confirmation}</>
   )
 }
