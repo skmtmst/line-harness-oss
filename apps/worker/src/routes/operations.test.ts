@@ -1154,6 +1154,7 @@ describe('W: 運用状態の確認項目の追加（-32）', () => {
     { quota: 'fail', consumption: 'ok', tenant: false, status: 'unknown', summary: '配信上限を確認できませんでした' },
     { quota: 'unlimited', consumption: 'ok', tenant: false, status: 'unknown', summary: '配信上限を確認できませんでした' },
     { quota: 'limited', consumption: 'fail', tenant: false, status: 'unknown', summary: '配信上限を確認できませんでした' },
+    { quota: 'limited', consumption: 'ok', tenant: false, status: 'normal', summary: '今月の配信枠に余裕があります' },
     { quota: 'fail', consumption: 'ok', tenant: true, status: 'unknown', summary: '配信上限を確認できませんでした' },
     { quota: 'limited', consumption: 'fail', tenant: true, status: 'unknown', summary: '配信上限を確認できませんでした' },
     { quota: 'unlimited', consumption: 'ok', tenant: true, status: 'normal', summary: '今月の配信枠に余裕があります' },
@@ -1173,6 +1174,15 @@ describe('W: 運用状態の確認項目の追加（-32）', () => {
     const item = checked.run.results.find((entry) => entry.checkKey === 'message_quota');
     expect(item).toMatchObject({ status, summary, source: 'line_messaging_api' });
     if (status === 'unknown') expect(item?.value?.sendable ?? null).toBeNull();
+  });
+  it.each(['exempt', 'trialing'])('プラン未設定の %s は LINE の枠で判定する', async (planStatus) => {
+    testDb.raw.prepare("INSERT INTO tenants (id, name, plan_key, plan_status) VALUES ('tenant-1', '統括', NULL, ?)").run(planStatus);
+    testDb.raw.prepare("UPDATE line_accounts SET tenant_id = 'tenant-1' WHERE id = 'account-1'").run();
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => String(input).endsWith('/quota/consumption')
+      ? Response.json({ totalUsage: 10 }) : Response.json({ type: 'limited', value: 1000 })));
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    const checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T05:00:00.000Z' });
+    expect(checked.run.results.find((item) => item.checkKey === 'message_quota')).toMatchObject({ status: 'normal', value: { sendable: 990 } });
   });
   it('月間配信数はLINEとHarnessの小さい方を送れる数にし、予定分と翌月1日(JST)のresetを返す', async () => {
     const now = '2026-09-15T05:00:00.000Z';

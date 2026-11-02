@@ -209,10 +209,12 @@ async function collectChecks(
         ? null : Math.max(0, harnessLimit - harnessUsed);
       // 実際に送れる残数は小さい方。片側だけの「余裕あり」はしない。
       const lineKnown = quota.unlimited || lineRemaining !== null;
-      const limitsKnown = lineKnown && harnessRemaining !== null;
+      const harnessKnown = !tenantRow?.plan_key || harnessRemaining !== null;
+      const limitsKnown = lineKnown && harnessKnown;
       const sendable = !limitsKnown ? null
-        : quota.unlimited ? harnessRemaining
-        : Math.min(lineRemaining!, harnessRemaining!);
+        : lineRemaining === null ? harnessRemaining
+        : harnessRemaining === null ? lineRemaining
+        : Math.min(lineRemaining, harnessRemaining);
       const lineRatio = quota.limit === null || quota.used === null ? null
         : quota.limit === 0 ? 1 : Number(quota.used) / Number(quota.limit);
       const harnessRatio = harnessLimit === null ? null

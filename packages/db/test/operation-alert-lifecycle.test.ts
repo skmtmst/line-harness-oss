@@ -79,6 +79,24 @@ beforeEach(() => {
 });
 
 describe('運用異常alertのライフサイクル', () => {
+  it('配信枠の未確認を挟んでも受領済み注意を再通知しない', async () => {
+    const inspect = async (status: OperationHealthStatus, runId: string) => {
+      await reconcileOperationHealthAlerts(db, { lineAccountId: 'account-1', runId,
+        results: [{ ...healthResult(status), checkKey: 'message_quota', runId }], now: '2026-09-16T00:00:00.000Z' });
+    };
+    for (const id of ['one', 'two', 'three']) sqlite.prepare(
+      `INSERT INTO operation_health_runs (id, scope_key, line_account_id, window_started_at, source, status, overall_status, started_at)
+       VALUES (?, 'account-1', 'account-1', ?, 'scheduled', 'completed', 'warning', ?)`
+    ).run(id, id, '2026-09-16T00:00:00.000Z');
+    await inspect('warning', 'one');
+    let [alert] = await listOperationAlerts(db, { lineAccountId: 'account-1' });
+    await acknowledgeOperationAlert(db, { id: alert.id, lineAccountId: 'account-1', actorId: 'owner-1', expectedVersion: alert.version, note: '確認中' });
+    await inspect('unknown', 'two');
+    await inspect('warning', 'three');
+    [alert] = await listOperationAlerts(db, { lineAccountId: 'account-1' });
+    expect(alert).toMatchObject({ status: 'acknowledged', severity: 'warning', acknowledgedById: 'owner-1' });
+    expect(alert.events.map(({ action }) => action)).not.toContain('escalated');
+  });
   it('同じ異常をまとめ、悪化・受領・解消・再発を版付き履歴に残す', async () => {
     await observe('warning', 'run-open', '2026-09-16T00:00:00.000Z');
     await observe('warning', 'run-same', '2026-09-16T00:05:00.000Z');
