@@ -193,7 +193,7 @@ export default function MediaUploadDialog({
 
   if (!open) return null
 
-  return <Dialog open={open} title="ファイルを入れる" onCancel={onClose} busy={busy} error={error || undefined} designNode="eXAJP" designWidth={720} footer={(<DialogActions leadingAction={<p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
+  return <Dialog contentLayout="form" open={open} title="ファイルを入れる" onCancel={onClose} busy={busy} error={error || undefined} designNode="eXAJP" designWidth={720} footer={(<DialogActions leadingAction={<p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
             {errorCount > 0 ? `${formatNumber(errorCount)}件は登録できません` : `${entries.length}件を選択中`}
           </p>}>
 
