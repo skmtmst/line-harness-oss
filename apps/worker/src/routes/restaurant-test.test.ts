@@ -1,5 +1,7 @@
 import { seedRestaurantFixture as seedRestaurantData } from '../test-utils/restaurant-fixture.js';
-import { getMediaDeleteImpactSnapshot, getMediaReplacementPlan, publishScenarioVersion } from '@line-crm/db';
+import { publishScenarioVersion } from '@line-crm/db';
+import { checkRestaurantMenuMedia } from './restaurant-menu-media-test-utils.js';
+import { seedNoticeFriend } from './restaurant-test-fixture-helpers.js';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -138,13 +140,7 @@ describe('電話予約のLINE確認通知', () => {
   const path = '/api/restaurant-test/reservations/manual?account_id=account-1';
   const body = { storeId: 'store-ginza', customerName: '試験用のお客さま', guestCount: 2,
     startsAt: '2026-11-10T10:00:00.000Z', endsAt: '2026-11-10T12:00:00.000Z', lineUid: 'U' + '1'.repeat(32), notifyLine: true };
-  function seedFriend(following = 1, accountId = 'account-2') {
-    seedRestaurantFixture();
-    testDb.raw.exec(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
-      VALUES ('account-2', '試験店舗', 'fixture-channel', 'unused', 'unused-token');`);
-    testDb.raw.prepare('INSERT INTO friends (id, line_user_id, line_account_id, is_following) VALUES (?, ?, ?, ?)')
-      .run('friend-fixture', body.lineUid, accountId, following);
-  }
+  const seedFriend = (following = 1, accountId = 'account-2') => seedNoticeFriend(testDb, seedRestaurantFixture, body.lineUid, following, accountId);
   async function approveFollowup(){
     testDb.raw.prepare("UPDATE scenario_steps SET message_content=? WHERE scenario_id='restaurant-followup:store-ginza' AND step_order=0").run('予約が確定しました。\n店舗: {{var.store_name}}\n日時: {{var.reservation_datetime}}〜{{var.reservation_end}}\n人数: {{var.guest_count}}名\nコース: {{var.course_name}}');
     await publishScenarioVersion(testDb.db,'restaurant-followup:store-ginza',{staffId:'owner',idempotencyKey:crypto.randomUUID()});
@@ -1209,35 +1205,7 @@ describe('V8-B 卓から出す予約枠と週の営業時間', () => {
 });
 
 describe('R2-18 飲食メニューの説明と登録画像', () => {
-  it('登録済み画像と説明を保存し、読み直せる', async () => {
-    seedRestaurantFixture();
-    testDb.raw.prepare(`INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES('menu-photo','account-2','image','dish.png','image/png',100,'fake/menu.png')`).run();
-    const response = await request('/api/restaurant-test/menu?account_id=account-1', { storeId:'store-ginza', kind:'course', name:'架空のコース', price:1000, status:'draft', description:'季節の料理', imageMediaId:'menu-photo' });
-    expect(response.status).toBe(201);
-    const id = ((await response.json()) as {data:{id:string}}).data.id;
-    const list = await request('/api/restaurant-test/menus?account_id=account-1&storeId=store-ginza');
-    const result = (await list.json()) as {data:Array<{id:string;description:string|null;image_media_id:string|null}>};
-    expect(result.data.find(row => row.id === id)).toMatchObject({ description:'季節の料理', image_media_id:'menu-photo' });
-    const impact = await getMediaDeleteImpactSnapshot(testDb.db, 'menu-photo', 'account-2', '2026-11-03T00:00:00Z');
-    expect(impact?.impact).toMatchObject({ canDelete:false, usageCount:1, references:[expect.objectContaining({ kind:'restaurant_menu', name:'架空のコース' })] });
-    testDb.raw.prepare(`INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES('replacement','account-2','image','other.png','image/png',100,'fake/replacement.png')`).run();
-    const plan = await getMediaReplacementPlan(testDb.db, { sourceId:'menu-photo', replacementId:'replacement', lineAccountId:'account-2', checkedAt:'2026-11-03T00:00:00Z' });
-    expect(plan?.impact).toMatchObject({ canReplace:false, canPartiallyReplace:false, blockedCount:1 });
-    const path = `/api/restaurant-test/menu/${id}?account_id=account-1`;
-    expect((await requestWithMethod(path, 'PATCH', { name:'名前だけ変更' })).status).toBe(200);
-    expect(testDb.raw.prepare('SELECT description,image_media_id FROM rt_menu_items WHERE id=?').get(id)).toEqual({ description:'季節の料理', image_media_id:'menu-photo' });
-    expect((await requestWithMethod(path, 'PATCH', { description:'新しい説明', imageMediaId:null })).status).toBe(200);
-    const updated = await request('/api/restaurant-test/menus?account_id=account-1&storeId=store-ginza');
-    expect(((await updated.json()) as typeof result).data.find(row => row.id === id)).toMatchObject({ description:'新しい説明', image_media_id:null });
-    testDb.raw.prepare(`INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES('other-photo','account-3','image','x.png','image/png',1,'other.png')`).run();
-    const unavailable = await requestWithMethod(path, 'PATCH', { imageMediaId:'other-photo' });
-    expect(unavailable.status).toBe(400);
-    expect(await unavailable.json()).toMatchObject({ code:'MENU_IMAGE_UNAVAILABLE' });
-    const missing = await request('/api/restaurant-test/menu?account_id=account-1', { storeId:'store-ginza', kind:'course', name:'欠けた画像', price:1000, imageMediaId:'missing' });
-    expect(missing.status).toBe(400);
-    expect(await missing.json()).toMatchObject({ code:'MENU_IMAGE_UNAVAILABLE' });
-    expect((await requestWithMethod(path, 'PATCH', { description:'x'.repeat(2001) })).status).toBe(400);
-  });
+  it('登録済み画像と説明を保存し、読み直せる', () => checkRestaurantMenuMedia({ testDb, seedRestaurantFixture, request, requestWithMethod }));
 });
 
 describe('V8-B メニューの価格確定', () => {

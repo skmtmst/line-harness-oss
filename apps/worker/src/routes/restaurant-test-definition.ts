@@ -428,7 +428,7 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
   }
   if (body.effectiveAt !== undefined && body.effectiveAt !== null && (typeof body.effectiveAt !== 'string' || !Number.isFinite(Date.parse(body.effectiveAt)))) return inputError(c, { success:false,error:'価格の開始日時を確認してください' }, 400, ["effectiveAt"]);
   if (!validRestaurantMenuDescription(body.description)) return inputError(c, { success:false, error:'説明は2000文字以内で入力してください' }, 400, ['description']);
-  if ((body.imageMediaId != null && (typeof body.imageMediaId !== 'string' || !body.imageMediaId)) || (body.imageMediaId !== undefined && !await validRestaurantMenuImage(dbFor(c.env, current.store_id), current.store_id, body.imageMediaId))) return c.json({ success:false, code:'MENU_IMAGE_UNAVAILABLE', error:'選択した画像を利用できません。登録メディアから選び直してください。' }, 400);
+  if ((body.imageMediaId != null && (typeof body.imageMediaId !== 'string' || !body.imageMediaId)) || (!await validRestaurantMenuImage(dbFor(c.env, current.store_id), current.store_id, body.imageMediaId === undefined ? current.image_media_id : body.imageMediaId))) return c.json({ success:false, code:'MENU_IMAGE_UNAVAILABLE', error:'選択した画像を利用できません。登録メディアから選び直してください。' }, 400);
   const effectiveAt = body.effectiveAt ? new Date(body.effectiveAt).toISOString() : null;
   const db = dbFor(c.env, current.store_id);
   const approvalId = price !== current.price ? crypto.randomUUID() : null;

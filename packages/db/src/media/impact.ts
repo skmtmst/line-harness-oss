@@ -187,7 +187,7 @@ export async function describeMediaUsageInner(
   };
 }
 
-/** 飲食のメニューは専用列を正本として直接照合する。別アカウントの名前は返さない。 */
+/** 飲食のメニューは専用列を正本として直接照合する。別アカウントの名称を伏せる。 */
 async function restaurantMenuReferences(db: D1Database, mediaId: string, lineAccountId: string, checkedAt: string): Promise<MediaDeleteImpactReference[]> {
   const rows = await db.prepare(`SELECT m.id, m.name, s.line_account_id FROM rt_menu_items m
     JOIN rt_stores s ON s.id = m.store_id WHERE m.image_media_id = ?`).bind(mediaId)
