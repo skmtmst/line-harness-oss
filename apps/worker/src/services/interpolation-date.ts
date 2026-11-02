@@ -26,12 +26,12 @@ export type DateFormat =
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 export const DATE_FORMATS: { value: DateFormat; label: string; example: string }[] = [
-  { value: 'md_w', label: '月日と曜日', example: '8月20日(水)' },
-  { value: 'ymd_w', label: '年月日と曜日', example: '2026年8月20日(水)' },
+  { value: 'md_w', label: '月日と曜日', example: '8月20日(木)' },
+  { value: 'ymd_w', label: '年月日と曜日', example: '2026年8月20日(木)' },
   { value: 'md', label: '月日', example: '8月20日' },
   { value: 'ymd', label: '年月日', example: '2026年8月20日' },
-  { value: 'slash_md_w', label: '月日と曜日（スラッシュ）', example: '8/20(水)' },
-  { value: 'slash_ymd_w', label: '年月日と曜日（スラッシュ）', example: '2026/8/20(水)' },
+  { value: 'slash_md_w', label: '月日と曜日（スラッシュ）', example: '8/20(木)' },
+  { value: 'slash_ymd_w', label: '年月日と曜日（スラッシュ）', example: '2026/8/20(木)' },
   { value: 'slash_md', label: '月日（スラッシュ）', example: '8/20' },
   { value: 'slash_ymd', label: '年月日（スラッシュ）', example: '2026/8/20' },
 ]

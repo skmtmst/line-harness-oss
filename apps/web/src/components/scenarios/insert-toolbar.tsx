@@ -28,12 +28,12 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
 const DATE_FORMATS: { token: string; label: string; example: string }[] = [
-  { token: '{{date}}', label: '月日と曜日', example: '8月20日(水)' },
-  { token: '{{date:ymd_w}}', label: '年月日と曜日', example: '2026年8月20日(水)' },
+  { token: '{{date}}', label: '月日と曜日', example: '8月20日(木)' },
+  { token: '{{date:ymd_w}}', label: '年月日と曜日', example: '2026年8月20日(木)' },
   { token: '{{date:md}}', label: '月日', example: '8月20日' },
   { token: '{{date:ymd}}', label: '年月日', example: '2026年8月20日' },
-  { token: '{{date:slash_md_w}}', label: '月日と曜日（スラッシュ）', example: '8/20(水)' },
-  { token: '{{date:slash_ymd_w}}', label: '年月日と曜日（スラッシュ）', example: '2026/8/20(水)' },
+  { token: '{{date:slash_md_w}}', label: '月日と曜日（スラッシュ）', example: '8/20(木)' },
+  { token: '{{date:slash_ymd_w}}', label: '年月日と曜日（スラッシュ）', example: '2026/8/20(木)' },
   { token: '{{date:slash_md}}', label: '月日（スラッシュ）', example: '8/20' },
   { token: '{{date:slash_ymd}}', label: '年月日（スラッシュ）', example: '2026/8/20' },
 ]
