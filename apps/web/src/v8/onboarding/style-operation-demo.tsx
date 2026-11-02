@@ -110,8 +110,8 @@ type EcEntry = { name: string; detail: string }
  * （未検証のため完成済みとしない）。実データの読み書きはしない。
  */
 const EC_BOARD_SAMPLE: EcEntry[] = [
-  { name: '見本 焼き菓子セット', detail: '¥1,200・残り 20' },
-  { name: '見本 ハーブティー', detail: '¥800・残り 35' },
+  { name: '見本 焼き菓子セット', detail: '¥1,200' },
+  { name: '見本 ハーブティー', detail: '¥800' },
 ]
 
 /**
@@ -159,7 +159,7 @@ const SALON_AFTER_SAMPLE = {
 /** サロン4ページ目「来店のあとも、つながりが続く」の静止見本。保存・送信はしない。 */
 export function SalonAfterDemo() {
   return <section aria-label="来店のあとの見本">
-    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
     <Card layout="vertical" padding="default" gap="normal" aria-label="来店のあと">
       <strong>来店のあと（見本）</strong>
       <section aria-label="来店の記録">
@@ -183,18 +183,17 @@ export function SalonAfterDemo() {
 /** EC3ページ目「商品の案内を用意する」の静止見本。保存・送信はしない。 */
 export function EcOperationDemo() {
   return <section aria-label="商品の案内の見本">
-    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <p className={styles.note}>画面の見本です。店のECサイトの商品案内の例で、在庫の管理はしません。実際の設定は変わりません。</p>
     <Card layout="vertical" padding="default" gap="normal" aria-label="商品の案内">
       <strong>商品の案内（見本）</strong>
       <ul className={styles.can}>
         {EC_BOARD_SAMPLE.map(entry => (
           <li key={entry.name}>
-            <StatusBadge tone="neutral">掲載中</StatusBadge>
             <span>{entry.name}・{entry.detail}</span>
           </li>
         ))}
       </ul>
-      <p className={styles.note}>名前・数は架空です。見本のため実際の設定は変わりません。</p>
+      <p className={styles.note}>名前・値段は架空です。見本のため実際の設定は変わりません。</p>
     </Card>
   </section>
 }
