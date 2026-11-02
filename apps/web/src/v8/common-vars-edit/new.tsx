@@ -154,7 +154,7 @@ export default function NewCommonVarV8() {
     { label: 'ホーム', href: '/' },
     { label: '共通情報', href: '/contents/vars' },
   ])
-  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountLoading, error: accountError } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
   const router = useRouter()
@@ -400,13 +400,17 @@ export default function NewCommonVarV8() {
   const saveDisabled = saving || !canWrite
   const previewName = name.trim() || '共通情報'
 
+  const previewAccountName = !accountLoading && !accountError && selectedAccountId && selectedAccount?.id === selectedAccountId
+    ? selectedAccount.displayName?.trim() || selectedAccount.name.trim() || 'アカウント名未取得'
+    : 'アカウント名未取得'
+
   const preview = (
     <>
       <Notice tone="warn" heading="秘密の値は入れないでください">
         パスワード・APIキー・トークンなどは保存できません（入れると止めます）。配信文に誤って差し込まれるおそれがあります。外部連携の設定に登録してください。
       </Notice>
-      <LinePreview caption="差し込んだ例" accountName="musubo" note="差し込んだときの見え方です。名前と中身を入れると、ここが変わります。">
-        <LinePreviewMessage accountName="musubo" avatar={<MusuboMark />} time="10:00">
+      <LinePreview caption="差し込んだ例" accountName={previewAccountName} note="差し込んだときの見え方です。名前と中身を入れると、ここが変わります。">
+        <LinePreviewMessage accountName={previewAccountName} avatar={<MusuboMark />} time="10:00">
           {`いつもありがとうございます。\n${previewName}は ${value || emptyValue('unconfigured')} です。`}
         </LinePreviewMessage>
       </LinePreview>
