@@ -101,6 +101,7 @@ export type DialogProps = {
   confirmPlacement?: 'start'
   error?: string
   confirmLabel?: string
+  confirmVariant?: 'danger'
   /** 再試行中も元の操作の意味と色を保ち、表示だけを変える。既定は今までどおり。 */
   confirmRetry?: boolean
   /** 実行中の文字。Buttonのbusyへ渡す。 */
@@ -176,6 +177,7 @@ export default function Dialog({
   initialFocusId,
   error,
   confirmLabel = '保存する',
+  confirmVariant,
   confirmRetry = false,
   busyLabel = '処理中…',
   cancelLabel = 'キャンセル',
@@ -370,7 +372,7 @@ export default function Dialog({
             <Button
               actionWording
               data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
-              variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? isDeleteConfirmation(confirmLabel) ? 'text' : 'secondary' : 'primary'}
+              variant={confirmVariant ?? (primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? isDeleteConfirmation(confirmLabel) ? 'text' : 'secondary' : 'primary')}
               textTone={tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? 'danger' : undefined}
               className={styles.designButton}
               widthReserve={actionWidthReserve}

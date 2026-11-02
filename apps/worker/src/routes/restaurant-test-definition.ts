@@ -402,7 +402,7 @@ async function attendance(c:Context<Env>,legacy?:'visit'|'undo_visit') {
   const stamped=await dbFor(c.env,r.store_id).prepare("SELECT SUM(delta) AS count FROM visit_stamp_entries WHERE visit_key=? AND kind IN('visit','reverse','restore')").bind('restaurant:'+id).first<{count:number|null}>();
   const stamp={status:stamped?.count?'recorded':'pending_or_unavailable',count:stamped?.count??0};
   return c.json({success:true,data:{...data as object,visit_mark:mark,stamp}});
- }catch(e){if(e instanceof StampError)return inputError(c,{success:false,error:e.message,code:e.message,fields:e.fields},e.status);throw e;}
+ }catch(e){if(e instanceof StampError){const error=e.message==='approval_required'?'承認してから無断にしてください':e.message==='already_arrived'?'来店済みの予約は無断にできません':e.message;return inputError(c,{success:false,error,code:e.message,fields:e.fields},e.status);}throw e;}
 }
 
 export const updateRestaurantMenu = async (c: Context<Env>) => {
