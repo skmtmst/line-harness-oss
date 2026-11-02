@@ -576,7 +576,7 @@ function FriendDetailInner() {
         </Card>
       </div>
 
-      {canAdjust ? (
+      {canAdjust && available != null ? (
         <MileageAdjustDialog
           key={adjustMode}
           open={adjustmentOpen}

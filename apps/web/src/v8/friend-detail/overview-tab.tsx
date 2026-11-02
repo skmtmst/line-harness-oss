@@ -223,12 +223,12 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         </p>
       ) : (
         <div className={styles.mile}>
-          <span className={styles.mileNum}>{mileageStatus === 'ready' && mileage ? formatNumber(mileage.available) : emptyValue('unknown')}</span>
+          <span className={styles.mileNum}>{mileageStatus === 'ready' && mileage?.available != null ? formatNumber(mileage.available) : emptyValue('unknown')}</span>
           <span className={styles.mileUnit}>
-            マイル使える{mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
+            マイル使える{mileage?.balanceSource === 'ec' ? '（ECと同期）' : mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
           </span>
         </div>
-      )}{rankLine ? <p className={styles.memo}>{rankLine}</p> : null}</> },
+      )}{mileageStatus === 'ready' && mileage?.balanceSource === 'ec' ? <p className={styles.memo}>会員ランク：{mileage.ecRank ?? '未設定'}（ECと同期）</p> : mileageStatus === 'ready' && mileage?.balanceSource !== 'ec' && rankLine ? <p className={styles.memo}>{rankLine}</p> : null}</> },
         { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)}>{perms.manage ? '変える' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} /> },
         { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Button variant="text" size="inline" href="/rich-menus">変える</Button> : <Button variant="text" size="inline" disabled lockedReason={manageLockReason}>変える</Button>, content: <>{richMenuStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>

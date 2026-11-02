@@ -58,7 +58,8 @@ interface OfferData {
 interface MileageData {
   programId: string;
   programName: string;
-  available: number;
+  available: number | null;
+  balanceSource?: 'ec' | 'musubo';
   pending: number;
   lifetimeEarned: number;
   spent: number;
@@ -324,18 +325,19 @@ function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
         <div>
           <p className="text-xs font-semibold opacity-80">{mileage.programName}</p>
           <p className="mt-1 text-4xl font-bold tracking-tight">
-            {mileage.available.toLocaleString()}
+            {mileage.available == null ? '—' : mileage.available.toLocaleString()}
             <span className="ml-1 text-sm font-semibold opacity-80">mile</span>
           </p>
-          <p className="mt-1 text-xs opacity-75">現在利用できるマイル</p>
+          <p className="mt-1 text-xs opacity-75">{mileage.balanceSource === 'ec' ? 'ECと同期したマイル' : '現在利用できるマイル'}</p>
         </div>
-        {mileage.pending > 0 && (
+        {mileage.balanceSource !== 'ec' && mileage.pending > 0 && (
           <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">
             確定待ち {mileage.pending.toLocaleString()}
           </span>
         )}
       </div>
 
+      {mileage.balanceSource === 'ec' && <p className="text-xs opacity-75">以下はmusubo側の記録です</p>}
       <div className="af-mileage-grid">
         <div>
           <span>累計獲得</span>
@@ -370,7 +372,7 @@ function MileageHistoryAccordion({ wallet }: { wallet: MileageWalletData }) {
     <details className="af-card af-history-accordion">
       <summary className="af-history-summary">
         <div className="min-w-0">
-          <h2 className="text-sm font-bold text-gray-900">マイル履歴</h2>
+          <h2 className="text-sm font-bold text-gray-900">{wallet.mileage.balanceSource === 'ec' ? 'musubo側のマイル履歴' : 'マイル履歴'}</h2>
           <p className="text-[11px] text-gray-400 mt-0.5">行動後、定期集計で反映されます</p>
         </div>
         <div className="flex items-center gap-2">

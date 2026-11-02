@@ -67,6 +67,7 @@ describe('V8 たまる決めごとの「止めているのみ」', () => {
     calls.friendsV6.mockResolvedValue({
       success: true,
       data: {
+        balanceSource: 'musubo',
         items: [],
         summary: {
           available: 0, totalMembers: 0, withBalanceCount: 0, pending: 0,
@@ -90,7 +91,7 @@ describe('85 題の右は副・主の順', () => {
   it('主ボタン（決めごとを作る）が右端に来る', async () => {
     calls.earningRulesV6.mockReset().mockResolvedValue({ success: true, data: overview([rule('r1', '動いている決めごと', 'published')]) })
     calls.history.mockResolvedValue({ success: true, data: { summary: { byType: [] } } })
-    calls.friendsV6.mockResolvedValue({ success: true, data: { items: [], summary: { available: 0, totalMembers: 0, withBalanceCount: 0, pending: 0, monthChange: 0, rankCounts: [], expiringMiles30d: null, nextExpiringAt: null }, pagination: { total: 0, limit: 1, offset: 0 }, measuredAt: '2026-09-01T00:00:00+09:00' } })
+    calls.friendsV6.mockResolvedValue({ success: true, data: { balanceSource: 'musubo', items: [], summary: { available: 0, totalMembers: 0, withBalanceCount: 0, pending: 0, monthChange: 0, rankCounts: [], expiringMiles30d: null, nextExpiringAt: null }, pagination: { total: 0, limit: 1, offset: 0 }, measuredAt: '2026-09-01T00:00:00+09:00' } })
     render(<V8EarningRulesTab />)
     await waitFor(() => expect(screen.getByRole('link', { name: '決めごとを作る' })).toBeTruthy())
     const region = document.querySelector('[data-page-heading-actions]')

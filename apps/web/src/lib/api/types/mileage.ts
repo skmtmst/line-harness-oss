@@ -3,7 +3,9 @@ import type { MileageFriendHistorySummary } from '@line-crm/shared'
 export type MileageSummary = {
   programId: string
   programName: string
-  available: number
+  available: number | null
+  balanceSource?: 'ec' | 'musubo'
+  ecRank?: string
   pending: number
   lifetimeEarned: number
   spent: number

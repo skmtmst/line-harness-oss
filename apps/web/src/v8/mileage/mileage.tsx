@@ -87,11 +87,11 @@ function MileageInner() {
       {tab === 'earning-rules' ? <EarningRulesTab key={tab} /> : null}
       {tab === 'rewards' ? <RewardsTab key={tab} /> : null}
       {tab === 'balances' ? <BalancesTab key={tab} /> : null}
-      {tab === 'history' ? currentSource === 'ec' || currentSource === 'musubo' ? <HistoryTab key={tab} />
+      {tab === 'history' ? !accountLoading && !selectedAccountId ? <MileageFrame><ListState kind="empty" title="LINEアカウントを選択してください" /></MileageFrame> : currentSource === 'ec' || currentSource === 'musubo' ? <HistoryTab key={tab} />
         : currentSource === 'error' ? <MileageFrame><ListState kind="error" title="残高の設定元を読み込めませんでした" onRetry={() => setSourceRetry((value) => value + 1)} /></MileageFrame>
         : <MileageFrame><ListState kind="loading" title="残高の設定元を確認しています" /></MileageFrame> : null}
       {tab === 'score' ? <ScoreTab key={tab} /> : null}
-      {tab === 'ranks' ? source?.account !== selectedAccountId ? <MileageFrame><ListState kind="loading" title="会員ランクを確認しています" /></MileageFrame>
+      {tab === 'ranks' ? !accountLoading && !selectedAccountId ? <MileageFrame><ListState kind="empty" title="LINEアカウントを選択してください" /></MileageFrame> : source?.account !== selectedAccountId ? <MileageFrame><ListState kind="loading" title="会員ランクを確認しています" /></MileageFrame>
         : source.value === 'ec' ? <MileageFrame><ListState kind="empty" title="会員ランクはECと同期" description="会員ランクの設定はECと同期しています。" action={<Button href="/nen/members?tab=ranks">ランク設定を見る</Button>} /></MileageFrame>
         : source.value === 'error' ? <MileageFrame><ListState kind="error" title="会員ランクの設定元を読み込めませんでした" onRetry={() => setSourceRetry((value) => value + 1)} /></MileageFrame>
         : <RanksTab key={tab} /> : null}

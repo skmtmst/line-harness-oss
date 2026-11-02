@@ -22,6 +22,7 @@ import MileagePage from './page'
  */
 let query = ''
 let balanceSource: 'ec' | 'musubo' | 'unknown' = 'musubo'
+let selectedAccountId: string | null = 'account-a'
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/mileage',
@@ -29,7 +30,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
-    selectedAccountId: 'account-a', selectedAccount: null, loading: false,
+    selectedAccountId, selectedAccount: null, loading: false,
   }),
 }))
 
@@ -395,6 +396,14 @@ test('EC が正の店では musubo の会員ランクを出さず EC と同期�
   await eventually(() => expect(host.textContent).toContain('ECと同期'))
   expect(host.textContent).not.toContain('ランクを足す')
   expect(host.textContent).not.toContain('動かす')
+})
+
+test.each(['history', 'ranks'])('アカウント未選択の%sは選択案内を出す', async (tab) => {
+  document.documentElement.dataset.theme = 'v8'; selectedAccountId = null; query = `tab=${tab}`
+  try {
+    await act(async () => root.render(<MileagePage />))
+    await eventually(() => expect(host.textContent).toContain('LINEアカウントを選択してください'))
+  } finally { selectedAccountId = 'account-a' }
 })
 
 test('設定元が不明ならランクを推測せず読み込みエラーを出す', async () => {

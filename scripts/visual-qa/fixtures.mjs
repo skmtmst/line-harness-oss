@@ -5227,7 +5227,7 @@ export const MILEAGE_OVERVIEW = {
  * 機能17の新しい友だち別残高契約。
  * 旧 `/overview` と違い、失効予定・今月の増減・財布の範囲を1行ずつ返す。
  */
-export const MILEAGE_FRIENDS = {
+export const MILEAGE_FRIENDS = { balanceSource: 'musubo',
   summary: {
     totalMembers: 1284,
     withBalanceCount: 1284,
