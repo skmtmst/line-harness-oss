@@ -197,15 +197,16 @@ it('スタイルを変えると最初のページに戻り、標準ではお知�
   expect(screen.getByRole('heading', { name: 'お知らせを作る' })).toBeTruthy()
 })
 
-it.each(['consult', 'lesson'] as const)('%s の体験台本もお礼の自動送信を断定しない', (style) => {
+it.each(['salon', 'consult', 'lesson'] as const)('%s の体験台本もお礼の自動送信を断定しない', (style) => {
   const script = STYLE_EXPERIENCE_SCRIPT.styles[style]
   const thanks = script.scenes.find(scene => scene.step === 'thanks')
   expect(thanks?.line).toBe('お礼の文と時刻の見本です（自動で送る機能の有無と条件は確認中です）')
-  expect(script.can[2].text).toContain('お礼を自動で送る機能の有無と条件は確認中です')
-  expect(JSON.stringify(script)).not.toMatch(/翌日にお礼を送れます|面談のお礼を送れます|参加のお礼を送れます/)
+  expect(script.can.find(item => item.text.includes('お礼'))?.text).toContain('お礼を自動で送る機能の有無と条件は確認中です')
+  expect(JSON.stringify(script)).not.toMatch(/翌日にお礼を送れます|面談のお礼を送れます|参加のお礼を送れます|来店のお礼を送れます/)
 })
-it('サロンの体験台本は翌日を時刻の見本として説明する', () => {
+it('サロンのお礼は確認中と示し、時刻と文面の見本を保つ', () => {
   const thanks = STYLE_EXPERIENCE_SCRIPT.styles.salon.scenes.find(scene => scene.step === 'thanks')
-  expect(thanks?.line).toBe('来店のお礼の文と翌日の時刻の見本です（送信には設定と承認が必要です）')
-  expect(thanks?.line).not.toContain('翌日にお礼を送れます')
+  expect(thanks?.line).toBe('お礼の文と時刻の見本です（自動で送る機能の有無と条件は確認中です）')
+  expect(thanks?.phone).toMatchObject({ part: 'line-talk', data: { caption: '翌日 12:00', messages: [{ from: 'shop', starter: 'reminder-thanks', text: '昨日はありがとうございました。またのお越しをお待ちしています。', time: '12:00' }] } })
+  expect(STYLE_EXPERIENCE_SCRIPT.styles.salon.can.find(item => item.text.includes('お礼'))?.text).toBe('前日の案内と来店のお礼の文を用意できます（お礼を自動で送る機能の有無と条件は確認中です）')
 })

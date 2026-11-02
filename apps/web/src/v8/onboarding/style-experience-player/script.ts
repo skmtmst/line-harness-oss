@@ -198,7 +198,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
       can: [
         { text: '担当者とメニューを選んで、LINE から予約を受けられます', basis: 'apps/liff/src/components/menu-list・staff-list' },
         { text: '担当ごとの盤で予定を見て、次回予約率を数えます', basis: 'STYLE_DEFAULT_METRIC_IDS.salon.nextBookingRate・StaffBoard' },
-        { text: '前日のリマインドと来店のお礼を送れます（初期セットでは止めた状態で入ります）', basis: "standardStarter('salon').reminder-day-before・reminder-thanks" },
+        { text: '前日の案内と来店のお礼の文を用意できます（お礼を自動で送る機能の有無と条件は確認中です）', basis: "standardStarter('salon').reminder-day-before・reminder-thanks" },
       ],
       steps: [{ key: 'reserve', label: '予約' }, { key: 'accept', label: '受付' }, { key: 'remind', label: 'リマインド' }, { key: 'visit', label: '来店' }, { key: 'thanks', label: 'お礼' }],
       scenes: [
@@ -227,7 +227,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
           board: { kind: 'staff-board', data: salonBoard('active', true) },
         },
         {
-          step: 'thanks', ms: 4000, line: '来店のお礼の文と翌日の時刻の見本です（送信には設定と承認が必要です）',
+          step: 'thanks', ms: 4000, line: 'お礼の文と時刻の見本です（自動で送る機能の有無と条件は確認中です）',
           phone: { part: 'line-talk', data: { caption: '翌日 12:00', messages: [{ from: 'shop', starter: 'reminder-thanks', text: '昨日はありがとうございました。またのお越しをお待ちしています。', time: '12:00' }], richMenu: true } },
           dashboard: { kpis: salonKpis(7, 50, 2), rows: [salonRow({ label: '来店', tone: 'success' })] },
           board: { kind: 'staff-board', data: salonBoard('done', true) },
