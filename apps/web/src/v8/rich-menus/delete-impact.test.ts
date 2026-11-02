@@ -61,9 +61,12 @@ describe('次に出るメニュー', () => {
     expect(text).not.toContain('必ず')
   })
 
-  it('候補が無いときは、出なくなる友だちがいると言う', () => {
-    const text = nextDisplayText({ guaranteedGroupId: null, reason: 'friend_specific_rules', candidates: [] })
-    expect(text).toContain('出なくなる友だちがいます')
+  it('候補が無いときは人数の確かさに応じて伝える', () => {
+    const next = { guaranteedGroupId: null, reason: 'friend_specific_rules' as const, candidates: [] }
+    expect(nextDisplayText(next, { value: 0, state: 'available', reason: null })).toContain('表示中の友だちはいません')
+    expect(nextDisplayText(next, { value: 0, state: 'partial', reason: 'preexisting_assignments_not_backfilled' })).toContain('いる場合があります')
+    expect(nextDisplayText(next, { value: null, state: 'unavailable', reason: 'assignment_ledger_unavailable' })).toContain('いる場合があります')
+    expect(nextDisplayText(next, { value: 1, state: 'available', reason: null })).toContain('出なくなる友だちがいます')
   })
 })
 

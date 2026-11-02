@@ -1175,9 +1175,7 @@ export default function RichMenusListV8() {
       title={`「${managedDelete.name}」はまだ消せません`}
       description={impact.group.status !== 'published' && impact.blockers.includes('default_for_all')
         ? '削除せずに残しておいて問題ありません。'
-        : impact.nextDisplay.candidates.length === 0
-        ? `消すと、リッチメニューが出なくなる友だちがいます（${audienceText(impact.currentAudience)}）。先に下の順に外してください。`
-        : `${nextDisplayText(impact.nextDisplay)}先に下の順に外してください。`}
+        : `${nextDisplayText(impact.nextDisplay, impact.currentAudience)}先に下の順に外してください。`}
       rows={blockerRows}
       busy={deleteBusy}
       error={deleteError}
@@ -1239,7 +1237,7 @@ export default function RichMenusListV8() {
                 {audienceText(impact.currentAudience)}
                 {audienceReason(impact.currentAudience) ? `（${audienceReason(impact.currentAudience)}）` : ''}
               </p>
-              <p><strong>次に出るメニュー：</strong>{nextDisplayText(impact.nextDisplay)}</p>
+              <p><strong>次に出るメニュー：</strong>{nextDisplayText(impact.nextDisplay, impact.currentAudience)}</p>
               <p>
                 <strong>切替元：</strong>
                 {impact.incomingSwitches.length === 0

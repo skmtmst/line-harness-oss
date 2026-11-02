@@ -196,14 +196,14 @@ export default function AdConnectionsV8() {
           <Th className={styles.colState}>状態</Th>
         </TableHeadRow></thead><tbody>
         {mapping.rows.map((row) => {
-          const returns = adMappingReturns(row.google) || adMappingReturns(row.meta)
+          const returns = model.platforms.some(platform => platform.isActive && platform.verifiedAt && ((platform.name === 'google' && adMappingReturns(row.google)) || (platform.name === 'meta' && adMappingReturns(row.meta))))
           return (
             <Tr key={row.pointId} data-table-layout="columns">
               <Td grow><span className={styles.cellText} title={row.pointName}>{row.pointName}</span></Td>
               <Td className={styles.colName}>{nameCell(row.google, 'Google広告')}</Td>
               <Td className={styles.colName}>{nameCell(row.meta, 'Meta広告')}</Td>
               <Td className={styles.colState}>
-                <StatusBadge tone={returns ? 'success' : 'neutral'} size="compact">{returns ? '返している' : '返していない'}</StatusBadge>
+                <StatusBadge tone={!model.loading && !model.failed && returns ? 'success' : 'neutral'} size="compact">{model.loading ? '確認中' : model.failed ? '確認できません' : returns ? '返している' : '返していない'}</StatusBadge>
               </Td>
             </Tr>
           )
