@@ -18,6 +18,7 @@ vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 
 import ReservationsPage from './reservations'
+import { ApiError } from '@/lib/api'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
@@ -134,6 +135,20 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     fireEvent.click(screen.getByRole('button', { name: '17:00' }))
     fireEvent.click(await screen.findByRole('button', { name: /台帳に入れる/ }))
     await waitFor(() => expect(fixture.createReservation).toHaveBeenCalledWith('account-1', expect.objectContaining({ customerName: '鈴木 花子', customerPhone: '09000001111', guestCount: 2, source: 'phone', kind: 'customer', startsAt: '2026-10-10T08:00:00.000Z', endsAt: '2026-10-10T10:00:00.000Z' })))
+  })
+
+  it('電話予約の保存時に営業時間未設定のコードを受け取ると設定を案内する', async () => {
+    fixture.createReservation.mockRejectedValueOnce(new ApiError(409, 'synthetic', 'opening_hours_unconfigured'))
+    render(<ReservationsPage />)
+    await screen.findByText('山田 太郎')
+    fireEvent.click(screen.getByRole('button', { name: /電話の予約を入れる/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'LINE 未連携の電話番号' }))
+    fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '鈴木 花子' } })
+    fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '090-0000-1111' } })
+    fireEvent.click(await screen.findByRole('button', { name: '17:00' }))
+    fireEvent.click(screen.getByRole('button', { name: /台帳に入れる/ }))
+    await waitFor(() => expect(fixture.createReservation).toHaveBeenCalledOnce())
+    expect(await screen.findByText('営業時間が未設定のため予約できません。営業時間を確認してください。')).toBeTruthy()
   })
 
   it('一覧の行メニューから直接変更し、詳細への入口と版つき保存を保つ', async () => {

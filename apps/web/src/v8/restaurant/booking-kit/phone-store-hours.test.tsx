@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import PhoneReservation from '../reservations/phone'
 import PhoneReservationDrawer from '../front-desk/phone-drawer'
+import { ApiError } from '@/lib/api'
 import { tables } from './test-data'
 
 const api = vi.hoisted(() => ({ openingHours: vi.fn(), reservationsDay: vi.fn(), customerSearch: vi.fn(), customerHistory: vi.fn(), createReservation: vi.fn() }))
@@ -192,4 +193,29 @@ it('教室で管理者でなければイベント管理の入口を案内しな�
  render(<PhoneReservation storeId="store-b" storeName="二号店" accountStyle="lesson" staffRole="staff" tables={tables} menuItems={[]} busy={false} preset={{hold:true,date:new Date('2026-11-03T00:00:00+09:00'),time:''}} onBack={vi.fn()} onSave={onSave} />)
  await screen.findByText(/この画面は飲食店スタイルの古い予約/)
  expect(screen.queryByRole('link',{name:'予約画面へ'})).toBeNull()
+})
+
+it('右パネルは保存時のコードを読み、営業時間の設定を案内する', async () => {
+ api.createReservation.mockRejectedValueOnce(new ApiError(409, 'synthetic', 'opening_hours_unconfigured'))
+ render(node('drawer','account-a','store-a'))
+ fireEvent.change(screen.getByRole('textbox',{name:'お名前'}),{target:{value:'架空客'}})
+ fireEvent.click(screen.getByRole('button',{name:/明日/}))
+ fireEvent.click(await screen.findByRole('button',{name:'19:00',exact:true}))
+ const save=screen.getByRole('button',{name:'予約を入れる'}) as HTMLButtonElement
+ await waitFor(()=>expect(save.disabled).toBe(false))
+ fireEvent.click(save)
+ await waitFor(()=>expect(api.createReservation).toHaveBeenCalledOnce())
+ expect(await screen.findByText('営業時間が未設定のため予約できません。営業時間を確認してください。')).toBeTruthy()
+})
+
+it('入力済みでも他スタイルではボタンとフォームの両方で受付を止める', async () => {
+ const page=(style:'restaurant'|'salon') => <PhoneReservation accountStyle={style} staffRole="owner" storeId="store-a" storeName="人工店舗" tables={tables} menuItems={[]} busy={false} preset={{hold:true,date:new Date('2026-11-03T00:00:00+09:00'),time:''}} onBack={vi.fn()} onSave={onSave} />
+ const view=render(page('restaurant'))
+ fireEvent.click(await screen.findByRole('button',{name:'19:00',exact:true}))
+ const save=screen.getByRole('button',{name:'枠を押さえる'}) as HTMLButtonElement
+ await waitFor(()=>expect(save.disabled).toBe(false))
+ view.rerender(page('salon'))
+ expect(save.disabled).toBe(true)
+ fireEvent.submit(document.querySelector('form')!)
+ expect(onSave).not.toHaveBeenCalled()
 })
