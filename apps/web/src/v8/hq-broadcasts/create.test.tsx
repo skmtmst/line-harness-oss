@@ -765,6 +765,15 @@ describe('読み込めない配信の保護', () => {
     expect(saved.input.messageBubblesJson).toBe(raw)
     expect(hq.create).not.toHaveBeenCalled(); expect(hq.update).not.toHaveBeenCalled(); expect(hq.send).not.toHaveBeenCalled()
   })
+  it.each([['id', 'image'], ['copy', 'flex']])('吹き出しのない旧形式 %s / %s は保存を止める', async (param, messageType) => {
+    params.value = new URLSearchParams(`${param}=run-x`)
+    const saved = source('')
+    hq.get.mockResolvedValue({ data: { ...saved, input: { ...saved.input, messageType } } })
+    render(<HqBroadcastCreate />)
+    expect((await screen.findByRole('alert')).textContent).toContain('編集・保存・送信はできません')
+    expect(screen.queryByRole('button', { name: /下書きを保存する|今すぐ送る|予約する/ })).toBeNull()
+    expect(hq.create).not.toHaveBeenCalled(); expect(hq.update).not.toHaveBeenCalled(); expect(hq.send).not.toHaveBeenCalled()
+  })
   it('未対応の複製元を読み込んでも保存・送信しない', async () => {
     params.value = new URLSearchParams('copy=run-x')
     hq.get.mockResolvedValue({ data: source(mixed) })

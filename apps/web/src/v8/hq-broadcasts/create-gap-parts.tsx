@@ -69,11 +69,11 @@ function bubblesFromInput(saved: Pick<HqBroadcastInput, 'messageBubblesJson' | '
 
 
 /** 読み直すと失われるメッセージを含む場合は編集しない。 */
-function hasUnsupportedBubbles(saved: Pick<HqBroadcastInput, 'messageBubblesJson'>): boolean {
-  if (!saved.messageBubblesJson) return false
+function hasUnsupportedBubbles(saved: Pick<HqBroadcastInput, 'messageBubblesJson' | 'messageType'>): boolean {
+  if (!saved.messageBubblesJson) return saved.messageType !== 'text'
   try {
     const raw: unknown = JSON.parse(saved.messageBubblesJson)
-    if (!Array.isArray(raw) || raw.length > MAX_BUBBLES) return true
+    if (!Array.isArray(raw) || raw.length > MAX_BUBBLES || (raw.length === 0 && saved.messageType !== 'text')) return true
     return raw.some((item: unknown) => !item || typeof item !== 'object' || Array.isArray(item) || !fromApiBubble(item as { type?: string; content?: Record<string, unknown> }))
   } catch { return true }
 }
