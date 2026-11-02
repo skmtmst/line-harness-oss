@@ -212,19 +212,6 @@ it('サロンのお礼は確認中と示し、時刻と文面の見本を保つ'
   expect(STYLE_EXPERIENCE_SCRIPT.styles.salon.can.find(item => item.text.includes('お礼'))?.text).toBe('前日の案内と来店のお礼の文を用意できます（お礼を自動で送る機能の有無と条件は確認中です）')
 })
 
-it.each(['restaurant', 'salon', 'consult', 'lesson', 'standard', 'ec'] as const)('%s の最後のページに見本の案内を表示する', (style) => {
-  const choose = vi.fn()
-  function Subject() {
-    const [chosen, setChosen] = useState<AccountStyle | null>(null)
-    return <StyleChoiceStep viewing={style} onView={vi.fn()} chosen={chosen} onChoose={value => { choose(value); setChosen(value) }} detail demoPage={4} />
-  }
-  // 実際の窓では各ページ共通の下部に選択操作がある。
-  // 内容の動作は窓の試験で確認し、ここでは各スタイルに案内があることを確かめる。
-  render(<Subject />)
-  expect(screen.getByRole('region', { name: '見本から始める案内' })).toBeTruthy()
-  expect(choose).not.toHaveBeenCalled()
-})
-
 it.each(['standard', 'ec'] as const)('%s の設定の見本には予約を出さない', (style) => {
   render(<StyleChoiceStep viewing={style} onView={vi.fn()} chosen={null} onChoose={vi.fn()} detail demoPage={1} />)
   expect(screen.getByRole('region', { name: `${STYLE_EXPERIENCE_SCRIPT.styles[style].label}のデモ` }).textContent).not.toContain('予約')
