@@ -118,6 +118,8 @@ test('シナリオの説明本文を型へつなぎ、開閉と同じ人の保�
     const tip = document.getElementById(toggle.getAttribute('aria-describedby') ?? '')
     expect(tip?.textContent).toContain('作っただけでは送られません。')
     expect(tip?.textContent).toContain('テストを送ってから配信を始めます')
+    expect(tip?.textContent).not.toContain('配信を始める方法・3手順')
+    expect(toggle.hasAttribute('title')).toBe(false)
     fireEvent.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
   } finally {

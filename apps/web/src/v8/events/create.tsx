@@ -525,7 +525,7 @@ function EventsCreateV8Inner() {
       <Card variant="form" gap="normal" aria-labelledby="ev-new-after-apply">
         <CardHeader size="stacked" titleId="ev-new-after-apply" title="申し込んだ人にすること" />
         <div className={styles.checks}>
-            <ToggleField checked disabled description="日時・場所が届きます" onChange={() => {}} title="申込の受付は、いつも LINE でお知らせします">
+            <ToggleField checked disabled description="申込の受付は、いつも LINE でお知らせします。日時・場所が届きます。" onChange={() => {}}>
               申込を受けたら LINE で知らせる
             </ToggleField>
 
