@@ -57,6 +57,7 @@ import MediaUploadDialog from './media-upload-dialog'
 let root: Root
 let host: HTMLDivElement
 let onComplete = vi.fn()
+let onClose = vi.fn()
 
 beforeEach(() => {
   calls.prepare.length = 0
@@ -64,6 +65,7 @@ beforeEach(() => {
   calls.complete.length = 0
   calls.putAnswer.clear()
   onComplete = vi.fn()
+  onClose = vi.fn()
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -79,7 +81,7 @@ const settle = async () => {
 }
 const render = async () => {
   await act(async () => root.render(
-    <MediaUploadDialog open accountId="account-a" folders={[]} initialFolderId="" onClose={() => {}} onComplete={onComplete} />,
+    <MediaUploadDialog open accountId="account-a" folders={[]} initialFolderId="" onClose={onClose} onComplete={onComplete} />,
   ))
   await settle()
 }
@@ -134,6 +136,8 @@ describe('メディアを入れる窓', () => {
     await press('1件を登録する')
     const row = dialog().querySelector('li[aria-live="polite"]')
     expect(row?.textContent).toContain('送信中 40%')
+    expect(dialog().querySelector('[role=progressbar][aria-label=登録しています]')?.getAttribute('aria-valuenow')).toBe('40')
+    expect(dialog().textContent).not.toContain('ほかの欄を入れて進めます')
     await act(async () => { release() })
     await settle()
     expect(dialog().textContent).toContain('1 件を登録しました')
@@ -155,4 +159,16 @@ describe('メディアを入れる窓', () => {
     expect(calls.prepare.at(-1)?.files.map((file) => file.filename)).toEqual(['b.png'])
     expect(calls.complete.map(([session]) => session)).toEqual(['session-a.png', 'session-b.png'])
   })
+})
+
+
+it('すべて登録後は件数を完了と示し、完了ボタンで閉じる', async () => {
+  await render()
+  await pick(png('done.png'))
+  await press('1件を登録する')
+  expect(dialog().textContent).not.toContain('1件を選択中')
+  expect(dialog().textContent).not.toContain('0件を登録する')
+  await press('完了')
+  expect(onClose).toHaveBeenCalledTimes(1)
+  expect(onComplete).toHaveBeenCalledTimes(1)
 })
