@@ -874,7 +874,7 @@ function EditCommonVarV8Inner() {
         }
       >
         <OperationTargetSummary accounts={[{ id: statusScope?.accountId ?? '' }]} />
-        <Field label={<><span className={styles.fieldLabelStrong}>
+        <Field required label={<><span className={styles.fieldLabelStrong}>
             {statusAction === 'stop' ? '止める理由（記録に残ります）'
               : statusAction === 'resume' ? '再開する理由（記録に残ります）'
                 : '公開する理由（記録に残ります）'}

@@ -75,6 +75,16 @@ it('状態変更の確認に対象アカウントと環境を表示する', asyn
   expect(within(dialog).getByText('環境')).toBeTruthy()
 })
 
+it('状態変更の理由は必須と表示し、空欄では送信しない', async () => {
+  render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '止める', exact: true }))
+  const dialog = await screen.findByRole('dialog', { name: '「営業時間」を止める' })
+  expect(within(dialog).getByText('必須', { exact: true })).toBeTruthy()
+  fireEvent.click(within(dialog).getByRole('button', { name: '止める', exact: true }))
+  expect(await within(dialog).findByText('変える理由を入力してください')).toBeTruthy()
+  expect(state.setStatus).not.toHaveBeenCalled()
+})
+
 it('理由を入力した状態変更は対象アカウントへ一度だけ送る', async () => {
   render(<Editor />)
   fireEvent.click(await screen.findByRole('button', { name: '止める', exact: true }))
