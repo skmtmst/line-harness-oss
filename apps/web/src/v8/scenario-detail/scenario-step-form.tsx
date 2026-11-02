@@ -63,6 +63,7 @@ export function ScenarioStepForm({
   stepFormPreview: { offsetDays: number; offsetHours: number; offsetMinutes: number; }
 }) {
   const tokenNames = useInsertTokenNames(scenario?.lineAccountId ?? null)
+  const displayOrder = editingStepId ? [...(scenario?.steps ?? [])].sort((a, b) => a.stepOrder - b.stepOrder).findIndex((step) => step.id === editingStepId) + 1 : stepForm.stepOrder
   return (    <div className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}>
       {!editingStepId && (
         <h4 className="text-sm font-semibold text-ink-secondary mb-3">新しいステップを追加</h4>
@@ -326,7 +327,7 @@ export function ScenarioStepForm({
                     hook: 'step_sent',
                     stepId: editingStepId,
                     choiceIndex: null,
-                    title: `${stepForm.stepOrder} 通目を送ったあと`,
+                    title: `${displayOrder} 通目を送ったあと`,
                   })
                 }
                 className="text-action shrink-0 text-xs hover:underline"
@@ -393,7 +394,7 @@ export function ScenarioStepForm({
       <aside data-design-node="xfYLn" className="min-w-0 space-y-4">
         <StepPreview
           deliveryMode={deliveryMode}
-          stepOrder={stepForm.stepOrder}
+          stepOrder={displayOrder}
           offsetDays={stepFormPreview.offsetDays}
           deliveryTime={stepForm.schedule.deliveryTime}
           offsetHours={stepFormPreview.offsetHours}
