@@ -164,6 +164,7 @@ export function buildRichPayload(input: {
 function richInitial(host: TemplateEditHost | undefined) {
   const content = host?.initialContent
   if (!content || content.kind !== 'rich_message') return null
+  if (content.editorState) return { name: content.name, shape: content.editorState.shapeValue, ...content.editorState }
   const payload = content.payload
   const taps = Array.isArray(payload.tapAreas) ? payload.tapAreas as Array<Record<string, unknown>> : []
   const shape = RICH_SHAPES.find((candidate) => candidate.value === payload.shape)
@@ -210,7 +211,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const [folder, setFolder] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
   const [imageUrl, setImageUrl] = useState(hostInitial?.imageUrl ?? '')
-  const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
+  const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(hostInitial && 'pickedMedia' in hostInitial ? hostInitial.pickedMedia : null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [shapeValue, setShapeValue] = useState(hostInitial ? hostInitial.shape : visual ? '2v' : '3')
   const [pendingShape, setPendingShape] = useState<string | null>(null)
@@ -242,18 +243,11 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     // 統括では上のバーのアカウントに結びつかない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
-  /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。画像の無い途中は通知しない。 */
-  const richDraftSnapshot = JSON.stringify([name, imageUrl, shapeValue, areas, uploaded])
+  // 画像や動きの準備前も、保存時の整形を通さず途中入力を記録する。
+  const richDraftSnapshot = JSON.stringify([name, imageUrl, pickedMedia, shapeValue, areas, uploaded])
   useEffect(() => {
-    if (!host?.onDraftChange) return
-    try {
-      const built = buildRichPayload({ imageUrl, pickedMedia: hqHost ? null : pickedMedia, shape: shapeDef, areas, liffId })
-      if ('error' in built) return
-      const { imageMediaId: _id, imageMediaKind: _kind, ...rest } = built.payload
-      void _id; void _kind
-      if (hqHost && !uploaded) return
-      host.onDraftChange({ kind: 'rich_message', name, payload: hqHost ? { ...uploaded!.payload, ...rest } : built.payload, media: uploaded?.media ?? [] })
-    } catch { /* 組み立て不可の途中入力は通知しない */ }
+    host?.onDraftChange?.({ kind: 'rich_message', name, payload: { ...uploaded?.payload }, media: uploaded?.media ?? [],
+      editorState: { imageUrl, pickedMedia, shapeValue, areas, uploaded } })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [richDraftSnapshot])
 

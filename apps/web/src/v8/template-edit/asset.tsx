@@ -127,39 +127,40 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
   const actionOptions = useActionOptions()
 
   /* 統括の編集：保存してある payload から欄を埋める（同じ形で保存し直す）。 */
-  const initialPayload = host?.initialContent && host.initialContent.kind === kind && 'payload' in host.initialContent ? host.initialContent.payload : existing?.payload
+  const initialPayload = host?.initialContent && host.initialContent.kind === kind && 'payload' in host.initialContent ? (host.initialContent.editorState && Object.keys(host.initialContent.payload).length === 0 ? undefined : host.initialContent.payload) : existing?.payload
+  const draftState = host?.initialContent && 'editorState' in host.initialContent && host.initialContent.kind === kind ? host.initialContent.editorState : undefined
   const init = initialPayload ? { name: host?.initialContent?.name ?? existing?.name ?? '', ...assetInitial(initialPayload) } : null
-  const [couponDraft, setCouponDraft] = useState(() => initialCouponDraft(initialPayload, visual))
-  const [name, setName] = useState(init ? init.name : visual ? (kind === 'coupon' ? '夏の20%オフ' : '定期便のご満足度') : '')
+  const [couponDraft, setCouponDraft] = useState(() => draftState?.couponDraft ?? (initialCouponDraft(initialPayload, visual)))
+  const [name, setName] = useState(host?.initialContent?.name ?? (init ? init.name : visual ? (kind === 'coupon' ? '夏の20%オフ' : '定期便のご満足度') : ''))
   const [folder, setFolder] = useState(kind === 'coupon' ? existing?.folderId ?? '' : visual ? meta.folder : '')
   const [folderTouched, setFolderTouched] = useState(false)
   const [assetFolders, setAssetFolders] = useState<BroadcastAssetFolder[]>([])
   const [folderProblem, setFolderProblem] = useState(false)
   const [folderAttempt, setFolderAttempt] = useState(0)
   const [folders, setFolders] = useState<Folder[]>([])
-  const [description, setDescription] = useState(init ? init.description : visual ? (kind === 'coupon' ? '会計時にこの画面をご提示ください。他の割引との併用はできません。' : 'いつもありがとうございます。3問だけ聞かせてください。') : '')
+  const [description, setDescription] = useState(draftState?.description ?? (init ? init.description : visual ? (kind === 'coupon' ? '会計時にこの画面をご提示ください。他の割引との併用はできません。' : 'いつもありがとうございます。3問だけ聞かせてください。') : ''))
   // クーポン
-  const [couponTitle, setCouponTitle] = useState(init ? init.couponTitle : visual && kind === 'coupon' ? '夏の20%オフ' : '')
-  const [imageUrl, setImageUrl] = useState(init ? init.imageUrl : '')
-  const [tapExtras, setTapExtras] = useState<TapExtras | undefined>(init?.tapExtras)
-  const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
+  const [couponTitle, setCouponTitle] = useState(draftState?.couponTitle ?? (init ? init.couponTitle : visual && kind === 'coupon' ? '夏の20%オフ' : ''))
+  const [imageUrl, setImageUrl] = useState(draftState?.imageUrl ?? (init ? init.imageUrl : ''))
+  const [tapExtras, setTapExtras] = useState<TapExtras | undefined>(draftState?.tapExtras ?? (init?.tapExtras))
+  const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(draftState?.pickedMedia ?? (null))
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited' | 'limited'>(typeof initialPayload?.maxUsesPerFriend === 'number' && initialPayload.maxUsesPerFriend > 1 ? 'limited' : init ? init.couponOnce : 'once')
-  const [countTouched, setCountTouched] = useState(false)
-  const [couponVisibility, setCouponVisibility] = useState<'friends' | 'link'>(init ? init.couponVisibility : 'friends')
-  const [lottery, setLottery] = useState(init ? init.lottery : false)
-  const [lotteryRate, setLotteryRate] = useState(init ? init.lotteryRate : '20')
-  const [winnerLimit, setWinnerLimit] = useState(init ? init.winnerLimit : '500')
-  const [couponStartsAt, setCouponStartsAt] = useState(init ? init.startsAt : visual ? '2026-08-01T00:00' : '')
-  const [couponEndsAt, setCouponEndsAt] = useState(init ? init.endsAt : visual ? '2026-08-31T23:59' : '')
-  const [couponUseActions, setCouponUseActions] = useState<InlineAction[]>(() => readInlineActions(initialPayload?.useActions as unknown[] | undefined))
+  const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited' | 'limited'>(draftState?.couponOnce ?? (typeof initialPayload?.maxUsesPerFriend === 'number' && initialPayload.maxUsesPerFriend > 1 ? 'limited' : init ? init.couponOnce : 'once'))
+  const [countTouched, setCountTouched] = useState(draftState?.countTouched ?? (false))
+  const [couponVisibility, setCouponVisibility] = useState<'friends' | 'link'>(draftState?.couponVisibility ?? (init ? init.couponVisibility : 'friends'))
+  const [lottery, setLottery] = useState(draftState?.lottery ?? (init ? init.lottery : false))
+  const [lotteryRate, setLotteryRate] = useState(draftState?.lotteryRate ?? (init ? init.lotteryRate : '20'))
+  const [winnerLimit, setWinnerLimit] = useState(draftState?.winnerLimit ?? (init ? init.winnerLimit : '500'))
+  const [couponStartsAt, setCouponStartsAt] = useState(draftState?.couponStartsAt ?? (init ? init.startsAt : visual ? '2026-08-01T00:00' : ''))
+  const [couponEndsAt, setCouponEndsAt] = useState(draftState?.couponEndsAt ?? (init ? init.endsAt : visual ? '2026-08-31T23:59' : ''))
+  const [couponUseActions, setCouponUseActions] = useState<InlineAction[]>(() => draftState?.couponUseActions ?? (readInlineActions(initialPayload?.useActions as unknown[] | undefined)))
   const initialUseActions = useRef(couponUseActions)
   // リサーチ
-  const [researchStartsAt, setResearchStartsAt] = useState(init ? init.startsAt : visual ? '2026-10-01T10:00' : '')
-  const [researchEndsAt, setResearchEndsAt] = useState(init ? init.endsAt : visual ? '2026-10-15T23:59' : '')
-  const [targetTagId, setTargetTagId] = useState(() => host?.initialContent && 'payload' in host.initialContent && typeof host.initialContent.payload.targetTagId === 'string' ? host.initialContent.payload.targetTagId : '')
-  const [questions, setQuestions] = useState<ResearchQuestion[]>(() => (init?.questions.length ? init.questions : visual ? visualQuestions() : [newQuestion()]))
-  const [answerActions, setAnswerActions] = useState<InlineAction[]>(() => readInlineActions(host?.initialContent && 'payload' in host.initialContent ? host.initialContent.payload.answerActions as unknown[] | undefined : undefined))
+  const [researchStartsAt, setResearchStartsAt] = useState(draftState?.researchStartsAt ?? (init ? init.startsAt : visual ? '2026-10-01T10:00' : ''))
+  const [researchEndsAt, setResearchEndsAt] = useState(draftState?.researchEndsAt ?? (init ? init.endsAt : visual ? '2026-10-15T23:59' : ''))
+  const [targetTagId, setTargetTagId] = useState(() => draftState?.targetTagId ?? (host?.initialContent && 'payload' in host.initialContent && typeof host.initialContent.payload.targetTagId === 'string' ? host.initialContent.payload.targetTagId : ''))
+  const [questions, setQuestions] = useState<ResearchQuestion[]>(() => draftState?.questions ?? ((init?.questions.length ? init.questions : visual ? visualQuestions() : [newQuestion()])))
+  const [answerActions, setAnswerActions] = useState<InlineAction[]>(() => draftState?.answerActions ?? (readInlineActions(host?.initialContent && 'payload' in host.initialContent ? host.initialContent.payload.answerActions as unknown[] | undefined : undefined)))
   const [orderMenu, setOrderMenu] = useState<string | null>(null)
   const orderAnchor = useRef<HTMLButtonElement | null>(null)
 
@@ -357,14 +358,14 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
     }
   }
 
-  /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。組み立て不可の途中は通知しない。 */
+  // 一時下書きは保存の検査・整形から分け、空欄や入力途中の文字も保つ。
   useEffect(() => {
     if (!host?.onDraftChange) return
-    try {
-      const built = buildPayload()
-      if ('error' in built) return
-      host.onDraftChange({ kind, name, payload: built.payload })
-    } catch { /* 組み立て不可の途中入力は通知しない */ }
+    host.onDraftChange({ kind, name, payload: initialPayload ?? {}, editorState: {
+      couponDraft, description, couponTitle, imageUrl, tapExtras, pickedMedia, couponOnce, countTouched,
+      couponVisibility, lottery, lotteryRate, winnerLimit, couponStartsAt, couponEndsAt, couponUseActions,
+      researchStartsAt, researchEndsAt, targetTagId, questions, answerActions,
+    } })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot])
   /* 統括の入口：中身を組み立てて呼ぶ側へ渡す（保存・配る・失敗の知らせは呼ぶ側）。 */

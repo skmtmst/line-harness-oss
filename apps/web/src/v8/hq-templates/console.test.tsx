@@ -722,9 +722,9 @@ it('カルーセルの通常入力は再読込後も一時下書きから復元�
   const body = document.getElementById('cr-text') as HTMLInputElement
   fireEvent.change(body, { target: { value: '未保存のカード本文' } })
   await waitFor(() => expect(window.sessionStorage.getItem('lh_hq_create_draft_v1:tenant-a:owner:template:carousel') ?? '').toContain('未保存のカード本文'), { timeout: 5000 })
-  const { loadEditorDraft: loadTmp } = await import('@/lib/hq-template-create-attempt')
-  const loadedTmp = loadTmp(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'template', 'carousel')
-  expect(loadedTmp?.kind).toBe('carousel')
+  const { loadEditorDraft: readCarouselDraft } = await import('@/lib/hq-template-create-attempt')
+  const restoredCarousel = readCarouselDraft(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'template', 'carousel')
+  expect(restoredCarousel?.kind).toBe('carousel')
   unmount()
   cleanup()
   window.history.replaceState(null, '', '/hq/templates?mode=create')
@@ -1125,4 +1125,100 @@ it('閲覧のみではシナリオの未送信下書きを表示・変更・消�
   expect(screen.queryByLabelText('ひな形の名前')).toBeNull()
   expect(window.sessionStorage.getItem(scenarioDraftKey)).toBe('read-only-draft')
   expect(calls.create).not.toHaveBeenCalled()
+})
+
+it.each([['coupon', 'クーポン'], ['research', 'リサーチ'], ['rich_message', 'リッチメッセージ']])('%sの未完成入力も最新の名前で復元する', async (kind, label) => {
+  const view = render(<HqTemplatesV8 type="template" />)
+  fireEvent.click(await screen.findByRole('tab', { name: new RegExp(label) }))
+  fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+  fireEvent.change(await screen.findByLabelText('テンプレート名'), { target: { value: '架空の途中入力' } })
+  const key = `lh_hq_create_draft_v1:tenant-a:owner:template:${kind}`
+  await waitFor(() => expect(window.sessionStorage.getItem(key)).toContain('架空の途中入力'))
+  view.unmount()
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  expect(await screen.findByDisplayValue('架空の途中入力')).toBeTruthy()
+  expect(calls.create).not.toHaveBeenCalled()
+})
+it.each(['message', 'coupon', 'research', 'carousel', 'question', 'rich_message', 'rich_video'])('%sのフォルダは入力と一緒に復元する', async kind => {
+  const { persistEditorDraft } = await import('@/lib/hq-template-create-attempt')
+  const { emptyQuestion } = await import('@/components/scenarios/question-editor')
+  const messageContent = kind === 'carousel' ? JSON.stringify([{ text: '架空本文', actions: [] }])
+    : kind === 'rich_video' ? JSON.stringify({ video: { originalContentUrl: '', previewImageUrl: '' }, baseSize: { height: 1040 } }) : ''
+  const content = { kind, name: '架空のフォルダ入力', messageType: 'text', messageContent, payload: {}, media: [], question: emptyQuestion(), tapLimitMode: 'none' }
+  persistEditorDraft(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'template', kind, { ...content, folderId: 'f-1' })
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  await screen.findByDisplayValue('架空のフォルダ入力')
+  await waitFor(() => expect(JSON.parse(window.sessionStorage.getItem(`lh_hq_create_draft_v1:tenant-a:owner:template:${kind}`)!).draft.folderId).toBe('f-1'))
+  expect(document.body.textContent).toContain('予約')
+})
+it.each(['template', 'tag'] as const)('%sは離脱後の保存成功でも一時下書きを消す', async type => {
+  const { persistEditorDraft } = await import('@/lib/hq-template-create-attempt')
+  const kind = type === 'template' ? 'message' : 'tag'
+  const content = type === 'template' ? { kind, name: '架空の保存中', messageType: 'text', messageContent: '架空本文' } : { kind, name: '架空の保存中', definition: { schemaVersion: 1, tag: { name: '架空の保存中', color: '#2563eb' }, folders: [] } }
+  const key = `lh_hq_create_draft_v1:tenant-a:owner:${type}:${kind}`
+  persistEditorDraft(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, type, kind, content)
+  let complete!: () => void
+  calls.create.mockImplementation(input => new Promise(resolve => { complete = () => resolve({ template: { ...detail().template, template_type: type, name: input.name }, definition: input.definition }) }))
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  const view = render(<HqTemplatesV8 type={type} />)
+  await screen.findByDisplayValue('架空の保存中')
+  fireEvent.click(await findPageAction({ name: '下書きを保存' }))
+  await waitFor(() => expect(calls.create).toHaveBeenCalled())
+  view.unmount()
+  await act(async () => { complete() })
+  expect(window.sessionStorage.getItem(key)).toBeNull()
+})
+
+it('壊れた一時下書きは破棄し、新規画面でも失敗通知を残す', async () => {
+  window.sessionStorage.setItem('lh_hq_create_draft_v1:tenant-a:owner:template:message', '{broken')
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  expect(await screen.findByText(/一時保存できなかった入力があります/)).toBeTruthy()
+  expect((await screen.findByLabelText('テンプレート名') as HTMLInputElement).value).toBe('')
+})
+it('容量超過の新入力は古い内容を残さず画面で知らせる', async () => {
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  const name = await screen.findByLabelText('テンプレート名')
+  fireEvent.change(name, { target: { value: '架空の旧入力' } })
+  const key = 'lh_hq_create_draft_v1:tenant-a:owner:template:message'
+  await waitFor(() => expect(window.sessionStorage.getItem(key)).toContain('架空の旧入力'))
+  const setItem = vi.spyOn(window.sessionStorage, 'setItem').mockImplementation(() => { throw new Error('artificial quota') })
+  try {
+    fireEvent.change(name, { target: { value: '架空の最新入力' } })
+    expect(await screen.findByText(/一時保存できなかった入力があります/)).toBeTruthy()
+    expect(window.sessionStorage.getItem(key)).toBeNull()
+  } finally { setItem.mockRestore() }
+})
+it('クーポンの空の割引額と未完成期間をそのまま復元し、保存では検査する', async () => {
+  const view = render(<HqTemplatesV8 type="template" />)
+  fireEvent.click(await screen.findByRole('tab', { name: /クーポン/ }))
+  fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+  fireEvent.change(await screen.findByLabelText('テンプレート名'), { target: { value: '架空の未完成特典' } })
+  fireEvent.change(screen.getByLabelText('クーポン名'), { target: { value: '架空の特典' } })
+  fireEvent.change(screen.getByLabelText('割引額'), { target: { value: '500' } })
+  fireEvent.change(screen.getByLabelText('割引額'), { target: { value: '' } })
+  view.unmount()
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  await screen.findByDisplayValue('架空の未完成特典')
+  expect((screen.getByLabelText('割引額') as HTMLInputElement).value).toBe('')
+  fireEvent.click(await findPageAction({ name: '下書きを保存' }))
+  expect(calls.create).not.toHaveBeenCalled()
+})
+
+it('本文未入力でもフォルダだけの変更を記録し、再読込で戻す', async () => {
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  const view = render(<HqTemplatesV8 type="template" />)
+  await screen.findByLabelText('テンプレート名')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  fireEvent.click(within(await screen.findByRole('option', { name: '予約' })).getByRole('button'))
+  const key = 'lh_hq_create_draft_v1:tenant-a:owner:template:message'
+  await waitFor(() => expect(JSON.parse(window.sessionStorage.getItem(key)!).draft.folderId).toBe('f-1'))
+  view.unmount()
+  render(<HqTemplatesV8 type="template" />)
+  expect(await screen.findByRole('button', { name: 'フォルダ' })).toBeTruthy()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'フォルダ' }).textContent).toContain('予約'))
 })

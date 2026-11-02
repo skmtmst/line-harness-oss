@@ -125,3 +125,31 @@ describe('HQ create editor draft (H-18原文の一時下書き）', () => {
     expect(() => clearEditorDraft(broken, scope, 'template', 'message')).not.toThrow()
   })
 })
+
+describe('一時下書きの失敗時は古い内容を復元しない', () => {
+  const draft = { kind: 'message', name: '架空の旧入力', messageContent: '旧本文' }
+  it.each(['oversize', 'invalid', 'write', 'serialize', 'mismatch'])('%sでも旧記録を破棄して失敗を返す', mode => {
+    const s = storage()
+    persistEditorDraft(s, scope, 'template', 'message', draft)
+    const next = { ...draft, name: '架空の最新入力', messageContent: '最新本文' }
+    if (mode === 'oversize') next.messageContent = 'x'.repeat(300_000)
+    if (mode === 'invalid') next.name = 'x'.repeat(201)
+    if (mode === 'serialize') Object.assign(next, { circular: next })
+    const port = { ...s, setItem: (key: string, value: string) => {
+      if (mode === 'write') throw new Error('artificial quota')
+      if (mode !== 'mismatch') s.setItem(key, value)
+    } }
+    const saved = persistEditorDraft(port, scope, 'template', 'message', next)
+    expect(loadEditorDraft(s, scope, 'template', 'message')).toBeNull()
+    expect(saved).toBe(false)
+  })
+})
+
+it('壊れた途中入力の構造は復元せず、失敗を知らせる', () => {
+  const s = storage(), key = editorDraftStorageKey(scope, 'template', 'research')
+  s.setItem(key, JSON.stringify({ version: 1, ...scope, type: 'template', kind: 'research', draft: { kind: 'research', name: '架空の破損入力', payload: {}, editorState: { questions: null } } }))
+  let notified = false
+  expect(loadEditorDraft(s, scope, 'template', 'research', () => { notified = true })).toBeNull()
+  expect(notified).toBe(true)
+  expect(s.getItem(key)).toBeNull()
+})
