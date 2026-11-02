@@ -381,7 +381,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     await selectAccounts('銀座店')
     fireEvent.click(screen.getByRole('button', { name: 'メッセージ設定へ' }))
     /* 絵 lLyFR の「その他」がクーポン（統括だけの種類）。 */
-    fireEvent.click(screen.getByRole('tab', { name: 'その他' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'クーポン' }))
     fireEvent.click(await screen.findByRole('button', { name: 'クーポンを選ぶ' }))
     /* 店に属する素材（銀座店だけ）は出さない。 */
     expect(screen.queryByRole('radio', { name: '銀座店だけ' })).toBeNull()
@@ -406,11 +406,11 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     definition: { schemaVersion: 1, media: [], template: { id, name: '秋の新商品 3種', category: '', messageType: 'carousel', messageContent: JSON.stringify(columns), carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' } },
   })
 
-  it('③ の種類のタブはG-9 の12種類（テキスト〜紹介・その他）で、見出しの右に［テンプレートから選ぶ］', async () => {
+  it('③ の種類のタブはリサーチと未対応の質問を区別し、見出しの右に［テンプレートから選ぶ］', async () => {
     render(<HqBroadcastCreate />)
     await toMessage()
     const tabs = within(screen.getByRole('tablist', { name: '1通目のメッセージ形式' })).getAllByRole('tab').map((tab) => tab.textContent)
-    expect(tabs).toEqual(['テキスト', '画像', '動画', '音声', 'スタンプ', 'カルーセル', 'リッチメッセージ', 'リッチビデオ', '位置情報', '質問', '紹介', 'その他'])
+    expect(tabs).toEqual(['テキスト', '画像', '動画', '音声', 'スタンプ', 'カルーセル', 'リッチメッセージ', 'リッチビデオ', '位置情報', 'リサーチ', '質問', '紹介', 'クーポン'])
     expect(screen.getByRole('button', { name: 'テンプレートから選ぶ' })).toBeTruthy()
   })
 
@@ -483,7 +483,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     render(<HqBroadcastCreate />)
     await toMessage()
     fireEvent.change(screen.getByLabelText('本文'), {target:{value:'残す本文'}})
-    for (const name of ['紹介','リッチビデオ']) {
+    for (const name of ['質問','紹介','リッチビデオ']) {
       const tab = screen.getByRole('tab', {name})
       expect(tab.getAttribute('aria-disabled')).toBe('true')
       expect(tab.getAttribute('title')).toBeTruthy()
@@ -685,7 +685,7 @@ it('統括でリサーチの質問と公開版を読み込み下書きへ保存�
  tpl.listByKind.mockResolvedValue([{id:'research1',name:'健康調査',kind:'research',content_summary:'リサーチ'}]);
  tpl.get.mockResolvedValue({template:{id:'research1',name:'健康調査',template_type:'template',current_version_id:'v1'},definition:{schemaVersion:1,media:[],template:{id:'source1',name:'健康調査',messageType:'text',messageContent:''},asset:{kind:'research',payload:{questions:[{text:'体調',format:'free',required:true}],answerActions:[]}}}});
  render(<HqBroadcastCreate />);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'健康調査'}});fireEvent.click(screen.getByRole('button',{name:'対象設定へ'}));await selectAccounts('銀座店');fireEvent.click(screen.getByRole('button',{name:'メッセージ設定へ'}));
- expect(screen.getByRole('tab',{name:'質問'}).getAttribute('aria-disabled')).not.toBe('true');
+ expect(screen.getByRole('tab',{name:'リサーチ'}).getAttribute('aria-disabled')).not.toBe('true');
  fireEvent.click(screen.getByRole('button',{name:'テンプレートから選ぶ'}));
  fireEvent.click(await screen.findByRole('radio',{name:'健康調査'}));fireEvent.click(screen.getByRole('button',{name:'このテンプレートを使う'}));
  await waitFor(()=>expect(screen.queryByRole('radio',{name:'健康調査'})).toBeNull());
@@ -748,4 +748,51 @@ it.each(['通信断', '500', '409'])('一括配信の店別やり直しの%sは�
  fireEvent.click(within(fresh).getByRole('button', { name: 'やり直す' }))
  await waitFor(() => expect(hq.retry).toHaveBeenCalledTimes(3))
  expect(hq.retry.mock.calls[2]).toEqual(['run-retry', 'a3', 6])
+})
+
+describe('読み込めない配信の保護', () => {
+  const source = (raw: string) => ({ id: 'run-x', status: 'prepared', version: 1, targets: [], input: { requestId: 'r', title: '元の配信', messageContent: '元の本文', messageBubblesJson: raw, accountIds: [], accountTagIds: [], excludedAccountIds: [], audience: { kind: 'all' }, scheduledAt: null } })
+  const unknown = JSON.stringify([{ type: 'future_kind', content: { value: '保持' } }])
+  const mixed = JSON.stringify([{ type: 'text', content: { text: '正常' } }, { type: 'future_kind', content: { value: '保持' } }])
+  it.each([['未知のみ', unknown], ['混在', mixed], ['質問', JSON.stringify([{type:'question',content:{}}])], ['紹介', JSON.stringify([{type:'intro',content:{}}])], ['壊れたJSON', '{'], ['配列以外', '{}'], ['null要素', '[null]'], ['上限超過', JSON.stringify(Array.from({length:6}, () => ({type:'text',content:{text:'a'}})))]])('%s の下書きは編集・保存・送信を止める', async (_name, raw) => {
+    params.value = new URLSearchParams('id=run-x')
+    const saved = source(raw)
+    hq.get.mockResolvedValue({ data: saved })
+    render(<HqBroadcastCreate />)
+    expect((await screen.findByRole('alert')).textContent).toContain('編集・保存・送信はできません')
+    expect(screen.queryByRole('button', { name: /下書きを保存する|今すぐ送る|予約する/ })).toBeNull()
+    expect(screen.getByRole('link', { name: '一括配信の一覧へ' }).getAttribute('href')).toBe('/hq/broadcasts')
+    expect(saved.input.messageBubblesJson).toBe(raw)
+    expect(hq.create).not.toHaveBeenCalled(); expect(hq.update).not.toHaveBeenCalled(); expect(hq.send).not.toHaveBeenCalled()
+  })
+  it('未対応の複製元を読み込んでも保存・送信しない', async () => {
+    params.value = new URLSearchParams('copy=run-x')
+    hq.get.mockResolvedValue({ data: source(mixed) })
+    render(<HqBroadcastCreate />)
+    expect((await screen.findByRole('alert')).textContent).toContain('編集・保存・送信はできません')
+    expect(screen.queryByRole('button', { name: /下書きを保存する|今すぐ送る|予約する/ })).toBeNull()
+    expect(hq.create).not.toHaveBeenCalled(); expect(hq.update).not.toHaveBeenCalled(); expect(hq.send).not.toHaveBeenCalled()
+  })
+  it('編集中の未対応配信の複製を拒否し入力を保持する', async () => {
+    const saved = { ...source(mixed), status: 'sent', title: '過去の配信' }
+    hq.list.mockResolvedValue({ data: [saved] })
+    hq.get.mockResolvedValue({ data: saved })
+    render(<HqBroadcastCreate />)
+    fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '編集中の名前' } })
+    fireEvent.click(screen.getByRole('radio', { name: /過去の配信を複製/ }))
+    fireEvent.click(screen.getByRole('button', { name: '過去の配信を選ぶ' }))
+    fireEvent.click(await screen.findByRole('radio', { name: '過去の配信' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この配信を写す' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('複製できません')
+    expect((screen.getByLabelText('配信名') as HTMLInputElement).value).toBe('編集中の名前')
+    expect(hq.create).not.toHaveBeenCalled(); expect(hq.update).not.toHaveBeenCalled(); expect(hq.send).not.toHaveBeenCalled()
+  })
+  it('読込待ちにも保存・送信口を出さない', async () => {
+    params.value = new URLSearchParams('id=run-x')
+    hq.get.mockImplementation(() => new Promise(() => {}))
+    render(<HqBroadcastCreate />)
+    expect(screen.getByRole('status').textContent).toContain('読み込んでいます')
+    expect(screen.queryByRole('button', { name: /下書きを保存する|今すぐ送る|予約する/ })).toBeNull()
+    expect(hq.create).not.toHaveBeenCalled(); expect(hq.update).not.toHaveBeenCalled(); expect(hq.send).not.toHaveBeenCalled()
+  })
 })

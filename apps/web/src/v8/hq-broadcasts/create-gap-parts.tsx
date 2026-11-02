@@ -68,6 +68,17 @@ function bubblesFromInput(saved: Pick<HqBroadcastInput, 'messageBubblesJson' | '
 }
 
 
+/** 読み直すと失われるメッセージを含む場合は編集しない。 */
+function hasUnsupportedBubbles(saved: Pick<HqBroadcastInput, 'messageBubblesJson'>): boolean {
+  if (!saved.messageBubblesJson) return false
+  try {
+    const raw: unknown = JSON.parse(saved.messageBubblesJson)
+    if (!Array.isArray(raw) || raw.length > MAX_BUBBLES) return true
+    return raw.some((item: unknown) => !item || typeof item !== 'object' || Array.isArray(item) || !fromApiBubble(item as { type?: string; content?: Record<string, unknown> }))
+  } catch { return true }
+}
+
+
 /** 保存した配信対象を画面の選び方に戻す（シナリオ1つだけの条件はシナリオ、ほかは詳細条件）。 */
 function audienceFromInput(saved: HqBroadcastInput): { audience: Audience; tagName: string; scenarioName: string; condition: SegmentCondition | null; savedName: string } {
   const empty = { tagName: '', scenarioName: '', condition: null, savedName: '' }
@@ -81,4 +92,4 @@ function audienceFromInput(saved: HqBroadcastInput): { audience: Audience; tagNa
   }
   return { ...empty, audience: 'all' }
 }
-export { type Audience, type Bubble, MAX_BUBBLES, newBubble, errorText, runKinds, jstIso, splitJst, assetContent, bubblesFromInput, audienceFromInput }
+export { type Audience, type Bubble, MAX_BUBBLES, newBubble, errorText, runKinds, jstIso, splitJst, assetContent, bubblesFromInput, hasUnsupportedBubbles, audienceFromInput }
