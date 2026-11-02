@@ -92,7 +92,7 @@ describe('作成の型の余白の口', () => {
     expect(frame.querySelector('[data-template-region="content"] input[aria-label="配信名"]')).toBeTruthy()
     expect(frame.querySelector('[data-template-region="preview"][aria-label="LINEの見え方"]')).toBeTruthy()
     expect(frame.querySelector('[data-template-region="footer"]')?.textContent).toContain('対象設定へ')
-    expect(getPageAction({ name: '下書きを保存する' }).getAttribute('role')).toBe('menuitem')
+    expect(frame.querySelector('[data-sticky-actions]')?.contains(getPageAction({ name: '下書きを保存する' }))).toBe(true)
   })
 })
 

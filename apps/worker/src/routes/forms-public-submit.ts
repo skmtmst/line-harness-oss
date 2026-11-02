@@ -29,6 +29,7 @@ import type { Context } from 'hono';
 export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:id/submit">) => {
   const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
   if (stopped) return stopped;
+  const courseClaims: Array<{key:string;owner:string}> = [];
   try {
     const formId = c.req.param('id');
     // 送信には Idempotency-Key(UUID)が必須。キーなしの連打・再送は
@@ -112,6 +113,24 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
     if (!identity.lineAccountId
       || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
       return fail(c, 404, 'FORM_NOT_FOUND');
+    }
+    // A claim is inserted only while the course exists. Deletion checks the same
+    // table in its DELETE, so a webhook cannot run for a course deleted midway.
+    for (const value of Object.values(submissionData)) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const booking = value as {kind?:unknown;storeId?:unknown;courseId?:unknown};
+      if (booking.kind !== 'seats' || typeof booking.courseId !== 'string' || !booking.courseId) continue;
+      const prefix = `form-course:${booking.courseId}:`;
+      await c.env.DB.prepare("DELETE FROM rt_resource_locks WHERE substr(resource_key,1,length(?))=? AND datetime(expires_at)<=datetime('now')")
+        .bind(prefix,prefix).run();
+      const owner = crypto.randomUUID();
+      const key = `${prefix}${owner}`;
+      const expires = new Date(Date.now() + 300_000).toISOString();
+      const claim = await c.env.DB.prepare(`INSERT INTO rt_resource_locks (resource_key, owner_token, expires_at)
+        SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=?)`)
+        .bind(key, owner, expires, booking.courseId, typeof booking.storeId === 'string' ? booking.storeId : '').run();
+      if (!claim.meta.changes) return c.json({success:false,code:'restaurant_course_unavailable',error:'メニューが見つかりません。選び直してください'},409);
+      courseClaims.push({key,owner});
     }
     const friend = await getFriendByLineUserIdForAccount(
       c.env.DB,
@@ -510,6 +529,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
               fileIds: documentIds(submissionData, layout),
             });
           } catch (error) {
+            if (error instanceof Error && error.message === 'restaurant_course_unavailable') await releaseFormCapacityClaims(c.env.DB, formId, ctx.submissionId);
             await failFormSubmitClaim(c.env.DB, ctx.scope, ctx.owner, ctx.version).catch(() => {});
             throw error;
           }
@@ -853,9 +873,15 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
     throw err;
   }
   } catch (err) {
+    if (err instanceof Error && err.message === 'restaurant_course_unavailable') return c.json({success:false,code:'restaurant_course_unavailable',error:'メニューが見つかりません。選び直してください'},409);
     if (err instanceof Error && ['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'].includes(err.message)) {
       return c.json({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' }, 409);
     }
     throw err;
+  } finally {
+    for (const claim of courseClaims) {
+      await c.env.DB.prepare('DELETE FROM rt_resource_locks WHERE resource_key=? AND owner_token=?')
+        .bind(claim.key,claim.owner).run().catch(() => {});
+    }
   }
 };

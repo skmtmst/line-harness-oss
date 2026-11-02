@@ -54,6 +54,7 @@ it('保存待ちの連続クリックは本体要求1回、作成結果が不明
  let reject!:(e:Error)=>void;createEvent.mockImplementation(()=>new Promise((_,r)=>{reject=r}));
  render(<EventsCreate/>);fill();const btn=getPageAction({name:'下書きを保存'});fireEvent.click(btn);fireEvent.click(btn);
  expect(createEvent).toHaveBeenCalledTimes(1);expect((screen.getByRole('button',{name:'保存しています…'}) as HTMLButtonElement).disabled).toBe(true);
+ expect((getPageAction({name:'公開する'}) as HTMLButtonElement).disabled).toBe(true);
  await act(async()=>reject(new Error('fixture offline')));
  await screen.findByText(/イベントの作成結果を確認できませんでした/);
  expect((getPageAction({name:'下書きを保存'}) as HTMLButtonElement).disabled).toBe(true);
@@ -86,4 +87,18 @@ it('枠の作成・更新の応答を失っても、入力と完了分を保ち�
  fireEvent.click(screen.getByRole('button',{name:'残りだけもう一度'}));await waitFor(()=>expect(push).toHaveBeenCalled());
  expect(createEvent).toHaveBeenCalledTimes(1);expect(createSlots).toHaveBeenCalledTimes(2);
  expect(updateSlot).toHaveBeenCalledTimes(1);expect(listSlots).toHaveBeenCalledTimes(1);expect(updateEvent).not.toHaveBeenCalled();
+})
+
+
+it('公開の保存中は公開ボタンだけ処理中になり、下書きは元の名前で押せない', async () => {
+ let finish!: (value: {id:string;version:number;is_published:number}) => void
+ createEvent.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+ createSlots.mockResolvedValue({items:[{id:'slot',version:1}]})
+ render(<EventsCreate/>); fill(); fireEvent.click(getPageAction({name:'公開する'}))
+ const confirm = await screen.findByRole('dialog',{name:'イベントを公開する'})
+ fireEvent.click(within(confirm).getByRole('button',{name:'公開する'}))
+ const footer = document.querySelector('[data-template-region="footer"]') as HTMLElement
+ expect((within(footer).getByRole('button',{name:'保存しています…'}) as HTMLButtonElement).disabled).toBe(true)
+ expect((within(footer).getByRole('button',{name:'下書きを保存'}) as HTMLButtonElement).disabled).toBe(true)
+ await act(async () => finish({id:'fixture-event',version:1,is_published:1}))
 })

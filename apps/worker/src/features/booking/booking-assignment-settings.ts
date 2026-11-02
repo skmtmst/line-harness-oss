@@ -33,12 +33,13 @@ export function d1AssignmentSettingsStore(db: D1Database): AssignmentSettingsSto
     async save(scope, input) {
       if (!await ready()) return 'unavailable';
       const result = await db.prepare(`INSERT INTO booking_assignment_settings(scope_kind,scope_id,method,balance_period,resources_json,version)
-        SELECT ?,?,?,?,?,1 WHERE ?=0 OR EXISTS(SELECT 1 FROM booking_assignment_settings WHERE scope_kind=? AND scope_id=?)
+        SELECT ?,?,?,?,?,1 WHERE (?=0 OR EXISTS(SELECT 1 FROM booking_assignment_settings WHERE scope_kind=? AND scope_id=?))
+          AND (? <> 'table' OR NOT EXISTS(SELECT 1 FROM json_each(?) r WHERE NOT EXISTS(SELECT 1 FROM rt_tables t WHERE t.id=json_extract(r.value,'$.resourceId') AND t.store_id=?)))
         ON CONFLICT(scope_kind,scope_id) DO UPDATE SET method=excluded.method,balance_period=excluded.balance_period,
           resources_json=excluded.resources_json,version=booking_assignment_settings.version+1,updated_at=datetime('now')
         WHERE booking_assignment_settings.version=?`)
         .bind(scope.kind, scope.id, input.method, input.balancePeriod, JSON.stringify(input.resources),
-          input.expectedVersion, scope.kind, scope.id, input.expectedVersion).run();
+          input.expectedVersion, scope.kind, scope.id, scope.kind, JSON.stringify(input.resources), scope.id, input.expectedVersion).run();
       return result.meta.changes === 1 ? 'saved' : 'conflict';
     },
   };

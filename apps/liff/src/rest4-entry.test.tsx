@@ -13,7 +13,7 @@ const sdk = vi.hoisted(() => ({
 vi.mock('@line/liff', () => ({ default: sdk }));
 const writes: Array<{ path: string; body: Record<string, unknown>; headers: Headers }> = [];
 let workerSdk: typeof sdk;
-let failHold = true, failConfirm = true, failFormBooking = true, peopleForm = false;
+let failHold = true, failConfirm = true, failFormBooking = true, peopleForm = false, dynamicCourse = false, failCourseSubmit = false, courseGone = false;
 const startsAt = '2026-10-12T09:00:00.000Z';
 const booking = (status = 'pending') => ({ id: 'r1', storeId: 'st', startsAt, endsAt: '2026-10-12T10:30:00.000Z', guestCount: 2, status, version: status === 'pending' ? 1 : 2, holdExpiresAt: status === 'pending' ? '2026-10-12T00:10:00Z' : null, seatType: 'table', note: null, customerPhone: null, courseId: 'c90', courseName: '夕食コース' });
 const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
@@ -21,7 +21,7 @@ const layout = { version: 2, header: [], sections: [{ id: 's', name: '来店', b
 
 beforeEach(() => {
   vi.resetModules(); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-12T00:00:00Z'));
-  writes.length = 0; failHold = failConfirm = failFormBooking = true; peopleForm = false;
+  writes.length = 0; failHold = failConfirm = failFormBooking = true; peopleForm = dynamicCourse = failCourseSubmit = courseGone = false;
   sdk.closeWindow.mockClear();
   workerSdk = { ...sdk, getProfile: async () => ({ userId: 'fixture', displayName: 'Workerの本人' }), closeWindow: vi.fn() };
   document.body.innerHTML = '<div id="app"></div>'; vi.stubGlobal('liff', workerSdk);
@@ -33,7 +33,7 @@ beforeEach(() => {
     if (path === '/api/liff/customer-look') return reply({ success: true, data: { settings: { liff_theme: 'night', shop_primary_color: '#885522' }, version: 1 } });
     if (path === '/api/liff/booking/settings') return reply({ liff_theme: 'night', shop_primary_color: '#885522' });
     if (path === '/api/liff/restaurant/link/tok') return reply({ success: true, data: { id: 'st', name: '予約店', timezone: 'Asia/Tokyo' } });
-    if (path === '/api/liff/restaurant/courses') return reply({ success: true, timezone: 'Asia/Tokyo', data: [{ id: 'c90', name: '夕食コース', durationMinutes: 90, price: 3000, allergens: [] }] });
+    if (path === '/api/liff/restaurant/courses') return reply({ success: true, timezone: 'Asia/Tokyo', data: courseGone ? [] : [{ id: 'c90', name: '夕食コース', durationMinutes: 90, price: 3000, allergens: [] }] });
     if (path === '/api/liff/restaurant/availability') {
       const date = url.searchParams.get('date')!;
       return reply({ success: true, data: { storeId: 'st', date, guestCount: 2, slots: [{ startsAt: new Date(`${date}T18:00:00+09:00`).toISOString(), endsAt: new Date(`${date}T19:30:00+09:00`).toISOString(), available: true, remainingTables: 2, seatTypes: ['table'] }], cancelDeadlineMinutesBefore: 0, cutoffMinutesBefore: 0 } });
@@ -42,11 +42,12 @@ beforeEach(() => {
     if (path === '/api/liff/restaurant/reservations/r1/confirm') return failConfirm ? reply({ error: 'booking_failed' }, 500) : reply({ success: true, data: booking('confirmed') });
     if (path === '/api/forms/f') {
       const formLayout = structuredClone(layout);
+      if (dynamicCourse) { delete (formLayout.sections[0].blocks[0].booking as {courseId?:string}).courseId; formLayout.sections[0].blocks.push({id:'name',kind:'input',type:'text',name:'お名前',label:'お名前',required:true} as never); }
       if (peopleForm) Object.assign(formLayout.sections[0].blocks[0].booking, { kind: 'people', menuId: 'm1', staffId: 's1' });
       return reply({ success: true, data: { id: 'f', name: '来店フォーム', fields: [], layout: formLayout, isActive: true } });
     }
     if (path === '/api/forms/f/opened') return reply({ success: true });
-    if (path === '/api/forms/f/submit') return reply({ success: true, data: { complete: true } });
+    if (path === '/api/forms/f/submit') { if (failCourseSubmit) { failCourseSubmit=false; courseGone=true; return reply({success:false,code:'restaurant_course_unavailable'},409); } return reply({ success: true, data: { complete: true } }); }
     if (path === '/api/liff/restaurant/form-booking') return failFormBooking ? reply({ error: 'slot_conflict' }, 409) : reply({ success: true, data: booking('confirmed') });
     if (path === '/api/liff/booking/menus') return reply({ menus: [{ id: 'm1', name: '個別相談', duration_minutes: 90 }] });
     if (path === '/api/liff/booking/availability') return reply({ by_staff: [{ staff_id: 's1', display_name: '担当', slots: [{ date: '2026-10-12', start: '18:00', end: '19:30', startUtc: startsAt, remaining: 1 }] }] });
@@ -110,6 +111,25 @@ for (const entry of ['apps', 'worker'] as const) {
     expect(reserves[0].body).toEqual(reserves[1].body);
     expect(reserves[0].body.submissionKey).toBe(answers[0].headers.get('Idempotency-Key'));
     expect(writes.some(w => w.path === '/api/liff/booking/requests')).toBe(false);
+  });
+  it(`${entry}のフォームで消えたコースを選び直し、ほかの入力を残して送る`, async () => {
+    dynamicCourse=true; failCourseSubmit=true; failFormBooking=false;
+    await open(entry, 'page=form&id=f');
+    fireEvent.change(await screen.findByRole('textbox',{name:/お名前/}),{target:{value:'人工の名前'}});
+    fireEvent.click(await screen.findByRole('radio',{name:/夕食コース/}));
+    fireEvent.click(await screen.findByRole('radio',{name:'18:00'}));
+    fireEvent.click(screen.getByRole('button',{name:'送信する'}));
+    await screen.findByText(/メニューを選び直してください/);
+    expect(screen.getByRole('textbox',{name:/お名前/})).toHaveProperty('value','人工の名前');
+    await waitFor(()=>expect(screen.queryByRole('radio',{name:/夕食コース/})).toBeNull());
+    fireEvent.click(screen.getByRole('radio',{name:/席のみ/}));
+    fireEvent.click(await screen.findByRole('radio',{name:'18:00'}));
+    fireEvent.click(screen.getByRole('button',{name:'送信する'}));
+    await screen.findByText(/次回のご予約/);
+    const answers=writes.filter(w=>w.path==='/api/forms/f/submit');
+    expect(answers).toHaveLength(2);
+    expect(answers[0].headers.get('Idempotency-Key')).not.toBe(answers[1].headers.get('Idempotency-Key'));
+    expect((answers[1].body.data as Record<string,unknown>)['お名前']).toBe('人工の名前');
   });
   it(`${entry}の人の予約ブロックは既存の口で担当付き予約を作り、回答を増やさず再試行`, async () => {
     peopleForm = true;

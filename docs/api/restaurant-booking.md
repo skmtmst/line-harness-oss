@@ -22,6 +22,8 @@
 
 予約の `note` はUnicodeで200文字、`customerPhone` は50文字まで。確定で省略すると押さえの値を保持し、null・空欄で消します。確認LINEは店舗時間で終了日まで明記します。通知は自動送信です。
 
+電話予約（`source:phone`）と枠の押さえは、営業時間が未設定なら409 `opening_hours_unconfigured`、開始時刻が現在より60秒を超えて過去なら409 `reservation_time_past` を返します。60秒は通信時間と端末時計の小さなずれのための猶予です。`source:manual` のウォークインや既存予約の編集・取消には、この受付条件を適用しません。
+
 LIFFは `/api/liff/restaurant` の `link/:token`・`availability`・`holds`・`reservations`・`reservations/:id/confirm|cancel|reschedule` を使います。対象店舗のLINE Login IDトークンと本人の友だちIDで検証します。新規は新しい `requestId`、同じ再実行は同じ値、変更は読んだ数値版を渡します。
 
 空きの `seatTypes`、予約の `seatType` を表示します。空きが無い理由は `temporary_closed/private_event/regular_closed/full`。内部の休業メモは公開しません。滞在時間は既定120分。受付期限、押さえ期限、席待ち、前日の深夜営業とLINE受付枠も空き判定へ含めます。通知は確定後に登録し、保存した送信キーで再試行します。

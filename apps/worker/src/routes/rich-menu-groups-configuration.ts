@@ -537,6 +537,16 @@ export const delete__api_rich_menu_groups_groupId_11 = async (c: Context<Env, "/
   ) {
     return fail(c, 404, 'NOT_FOUND');
   }
+  const rawVersion = c.req.query('expectedVersion');
+  if (rawVersion !== undefined && (!/^\d+$/.test(rawVersion) || !Number.isSafeInteger(Number(rawVersion)) || Number(rawVersion) < 1)) {
+    return inputError(c, { success: false, error: '下書きの版が正しくありません' }, 400, ['expectedVersion']);
+  }
+  if (rawVersion !== undefined) {
+    const current = await getRichMenuGroupById(c.env.DB, groupId);
+    if (!current || current.status !== 'draft' || current.version !== Number(rawVersion)) {
+      return c.json({ success: false, code: 'draft_changed', error: '下書きの状態が変わったため消せません。読み直して確認してください。' }, 409);
+    }
+  }
   // query に force=true が残っていても、影響確認を迂回させない。公開中、LINE上に
   // 実体が残る、別設定から参照される、のどれかなら必ず止める。
   if (!impact.canDelete) {
@@ -550,7 +560,7 @@ export const delete__api_rich_menu_groups_groupId_11 = async (c: Context<Env, "/
       409,
     );
   }
-  const ok = await deleteRichMenuGroup(c.env.DB, groupId);
-  if (!ok) return fail(c, 404, 'NOT_FOUND');
+  const ok = rawVersion === undefined ? await deleteRichMenuGroup(c.env.DB, groupId) : await deleteRichMenuGroup(c.env.DB, groupId, Number(rawVersion));
+  if (!ok) return rawVersion === undefined ? fail(c, 404, 'NOT_FOUND') : c.json({ success: false, code: 'draft_changed', error: '下書きの状態が変わったため消せません。読み直して確認してください。' }, 409);
   return c.json({ success: true });
 };

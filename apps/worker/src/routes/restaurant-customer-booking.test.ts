@@ -144,6 +144,19 @@ describe('飲食店の本人予約', () => {
       to: 'Uone',
     });
   });
+  it('空席を読んだ後に卓が消えた場合は競合として返す', async () => {
+    const prepare = db.db.prepare.bind(db.db)
+    const spy = vi.spyOn(db.db, 'prepare').mockImplementation((sql) => {
+      if (sql.includes('INSERT INTO rt_reservations(id,store_id,source')) {
+        db.raw.exec("DELETE FROM rt_tables WHERE id IN ('table1','table2')")
+      }
+      return prepare(sql)
+    })
+    try {
+      expect((await hold()).status).toBe(409)
+      expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:0})
+    } finally { spy.mockRestore() }
+  })
   it('同じ本人の同時予約、同じ卓の同時確保をDBで拒否する', async () => {
     const [a, b] = await Promise.all([
       hold('request_one'),

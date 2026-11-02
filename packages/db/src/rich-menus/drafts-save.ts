@@ -92,10 +92,13 @@ export async function saveRichMenuGroupDraft(
 export async function deleteRichMenuGroup(
   db: D1Database,
   id: string,
+  expectedVersion?: number,
 ): Promise<boolean> {
   const result = await db
-    .prepare(`DELETE FROM rich_menu_groups WHERE id = ?`)
-    .bind(id)
+    .prepare(expectedVersion === undefined ? `DELETE FROM rich_menu_groups WHERE id = ?` : `DELETE FROM rich_menu_groups WHERE id = ? AND version = ? AND status = 'draft'
+      AND publishing_at IS NULL AND is_default_for_all = 0
+      AND NOT EXISTS (SELECT 1 FROM rich_menu_pages WHERE group_id = rich_menu_groups.id AND line_richmenu_id IS NOT NULL)`)
+    .bind(...(expectedVersion === undefined ? [id] : [id, expectedVersion]))
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }

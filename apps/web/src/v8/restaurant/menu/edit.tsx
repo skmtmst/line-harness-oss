@@ -15,6 +15,7 @@ import { resolveResourceTitle } from '@/lib/resource-title'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import DateTimeField from '@/components/shared/date-time-field'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
@@ -173,13 +174,13 @@ function MenuEditBody() {
     try {
       await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(editing.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE' })
       if (!stillHere()) return
-      notifySaved('下書きのメニューを削除しました。')
+      notifySaved('メニューを削除しました。')
       setSaved(draft)
       router.push(LIST_HREF)
       return true
-    } catch {
+    } catch (error) {
       if (!stillHere()) return
-      setError('削除できませんでした。公開したことがあるメニュー・申請中・予約で使っているメニューは削除できません。')
+      setError(japaneseDetailOf(error) || '削除できませんでした。')
       return false
     } finally {
       if (stillHere()) setBusy(false)
@@ -211,7 +212,7 @@ function MenuEditBody() {
         preview={side}
         previewSurface="plain"
         previewToggle={<PreviewLauncher title="お支払いの説明" label="お支払いの説明を見る">{side}</PreviewLauncher>}
-        destructive={canEdit && draftItem ? <Button variant="danger" onClick={() => { setError(null); setDeleting(true) }} disabled={busy}>削除する</Button> : undefined}
+        destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setError(null); setDeleting(true) }} disabled={busy}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
           {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => { setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
@@ -274,7 +275,7 @@ function MenuEditBody() {
           </Card>
         ) : course && canEdit ? <p className={styles.note}>お支払いの方法は、コースを追加したあとにこのページで決められます。</p> : null}
       </CreatePage>
-      <ConfirmDialog open={deleting} title="この下書きを削除しますか？" description="一度も公開していない下書きだけ削除できます。元に戻せません。"
+      <ConfirmDialog open={deleting} title="このメニューを削除しますか？" description={`「${editing?.name ?? ''}」を削除します。予約や設定で使われていないメニューだけ削除できます。元に戻せません。`}
         confirmLabel="削除する" destructive busy={busy} onCancel={() => setDeleting(false)} error={error || undefined} onSuccess={() => setDeleting(false)} onConfirm={() => remove()} />
       <ConfirmDialog open={confirmingPrice} title="価格変更を確定しますか？"
         description={`${editing?.name ?? 'メニュー'}の価格を${formatYen(editing?.price ?? 0)}から${formatYen(Number(draft.price))}へ変更します。${priceStartsLater && priceStartsAt ? `${polishFormatDateTime(priceStartsAt)}に新価格を反映します。` : '保存後すぐに新価格を反映します。'}`}

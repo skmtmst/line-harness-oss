@@ -21,8 +21,8 @@ const onSave = vi.fn()
 function open(entry: Entry, proof: typeof definition | null = definition) {
   const props = { tableDefinition: proof ?? undefined }
   const shownTables = proof?.snapshot.tables ?? capacityTables
-  if (entry === 'page') render(<PhoneReservation {...props} storeId="store-1" storeName="模擬店舗" tables={shownTables} menuItems={[]} busy={false} preset={{ date: new Date('2026-10-11T00:00:00+09:00') }} onBack={vi.fn()} onSave={onSave} />)
-  else if (entry === 'drawer') render(<PhoneReservationDrawer {...props} open accountId="account-1" storeId="store-1" tables={shownTables} onClose={vi.fn()} onSaved={vi.fn()} />)
+  if (entry === 'page') render(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props} storeId="store-1" storeName="模擬店舗" tables={shownTables} menuItems={[]} busy={false} preset={{ date: new Date('2026-10-11T00:00:00+09:00') }} onBack={vi.fn()} onSave={onSave} />)
+  else if (entry === 'drawer') render(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" {...props} open accountId="account-1" storeId="store-1" tables={shownTables} onClose={vi.fn()} onSaved={vi.fn()} />)
   else render(<WalkInDialog {...props} open accountId="account-1" storeId="store-1" tables={shownTables} onClose={vi.fn()} onSaved={vi.fn()} />)
 }
 function changeCount(entry: Entry, count: number) {

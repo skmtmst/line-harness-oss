@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import HelpTip from '@/components/shared/help-tip'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { DataTable, TableHeadRow, Td, Th, Tr, ActionCell, NameCell, RowNameButton } from '@/components/shared/table'
@@ -15,7 +16,7 @@ import { formatYen } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
-import { RestaurantShell, Panel, StatRow, Status, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { RestaurantShell, Panel, QuietError, StatRow, Status, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import { DialogNote, RowMore, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import styles from './menu.module.css'
 import { formatDateTime as polishFormatDateTime } from '@/lib/format'
@@ -55,6 +56,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const scheduledPrices = rows.filter((item) => item.status === 'active' && item.pendingPrice != null && item.priceChangeStatus === 'approved')
   const [stopId, setStopId] = useState('')
   const [deleteId, setDeleteId] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const stopping = rows.find((row) => row.id === stopId)
   const deleting = rows.find((row) => row.id === deleteId)
   /* 追加・変更は 1 枚の編集ページ（mauOC）。前の窓は消した。 */
@@ -70,13 +72,16 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
     ).then(() => setStopId(''))
   }
 
-  /* 一度も公開していない下書きだけ消せる（サーバが公開済み・申請中・予約で使用中を断る）。 */
+  /* 参照の有無は削除時にサーバで判定する。 */
   const remove = (item: RestaurantMenuItem) => {
     if (!selectedAccountId) return
     void mutate(
-      () => fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(item.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE' }),
-      '下書きのメニューを削除しました。',
-    ).then(() => setDeleteId(''))
+      async () => {
+        try { await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(item.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE' }) }
+        catch (error) { setDeleteError(japaneseDetailOf(error) || '削除できませんでした。'); throw new QuietError() }
+      },
+      'メニューを削除しました。',
+    ).then((ok) => { if (ok) setDeleteId('') })
   }
 
   const resume = (item: RestaurantMenuItem) => {
@@ -105,7 +110,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
           <Button variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</Button>
         ) : null}
         flush
-        help={<HelpTip label="メニュー一覧の説明">「…」の中身：有効＝変更・停止／アーカイブ＝変更・再開／一度も公開していない下書き＝変更・削除</HelpTip>}
+        help={<HelpTip label="メニュー一覧の説明">「…」から変更・停止・再開・削除ができます。参照中のメニューは削除できません。</HelpTip>}
       >
         {legacyPending ? <Notice tone="warn">以前の価格変更申請が残っています。{canEdit ? <Button onClick={() => router.push('/restaurant-test/approvals')}>以前の申請を確認する</Button> : '管理者に確認を依頼してください。'}</Notice> : null}
         <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
@@ -152,9 +157,8 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                             { id: 'edit', label: '変更', onSelect: () => openEdit(item) },
                             ...(archived
                               ? [{ id: 'resume', label: '再開', onSelect: () => resume(item) }]
-                              : draftItem
-                                ? [{ id: 'delete', label: '削除', tone: 'danger' as const, dividerBefore: true, onSelect: () => setDeleteId(item.id) }]
-                                : [{ id: 'stop', label: '停止', onSelect: () => setStopId(item.id) }]),
+                              : draftItem ? [] : [{ id: 'stop', label: '停止', onSelect: () => setStopId(item.id) }]),
+                            { id: 'delete', label: '削除', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setDeleteError(''); setDeleteId(item.id) } },
                           ]}
                         />
                       </span>
@@ -186,7 +190,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
       </RsDialog>
       <RsDialog
         open={Boolean(deleting)}
-        title="この下書きを削除しますか？"
+        title="このメニューを削除しますか？"
         width={480}
         top={300}
         busy={busy}
@@ -199,7 +203,8 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         )}
       >
         <p className={styles.stopName}>{deleting?.name}</p>
-        <DialogNote>一度も公開していない下書きだけ削除できます。元に戻せません。</DialogNote>
+        <DialogNote>予約や設定で使われていないメニューだけ削除できます。元に戻せません。</DialogNote>
+        {deleteError ? <Notice tone="danger">{deleteError}</Notice> : null}
       </RsDialog>
     </>
   )
