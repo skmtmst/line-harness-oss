@@ -99,6 +99,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const [editor, setEditor] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof Draft, string>>>({})
+  const [editorError, setEditorError] = useState('')
   const editorRef = useRef<HTMLDivElement>(null)
   const [showPlacement, setShowPlacement] = useState(false)
   const [stopId, setStopId] = useState('')
@@ -117,12 +118,14 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     : []), [data.reservations, stopping, now])
 
   const openNew = () => {
+    setEditorError('')
     setDraft({ code: '', label: '', seatType: 'table', minCapacity: '1', maxCapacity: '2', floorX: '', floorY: '', joinGroup: '',floorId:floors[0]?.id??'floor-'+store?.id })
     setFieldErrors({})
     setShowPlacement(false)
     setEditor('new')
   }
   const openEdit = (table: RestaurantTable) => {
+    setEditorError('')
     setDraft({
       code: table.code, label: table.label, seatType: table.seat_type,
       minCapacity: String(table.min_capacity), maxCapacity: String(table.max_capacity),
@@ -134,7 +137,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   }
 
   const save = async () => {
-    if (!draft || !selectedAccountId) return
+    if (!draft) return
+    setEditorError('')
+    if (!selectedAccountId) { setEditorError('LINEアカウントを選んでから、もう一度お試しください。'); return }
+    if (!editing && !store) { setEditorError('店舗を選んでから、もう一度お試しください。'); return }
     const errors: Partial<Record<keyof Draft, string>> = {}
     if ((b244Requirements.draft_code.check(draft.code) !== null)) errors.code = '卓番を入れてください。'
     if ((b244Requirements.draft_label.check(draft.label) !== null)) errors.label = '表示名を入れてください。'
@@ -165,9 +171,9 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       joinGroup: draft.joinGroup.trim() || null,
     }
     const ok = editing
-      ? await mutate(() => restaurantTestApi.updateTable(selectedAccountId, editing.id, body), '卓を更新しました。')
+      ? await mutate(() => restaurantTestApi.updateTable(selectedAccountId, editing.id, body), '卓を更新しました。', setEditorError)
       : store
-        ? await mutate(() => restaurantTestApi.createTable(selectedAccountId, { storeId: store.id, ...body }), '卓を追加しました。')
+        ? await mutate(() => restaurantTestApi.createTable(selectedAccountId, { storeId: store.id, ...body }), '卓を追加しました。', setEditorError)
         : false
     if (ok) setEditor(null)
   }
@@ -299,6 +305,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       >
         {draft ? (
           <div ref={editorRef} className={styles.editorFields}>
+            {editorError ? <Notice tone="danger" role="alert">{editorError}</Notice> : null}
             <div className={styles.pair}>
               <Field label="卓番" htmlFor="rs-table-code" error={fieldErrors.code} requirement={b244Requirements.draft_code}>
                 <SaveErrorField names={["code","draft.code"]}><TextField id="rs-table-code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} /></SaveErrorField>
