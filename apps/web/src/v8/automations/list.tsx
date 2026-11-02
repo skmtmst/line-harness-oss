@@ -54,6 +54,7 @@ import { ActionCell, RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
 
@@ -641,7 +642,7 @@ export default function AutomationListV8() {
           error={actionError}
           onConfirm={pending?.accountId === selectedAccountId ? () => confirmPending() : undefined}
           onCancel={() => { if (!working) setPending(null) }}
-        />
+        ><OperationTargetSummary accounts={[{ id: pending?.accountId ?? '' }]} /></ConfirmDialog>
         <Dialog
           open={testing !== null}
           dirty={testDone ? false : undefined}
