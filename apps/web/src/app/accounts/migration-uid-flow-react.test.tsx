@@ -499,6 +499,9 @@ describe('UID移行の空と履歴のカード表示', () => {
     expect(card!.querySelector('h3')?.textContent).toBe('テスト移行の結果')
     // 履歴側の空カードも同じ形で出す。
     expect(document.body.textContent).toContain('移行履歴はまだありません')
+    // A-28：絞り込み用の既定文ではなく、移行の履歴用の説明を出す。
+    expect(document.body.textContent).toContain('移行を実行すると、ここに履歴が表示されます。')
+    expect(document.body.textContent).not.toContain('条件を変えるか、新しく作成してください。')
   })
 
   it('履歴なしでも下の履歴節へ飛ぶだけのボタンは出さない', async () => {
