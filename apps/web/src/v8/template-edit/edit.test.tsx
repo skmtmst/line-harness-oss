@@ -420,11 +420,21 @@ describe('V8 テンプレートの下書き自動保存（一斉配信と同じ�
 })
 
 describe('V8 クーポン・リサーチを作る', () => {
+  it('新規の種類は表示なしで、割引を選ぶと金額を入力できる', async () => {
+    await mount('kind=coupon')
+    expect(screen.getByLabelText('クーポンタイプ').textContent).toContain('種類の表示なし')
+    expect(screen.queryByLabelText('割引額')).toBeNull()
+    fireEvent.click(screen.getByLabelText('クーポンタイプ'))
+    fireEvent.click(screen.getByRole('button', { name: '割引', exact: true }))
+    expect(screen.getByLabelText('割引額')).toBeTruthy()
+  })
   it('クーポン：期間が無ければ保存の口を呼ばない', async () => {
     await mount('kind=coupon')
     expect(document.querySelector('[data-design-node="S6FEuB"]')).toBeTruthy()
     type(screen.getByLabelText('テンプレート名'), '夏の20%オフ')
     type(screen.getByLabelText('クーポン名'), '夏の20%オフ')
+    fireEvent.click(screen.getByLabelText('クーポンタイプ'))
+    fireEvent.click(screen.getByRole('button', { name: '割引', exact: true }))
     type(screen.getByLabelText('割引額'), '500')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await flush()
@@ -671,6 +681,8 @@ describe('V8 テンプレートの公開と送信の違い', () => {
 
   it('リッチメッセージでも注記を出す', async () => {
     await mount('kind=rich_message&visual=1')
+    expect(screen.queryByText('配信日 10:00')).toBeNull()
+    expect(screen.getByText('今日')).toBeTruthy()
     expect(screen.getByRole('button', { name: '保存して公開' })).toBeTruthy()
     expect(screen.getByText(note)).toBeTruthy()
   })

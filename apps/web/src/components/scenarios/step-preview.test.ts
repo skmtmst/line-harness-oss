@@ -7,6 +7,7 @@
  * ときの繰り上がりを見る。
  */
 import { describe, it, expect } from 'vitest'
+import { emptySchedule } from './schedule-input'
 import { computeDeliveryAt, previewOffsets, renderPreviewBody, isDeliveryTimeSet } from './step-preview'
 
 /** JSTの日時をローカルのDateとして組み立てる（画面側と同じ扱い）。 */
@@ -15,17 +16,18 @@ function at(y: number, m: number, d: number, hh: number, mm = 0): Date {
 }
 
 describe('時刻で指定', () => {
+  it('追加する通も1通目と同じ10時を初期値にする', () => { expect(emptySchedule.deliveryTime).toBe('10:00') })
   it('0日後で、まだ配信時刻を過ぎていなければ当日', () => {
     const out = computeDeliveryAt(at(2026, 8, 19, 8, 30), 'absolute_time', 0, '10:00', 0)
     expect(out.getDate()).toBe(19)
     expect(out.getHours()).toBe(10)
   })
 
-  it('0日後で、配信時刻をもう過ぎていれば翌日', () => {
+  it('0日後で、配信時刻をもう過ぎていればすぐ', () => {
     // 11:00 に購読開始 → その日の 10:00 は過ぎている
     const out = computeDeliveryAt(at(2026, 8, 19, 11, 0), 'absolute_time', 0, '10:00', 0)
-    expect(out.getDate()).toBe(20)
-    expect(out.getHours()).toBe(10)
+    expect(out.getDate()).toBe(19)
+    expect(out.getHours()).toBe(11)
   })
 
   it('1日後は、購読開始の翌日の決めた時刻', () => {

@@ -257,6 +257,8 @@ describe('共通情報の一覧の出し方', () => {
     const headings = [...host.querySelectorAll('thead th')].map((cell) => cell.textContent?.trim()).filter(Boolean)
     expect(headings).toEqual(['共通情報（差し込み名）', '中身', '状態', '使っている所'])
     expect(host.querySelector('thead')?.textContent).not.toContain('種別')
+    const companyRow = [...host.querySelectorAll('tbody tr')].find(row => row.textContent?.includes('会社名'))
+    expect(companyRow?.textContent).toContain('{{var.company_name}}')
   })
 
   it('既定は使われている数が多い順に並べる', async () => {

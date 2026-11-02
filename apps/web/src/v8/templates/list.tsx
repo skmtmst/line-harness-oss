@@ -90,6 +90,7 @@ export default function TemplatesListV8() {
    * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
    * テンプレートを開いて「戻る」と同じ一覧に戻る。
    */
+
   const templateQuery = urlView.q
   const setTemplateQuery = useCallback((next: string) => setUrlView({ q: next, page: '1' }), [setUrlView])
   const chips = useMemo<Record<ChipKey, boolean>>(() => {

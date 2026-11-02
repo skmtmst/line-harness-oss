@@ -321,7 +321,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
         }
         throw err
       }
-    }, '開ける時間と配分を保存しました。予約サイトへは書き戻していません。').then((ok) => {
+    }, '受付時間と配分を保存しました。予約サイトへは書き戻していません。').then((ok) => {
       if (ok) { setConflict(null); setDiffOpen(false); setAllocOverride(null); setAllocVersions(null); setRefresh((n) => n + 1) }
     })
   }
@@ -593,7 +593,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
               {conflict ? (
                 <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={() => setDiffOpen(true)}><Check size={16} aria-hidden="true" />比べてから保存</Button>
               ) : (
-                <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy || allocInvalid || (!hoursDraft && rows.length === 0) || (allocOverride === null && !hoursChanged)} disabledReason={allocOverride === null && !hoursChanged ? "変更していません" : undefined} onClick={() => saveAll(false)}><Check size={16} aria-hidden="true" />開ける時間と配分を保存</Button>
+                <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy || allocInvalid || (!hoursDraft && rows.length === 0) || (allocOverride === null && !hoursChanged)} disabledReason={allocOverride === null && !hoursChanged ? "変更していません" : undefined} onClick={() => saveAll(false)}><Check size={16} aria-hidden="true" />受付時間と配分を保存</Button>
               )}
             </>
           )}

@@ -52,3 +52,9 @@ it.each(['other', 'foreign'])('%sの店舗の卓・コースが誤って結ば�
   expect(schedule.entries[0]).toMatchObject({ title: '—', tableNames: [] });
   expect(JSON.stringify(schedule.entries[0])).not.toMatch(/別店|別店舗/);
 });
+
+it('未割り当て列は卓軸では卓、担当軸では担当の状態を示す', async () => {
+  fixture.raw.exec("DELETE FROM rt_reservation_table_links WHERE reservation_id='r'; UPDATE rt_reservations SET table_id=NULL WHERE id='r'");
+  expect((await load('restaurant', 'table')).columns.find(column => column.id === 'unassigned')?.name).toBe('卓未割り当て');
+  expect((await load('restaurant', 'staff')).columns.find(column => column.id === 'unassigned')?.name).toBe('担当未定');
+});
