@@ -24,8 +24,7 @@ import NumberInput from '@/components/shared/number-field'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { Field, TextArea } from '@/components/shared/form-controls'
-import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import MediaThumbnail from '@/components/shared/media-thumbnail'
+import RegisteredImageSelect from '@/components/shared/registered-image-select'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { TextField } from '@/components/shared/text-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -79,9 +78,7 @@ function MenuEditBody() {
   const [item, setItem] = useState<RestaurantMenuItem | null>(null)
   const [storeId, setStoreId] = useState<string | null>(null)
   const [storeAccountId, setStoreAccountId] = useState<string | null>(null)
-  const [mediaOpen, setMediaOpen] = useState(false)
   const [mediaName, setMediaName] = useState<string | null>(null)
-  const [imageFailed, setImageFailed] = useState(false)
   const [draft, setDraft] = useState<Draft>(draftOf(null))
   const [saved, setSaved] = useState<Draft>(draftOf(null))
   const [busy, setBusy] = useState(false)
@@ -111,7 +108,6 @@ function MenuEditBody() {
   useEffect(() => {
     let active = true
     setMediaName(null)
-    setImageFailed(false)
     if (draft.imageMediaId && storeAccountId) void api.media.detail(draft.imageMediaId, storeAccountId)
       .then(result => { if (active) setMediaName(result.success ? result.data.item.filename : '画像名を確認できませんでした') })
       .catch(() => { if (active) setMediaName('画像名を確認できませんでした') })
@@ -134,7 +130,7 @@ function MenuEditBody() {
   const contextKey = JSON.stringify([selectedAccountId, id, storeParam])
   const mutationContext = useRef<{ key: string; menuSignature: string | null }>({ key: contextKey, menuSignature: null })
   if (mutationContext.current.key !== contextKey) mutationContext.current = { key: contextKey, menuSignature: null }
-  useEffect(() => { setMediaOpen(false); setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setError(null) }, [contextKey])
+  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setError(null) }, [contextKey])
 
   async function save() {
     if (!canEdit || !selectedAccountId || !valid) return
@@ -234,7 +230,7 @@ function MenuEditBody() {
         destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setError(null); setDeleting(true) }} disabled={busy}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => { setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} disabledReason={!valid ? '名前と値段を入力してください。' : undefined} onClick={() => { setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
@@ -272,10 +268,9 @@ function MenuEditBody() {
               <SaveErrorField names={['description', 'draft.description']}><TextArea id="rs-menu-description" aria-label="メニューの説明" rows={3} maxLength={2000} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></SaveErrorField>
             </Field>
             <Field label="メニューの画像">
-              {draft.imageMediaId && storeAccountId && !imageFailed ? <span onErrorCapture={() => setImageFailed(true)}><MediaThumbnail size="compact" kind="image" src={api.media.contentUrl(draft.imageMediaId, storeAccountId)} alt="選択したメニューの画像" /></span> : imageFailed ? <p>画像なし</p> : null}
-              <Button type="button" disabled={!storeAccountId || busy} disabledReason={!storeAccountId ? '店舗にLINEアカウントを設定すると画像を選べます。' : undefined} onClick={() => setMediaOpen(true)}>登録メディアから選ぶ</Button>
-              {draft.imageMediaId ? <Button type="button" onClick={() => setDraft({ ...draft, imageMediaId: null })} disabled={busy}>選んだ画像を外す</Button> : null}
-              <p>{draft.imageMediaId ? mediaName ? `選択中：${mediaName}` : '選択中の画像名を確認しています' : '画像はまだ選んでいません'}</p>
+              <RegisteredImageSelect accountId={storeAccountId} imageId={draft.imageMediaId} imageName={mediaName} disabled={busy}
+                onSelect={media => { setDraft(current => ({ ...current, imageMediaId: media.id })); setMediaName(media.filename) }}
+                onRemove={() => setDraft(current => ({ ...current, imageMediaId: null }))} />
             </Field>
             <Field label="アレルギー（カンマ区切り）" htmlFor="rs-menu-allergens">
               <SaveErrorField names={['allergens', 'draft.allergens']}><TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} /></SaveErrorField>
@@ -305,7 +300,6 @@ function MenuEditBody() {
           </Card>
         ) : course && canEdit ? <p className={styles.note}>お支払いの方法は、コースを追加したあとにこのページで決められます。</p> : null}
       </CreatePage>
-      <MediaPickerDialog open={mediaOpen} accountId={storeAccountId} kind="image" accountOnly title="メニューの画像を選ぶ" onClose={() => setMediaOpen(false)} onSelect={media => { setDraft(current => ({ ...current, imageMediaId: media.id })); setMediaName(media.filename); setMediaOpen(false) }} />
       <ConfirmDialog open={deleting} title="このメニューを削除しますか？" description={`「${editing?.name ?? ''}」を削除します。予約や設定で使われていないメニューだけ削除できます。元に戻せません。`}
         confirmLabel="削除する" destructive busy={busy} onCancel={() => setDeleting(false)} error={error || undefined} onSuccess={() => setDeleting(false)} onConfirm={() => remove()} />
       <ConfirmDialog open={confirmingPrice} title="価格変更を確定しますか？"

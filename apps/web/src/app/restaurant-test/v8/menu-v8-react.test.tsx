@@ -90,8 +90,18 @@ describe('MJoJR メニュー管理のV8', () => {
     render(<MenuEditV8 />)
     const image = await screen.findByAltText('選択したメニューの画像')
     fireEvent.error(image)
-    expect(await screen.findByText('画像なし')).toBeTruthy()
+    expect(await screen.findByText('画像を読めません。登録メディアから選び直してください。')).toBeTruthy()
+    expect(screen.queryByText(/選択中：/)).toBeNull()
     expect(screen.queryByAltText('選択したメニューの画像')).toBeNull()
+  })
+
+  it('必須項目がない時は保存できない理由を表示する', async () => {
+    nav.params = new URLSearchParams('store=store-1')
+    try {
+      render(<MenuEditV8 />)
+      expect(await screen.findByText('名前と値段を入力してください。')).toBeTruthy()
+      expect((screen.getByRole('button', { name:'保存して追加する' }) as HTMLButtonElement).disabled).toBe(true)
+    } finally { nav.params = new URLSearchParams('id=m1') }
   })
 
   it('変更は窓（NkmwU）ではなく 1 枚の編集ページ（板 mauOC）', async () => {
