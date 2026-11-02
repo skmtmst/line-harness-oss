@@ -63,8 +63,6 @@ body.wb-active #app {
   color: inherit;
   margin: 0;
   padding: 0;
-  background-color: transparent;
-  background-image: none;
   border: 0;
   cursor: pointer;
 }
@@ -90,11 +88,21 @@ body.wb-active #app {
   /* border: 0 (style が none になる) にすると Tailwind の .border 系
    * (幅・色のみ指定) が描画されなくなる。Tailwind preflight と同じく
    * 幅 0 + style solid でリセットする。 */
-  border-width: 0;
   border-style: solid;
-  border-color: currentColor;
-  border-radius: 0;
-  background-color: transparent;
+}
+/* 背景と枠の初期値は、各部品の utility より弱い層に置く。 */
+@layer base {
+  :where(body.wb-active) button {
+    background-color: transparent;
+    background-image: none;
+  }
+  :where(body.wb-active) input:not([type='radio']):not([type='checkbox']),
+  :where(body.wb-active) textarea {
+    border-width: 0;
+    border-color: currentColor;
+    border-radius: 0;
+    background-color: transparent;
+  }
 }
 :where(body.wb-active) input[type='radio'],
 :where(body.wb-active) input[type='checkbox'] {
