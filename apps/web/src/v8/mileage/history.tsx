@@ -38,7 +38,9 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 export default function HistoryTab() {
-  const { readonly, narrow } = useMileageShell()
+  const { readonly: roleReadonly, narrow, balanceSource } = useMileageShell()
+  const ecSource = balanceSource === 'ec'
+  const readonly = roleReadonly || ecSource
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const requestRef = useRef(0)
@@ -176,7 +178,7 @@ export default function HistoryTab() {
         item.balanceAfter ?? '',
         item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : '自動',
       ])
-      const csv = [['日時', '友だち', '増減', '理由', '残高', 'だれが'], ...rows]
+      const csv = [['日時', '友だち', '増減', '理由', ecSource ? 'musuboの残高' : '残高', 'だれが'], ...rows]
         .map((row) => row.map((value) => csvCell(value)).join(','))
         .join('\n')
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
@@ -188,7 +190,7 @@ export default function HistoryTab() {
     } catch {
       setExportError('CSVを書き出せませんでした。もう一度お試しください。')
     }
-  }, [canExport, items])
+  }, [canExport, items, ecSource])
 
   const runPendingAction = async () => {
     if (!pendingAction || pendingBusy || !selectedAccountId) return
@@ -260,7 +262,7 @@ export default function HistoryTab() {
   const toolbar = (
     <MileageToolbar
       narrow={narrow}
-      notices={<ToolbarNotices error={exportError} />}
+      notices={<>{ecSource ? <Notice tone="info">これはmusubo側の履歴です。現在の残高とランクはECと同期しています。</Notice> : null}<ToolbarNotices error={exportError} /></>}
       search={{
         placeholder: '友だち・できごとで探す',
         value: searchInput,
@@ -277,7 +279,7 @@ export default function HistoryTab() {
     />
   )
 
-  const table = <HistoryTable {...{ items, readonly, menuId, setMenuId, openPending, viewName }} />
+  const table = <HistoryTable {...{ items, readonly, menuId, setMenuId, openPending, viewName }} ecSource={ecSource} />
 
   const body = !accountLoading && !selectedAccountId ? (
     <ListState kind="empty" title="LINEアカウントを選択してください" description="共通トップバーでLINEアカウントを選ぶと、マイルの履歴を確認できます。" />
@@ -303,13 +305,13 @@ export default function HistoryTab() {
     <div className={styles.pagerStack}>
       <HistoryPager {...{ spentOnly, total, page, pageSize, items, pageCount, loading, setPage }} />
       {/* 行の操作の案内はページ送りの下の1行（絵 oRbJi の「下の段」）。 */}
-      <p className={styles.footNoteFlush}>行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。</p>
+      <p className={styles.footNoteFlush}>{ecSource ? 'これはmusubo側の履歴です。現在の残高はECと同期しています。' : '行を押すと、その友だちのマイルの詳細を開きます。「増やす・減らす」は理由を書いて明細を足します（オーナー・管理者だけ）。'}</p>
     </div>
   ) : undefined
 
   return (
     <MileageFrame
-      explanation="明細はあとから消せません。間違えて付けたときは「減らす」で取り消しの明細を足します。"
+      explanation={ecSource ? 'ここはmusuboの過去の履歴です。現在の残高とランクはECと同期しています。' : '明細はあとから消せません。間違えて付けたときは「減らす」で取り消しの明細を足します。'}
       actions={<div className={styles.headActions}>
         <Button onClick={exportCsv} disabled={!canExport}>
           <Download size={16} aria-hidden="true" /> CSVで書き出す

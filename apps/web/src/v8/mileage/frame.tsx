@@ -49,6 +49,7 @@ export interface MileageShellContext {
   readonly: boolean
   narrow: boolean
   counts: MileageTabCounts
+  balanceSource?: 'ec' | 'musubo' | null
   /** 読み直したタブが件数を載せ直す。null で消す。 */
   setCount: (key: MileageTabKey, text: string | null) => void
 }

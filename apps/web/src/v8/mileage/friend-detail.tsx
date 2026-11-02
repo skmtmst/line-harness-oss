@@ -102,13 +102,15 @@ function FriendDetailInner() {
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [mileage, setMileage] = useState<MileageDetail | null>(null)
   const [v6Friend, setV6Friend] = useState<MileageFriendV6 | null>(null)
+  const [balanceSource, setBalanceSource] = useState<'ec' | 'musubo' | null>(null)
   const [v6History, setV6History] = useState<MileageDetailHistoryItem[] | null>(null)
   /* WEB075：口が数えた明細の全件数。読めた最新100件より多ければ、ここに出ているのは一部。 */
   const [historyTotal, setHistoryTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [error, setError] = useState(false)
   const [missing, setMissing] = useState(false)
-  const canAdjust = canManageRole(useStaffRole())
+  const canAdjust = canManageRole(useStaffRole()) && balanceSource === 'musubo'
   const canConfigureAdjustmentPolicy = isOwnerRole(useStaffRole())
   const [adjustmentOpen, setAdjustmentOpen] = useState(false)
   const [adjustMode, setAdjustMode] = useState<'increase' | 'decrease'>('increase')
@@ -134,6 +136,7 @@ function FriendDetailInner() {
       setMileage(null)
       setV6Friend(null)
       setV6History(null)
+      setLoadedAccountId(null)
       setLoading(false)
       return
     }
@@ -144,21 +147,30 @@ function FriendDetailInner() {
     try {
       const friendResponse = await api.friends.get(friendId)
       if (!friendResponse.success) throw new Error('load_failed')
-      const [mileageResponse, v6Response, historyResponse] = await Promise.all([
+      const v6Response = await api.mileage.friendsV6({ accountId: selectedAccountId, friendId, limit: 1, offset: 0 }).catch(() => null)
+      if (request !== requestRef.current) return
+      if (!v6Response?.success || !['ec', 'musubo'].includes(v6Response.data?.balanceSource)) throw new Error('load_failed')
+      const selected = Array.isArray(v6Response.data.items) ? v6Response.data.items.find((item) => item.friendId === friendId) ?? null : null
+      if (v6Response.data.balanceSource === 'ec' && !selected) {
+        setMissing(true); setFriend(null); setMileage(null); setV6Friend(null)
+        return
+      }
+      setBalanceSource(v6Response.data.balanceSource)
+      setFriend(friendResponse.data)
+      setV6Friend(selected)
+      if (v6Response.data.balanceSource === 'ec') {
+        setMileage(null); setV6History(null); setHistoryTotal(null)
+        return
+      }
+      const [mileageResponse, historyResponse] = await Promise.all([
         api.friends.mileage(friendId, { limit: 100, accountId: selectedAccountId }),
-        api.mileage.friendsV6({ accountId: selectedAccountId, friendId, limit: 1, offset: 0 }).catch(() => null),
         api.mileage.history({ accountId: selectedAccountId, friendId, limit: 100, offset: 0 }).catch(() => null),
       ])
       if (request !== requestRef.current) return
       if (!mileageResponse.success) throw new Error('load_failed')
-      setFriend(friendResponse.data)
       setMileage(mileageResponse.data)
-      setV6Friend(v6Response?.success && Array.isArray(v6Response.data?.items)
-        ? v6Response.data.items.find((item) => item.friendId === friendId) ?? null
-        : null)
       setV6History(historyResponse?.success && Array.isArray(historyResponse.data?.items)
-        ? historyResponse.data.items.map(friendHistoryItem)
-        : null)
+        ? historyResponse.data.items.map(friendHistoryItem) : null)
       setHistoryTotal(historyResponse?.success ? mileagePaginationTotal(historyResponse.data) : null)
 
     } catch (caught) {
@@ -166,12 +178,13 @@ function FriendDetailInner() {
       setFriend(null)
       setMileage(null)
       setV6Friend(null)
+      setBalanceSource(null)
       setV6History(null)
 
       if (caught instanceof ApiError && caught.status === 404) setMissing(true)
       else setError(true)
     } finally {
-      if (request === requestRef.current) setLoading(false)
+      if (request === requestRef.current) { setLoadedAccountId(selectedAccountId); setLoading(false) }
     }
   }, [friendId, selectedAccountId])
 
@@ -256,7 +269,7 @@ function FriendDetailInner() {
     voided: displayedHistory.filter((item) => kindOf(item) === 'voided').length,
   }), [displayedHistory])
 
-  if (accountLoading || loading) {
+  if (accountLoading || loading || (friendId && selectedAccountId && loadedAccountId !== selectedAccountId)) {
     return <div data-design-node="R6kIG"><DetailLoading label="マイル明細を読み込んでいます" /></div>
   }
   if (!friendId) {
@@ -269,20 +282,29 @@ function FriendDetailInner() {
   if (!selectedAccountId) {
     return <div data-design-node="R6kIG"><ListState kind="empty" title="LINEアカウントを選択してください" description="共通トップバーでLINEアカウントを選ぶと、友だちのマイル明細を確認できます。" /></div>
   }
-  if (missing || (!error && (!friend || !mileage))) {
+  if (missing || (!error && (!friend || (!mileage && balanceSource !== 'ec')))) {
     return (
       <div data-design-node="R6kIG">
         <TargetMissing kind="not-found" title="この友だちは見つかりません" description="友だちが選択中のLINEアカウントにいるか確認して、一覧から選び直してください。" backHref="/friends" backLabel="友だち一覧へ戻る" />
       </div>
     )
   }
-  if (error || !friend || !mileage) {
+  if (error || !friend || (!mileage && balanceSource !== 'ec')) {
     return (
       <div data-design-node="R6kIG">
         <TargetMissing kind="error" title="マイル明細を表示できませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
       </div>
     )
   }
+
+  if (balanceSource === 'ec') {
+    return <DetailPage boardId="R6kIG" title={v6Friend?.displayName || friend.displayName || '名前未設定'} help="ECと同期">
+      <KpiBand><KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="使える残高" value={v6Friend?.available ?? null} unit="マイル" detail="ECと同期" /></KpiBand>
+      <Notice tone="info">会員ランク：{v6Friend?.rank ?? '未設定'}。残高とランクはECから受け取った情報です。</Notice>
+    </DetailPage>
+  }
+
+  if (!mileage) return <div data-design-node="R6kIG"><TargetMissing kind="error" title="マイル明細を表示できませんでした" description="もう一度読み込んでください。" onRetry={() => void load()} /></div>
 
   const displayName = v6Friend?.displayName || friend.displayName || '名前未設定'
   const rankLabel = v6Friend?.rank === 'gold'

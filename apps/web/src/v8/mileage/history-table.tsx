@@ -12,8 +12,8 @@ import { formatMileageChange, formatMileageShortDateTime, mileageEntryTypeLabel,
 import { MILEAGE_TABLE_LAYOUT } from './frame'
 import styles from './mileage.module.css'
 
-export default function HistoryTable({ items, readonly, menuId, setMenuId, openPending, viewName }: {
-  items: MileageAdminHistoryItem[]; readonly: boolean; menuId: string | null
+export default function HistoryTable({ items, readonly, menuId, setMenuId, openPending, viewName, ecSource = false }: {
+  items: MileageAdminHistoryItem[]; readonly: boolean; menuId: string | null; ecSource?: boolean
   setMenuId: (id: string | null) => void
   openPending: (kind: 'confirm' | 'void', item: MileageAdminHistoryItem) => void
   viewName: (item: MileageAdminHistoryItem) => string
@@ -27,7 +27,7 @@ export default function HistoryTable({ items, readonly, menuId, setMenuId, openP
             <Th grow>いつ・だれに</Th>
             <Th align="right" className={styles.colDelta}>増減</Th>
             <Th className={styles.colWhy}>なぜ</Th>
-            <Th align="right" className={styles.colAfter}>残高</Th>
+            <Th align="right" className={styles.colAfter}>{ecSource ? 'musuboの残高' : '残高'}</Th>
             <Th collapseAt="narrow" className={styles.colWho}>だれが</Th>
             <Th className={styles.colOpsHistory}>操作</Th>
           </TableHeadRow>
