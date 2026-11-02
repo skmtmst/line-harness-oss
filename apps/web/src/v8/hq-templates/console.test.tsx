@@ -821,6 +821,21 @@ it('リサーチの通常入力は再読込後も一時下書きから復元す�
   expect(await screen.findByDisplayValue('未保存リサーチ')).toBeTruthy()
   expect((screen.getByLabelText('質問文') as HTMLInputElement).value).toContain('未保存の質問ですか？')
 })
+it('タグの通常入力は再読込後も一時下書きから復元する（H-18原文）', async () => {
+  window.history.replaceState(null, '', '/hq/templates')
+  calls.list.mockResolvedValue([])
+  calls.folderList.mockResolvedValue([])
+  const { unmount } = render(<HqTemplatesV8 type="tag" />)
+  fireEvent.click((await screen.findAllByRole('button', { name: /タグを作る/ }))[0])
+  expect(await screen.findByRole('heading', { name: 'タグのひな形を作る' })).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('タグ名'), { target: { value: '未保存タグ' } })
+  await waitFor(() => expect(window.sessionStorage.getItem('lh_hq_create_draft_v1:tenant-a:owner:tag:tag') ?? '').toContain('未保存タグ'), { timeout: 5000 })
+  unmount()
+  cleanup()
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="tag" />)
+  expect(await screen.findByDisplayValue('未保存タグ')).toBeTruthy()
+})
 it('未配布ありの1件を消すと数の帯を取り直す（B25）', async () => {
   calls.listStats
     .mockResolvedValueOnce({ thisMonthSentCount: 0, outdatedTemplateCount: 1 })

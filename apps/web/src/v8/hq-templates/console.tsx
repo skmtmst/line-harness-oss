@@ -317,6 +317,24 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }, [stage])
 
   const tagDraft = useRef<TemplateDefinition | null>(null)
+  /* H-18原文の再読込対策：タグの作る画面の通常入力の一時下書き。結果不明の送信依頼とは別キーで所属・種別を区別し、保存・取消・作り直しで消す。 */
+  const TAG_DRAFT_KIND = 'tag'
+  const persistTagCreateDraft = (next: TagDefinition) => {
+    const scope = creationScope.current
+    /* 編集・結果不明の復旧中は作る画面の下書きに混ぜない（衝突表示は tagDraft が今までどおり持つ）。 */
+    if (!scope || detail !== null || createUncertain) return
+    try {
+      const draftName = definitionName('tag', next)
+      if (!draftName.trim() && JSON.stringify(next) === JSON.stringify(freshDefinition('tag'))) {
+        clearEditorDraft(window.sessionStorage, scope, 'tag', TAG_DRAFT_KIND)
+        return
+      }
+      persistEditorDraft(window.sessionStorage, scope, 'tag', TAG_DRAFT_KIND, { kind: TAG_DRAFT_KIND, name: draftName, definition: next })
+    } catch { /* 下書きの保存失敗は本機能を止めない */ }
+  }
+  const clearTagCreateDraft = () => {
+    if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, 'tag', TAG_DRAFT_KIND)
+  }
   const conflictScope = JSON.stringify([type, detail?.template.id, creationScope.current?.tenantId])
   const conflictScopeRef = useRef(conflictScope)
   conflictScopeRef.current = conflictScope
@@ -363,7 +381,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : [])
     createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false); setRestoreDraft(null)
     /* 下書きは新規作成の分だけ消す。editKind は一覧の描画では未初期化のため kind を使う（新規では同値）。 */
-    if (!detail && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind)
+    if (!detail && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft()
     flushListUrlState()
     entryHandled.current = ''
     window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref))
@@ -419,6 +437,17 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         setKind(restored.kind); setRestoreDraft(restored.draft); setDetail(null); setFolderId(null); setName(''); setDescription(''); setStage('edit'); setError(''); setConflict(false)
         return
       }
+      /* H-18原文：タグの作る画面の一時下書きがあれば戻す（編集・結果不明の復旧は対象外）。 */
+      if (type === 'tag' && creation) {
+        const loaded = loadEditorDraft(window.sessionStorage, creation, 'tag', TAG_DRAFT_KIND)
+        const tagDef = loaded && loaded.kind === TAG_DRAFT_KIND && loaded.definition && typeof loaded.definition === 'object' && 'tag' in (loaded.definition as Record<string, unknown>) ? loaded.definition as TagDefinition : null
+        if (tagDef && definitionName('tag', tagDef)) {
+          const restoredFolder = typeof tagDef.tag.folderId === 'string' ? tagDef.tag.folderId : null
+          editBaseline.current = JSON.stringify({ name: '', description: '', definition: freshDefinition('tag'), folderId: null })
+          setDetail(null); setFolderId(restoredFolder); setName(String(loaded?.name ?? '')); setDescription(''); setDefinition(tagDef); setStage('edit'); setError(''); setConflict(false)
+          return
+        }
+      }
       startCreate()
       return
     }
@@ -433,7 +462,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }, [ready, busy, location, canEdit])
   const startCreate = () => {
     createAttempt.current = null; sessionUploads.current = []; setMenuTargets([]); setRestoreDraft(null)
-    if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind)
+    if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft()
     const fresh = freshDefinition(type), nextFolder = folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null
     editBaseline.current = JSON.stringify({ name: '', description: '', definition: fresh, folderId: nextFolder })
     setDetail(null); setFolderId(nextFolder); setName(''); setDescription(''); setDefinition(fresh); setStage('edit'); setError(''); setConflict(false)
@@ -516,8 +545,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       setStage('saved')
     }
     // R561: 「保存して続けて作る」は新規作成のときだけ、空の新規入力へ戻る。
-    else if (andAnother && isNew) { setRestoreDraft(null); if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
-    else if (isNew) { setRestoreDraft(null); if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); flushListUrlState(); entryHandled.current = ''; window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref)); notifyListLocation(); setStage('list') }
+    else if (andAnother && isNew) { setRestoreDraft(null); if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
+    else if (isNew) { setRestoreDraft(null); if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); flushListUrlState(); entryHandled.current = ''; window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref)); notifyListLocation(); setStage('list') }
     else {
       setStage('edit')
       flushListUrlState()
@@ -1115,7 +1144,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     const folderOf = (next: TagDefinition) => folders.some((folder) => folder.id === next.tag.folderId) ? next.tag.folderId ?? null : next.tag.folderId ? folderId : null
     return <SaveErrorScope errors={saveErrors}><HqTagEditorV8 key={formKey} definition={definition} folders={folders} onCreateFolder={canEdit ? createFolder : undefined} editing={Boolean(detail)} saving={busy} readOnly={!canEdit}
       onSaveDraft={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(false, next, nextName, description, false, { folderId: nextFolder }) }}
-      conflictNotice={conflictNotice} onDraftChange={(next) => { tagDraft.current = next }} conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}
+      conflictNotice={conflictNotice} onDraftChange={(next) => { tagDraft.current = next; persistTagCreateDraft(next) }} conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}
       error={error} notice={message || undefined} onCancel={toList} onSave={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(true, next, nextName, description, false, { folderId: nextFolder }) }} /></SaveErrorScope>
   }
 
