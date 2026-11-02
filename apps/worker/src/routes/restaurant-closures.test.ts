@@ -180,13 +180,13 @@ beforeEach(() => {
   };
   cardSender.mockClear();
   seedStore();
+  vi.useFakeTimers({toFake:['Date']});
+  vi.setSystemTime(new Date('2026-11-01T00:00:00Z'));
 });
 
 
 afterEach(()=>{testDb.raw.close();vi.unstubAllGlobals();vi.useRealTimers();});
 function configurePhoneIntake() {
- vi.useFakeTimers({toFake:['Date']});
- vi.setSystemTime(new Date('2026-11-01T00:00:00Z'));
  const hours=Array.from({length:7},(_,weekday)=>({weekday,periods:[{opensAt:'17:00',closesAt:'23:00'}]}));
  testDb.raw.prepare("INSERT INTO rt_opening_hours_settings(store_id,hours_json,updated_by) VALUES('store-s',?,'test')").run(JSON.stringify(hours));
 }
