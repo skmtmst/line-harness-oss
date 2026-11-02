@@ -5,7 +5,7 @@ import Notice from '@/components/shared/notice'
 import { loadAdminVersionDetail } from '@/lib/admin-version-cache'
 
 /** 本番や環境が確認できない場合は、検証環境と断定しない。 */
-export function BoundaryBanner(_props: { note?: string } = {}) {
+export function BoundaryBanner({ note, noteAlways = false }: { note?: string; noteAlways?: boolean } = {}) {
   const [staging, setStaging] = useState(false)
   useEffect(() => {
     let active = true
@@ -14,5 +14,6 @@ export function BoundaryBanner(_props: { note?: string } = {}) {
     }).catch(() => { if (active) setStaging(false) })
     return () => { active = false }
   }, [])
-  return staging ? <Notice tone="info">検証環境です。予約サイトへは送りません</Notice> : null
+  if (!staging && !(noteAlways && note)) return null
+  return <Notice tone="info">{staging ? <span>検証環境です。予約サイトへは送りません</span> : null}{note && (staging || noteAlways) ? <span>{staging ? ' ' : null}{note}</span> : null}</Notice>
 }

@@ -26,3 +26,14 @@ it.each([['共通画面', CommonBanner], ['予約画面', BookingBanner]])('%s�
     unmount()
   }
 })
+
+it('検証時の固有の注意と、本番でも必要なGoogle送信の注意を消さない', async () => {
+  environment.value = 'staging'
+  const { unmount } = render(<CommonBanner note="デリバリーは検証用です" />)
+  expect(await screen.findByText('デリバリーは検証用です')).toBeTruthy()
+  unmount()
+  environment.value = 'production'
+  render(<CommonBanner note="Googleへ実際に届きます" noteAlways />)
+  expect(await screen.findByText('Googleへ実際に届きます')).toBeTruthy()
+  expect(screen.queryByText('検証環境です。予約サイトへは送りません')).toBeNull()
+})
