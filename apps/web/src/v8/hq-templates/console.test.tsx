@@ -731,6 +731,21 @@ it('カルーセルの通常入力は再読込後も一時下書きから復元�
   expect(await screen.findByDisplayValue('未保存カルーセル')).toBeTruthy()
   expect((document.getElementById('cr-text') as HTMLInputElement).value).toContain('未保存のカード本文')
 })
+it('質問の通常入力は再読込後も一時下書きから復元する（H-18原文）', async () => {
+  const { unmount } = render(<HqTemplatesV8 type="template" />)
+  fireEvent.click(await screen.findByRole('tab', { name: /質問/ }))
+  fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+  expect(await screen.findByRole('heading', { name: '質問を作る' })).toBeTruthy()
+  fireEvent.change(screen.getByPlaceholderText('例：継続の意思をうかがう'), { target: { value: '未保存の質問名' } })
+  fireEvent.change(screen.getByLabelText(/^質問文/), { target: { value: '未保存の質問文ですか？' } })
+  await waitFor(() => expect(window.sessionStorage.getItem('lh_hq_create_draft_v1:tenant-a:owner:template:question') ?? '').toContain('未保存の質問文ですか？'), { timeout: 5000 })
+  unmount()
+  cleanup()
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  expect(await screen.findByDisplayValue('未保存の質問名')).toBeTruthy()
+  expect((screen.getByLabelText(/^質問文/) as HTMLInputElement).value).toContain('未保存の質問文ですか？')
+})
 it('未配布ありの1件を消すと数の帯を取り直す（B25）', async () => {
   calls.listStats
     .mockResolvedValueOnce({ thisMonthSentCount: 0, outdatedTemplateCount: 1 })

@@ -160,6 +160,15 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (!choice.label.trim() ? 'ボタンの文字を入力してください。' : choice.label.length > 20 ? 'ボタンの文字は20文字以内で入力してください。' : null), { required: true })
   })
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
+  /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。 */
+  const questionDraftSnapshot = JSON.stringify([name, question])
+  useEffect(() => {
+    if (!host?.onDraftChange) return
+    try {
+      host.onDraftChange({ kind: 'question', name, question: question as unknown as Record<string, unknown>, messageContent: question.intro?.trim() || question.text })
+    } catch { /* 組み立て不可の途中入力は通知しない */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionDraftSnapshot])
 
   const save = async (questionStatus: 'draft' | 'published'): Promise<boolean> => {
     if (host) {
