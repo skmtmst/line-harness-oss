@@ -174,3 +174,62 @@ it('はじめの質問のデモで選ぶと、選択を渡し選択済みボタ�
   await waitFor(() => expect(document.activeElement).toBe(selected))
   expect(within(dialog).getByText('選んでいるスタイル：飲食店')).toBeTruthy()
 })
+
+it.each(STYLE_EXPERIENCE_SCRIPT.order.flatMap(style => [0, 1, 2, 3, 4].map(page => ({ style, page }))))('$style の $page ページからスタイルを選べる', ({ style, page }) => {
+  render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+  view(style)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  for (let index = 0; index < page; index++) fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+  fireEvent.click(screen.getByRole('button', { name: 'このスタイルにする' }))
+  expect(calls.choose).toHaveBeenCalledExactlyOnceWith(style)
+  expect(calls.save).not.toHaveBeenCalled()
+})
+
+it.each(STYLE_EXPERIENCE_SCRIPT.order)('%s の最後のページにそのスタイルのメニューを表示する', style => {
+  render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+  view(style)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  for (let page = 0; page < 4; page++) fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+  const guide = within(screen.getByRole('region', { name: '見本から始める案内' }))
+  for (const item of STYLE_EXPERIENCE_SCRIPT.styles[style].richMenu ?? []) expect(guide.getByText(item.label)).toBeTruthy()
+  expect(calls.choose).not.toHaveBeenCalled()
+})
+
+it('メニューの見本が空の場合は案内を表示する', () => {
+  const script = STYLE_EXPERIENCE_SCRIPT.styles.ec
+  const original = script.richMenu
+  try {
+    script.richMenu = []
+    render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+    view('ec')
+    fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+    for (let page = 0; page < 4; page++) fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+    expect(screen.getByText('メニューの内容を確認できません。')).toBeTruthy()
+  } finally { script.richMenu = original }
+})
+
+it('ECの注文と未返信の見本を確認する', () => {
+  render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+  view('ec')
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  for (let page = 0; page < 3; page++) fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+  const section = within(screen.getByRole('region', { name: '注文のあとの見本' }))
+  expect(section.getByText('今日の注文 5件')).toBeTruthy()
+  const rows = section.getAllByRole('listitem')
+  expect(rows.map(row => Number(row.textContent?.match(/(\d+)件/)?.[1]))).toEqual([2, 1, 2])
+  expect(rows.reduce((sum, row) => sum + Number(row.textContent?.match(/(\d+)件/)?.[1]), 0)).toBe(5)
+  expect(section.getByText('お問い合わせ・未返信 1件')).toBeTruthy()
+  expect(section.getByText('見本 あかり さま・届き日のご相談')).toBeTruthy()
+})
+
+
+it.each(['standard', 'ec'] as const)('%s のデモに予約の言葉を出さない', style => {
+  render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+  view(style)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  for (let index = 0; index < 5; index++) {
+    const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+    expect(dialog.textContent).not.toContain('予約')
+    if (index < 4) fireEvent.click(within(dialog).getByRole('button', { name: '次のページ' }))
+  }
+})
