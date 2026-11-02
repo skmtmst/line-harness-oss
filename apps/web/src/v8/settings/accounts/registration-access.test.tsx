@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /* 登録・接続確認はオーナーと管理者。スタッフ・閲覧のみは理由付きで入口を止め、直アクセスも拒否する。 */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
@@ -22,6 +22,10 @@ vi.mock('@/components/shell/page-chrome', async (importOriginal) => ({
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, accounts: [] }),
+}))
+
+vi.mock('@/lib/use-running-version', () => ({
+  useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -189,4 +193,17 @@ it.each(['owner', 'admin'])('%sの通常アーカイブは1回、開いた窓を
   await act(async () => {})
   expect(fixture.archive).toHaveBeenCalledTimes(1)
   expect(fixture.restore).not.toHaveBeenCalled()
+})
+
+it('アーカイブ前に、選択中ではなく操作するアカウントと環境を表示する', async () => {
+  fixture.list.mockResolvedValue({ success: true, data: [{ id: 'acc-2', name: '対象の店', channelId: '2', isActive: false, archivedAt: null }] })
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '対象の店の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'アーカイブ' }))
+  const dialog = within(screen.getByRole('alertdialog'))
+  expect(dialog.getByText('LINEアカウント')).toBeTruthy()
+  expect(dialog.getByText('対象の店')).toBeTruthy()
+  expect(dialog.getByText('環境')).toBeTruthy()
+  expect(dialog.getByText('検証環境')).toBeTruthy()
+  expect(fixture.archive).not.toHaveBeenCalled()
 })

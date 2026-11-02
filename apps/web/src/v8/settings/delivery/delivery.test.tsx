@@ -380,6 +380,11 @@ describe('設定 › デリバリー連携', () => {
     fireEvent.click(button('連携を解除する'))
     // 承認案 `kJLks` のとおり、英字で終わる社名のあとは半角の空きを入れる。
     expect(screen.getByText('Uber Eats の連携を解除しますか')).toBeTruthy()
+    const confirmation = screen.getByRole('alertdialog', { name: 'Uber Eats の連携を解除しますか' })
+    expect(within(confirmation).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(confirmation).getByText('本店')).toBeTruthy()
+    expect(within(confirmation).getByText('渋谷店')).toBeTruthy()
+    expect(within(confirmation).getByText('環境')).toBeTruthy()
     expect(screen.getByText(/^Uber Eats とのつなぎを外します。/)).toBeTruthy()
     expect(fixture.disconnect).not.toHaveBeenCalled()
 
@@ -395,6 +400,21 @@ describe('設定 › デリバリー連携', () => {
     expect(card('Uber Eats').getByText('未接続')).toBeTruthy()
     expect(card('Uber Eats').queryByText('渋谷店')).toBeNull()
     expect(screen.queryByText('現在準備中です')).toBeNull()
+  })
+
+  it('アカウントを切り替えて戻した後の古い解除確定は送らない', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'connected', storeName: '渋谷店' }))
+    const view = render(<DeliverySettingsPage />)
+    await screen.findByText('渋谷店')
+    fireEvent.click(button('連携を解除する'))
+    const target = button('解除する')
+    const key = Object.keys(target).find(item => item.startsWith('__reactProps$'))!
+    const handler = (target as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    fixture.accountId.value = 'acc-2'; view.rerender(<DeliverySettingsPage />)
+    fixture.accountId.value = 'acc-1'; view.rerender(<DeliverySettingsPage />)
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: target, target }) })
+    expect(fixture.disconnect).not.toHaveBeenCalled()
   })
 
   it('DL-3：解除結果が確定しなければ窓と接続表示を保ち、自動で送り直さない', async () => {

@@ -25,6 +25,7 @@ import { DetailPage } from '@/components/templates';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import KpiBand from '@/components/shared/kpi-band'
@@ -183,6 +184,7 @@ export default function AutoReplyRunsV8() {
   const [search, setSearch] = useListUrlValue('q', '')
   const [actionMessage, setActionMessage] = useState('')
   const [stopOpen, setStopOpen] = useState(false)
+  const [stopAccount, setStopAccount] = useState<{ ruleId: string; accountId: string | null } | null>(null)
   const [stopReason, setStopReason] = useState('')
   const [stopping, setStopping] = useState(false)
   const [retryingId, setRetryingId] = useState<string | null>(null)
@@ -239,6 +241,19 @@ export default function AutoReplyRunsV8() {
   }, [page, pageSize, requestedRuleId, range])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    const ruleId = data?.rule.id
+    if (!stopOpen || !ruleId) return
+    let active = true
+    setStopAccount(null)
+    void api.autoReplies.get(ruleId).then(response => {
+      if (active && response.success && response.data.id === ruleId && (response.data.lineAccountId === null || typeof response.data.lineAccountId === 'string')) {
+        setStopAccount({ ruleId, accountId: response.data.lineAccountId })
+      }
+    }).catch(() => {})
+    return () => { active = false }
+  }, [stopOpen, data?.rule.id])
 
   const total = data?.pagination.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
@@ -433,7 +448,7 @@ export default function AutoReplyRunsV8() {
       help="いつ・誰に・何を返したか、失敗した処理を見ます。"
       identity={<></>}
       actions={<div className={styles.headActions}>
-          <Button lockedReason={manageReason} onClick={() => { if (canManageRunsNow()) { setActionMessage(''); setStopOpen(true) } }} disabled={!canChange || !isActiveRule || stopping}>
+          <Button lockedReason={manageReason} onClick={() => { if (canManageRunsNow()) { setActionMessage(''); setStopAccount(null); setStopOpen(true) } }} disabled={!canChange || !isActiveRule || stopping}>
             <Pause size={16} aria-hidden="true" />一時停止する
           </Button>
         {data?.rule.id ? (
@@ -615,6 +630,7 @@ export default function AutoReplyRunsV8() {
         error={actionMessage || undefined} onSuccess={() => setStopOpen(false)} onConfirm={() => stopRule()}
         onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}
       >
+        <OperationTargetSummary allAccounts={Boolean(stopAccount && stopAccount.ruleId === data?.rule.id && stopAccount.accountId === null)} accounts={stopAccount && stopAccount.ruleId === data?.rule.id && stopAccount.accountId === null ? [] : [{ id: stopAccount && stopAccount.ruleId === data?.rule.id ? stopAccount.accountId ?? '' : '' }]} />
         <SaveErrorField names={["stopReason","reason","stop_reason"]}><SharedTextField
           type="text"
           className={styles.stopReason}

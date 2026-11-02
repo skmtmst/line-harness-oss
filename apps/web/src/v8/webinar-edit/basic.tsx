@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { describeSaveFailure, webinarApi, type WebinarFolder } from '@/lib/api'
@@ -206,6 +207,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         onCancel={() => { if (!saving && !testing) setTestConfirm(false) }}
         onConfirm={() => runTest()}
       >
+        <OperationTargetSummary accounts={[{ id: webinar.accountId ?? '' }]} />
         {dirty ? <p className={styles.cardNote}>変えた基本設定を保存してから送ります。</p> : null}
       </ConfirmDialog>
     </CreatePage></SaveErrorScope>

@@ -59,6 +59,8 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.account.selected, accounts: fixture.account.accounts, setSelectedAccountId: fixture.selectAccount }),
 }))
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'acc-1', name: '移行前の店' }, { id: 'acc-2', name: '移行先の店' }] })) }))
 
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => fixture.role.value,
@@ -233,6 +235,28 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     expect(await screen.findByText('Instagram の接続を解除しますか？')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '解除する' }))
     await waitFor(() => expect(fixture.igDisconnect).toHaveBeenCalledWith('acc-1', 3))
+  })
+
+  it('解除前に対象と環境を示し、アカウントが変わると元の確認を実行できない', async () => {
+    fixture.googleConnection.mockResolvedValue(googleData())
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('connected', CONNECTED) })
+    const view = render(<SnsSettingsPage />)
+    await openIgMenu()
+    fireEvent.click(screen.getAllByRole('menuitem', { name: '接続を解除する' })[0])
+    const dialog = within(await screen.findByRole('alertdialog'))
+    expect(dialog.getByText('LINEアカウント')).toBeTruthy()
+    expect(await dialog.findByText('移行前の店')).toBeTruthy()
+    expect(dialog.getByText('検証環境')).toBeTruthy()
+    const staleConfirm = dialog.getByRole('button', { name: '解除する' })
+    fixture.account.selected = 'acc-2'
+    view.rerender(<SnsSettingsPage />)
+    fireEvent.click(staleConfirm)
+    expect(fixture.igDisconnect).not.toHaveBeenCalled()
+    fixture.account.selected = 'acc-1'
+    view.rerender(<SnsSettingsPage />)
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    fireEvent.click(staleConfirm)
+    expect(fixture.igDisconnect).not.toHaveBeenCalled()
   })
 })
 

@@ -23,6 +23,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import DateField from '@/components/shared/date-field'
 import DateTimeField,{ TimeField } from '@/components/shared/date-time-field'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -107,9 +108,13 @@ function EditCommonVarV8Inner() {
 
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
   const [clearSchedulesOpen, setClearSchedulesOpen] = useState(false)
+  const [clearScope, setClearScope] = useState<{ accountId: string; itemId: string; scheduleIds: string[]; window: object } | null>(null)
+  const clearWindow = useRef<object>({})
+  useEffect(() => { setClearSchedulesOpen(false); setClearSchedulesBusy(false); return () => { clearWindow.current = {} } }, [selectedAccountId])
   const [addingSchedule, setAddingSchedule] = useState(false)
   const [clearSchedulesBusy, setClearSchedulesBusy] = useState(false)
   const [clearSchedulesError, setClearSchedulesError] = useState('')
+  const [clearSchedulesNeedsReview, setClearSchedulesNeedsReview] = useState(false)
 
   useEffect(() => { setValueFieldError('') }, [value])
   useEffect(() => { setFallbackFieldError('') }, [fallbackValue])
@@ -264,13 +269,19 @@ function EditCommonVarV8Inner() {
     setError('')
   }
 
-  const [deleteTarget, setDeleteTarget] = useState<{ item: CommonVar; accountId: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ item: CommonVar; accountId: string; window: object } | null>(null)
+  const deleteWindow = useRef<object>({})
+  const deleteWindowAccount = useRef(selectedAccountId)
+  if (deleteWindowAccount.current !== selectedAccountId) deleteWindow.current = {}
+  deleteWindowAccount.current = selectedAccountId
+  useEffect(() => () => { deleteWindow.current = {} }, [])
   const [deleteReason, setDeleteReason] = useState('')
   const [deletePhase, setDeletePhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [deleteImpact, setDeleteImpact] = useState<CommonVarDeleteImpact | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-  const deleteAccountSwitched = deleteTarget !== null && deleteTarget.accountId !== selectedAccountId
+  const deleteAccountSwitched = deleteTarget !== null && (deleteTarget.accountId !== selectedAccountId || deleteTarget.window !== deleteWindow.current)
+  useEffect(() => { setDeleting(false) }, [selectedAccountId])
 
   const dirty = item !== null && (
     name !== item.name ||
@@ -293,7 +304,8 @@ function EditCommonVarV8Inner() {
 
   const openDelete = async () => {
     if (!item || !selectedAccountId) return
-    const target = { item, accountId: selectedAccountId }
+    deleteWindow.current = {}
+    const target = { item, accountId: selectedAccountId, window: deleteWindow.current }
     setDeleteTarget(target)
     setDeleteImpact(null)
     setDeleteError('')
@@ -301,11 +313,12 @@ function EditCommonVarV8Inner() {
     setDeletePhase('loading')
     try {
       const res = await api.commonVars.deleteImpact(target.item.id, target.accountId)
-      if (latestAccountRef.current !== target.accountId) return
+      if (latestAccountRef.current !== target.accountId || deleteWindow.current !== target.window) return
       if (!res.success) throw new Error(res.error)
       setDeleteImpact(res.data)
       setDeletePhase('ready')
     } catch (saveFailure) {
+      if (latestAccountRef.current !== target.accountId || deleteWindow.current !== target.window) return
       saveErrors.capture(saveFailure)
       setDeletePhase('error')
     }
@@ -314,6 +327,7 @@ function EditCommonVarV8Inner() {
   const closeDelete = () => {
     if (deleting)
  return
+    deleteWindow.current = {}
     setDeleteTarget(null)
     setDeleteImpact(null)
     setDeleteError('')
@@ -322,15 +336,20 @@ function EditCommonVarV8Inner() {
   }
 
   const remove = async () => {
-    if (!deleteTarget || deleting || deleteAccountSwitched) return
+    if (!deleteTarget || deleting || deleteAccountSwitched || latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return
     if (deletePhase !== 'ready' || !deleteImpact?.canDelete) return
     setDeleting(true)
     setDeleteError('')
     try {
       const res = await api.commonVars.delete(deleteTarget.item.id, deleteTarget.accountId, deleteReason.trim())
+      if (latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return
       if (!res.success) throw new Error(res.error)
+      setDeleting(false)
+      deleteWindow.current = {}
+      setDeleteTarget(null)
       router.push('/contents/vars')
     } catch (e) {
+      if (latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return
       const fieldFailure = saveErrors.capture(e);
 
       if (e instanceof ApiError && e.status === 409) {
@@ -338,6 +357,7 @@ function EditCommonVarV8Inner() {
         setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。') }
         try {
           const again = await api.commonVars.deleteImpact(deleteTarget.item.id, deleteTarget.accountId)
+          if (latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return
           if (again.success) setDeleteImpact(again.data)
           else setDeletePhase('error')
         } catch (saveFailure) {
@@ -349,7 +369,7 @@ function EditCommonVarV8Inner() {
       { if (!fieldFailure)
       setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setDeleting(false)
+      if (latestAccountRef.current === deleteTarget.accountId && deleteWindow.current === deleteTarget.window) setDeleting(false)
     }
   }
 
@@ -409,31 +429,48 @@ function EditCommonVarV8Inner() {
   }
 
   const clearSchedules = async () => {
-    if (!item || !selectedAccountId) return
+    if (!item || !selectedAccountId || !clearScope || clearScope.itemId !== item.id || clearScope.accountId !== selectedAccountId || latestAccountRef.current !== clearScope.accountId || clearScope.window !== clearWindow.current || clearSchedulesBusy || clearSchedulesNeedsReview) return
+    if (schedules.length !== clearScope.scheduleIds.length || schedules.some(schedule => !clearScope.scheduleIds.includes(schedule.id))) {
+      setClearSchedulesError('予定が変わりました。閉じて、予定を確認してからやり直してください。')
+      setClearSchedulesNeedsReview(true)
+      return
+    }
     setClearSchedulesBusy(true)
     setClearSchedulesError('')
     try {
-      for (const schedule of schedules) {
-        await api.commonVars.deleteSchedule(item.id, schedule.id, selectedAccountId)
+      for (const scheduleId of clearScope.scheduleIds) {
+        if (latestAccountRef.current !== clearScope.accountId || clearWindow.current !== clearScope.window) return
+        const response = await api.commonVars.deleteSchedule(item.id, scheduleId, selectedAccountId)
+        if (!response.success) throw new Error('schedule_delete_failed')
       }
+      if (latestAccountRef.current !== clearScope.accountId || clearWindow.current !== clearScope.window) return
+      setClearSchedulesBusy(false); clearWindow.current = {}
       setClearSchedulesOpen(false)
       await refreshBaseline(item.id, selectedAccountId)
     } catch (saveFailure) {
+      if (latestAccountRef.current !== clearScope.accountId || clearWindow.current !== clearScope.window) return
+      setClearSchedulesNeedsReview(true)
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setClearSchedulesError('消せなかった予定があります。通信を確かめて、もう一度お試しください。') }
     } finally {
-      setClearSchedulesBusy(false)
+      if (latestAccountRef.current === clearScope.accountId && clearWindow.current === clearScope.window) setClearSchedulesBusy(false)
     }
   }
 
   const [statusAction, setStatusAction] = useState<'stop' | 'resume' | 'publish' | null>(null)
+  const [statusScope, setStatusScope] = useState<{ accountId: string; itemId: string; window: object } | null>(null)
+  const statusWindow = useRef<object>({})
+  useEffect(() => { setStatusAction(null); setStatusBusy(false); return () => { statusWindow.current = {} } }, [selectedAccountId])
   const [statusReason, setStatusReason] = useState('')
   const [statusBusy, setStatusBusy] = useState(false)
   const [statusError, setStatusError] = useState('')
 
   const openStatusDialog = (action: 'stop' | 'resume' | 'publish') => {
+    if (!selectedAccountId || !item) return
+    statusWindow.current = {}
+    setStatusScope({ accountId: selectedAccountId, itemId: item.id, window: statusWindow.current })
     setStatusAction(action)
     setStatusReason('')
     setStatusError('')
@@ -441,13 +478,14 @@ function EditCommonVarV8Inner() {
 
   const closeStatusDialog = () => {
     if (statusBusy) return
+    statusWindow.current = {}
     setStatusAction(null)
     setStatusReason('')
     setStatusError('')
   }
 
   const applyStatus = async () => {
-    if (!item || !selectedAccountId || !statusAction) return
+    if (!item || !selectedAccountId || !statusAction || !statusScope || statusScope.accountId !== selectedAccountId || statusScope.itemId !== item.id || latestAccountRef.current !== statusScope.accountId || statusWindow.current !== statusScope.window) return
     const reason = statusReason.trim()
     if (!reason) {
       setStatusError('変える理由を入力してください')
@@ -461,14 +499,16 @@ function EditCommonVarV8Inner() {
         changeReason: reason,
         expectedVersion: item.version,
       })
+      if (latestAccountRef.current !== statusScope.accountId || statusWindow.current !== statusScope.window) return
       if (!res.success) {
         setStatusError(res.error)
         return
       }
-      setStatusAction(null)
+      setStatusBusy(false); statusWindow.current = {}; setStatusAction(null)
       setStatusReason('')
       await load()
     } catch (e) {
+      if (latestAccountRef.current !== statusScope.accountId || statusWindow.current !== statusScope.window) return
       const fieldFailure = saveErrors.capture(e)
 
       { if (!fieldFailure)
@@ -478,7 +518,7 @@ function EditCommonVarV8Inner() {
           : '状態を変えられませんでした。通信を確かめて、もう一度お試しください。',
       ) }
     } finally {
-      setStatusBusy(false)
+      if (latestAccountRef.current === statusScope.accountId && statusWindow.current === statusScope.window) setStatusBusy(false)
     }
   }
 
@@ -565,7 +605,7 @@ function EditCommonVarV8Inner() {
 
   const fieldsGroup = renderValueFields({ canWrite, expiryBehavior, fallbackFieldError, fallbackValue, folderId, folders, foldersError, item, loadFolders, memo, name, nameFieldError, periodFieldError, selectedAccountId, setExpiryBehavior, setFallbackValue, setFolderId, setFolders, setMemo, setName, setNameFieldError, setPeriodFieldError, setSaved, setValidFrom, setValidUntil, validFrom, validUntil })
 
-  const scheduleCard = renderScheduleCard({ canWrite, item, loadSchedules, removeSchedule, schedules, schedulesError, selectedAccountId, setClearSchedulesError, setClearSchedulesOpen, setDraft, value })
+  const scheduleCard = renderScheduleCard({ canWrite, item, loadSchedules, removeSchedule, schedules, schedulesError, selectedAccountId, setClearSchedulesError, setClearSchedulesOpen: () => { if (!selectedAccountId || !item) return; clearWindow.current = {}; setClearSchedulesNeedsReview(false); setClearScope({ accountId: selectedAccountId, itemId: item.id, scheduleIds: schedules.map(schedule => schedule.id), window: clearWindow.current }); setClearSchedulesOpen(true) }, setDraft, value })
 
   const historyCard = item ? (
     <section className={styles.sideCard} aria-labelledby="cv-edit-history-heading">
@@ -803,7 +843,7 @@ function EditCommonVarV8Inner() {
 
       {/* 状態の切替（止める・再開する・公開する）。理由は記録に残すので必須。 */}
       <Dialog
-        open={statusAction !== null}
+        open={statusAction !== null && statusScope?.accountId === selectedAccountId && statusScope.window === statusWindow.current}
         designNode="AYc6O-status"
         title={item && statusAction
           ? `「${item.name}」を${statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}`
@@ -834,7 +874,8 @@ function EditCommonVarV8Inner() {
           </DialogActions>
         }
       >
-        <Field label={<><span className={styles.fieldLabelStrong}>
+        <OperationTargetSummary accounts={[{ id: statusScope?.accountId ?? '' }]} />
+        <Field required label={<><span className={styles.fieldLabelStrong}>
             {statusAction === 'stop' ? '止める理由（記録に残ります）'
               : statusAction === 'resume' ? '再開する理由（記録に残ります）'
                 : '公開する理由（記録に残ります）'}
@@ -868,6 +909,7 @@ function EditCommonVarV8Inner() {
         }
         onCancel={closeDelete}
       >
+        <OperationTargetSummary accounts={[{ id: deleteTarget?.accountId ?? '' }]} />
         <div className={styles.dialogBody}>
           {deletePhase === 'loading' ? (
             <p className={styles.fieldHint}>使われている場所を読み込んでいます</p>
@@ -952,16 +994,18 @@ function EditCommonVarV8Inner() {
       </Dialog>
 
       <ConfirmDialog
-        open={clearSchedulesOpen}
+        open={clearSchedulesOpen && clearScope?.accountId === selectedAccountId && clearScope.window === clearWindow.current}
         title={schedules.length > 1 ? "更新の予定をすべて消しますか？" : "更新の予定を消しますか？"}
         description="予定の時刻に値が変わる設定をすべて取り消します。いま入力中の内容はそのまま残ります。"
         confirmLabel="すべて削除する"
         destructive
         busy={clearSchedulesBusy}
+        confirmDisabled={clearSchedulesNeedsReview}
+        confirmDisabledReason="閉じて予定を読み直してからやり直してください。"
         error={clearSchedulesError || undefined}
         onConfirm={clearSchedulesBusy ? undefined : () => clearSchedules()}
-        onCancel={() => { if (!clearSchedulesBusy) setClearSchedulesOpen(false) }}
-      />
+        onCancel={() => { if (!clearSchedulesBusy) { clearWindow.current = {}; setClearSchedulesOpen(false); if (clearSchedulesNeedsReview && clearScope && latestAccountRef.current === clearScope.accountId) { setSchedulesError(true); void loadSchedules(clearScope.itemId, clearScope.accountId) } } }}
+      ><OperationTargetSummary accounts={[{ id: clearScope?.accountId ?? '' }]} /></ConfirmDialog>
 
       {/* 違いを比べる窓（板 `piWhz`）。いまの版と自分の入力を見せる。 */}
       <Dialog

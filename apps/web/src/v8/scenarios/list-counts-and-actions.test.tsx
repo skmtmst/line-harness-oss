@@ -96,6 +96,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: state.account, loading: false }),
   useOptionalAccount: () => ({ selectedAccountId: state.account, loading: false }),
 }))
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: () => {}, back: () => {} }),
@@ -350,18 +351,44 @@ describe('操作の失敗', () => {
     expect(document.body.textContent).not.toContain('offline')
   })
 
+  test('全アカウント共通のシナリオの停止では全アカウントに効くことを示す', async () => {
+    listPage.mockResolvedValue({ success: true, data: { items: [{ ...rows[0], lineAccountId: null }], total: 1, limit: 20, sort: [] } })
+    await mount()
+    selectRow('新規登録7日間フォロー')
+    fireEvent.click(await screen.findByRole('button', { name: '止める' }))
+    const dialog = within(await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' }))
+    expect(dialog.getByText('すべてのLINEアカウント')).toBeTruthy()
+    expect(dialog.queryByText('本店', { exact: true })).toBeNull()
+    expect(update).not.toHaveBeenCalled()
+  })
+
   test('フォルダ移動に失敗したら日本語で知らせ、行を元のフォルダへ戻す', async () => {
     update.mockResolvedValue({ success: false, error: 'Internal Server Error' })
     await mount()
     selectRow('新規登録7日間フォロー')
     fireEvent.click(await screen.findByRole('button', { name: 'フォルダへ移す' }))
     const dialog = await screen.findByRole('dialog', { name: '「新規登録7日間フォロー」のフォルダを移動' })
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(await within(dialog).findByText('本店')).toBeTruthy()
+    expect(within(dialog).getByText('検証環境')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: '移動する' }))
     await waitFor(() => expect(update).toHaveBeenCalledWith('s-filed', { folderId: null }))
     expect(await screen.findByText(/全 1 件中 0 件の保存を確認しました。1 件目で止めました。未送信は 0 件です。理由：/)).toBeTruthy()
     expect(document.body.textContent).not.toContain('Internal Server Error')
     const row = screen.getByText('新規登録7日間フォロー').closest('tr') as HTMLElement
     await waitFor(() => expect(row.querySelector('[data-folder-dot]')?.getAttribute('aria-label')).toBe('フォルダ：初回案内'))
+  })
+
+  test('共通と個別のシナリオを一緒に移すとき全アカウントへの影響を示す', async () => {
+    listPage.mockResolvedValue({ success: true, data: { items: [{ ...rows[0], lineAccountId: null }, rows[1]], total: 2, limit: 20, sort: [] } })
+    await mount()
+    selectRow('新規登録7日間フォロー')
+    selectRow('会員更新リマインド')
+    fireEvent.click(await screen.findByRole('button', { name: 'フォルダへ移す' }))
+    const dialog = within(await screen.findByRole('dialog', { name: '2 件のシナリオのフォルダを移動' }))
+    expect(dialog.getByText('すべてのLINEアカウント')).toBeTruthy()
+    expect(dialog.getByText('検証環境')).toBeTruthy()
+    expect(update).not.toHaveBeenCalled()
   })
 })
 
@@ -412,7 +439,21 @@ describe('右詳細の情報と操作', () => {
     fireEvent.click(within(detail).getByRole('button', { name: '「新規登録7日間フォロー」のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '削除する', exact: true }))
     const confirmation = await screen.findByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？', exact: true })
+    expect(within(confirmation).getByText('LINEアカウント')).toBeTruthy()
+    expect(await within(confirmation).findByText('本店')).toBeTruthy()
+    expect(within(confirmation).getByText('検証環境')).toBeTruthy()
     fireEvent.click(within(confirmation).getByRole('button', { name: 'キャンセル', exact: true }))
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  test('全アカウント共通のシナリオは選択中の1件と区別して削除前に示す', async () => {
+    listPage.mockResolvedValue({ success: true, data: { items: [{ ...rows[0], lineAccountId: null }], total: 1, limit: 20, sort: [] } })
+    const detail = await panel()
+    fireEvent.click(within(detail).getByRole('button', { name: '「新規登録7日間フォロー」のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する', exact: true }))
+    const dialog = within(await screen.findByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？' }))
+    expect(dialog.getByText('すべてのLINEアカウント')).toBeTruthy()
+    expect(dialog.queryByText('本店', { exact: true })).toBeNull()
     expect(remove).not.toHaveBeenCalled()
   })
 
@@ -469,6 +510,32 @@ describe('保持した書込操作の実行直前の判定', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '削除する', exact: true }))
     return screen.findByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？', exact: true })
   }
+  test('停止確認の後にアカウントが変わったら、保持した旧確定から送らない', async () => {
+    const view = await mount()
+    selectRow('新規登録7日間フォロー')
+    fireEvent.click(await screen.findByRole('button', { name: '止める' }))
+    const dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
+    const stale = heldClick(within(dialog).getByRole('button', { name: '停止する' }))
+    state.account = 'account-b'
+    view.rerender(<><ScenariosListV8 /><ToastHost /></>)
+    await act(async () => { await stale() })
+    expect(update).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: '選んだシナリオを停止しますか？' })).toBeNull()
+  })
+  test('停止確認を閉じて開き直すと古い確定では送らない', async () => {
+    await mount()
+    selectRow('新規登録7日間フォロー')
+    fireEvent.click(await screen.findByRole('button', { name: '止める' }))
+    let dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
+    const stale = heldClick(within(dialog).getByRole('button', { name: '停止する' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(screen.getByRole('button', { name: '止める' }))
+    dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
+    await act(async () => { await stale() })
+    expect(update).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: '停止する' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+  })
   test.each(['viewer', 'unknown', 'read-proxy'] as const)('%sへ変わると、保持した削除確定もAPI0で窓と読取を残す', async change => {
     await mount()
     const dialog = await deleteConfirmation()

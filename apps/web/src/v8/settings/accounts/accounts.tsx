@@ -19,6 +19,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import SegmentedControl from '@/components/shared/segmented'
 import { TextArea } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
@@ -311,6 +312,7 @@ export default function AccountsV8() {
         onCancel={() => { if (!busy) { setArchiveTarget(null); setArchiveReason(''); setDialogError('') } }}
         onConfirm={() => runArchive()}
       >
+        {archiveTarget ? <OperationTargetSummary accounts={[{ id: archiveTarget.id, name: archiveTarget.name }]} /> : null}
         <Field label="アーカイブの理由"><SaveErrorField names={["archiveReason","archive_reason"]}><TextArea
             rows={2}
             maxLength={500}

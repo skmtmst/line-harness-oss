@@ -7,11 +7,11 @@ import React, { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ runs: vi.fn() }))
+const mocks = vi.hoisted(() => ({ runs: vi.fn(), get: vi.fn() }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, api: { ...actual.api, autoReplies: { ...actual.api.autoReplies, runs: mocks.runs } } }
+  return { ...actual, api: { ...actual.api, autoReplies: { ...actual.api.autoReplies, runs: mocks.runs, get: mocks.get } } }
 })
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => ({
   ...(await importOriginal()),
@@ -23,6 +23,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useSearchParams: () => new URLSearchParams('id=rule-1'),
 }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'acc-1', name: '本店' }] })) }))
 
 import AutoReplyRunsPage from '@/app/auto-replies/runs/page'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
@@ -73,6 +74,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   mocks.runs.mockReset()
+  mocks.get.mockReset()
 })
 
 /** 画面の最初の読み込み（offset 0・件数少なめ）と、書き出しの読み込み（limit 100）を分けて返す。 */
@@ -94,6 +96,43 @@ async function startExport() {
 }
 
 const exportCalls = () => mocks.runs.mock.calls.filter(([query]) => query.limit === 100)
+
+it('一時停止の確認にはルールの実際のLINEアカウントを示す', async () => {
+  serve(1)
+  mocks.get.mockResolvedValue({ success: true, data: { id: 'rule-1', lineAccountId: null } })
+  render(<AutoReplyRunsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: '一時停止する' }))
+  expect(await screen.findByText('すべてのLINEアカウント')).toBeTruthy()
+  expect(mocks.get).toHaveBeenCalledWith('rule-1')
+})
+
+it('対象ルールを取得できなければアカウントを不明として示す', async () => {
+  serve(1)
+  mocks.get.mockRejectedValue(new Error('offline'))
+  render(<AutoReplyRunsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: '一時停止する' }))
+  expect(await screen.findByText('名前を確認できません')).toBeTruthy()
+  expect(screen.queryByText('すべてのLINEアカウント')).toBeNull()
+})
+
+it('特定アカウントのルールはその名前を示す', async () => {
+  serve(1)
+  mocks.get.mockResolvedValue({ success: true, data: { id: 'rule-1', lineAccountId: 'acc-1' } })
+  render(<AutoReplyRunsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: '一時停止する' }))
+  expect(await screen.findByText('本店', { selector: 'dd span' })).toBeTruthy()
+  expect(screen.queryByText('すべてのLINEアカウント')).toBeNull()
+})
+
+it('別のルールの応答を対象として表示しない', async () => {
+  serve(1)
+  mocks.get.mockResolvedValue({ success: true, data: { id: 'other-rule', lineAccountId: null } })
+  render(<AutoReplyRunsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: '一時停止する' }))
+  await waitFor(() => expect(mocks.get).toHaveBeenCalledWith('rule-1'))
+  expect(screen.getByText('名前を確認できません')).toBeTruthy()
+  expect(screen.queryByText('すべてのLINEアカウント')).toBeNull()
+})
 
 it('全部を100件ずつ読み、書き出した件数を知らせる', async () => {
   serve(150)
