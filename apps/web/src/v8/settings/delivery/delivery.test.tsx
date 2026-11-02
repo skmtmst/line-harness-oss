@@ -151,10 +151,33 @@ describe('設定 › デリバリー連携', () => {
     const login = button('Uber Eats にログインしてつなぐ')
     expect(login.disabled).toBe(false)
     expect(login.title).toBe('')
-    // 未接続の会社は準備中の案内を開き、申込済みと偽らない。
+    expect(card('出前館').getByText('出前館への連携の申し込みは準備中です。')).toBeTruthy()
+    // 準備前の会社は申込入口を止め、各社の欄で理由を伝える。
     const apply = screen.getAllByRole('button', { name: '連携を申し込む' }) as HTMLButtonElement[]
     expect(apply).toHaveLength(2)
-    expect(apply.every((one) => !one.disabled)).toBe(true)
+    expect(apply.every((one) => one.disabled)).toBe(true)
+    for (const name of ['出前館', 'ロケットナウ']) {
+      const region = card(name)
+      const control = region.getByRole('button', { name: '連携を申し込む' }) as HTMLButtonElement
+      expect(control.dataset.variant).toBe('secondary')
+      expect(control.getAttribute('aria-description')).toBe('連携の申し込みは準備中です。')
+      expect(region.getAllByText('連携の申し込みは準備中です。')).toHaveLength(1)
+      fireEvent.click(control)
+      fireEvent.keyDown(control, { key: 'Enter' })
+      fireEvent.keyUp(control, { key: 'Enter' })
+      fireEvent.keyDown(control, { key: ' ' })
+      fireEvent.keyUp(control, { key: ' ' })
+      expect(region.getByText('未接続')).toBeTruthy()
+      expect(region.queryByText('申し込んだ日')).toBeNull()
+    }
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(fixture.connectStart).not.toHaveBeenCalled()
+    expect(fixture.selectStore).not.toHaveBeenCalled()
+    expect(fixture.checkConnection).not.toHaveBeenCalled()
+    expect(fixture.disconnect).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'デリバリー連携の説明' }))
+    expect(screen.getByText(/出前館とロケットナウへの申し込みは準備中です。/)).toBeTruthy()
+    expect(screen.queryByText(/出前館とロケットナウは「連携を申し込む」を押すだけです。/)).toBeNull()
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
   })
 
@@ -358,6 +381,20 @@ describe('設定 › デリバリー連携', () => {
     fireEvent.click(demaecan.getByRole('button', { name: '申し込みを取り消す' }))
     expect(screen.getByText('現在準備中です')).toBeTruthy()
     expect(card('出前館').getByText('申し込み受付中')).toBeTruthy()
+  })
+
+  it.each(['admin', null])('本人の役割が%sの時に準備理由と権限理由を取り違えない', (role) => {
+    fixture.role.value = verifiedStaffRole(role)
+    render(<DeliverySettingsPage />)
+    for (const name of ['出前館', 'ロケットナウ']) {
+      const region = card(name)
+      const control = region.getByRole('button', { name: '連携を申し込む' }) as HTMLButtonElement
+      expect(control.disabled).toBe(true)
+      expect(region.queryAllByText('連携の申し込みは準備中です。')).toHaveLength(role === 'admin' ? 1 : 0)
+      expect(control.hasAttribute('data-permission-locked')).toBe(false)
+      fireEvent.click(control)
+    }
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('未接続の会社への申し込みは準備中を示し、接続や日付を作らない', () => {
