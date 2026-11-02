@@ -375,7 +375,6 @@ export default function StepPreview({
       {immediate && (
         <Notice tone="warn" className="mt-2">
           設定した時刻を過ぎているため、すぐに送ります。
-          購読開始が {deliveryTime} より前なら、その日のうちに届きます。
         </Notice>
       )}
 

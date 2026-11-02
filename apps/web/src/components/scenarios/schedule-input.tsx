@@ -18,7 +18,7 @@ export const emptySchedule: ScheduleValue = {
   offsetDays: 0,
   offsetHours: 0,
   offsetMinutesRemainder: 0,
-  deliveryTime: '10:00',
+  deliveryTime: '09:00',
 }
 
 /**

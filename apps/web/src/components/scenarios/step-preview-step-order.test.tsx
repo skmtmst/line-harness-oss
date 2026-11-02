@@ -59,5 +59,6 @@ it('時刻を過ぎた当日のプレビューは翌日ではなくすぐ送る�
   render(<StepPreview {...base} deliveryMode="absolute_time" offsetDays={0} deliveryTime="10:00" stepOrder={2} />)
   expect(screen.getByText('すぐに届きます（2通目）')).toBeTruthy()
   expect(screen.getByText(/時刻を過ぎているため、すぐに送ります/)).toBeTruthy()
+  expect(screen.queryByText(/購読開始が.*より前なら/)).toBeNull()
   expect(screen.queryByText(/翌日になります/)).toBeNull()
 })

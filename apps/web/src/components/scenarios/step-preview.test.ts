@@ -16,7 +16,7 @@ function at(y: number, m: number, d: number, hh: number, mm = 0): Date {
 }
 
 describe('時刻で指定', () => {
-  it('追加する通も1通目と同じ時刻を初期値にする', () => { expect(emptySchedule.deliveryTime).toBe('10:00') })
+  it('追加する通の初期時刻は従来どおりにする', () => { expect(emptySchedule.deliveryTime).toBe('09:00') })
   it('0日後で、まだ配信時刻を過ぎていなければ当日', () => {
     const out = computeDeliveryAt(at(2026, 8, 19, 8, 30), 'absolute_time', 0, '10:00', 0)
     expect(out.getDate()).toBe(19)
