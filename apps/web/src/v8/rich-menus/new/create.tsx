@@ -209,6 +209,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /* 状態 */
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [discardingDraft, setDiscardingDraft] = useState(false)
+  const [discardDraftError, setDiscardDraftError] = useState('')
+  const discardDraftLock = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   /*
@@ -322,9 +325,10 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   const publishDirty = JSON.stringify(publishPlan) !== JSON.stringify(publishBaseline)
   const dirty = baselineSignature !== null && (signatureNow() !== baselineSignature || publishDirty)
+  const createdDraft = !host && !editGroupId && !done && group?.status === 'draft' ? group : null
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
-    dirty,
-    busy: saving || publishing,
+    dirty: dirty || Boolean(createdDraft),
+    busy: saving || publishing || discardingDraft,
   })
 
   function confirmLeaveAndDiscard() {
@@ -333,6 +337,32 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setPublishBaseline(DEFAULT_PUBLISH_PLAN)
     setEndEnabled(false)
     confirmLeave()
+  }
+
+  async function discardCreatedDraft() {
+    if (!createdDraft || discardDraftLock.current) return
+    if (createdDraft.accountId !== candidateAccountRef.current) {
+      setDiscardDraftError('作成したアカウントに戻してから、下書きを消してください。')
+      return
+    }
+    discardDraftLock.current = true
+    setDiscardingDraft(true)
+    setDiscardDraftError('')
+    try {
+      const response = await api.richMenuGroups.delete(createdDraft.id, createdDraft.version)
+      if (createdDraft.accountId !== candidateAccountRef.current) return
+      if (!response.success) throw new Error(response.error)
+      confirmLeaveAndDiscard()
+    } catch (cause) {
+      setDiscardDraftError(cause instanceof ApiError && cause.code === 'rich_menu_delete_blocked'
+        ? '公開状態や使われている場所を確認してから、一覧で削除してください。'
+        : cause instanceof ApiError && cause.status === 409
+        ? '下書きの状態が変わったため消せません。編集を続けて最新の状態を確かめてください。'
+        : '下書きの削除結果を確認できません。編集を続けるか、一覧で状態を確認してください。')
+    } finally {
+      discardDraftLock.current = false
+      setDiscardingDraft(false)
+    }
   }
 
   /* ---------- 読み込み ---------- */
@@ -1365,7 +1395,15 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <p>手順②で画像の上から面を選び、押したときの動きを設定します。公開前に「LINEでの見え方」と実際のスマートフォンで確認してください。</p>
         </div>
       </Dialog>
-      <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力" onConfirm={confirmLeaveAndDiscard} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力"
+        title={createdDraft ? '下書きをどうしますか？' : undefined}
+        description={createdDraft ? '保存された下書きがあります。残すか、消して移るか選んでください。' : undefined}
+        saveLabel={createdDraft ? '下書きを残して移る' : undefined}
+        discardLabel={createdDraft ? '下書きを消して移る' : undefined}
+        busy={saving || discardingDraft} error={discardDraftError}
+        onSave={createdDraft ? async () => !dirty || await saveDraft() : undefined}
+        onSavedLeave={confirmLeave} onConfirm={createdDraft ? () => void discardCreatedDraft() : confirmLeaveAndDiscard}
+        onCancel={() => { setDiscardDraftError(''); cancelLeave() }} />
       <Dialog open={priorityOpen} title="出す順番" description="一覧で上にあるメニューが優先されます。1がいちばん先です。"
         confirmLabel="順番を変える" onConfirm={() => {
           setTargetingPriority(Math.max(0, (parseInt(priorityInput, 10) || 1) - 1))

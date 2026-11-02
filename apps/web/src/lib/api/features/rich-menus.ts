@@ -195,8 +195,8 @@ export const richMenusMethods = {
         `/api/rich-menu-groups/${groupId}/delete-impact`,
       ),
 
-    delete: (groupId: string) =>
-      fetchApi<ApiResponse<null>>(`/api/rich-menu-groups/${groupId}`, { method: 'DELETE' }),
+    delete: (groupId: string, expectedVersion?: number) =>
+      fetchApi<ApiResponse<null>>(`/api/rich-menu-groups/${groupId}${expectedVersion === undefined ? '' : `?expectedVersion=${expectedVersion}`}`, { method: 'DELETE' }),
 
     publish: (groupId: string, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ pages: Array<{ pageId: string; newRichMenuId: string }> }>>(

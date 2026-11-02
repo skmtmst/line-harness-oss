@@ -355,9 +355,11 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       if (!response.success) throw new Error(response.error)
       confirmLeave()
     } catch (cause) {
-      setDiscardError(cause instanceof ApiError && cause.status === 409
+      setDiscardError(cause instanceof ApiError && cause.code === 'IN_USE'
+        ? '使われているため消せません。利用先を確認してください。'
+        : cause instanceof ApiError && cause.status === 409
         ? '下書きの状態が変わったため消せません。編集を続けて最新の状態を確かめてください。'
-        : '下書きを消せませんでした。編集を続けて状態を確認してください。')
+        : '下書きの削除結果を確認できません。編集を続けるか、一覧で状態を確認してください。')
     } finally {
       discardLock.current = false
       setDiscarding(false)
