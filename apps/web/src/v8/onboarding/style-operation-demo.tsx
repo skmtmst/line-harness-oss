@@ -208,7 +208,7 @@ export function ConsultAfterDemo() {
         <p className={styles.description}>次のご案内（{CONSULT_AFTER_SAMPLE.thanks.when}・停止中）</p>
         <p className={styles.description}>{CONSULT_AFTER_SAMPLE.thanks.text}</p>
       </section>
-      <p className={styles.note}>名前・数は架空です。送り始めるには設定と承認が必要で、保存しただけでは始まりません。</p>
+      <p className={styles.note}>名前・数は架空です。お礼の自動送信の条件は確認中のため、この見本では送り始める手順を示しません。実際の設定は変わりません。</p>
     </Card>
   </section>
 }
@@ -241,7 +241,7 @@ export function LessonAfterDemo() {
         <p className={styles.description}>参加のお礼（{LESSON_AFTER_SAMPLE.thanks.when}・停止中）</p>
         <p className={styles.description}>{LESSON_AFTER_SAMPLE.thanks.text}</p>
       </section>
-      <p className={styles.note}>名前・数は架空です。送り始めるには設定と承認が必要で、保存しただけでは始まりません。</p>
+      <p className={styles.note}>名前・数は架空です。お礼の自動送信の条件は確認中のため、この見本では送り始める手順を示しません。実際の設定は変わりません。</p>
     </Card>
   </section>
 }
@@ -262,7 +262,7 @@ export function StandardAfterDemo() {
     <Card layout="vertical" padding="default" gap="normal" aria-label="問い合わせのあと">
       <strong>問い合わせのあと（見本）</strong>
       <section aria-label="受信箱の見本">
-        <p className={styles.description}>受信箱・未返信 {STANDARD_AFTER_SAMPLE.inbox.unreplied}件</p>
+        <p className={styles.description}>受信箱・未返信 {STANDARD_AFTER_SAMPLE.inbox.unreplied}件（最新の1件の見本）</p>
         <ul className={styles.can}>
           <li>
             <StatusBadge tone="caution">未返信</StatusBadge>
