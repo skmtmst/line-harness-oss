@@ -40,6 +40,7 @@ const GUARDED = [
   'v8/webhooks/incoming-actions.tsx',
   'components/shared/restaurant-floor-editor.tsx',
   'app/booking/bookings/detail/page.tsx',
+  'app/analytics/page.tsx',
   'v8/automations/create/create.tsx',
   'v8/settings/pools/create.tsx',
   'v8/broadcasts/quick-send.tsx',
