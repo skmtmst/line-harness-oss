@@ -118,3 +118,23 @@ it.each([1, 4])('段%sの認証が失敗した画面でも手動確認を示し�
   expect(register === null || register.disabled).toBe(true)
   expect(calls.connect).not.toHaveBeenCalled()
 })
+
+it('接続情報の必須欄が空の間は次へを止め、入力する内容を示す', () => {
+  render(<AccountRegisterV8 />)
+  fireEvent.click(screen.getByRole('radio', { name: 'はい、あります' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'いいえ、引き継ぎません' }))
+  fireEvent.click(screen.getByRole('radio', { name: '使っていません' }))
+  fireEvent.click(screen.getByRole('button', { name: '次へ', exact: true }))
+  const next = () => screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
+  expect(next().disabled).toBe(true)
+  expect(screen.getByText('チャネルIDとチャネルシークレットを入力してください。')).toBeTruthy()
+  fireEvent.change(document.getElementById('v8-channel-id')!, { target: { value: '1234567890' } })
+  expect(next().disabled).toBe(true)
+  fireEvent.change(document.getElementById('v8-channel-secret')!, { target: { value: 'a'.repeat(32) } })
+  expect(next().disabled).toBe(false)
+  fireEvent.click(next())
+  expect(next().disabled).toBe(true)
+  expect(screen.getByText('プロバイダーIDを入力してください。')).toBeTruthy()
+  expect(calls.check).not.toHaveBeenCalled()
+  expect(calls.connect).not.toHaveBeenCalled()
+})
