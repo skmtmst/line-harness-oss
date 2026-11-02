@@ -23,6 +23,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import DateField from '@/components/shared/date-field'
 import DateTimeField,{ TimeField } from '@/components/shared/date-time-field'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -264,13 +265,19 @@ function EditCommonVarV8Inner() {
     setError('')
   }
 
-  const [deleteTarget, setDeleteTarget] = useState<{ item: CommonVar; accountId: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ item: CommonVar; accountId: string; window: object } | null>(null)
+  const deleteWindow = useRef<object>({})
+  const deleteWindowAccount = useRef(selectedAccountId)
+  if (deleteWindowAccount.current !== selectedAccountId) deleteWindow.current = {}
+  deleteWindowAccount.current = selectedAccountId
+  useEffect(() => () => { deleteWindow.current = {} }, [])
   const [deleteReason, setDeleteReason] = useState('')
   const [deletePhase, setDeletePhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [deleteImpact, setDeleteImpact] = useState<CommonVarDeleteImpact | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-  const deleteAccountSwitched = deleteTarget !== null && deleteTarget.accountId !== selectedAccountId
+  const deleteAccountSwitched = deleteTarget !== null && (deleteTarget.accountId !== selectedAccountId || deleteTarget.window !== deleteWindow.current)
+  useEffect(() => { setDeleting(false) }, [selectedAccountId])
 
   const dirty = item !== null && (
     name !== item.name ||
@@ -293,7 +300,8 @@ function EditCommonVarV8Inner() {
 
   const openDelete = async () => {
     if (!item || !selectedAccountId) return
-    const target = { item, accountId: selectedAccountId }
+    deleteWindow.current = {}
+    const target = { item, accountId: selectedAccountId, window: deleteWindow.current }
     setDeleteTarget(target)
     setDeleteImpact(null)
     setDeleteError('')
@@ -301,11 +309,12 @@ function EditCommonVarV8Inner() {
     setDeletePhase('loading')
     try {
       const res = await api.commonVars.deleteImpact(target.item.id, target.accountId)
-      if (latestAccountRef.current !== target.accountId) return
+      if (latestAccountRef.current !== target.accountId || deleteWindow.current !== target.window) return
       if (!res.success) throw new Error(res.error)
       setDeleteImpact(res.data)
       setDeletePhase('ready')
     } catch (saveFailure) {
+      if (latestAccountRef.current !== target.accountId || deleteWindow.current !== target.window) return
       saveErrors.capture(saveFailure)
       setDeletePhase('error')
     }
@@ -314,6 +323,7 @@ function EditCommonVarV8Inner() {
   const closeDelete = () => {
     if (deleting)
  return
+    deleteWindow.current = {}
     setDeleteTarget(null)
     setDeleteImpact(null)
     setDeleteError('')
@@ -322,15 +332,19 @@ function EditCommonVarV8Inner() {
   }
 
   const remove = async () => {
-    if (!deleteTarget || deleting || deleteAccountSwitched) return
+    if (!deleteTarget || deleting || deleteAccountSwitched || latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return
     if (deletePhase !== 'ready' || !deleteImpact?.canDelete) return
     setDeleting(true)
     setDeleteError('')
     try {
       const res = await api.commonVars.delete(deleteTarget.item.id, deleteTarget.accountId, deleteReason.trim())
+      if (latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return
       if (!res.success) throw new Error(res.error)
+      setDeleting(false)
+      deleteWindow.current = {}
       router.push('/contents/vars')
     } catch (e) {
+      if (latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return
       const fieldFailure = saveErrors.capture(e);
 
       if (e instanceof ApiError && e.status === 409) {
@@ -338,6 +352,7 @@ function EditCommonVarV8Inner() {
         setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。') }
         try {
           const again = await api.commonVars.deleteImpact(deleteTarget.item.id, deleteTarget.accountId)
+          if (latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return
           if (again.success) setDeleteImpact(again.data)
           else setDeletePhase('error')
         } catch (saveFailure) {
@@ -349,7 +364,7 @@ function EditCommonVarV8Inner() {
       { if (!fieldFailure)
       setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setDeleting(false)
+      if (latestAccountRef.current === deleteTarget.accountId && deleteWindow.current === deleteTarget.window) setDeleting(false)
     }
   }
 
@@ -868,6 +883,7 @@ function EditCommonVarV8Inner() {
         }
         onCancel={closeDelete}
       >
+        <OperationTargetSummary accounts={[{ id: deleteTarget?.accountId ?? '' }]} />
         <div className={styles.dialogBody}>
           {deletePhase === 'loading' ? (
             <p className={styles.fieldHint}>使われている場所を読み込んでいます</p>

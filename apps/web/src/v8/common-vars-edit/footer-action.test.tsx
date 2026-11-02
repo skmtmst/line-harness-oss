@@ -3,9 +3,9 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const state = vi.hoisted(() => ({ role: 'owner' as 'owner' | 'viewer', impact: vi.fn(), remove: vi.fn() }))
+const state = vi.hoisted(() => ({ role: 'owner' as 'owner' | 'viewer', account: 'a', impact: vi.fn(), remove: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams('id=var-1') }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', loading: false }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => state.role }))
 vi.mock('@/lib/api', async original => {
@@ -22,6 +22,7 @@ import Editor from './edit'
 
 beforeEach(() => {
   state.role = 'owner'
+  state.account = 'a'
   state.impact.mockReset().mockResolvedValue({ success: true, data: {
     variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 0, blockingTotal: 0,
     historicalTotal: 0, unscopedFormTotal: 0, canDelete: true, byKind: {}, items: [],
@@ -40,6 +41,8 @@ it('下帯の削除入口は赤い文字で、押すと使用先を確認し、�
   expect(trigger.closest('[data-shared-part="sticky-bar"]')).not.toBeNull()
   fireEvent.click(trigger)
   const dialog = await screen.findByRole('alertdialog')
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
   await within(dialog).findByText('使っている設定はありません。')
   expect(state.impact).toHaveBeenCalledWith('var-1', 'a')
   expect(within(dialog).queryByRole('button', { name: '削除する', exact: true })).toBeNull()
@@ -60,5 +63,32 @@ it('閲覧のみの人には、下帯の削除入口を出さない', async () =
   await screen.findByRole('heading', { name: '営業時間', exact: true })
   expect(screen.queryByRole('button', { name: '削除する', exact: true })).toBeNull()
   expect(state.impact).not.toHaveBeenCalled()
+  expect(state.remove).not.toHaveBeenCalled()
+})
+
+it('確認と理由がそろったら対象アカウントで一度だけ削除する', async () => {
+  state.remove.mockResolvedValue({ success: true })
+  render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '削除する', exact: true }))
+  const dialog = await screen.findByRole('alertdialog')
+  await within(dialog).findByText('使っている設定はありません。')
+  fireEvent.change(within(dialog).getByRole('textbox', { name: /消した理由/ }), { target: { value: '整理のため' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: '削除する', exact: true }))
+  await waitFor(() => expect(state.remove).toHaveBeenCalledWith('var-1', 'a', '整理のため'))
+  expect(state.remove).toHaveBeenCalledTimes(1)
+})
+
+it('アカウントを切り替えて戻しても古い削除確定は送らない', async () => {
+  const view = render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '削除する', exact: true }))
+  const dialog = await screen.findByRole('alertdialog')
+  await within(dialog).findByText('使っている設定はありません。')
+  fireEvent.change(within(dialog).getByRole('textbox', { name: /消した理由/ }), { target: { value: '整理のため' } })
+  const target = within(dialog).getByRole('button', { name: '削除する', exact: true })
+  const key = Object.keys(target).find(item => item.startsWith('__reactProps$'))!
+  const handler = (target as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+  state.account = 'b'; view.rerender(<Editor />)
+  state.account = 'a'; view.rerender(<Editor />)
+  await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: target, target })
   expect(state.remove).not.toHaveBeenCalled()
 })
