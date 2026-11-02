@@ -15,6 +15,9 @@ export async function setRestaurantAttendance(db:D1Database,id:string,storeId:st
  const sql:D1PreparedStatement[]=[];
  let next=current.status;
  if(['visited','late','no_show'].includes(input.action)) {
+  if(input.action==='no_show'&&current.status==='pending')throw new StampError('approval_required',409);
+  if(input.action==='no_show'&&current.status==='seated')throw new StampError('already_arrived',409);
+  if(input.action==='no_show'&&await db.prepare("SELECT 1 FROM rt_seat_visit_marks WHERE reservation_id=? AND kind='visited' AND undone_at IS NULL LIMIT 1").bind(id).first())throw new StampError('already_arrived',409);
   if(current.departed_at||!['pending','confirmed','seated'].includes(current.status))throw new StampError('この状態からは付けられません',409);
   if(input.action==='late'&&(!Number.isInteger(input.lateMinutes)||input.lateMinutes!<1||input.lateMinutes!>1440))throw new StampError('遅れ分数は1〜1440です',400,['lateMinutes']);
   next=input.action==='late'?current.status:input.action;

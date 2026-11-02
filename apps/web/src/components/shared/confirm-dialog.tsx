@@ -18,6 +18,7 @@ interface ConfirmDialogBaseProps {
   deleteName?: string
   description: string
   confirmLabel?: string
+  confirmVariant?: 'danger'
   /** 実行中の文字。Buttonのbusyへ渡す。 */
   busyLabel?: string
   cancelLabel?: string
@@ -109,6 +110,7 @@ export default function ConfirmDialog({
   deleteName,
   description,
   confirmLabel = '実行する',
+  confirmVariant,
   busyLabel = '処理中…',
   cancelLabel = 'キャンセル',
   destructive = false,
@@ -260,6 +262,7 @@ export default function ConfirmDialog({
       tone={destructive ? 'destructive' : 'default'}
       descriptionBand={dangerBand ? 'danger' : warning ? 'warning' : undefined}
       confirmLabel={deleteName !== undefined || isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
+      confirmVariant={confirmVariant}
       confirmRetry={managed && Boolean(executionError)}
       busyLabel={busyLabel}
       cancelLabel={cancelLabel}

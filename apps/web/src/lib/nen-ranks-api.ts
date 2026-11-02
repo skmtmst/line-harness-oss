@@ -132,6 +132,10 @@ export const nenRanksApi = {
     }),
   settings: (accountId: string) =>
     fetchApi<ApiResponse<NenRankSettingsData>>(`/api/nen/rank-settings?accountId=${encodeURIComponent(accountId)}`),
+  initialize: (accountId: string) =>
+    fetchApi<ApiResponse<NenRankSettingsData>>('/api/nen/rank-settings/initialize', {
+      method: 'POST', body: JSON.stringify({ accountId }),
+    }),
   saveRanks: (accountId: string, ranks: Array<{ id?: string | null; name: string; annualThresholdYen: number; mileRatePercent: number }>) =>
     fetchApi<ApiResponse<NenRankSettingsData>>('/api/nen/rank-settings', {
       method: 'PUT', body: JSON.stringify({ accountId, ranks }),

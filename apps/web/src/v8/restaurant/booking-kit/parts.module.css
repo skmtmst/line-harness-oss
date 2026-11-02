@@ -41,6 +41,7 @@
  */
 .dialogActions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--tpl-rs-dlg-actions-gap);
   padding-top: var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-gap));
@@ -50,6 +51,7 @@
 /* 絵に下の線が無い窓（デリバリーの確認窓 dgeTy・XCVGd）のボタンの段。 */
 .dialogActionsPlain {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--tpl-rs-dlg-actions-gap);
   padding-top: var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-actions-pad-plain));

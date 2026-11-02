@@ -20,7 +20,7 @@ import RankSettingsTab from '@/v8/nen-members/ranks'
 import LifetimeTab from '@/v8/nen-members/lifetime'
 
 const settings = (account: string): NenRankSettingsData => ({
-  ranks: [{ id: `rank-${account}`, key: 'regular', name: `${account}ランク`, annualThresholdYen: 0, mileRatePercent: 1, tagId: null, tagName: null, memberCount: 0 }],
+  ranks: [{ id: `rank-${account}`, key: 'regular', name: `${account}ランク`, annualThresholdYen: 0, mileRatePercent: 1, tagId: `tag-${account}`, tagName: `${account}タグ`, memberCount: 0 }],
   milestones: [{ id: `milestone-${account}`, thresholdYen: 1000, title: `${account}称号`, benefitKind: null, benefitNote: null, notifyOnReach: false, reachedCount: 0 }],
   rules: null,
   kpis: { members: 0, annualTotalYen: 0, lifetimeTotalYen: 0, balanceTotal: 0, usedThisMonth: 0, byRank: {} },
