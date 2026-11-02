@@ -1002,6 +1002,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             page={page}
             blocks={blocks}
             refs={refs}
+            bookingStaffError={bookingStaffError}
             selectedBlockId={selectedBlockId}
             inputCount={inputCount}
             accountId={host ? null : selectedAccountId}
