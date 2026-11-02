@@ -100,8 +100,9 @@ function enterCheckStep() {
   nextStep()
 }
 
-async function enterSaveStep() {
+async function enterSaveStep(confirmProvider: () => void) {
   enterCheckStep()
+  confirmProvider()
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '登録する' })).toBeTruthy(), { timeout: 5000 })
 }
@@ -112,7 +113,7 @@ async function save() {
 
 describe('R523 保存の応答消失と重複（本物のReact）', () => {
   it('応答を失っても未保存と断定せず、登録済みの詳細へ復帰する', async () => {
-    await enterSaveStep()
+    await enterSaveStep(() => fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' })))
     // サーバ側では行が作られたが、応答だけ届かない。
     calls.connect.mockRejectedValue(new Error('fetch failed'))
     calls.list.mockResolvedValue({
@@ -130,7 +131,7 @@ describe('R523 保存の応答消失と重複（本物のReact）', () => {
   })
 
   it('同じ情報での再試行の重複エラーは行き止まりにせず詳細へ案内する', async () => {
-    await enterSaveStep()
+    await enterSaveStep(() => fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' })))
     calls.connect.mockResolvedValue({ success: false, error: 'channelId already registered' })
     calls.list.mockResolvedValue({
       success: true,
@@ -143,7 +144,7 @@ describe('R523 保存の応答消失と重複（本物のReact）', () => {
   })
 
   it('行が無い真の失敗は失敗として出す', async () => {
-    await enterSaveStep()
+    await enterSaveStep(() => fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' })))
     calls.connect.mockRejectedValue(new Error('fetch failed'))
     calls.list.mockResolvedValue({ success: true, data: [] })
     await save()
@@ -161,6 +162,7 @@ describe('接続確認の失敗後も入力と権限の案内を保つ', () => {
   ])('%iでは原因を案内し、登録せず入力を残す', async (status, message) => {
     enterCheckStep()
     calls.connectCheck.mockRejectedValue(new ApiError(status, undefined, undefined, undefined, undefined, 60))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
     await screen.findByText(message)
     expect(calls.connectCheck).toHaveBeenCalledOnce()

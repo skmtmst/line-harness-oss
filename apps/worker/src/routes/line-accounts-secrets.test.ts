@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@line-crm/db', () => ({
+  getLineAccountListStats: vi.fn().mockResolvedValue({}),
   getLineAccountById: vi.fn().mockResolvedValue({
     id: 'acc-1', channel_id: '2011', name: 'TEST', liff_id: 'dummy-public-liff-id',
     channel_access_token: 'SECRET-TOKEN', channel_secret: 'SECRET-CHANNEL',
