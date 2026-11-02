@@ -940,9 +940,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       <Button href="/form-submissions">キャンセル</Button>
       {canEdit ? (
         <>
-          <Button variant={retryAutosave ? 'primary' : 'secondary'} onClick={() => void save(false).then((ok) => { if (ok) autosave.markSaved() })} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
+          {!conflict ? <Button variant={retryAutosave ? 'primary' : 'secondary'} onClick={() => void save(false).then((ok) => { if (ok) autosave.markSaved() })} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
             下書きを保存
-          </Button>
+          </Button> : null}
           {conflict ? (
             <Button variant="primary" onClick={() => void saveConflict.compare()} disabled={saveConflict.compareBusy || saving}>
               比べてから保存
