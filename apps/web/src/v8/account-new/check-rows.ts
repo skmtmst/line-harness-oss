@@ -47,7 +47,7 @@ const V06_ROW_OK: Record<RowKey, string> = {
 const V06_ROW_ERROR: Record<RowKey, string> = {
   channel: '2つのチャネルに接続できませんでした。チャネルIDとチャネルシークレットを確認してください。',
   provider: '2つのチャネルの認証を完了できませんでした。チャネルIDとチャネルシークレットを確認してください。',
-  webhook: 'URLは登録できましたが、「Webhookの利用」がOFFのままです。上の案内のとおりONにしてください。',
+  webhook: 'URLは登録できましたが、「Webhookの利用」がOFFのままです。下の案内のとおりONにしてください。',
   lineId: 'アカウント名・@ID・アイコンを取り込めませんでした。',
   addUrl: '友だち追加の窓口（LIFF）を作れませんでした。',
 }
