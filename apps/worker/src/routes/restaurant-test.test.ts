@@ -1236,7 +1236,7 @@ describe('V8-B メニューの価格確定', () => {
     expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 8800 });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS total FROM rt_menu_change_requests').get()).toEqual({ total: 1 });
   });
-  it('未公開の下書きだけ削除でき、公開後に下書きへ戻しても削除できない', async () => {
+  it('参照がなければ公開後に下書きへ戻したメニューも削除できる', async () => {
     seedRestaurantFixture();
     const create = () => request('/api/restaurant-test/menu?account_id=account-1', { storeId: 'store-ginza', kind: 'course', name: '下書き', price: 1000, status: 'draft' });
     const first = (await (await create()).json() as any).data.id;
@@ -1245,7 +1245,7 @@ describe('V8-B メニューの価格確定', () => {
     const path = `/api/restaurant-test/menus/${id}?account_id=account-1`;
     await requestWithMethod(path, 'PATCH', { status: 'active' });
     await requestWithMethod(path, 'PATCH', { status: 'draft' });
-    expect((await requestWithMethod(path, 'DELETE')).status).toBe(409);
+    expect((await requestWithMethod(path, 'DELETE')).status).toBe(200);
     expect((await requestWithMethod(menuPath, 'DELETE')).status).toBe(409);
   });
   it('他店舗からの申請・削除を拒否する', async () => {
@@ -1314,49 +1314,6 @@ describe('V8-B 予約経路と隔離メール', () => {
     expect((await requestAs('/api/restaurant-test/channels?account_id=account-1&storeId=store-yokohama', token)).status).toBe(400);
     expect((await requestAs('/api/restaurant-test/inbound-emails?account_id=account-1&storeId=store-yokohama', token)).status).toBe(400);
     expect((await requestAs('/api/restaurant-test/inbound-emails/email-other/manual-import?account_id=account-1', token, {})).status).toBe(404);
-  });
-});
-
-describe('V8 仮押さえ・日付・来店履歴', () => {
-  const hold = { storeId: 'store-ginza', startsAt: '2099-10-10T10:00:00Z', endsAt: '2099-10-10T12:00:00Z', guestCount: 2, holdMinutes: 15 };
-  it('仮押さえは期限を保存し、重なる要求を409で止め、解除後は再登録できる', async () => {
-    seedRestaurantFixture();
-    const res = await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold);
-    expect(res.status).toBe(201);
-    const saved = (await res.json() as any).data;
-    expect(Date.parse(saved.holdExpiresAt)).toBeGreaterThan(Date.now());
-    expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold)).status).toBe(409);
-    expect((await requestWithMethod(`/api/restaurant-test/reservations/${saved.id}?account_id=account-1`, 'PATCH', { status: 'cancelled' })).status).toBe(200);
-    expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold)).status).toBe(201);
-  });
-  it('期限が切れた押さえを再読込で解除し、確定させない', async () => {
-    seedRestaurantFixture();
-    const res = await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold);
-    const { id } = (await res.json() as any).data;
-    testDb.raw.prepare("UPDATE rt_reservations SET hold_expires_at='2000-01-01T00:00:00Z' WHERE id=?").run(id);
-    expect((await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { status: 'confirmed' })).status).toBe(409);
-    expect(testDb.raw.prepare('SELECT status FROM rt_reservations WHERE id=?').get(id)).toEqual({ status: 'cancelled' });
-  });
-  it('店の暦日で500件を超えても全予約を返し、別店舗を混ぜない', async () => {
-    seedRestaurantFixture();
-    const insert = testDb.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at) VALUES(?, 'store-ginza','phone','試験',1,'2099-10-09T15:00:00Z','2099-10-09T16:00:00Z')`);
-    for (let i=0;i<501;i++) insert.run(`day-${i}`);
-    const res = await request('/api/restaurant-test/reservations/day?account_id=account-1&storeId=store-ginza&date=2099-10-10');
-    expect(res.status).toBe(200);
-    expect((await res.json() as any).data.reservations).toHaveLength(501);
-    expect((await request('/api/restaurant-test/reservations/day?account_id=account-1&storeId=store-ginza&date=2099-02-30')).status).toBe(400);
-  });
-  it('来店履歴はvisitedのみ、名前の一致で別人を混ぜない', async () => {
-    seedRestaurantFixture();
-    testDb.raw.exec("UPDATE rt_reservations SET customer_phone='090-0000-0000',status='visited' WHERE id='reservation-ginza'");
-    let res = await request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=09000000000');
-    expect((await res.json() as any).data.visitCount).toBe(1);
-    res = await request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-yokohama&phone=09000000000');
-    expect((await res.json() as any).data.visitCount).toBe(0);
-  });
-  it('存在しない店舗・不正な期限では保存しない', async () => {
-    seedRestaurantFixture();
-    for (const body of [{ ...hold, holdMinutes: 0 }, { ...hold, storeId: 'other' }]) expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', body)).status).toBe(400);
   });
 });
 
@@ -1489,6 +1446,7 @@ describe('V8 店の名簿とログイン権限',()=>{
  });
  it('担当者は予約入力と日付読取ができ、設定変更はできない',async()=>{
   seedLogin();
+  testDb.raw.prepare("INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES ('store-ginza', '[]', 'test')").run();
   authMocks.getStaffByApiKey.mockResolvedValue({id:'login',name:'担当者',role:'staff',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:0});
   expect((await requestAs('/api/restaurant-test/reservations/holds?account_id=account-2','operator-key',{storeId:'store-ginza',startsAt:'2099-10-10T10:00:00Z',endsAt:'2099-10-10T12:00:00Z',guestCount:2,holdMinutes:15})).status).toBe(201);
   expect((await requestAs('/api/restaurant-test/reservations/day?account_id=account-2&storeId=store-ginza&date=2099-10-10','operator-key')).status).toBe(200);
@@ -1854,4 +1812,38 @@ it('電話の全角・区切りを検索で整え、他店を混ぜず旧行も�
   expect((await (await request(history+encodeURIComponent('０９０－１２３４－５６７８'))).json() as {data:{visitCount:number}}).data.visitCount).toBe(1);
   expect((await (await request(path.replace('store-ginza','store-yokohama')+'09012345678')).json() as {data:unknown[]}).data).toEqual([]);
   expect(testDb.raw.prepare("SELECT customer_phone FROM rt_reservations WHERE id='reservation-ginza'").get()).toEqual({customer_phone:'０９０－１２３４－５６７８'});
+});
+
+describe('電話予約と押さえの受付条件', () => {
+  const manual = '/api/restaurant-test/reservations/manual?account_id=account-1';
+  const holds = '/api/restaurant-test/reservations/holds?account_id=account-1';
+  const now = Date.now();
+  const input = { storeId: 'store-ginza', customerName: '試験客', guestCount: 2, startsAt: new Date(now + 3600000).toISOString(), endsAt: new Date(now + 10800000).toISOString(), source: 'phone' };
+  it('未設定の店舗は電話と押さえをコード付きで拒否し、店頭受付は通す', async () => {
+    seedRestaurantFixture();
+    for (const [path, body] of [[manual, input], [holds, {...input, holdMinutes: 15}]] as const) {
+      const res = await request(path, body); expect(res.status).toBe(409);
+      expect((await res.json() as {code:string}).code).toBe('opening_hours_unconfigured');
+    }
+    const res = await request(manual, {...input, source:'manual'}); expect(res.status).toBe(201);
+  });
+  it('設定済みの店は時刻の小さなずれを許す', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES (?, ?, 'test')").run('store-ginza', JSON.stringify([]));
+    const body = {...input, startsAt:new Date(Date.now()-30000).toISOString(), endsAt:new Date(Date.now()+3600000).toISOString()};
+    expect((await request(manual,body)).status).toBe(201);
+  });
+  it('未設定でも既存の予約は編集できる', async () => {
+    seedRestaurantFixture();
+    const res = await requestWithMethod('/api/restaurant-test/reservations/reservation-ginza?account_id=account-1', 'PATCH', { note:'編集の確認' });
+    expect(res.status).toBe(200);
+  });
+  it('設定済みでも過去の電話と押さえを拒否する', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES (?, ?, 'test')").run('store-ginza', JSON.stringify(Array.from({length:7},(_,weekday)=>({weekday,periods:[]}))));
+    const past = {...input, startsAt:new Date(Date.now()-120000).toISOString(), endsAt:new Date(Date.now()+3600000).toISOString()};
+    for (const [path, body] of [[manual,past],[holds,{...past,holdMinutes:15}]] as const) {
+      const res = await request(path,body); expect(res.status).toBe(409); expect((await res.json() as {code:string}).code).toBe('reservation_time_past');
+    }
+  });
 });

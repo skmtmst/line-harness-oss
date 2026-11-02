@@ -47,3 +47,40 @@ test('CS-C02: 一部登録失敗は判定せず失敗表示、再送で成功し
   expect(fixture.raw.prepare("SELECT notes FROM chats WHERE friend_id='f'").get()).toEqual({notes:'新しい値'});
   await submit();expect(observed).toHaveBeenCalledTimes(1);
 });
+
+test('消えたコースの回答は409で受け付けず、他の入力や処理を書き込まない', async () => {
+  const layout=emptyLayout();
+  layout.sections[0].blocks=[{id:'booking',name:'booking',kind:'input',type:'booking',label:'予約',required:true,booking:{kind:'seats',storeId:'store',menuId:''}}];
+  fixture.raw.prepare('INSERT INTO forms(id,name,layout,save_to_metadata) VALUES(?,?,?,0)').run('booking-form','予約',JSON.stringify(layout));
+  fixture.raw.prepare("INSERT INTO form_accounts(form_id,line_account_id) VALUES('booking-form','a')").run();
+  const app=new Hono<Env>();app.route('/',forms);
+  const res=await app.request('/api/forms/booking-form/submit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer fake','Idempotency-Key':'bbbbbbbb-1111-4333-8444-222222222222'},body:JSON.stringify({data:{booking:{kind:'seats',storeId:'store',courseId:'gone',menuId:'',staffId:'',guestCount:2,startsAt:'2099-01-01T00:00:00Z'}}})},{DB:fixture.db,LINE_CHANNEL_ACCESS_TOKEN:'fake',WORKER_URL:'https://fake.test'} as Env['Bindings'],{waitUntil:()=>{},passThroughOnException:()=>{},props:{}} as ExecutionContext);
+  expect(res.status).toBe(409);
+  expect(await res.json()).toMatchObject({code:'restaurant_course_unavailable'});
+  expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM form_submissions WHERE form_id='booking-form'").get()).toEqual({n:0});
+  expect(observed).not.toHaveBeenCalled();
+});
+
+test('回答の確認後にコースが消えても回答を作らない', async () => {
+  fixture.raw.exec("INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','店舗'); INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','店舗','S','a'); INSERT INTO rt_menu_items(id,store_id,kind,name,price) VALUES('course','store','course','検証',1000)");
+  const layout=emptyLayout();
+  layout.sections[0].blocks=[{id:'booking',name:'booking',kind:'input',type:'booking',label:'予約',required:true,booking:{kind:'seats',storeId:'store',menuId:''}}];
+  fixture.raw.prepare('INSERT INTO forms(id,name,layout,save_to_metadata) VALUES(?,?,?,0)').run('booking-form','予約',JSON.stringify(layout));
+  fixture.raw.prepare("INSERT INTO form_accounts(form_id,line_account_id) VALUES('booking-form','a')").run();
+  const prepare=fixture.db.prepare.bind(fixture.db);
+  const spy=vi.spyOn(fixture.db,'prepare').mockImplementation((sql)=>{
+    if(sql.includes('INSERT INTO form_submissions')) {
+      expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM rt_resource_locks WHERE resource_key LIKE 'form-course:course:%'").get()).toEqual({n:1});
+      fixture.raw.prepare("DELETE FROM rt_menu_items WHERE id='course'").run();
+    }
+    return prepare(sql);
+  });
+  try {
+    const app=new Hono<Env>();app.route('/',forms);
+    const res=await app.request('/api/forms/booking-form/submit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer fake','Idempotency-Key':'cccccccc-1111-4333-8444-333333333333'},body:JSON.stringify({data:{booking:{kind:'seats',storeId:'store',courseId:'course',menuId:'',staffId:'',guestCount:2,startsAt:'2099-01-01T00:00:00Z'}}})},{DB:fixture.db,LINE_CHANNEL_ACCESS_TOKEN:'fake',WORKER_URL:'https://fake.test'} as Env['Bindings'],{waitUntil:()=>{},passThroughOnException:()=>{},props:{}} as ExecutionContext);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({code:'restaurant_course_unavailable'});
+    expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM form_submissions WHERE form_id='booking-form'").get()).toEqual({n:0});
+    expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM rt_resource_locks WHERE resource_key LIKE 'form-course:%'").get()).toEqual({n:0});
+  } finally { spy.mockRestore(); }
+});

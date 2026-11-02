@@ -1,3 +1,4 @@
+import { validRestaurantCoursesSql } from './forms/course-guard.js';
 import type { HqTemplateVersion } from './hq-template-version-types.js';
 export type { HqTemplateVersion } from './hq-template-version-types.js';
 import type { HqTemplateArchiveStatus } from '@line-crm/shared';
@@ -375,7 +376,7 @@ export function buildCreateHqTemplateVersionPlan(input: {
                 (id, tenant_id, template_id, version, definition_json, content_hash, created_by)
               SELECT ?, ?, ?, ?, ?, ?, ?
               FROM hq_templates
-              WHERE id = ? AND tenant_id = ? AND revision = ? AND archived_at IS NULL`,
+              WHERE id = ? AND tenant_id = ? AND revision = ? AND archived_at IS NULL AND ${validRestaurantCoursesSql}`,
         bindings: [
           input.id,
           input.tenantId,
@@ -387,6 +388,8 @@ export function buildCreateHqTemplateVersionPlan(input: {
           input.templateId,
           input.tenantId,
           input.expectedTemplateRevision,
+          input.definitionJson,
+          null,
         ],
       },
       {

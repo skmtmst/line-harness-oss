@@ -18,8 +18,9 @@ vi.hoisted(() => {
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: ACCOUNT, loading: false }),
 }))
+const push = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useRouter: () => ({ push, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(window.location.search),
   usePathname: () => '/rich-menus/new',
 }))
@@ -77,6 +78,7 @@ function stubFetch() {
       groupBody = { ...GROUP, ...(groupBody as typeof GROUP), ...body, id: GROUP.id, pages: GROUP.pages }
       return { ok: true, status: 200, json: async () => ({ success: true, data: groupBody }) }
     }
+    if (parsed.pathname === '/api/rich-menu-groups/rmg-x' && init?.method === 'DELETE') { writes.push({method:'DELETE',body:{expectedVersion:parsed.searchParams.get('expectedVersion')}}); return {ok:true,status:200,json:async()=>({success:true,data:null})} }
     if (parsed.pathname === '/api/rich-menu-groups/rmg-x') return { ok: true, status: 200, json: async () => ({ success: true, data: groupBody }) }
     if (parsed.pathname === '/api/rich-menu-groups') return { ok: true, status: 200, json: async () => ({ success: true, data: { items: [], total: 0, page: 1, limit: 200 } }) }
     return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
@@ -266,6 +268,69 @@ describe('リッチメニューの出す相手は明示的に決める', () => {
     await open('?step=audience', { host: makeHqHost() })
     expect((screen.getByRole('radio', { name: /^決めない/ }) as HTMLInputElement).checked).toBe(true)
     expect((screen.getByRole('radio', { name: /^全員/ }) as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('手順を進めるまでは入力だけで下書きを作らない', async () => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 2100)) })
+    expect(writes).toHaveLength(0)
+  })
+
+  it('手順を進めて保存した下書きは、キャンセル時に残すか消すか確かめる', async () => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き', exact: true })) })
+    await settle()
+    const leave = vi.fn()
+    await act(async () => { requestUnsavedAction(leave) })
+    expect(leave).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '下書きを残して移る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '下書きを消して移る' })).toBeTruthy()
+  })
+
+  it.each(['keep','delete'] as const)('保存済み下書きの%sを選んで移る', async (choice) => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き', exact: true })) })
+    await settle()
+    const leave = vi.fn()
+    await act(async () => { requestUnsavedAction(leave) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: choice === 'keep' ? '下書きを残して移る' : '下書きを消して移る' })) })
+    await settle()
+    expect(leave).toHaveBeenCalledOnce()
+    const deletion = writes.find(write => write.method === 'DELETE')
+    if (choice === 'keep') expect(deletion).toBeUndefined()
+    else expect(deletion?.body).toEqual({expectedVersion:'1'})
+  })
+
+  it('保存した下書きの削除に失敗したら、理由を出して画面に残る', async () => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き', exact: true })) })
+    await settle()
+    failing['/api/rich-menu-groups/rmg-x'] = 1
+    const leave = vi.fn()
+    await act(async () => { requestUnsavedAction(leave) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを消して移る' })) })
+    await settle()
+    expect(leave).not.toHaveBeenCalled()
+    expect(screen.getByText(/下書きの削除結果を確認できません/)).toBeTruthy()
+  })
+
+  it('削除結果が不明なら一覧で確認する操作を案内する', async () => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き', exact: true })) })
+    await settle()
+    failing['/api/rich-menu-groups/rmg-x'] = 1
+    await act(async () => { requestUnsavedAction(vi.fn()) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを消して移る' })) })
+    await settle()
+    expect(screen.getByText(/削除結果を確認できません/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '下書きを残して移る' })).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '一覧で確認する' })) })
+    expect(push).toHaveBeenCalledWith('/rich-menus')
   })
 
   it('初めの下書き保存と手順の保存でも全員の既定にしない', async () => {
