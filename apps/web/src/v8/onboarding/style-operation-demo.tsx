@@ -148,8 +148,9 @@ export function RestaurantAfterDemo() {
 }
 
 /**
- * サロンの来店後の見本の値。来店後の送信は設定・公開・承認が必要で、
- * 保存しただけでは始まらない。実データの読み書き・送信はしない。
+ * サロンの来店後の見本の値。お礼を自動で送る機能の有無と条件は確認中。
+ * 時刻と停止状態も見本であり、実際の設定値や送り始める手順は示さない。
+ * 実データの読み書き・送信はしない。
  */
 const SALON_AFTER_SAMPLE = {
   visit: { time: '11:30–12:30', name: '見本 みお', menu: 'カット', staff: '見本 あおい' },
@@ -172,10 +173,10 @@ export function SalonAfterDemo() {
         </ul>
       </section>
       <section aria-label="お礼の見本">
-        <p className={styles.description}>LINEのお礼（{SALON_AFTER_SAMPLE.thanks.when}・停止中）</p>
+        <p className={styles.description}>LINEのお礼の見本（{SALON_AFTER_SAMPLE.thanks.when}・停止中）</p>
         <p className={styles.description}>{SALON_AFTER_SAMPLE.thanks.text}</p>
       </section>
-      <p className={styles.note}>名前・数は架空です。送り始めるには設定と承認が必要で、保存しただけでは始まりません。</p>
+      <p className={styles.note}>名前・数は架空です。お礼を自動で送る機能の有無と条件は確認中のため、「翌日 12:00」や「停止中」を含め、この見本では送り始める手順を示しません。実際の設定は変わりません。</p>
     </Card>
   </section>
 }
