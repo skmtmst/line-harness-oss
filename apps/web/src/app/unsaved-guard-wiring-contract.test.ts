@@ -161,6 +161,8 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  // 共通アクションの編集値は CreatePage に渡し、型の番兵が離脱を守る。
+  'v8/automations/common-action-edit.tsx': 'components/templates/create-page.tsx',
   // 入口は保存状態を持たず、カードの入力と画面離脱は実体の番兵へ委ねる。
   'v8/restaurant/line-followup/line-followup.tsx': 'v8/restaurant/line-followup/followup-board.tsx',
   // 振替の窓はonEditStateで未保存/保存中を親へ返し、Dialogが窓内の破棄を、親の番兵が画面離脱を守る。
