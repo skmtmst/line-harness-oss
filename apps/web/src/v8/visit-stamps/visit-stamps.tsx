@@ -16,6 +16,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import { DetailColumns } from '@/components/templates/detail-columns';
 import { StaffQr, StorefrontQr } from './qr'
 import tpl from '@/components/templates/page-templates.module.css'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import MediaSlot from '@/components/shared/media-slot'
 import ColorWell from '@/components/shared/color-well'
@@ -674,7 +675,7 @@ function VisitStampsScreen() {
 
           ) : null}
           {tab === 'paper' ? (
-            <section className={styles.section} aria-label="紙のカードからの移行の申請">
+            <Card as="section" variant="form" className={styles.section} aria-label="紙のカードからの移行の申請">
               <SectionTitle help="お客さまが LINE から送った紙のスタンプカードの写真です。写真の押印数を確かめて［承認］すると、その数をカードに足します。承認は1回だけで、同じ申請を2回は足しません。">紙のカードからの移行の申請</SectionTitle>
               {paperError && paper === null ? <ListState kind="error" error={paperError} onRetry={() => void loadPaper()} />
                 : paper === null ? <ListState kind="loading" />
@@ -734,13 +735,13 @@ function VisitStampsScreen() {
                         </tbody>
                       </DataTable>
                     )}
-            </section>
+            </Card>
 
           ) : null}
           {tab === 'history' ? (
             <HistoryColumns canStamp={canStamp} expanded={manualExpanded} onExpandedChange={setManualExpanded}>
               {/* 押した・使った記録 */}
-              <section className={styles.section} aria-label="押した・使った記録">
+              <Card as="section" variant="form" className={styles.section} aria-label="押した・使った記録">
                 <SectionTitle
                   help="この店で押した・使った記録です（共通のカードでも、この店で押した・使ったものだけ）。来店・会計で自動で押したもの、店で足したもの、紙のカードから移したもの、特典で使ったものが新しい順に並びます。まちがいは「…」から取り消せます（取り消しも記録に残ります）。"
                 >押した・使った記録</SectionTitle>
@@ -765,7 +766,7 @@ function VisitStampsScreen() {
                   <Pagination page={logPage} pageCount={logPages} onPageChange={setLogPage} ariaLabel="記録のページ送り"
                     range={{ total: log.total, first: logTotal ? (logPage - 1) * logPageSize + 1 : 0, last: Math.min(logPage * logPageSize, logTotal) }} />
                 ) : null}
-              </section>
+              </Card>
               {canStamp ? (
                 <section className={styles.side} aria-label="店で手入力">
                   <h3 className={styles.sectionTitle}>店で手入力</h3>
