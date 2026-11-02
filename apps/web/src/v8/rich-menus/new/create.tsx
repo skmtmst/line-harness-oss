@@ -1,15 +1,11 @@
 'use client'
-
 import { useListNavigationRouter } from '@/components/shared/list-navigation'
 import { useMenuMediaScope } from './use-menu-media-scope'
-
 import { useMenuShapeDraft } from './use-menu-shape-draft'
-
 import { publishMenuNow } from './create-publish-actions'
 import { reloadMenuGroup } from './create-reload-group'
 import { seedMenuShape } from './create-seed-shape'
 import { applyMenuTabCount,requestMenuTabCount } from './create-tab-actions'
-
 import { renderAudienceStep,renderHqAudienceStep } from './create-audience-step'
 import { renderButtonsStep } from './create-buttons-step'
 import { hydrateMenuDraft } from './create-hydration'
@@ -50,6 +46,7 @@ isForbiddenOrRateLimited,
 loadFailureNotice } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
@@ -231,12 +228,20 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false)
 
   const accountId = selectedAccount?.id ?? null
-  useEffect(() => { setPublishConfirmOpen(false); setPriorityOpen(false) }, [accountId, group?.id])
+  const publishScopeKey = JSON.stringify([accountId, group?.id])
+  const publishScope = useRef({ key: publishScopeKey })
+  if (publishScope.current.key !== publishScopeKey) publishScope.current = { key: publishScopeKey }
+  const [publishTarget, setPublishTarget] = useState<{ accountId: string; name: string | null; scope: object } | null>(null)
+  const publishAlive = useRef(true)
+  useEffect(() => { publishAlive.current = true; return () => { publishAlive.current = false } }, [])
+  useEffect(() => { setPublishConfirmOpen(false); setPublishTarget(null); setPriorityOpen(false) }, [accountId, group?.id])
   candidateAccountRef.current = accountId
   useMenuMediaScope(accountId, Boolean(host), setPendingImages, setMediaPickerOpen)
   const aggregateOnly = staffRole === 'staff' || staffRole === 'viewer'
   const storeCanOperate = useFeatureAccess('richMenus')
   const canOperate = host ? host.canOperate : storeCanOperate
+  const canOperateRef = useRef(canOperate)
+  canOperateRef.current = canOperate
 
   /* ---------- 署名（未保存の検知） ---------- */
 
@@ -1026,7 +1031,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       void scheduleSubmit(input)
       return
     }
-    setError(null); setPublishConfirmOpen(true)
+    if (!group || !accountId || group.accountId !== accountId || !canOperateRef.current) return
+    setError(null); setPublishTarget({ accountId: group.accountId, name: selectedAccount?.id === group.accountId ? selectedAccount.name : null, scope: publishScope.current }); setPublishConfirmOpen(true)
   }
 
   /* ---------- 派生値 ---------- */
@@ -1424,14 +1430,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         <Field label="出す順番" htmlFor="rm-edit-priority"><NumberInput numericText id="rm-edit-priority" inputMode="numeric" min={1} step={1} unit="番目" value={priorityInput} onChange={event => setPriorityInput(event.target.value)} /></Field>
       </Dialog>
       <ConfirmDialog
-        open={publishConfirmOpen}
+        open={publishConfirmOpen && publishTarget?.scope === publishScope.current}
         title="公開の確認"
         description={publishConfirmNote}
         confirmLabel="公開する"
         busy={publishing || saving}
-        error={error || undefined} onSuccess={() => setPublishConfirmOpen(false)} onConfirm={() => handlePublish()}
+        error={error || undefined} onSuccess={() => setPublishConfirmOpen(false)} onConfirm={() => { if (publishAlive.current && publishTarget?.scope === publishScope.current && canOperateRef.current) return handlePublish() }}
         onCancel={() => setPublishConfirmOpen(false)}
-      />
+      >
+        {publishTarget ? <OperationTargetSummary accounts={[{ id: publishTarget.accountId, name: publishTarget.name }]} /> : null}
+      </ConfirmDialog>
 
       {/* ★V8 `r8dGXT`「違いを比べる」の窓。最新と入力中の設定の要約を比べる。 */}
       <Dialog

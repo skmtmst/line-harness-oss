@@ -148,11 +148,25 @@ describe('公開履歴の読み込み（応答の形ずれ）', () => {
     fireEvent.click(screen.getByRole('button', { name: '失敗だけやり直す' }))
     const dialog = screen.getByRole('dialog', { name: '失敗した公開をやり直しますか？' })
     expect(within(dialog).getByText(/対象: 条件に当てはまる友だち/)).toBeTruthy()
+    expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
     expect(within(dialog).getByText(/下書きが保存時から変わっている場合.*再試行せず止めます/)).toBeTruthy()
     expect(net.retry).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: 'やり直す' }))
     await screen.findByText('失敗した公開をやり直しました。最新の状態を確かめてください。')
     expect(net.retry).toHaveBeenCalledExactlyOnceWith('menu-1', 'run-1')
+  })
+
+  it('メニューを切り替えて戻しても古い公開やり直しを送らない', async () => {
+    net.publishRunsResult = { success: true, data: { runs: [run('failed')], published: null, draftDiffersFromPublished: null } }
+    await renderDetail()
+    fireEvent.click(screen.getByRole('button', { name: '失敗だけやり直す' }))
+    const button = within(screen.getByRole('dialog', { name: '失敗した公開をやり直しますか？' })).getByRole('button', { name: 'やり直す' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    await act(async () => { root.render(<RichMenuDetailV8 groupId="menu-2" />) })
+    await act(async () => { root.render(<RichMenuDetailV8 groupId="menu-1" />) })
+    await act(async () => { await handler({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+    expect(net.retry).not.toHaveBeenCalled()
   })
 
   it('履歴の欄は名前つきで出し、成功した記録にはやり直す口を出さない', async () => {
@@ -171,6 +185,7 @@ describe('公開履歴の読み込み（応答の形ずれ）', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ずれを直す' }))
     const dialog = screen.getByRole('dialog', { name: 'LINEとのずれを直しますか？' })
     expect(within(dialog).getByText('切り替え先がありません（切り替え先を戻す）')).toBeTruthy()
+    expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
     expect(net.reconcile).not.toHaveBeenCalledWith('menu-1', false)
     fireEvent.click(within(dialog).getByRole('button', { name: 'ずれを直す' }))
     await screen.findByText(/ずれを 1 件修復しました。取り込みが必要なずれが 1 件あります/)

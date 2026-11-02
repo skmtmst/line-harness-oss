@@ -182,6 +182,28 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     expect(sink).not.toContain('保管する')
   })
 
+  it('配信を止める前に実際のアカウントと環境を確認する', async () => {
+    await render(); await openMenu('店頭QRの初回案内')
+    await act(async () => { screen.getByRole('menuitem', { name: '止める' }).click() })
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('本店'); expect(dialog.textContent).toContain('環境')
+  })
+
+  it('アカウントを切り替えて戻した後、古い停止を実行しない', async () => {
+    const existingFetch = globalThis.fetch
+    const requests = vi.fn((...args: Parameters<typeof fetch>) => existingFetch(...args))
+    vi.stubGlobal('fetch', requests)
+    await render(); await openMenu('店頭QRの初回案内')
+    await act(async () => { screen.getByRole('menuitem', { name: '止める' }).click() })
+    const button = within(screen.getByRole('dialog')).getByRole('button', { name: '止める' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    await act(async () => { accountState.id = 'account-b'; root.render(<FriendAddListV8 />) })
+    await act(async () => { accountState.id = 'account-a'; root.render(<FriendAddListV8 />) })
+    await act(async () => { await handler({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+    expect(requests.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+  })
+
   it('保管前に実際のアカウントと環境を確認する', async () => {
     await render(); await openMenu('店頭QRの初回案内')
     await act(async () => { screen.getByRole('menuitem', { name: '保管する' }).click() })
