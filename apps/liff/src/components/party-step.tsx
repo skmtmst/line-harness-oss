@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { bookingPriceText, staffNominationFee } from '../lib/booking-price.js';
 import { logFailure } from '../lib/user-message.js';
@@ -40,8 +40,8 @@ export default function PartyMenuStep({ menu, party, onParty, onChangeMenu }: {
   /** 1 人目のメニューを選び直す。 */
   onChangeMenu: () => void;
 }) {
-  /* 2 人以上は口がまだ無いので、形は 3 人まで見せ、予約を送るときに「現在準備中です」を出す。 */
-  const max = 3;
+  /* 複数人の送信は準備中のまま、メニューの人数上限を表示に反映する。 */
+  const max = Math.max(1, Math.floor(menu.max_party_size ?? 1));
   const [picking, setPicking] = useState<number | null>(null);
   const setMember = (index: number, patch: Partial<PartyMember>) => onParty({ ...party, members: party.members.map((m, i) => (i === index ? { ...m, ...patch } : m)) });
   const toggleAddon = (index: number, id: string) => {
@@ -122,16 +122,37 @@ function OtherMenuSheet({ onPick, onClose }: { onPick: (m: MenuItem) => void; on
   const [menus, setMenus] = useState<MenuItem[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [key, setKey] = useState(0);
+  const [loadingMenu, setLoadingMenu] = useState<MenuItem | null>(null);
+  const [addonFailed, setAddonFailed] = useState<MenuItem | null>(null);
+  const active = useRef(true);
+  const selecting = useRef(false);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  async function selectMenu(menu: MenuItem) {
+    if (selecting.current) return;
+    selecting.current = true; setLoadingMenu(menu); setAddonFailed(null);
+    try {
+      const addons = await api.addons(menu.id);
+      if (active.current) onPick({ ...menu, addons });
+    } catch (error) {
+      logFailure('party-menu-addons', error);
+      if (active.current) setAddonFailed(menu);
+    } finally {
+      selecting.current = false;
+      if (active.current) setLoadingMenu(null);
+    }
+  }
   useEffect(() => { setFailed(false); api.menus().then((r) => setMenus(r.menus.filter((m) => (m.max_party_size ?? 1) > 1))).catch((e) => { logFailure('party-menus', e); setFailed(true); }); }, [key]);
   return (
     <div className="fixed inset-0 z-50 text-ink" role="dialog" aria-modal="true" aria-label="別のメニューを選ぶ" onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
       <Button variant="overlay" aria-label="閉じる" onClick={onClose} />
       <div className="absolute inset-x-0 bottom-0 mx-auto max-h-[80vh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-(--liff-radius-lg) bg-canvas px-4 pt-4 pb-8">
         <h2 className="text-[15px] font-bold">別のメニューを選ぶ</h2>
+        {loadingMenu && <p role="status">追加メニューを読み込んでいます…</p>}
+        {addonFailed && <p role="alert">追加メニューを読み込めませんでした。<Button variant="link" onClick={() => void selectMenu(addonFailed)}>もう一度</Button></p>}
         {failed ? <LoadErrorView onRetry={() => setKey((n) => n + 1)} /> : !menus ? <LoadingView /> : menus.length === 0 ? <p className="text-[13px] text-liff-sub">ほかに選べるメニューがありません。</p> : (
           <ul className="space-y-2">
             {menus.map((m) => (
-              <li key={m.id}><Button variant="option" onClick={() => onPick(m)}><span className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-bold">{m.name}</span><span className="block text-xs text-liff-sub">{`${m.duration_minutes} 分・${bookingPriceText(m.base_price, m.price_mode)}`}</span></span></Button></li>
+              <li key={m.id}><Button variant="option" disabled={loadingMenu !== null} onClick={() => void selectMenu(m)}><span className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-bold">{m.name}</span><span className="block text-xs text-liff-sub">{`${m.duration_minutes} 分・${bookingPriceText(m.base_price, m.price_mode)}`}</span></span></Button></li>
             ))}
           </ul>
         )}

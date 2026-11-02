@@ -268,6 +268,9 @@ describe('たまる決めごとの公開確認(本物のReact)', () => {
     await settle()
     expect(net.publishes()).toHaveLength(0)
     expect(dialog()).not.toBeNull()
+    expect(dialog()?.textContent).toContain('LINEアカウント')
+    expect(dialog()?.textContent).toContain('環境')
+    expect(dialog()?.textContent).toContain('公式A')
 
     // 確定で1回だけ送る。いまの下書き版と取消不可の確認・冪等キーを添える。
     await act(async () => { dialogConfirm()?.click() })

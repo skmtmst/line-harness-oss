@@ -37,7 +37,7 @@ it('管理者の中身を見る操作は既存の設定の一覧を開く', () =
 it('閲覧だけでは警告の変更操作も灰色と理由にする', () => {
   const source = data(); source.warnings = [{ feature: 'booking', areaId: 'booking', groupId: 'menu', customerState: 'preparing', href: '/booking/menus' }]
   render(<SetupWarningBands data={source} configureAllowed={false} role="viewer" />)
-  const button = screen.getByRole('button', { name: '決まりを入れる' })
+  const button = screen.getByRole('button', { name: '予約を設定する' })
   expect(button.getAttribute('aria-disabled')).toBe('true')
   expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toContain('閲覧のみ')
 })

@@ -6,7 +6,7 @@ import EventWaitlistOffer from './event-waitlist-offer.js';
 import { api } from '../lib/api.js';
 
 vi.mock('../lib/api.js', () => ({ api: {
-  eventWaitlistOffer: vi.fn().mockResolvedValue({ data: null }), acceptEventWaitlistOffer: vi.fn(),
+  eventWaitlistOffer: vi.fn().mockResolvedValue({ data: { waitlistId: 'w', eventId: 'e', slotId: 's', partySize: 2, status: 'offered', expiresAt: '2030-11-01T01:00:00Z', eventName: '見本のイベント', startsAt: '2030-11-20T01:00:00Z', endsAt: '2030-11-20T02:00:00Z', venueName: null, remainingSeconds: 3600, canAccept: true } }), acceptEventWaitlistOffer: vi.fn(),
   customerLook: vi.fn().mockResolvedValue({ success: true, data: { settings: {} } }), liffConfig: vi.fn().mockResolvedValue({ data: {} }),
 } }));
 vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }));

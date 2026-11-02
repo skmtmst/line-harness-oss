@@ -12,6 +12,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { MessageSquareText, Plus, Upload } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -50,14 +51,16 @@ const STATUS_OPTIONS = [
   { value: 'stopped', label: '止めた' },
 ]
 
-type Load = { kind: 'loading' } | { kind: 'ready'; items: QaEntry[]; total: number } | { kind: 'error'; error: unknown }
-type Pending = { kind: 'publish' | 'stop' | 'delete'; entry: QaEntry }
+type Load = { kind: 'loading' } | { kind: 'ready'; items: QaEntry[]; total: number; scope: object } | { kind: 'error'; error: unknown }
+type Pending = { kind: 'publish' | 'stop' | 'delete'; entry: QaEntry; accountId: string; scope: object }
 
 export const QA_HELP = 'よくある質問と店の答えを登録します。公開した Q&A は返信案の元になり、自動で答えるをオンにした店では答えの文をそのまま返します。行を押すと編集、「…」に公開・止める・削除。'
 
 export default function QaListV8() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const accountId = selectedAccountId ?? ''
+  const accountScope = useRef({ accountId })
+  if (accountScope.current.accountId !== accountId) accountScope.current = { accountId }
   const ai = useAiSettings(selectedAccountId)
   usePageTitle('Q&A')
   usePageCrumbs([{ label: '自動応答', href: '/auto-replies' }])
@@ -77,36 +80,40 @@ export default function QaListV8() {
 
   const fetchList = useCallback(async () => {
     const mine = ++generation.current
-    if (!accountId) { setLoad({ kind: 'ready', items: [], total: 0 }); return }
+    const scope = accountScope.current
+    if (!accountId) { setLoad({ kind: 'ready', items: [], total: 0, scope }); return }
     setLoad({ kind: 'loading' })
     try {
       const res = await aiReplyApi.listQa(accountId, { q: url.q, status: url.status as QaStatus | '', page, limit: size })
-      if (mine !== generation.current) return
-      setLoad({ kind: 'ready', items: res.data.items, total: res.data.total })
+      if (mine !== generation.current || accountScope.current !== scope) return
+      setLoad({ kind: 'ready', items: res.data.items, total: res.data.total, scope })
     } catch (error) {
-      if (mine !== generation.current) return
+      if (mine !== generation.current || accountScope.current !== scope) return
       setLoad({ kind: 'error', error })
     }
   }, [accountId, url.q, url.status, page, size])
 
   useEffect(() => { void fetchList() }, [fetchList])
+  useEffect(() => { setPending(null); setPendingBusy(false); setPendingError('') }, [accountId])
 
   const runPending = async () => {
-    if (!pending) return
+    if (!pending || pending.scope !== accountScope.current || pendingBusy) return
     setPendingBusy(true)
     setPendingError('')
     try {
-      if (pending.kind === 'publish') await aiReplyApi.publishQa(accountId, pending.entry.id, pending.entry.version)
-      else if (pending.kind === 'stop') await aiReplyApi.stopQa(accountId, pending.entry.id, pending.entry.version)
-      else await aiReplyApi.deleteQa(accountId, pending.entry.id, pending.entry.version)
+      if (pending.kind === 'publish') await aiReplyApi.publishQa(pending.accountId, pending.entry.id, pending.entry.version)
+      else if (pending.kind === 'stop') await aiReplyApi.stopQa(pending.accountId, pending.entry.id, pending.entry.version)
+      else await aiReplyApi.deleteQa(pending.accountId, pending.entry.id, pending.entry.version)
+      if (pending.scope !== accountScope.current) return
       notifyToast(pending.kind === 'publish' ? 'Q&A を公開しました' : pending.kind === 'stop' ? 'Q&A を止めました' : 'Q&A を削除しました')
       setPending(null)
       void fetchList()
       void ai.reload()
     } catch (caught) {
+      if (pending.scope !== accountScope.current) return
       if (!saveErrors.capture(caught)) setPendingError(describeApiFailure(caught, pending.kind === 'publish' ? '公開' : pending.kind === 'stop' ? '止める操作' : '削除'))
     } finally {
-      setPendingBusy(false)
+      if (pending.scope === accountScope.current) setPendingBusy(false)
     }
   }
 
@@ -160,7 +167,7 @@ export default function QaListV8() {
           onClose={() => setEdit(null)}
         />
         <ConfirmDialog
-          open={pending !== null}
+          open={pending !== null && pending.scope === accountScope.current}
           title={pending?.kind === 'publish' ? `「${pending.entry.questions[0] ?? ''}」を公開しますか？` : pending?.kind === 'stop' ? `「${pending.entry.questions[0] ?? ''}」を止めますか？` : `「${pending?.entry.questions[0] ?? ''}」を削除しますか？`}
           description={pending?.kind === 'publish'
             ? '公開すると返信案の元になります。自動で答えるをオンにしている店では、この答えをそのまま返します。'
@@ -173,7 +180,9 @@ export default function QaListV8() {
           error={pendingError || undefined}
           onConfirm={() => void runPending()}
           onCancel={() => { if (!pendingBusy) { setPending(null); setPendingError('') } }}
-        />
+        >
+          {pending ? <OperationTargetSummary accounts={[{ id: pending.accountId }]} /> : null}
+        </ConfirmDialog>
         <QaImportDialog open={importOpen} accountId={accountId} onClose={() => setImportOpen(false)} />
       </>}
     >
@@ -207,9 +216,9 @@ export default function QaListV8() {
               const title = entry.questions[0] ?? '—'
               const items = [
                 { id: 'edit', label: '編集する', onSelect: () => { setMenuId(null); setEdit({ entry }) } },
-                ...(permissions.publishQa && entry.status !== 'published' ? [{ id: 'publish', label: '公開する', onSelect: () => { setMenuId(null); setPending({ kind: 'publish', entry }) } }] : []),
-                ...(permissions.publishQa && entry.status === 'published' ? [{ id: 'stop', label: '止める', onSelect: () => { setMenuId(null); setPending({ kind: 'stop', entry }) } }] : []),
-                ...(permissions.publishQa ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: () => { setMenuId(null); setPending({ kind: 'delete', entry }) } }] : []),
+                ...(permissions.publishQa && entry.status !== 'published' ? [{ id: 'publish', label: '公開する', onSelect: () => { setMenuId(null); if (accountId && load.scope === accountScope.current) setPending({ kind: 'publish', entry, accountId, scope: load.scope }) } }] : []),
+                ...(permissions.publishQa && entry.status === 'published' ? [{ id: 'stop', label: '止める', onSelect: () => { setMenuId(null); if (accountId && load.scope === accountScope.current) setPending({ kind: 'stop', entry, accountId, scope: load.scope }) } }] : []),
+                ...(permissions.publishQa ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: () => { setMenuId(null); if (accountId && load.scope === accountScope.current) setPending({ kind: 'delete', entry, accountId, scope: load.scope }) } }] : []),
               ]
               return (
                 <Tr key={entry.id} data-row-id={entry.id} onClick={permissions.editQa ? () => setEdit({ entry }) : undefined}>

@@ -191,7 +191,7 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     expect(screen.getByRole('heading', { name: '足りないもの' })).toBeTruthy()
     expect(screen.getByText('トップ：面 B の動きが未設定')).toBeTruthy()
     expect(screen.getByText('タブA：予約：面が未設定')).toBeTruthy()
-    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: '②で決める' })[0]) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'ボタンの動きを設定する' })[0]) })
     await settle()
     expect(screen.getByRole('heading', { name: '面 B「会員証」の動き' })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: '足りないもの' })).toBeNull()

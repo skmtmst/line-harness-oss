@@ -14,6 +14,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -134,7 +135,15 @@ function EventsCreateV8Inner() {
   })
   const completedSlotRef = useRef<{ accountId: string; eventId: string; cache: InitialSlotCache } | null>(null)
   const createdRef = useRef<{ accountId: string; event: EventDetail; payload: string } | null>(null)
-  const [publishOpen, setPublishOpen] = useState(false)
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
+  const [publishTarget, setPublishTarget] = useState<{ accountIds: string[]; generation: number } | null>(null)
+  const targetIds = selectedAccountId ? resolveEventMultiAccountIds(draft, selectedAccountId) ?? [selectedAccountId] : []
+  const targetIdsRef = useRef(targetIds)
+  targetIdsRef.current = targetIds
+  useEffect(() => { setPublishTarget(null) }, [selectedAccountId])
   const [unknownCreateAccounts, setUnknownCreateAccounts] = useState<Set<string>>(new Set())
   const unknownCreateRef = useRef(new Set<string>())
   const createUnknown = Boolean(selectedAccountId && unknownCreateAccounts.has(selectedAccountId))
@@ -226,7 +235,7 @@ function EventsCreateV8Inner() {
       })
       feedback.success('イベントと最初の予約枠')
       initialRef.current = snapshot
-      setPublishOpen(false)
+      setPublishTarget(null)
       router.push(`/events?highlight=${encodeURIComponent(eventId)}`)
       return true
     } catch (cause) {
@@ -311,7 +320,7 @@ function EventsCreateV8Inner() {
         <>
           <Button href="/events">キャンセル</Button>
           <Button disabled={saving || !selectedAccountId || createUnknown} busy={saving && !savingPublished} onClick={() => void save(false)}>下書きを保存</Button>
-          <Button variant="primary" disabled={saving || !selectedAccountId || createUnknown} busy={saving && savingPublished} onClick={() => { if (validateInput()) setPublishOpen(true) }}><Globe size={16} aria-hidden="true" />公開する</Button>
+          <Button variant="primary" disabled={saving || !selectedAccountId || createUnknown} busy={saving && savingPublished} onClick={() => { if (validateInput() && selectedAccountId) setPublishTarget({ accountIds: targetIds, generation: accountScope.current.generation }) }}><Globe size={16} aria-hidden="true" />公開する</Button>
         </>
       )} dirty={false}
     >
@@ -541,7 +550,12 @@ function EventsCreateV8Inner() {
       </Card>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したイベント" onConfirm={confirmLeave} onCancel={cancelLeave} />
-      <ConfirmDialog open={publishOpen} title="イベントを公開する" description="イベントを公開し、お客さまが申し込めるようにします。内容を確かめてください。" confirmLabel="公開する" busy={saving} confirmDisabled={createUnknown} confirmDisabledReason="閉じて一覧で作成結果を確認してください。" error={error || undefined} onSuccess={() => setPublishOpen(false)} onConfirm={() => save(true)} onCancel={() => setPublishOpen(false)} />
+      <ConfirmDialog open={publishTarget !== null && publishTarget.generation === accountScope.current.generation} title="イベントを公開する" description="イベントを公開し、お客さまが申し込めるようにします。内容を確かめてください。" confirmLabel="公開する" busy={saving} confirmDisabled={createUnknown} confirmDisabledReason="閉じて一覧で作成結果を確認してください。" error={error || undefined} onSuccess={() => setPublishTarget(null)} onConfirm={() => {
+        if (!publishTarget || publishTarget.generation !== accountScope.current.generation || !canEditRef.current || JSON.stringify(publishTarget.accountIds) !== JSON.stringify(targetIdsRef.current)) return
+        return save(true)
+      }} onCancel={() => setPublishTarget(null)}>
+        {publishTarget ? <OperationTargetSummary accounts={publishTarget.accountIds.map(id => ({ id }))} /> : null}
+      </ConfirmDialog>
     </CreatePage></SaveErrorScope>
   )
 }

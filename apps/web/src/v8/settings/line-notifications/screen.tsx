@@ -30,6 +30,7 @@ import Button from '@/components/shared/button'
 import { DialogActions } from '@/components/shared/dialog'
 import { PageFooter } from '@/components/templates/page-footer'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Notice from '@/components/shared/notice'
@@ -716,6 +717,8 @@ function LineNotificationsPage() {
   const canManage = canManageRole(staffRole)
   const manageLockReason = usePermissionLockReason(canManage, 'manager')
   const canChange = canManage && !manageLockReason
+  const canChangeRef = useRef(canChange)
+  canChangeRef.current = canChange
   /* 運用者へのお知らせ：板の頭の「CSVで書き出す」で開く理由の窓。 */
   const [operatorExportOpen, setOperatorExportOpen] = useState(false)
   /*
@@ -729,6 +732,8 @@ function LineNotificationsPage() {
    */
   const selectedAccountRef = useRef(selectedAccountId)
   selectedAccountRef.current = selectedAccountId
+  const testAccountScope = useRef({ accountId: selectedAccountId })
+  if (testAccountScope.current.accountId !== selectedAccountId) testAccountScope.current = { accountId: selectedAccountId }
   const tab = useMergedTab(TABS, 'tab', 'customer')
   const [settings, setSettings] = useState<EcNotificationSetting[]>([])
   // 読めたことの確かめだけに使う（WEB198：件数としては出さない）。
@@ -742,7 +747,7 @@ function LineNotificationsPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)
-  const [pendingToggle, setPendingToggle] = useState<EcNotificationSetting | null>(null)
+  const [pendingToggle, setPendingToggle] = useState<{ setting: EcNotificationSetting; accountId: string; accountName: string | null; scope: object; generation: number } | null>(null)
   const [definitionsFailed, setDefinitionsFailed] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
@@ -751,7 +756,7 @@ function LineNotificationsPage() {
    * （最大20名）へ送る。クリック即APIではなく、宛先と人数を見せる確認を挟む。
    * 開いただけでは送らない。宛先が0人・読み込み失敗のときは送信ボタンを出さない。
    */
-  const [testSendDraft, setTestSendDraft] = useState<EcNotificationSetting | null>(null)
+  const [testSendDraft, setTestSendDraft] = useState<{ setting: EcNotificationSetting; accountId: string; accountName: string | null; scope: object; generation: number } | null>(null)
   const [testRecipients, setTestRecipients] = useState<{
     state: 'loading' | 'ready' | 'error'
     items: Array<{ id: string; displayName: string; pictureUrl: string | null }>
@@ -777,10 +782,13 @@ function LineNotificationsPage() {
   // 描画ではなく操作の中で見るので、state ではなく ref に置く。
   const editFingerprintRef = useRef(new Map<string, string>())
   const loadGeneration = useRef(0)
+  const loadedAccountScope = useRef<object | null>(null)
 
   const load = useCallback(async () => {
     const generation = loadGeneration.current + 1
     loadGeneration.current = generation
+    const scope = testAccountScope.current
+    loadedAccountScope.current = null
     setLoadState('loading')
     // アカウント切替中に前のアカウントの件数を残さない。
     setSettings([])
@@ -816,7 +824,7 @@ function LineNotificationsPage() {
      * 描画のたびに同期する selectedAccountRef も見て、この load が
      * 「いま画面が向いているアカウントのものか」を確かめる。
      */
-    const stale = () => generation !== loadGeneration.current || selectedAccountId !== selectedAccountRef.current
+    const stale = () => generation !== loadGeneration.current || selectedAccountId !== selectedAccountRef.current || scope !== testAccountScope.current
     // N-341: 運用者タブの件数だけ先に実数で取る。顧客タブの成否とは切り分ける。
     try {
       const operatorRes = await api.lineNotifications.operatorRules.list(selectedAccountId)
@@ -932,6 +940,7 @@ function LineNotificationsPage() {
         setDirtyEvents(restoredEvents)
         notifySaved(`未保存の編集を${formatNumber(restoredEvents.length)}件復元しました。確認して保存してください。`)
       }
+      loadedAccountScope.current = scope
       setLoadState('ready')
       setCustomerLoadError(null)
     } catch (error) {
@@ -1179,17 +1188,19 @@ function LineNotificationsPage() {
   const openTestSendConfirm = (setting: EcNotificationSetting) => {
     if (!canChange) return
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
+    if (loadedAccountScope.current !== testAccountScope.current) return
     const accountId = selectedAccountId
     const generation = ++testRecipientGeneration.current
-    setTestSendDraft(setting)
+    const scope = testAccountScope.current
+    setTestSendDraft({ setting, accountId, accountName: selectedAccount?.id === accountId ? selectedAccount.name : null, scope, generation })
     setTestRecipients({ state: 'loading', items: [] })
     api.accountSettings.getTestRecipients(accountId).then((result) => {
       // 閉じた・開き直した・アカウント切替のあとに返った古い応答は捨てる。
-      if (generation !== testRecipientGeneration.current || accountId !== selectedAccountRef.current) return
+      if (generation !== testRecipientGeneration.current || accountId !== selectedAccountRef.current || scope !== testAccountScope.current) return
       if (result.success) setTestRecipients({ state: 'ready', items: result.data })
       else setTestRecipients({ state: 'error', items: [] })
     }).catch(() => {
-      if (generation !== testRecipientGeneration.current || accountId !== selectedAccountRef.current) return
+      if (generation !== testRecipientGeneration.current || accountId !== selectedAccountRef.current || scope !== testAccountScope.current) return
       setTestRecipients({ state: 'error', items: [] })
     })
   }
@@ -1199,7 +1210,7 @@ function LineNotificationsPage() {
   }
   const confirmTestSend = () => {
     const target = testSendDraft
-    return target ? testSend(target) : undefined
+    return canChangeRef.current && target && target.scope === testAccountScope.current && target.generation === testRecipientGeneration.current && target.accountId === selectedAccountRef.current ? testSend(target.setting) : undefined
   }
 
   const testSend = async (setting: EcNotificationSetting) => {
@@ -1290,24 +1301,21 @@ function LineNotificationsPage() {
         * 送信ボタンそのものを出さない（ConfirmDialog の作り）。
         */}
       <ConfirmDialog
-        open={testSendDraft !== null}
+        open={testSendDraft !== null && testSendDraft.scope === testAccountScope.current}
         title="テスト受信者に送信しますか？"
         description="編集中の文面を、テスト受信者として登録されている人へ送ります。お客さま全員への一斉配信ではありません。"
         confirmLabel={testRecipients.items.length > 0 ? `テスト受信者 ${formatNumber(testRecipients.items.length)}名へ送信` : 'テスト受信者に送信'}
-        busy={busy === testSendDraft?.eventType}
+        busy={busy === testSendDraft?.setting.eventType}
         error={notice?.tone === 'error' ? notice.text : testRecipients.state === 'error' ? 'テスト受信者を読み込めませんでした。時間をおいて、もう一度お試しください。' : undefined}
         onSuccess={closeTestSendConfirm}
         onConfirm={testRecipients.state === 'ready' && testRecipients.items.length > 0 ? confirmTestSend : undefined}
         onCancel={closeTestSendConfirm}
       >
+        {testSendDraft ? <OperationTargetSummary accounts={[{ id: testSendDraft.accountId, name: testSendDraft.accountName }]} /> : null}
         <dl className="space-y-3 text-sm">
           <div>
-            <dt className="text-xs font-semibold text-ink-faint">アカウント</dt>
-            <dd className="mt-0.5 text-ink">{selectedAccount?.name ?? '選択中のアカウント'}</dd>
-          </div>
-          <div>
             <dt className="text-xs font-semibold text-ink-faint">送るお知らせ</dt>
-            <dd className="mt-0.5 text-ink">「{testSendDraft?.title?.trim() || testSendDraft?.label}」</dd>
+            <dd className="mt-0.5 text-ink">「{testSendDraft?.setting.title?.trim() || testSendDraft?.setting.label}」</dd>
           </div>
           <div>
             <dt className="text-xs font-semibold text-ink-faint">宛先</dt>
@@ -1329,16 +1337,18 @@ function LineNotificationsPage() {
       * 中には置かない。
       */}
     <ConfirmDialog
-      open={pendingToggle !== null}
-      title={pendingToggle?.isEnabled ? `「${pendingToggle.label}」のお知らせを止めますか？` : `「${pendingToggle?.label ?? ''}」のお知らせを出しますか？`}
-      description={pendingToggle?.isEnabled ? '止めると、この出来事が起きてもお客さまへLINEが送られなくなります。あとからまた出せます。' : '出すと、この出来事が起きたお客さまへLINEが送られ始めます。'}
-      confirmLabel={pendingToggle?.isEnabled ? 'お知らせを止める' : 'お知らせを出す'}
-      busy={busy === pendingToggle?.eventType}
+      open={pendingToggle !== null && pendingToggle.scope === testAccountScope.current}
+      title={pendingToggle?.setting.isEnabled ? `「${pendingToggle.setting.label}」のお知らせを止めますか？` : `「${pendingToggle?.setting.label ?? ''}」のお知らせを出しますか？`}
+      description={pendingToggle?.setting.isEnabled ? '止めると、この出来事が起きてもお客さまへLINEが送られなくなります。あとからまた出せます。' : '出すと、この出来事が起きたお客さまへLINEが送られ始めます。'}
+      confirmLabel={pendingToggle?.setting.isEnabled ? 'お知らせを止める' : 'お知らせを出す'}
+      busy={busy === pendingToggle?.setting.eventType}
       error={notice?.tone === 'error' ? notice.text : undefined}
       onSuccess={() => setPendingToggle(null)}
-      onConfirm={pendingToggle ? () => save(pendingToggle, !pendingToggle.isEnabled) : undefined}
+      onConfirm={pendingToggle ? () => canChangeRef.current && pendingToggle.scope === testAccountScope.current && pendingToggle.generation === loadGeneration.current ? save(pendingToggle.setting, !pendingToggle.setting.isEnabled) : undefined : undefined}
       onCancel={() => setPendingToggle(null)}
-    />
+    >
+      {pendingToggle ? <OperationTargetSummary accounts={[{ id: pendingToggle.accountId, name: pendingToggle.accountName }]} /> : null}
+    </ConfirmDialog>
     {tab === 'customer' && !expandedSetting ? <>
     {/* 板 g3iDs：数のカード4枚（共通の KpiBand・KpiCard）。 */}
     <KpiBand presentation="band" data-design="KPIs">
@@ -1413,7 +1423,7 @@ function LineNotificationsPage() {
                 <Td><TruncatedText value={audienceLabel(setting)} /></Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
                 <StatusCell primary={<><StatusBadge tone={status.tone === 'good' ? 'success' : 'neutral'} title={status.warning ?? undefined} aria-description={status.warning ?? undefined}>{status.label}</StatusBadge>{status.warning ? <StatusDot tone="caution" /> : null}</>} />
-                <Td><NotificationToggle setting={setting} busy={busy === setting.eventType} allowed={canChange} lockedReason={manageLockReason} onToggle={() => { setNotice(null); setPendingToggle(setting) }} /></Td>
+                <Td><NotificationToggle setting={setting} busy={busy === setting.eventType} allowed={canChange} lockedReason={manageLockReason} onToggle={() => { if (!selectedAccountId || loadedAccountScope.current !== testAccountScope.current) return; setNotice(null); setPendingToggle({ setting, accountId: selectedAccountId, accountName: selectedAccount?.id === selectedAccountId ? selectedAccount.name : null, scope: testAccountScope.current, generation: loadGeneration.current }) }} /></Td>
                 <ActionCell><RowActions edit={{ onClick: () => { if (canChange) setExpanded(setting.eventType) }, disabled: !canChange, lockedReason: manageLockReason }} /></ActionCell>
               </Tr>
             })}

@@ -20,7 +20,7 @@ import type { ApiBroadcast } from '@/lib/api'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
 import { formatNumber } from '@/lib/format'
 import BroadcastPhone from './phone'
-import { CancelReservationDialog } from './detail'
+import { broadcastOperationAccounts, CancelReservationDialog } from './detail'
 import { formatBroadcastDateTime, formatShortDateTime } from './display'
 import styles from './reserved.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -136,6 +136,7 @@ export default function Reserved({
 
       <CancelReservationDialog
         open={cancelOpen}
+        broadcastId={broadcast.id} accounts={broadcastOperationAccounts(broadcast)}
         title={broadcast.title}
         description={broadcast.scheduledAt
           ? `${scheduledLabel} に送る予定の ${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)} 人`} に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。${broadcast.approvalStatus && broadcast.approvalStatus !== 'none' ? '承認はやり直しになります。' : ''}`

@@ -10,6 +10,7 @@ export interface TemplateUsages {
     scenarioName: string;
     stepId: string;
     stepOrder: number;
+    displayOrder?: number;
   }>;
   automations: Array<{ id: string; name: string; eventType: string }>;
   reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>;

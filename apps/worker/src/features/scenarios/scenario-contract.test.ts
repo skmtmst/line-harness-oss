@@ -198,6 +198,15 @@ describe('scenario API contract service', () => {
     });
   });
 
+  it('購読の通数は編集後の下書きでなく固定された公開版の順番で返す', async () => {
+    insertFriend(testDb.raw, 'friend-pin', { line_account_id: 'account-1' });
+    const snapshot = JSON.stringify([1, 3, 5].map(n => ({ version_step_id: `version-1:${n}`, step_order: n })));
+    testDb.raw.prepare(`INSERT INTO scenario_versions (id, scenario_id, version_number, steps_snapshot, published_at, created_at, updated_at) VALUES ('version-1', 'scenario-1', 1, ?, '2026-09-01', '2026-09-01', '2026-09-01')`).run(snapshot);
+    testDb.raw.prepare(`INSERT INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, updated_at, published_version_id) VALUES ('subscription-pin', 'friend-pin', 'scenario-1', 3, 'active', '2026-09-07', '2026-09-07', 'version-1')`).run();
+    const result = await getScenarioRuns(testDb.db, { scenarioId: 'scenario-1', lineAccountId: 'account-1', limit: 20, quotaFetcher: async () => ({ limit: null, used: null }) });
+    expect(result.subscriptions[0]).toMatchObject({ currentStepOrder: 3, currentDisplayOrder: 2 });
+  });
+
   it('DB失敗を成功や空状態に置き換えない', async () => {
     const broken = {
       prepare() {

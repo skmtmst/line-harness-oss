@@ -13,6 +13,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
@@ -120,15 +121,21 @@ function Bookings({ eventId }: { eventId: string }) {
   const [cancelApplicant, setCancelApplicant] = useState<{ applicant: EventOccurrenceApplicant; accountId: string } | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState('')
-  const [rejectApplicant, setRejectApplicant] = useState<EventOccurrenceApplicant | null>(null)
+  const [rejectApplicant, setRejectApplicant] = useState<{ applicant: EventOccurrenceApplicant; accountId: string } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [rejectError, setRejectError] = useState('')
-  const [waitlistDialog, setWaitlistDialog] = useState<WaitlistDialog | null>(null)
+  const [waitlistDialog, setWaitlistState] = useState<WaitlistDialog | null>(null)
+  const [waitlistAccount, setWaitlistAccount] = useState<string | null>(null)
+  const setWaitlistDialog = (next: WaitlistDialog | null) => {
+    if (next && !selectedAccountId) return
+    setWaitlistAccount(next ? selectedAccountId : null)
+    setWaitlistState(next)
+  }
   const [waitlistReason, setWaitlistReason] = useState('')
   const [waitlistBusy, setWaitlistBusy] = useState(false)
   const [waitlistError, setWaitlistError] = useState('')
   const [broadcastMessage, setBroadcastMessage] = useState('')
-  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number } | null>(null)
+  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number; accountId: string } | null>(null)
   const [broadcastConfirmOpen, setBroadcastConfirmOpen] = useState(false)
   const [broadcastBusy, setBroadcastBusy] = useState(false)
   const [broadcastError, setBroadcastError] = useState('')
@@ -413,7 +420,7 @@ function Bookings({ eventId }: { eventId: string }) {
 
   async function runWaitlistOperation() {
     if (!canChangeBookings || bookingLockReason) return
-    if (!selectedAccountId || !occurrence || !waitlistDialog || waitlistBusy) return
+    if (!selectedAccountId || selectedAccountId !== waitlistAccount || !occurrence || !waitlistDialog || waitlistBusy) return
     const trimmed = waitlistReason.trim()
     if (trimmed === '') return
     const request = operations.start('waitlist')
@@ -495,7 +502,7 @@ function Bookings({ eventId }: { eventId: string }) {
         snapshotId: applicants?.snapshotId ?? '',
       }, crypto.randomUUID())
       if (!request.isCurrent()) return
-      setBroadcastPreview({ broadcastId: result.broadcastId, recipientCount: result.recipientCount })
+      setBroadcastPreview({ broadcastId: result.broadcastId, recipientCount: result.recipientCount, accountId: selectedAccountId })
       setBroadcastConfirmOpen(true)
     } catch (saveFailure) {
       if (!request.isCurrent()) return
@@ -633,7 +640,7 @@ function Bookings({ eventId }: { eventId: string }) {
                       <RowMenu label={`${withHonorific(row.displayName ?? '申込者')}の操作`} triggerProps={{ 'data-booking-id': row.id, 'data-booking-action': 'menu' }} items={[{ id: 'reject', lockedReason: bookingLockReason, label: '断る', onSelect: () => {
                           setRejectReason('')
                           setRejectError('')
-                          setRejectApplicant(row)
+                          if (selectedAccountId) setRejectApplicant({ applicant: row, accountId: selectedAccountId })
                         }, disabled: !canChangeBookings || Boolean(busy), disabledReason: busy ? '処理を反映しています' : undefined}]} />
                     </>
                   ) : null}
@@ -780,7 +787,7 @@ function Bookings({ eventId }: { eventId: string }) {
           ]} />
         </span> : booking.status === 'requested' ? <span className={styles.recordsActions}>
           <Button variant="primary" onClick={() => void decide(row, 'confirm')} lockedReason={bookingLockReason} disabled={!canChangeBookings || busy}>承認する</Button>
-          <RowMenu label={`${withHonorific(booking.friend_display_name ?? booking.friend_name ?? '申込者')}の操作`} triggerProps={{ 'data-booking-id': booking.id, 'data-booking-action': 'menu' }} items={[{ id: 'reject', lockedReason: bookingLockReason, label: '断る', onSelect: () => { setRejectReason(''); setRejectError(''); setRejectApplicant(row) }, disabled: !canChangeBookings || busy, disabledReason: busy ? '処理を反映しています' : undefined }]} />
+          <RowMenu label={`${withHonorific(booking.friend_display_name ?? booking.friend_name ?? '申込者')}の操作`} triggerProps={{ 'data-booking-id': booking.id, 'data-booking-action': 'menu' }} items={[{ id: 'reject', lockedReason: bookingLockReason, label: '断る', onSelect: () => { setRejectReason(''); setRejectError(''); if (selectedAccountId) setRejectApplicant({ applicant: row, accountId: selectedAccountId }) }, disabled: !canChangeBookings || busy, disabledReason: busy ? '処理を反映しています' : undefined }]} />
         </span> : null}</>
       }}>
         {ready ? <>
@@ -819,18 +826,20 @@ function Bookings({ eventId }: { eventId: string }) {
           setCancelError('')
           setCancelApplicant(null)
         }}
-      />
+      >
+        {cancelApplicant ? <OperationTargetSummary accounts={[{ id: cancelApplicant.accountId }]} /> : null}
+      </ConfirmDialog>
 
       <ConfirmDialog
         key={`reject:${operationScope}`}
         open={rejectApplicant !== null}
         destructive
-        title={`「${rejectApplicant?.displayName ?? '友だちは未取得'}」の申込を断りますか？`}
+        title={`「${rejectApplicant?.applicant.displayName ?? '友だちは未取得'}」の申込を断りますか？`}
         description="理由は内部にだけ残り、友だちには送りません。友だちには決まったお知らせの文が届き、断ると枠が空きます。"
         confirmLabel="断る"
         busy={busy}
         error={rejectError}
-        onConfirm={() => rejectApplicant && void decide(rejectApplicant, 'reject')}
+        onConfirm={() => rejectApplicant && rejectApplicant.accountId === selectedAccountId && void decide(rejectApplicant.applicant, 'reject')}
         onCancel={() => {
           if (busy) return
           setRejectError('')
@@ -838,6 +847,7 @@ function Bookings({ eventId }: { eventId: string }) {
           setRejectApplicant(null)
         }}
       >
+        {rejectApplicant ? <OperationTargetSummary accounts={[{ id: rejectApplicant.accountId }]} /> : null}
         {rejectApplicant ? (
           <Field label="断る理由（・内部メモ）"><SaveErrorField names={["rejectReason","reject_reason"]}><TextArea
               value={rejectReason}
@@ -876,6 +886,7 @@ function Bookings({ eventId }: { eventId: string }) {
           setWaitlistDialog(null)
         }}
       >
+        {waitlistDialog && waitlistAccount ? <OperationTargetSummary accounts={[{ id: waitlistAccount }]} /> : null}
         {waitlistDialog ? (
           <>
             {waitlistDialog.kind === 'reorder' ? (
@@ -943,7 +954,9 @@ function Bookings({ eventId }: { eventId: string }) {
           setBroadcastError('')
           setBroadcastConfirmOpen(false)
         }}
-      />
+      >
+        {broadcastPreview ? <OperationTargetSummary accounts={[{ id: broadcastPreview.accountId }]} /> : null}
+      </ConfirmDialog>
     </DetailPage></SaveErrorScope>
   )
 }

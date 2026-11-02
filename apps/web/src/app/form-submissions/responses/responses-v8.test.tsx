@@ -9,6 +9,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fetchApi = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ current: 'acc-1' }))
 const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.current, canManageRole: (value: string | null) => value === 'owner' || value === 'admin' }))
 
@@ -29,7 +30,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: account.current, loading: false }),
 }))
 
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {}, usePageChrome: () => ({}) }))
@@ -104,6 +105,7 @@ function tabButton(label: string): HTMLButtonElement | undefined {
 
 beforeEach(() => {
   fetchApi.mockClear()
+  account.current = 'acc-1'
   role.current = verifiedStaffRole('owner')
   document.documentElement.dataset.theme = 'v8'
   fetchApi.mockImplementation((async (url: string) => {
@@ -242,6 +244,19 @@ it.each([false, true])('回答の%sから確認し、取消は送らない', asy
   expect(dialog.textContent).toContain(target.friendName)
   expect(dialog.textContent).toContain('の回答と添付')
   await act(async () => allButtons().find(b => b.textContent === 'キャンセル')!.click()); await settle()
+  expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+})
+it('回答削除の確認に実際の対象と環境を出し、アカウント切替後の古い確定を拒む', async () => {
+  await rowView(); await openResponseDelete()
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+  expect(dialog.textContent).toContain('LINEアカウント')
+  expect(dialog.textContent).toContain('環境')
+  expect(dialog.querySelector('[title="acc-1"]')).toBeTruthy()
+  await act(async () => { account.current = 'acc-2'; root.render(<FormResponsesPage />) }); await settle()
+  expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+  await act(async () => { account.current = 'acc-1'; root.render(<FormResponsesPage />) }); await settle()
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
   expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
 })
 it('二重押下は1要求。失敗は窓を残してやり直し、成功後は再読込', async () => {

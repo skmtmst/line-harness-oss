@@ -379,7 +379,7 @@ export function describePicked(items: EntityPickerItem[], folders: EntityPickerF
   }
   if (!value) return { name: '', meta: '', missing: false }
   const item = items.find((candidate) => candidate.id === value)
-  if (!item) return items.length ? { name: '見つかりません', meta: '消されたか、使えなくなりました。選び直してください。', missing: true } : { name: '読み込み中…', meta: '', missing: false }
+  if (!item) return items.length ? { name: '現在は選べません', meta: '選び直してください。', missing: true } : { name: '読み込み中…', meta: '', missing: false }
   const folder = item.folderId ? folders.find((entry) => entry.id === item.folderId) : null
   return { name: item.name, meta: item.folderId === null ? 'フォルダ：未分類' : folder ? `フォルダ：${folder.name}` : item.meta ?? '', missing: false }
 }

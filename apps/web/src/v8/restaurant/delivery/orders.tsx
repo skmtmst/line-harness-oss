@@ -610,7 +610,7 @@ export default function OrdersBoard({
 
       {/* 閲覧のみの人は選べないので、まとめての帯は出さない。選んだ数の帯は共通の一括バー。 */}
       {canManage ? (
-        <BulkBar count={checkedCount} unit="件">
+        <BulkBar count={checkedCount} unit="件" onClear={() => onToggleSelectAll(false)}>
           <Button variant="primary" busy={bulkBusy} busyLabel="受付中…" disabled={bulkBusy} onClick={onBulkAccept}>
             まとめて受け付ける
           </Button>

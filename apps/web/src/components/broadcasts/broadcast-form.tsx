@@ -1463,6 +1463,7 @@ export default function BroadcastForm({
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
+          {currentStep === 'schedule' ? <Button type="button" disabled={saving || composerBusy} onClick={() => goToStep('message')}>メッセージへ戻る</Button> : null}
           <Button variant="secondary" type="button" disabled={saving || composerBusy} onClick={() => saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={16} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" disabled={composerBusy || nextBlockReason !== null} aria-describedby={nextBlockReason ? 'broadcast-footer-reason' : undefined} onClick={() => { if (nextBlockReason === null) goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)]) }}>

@@ -132,7 +132,7 @@ it('HQ coupon read failure shows retry instead of no coupons',async()=>{
  render(<HqBroadcastCreate/>);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'人工配信'}})
  fireEvent.click(screen.getByRole('button',{name:'対象設定へ'}));await selectAccounts('銀座店')
  fireEvent.click(screen.getByRole('button',{name:'メッセージ設定へ'}))
- fireEvent.click(screen.getByRole('tab',{name:'その他',exact:true}))
+ fireEvent.click(screen.getByRole('tab',{name:'クーポン',exact:true}))
  const error=await screen.findByText('クーポンを読み込めませんでした')
  fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
  await waitFor(()=>expect(screen.queryByText('クーポンを読み込めませんでした')).toBeNull())

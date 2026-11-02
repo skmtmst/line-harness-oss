@@ -58,7 +58,7 @@ export function totals(party: PartyState, first: MenuItem) {
 /** 全員が同じ担当を指名したら続けて受ける（時間が直列になる）。 */
 export function sameStaffSequence(party: PartyState): boolean {
   const ids = party.members.map((m) => m.staff?.id ?? null);
-  return party.size > 1 && ids.every((id) => id !== null && id === ids[0]);
+  return party.size > 1 && party.members.every((member) => member.designated) && ids.every((id) => id !== null && id === ids[0]);
 }
 
 export const personLabel = (index: number): string => (index === 0 ? '1 人目（あなた）' : `${index + 1} 人目（お連れさま）`);

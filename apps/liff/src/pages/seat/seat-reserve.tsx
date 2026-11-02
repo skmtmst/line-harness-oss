@@ -3,6 +3,7 @@ import { useRequestGeneration } from '../../lib/use-request-generation.js';
 import { FieldError } from '../../components/forms/controls.js';
 import CourseChoice from '../../components/course-choice.js';
 import Card from '../../components/ui/card.js';
+import Badge from '../../components/ui/badge.js';
 import { useUrlStep } from '../../lib/use-url-step.js';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -470,7 +471,7 @@ export default function SeatReserve() {
               {referrals.map(r=><Card key={r.storeId} className="space-y-4 p-6">
                 <div className="space-y-0.5"><h3 className="truncate text-[15px] leading-[23px] font-bold text-ink" title={r.storeName}>{r.storeName}</h3><p className="text-xs leading-[18px] text-liff-sub">{r.distanceKm.toFixed(1)}km</p></div>
                 <div className="space-y-2.5">
-                  <Button variant="restaurant-time" disabled aria-label="案内先の時刻">{zonedParts(r.startsAt,store.timezone).hm}</Button>
+                  <Badge tone="confirmed" size="md">{`${zonedParts(r.startsAt,store.timezone).hm} 空きあり`}</Badge>
                   <div><Button variant="restaurant-control" disabled={busy} onClick={async()=>{
                     if(busyRef.current)return;busyRef.current=true;setBusy(true);setReferralError(false);
                     try {const next=await restaurantBookingApi.referral({storeId:store.id,targetStoreId:r.storeId,date,startsAt:r.startsAt,guestCount,courseId});window.location.assign(next.data.bookingUrl);}

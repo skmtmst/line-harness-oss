@@ -251,8 +251,8 @@ function MenuEditBody() {
               <Field label={course ? '1名の値段' : '値段'} htmlFor="rs-menu-price" required error={draft.price !== '' && Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : undefined}>
                 <SaveErrorField names={['price', 'draft.price']}><NumberInput id="rs-menu-price" aria-label="価格（税込）" unit="円" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></SaveErrorField>
               </Field>
-              <Field label="時間" htmlFor="rs-menu-duration">
-                <TextField id="rs-menu-duration" aria-label="時間" readOnly aria-readonly="true" value={editing?.duration_minutes ? `${editing.duration_minutes} 分` : emptyValue('unknown')} />
+              <Field label="所要時間（変更不可）" htmlFor="rs-menu-duration" optional={false}>
+                <TextField id="rs-menu-duration" aria-label="時間" disabled value={editing?.duration_minutes ? `${editing.duration_minutes} 分` : emptyValue('unknown')} />
               </Field>
             </SettingsFormRow>
             <SettingsFormRow layout="columns" columns={3}>

@@ -13,12 +13,11 @@ import { useMemo, useState } from 'react'
 import { CircleHelp, Download, MousePointerClick, Send, Users } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { api, type AnalyticsMetric, type AnalyticsReactionsOverview } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { RangePickerV8, dataRangeCaption, shortDateTime } from './common'
-import { METRIC_STATE_TEXT, downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
+import { METRIC_STATE_TEXT, downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport, CsvExportButton } from './parts'
 import styles from './analytics.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { useReportPeriod } from '@/components/shared/period-picker'
@@ -59,7 +58,8 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
     ])
   }
   const exportDisabled = !overview || overview.campaigns.length === 0
-  useRegisterExport(exportCampaigns, exportDisabled)
+  const exportReason = state.loading ? '集計結果を読み込んでいます。' : state.error || 'この期間に書き出せる配信はありません。'
+  useRegisterExport(exportCampaigns, exportDisabled, exportReason)
 
   if (!state.data || !overview) {
     return <div className={styles.body}>
@@ -87,7 +87,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
         <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
         <span className={styles.caption} title={`データ締切 ${state.data.dataCutoffAt}`}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
-        <Button variant="secondary" onClick={exportCampaigns} disabled={exportDisabled}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
+        <CsvExportButton variant="secondary" onClick={exportCampaigns} disabled={exportDisabled} disabledReason={exportReason}><Download size={16} aria-hidden="true" />CSVで書き出す</CsvExportButton>
       </div>
       <p className={styles.caption}>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。{truncationNote ? ` ${truncationNote}までを表示しています。それより古い配信は一覧にも CSV にも入りません。` : ''}</p>
       <div className={styles.table} role="table" aria-label="配信ごとの反応">

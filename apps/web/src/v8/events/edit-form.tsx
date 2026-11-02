@@ -14,7 +14,8 @@ import OgEditor from '@/components/shared/og-editor';
 import { useAccount } from '@/contexts/account-context';
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from '@/components/events/bulk-slot-generator';
 import { splitBand } from '@/components/events/jst';
-import ConfirmDialog from '@/components/shared/confirm-dialog';
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import Dialog from '@/components/shared/dialog';
@@ -36,6 +37,7 @@ import ListState from '@/components/shared/list-state';
 import { Tabs } from '@/components/shared/tabs';
 import { TextArea } from '@/components/shared/text-field';
 import { EVENT_CANCEL_DEADLINE_OPTIONS, EVENT_DEFAULT_DRAFT, EVENT_DESCRIPTION_MAX_LENGTH, EVENT_ENTRY_CUTOFF_OPTIONS, EVENT_NAME_MAX_LENGTH, deadlineOptionsWithSaved, deadlineSelectValue, parseDeadlineSelect } from '@/components/events/event-draft-shared';
+import { eventOperationAccounts } from '@/components/events/event-draft-shared';
 
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -358,7 +360,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           if (draft.version !== previousRevision) setError('振替の決まりは保存しました。クラスの概要はほかの人が更新しています。概要の入力を控えて開き直してから保存してください。')
         }} />
       </> : null} /> : null}
-    {tab === 'slots' ? <SlotsTab accountId={accountId} eventId={eventId} slots={slots} setSlots={setSlots} /> : null}
+    {tab === 'slots' ? <SlotsTab accountId={accountId} eventId={eventId} slots={slots} setSlots={setSlots} operationAccounts={eventOperationAccounts(savedDraft, accountId)} /> : null}
     {tab === 'publish' ? <PublishTab draft={draft} update={update} tags={tags} /> : null}
     {tab !== 'slots' ? <StickyBar destructive={tab === 'overview' && eventId && canDelete ? <Button variant="danger" onClick={() => { setDeleteError(''); setDeleteOpen(true) }} disabled={saving}>削除する</Button> : undefined} status={tab === 'overview'
       /* 変更のときは左端に［削除する］が入り幅が足りないので、説明の文は出さない（ボタンの名前で分かる）。 */
@@ -370,7 +372,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         </Button>
       </>} /> : null}
  <ConfirmDialog open={deleteOpen} title={`「${draft.name || 'このイベント'}」を削除しますか？`} description="削除すると元に戻せません。申込中・確定済みの予約やキャンセル待ちがあるときは削除できません。"
-      confirmLabel="削除する" destructive busy={deleteBusy} error={deleteError || undefined} onCancel={() => { if (!deleteBusy) setDeleteOpen(false) }} onConfirm={() => void removeEvent()} />
+      confirmLabel="削除する" destructive busy={deleteBusy} error={deleteError || undefined} onCancel={() => { if (!deleteBusy) setDeleteOpen(false) }} onConfirm={() => void removeEvent()}><OperationTargetSummary showAccountCount accounts={eventOperationAccounts(savedDraft, accountId)} /></ConfirmDialog>
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="イベントへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </></SaveErrorScope>
 }
@@ -534,11 +536,13 @@ export function SlotsTab({
   eventId,
   slots,
   setSlots,
+  operationAccounts,
 }: {
   accountId: string
   eventId: string | null
   slots: EventSlot[]
   setSlots: (s: EventSlot[]) => void
+  operationAccounts?: Array<{ id: string }>
 }) {
   const saveErrors = useSaveFormErrors()
   const [busy, setBusy] = useState(false)
@@ -810,7 +814,7 @@ export function SlotsTab({
           setDeleteSlotError('')
           setDeleteSlotTarget(null)
         }}
-      />
+      ><OperationTargetSummary showAccountCount accounts={operationAccounts ?? [{ id: '' }]} /></ConfirmDialog>
 
       <ConfirmDialog
         open={bulkPreview !== null}
@@ -833,7 +837,7 @@ export function SlotsTab({
           setBulkDone(0)
           setBulkPreview(null)
         }}
-      />
+      ><OperationTargetSummary showAccountCount accounts={operationAccounts ?? [{ id: '' }]} /></ConfirmDialog>
     </FormSection></SaveErrorScope>
   )
 }

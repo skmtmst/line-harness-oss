@@ -92,7 +92,7 @@ it('全件の選択を待つ間に権限を往復しても前の選択を復活�
   fx.list.mockResolvedValueOnce(answer([friend], 2)).mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
   const view = await open()
   fireEvent.click(screen.getByRole('checkbox', { name: '山田さんを選ぶ' }))
-  fireEvent.click(screen.getByRole('button', { name: '2人すべてを選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '条件に合う2人すべてを選ぶ' }))
   await waitFor(() => expect(fx.list).toHaveBeenCalledTimes(2))
   fx.role = 'viewer'; view.rerender(<List />)
   fx.role = 'owner'; view.rerender(<List />)
