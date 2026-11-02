@@ -39,8 +39,7 @@ describe('V8 Mu8qW イベント申込者の次行動と安全なキャンセル'
 
   it('拒否理由をブラウザ標準の窓で聞かず、届く範囲が分かる窓で確認する', () => {
     expect(CODE).not.toContain('window.prompt')
-    expect(CODE).toContain('setRejectApplicant({ applicant: row, accountId: selectedAccountId })')
-    expect(CODE).toContain('rejectApplicant.accountId === selectedAccountId')
+    expect(CODE).toMatch(/setRejectApplicant\(\{ applicant: row, accountId: selectedAccountId \}\)[\s\S]*?onConfirm=\{\(\) => rejectApplicant && rejectApplicant\.accountId === selectedAccountId && void decide\(rejectApplicant\.applicant, 'reject'\)/)
     expect(CODE).toContain('open={rejectApplicant !== null}')
     // 書いた理由がどこへ行くのか。prompt には書く場所が無かった。
     expect(CODE).toContain('理由は内部にだけ残り')

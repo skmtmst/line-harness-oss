@@ -268,7 +268,7 @@ it('イベントの削除確認に操作先と環境を出す', async () => {
   await act(async () => root.render(<EventForm accountId="account-a" eventId="event-1" />))
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
   await click('削除する')
-  let dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
+  const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
   expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
   expect(await screen.findByText('店B')).toBeTruthy()
   expect(screen.getByText('2件')).toBeTruthy()
@@ -277,12 +277,10 @@ it('イベントの削除確認に操作先と環境を出す', async () => {
 it('予約枠の削除確認に操作先と環境を出す', async () => {
   st.getEvent.mockResolvedValue({ ...ev, target_type: 'multi-account-dedup', account_ids: '["account-a","account-b"]' })
   await renderSlots()
-  let dialog: Element
-
   const row = host.querySelector('tbody tr')!
   await act(async () => { (row.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement).click() })
   await act(async () => { (await screen.findByRole('menuitem', { name: '削除する' })).click() })
-  dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
+  const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
   expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
   expect(await screen.findByText('店B')).toBeTruthy()
   expect(screen.getByText('2件')).toBeTruthy()
