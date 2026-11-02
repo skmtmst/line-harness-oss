@@ -371,10 +371,13 @@ function healthStatus(input: {
   heartbeatMinutes: number;
   heartbeatStatus: 'running' | 'succeeded' | 'failed' | null;
 }): OperationHealthStatus {
+  // このdispatcherに処理待ちがない間は、heartbeatが未作成・古いだけでは
+  // 配信障害ではない。永続的な失敗行だけは仕事の有無と無関係に示す。
+  if (input.counts.dead > 0) return 'danger';
+  if (input.counts.queued + input.counts.sending + input.counts.retrying === 0) return 'normal';
   if (
     input.heartbeatStatus === null
     || input.heartbeatStatus === 'failed'
-    || input.counts.dead > 0
     || input.delayMinutes >= DANGER_MINUTES
     || input.heartbeatMinutes >= DANGER_MINUTES
   ) return 'danger';

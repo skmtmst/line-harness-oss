@@ -812,7 +812,7 @@ export async function enqueuePendingOperationAlertNotifications(
   }>();
   for (const event of events.results ?? []) {
     const recipients = await db.prepare(
-      `SELECT sm.id, sm.email, sm.line_user_id
+      `SELECT sm.id, sm.email, sm.line_user_id, sm.notification_preferences
          FROM staff_members sm
          JOIN line_accounts la ON la.id = ?
         WHERE sm.is_active = 1 AND sm.role IN ('owner', 'admin')
@@ -827,7 +827,7 @@ export async function enqueuePendingOperationAlertNotifications(
         ORDER BY sm.id`,
     ).bind(
       event.line_account_id, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, event.line_account_id,
-    ).all<{ id: string; email: string | null; line_user_id: string | null }>();
+    ).all<{ id: string; email: string | null; line_user_id: string | null; notification_preferences: string }>();
     // 解消の直後の再発は、解消の知らせとまとめて1通にする。
     const flapSuppressed = event.action === 'reopened'
       && await operationAlertResolvedRecently(db, {
@@ -844,8 +844,13 @@ export async function enqueuePendingOperationAlertNotifications(
     const statements: D1PreparedStatement[] = [];
     let missingContactCount = 0;
     for (const recipient of recipients.results ?? []) {
+      let preferences: Record<string, { line?: boolean; email?: boolean }> = {};
+      try {
+        preferences = JSON.parse(recipient.notification_preferences) as typeof preferences;
+      } catch { /* 旧データや破損値は従来の既定値を使う */ }
+      const operations = preferences?.operations;
       if (!recipient.line_user_id && !recipient.email) missingContactCount += 1;
-      if (recipient.line_user_id && !suppressed
+      if (recipient.line_user_id && operations?.line !== false && !suppressed
         && !(await operationAlertNotifiedRecently(db, {
           alertId: event.alert_id, action: event.action, staffId: recipient.id, channel: 'line', since,
         }))) statements.push(db.prepare(
@@ -854,7 +859,7 @@ export async function enqueuePendingOperationAlertNotifications(
             next_attempt_at, created_at, updated_at)
          VALUES (?, ?, ?, ?, 'line', 'queued', 0, ?, ?, ?)`,
       ).bind(crypto.randomUUID(), event.id, event.line_account_id, recipient.id, now, now, now));
-      if (recipient.email && !suppressed
+      if (recipient.email && operations?.email !== false && !suppressed
         && !(await operationAlertNotifiedRecently(db, {
           alertId: event.alert_id, action: event.action, staffId: recipient.id, channel: 'email', since,
         }))) statements.push(db.prepare(
