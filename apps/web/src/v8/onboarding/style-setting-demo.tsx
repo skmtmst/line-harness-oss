@@ -13,7 +13,8 @@ type Example = { area: string; open: string; field: string; value: string; save:
 const reservation = (value: string): Example => ({ area: '予約設定', open: value, field: 'メニュー名', value, save: '変更を保存する', steps: ['予約設定を開く', 'メニューを選ぶ', 'メニュー名を入力する', '変更を保存する'] })
 const examples: Record<AccountStyle, Example> = {
   restaurant: { area: '座席・卓管理', open: '卓を作る', field: '表示名', value: '2人卓', save: '追加する', steps: ['座席・卓管理を開く', '卓を作る', '卓番を入力する', '表示名を入力する', '追加する'] },
-  salon: reservation('カット'), consult: reservation('初めてのご相談'), standard: reservation('ご相談'),
+  salon: reservation('カット'), consult: reservation('初めてのご相談'),
+  standard: { area: 'タグ', open: 'タグを作る', field: 'タグ名', value: 'お知らせ希望', save: 'タグを作る', steps: ['タグを開く', 'タグを作る', 'タグ名を入力する', '作成を確定する'] },
   lesson: { area: 'イベント予約', open: 'イベントを作る', field: 'イベント名', value: 'ヨガレッスン', save: '下書きを保存', steps: ['イベント予約を開く', 'イベントを作る', 'イベント名などを入力する', '下書きを保存する'] },
   ec: { area: 'タグ', open: 'タグを作る', field: 'タグ名', value: 'リピーター', save: 'タグを作る', steps: ['タグを開く', 'タグを作る', 'タグ名を入力する', '作成を確定する'] },
 }
@@ -44,10 +45,10 @@ export default function StyleSettingDemo({ style }: { style: AccountStyle }) {
     <Card layout="vertical" padding="compact">
     <Card surface="muted" layout="vertical" padding="default" gap="normal">
       <div className={styles.canvas} aria-hidden="true" inert>
-        <aside className={styles.sidebar}><strong>musubo</strong><div><LayoutDashboard size={15} /> ダッシュボード</div><div><CalendarDays size={15} /> 予約</div><div><Users size={15} /> 友だち</div><div className={`${styles.menuItem} ${step === 0 ? styles.active : ''}`}>{example.area}{step === 0 && <Hand className={styles.hand} size={22} />}</div></aside>
+        <aside className={styles.sidebar}><strong>musubo</strong><div><LayoutDashboard size={15} /> ダッシュボード</div>{style !== 'standard' && style !== 'ec' && <div><CalendarDays size={15} /> 予約</div>}<div><Users size={15} /> 友だち</div><div className={`${styles.menuItem} ${step === 0 ? styles.active : ''}`}>{example.area}{step === 0 && <Hand className={styles.hand} size={22} />}</div></aside>
         <div className={styles.screen}><header className={styles.screenHead}><div><small>設定</small><h4>{example.area}</h4></div><div className={step === 1 ? styles.active : ''}><Button variant="primary">{example.open}</Button>{step === 1 && <Hand className={styles.hand} size={22} />}</div></header>
           <div className={styles.board}><strong>{example.area}</strong><p>設定した内容をここで確認できます。</p>
-          {editing && <div className={styles.form}><strong>{style === 'restaurant' ? '新しい卓' : style === 'lesson' ? 'イベントを作る' : style === 'ec' ? 'タグを作る' : '予約メニューを直す'}</strong>
+          {editing && <div className={styles.form}><strong>{style === 'restaurant' ? '新しい卓' : style === 'lesson' ? 'イベントを作る' : (style === 'ec' || style === 'standard') ? 'タグを作る' : '予約メニューを直す'}</strong>
             {style === 'restaurant' && <div className={step === 2 ? styles.active : ''}><Field label="卓番" required><TextInput value="1" readOnly /></Field>{step === 2 && <Hand className={styles.hand} size={22} />}</div>}
             <div className={!saving && (style !== 'restaurant' || step === 3) ? styles.active : ''}><Field label={example.field} required><TextInput value={step >= (style === 'restaurant' ? 3 : 2) ? example.value : ''} readOnly /></Field>{!saving && (style !== 'restaurant' || step === 3) && <Hand className={styles.hand} size={22} />}</div>
             <div className={`${styles.buttonTarget} ${saving ? styles.active : ''}`}><Button variant="primary">{example.save}</Button>{saving && <Hand className={styles.hand} size={22} />}</div>

@@ -174,3 +174,24 @@ it('はじめの質問のデモで選ぶと、選択を渡し選択済みボタ�
   await waitFor(() => expect(document.activeElement).toBe(selected))
   expect(within(dialog).getByText('選んでいるスタイル：飲食店')).toBeTruthy()
 })
+
+it.each([0, 1, 2, 3, 4])('デモの %i ページからスタイルを選べる', page => {
+  render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  for (let index = 0; index < page; index++) fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+  fireEvent.click(screen.getByRole('button', { name: 'このスタイルにする' }))
+  expect(calls.choose).toHaveBeenCalledExactlyOnceWith('restaurant')
+  expect(calls.save).not.toHaveBeenCalled()
+})
+
+
+it.each(['standard', 'ec'] as const)('%s のデモに予約の言葉を出さない', style => {
+  render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+  view(style)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  for (let index = 0; index < 5; index++) {
+    const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+    expect(dialog.textContent).not.toContain('予約')
+    if (index < 4) fireEvent.click(within(dialog).getByRole('button', { name: '次のページ' }))
+  }
+})
