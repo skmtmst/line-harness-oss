@@ -115,10 +115,20 @@ it('対応一覧の取得失敗は 0 件とせず不明を示す', async () => {
   await render()
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
   expect(container.querySelector('tbody tr')!.children[3].textContent).not.toContain('0 件')
-  expect(container.textContent).toContain('対応件数を取得できませんでした')
+  expect(container.textContent).toContain('対応件数：表示できませんでした')
+  expect(container.textContent).not.toContain('機能設定')
   attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { unhandledChats: 1, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 0 } }] } })
   await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === 'もう一度読み込む')!.click() })
   expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('1 件')
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
+})
+
+it('対応件数が権限不足なら管理者への案内を出し再試行しない', async () => {
+  attention.mockRejectedValue({ status: 403 })
+  await render()
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  expect(container.textContent).toContain('統括の管理者に頼んでください')
+  expect([...container.querySelectorAll('button')].some(button => button.textContent === 'もう一度読み込む')).toBe(false)
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
 })
 
@@ -140,6 +150,22 @@ it('接続情報を更新したら対応件数も取り直す', async () => {
   await act(async () => { await Promise.resolve() })
   expect(attention.mock.calls.length).toBeGreaterThanOrEqual(2)
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('0 件')
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
+})
+
+it('更新中に古い対応件数が届いても表示しない', async () => {
+  let resolveOld!: (value: unknown) => void
+  let resolveUpdate!: (value: unknown) => void
+  attention.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    .mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { unhandledChats: 0, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 0 } }] } })
+  checkConnection.mockImplementationOnce(() => new Promise(resolve => { resolveUpdate = resolve }))
+  await render()
+  await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === '更新する')!.click() })
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  await act(async () => { resolveOld({ success: true, data: { items: [{ accountId: 'acc-1', counts: { unhandledChats: 9, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 0 } }] } }) })
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toBe('—')
+  await act(async () => { resolveUpdate({ success: true }) })
   expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('0 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
 })

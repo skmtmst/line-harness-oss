@@ -89,7 +89,8 @@ export default function HqHomeV8() {
   const [reloadKey, setReloadKey] = useState(0)
   const [attentionCounts, setAttentionCounts] = useState<Record<string, number> | null>(null)
   const [attentionKey, setAttentionKey] = useState(0)
-  const [attentionError, setAttentionError] = useState(false)
+  const [attentionError, setAttentionError] = useState<unknown>(null)
+  const [attentionRefreshing, setAttentionRefreshing] = useState(false)
   const attentionEpoch = useRef(0)
   const [editingAccount, setEditingAccount] = useState<AccountWithStats | null>(null)
   const [settingsAccount, setSettingsAccount] = useState<AccountWithStats | null>(null)
@@ -146,10 +147,10 @@ export default function HqHomeV8() {
     let cancelled = false
     const epoch = attentionEpoch.current
     setAttentionCounts(null)
-    setAttentionError(false)
+    setAttentionError(null)
     void hqStyleApi.attention().then((result) => {
       if (cancelled || epoch !== attentionEpoch.current) return
-      if (!result.success) { setAttentionError(true); return }
+      if (!result.success) { setAttentionError(new Error('attention failed')); return }
       const kinds = ['unhandledChats', 'pendingBookings', 'unpaid', 'connections', 'stoppedDeliveries'] as const
       const counts: Record<string, number> = {}
       for (const item of result.data.items) {
@@ -159,7 +160,7 @@ export default function HqHomeV8() {
         }
       }
       setAttentionCounts(counts)
-    }).catch(() => { if (!cancelled && epoch === attentionEpoch.current) setAttentionError(true) })
+    }).catch((error: unknown) => { if (!cancelled && epoch === attentionEpoch.current) setAttentionError(error ?? new Error('attention failed')) })
     return () => { cancelled = true }
   }, [reloadKey, attentionKey])
 
@@ -181,12 +182,15 @@ export default function HqHomeV8() {
     setReloadFailed(false)
     attentionEpoch.current += 1
     setAttentionCounts(null)
+    setAttentionError(null)
+    setAttentionRefreshing(true)
     try {
       await Promise.all([load(), refreshAccounts(), loadFolders()])
     } catch (saveFailure) {
       saveErrors.capture(saveFailure)
       setReloadFailed(true)
     } finally {
+      setAttentionRefreshing(false)
       setAttentionKey(key => key + 1)
     }
   }
@@ -197,12 +201,15 @@ export default function HqHomeV8() {
     setCheckingConnections(true)
     attentionEpoch.current += 1
     setAttentionCounts(null)
+    setAttentionError(null)
+    setAttentionRefreshing(true)
     try {
       await Promise.all([load(), refreshAccounts()])
       setConnectionResult(null)
     } catch (saveFailure) {
       saveErrors.capture(saveFailure)
     } finally {
+      setAttentionRefreshing(false)
       setAttentionKey(key => key + 1)
       connectionUpdateInFlight.current = false
       setCheckingConnections(false)
@@ -217,6 +224,8 @@ export default function HqHomeV8() {
     setCheckingConnections(true)
     attentionEpoch.current += 1
     setAttentionCounts(null)
+    setAttentionError(null)
+    setAttentionRefreshing(true)
     setConnectionResult(null)
     let succeeded = 0
     const failed: string[] = []
@@ -251,6 +260,7 @@ export default function HqHomeV8() {
       needsReload = true
       message += ' 一覧を再読み込みできませんでした。もう一度読み込んでください。'
     } finally {
+      setAttentionRefreshing(false)
       setAttentionKey(key => key + 1)
       setConnectionResult({ tone: failed.length > 0 || needsReload ? 'danger' : 'success', message, needsReload })
       setConnectionProgress('')
@@ -569,7 +579,7 @@ export default function HqHomeV8() {
     />
   ) : (
     <>
-      {view === 'table' && attentionError ? <Notice tone="danger" message="対応件数を取得できませんでした。権限や機能設定を確認してください。" action={<Button type="button" onClick={() => setAttentionKey(key => key + 1)}>もう一度読み込む</Button>} /> : null}
+      {view === 'table' && attentionError ? <Notice tone="danger" message={`対応件数：${loadFailureNotice(attentionError, '対応件数', 'hq')}`} action={classifyApiFailure(attentionError) === 'forbidden' ? undefined : <Button type="button" disabled={attentionRefreshing} onClick={() => setAttentionKey(key => key + 1)}>もう一度読み込む</Button>} /> : null}
       {view === 'table' ? <p className={styles.progress}>対応件数は対応が要るものの合計です。LINE接続の状態とは判定が異なり、停止・アーカイブの未処理分も含みます。</p> : null}
       {connectionProgress ? <p className={styles.progress} role="status">{connectionProgress}</p> : null}
       {connectionResult ? <Notice tone={connectionResult.tone} message={connectionResult.message}
