@@ -8,4 +8,3 @@ export const validRestaurantCoursesSql = `NOT EXISTS (
     AND NOT EXISTS (SELECT 1 FROM rt_menu_items m
       WHERE m.id=json_extract(node.value,'$.courseId') AND m.store_id=json_extract(node.value,'$.storeId'))
 )`;
-
