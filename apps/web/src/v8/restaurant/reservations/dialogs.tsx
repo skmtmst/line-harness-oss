@@ -53,8 +53,9 @@ function ReadOnlyChoice({ label, value, options }: { label: string; value: strin
   return <SaveErrorField names={["shown"]}><TextField aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} /></SaveErrorField>
 }
 
-export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore }: {
+export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore, resetRevision = 0 }: {
   reservation: RestaurantReservation | null
+  resetRevision?: number
   tables: RestaurantTable[]
   courses: RestaurantMenuItem[]
   busy: boolean
@@ -64,9 +65,14 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   onCancelReservation: (id: string) => void
   onRestore: (id: string) => void
 }) {
+  const initialReservation = useRef<{ id: string; version: number } | null>(null)
+  if (reservation && initialReservation.current?.id !== reservation.id) {
+    initialReservation.current = { id: reservation.id, version: reservation.customer_version ?? 1 }
+  }
+  const changedElsewhere = !!reservation && !!initialReservation.current && (reservation.customer_version ?? 1) !== initialReservation.current.version
   const [draft, setDraft] = useState({ customerName: '', customerPhone: '', guestCount: '2', allergyNote: '', startsAt: '', endsAt: '', tableId: '', courseId: '' })
   useEffect(() => {
-    if (!reservation) return
+    if (!reservation || (reservation.customer_version ?? 1) !== initialReservation.current?.version) return
     setDraft({
       customerName: reservation.customer_name,
       customerPhone: reservation.customer_phone || '',
@@ -77,13 +83,13 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       tableId: reservation.table_id || '',
       courseId: reservation.course_id || '',
     })
-  }, [reservation])
+  }, [reservation?.id, resetRevision])
   const fields = useSaveFormErrors()
   const [saveError, setSaveError] = useState<unknown>(null)
   const saving = useRef(false)
   const attempt = useRef(0)
-  const currentInput = useRef({ draft, canWrite, busy, onSave })
-  currentInput.current = { draft, canWrite, busy, onSave }
+  const currentInput = useRef({ draft, canWrite, busy, changedElsewhere, onSave })
+  currentInput.current = { draft, canWrite, busy, changedElsewhere, onSave }
   useEffect(() => () => { attempt.current += 1 }, [])
   fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。', { required: true })
   fields.define('phone', '電話番号', () => phoneProblem(draft.customerPhone) || null)
@@ -94,8 +100,8 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   const hold = isHold(reservation)
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
   const save = async () => {
-    const { draft: input, canWrite: allowed, busy: working, onSave: commit } = currentInput.current
-    if (saving.current || working || !allowed) return
+    const { draft: input, canWrite: allowed, busy: working, changedElsewhere: stale, onSave: commit } = currentInput.current
+    if (saving.current || working || !allowed || stale) return
     if (fields.submit().length > 0) {
       requestAnimationFrame(() => {
         const target = document.querySelector<HTMLElement>('[role="dialog"] [aria-invalid="true"]')
@@ -108,6 +114,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     setSaveError(null)
     try {
       const result = await commit({
+        expectedVersion: initialReservation.current?.version ?? 1,
         customerName: input.customerName,
         customerPhone: normalizePhone(input.customerPhone) || null,
         guestCount: Number(input.guestCount),
@@ -152,11 +159,12 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             )
           ) : null}
           <Button type="button" onClick={onClose} disabled={busy}>{canWrite && !hold ? 'キャンセル' : '閉じる'}</Button>
-          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy}><Check aria-hidden="true" />保存する</Button> : null}
+          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy || changedElsewhere}><Check aria-hidden="true" />保存する</Button> : null}
         </>
       )}
     >
-      {saveError !== null ? <Notice tone="danger" role="alert" message={describeApiFailure(saveError, '保存')} /> : null}
+      {changedElsewhere ? <Notice tone="warn" role="alert" message="他の担当者が予約を変更しました。入力を控えてから閉じ、最新の予約を開き直してください。" /> : null}
+      {!changedElsewhere && saveError !== null ? <Notice tone="danger" role="alert" message={describeApiFailure(saveError, '保存')} /> : null}
       {hold ? (
         <DialogNote>{`${reservation.note || '仮押さえ'}・解除の期限 ${reservation.hold_expires_at ? hm(reservation.hold_expires_at) : emptyValue('unknown')}。期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。`}</DialogNote>
       ) : (

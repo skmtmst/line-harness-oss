@@ -103,6 +103,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   /* その日（今日の見方は選んだ日・ほかの見方は今日）の臨時休業・貸切。日の読み出しの口に入っている。 */
   const [dayClosures, setDayClosures] = useState<{ day: string; closures: RestaurantClosure[] } | null>(null)
   const [editTarget, setEditTarget] = useState<{ id: string; accountId: string; storeId: string; sequence: number } | null>(null)
+  const [editResetRevision, setEditResetRevision] = useState(0)
   const editSequence = useRef(0)
   const editContext = useRef({ target: editTarget, accountId, storeId })
   editContext.current = { target: editTarget, accountId, storeId }
@@ -273,6 +274,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
       <EditReservationDialog
         key={editTarget?.sequence ?? 0}
         reservation={opened}
+        resetRevision={editResetRevision}
         tables={tables}
         courses={menuItems}
         busy={busy}
@@ -285,7 +287,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           let inputError: unknown
           const saved = await mutate(async () => {
             try {
-              const result = await restaurantTestApi.updateReservation(accountId, opened.id, { ...patch, expectedVersion: opened.customer_version ?? 1 })
+              const result = await restaurantTestApi.updateReservation(accountId, opened.id, { ...patch })
               if (!current()) throw new QuietError()
               return result
             } catch (error) {
@@ -299,7 +301,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           }, '予約を変更しました。')
           if (!current()) return { saved: false }
           if (saved) setOpenId('')
-          else if (inputError === undefined) void reload()
+          else if (inputError === undefined) void reload().then(() => { if (current()) setEditResetRevision((revision) => revision + 1) })
           return { saved, inputError }
         }}
         onCancelReservation={(id) => { setOpenId(''); setCancelId(id) }}

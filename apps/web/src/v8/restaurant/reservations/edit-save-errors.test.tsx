@@ -150,3 +150,35 @@ it('閉じて同じ予約を開き直すと局所理由と入力は残らない'
   expect((within(reopened).getByLabelText('人数') as HTMLInputElement).value).toBe('2')
   expect(within(reopened).queryByText(reason, { exact: false })).toBeNull()
 })
+
+it.each(['同じ版', '別の版'] as const)('今日の自動更新が%sでも入力と失敗理由を保ち、別の版なら保存を止める', async version => {
+  const interval = vi.spyOn(globalThis, 'setInterval')
+  try {
+    fixture.updateReservation.mockRejectedValueOnce(new ApiError(409, reason, 'availability_conflict'))
+    render(<TestPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+    fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
+    const dialog = screen.getByRole('dialog')
+    const input = within(dialog).getByLabelText('人数') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '9' } })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '保存する' })); await Promise.resolve() })
+    await waitFor(() => expect(within(dialog).getByText(reason, { exact: false })).toBeTruthy())
+    const poll = interval.mock.calls.find(([, ms]) => ms === 30_000)?.[0]
+    expect(typeof poll).toBe('function')
+    fixture.reservationsDay.mockResolvedValueOnce({ data: { date: '', reservations: today.map(row => ({ ...row, ...(row.id === 'r1' && version === '別の版' ? { customer_version: 2, guest_count: 3 } : {}) })) } })
+    await act(async () => { (poll as () => void)(); await Promise.resolve() })
+    expect(input.value).toBe('9')
+    const button = within(dialog).getByRole('button', { name: '保存する' }) as HTMLButtonElement
+    if (version === '同じ版') {
+      expect(within(dialog).getByText(reason, { exact: false })).toBeTruthy()
+      expect(button.disabled).toBe(false)
+      await act(async () => { fireEvent.click(button); await Promise.resolve() })
+      expect(fixture.updateReservation.mock.calls[1][2]).toEqual(expect.objectContaining({ guestCount: 9, expectedVersion: 1 }))
+    } else {
+      expect(within(dialog).getByText(/他の担当者が予約を変更しました/)).toBeTruthy()
+      expect(button.disabled).toBe(true)
+      fireEvent.click(button)
+      expect(fixture.updateReservation).toHaveBeenCalledTimes(1)
+    }
+  } finally { interval.mockRestore() }
+})

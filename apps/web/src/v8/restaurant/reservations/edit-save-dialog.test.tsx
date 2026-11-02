@@ -59,3 +59,14 @@ it('次の保存を始めると前の局所理由を消す', async () => {
   expect(screen.queryByRole('alert')).toBeNull()
   await act(async () => { release({ saved: true }); await second })
 })
+it('別の版を受け取った後は古い確定口でも上書きしない', async () => {
+  const save = vi.fn(async () => ({ saved: true }))
+  const view = render(<EditReservationDialog {...props(save)} />)
+  const old = callbacks.submit!
+  fireEvent.change(screen.getByLabelText('人数'), { target: { value: '7' } })
+  view.rerender(<EditReservationDialog {...props(save)} reservation={{ ...row, customer_version: 2, guest_count: 3 }} />)
+  expect((screen.getByLabelText('人数') as HTMLInputElement).value).toBe('7')
+  expect(screen.getByText(/他の担当者が予約を変更しました/)).toBeTruthy()
+  await act(async () => { await old() })
+  expect(save).not.toHaveBeenCalled()
+})
