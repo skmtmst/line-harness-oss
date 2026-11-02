@@ -9,13 +9,13 @@ const account = (id: string, options: Partial<AccountWithStats> = {}): AccountWi
 } as unknown as AccountWithStats)
 
 describe('★V8 LINEアカウント一覧（V7vn3）の数と並び', () => {
-  it('数の4枚：つないでいる＝全部、有効・接続に問題・友だちの合計はアーカイブを数えない', () => {
+  it('数の4枚はアーカイブを数えない', () => {
     const kpis = accountKpis([
       account('a', { stats: { friendCount: 1284, activeScenarios: 0, messagesThisMonth: 0 } }),
       account('b', { isActive: false, webhook: { status: 'mismatched' } as LineAccount['webhook'], stats: { friendCount: 14, activeScenarios: 0, messagesThisMonth: 0 } }),
       account('c', { isActive: false, archivedAt: '2026-04-01T00:00:00.000Z', webhook: { status: 'mismatched' } as LineAccount['webhook'], stats: { friendCount: 900, activeScenarios: 0, messagesThisMonth: 0 } }),
     ])
-    expect(kpis).toEqual({ connected: 3, active: 1, problem: 0, friends: 1298 })
+    expect(kpis).toEqual({ connected: 2, active: 1, problem: 0, friends: 1298 })
   })
 
   it('並びは「並び順と親子を変える」で決めた順（displayOrder）。同じ値は届いた順のまま', () => {

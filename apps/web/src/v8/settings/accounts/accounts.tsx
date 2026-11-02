@@ -1,6 +1,6 @@
 'use client'
 
-import { tokenExpiryNotice, tokenExpirySummary } from '@/lib/line-account-state'
+import { tokenExpiryNotice, tokenExpirySummary, tokenExpiryBreakdownText } from '@/lib/line-account-state'
 
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -202,7 +202,7 @@ export default function AccountsV8() {
         <KpiBand data-design="KPIs">
           <KpiCard title="つないでいる" icon={<Cable size={16} aria-hidden="true" />} value={kpis?.connected} unit="アカウント" detail={null} />
           <KpiCard title="有効" icon={<CircleCheck size={16} aria-hidden="true" />} value={kpis?.active} unit="件" detail={null} />
-          <KpiCard title="接続に問題" icon={<TriangleAlert size={16} aria-hidden="true" />} value={kpis?.problem} unit="件" detail={null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
+          <KpiCard title="接続に問題" icon={<TriangleAlert size={16} aria-hidden="true" />} value={kpis?.problem} unit="件" detail={ready ? tokenExpiryBreakdownText(accounts) : null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
           <KpiCard title="友だちの合計" icon={<Users size={16} aria-hidden="true" />} value={kpis?.friends} unit="人" detail={null} />
         </KpiBand>
 

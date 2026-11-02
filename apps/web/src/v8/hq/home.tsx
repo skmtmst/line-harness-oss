@@ -1,6 +1,7 @@
 'use client'
 
-import { tokenExpiryBadge, tokenExpirySummary } from '@/lib/line-account-state'
+import { tokenExpiryBadge, tokenExpirySummary, tokenExpiryBreakdownText } from '@/lib/line-account-state'
+import { hqStyleApi } from '@/lib/api/helpers/styles'
 
 import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { jstDate } from '@/lib/jst-datetime'
@@ -86,6 +87,7 @@ export default function HqHomeV8() {
   // M021：捕まえた失敗を持ち、共通部品へ渡す（403 は権限の案内になる）。
   const [loadError, setLoadError] = useState<unknown>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [attentionCounts, setAttentionCounts] = useState<Record<string, number> | null>(null)
   const [editingAccount, setEditingAccount] = useState<AccountWithStats | null>(null)
   const [settingsAccount, setSettingsAccount] = useState<AccountWithStats | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<{ account: AccountWithStats; mode: 'archive' | 'restore' } | null>(null)
@@ -136,6 +138,24 @@ export default function HqHomeV8() {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [load, reloadKey])
+
+  useEffect(() => {
+    let cancelled = false
+    setAttentionCounts(null)
+    void hqStyleApi.attention().then((result) => {
+      if (cancelled || !result.success) return
+      const kinds = ['unhandledChats', 'pendingBookings', 'unpaid', 'connections', 'stoppedDeliveries'] as const
+      const counts: Record<string, number> = {}
+      for (const item of result.data.items) {
+        const values = kinds.map(kind => item.counts[kind])
+        if (values.every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0)) {
+          counts[item.accountId] = values.reduce((sum, value) => sum + value, 0)
+        }
+      }
+      setAttentionCounts(counts)
+    }).catch(() => { /* 読めなければ件数は不明のまま */ })
+    return () => { cancelled = true }
+  }, [reloadKey])
 
   useEffect(() => {
     void loadFolders()
@@ -509,7 +529,7 @@ export default function HqHomeV8() {
           /></SaveErrorField>
           </ListToolbarEnd>
         </ListToolbarRow>
-        {tokenExpirySummary(currentAccounts) ? <ListToolbarRow><Notice tone="warn" compact message={tokenExpirySummary(currentAccounts)!} /></ListToolbarRow> : null}
+        {accountsReadable && (tokenExpirySummary(currentAccounts) || tokenExpiryBreakdownText(currentAccounts)) ? <ListToolbarRow><Notice tone="warn" compact message={[tokenExpirySummary(currentAccounts), tokenExpiryBreakdownText(currentAccounts)].filter(Boolean).join('・')} /></ListToolbarRow> : null}
       </ListToolbarFrame> : null}
   </>
 
@@ -633,7 +653,7 @@ export default function HqHomeV8() {
                   if (!pay || pay === 'unknown') return emptyValue('unknown')
                   return <StatusBadge tone={pay === 'live' ? 'success' : pay === 'test' ? 'warning' : 'neutral'}>{pay === 'live' ? 'つながっている' : pay === 'test' ? '試験モード' : 'つなぐ前'}</StatusBadge>
                 })()}</Td>
-                <Td>{state.tone === 'warn' ? `${Math.max(1, account.connection?.issues?.length ?? 0)} 件` : <span>—</span>}</Td>
+                <Td>{attentionCounts?.[account.id] !== undefined ? `${formatNumber(attentionCounts[account.id])} 件` : emptyValue('unknown')}</Td>
                 <Td>{typeof account.stats?.friendCount === 'number' ? formatNumber(account.stats.friendCount) : emptyValue('unknown')}</Td>
                 <Td>{typeof account.stats?.messagesThisMonth === 'number' ? formatNumber(account.stats.messagesThisMonth) : emptyValue('unknown')}</Td>
                 <Td>{tableMenu(account)}</Td>

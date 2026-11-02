@@ -21,6 +21,7 @@ const checkConnection = vi.hoisted(() => vi.fn())
 const importState = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const select = vi.hoisted(() => vi.fn())
+const attention = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -46,6 +47,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
+vi.mock('@/lib/api/helpers/styles', () => ({ hqStyleApi: { attention } }))
 vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => role.value }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [], setSelectedAccountId: select, refreshAccounts: async () => {} }),
@@ -76,6 +78,8 @@ beforeEach(() => {
   document.body.appendChild(container)
   root = createRoot(container)
   accounts.mockResolvedValue({ success: true, data: [warnedAccount] })
+  attention.mockReset()
+  attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { unhandledChats: 2, pendingBookings: 1, unpaid: 0, connections: 1, stoppedDeliveries: 0 } }] } })
   checkConnection.mockReset()
   checkConnection.mockResolvedValue({ success: true, data: {} })
   importState.mockReset()
@@ -97,6 +101,32 @@ async function render() {
   await act(async () => { root.render(<HqHomeV8 />) })
   await act(async () => { await Promise.resolve() })
 }
+
+it('表の対応が要る件数は同じアカウントの対応一覧の5種類を合計する', async () => {
+  await render()
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  const row = container.querySelector('tbody tr')!
+  expect(row.children[3].textContent).toContain('4 件')
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
+})
+
+it('対応一覧の取得失敗は 0 件とせず不明を示す', async () => {
+  attention.mockRejectedValue(new Error('offline'))
+  await render()
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  expect(container.querySelector('tbody tr')!.children[3].textContent).not.toContain('0 件')
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
+})
+
+it('対応一覧に対象アカウントが無い場合は別店舗の件数を表示しない', async () => {
+  attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'another', counts: { unhandledChats: 9, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 0 } }] } })
+  await render()
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  const count = container.querySelector('tbody tr')!.children[3].textContent
+  expect(count).not.toContain('9 件')
+  expect(count).not.toContain('0 件')
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
+})
 
 describe('統括のアカウント', () => {
   it('カードの入口は短い「入る」にし、読み上げにはアカウント名を残す', async () => {
@@ -162,6 +192,7 @@ describe('統括のアカウント', () => {
       .filter((band) => !band.closest('article'))
     expect(bands).toHaveLength(1)
     expect(bands[0].textContent).toContain('期限が切れたトークン 1 件・期限が近い 1 件')
+    expect(bands[0].textContent).toContain('接続に問題のうちトークン期限切れ 1 件')
   })
 
   it('表の LINE 接続は状態の札に期限の札を添え、素の期限の文字を出さない', async () => {
