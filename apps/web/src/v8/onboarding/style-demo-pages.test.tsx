@@ -211,3 +211,8 @@ it('サロンのお礼は確認中と示し、時刻と文面の見本を保つ'
   expect(thanks?.phone).toMatchObject({ part: 'line-talk', data: { caption: '翌日 12:00', messages: [{ from: 'shop', starter: 'reminder-thanks', text: '昨日はありがとうございました。またのお越しをお待ちしています。', time: '12:00' }] } })
   expect(STYLE_EXPERIENCE_SCRIPT.styles.salon.can.find(item => item.text.includes('お礼'))?.text).toBe('前日の案内と来店のお礼の文を用意できます（お礼を自動で送る機能の有無と条件は確認中です）')
 })
+
+it.each(['standard', 'ec'] as const)('%s の設定の見本には予約を出さない', (style) => {
+  render(<StyleChoiceStep viewing={style} onView={vi.fn()} chosen={null} onChoose={vi.fn()} detail demoPage={1} />)
+  expect(screen.getByRole('region', { name: `${STYLE_EXPERIENCE_SCRIPT.styles[style].label}のデモ` }).textContent).not.toContain('予約')
+})

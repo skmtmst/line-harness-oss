@@ -95,7 +95,9 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
     body = (
       <>
         <StyleChoiceStep accountName={accountName} viewing={viewing} onView={setViewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} switcher="external" detail={demoOpen} onDetailChange={setDemoOpen} demoPage={demoPage} onDemoPage={setDemoPage} />
-        {where(`あとから変えられます（設定 › アカウント）。友だち・配信は残ります。前の予約は${BOOKING_PLACE[state.style]}から見られます。`)}
+        {where(demoOpen && (viewing === 'standard' || viewing === 'ec')
+          ? 'あとから変えられます（設定 › アカウント）。友だち・配信は残ります。'
+          : `あとから変えられます（設定 › アカウント）。友だち・配信は残ります。前の予約は${BOOKING_PLACE[state.style]}から見られます。`)}
       </>
     )
   } else if (step === 1) {

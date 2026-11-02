@@ -124,6 +124,15 @@ describe('getRichMenuDeleteImpact', () => {
     });
   });
 
+  test.each([null, 'line-target'])('既定の印がある下書きはLINE IDが%sでも削除できない', async (lineId) => {
+    insertGroup(sqlite, { id: 'target', isDefault: true });
+    insertPage(sqlite, 'target', 'target-page', lineId);
+    const impact = await getRichMenuDeleteImpact(asD1(sqlite), 'target');
+    expect(impact?.canDelete).toBe(false);
+    expect(impact?.blockers).toContain('default_for_all');
+    expect(impact?.blockers.includes('line_resources')).toBe(lineId !== null);
+  });
+
   test('公開中・デフォルト・LINE実体を別々の停止理由にする', async () => {
     insertGroup(sqlite, {
       id: 'target',
