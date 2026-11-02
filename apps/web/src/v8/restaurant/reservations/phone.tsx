@@ -131,7 +131,10 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
   fields.define('person', 'お客さま', () => kind !== 'customer' || whoTab !== 'line' || person ? null : '名前・電話番号で探して、お客さまを選んでください。', { required: true })
   fields.define('name', 'お名前', () => kind !== 'customer' || whoTab !== 'phone' || manualName.trim() ? null : 'お名前を入れてください。', { required: true })
   fields.define('phone', '電話番号', () => kind !== 'customer' ? null : phoneProblem(person?.phone || manualPhone) || null)
-  fields.define('date', '日付', () => /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(`${date}T00:00:00`)) ? null : '日付を選んでください。', { required: true })
+  fields.define('date', '日付', () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(`${date}T00:00:00`))) return '日付を選んでください。'
+    return date < toYmd(new Date()) ? '過去の日付は選べません。' : null
+  }, { required: true })
   fields.define('count', '人数', () => Number.isInteger(guests) && guests >= 1 && guests <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
   fields.define('time', '時間', () => time && openTimes(date, hours ?? []).includes(time) ? null : '空いている時間を選んでください。', { required: true })
   fields.define('hold', '仮押さえの期限（分）', () => kind !== 'hold' || (Number.isInteger(Number(holdMinutes)) && Number(holdMinutes) >= 1 && Number(holdMinutes) <= 120) ? null : '期限は1〜120分で入れてください。', { required: true })
@@ -372,7 +375,7 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
             <h2 id="rs-phone-when" className={styles.phoneCardTitle}>いつ・何人・どの卓</h2>
             <SettingsFormRow layout="columns">
               <Field label="日付" htmlFor="rs-phone-date" error={fields.error('date')} requirement={fields.requirement('date')}>
-                <SaveErrorField names={["date"]}><DateField size="compact" id="rs-phone-date" invalid={fields.invalid('date')} value={date} onChange={(next) => { setDate(next); setTime('') }} /></SaveErrorField>
+                <SaveErrorField names={["date"]}><DateField size="compact" id="rs-phone-date" invalid={fields.invalid('date')} value={date} min={todayInput} onChange={(next) => { setDate(next); setTime('') }} /></SaveErrorField>
               </Field>
               <Field label="人数" htmlFor="rs-phone-count" error={fields.error('count')} requirement={fields.requirement('count')}>
                 <SaveErrorField names={["count"]}><NumberInput id="rs-phone-count" type="number" min={1} max={100} required value={count} onChange={(event) => setCount(event.target.value)} /></SaveErrorField>

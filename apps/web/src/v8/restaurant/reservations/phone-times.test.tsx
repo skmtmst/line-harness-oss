@@ -60,6 +60,17 @@ it('R1-11: 開いたまま時刻が過ぎた候補は確定できない', async 
   expect(screen.queryByRole('button', { name: '19:00', exact: true })).toBeNull()
   expect(onSave).not.toHaveBeenCalled()
 })
+it('R1-11: 過去日付のプリセット時刻は確定できない', async () => {
+  vi.setSystemTime(new Date('2026-11-02T18:00:00+09:00'))
+  onSave.mockClear()
+  open('19:00', '2026-11-01')
+  await waitFor(() => expect(api.openingHours).toHaveBeenCalled())
+  fireEvent.click(document.querySelector('#rs-phone-date')!)
+  expect(screen.getByRole('button', { name: '2026年11月1日（日）' }).getAttribute('aria-disabled')).toBe('true')
+  fireEvent.submit(document.querySelector('form')!)
+  expect(await screen.findByText('過去の日付は選べません。')).toBeTruthy()
+  expect(onSave).not.toHaveBeenCalled()
+})
 it('営業時間内の将来時刻は確定できる', async () => {
   open('19:00')
   await screen.findByRole('button', { name: '19:00', exact: true })
