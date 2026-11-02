@@ -67,6 +67,18 @@ export function SalonOperationDemo() {
   </section>
 }
 
+type LessonEntry = { time: string; name: string; note: string; tone: 'success' | 'info'; stateLabel: string }
+
+/**
+ * 教室のクラスの見本の値。購入・月謝・決済は描かない（未検証のため完成済みとしない）。
+ * 実データの読み書きはしない。
+ */
+const LESSON_BOARD_SAMPLE: LessonEntry[] = [
+  { time: '9:00–10:00', name: '朝のヨガ', note: '出席済み 12人', tone: 'success', stateLabel: '出席済み' },
+  { time: '10:00–11:00', name: 'はじめてのヨガ', note: '残り 3・出欠待ち 2人', tone: 'info', stateLabel: '出欠待ち' },
+  { time: '14:00–15:00', name: 'おひるのヨガ', note: '残り 8', tone: 'info', stateLabel: '受付中' },
+]
+
 /** 面談・相談3ページ目「相談の予定を確認する」の静止見本。保存・送信はしない。 */
 export function ConsultOperationDemo() {
   return <section aria-label="相談の予定の見本">
@@ -86,6 +98,25 @@ export function ConsultOperationDemo() {
           </ul>
         </section>
       ))}
+      <p className={styles.note}>名前・数は架空です。見本のため実際の設定は変わりません。</p>
+    </Card>
+  </section>
+}
+
+/** 教室・レッスン3ページ目「クラスの予定を確認する」の静止見本。保存・送信はしない。 */
+export function LessonOperationDemo() {
+  return <section aria-label="クラスの予定の見本">
+    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="クラスの予定">
+      <strong>クラスの予定（見本）</strong>
+      <ul className={styles.can}>
+        {LESSON_BOARD_SAMPLE.map(entry => (
+          <li key={`${entry.time}-${entry.name}`}>
+            <StatusBadge tone={entry.tone}>{entry.stateLabel}</StatusBadge>
+            <span>{entry.time} {entry.name}・{entry.note}</span>
+          </li>
+        ))}
+      </ul>
       <p className={styles.note}>名前・数は架空です。見本のため実際の設定は変わりません。</p>
     </Card>
   </section>
