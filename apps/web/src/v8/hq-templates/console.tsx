@@ -123,6 +123,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const returnHref = useListReturnHref(listPath)
   const entryHandled = useRef('')
   const entryHref = (id: string, mode: 'detail' | 'edit') => `${listPath}?item=${encodeURIComponent(id)}&mode=${mode}`
+  /* 作る画面にも URL を付ける（H-18）。読み直しても入力が消えないよう mode=create で開き直せる。 */
+  const showCreateUrl = () => { entryHandled.current = 'create'; window.history.replaceState(window.history.state, '', destination(`${listPath}?mode=create`)); notifyListLocation() }
   const [folderDistribution, setFolderDistribution] = useState<{ name: string; templates: HqTemplate[] } | null>(null)
   const [folderBatch, setFolderBatch] = useState<{ name: string; runs: FolderRun[]; index: number; history: FolderRun[] } | null>(null)
   const folderBatchRef = useRef(folderBatch)
@@ -377,6 +379,12 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   useEffect(() => {
     if (!ready || busy || lock.current || !location) return
     const params = new URLSearchParams(location.split('?')[1]?.split('#')[0] ?? '')
+    if (params.get('mode') === 'create') {
+      if (!canEdit || entryHandled.current === 'create') return
+      entryHandled.current = 'create'
+      startCreate()
+      return
+    }
     const id = params.get('item')
     const next = params.get('mode') === 'edit' && canEdit ? 'edit' : 'detail'
     const key = `${id}:${next}`
@@ -391,6 +399,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     const fresh = freshDefinition(type), nextFolder = folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null
     editBaseline.current = JSON.stringify({ name: '', description: '', definition: fresh, folderId: nextFolder })
     setDetail(null); setFolderId(nextFolder); setName(''); setDescription(''); setDefinition(fresh); setStage('edit'); setError(''); setConflict(false)
+    showCreateUrl()
   }
   /* 店のひな形（テキスト・カード）の保存で落ちた欄。MessageForm が欄ごとに検査し、1つ目へ移る。 */
   const messageFields = useFormErrors()
@@ -470,7 +479,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     }
     // R561: 「保存して続けて作る」は新規作成のときだけ、空の新規入力へ戻る。
     else if (andAnother && isNew) { setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
-    else if (isNew) setStage('list')
+    else if (isNew) { flushListUrlState(); entryHandled.current = ''; window.history.replaceState(window.history.state, '', returnHref); notifyListLocation(); setStage('list') }
     else {
       setStage('edit')
       flushListUrlState()
