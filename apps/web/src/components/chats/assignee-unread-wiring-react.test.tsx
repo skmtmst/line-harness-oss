@@ -84,6 +84,7 @@ describe('担当者ごとの未読数の配線（YZaDK）', () => {
     await act(async () => root.render(<ChatsPage />))
     await settle()
     expect(statsCalls.length).toBeGreaterThan(0)
+    expect(statsCalls.every(call => call.searchParams.get('lineAccountId') === 'account-a')).toBe(true)
     const { names, pickerText } = await assigneeChoices()
     expect(names).toEqual(expect.arrayContaining(['河野（3）', '佐々木（0）']))
     expect(pickerText).toContain('未読 2件')
@@ -120,6 +121,7 @@ describe('担当者ごとの未読数の配線（YZaDK）', () => {
     await act(async () => root.render(<ChatsPage />))
     await settle()
     expect(statsCalls.length).toBeGreaterThan(before)
+    expect(statsCalls.slice(before).every(call => call.searchParams.get('lineAccountId') === 'account-b')).toBe(true)
     expect((await assigneeChoices()).names).toContain('河野（—）')
 
     await act(async () => { release(); await Promise.resolve() })
