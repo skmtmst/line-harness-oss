@@ -1,3 +1,4 @@
+import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
 import { normalizePhone } from '@line-crm/shared';
 import { normalizedPhoneSql as customerPhoneSql } from '../lib/phone-sql.js';
 import { validFloorCoordinate, validJoinGroup } from './restaurant-store-status.js';
@@ -460,6 +461,8 @@ export const post__api_restaurant_test_reservations_holds_23 = async (c: Context
   if (!body) return inputError(c, { success: false, error: '日時・人数・仮押さえの期限（1〜120分）を確認してください' }, 400, []);
   if (!await storeBelongsTo(c, organization.id, body.storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
   const db = dbFor(c.env, body.storeId);
+  const failure = await phoneIntakeFailure(db, body.storeId, body.startsAt);
+  if (failure) return c.json({ success: false, code: failure, error: failure }, 409);
   await expireRestaurantHolds(db, undefined, body.storeId);
   const owner = crypto.randomUUID();
   const key = `reservation:${body.storeId}`;
