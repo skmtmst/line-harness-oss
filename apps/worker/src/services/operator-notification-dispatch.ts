@@ -128,12 +128,15 @@ function ruleVersion(rule: NotificationRuleRow): number {
 
 import { canAssignChatTo } from './chat-assignees.js';
 
-async function assignedReplyRecipient(db: D1Database, accountId: string, sourceEventId: string): Promise<string | null> {
-  const row = await db.prepare(`SELECT c.assignee_staff_id FROM messages_log m
+async function assignedReplyChat(db: D1Database, accountId: string, sourceEventId: string) {
+  return db.prepare(`SELECT c.assignee_staff_id, c.operator_id FROM messages_log m
     JOIN chats c ON c.friend_id = m.friend_id JOIN friends f ON f.id = c.friend_id
     WHERE m.id = ? AND m.line_account_id = ? AND f.line_account_id = ?`)
-    .bind(sourceEventId, accountId, accountId).first<{assignee_staff_id:string|null}>();
-  const id = row?.assignee_staff_id;
+    .bind(sourceEventId, accountId, accountId).first<{assignee_staff_id:string|null;operator_id:string|null}>();
+}
+
+async function assignedReplyRecipient(db: D1Database, accountId: string, sourceEventId: string): Promise<string | null> {
+  const id = (await assignedReplyChat(db, accountId, sourceEventId))?.assignee_staff_id;
   return id && await canAssignChatTo(db, id, accountId) ? id : null;
 }
 
@@ -614,12 +617,18 @@ export async function dispatchOperatorRule(
     conditions,
     channels,
   });
-  let recipients = await operatorRecipients(
-    db, input.lineAccountId, input.recipientIds ?? await operatorRuleRecipientIds(db, input.lineAccountId, conditions),
-  );
+  const configuredRecipients = input.recipientIds ?? await operatorRuleRecipientIds(db, input.lineAccountId, conditions);
+  let recipients = await operatorRecipients(db, input.lineAccountId, configuredRecipients);
+  let assignedRecipient: string | null = null;
   if (rule.event_type === 'inbox_assigned_reply' && input.executionMode !== 'test') {
-    const assignee = await assignedReplyRecipient(db, input.lineAccountId, input.sourceEventId);
-    recipients = recipients.filter(recipient => recipient.id === assignee);
+    const chat = await assignedReplyChat(db, input.lineAccountId, input.sourceEventId);
+    assignedRecipient = chat?.assignee_staff_id && await canAssignChatTo(db, chat.assignee_staff_id, input.lineAccountId)
+      ? chat.assignee_staff_id : null;
+    const legacy = Boolean(chat && !chat.assignee_staff_id && chat.operator_id);
+    if (!chat) recipients = [];
+    else if (configuredRecipients === undefined && !legacy) recipients = recipients.filter(recipient => recipient.id === assignedRecipient);
+    const allowed = await Promise.all(recipients.map(recipient => canAssignChatTo(db, recipient.id, input.lineAccountId)));
+    recipients = recipients.filter((_, index) => allowed[index]);
   }
   const token = channels.includes('line') ? await accountToken(db, input.lineAccountId) : null;
   let accepted = 0;
@@ -632,6 +641,8 @@ export async function dispatchOperatorRule(
   for (const recipient of recipients) {
     const preview = recipientPreview(recipient, channels);
     for (const requestedChannel of channels) {
+      if (rule.event_type === 'inbox_assigned_reply' && input.executionMode !== 'test'
+        && (requestedChannel === 'push' || requestedChannel === 'dashboard') && recipient.id !== assignedRecipient) continue;
       if(requestedChannel==='push'){
         const message=await db.prepare('SELECT c.id,c.operator_id FROM messages_log m JOIN chats c ON c.friend_id=m.friend_id WHERE m.id=? AND m.line_account_id=?').bind(input.sourceEventId,input.lineAccountId).first<{id:string;operator_id:string|null}>();
         if(message&&['inbox_new_inquiry','inbox_assigned_reply'].includes(rule.event_type)){
@@ -827,8 +838,15 @@ export async function sweepOperatorNotifications(
     const teamConditions = metadata.conditions as OperatorRuleConditions | undefined;
     const inTeam = row.execution_mode === 'test' || !teamConditions?.teamId
       || (await operatorRuleRecipientIds(db, row.line_account_id, teamConditions))?.includes(row.recipient_id);
-    const assigned = instance.source_event_type !== 'inbox_assigned_reply' || row.execution_mode === 'test'
-      || await assignedReplyRecipient(db, row.line_account_id, instance.source_event_id) === row.recipient_id;
+    let assigned = true;
+    if (instance.source_event_type === 'inbox_assigned_reply' && row.execution_mode !== 'test') {
+      const chat = await assignedReplyChat(db, row.line_account_id, instance.source_event_id);
+      const legacy = Boolean(chat && !chat.assignee_staff_id && chat.operator_id);
+      const specified = Boolean(teamConditions?.teamId) || Array.isArray(teamConditions?.recipientIds);
+      const mustMatch = row.channel === 'in_app' || (!specified && !legacy);
+      assigned = Boolean(chat) && await canAssignChatTo(db, row.recipient_id, row.line_account_id)
+        && (!mustMatch || await assignedReplyRecipient(db, row.line_account_id, instance.source_event_id) === row.recipient_id);
+    }
     if (!recipient || recipient.is_active !== 1 || !sameTenant || !inScope || !inTeam || !assigned) {
       await finishOperatorDelivery(db, {
         id: row.id,
