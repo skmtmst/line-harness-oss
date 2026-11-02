@@ -17,6 +17,7 @@ vi.mock('@/lib/api', () => ({
   api: {
     autoReplies: {
       runs: runsMock,
+      get: vi.fn().mockResolvedValue({ success: true, data: { id: 'rule-1', lineAccountId: null } }),
       retryRun: actions.retry,
       stop: actions.stop,
       update: vi.fn(),

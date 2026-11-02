@@ -14,11 +14,14 @@ describe("管理画面 担当者ごとの未読数（YZaDK）の配線で戻さ�
     expect(PAGE).not.toContain('items.filter((item) => item.operatorId')
   })
 
-  it('集計の口に契約に無い引数を足さない', () => {
-    expect(PAGE).not.toContain('api.chatStats.get(selectedAccountId')
+  it('選択したアカウントを集計の口に渡す', () => {
+    expect(PAGE).toContain('api.chatStats.get(selectedAccountId)')
   })
 
   it('集計の失敗で担当者一覧そのものを空にしない', () => {
-    expect(PAGE).not.toContain('setOperators([])')
+    const stats = PAGE.slice(PAGE.indexOf('const res = await api.chatStats.get(selectedAccountId)'))
+    const end = stats.indexOf('}, [selectedAccountId, refreshVersion])')
+    expect(end).toBeGreaterThan(0)
+    expect(stats.slice(0, end)).not.toContain('setOperators([])')
   })
 })
