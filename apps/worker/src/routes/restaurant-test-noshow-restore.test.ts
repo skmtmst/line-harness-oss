@@ -142,6 +142,58 @@ describe('無断→有効に戻す→来店→訂正', () => {
     expect(marks(id)).toEqual([{ kind: 'no_show', undone: 1 }, { kind: 'visited', undone: 1 }]);
   });
 
+  it('承認待ちは無断にできず、状態と版を保つ', async () => {
+    seedRestaurantData(testDb);
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
+      method: 'POST', headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeId: store.id, customerName: '人工 客', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z' }),
+    }, env);
+    const { data: { id } } = await created.json() as { data: { id: string } };
+    expect((await patch(id, { status: 'pending' })).status).toBe(200);
+    const response = await attend(id, 'no_show');
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'approval_required' });
+    const direct = await patch(id, { status: 'no_show' });
+    expect(direct.status).toBe(409);
+    expect(await direct.json()).toMatchObject({ code: 'approval_required' });
+    expect(row(id)).toEqual({ status: 'pending', customer_version: 2 });
+    expect(marks(id)).toEqual([]);
+  });
+
+  it('古い未取消の来店印がある予約は無断にせず、記録を保つ', async () => {
+    seedRestaurantData(testDb);
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
+      method: 'POST', headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeId: store.id, customerName: '人工 客', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z' }),
+    }, env);
+    const { data: { id } } = await created.json() as { data: { id: string } };
+    expect((await attend(id, 'visited')).status).toBe(200);
+    testDb.raw.prepare("UPDATE rt_reservations SET status='confirmed', customer_version=customer_version+1 WHERE id=?").run(id);
+    const response = await attend(id, 'no_show');
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'already_arrived' });
+    expect((await patch(id, { status: 'no_show' })).status).toBe(409);
+    expect(marks(id)).toEqual([{ kind: 'visited', undone: 0 }]);
+  });
+
+  it('来店後に取消・復旧しても来店の印が残らない', async () => {
+    seedRestaurantData(testDb);
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
+      method: 'POST', headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storeId: store.id, customerName: '人工 客', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z' }),
+    }, env);
+    const { data: { id } } = await created.json() as { data: { id: string } };
+    expect((await attend(id, 'visited')).status).toBe(200);
+    expect((await patch(id, { status: 'cancelled' })).status).toBe(200);
+    expect((await restore(id)).status).toBe(200);
+    expect(marks(id)).toEqual([{ kind: 'visited', undone: 1 }]);
+    expect((await attend(id, 'no_show')).status).toBe(200);
+    expect(marks(id)).toEqual([{ kind: 'visited', undone: 1 }, { kind: 'no_show', undone: 0 }]);
+  });
+
   it('無断の復活は既存の来店取消口で印・監査・版を保って戻す', async () => {
     seedRestaurantData(testDb);
     const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
