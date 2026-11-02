@@ -40,6 +40,9 @@ export default function Booking() {
   const menuTouched = useRef(false);
   const [step, setStep] = useUrlStep<Step>('menu', { search: params.toString(), write: (query, replace) => setParams(query, { replace }) });
   const [menu, setMenu] = useState<MenuItem | null>(null);
+  const [addonStatus, setAddonStatus] = useState<'idle' | 'loading' | 'failed' | 'ready'>('idle');
+  const addonGeneration = useRef(0);
+  useEffect(() => () => { addonGeneration.current++; }, []);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   /* 同伴・追加メニュー（B5）。メニューが許したときだけ使う。1 人で追加なしなら今までどおり。 */
   const [party, setParty] = useState<PartyState>(initialParty);
@@ -95,9 +98,17 @@ export default function Booking() {
     navigate({ pathname: '/booking', search: next.toString() }, { replace: true });
   }
 
-  /** 追加メニュー（B5）：メニューを選んだあとに読み足す。読めなければ追加なしのまま進める。 */
+  /** 追加メニューを確認できるまで予約を進めない。 */
   function loadAddons(m: MenuItem) {
-    Promise.resolve().then(() => api.addons(m.id)).then((addons) => setMenu((cur) => (cur && cur.id === m.id ? { ...cur, addons } : cur))).catch(() => undefined);
+    const generation = ++addonGeneration.current;
+    setAddonStatus('loading');
+    Promise.resolve().then(() => api.addons(m.id)).then((addons) => {
+      if (generation !== addonGeneration.current) return;
+      setMenu((cur) => (cur && cur.id === m.id ? { ...cur, addons } : cur));
+      setAddonStatus('ready');
+    }).catch(() => {
+      if (generation === addonGeneration.current) setAddonStatus('failed');
+    });
   }
 
   function pickMenu(m: MenuItem) {
@@ -125,6 +136,7 @@ export default function Booking() {
   }
 
   /* 2 人以上・追加メニューあり。確認と送信を組の形にする。 */
+  const addonsBlocked = menu !== null && addonStatus !== 'ready';
   const partyActive = party.size > 1 || party.members[0]?.addonIds.length > 0;
   const partyMode = step === 'menu' && !changingMenu && partyCapable(menu);
   const STEPS = [words.bookingContent, words.staff, '日時', '確認'];
@@ -145,6 +157,13 @@ export default function Booking() {
       <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>
         {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
         <div key={step} className="liff-step">
+        {addonsBlocked && menu ? (
+          <div role="status" className="space-y-3 text-center">
+            <p>{addonStatus === 'failed' ? '追加メニューを読み込めませんでした。もう一度お試しください。' : '追加メニューを読み込んでいます…'}</p>
+            {addonStatus === 'failed' && <Button variant="secondary" onClick={() => loadAddons(menu)}>もう一度読み込む</Button>}
+            <Button variant="text" onClick={() => { addonGeneration.current++; setMenu(null); setAddonStatus('idle'); setParty(initialParty()); setStep('menu'); }}>メニューを選び直す</Button>
+          </div>
+        ) : <>
         {step === 'menu' && partyMode && (
           <PartyMenuStep menu={menu!} party={party} onParty={changeParty} onChangeMenu={() => setChangingMenu(true)} />
         )}
@@ -233,16 +252,17 @@ export default function Booking() {
             prepayNotice={prepayNotice}
           />
         )}
+        </>}
         </div>
       </div>
-      {step === 'menu' && !partyMode && stepReady && (
+      {!addonsBlocked && step === 'menu' && !partyMode && stepReady && (
         <BottomBar>
           <Button variant="primary" disabled={!menu} onClick={() => setStep('staff')}>
             担当を選ぶ
           </Button>
         </BottomBar>
       )}
-      {step === 'menu' && partyMode && menu && (
+      {!addonsBlocked && step === 'menu' && partyMode && menu && (
         <BottomBar>
           <PartySummary party={party} first={menu} />
           <Button variant="primary" onClick={() => setStep('staff')}>
@@ -250,7 +270,7 @@ export default function Booking() {
           </Button>
         </BottomBar>
       )}
-      {step === 'staff' && stepReady && (
+      {!addonsBlocked && step === 'staff' && stepReady && (
         <BottomBar>
           {!partyActive && menu && staff && menu.price_mode !== 'inquiry' && menu.base_price > 0 ? (
             <p className="mb-2.5 flex items-baseline gap-2 text-[13px] text-liff-sub" data-booking-total="">
