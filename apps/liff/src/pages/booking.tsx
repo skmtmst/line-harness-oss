@@ -161,7 +161,7 @@ export default function Booking() {
           <div role="status" className="space-y-3 text-center">
             <p>{addonStatus === 'failed' ? '追加メニューを読み込めませんでした。もう一度お試しください。' : '追加メニューを読み込んでいます…'}</p>
             {addonStatus === 'failed' && <Button variant="secondary" onClick={() => loadAddons(menu)}>もう一度読み込む</Button>}
-            <Button variant="text" onClick={() => { addonGeneration.current++; setMenu(null); setAddonStatus('idle'); setParty(initialParty()); setStep('menu'); }}>メニューを選び直す</Button>
+            <Button variant="text" onClick={() => { addonGeneration.current++; setMenu(null); setAddonStatus('idle'); setParty(initialParty()); setStep('menu'); }}>{`${words.bookingContent}を選び直す`}</Button>
           </div>
         ) : <>
         {step === 'menu' && partyMode && (

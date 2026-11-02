@@ -59,11 +59,21 @@ it('同じメニューを再選択しても先の応答では進めない', asyn
   render(<MemoryRouter initialEntries={['/booking']}><Booking /></MemoryRouter>);
   fireEvent.click(await screen.findByRole('button', { name: 'メニューを選択' }));
   await screen.findByText(/追加メニューを読み込んでいます/);
-  fireEvent.click(screen.getByRole('button', { name: 'メニューを選び直す' }));
+  fireEvent.click(screen.getByRole('button', { name: '予約内容を選び直す' }));
   fireEvent.click(await screen.findByRole('button', { name: 'メニューを選択' }));
   await screen.findByText(/追加メニューを読み込んでいます/);
   await act(async () => finishOld(data.addons));
   expect(screen.queryByRole('button', { name: '担当を選ぶ' })).toBeNull();
   await act(async () => finishNew(data.addons));
   expect(await screen.findByRole('button', { name: '担当を選ぶ' })).toBeTruthy();
+});
+it.each([
+  ['standard','メニュー'], ['ec','メニュー'], ['restaurant','コース'],
+  ['salon','メニュー'], ['consult','面談の種類'], ['lesson','クラス'],
+] as const)('%s の選び直しは%sと表示する', async (style, name) => {
+  const { CustomerStyleContext } = await import('../components/customer-style-scope.js');
+  addonRequest.mockRejectedValueOnce(new Error('offline'));
+  render(<CustomerStyleContext.Provider value={style}><MemoryRouter><Booking /></MemoryRouter></CustomerStyleContext.Provider>);
+  fireEvent.click(await screen.findByRole('button', { name: 'メニューを選択' }));
+  expect(await screen.findByRole('button', { name: `${name}を選び直す` })).toBeTruthy();
 });

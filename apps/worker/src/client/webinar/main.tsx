@@ -1169,6 +1169,13 @@ export function FormSheet({
     'w-full min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-base text-gray-900';
   const todayJst = jstDate();
   const meetingDateOptions = buildMeetingDateOptions(todayJst);
+  const rawCompletionMessage = sheet.phase === 'done' ? sheet.def.onSubmitMessageContent?.trim() : '';
+  let structuredMessage = false;
+  if (rawCompletionMessage?.startsWith('[')) {
+    try { structuredMessage = Array.isArray(JSON.parse(rawCompletionMessage)); } catch { /* 通常の文章として表示する。 */ }
+  }
+  const completionMessage = rawCompletionMessage && (structuredMessage || rawCompletionMessage.startsWith('{') || /\{\{|\}\}/.test(rawCompletionMessage))
+    ? '送信後のご案内は、配信元にお問い合わせください。' : rawCompletionMessage;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -1194,9 +1201,9 @@ export function FormSheet({
           <div className="py-6 text-center">
             <p className="text-2xl">🎉</p>
             <p className="mt-2 text-lg font-bold">回答を送信しました</p>
-            {sheet.def.onSubmitMessageContent && (
+            {completionMessage && (
               <p className="mt-3 whitespace-pre-wrap break-words text-sm text-gray-700">
-                {sheet.def.onSubmitMessageContent.split(/(https?:\/\/[^\s<>"']+)/g).map((part, index) =>
+                {completionMessage.split(/(https?:\/\/[^\s<>"'、。！？」』）】〉》]+)/g).map((part, index) =>
                   /^https?:\/\//.test(part)
                     ? <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">{part}</a>
                     : part,

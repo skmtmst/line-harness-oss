@@ -32,3 +32,20 @@ it('リンクを含む回答送信の成功でも自動遷移を予約しない'
   await waitFor(()=>expect(done).toHaveBeenCalledTimes(1));
   expect(timers.mock.calls.some(([,delay])=>delay===900)).toBe(false);
 });
+it.each([
+  '{"type":"bubble","body":{"text":"見本","url":"https://example.com"}}',
+  '[{"type":"bubble","body":{}}]',
+  '["one","two"]',
+  '{{name}}さま、ご案内です',
+  '認証はこちら {{auth_url:CHANNEL_ID}}',
+])('未展開の案内は定型文に置き換える: %s', content => {
+  render(<FormSheet sheet={{cta,phase:'done',def:{...def,onSubmitMessageContent:content}}} ctx={{liffId:'l',lineUserId:'u',idToken:'t'}} onFunnelEvent={()=>{}} onClose={()=>{}} onSubmitted={()=>{}} />);
+  expect(screen.getByText('送信後のご案内は、配信元にお問い合わせください。')).toBeTruthy();
+  expect(document.body.textContent).not.toContain(content);
+  expect(screen.queryByRole('link')).toBeNull();
+});
+it('URLに続く句読点と文章をリンク先に含めない', () => {
+  render(<FormSheet sheet={{cta,phase:'done',def:{...def,onSubmitMessageContent:'こちら https://example.com/help。ご確認ください'}}} ctx={{liffId:'l',lineUserId:'u',idToken:'t'}} onFunnelEvent={()=>{}} onClose={()=>{}} onSubmitted={()=>{}} />);
+  expect(screen.getByRole('link',{name:'https://example.com/help'}).getAttribute('href')).toBe('https://example.com/help');
+  expect(screen.getByText(/。ご確認ください/)).toBeTruthy();
+});
