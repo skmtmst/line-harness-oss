@@ -527,6 +527,11 @@ export async function reconcileOperationHealthAlerts(
       continue;
     }
 
+    // 配信枠が一時的に読めなくても、確認済みの注意・エラーを未確認へ下げない。
+    // 次回同じ状態に戻っただけで受領解除や再通知が起きるのを防ぐ。
+    if (result.checkKey === 'message_quota' && nextSeverity === 'unknown'
+      && (current.severity === 'warning' || current.severity === 'danger')) continue;
+
     const escalated = alertSeverityRank(nextSeverity) > alertSeverityRank(current.severity);
     const changed = await db.prepare(
       `UPDATE operation_alerts

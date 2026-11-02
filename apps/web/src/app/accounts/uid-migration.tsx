@@ -264,7 +264,7 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
           <p className={styles.sectionDesc}>これまでの移行です。選ぶと対応表と結果を見直せます。</p>
         </div>
         {runs.length === 0 ? (
-          <ListState kind="empty" title="移行履歴はまだありません" />
+          <ListState kind="empty" title="移行履歴はまだありません" description="移行を実行すると、ここに履歴が表示されます。" />
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>

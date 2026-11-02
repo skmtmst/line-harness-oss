@@ -63,7 +63,10 @@ it('1回ごとに1枚：日付・種類の数・3行・［すべて見る］を�
 
   expect(within(cards()[0]).getByText('これから入る変更')).toBeTruthy()
   expect(within(cards()[0]).queryByText('最新')).toBeNull()
-  expect(within(cards()[3]).getByText('保管用の版（5,707 行）')).toBeTruthy()
+  expect(within(cards()[3]).getByText('前の版のまとめ（5,707 行）')).toBeTruthy()
+  // IND-U06本文：作る側の言葉ではなく利用者向けの説明を出す。
+  expect(within(cards()[3]).getByText('この版の行は前の版のまとめに集めてあり、この画面には出していません。')).toBeTruthy()
+  expect(within(cards()[3]).queryByText(/保管用の記録にまとめてあり/)).toBeNull()
 })
 
 it('配備の記録が読めない時も版の並びは出し、結果を「成功」と言わない', async () => {

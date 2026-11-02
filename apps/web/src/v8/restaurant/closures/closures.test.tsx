@@ -83,7 +83,7 @@ describe('UVnvR 休業日・貸切', () => {
     })
     const board = document.querySelector('[data-design-node="UVnvR"]')!
     fireEvent.click(screen.getByRole('button', { name: '予約枠・在庫の説明' }))
-    expect(screen.getByText('渋谷店・1つの時間帯の総数 20席（有効の卓 5）')).toBeTruthy()
+    expect(screen.getByText('渋谷店・1つの時間帯の総数 20席（有効な卓 5 卓）')).toBeTruthy()
     expect(board.textContent).not.toContain('検証環境専用')
     const toggle = within(screen.getByRole('group', { name: '予約枠・在庫の切り替え' })).getByRole('button', { name: '休業日・貸切' })
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
