@@ -22,6 +22,7 @@ const deleteImpact = vi.hoisted(() => vi.fn())
 const replacementCandidates = vi.hoisted(() => vi.fn())
 const replacementImpact = vi.hoisted(() => vi.fn())
 const listExports = vi.hoisted(() => vi.fn())
+const setStatus = vi.hoisted(() => vi.fn())
 const staffRole = vi.hoisted(() => ({ value: 'owner' as string }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -37,6 +38,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         replacementCandidates,
         replacementImpact,
         listExports,
+        setStatus,
       },
       folders: { ...actual.api.folders, list: listFolders },
     },
@@ -89,6 +91,7 @@ const contact = { ...base, id: 'v-contact', folderId: null, name: '問い合わ�
 const notice = { ...base, id: 'v-notice', folderId: null, name: '臨時のお知らせ', varKey: 'temp_notice', value: '本日は17時まで', state: 'draft', usageCount: 0 }
 
 beforeEach(() => {
+  setStatus.mockReset().mockResolvedValue({ success: true, data: {} })
   document.documentElement.dataset.theme = 'v8'
   staffRole.value = verifiedStaffRole('owner')
   listVars.mockImplementation(async () => ({ success: true, data: [company, contact, notice] }))
@@ -210,7 +213,24 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     act(() => { buttonByText('止める').click() })
     await flush()
     expect(document.body.textContent).toContain('「会社名」を止める')
+    expect(document.querySelector('[data-design-node="Hhl9M"]')?.textContent).toContain('LINEアカウント')
     expect(document.body.textContent).toContain('予約中の一斉配信「10月のお知らせ」が送られなくなります。')
+  })
+
+  it('理由を入力して止めた後、次の確認でも操作できる', async () => {
+    act(() => { root.render(<CommonVarsListV8 />) }); await flush()
+    act(() => { buttonByLabel('共通情報「会社名」の操作').click() }); await flush()
+    act(() => { buttonByText('止める').click() }); await flush()
+    const input = document.querySelector<HTMLInputElement>('input[placeholder="キャンペーンが終わったため"]')!
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => { setter.call(input, '確認のため'); input.dispatchEvent(new Event('input', { bubbles: true })) }); await flush()
+    const dialog = document.querySelector('[data-design-node="Hhl9M"]')!
+    const confirm = [...dialog.querySelectorAll('button')].find(item => item.textContent?.trim() === '止める')!
+    await act(async () => { confirm.click() }); await flush()
+    expect(setStatus).toHaveBeenCalledWith('v-company', 'account-a', { to: 'stopped', changeReason: '確認のため' })
+    act(() => { buttonByLabel('共通情報「会社名」の操作').click() }); await flush()
+    act(() => { buttonByText('止める').click() }); await flush()
+    expect(document.querySelector('[data-design-node="Hhl9M"]')).toBeTruthy()
   })
 
   it('行の「…」から削除の窓（xxKtW）が開き、使われているものは「まだ消せません」', async () => {

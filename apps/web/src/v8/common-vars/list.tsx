@@ -255,6 +255,11 @@ function CommonVarsListInner() {
   const [statusReason, setStatusReason] = useState('')
   const [statusBusy, setStatusBusy] = useState(false)
   const [statusError, setStatusError] = useState('')
+  const statusWindow = useRef<object>({})
+  const statusAccount = useRef(selectedAccountId)
+  if (statusAccount.current !== selectedAccountId) statusWindow.current = {}
+  statusAccount.current = selectedAccountId
+  const renderedStatusWindow = statusWindow.current
   /* 右から出る詳細パネル。URL に今の行を残す（`?row=`）。 */
   const [activeId, setActiveId] = useDetailPanelUrl('row')
   /* パネルを開いている1件の止める・再開は、窓ではなくパネルの中で聞く。 */
@@ -265,6 +270,7 @@ function CommonVarsListInner() {
   const [statusScheduled, setStatusScheduled] = useState<CommonVarDeleteImpact['items']>([])
 
   const openStatusDialog = (item: CommonVar, action: 'stop' | 'resume') => {
+    statusWindow.current = {}
     setPanelStatus(item.id === activeId)
     setStatusTarget(item)
     setStatusAction(action)
@@ -287,13 +293,16 @@ function CommonVarsListInner() {
 
   const closeStatusDialog = () => {
     if (statusBusy) return
+    statusWindow.current = {}
     setStatusTarget(null)
     setStatusReason('')
     setStatusError('')
   }
 
+  useEffect(() => { setStatusTarget(null); setPanelStatus(false); setStatusBusy(false); return () => { statusWindow.current = {} } }, [selectedAccountId])
+
   const applyStatus = async () => {
-    if (!statusTarget || !selectedAccountId || statusBusy) return
+    if (!statusTarget || !selectedAccountId || statusTarget.lineAccountId !== selectedAccountId || latestAccountRef.current !== selectedAccountId || statusWindow.current !== renderedStatusWindow || statusBusy) return
     const reason = statusReason.trim()
     if (reasonRequirement.check(reason)) {
       setStatusError(statusAction === 'stop' ? '止める理由を入力してください' : '再開する理由を入力してください')
@@ -306,15 +315,17 @@ function CommonVarsListInner() {
         to: statusAction === 'stop' ? 'stopped' : 'active',
         changeReason: reason,
       })
+      if (statusWindow.current !== renderedStatusWindow || latestAccountRef.current !== selectedAccountId) return
       if (!res.success) {
         setStatusError(res.error)
         return
       }
-      setStatusTarget(null)
+      setStatusBusy(false); statusWindow.current = {}; setStatusTarget(null)
       setPanelStatus(false)
       setStatusReason('')
       await load()
     } catch (e) {
+      if (statusWindow.current !== renderedStatusWindow || latestAccountRef.current !== selectedAccountId) return
       const fieldFailure = saveErrors.capture(e)
 
       { if (!fieldFailure)
@@ -324,7 +335,7 @@ function CommonVarsListInner() {
           : '状態を変えられませんでした。通信を確かめて、もう一度お試しください。',
       ) }
     } finally {
-      setStatusBusy(false)
+      if (statusWindow.current === renderedStatusWindow && latestAccountRef.current === selectedAccountId) setStatusBusy(false)
     }
   }
 
@@ -545,6 +556,12 @@ function CommonVarsListInner() {
   const [deleting, setDeleting] = useState(false)
   const [deleteBatchError, setDeleteBatchError] = useState('')
   const batchRequestRef = useRef({ accountId: selectedAccountId, generation: 0 })
+  const renderedBatchGeneration = batchRequestRef.current.generation
+  useEffect(() => {
+    batchRequestRef.current = { accountId: selectedAccountId, generation: batchRequestRef.current.generation + 1 }
+    setDeleteTargets([]); setDeleting(false); setBatchReason(''); setDeleteBatchError('')
+    return () => { batchRequestRef.current.generation += 1 }
+  }, [selectedAccountId])
 
   /* 行の「…」の中身。右クリックでも同じものを出す。 */
   const rowMenuItems = (item: CommonVar): ActionMenuItem[] => {
@@ -613,7 +630,10 @@ function CommonVarsListInner() {
 
   const prepareRemoveSelected = () => prepareCommonVarRemoval({ batchRequestRef, items, saveErrors, selected, selectedAccountId, setBatchReason, setDeleteBatchError, setDeleteTargets, setError })
 
-  const removeSelected = () => removeCommonVars({ batchReason, batchRequestRef, deleteTargets, deleting, load, saveErrors, selectedAccountId, setBatchReason, setDeleteBatchError, setDeleteTargets, setDeleting, setSelected })
+  const removeSelected = () => {
+    if (!selectedAccountId || latestAccountRef.current !== selectedAccountId || batchRequestRef.current.generation !== renderedBatchGeneration || batchRequestRef.current.accountId !== selectedAccountId || deleteTargets.some(item => item.lineAccountId !== selectedAccountId)) return Promise.resolve()
+    return removeCommonVars({ batchReason, batchRequestRef, deleteTargets, deleting, load, saveErrors, selectedAccountId, setBatchReason, setDeleteBatchError, setDeleteTargets, setDeleting, setSelected })
+  }
 
   const toggle = (id: string) =>
     setSelected((prev) => {

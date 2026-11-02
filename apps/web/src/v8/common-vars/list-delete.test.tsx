@@ -382,6 +382,20 @@ function confirmDialog(): HTMLElement {
 }
 
 describe('まとめて削除の確認', () => {
+  it('アカウントを切り替えて戻しても古い一括確定では削除しない', async () => {
+    await render()
+    await selectRows('問い合わせ先', '臨時のお知らせ')
+    await click(button('選択した共通情報を削除'))
+    await type(inputByPlaceholder('店舗情報の変更のため', confirmDialog()), '整理のため')
+    const target = button('削除する', confirmDialog())
+    const key = Object.keys(target).find(item => item.startsWith('__reactProps$'))!
+    const handler = (target as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    account.id = 'account-b'; await render()
+    account.id = 'account-a'; await render()
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: target, target }) })
+    expect(deleteVar).not.toHaveBeenCalled()
+  })
+
   it('使用先を確かめてから共通の確認窓を開き、消えるもの・残るもの・戻せないことを伝える', async () => {
     const nativeConfirm = vi.spyOn(window, 'confirm')
     await render()
@@ -406,6 +420,7 @@ describe('まとめて削除の確認', () => {
     await render()
     await selectRows('問い合わせ先', '臨時のお知らせ')
     await click(button('選択した共通情報を削除'))
+    expect(confirmDialog().textContent).toContain('LINEアカウント')
     await type(inputByPlaceholder('店舗情報の変更のため', confirmDialog()), '整理のため')
     const listCalls = listVars.mock.calls.length
     await click(button('削除する', confirmDialog()))
