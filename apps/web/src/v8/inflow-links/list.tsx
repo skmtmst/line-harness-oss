@@ -939,8 +939,8 @@ export default function InflowListV8({
             }
           }}
         >
-          <Field label={`完全削除するには「${deleteTarget?.name ?? ''}」と入力`}>
-            <TextField value={deleteName} onChange={event => setDeleteName(event.target.value)} autoComplete="off" />
+          <Field required label={`完全削除するには「${deleteTarget?.name ?? ''}」と入力`}>
+            <TextField required value={deleteName} onChange={event => setDeleteName(event.target.value)} autoComplete="off" />
           </Field>
         </ConfirmDialog>
         {routeEditor}

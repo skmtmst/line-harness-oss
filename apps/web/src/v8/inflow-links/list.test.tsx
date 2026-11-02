@@ -313,6 +313,7 @@ it('D-18: 一覧から名前確認の後に削除し、失敗時は窓と入力�
   await act(async () => action.click())
   const dialog = document.querySelector('[role="alertdialog"]')!
   expect(dialog.textContent).toContain('利用履歴がない経路だけ')
+  expect(dialog.querySelector('[data-required-badge]')?.textContent).toBe('必須')
   const confirm = [...dialog.querySelectorAll('button')].find(el => el.textContent?.includes('削除する')) as HTMLButtonElement
   expect(confirm.disabled).toBe(true)
   const input = dialog.querySelector('input')!
