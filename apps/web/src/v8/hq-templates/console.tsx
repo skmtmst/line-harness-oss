@@ -41,7 +41,7 @@ import { hqMediaApi } from '@/lib/api/helpers/hq-media'
 import { formatNumber } from '@/lib/format'
 import { HqRichMenuCompatibilityError,hqRichMenuDefinitionFromSeed,hqRichMenuSeedFromDefinition } from '@/lib/hq-rich-menu-create'
 import { freshDefinition } from '@/lib/hq-template-authoring'
-import { clearCreationAttempt,loadCreationAttempt,persistCreationAttempt,sameCreationScope,type CreationAttempt,type CreationScope } from '@/lib/hq-template-create-attempt'
+import { clearCreationAttempt,clearEditorDraft,loadCreationAttempt,loadEditorDraft,persistCreationAttempt,persistEditorDraft,sameCreationScope,type CreationAttempt,type CreationScope,type EditorDraftContent } from '@/lib/hq-template-create-attempt'
 import { hqTemplatesApi,type DistributionMode,type DistributionResult,type FormDefinition,type HqAccount,type HqTemplate,type HqTemplateListItem,type MessageTemplateDefinition,type Preflight,type RichMenuDefinition,type TagDefinition,type TemplateDefinition,type TemplateDetail,type TemplateInput,type TemplateType } from '@/lib/hq-templates-api'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { useStaffRole,useTenantWideAccess } from '@/lib/staff-role'
@@ -157,6 +157,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [accounts, setAccounts] = useState<HqAccount[]>([])
   const [detail, setDetail] = useState<TemplateDetail | null>(null)
   const [name, setName] = useState('')
+  /* H-18原文の再読込対策：子画面の通常入力の一時下書きの復元（message先行、他は未完）。 */
+  const [restoreDraft, setRestoreDraft] = useState<EditorDraftContent | null>(null)
   const [description, setDescription] = useState('')
   const [definition, setDefinition] = useState<TemplateDefinition>(() => freshDefinition(type))
   const editBaseline = useRef(JSON.stringify({ name, description, definition, folderId }))
@@ -357,7 +359,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     setFolderBatch(null); setFolderDistribution(null)
     if (createUncertain) return
     reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : [])
-    createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
+    createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false); setRestoreDraft(null)
+    /* 下書きは新規作成の分だけ消す。editKind は一覧の描画では未初期化のため kind を使う（新規では同値）。 */
+    if (!detail && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind)
     flushListUrlState()
     entryHandled.current = ''
     window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref))
@@ -400,6 +404,13 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       entryHandled.current = 'create'
       /* 結果不明の復旧依頼がある再読込では startCreate で依頼・入力を消さない（PR#2042高）。 */
       if (createAttempt.current) return
+      /* H-18原文：子画面の通常入力の一時下書きがあれば initial として戻す（message先行、他は未完）。kind は一覧タブの値（新規では editKind と同値）。 */
+      const creation = creationScope.current
+      const editorDraft = creation ? loadEditorDraft(window.sessionStorage, creation, type, kind) : null
+      if (editorDraft && editorDraft.kind === 'message') {
+        setRestoreDraft(editorDraft); setDetail(null); setFolderId(null); setName(''); setDescription(''); setStage('edit'); setError(''); setConflict(false)
+        return
+      }
       startCreate()
       return
     }
@@ -413,7 +424,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, busy, location, canEdit])
   const startCreate = () => {
-    createAttempt.current = null; sessionUploads.current = []; setMenuTargets([])
+    createAttempt.current = null; sessionUploads.current = []; setMenuTargets([]); setRestoreDraft(null)
+    if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind)
     const fresh = freshDefinition(type), nextFolder = folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null
     editBaseline.current = JSON.stringify({ name: '', description: '', definition: fresh, folderId: nextFolder })
     setDetail(null); setFolderId(nextFolder); setName(''); setDescription(''); setDefinition(fresh); setStage('edit'); setError(''); setConflict(false)
@@ -496,8 +508,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       setStage('saved')
     }
     // R561: 「保存して続けて作る」は新規作成のときだけ、空の新規入力へ戻る。
-    else if (andAnother && isNew) { setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
-    else if (isNew) { flushListUrlState(); entryHandled.current = ''; window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref)); notifyListLocation(); setStage('list') }
+    else if (andAnother && isNew) { setRestoreDraft(null); if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
+    else if (isNew) { setRestoreDraft(null); if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); flushListUrlState(); entryHandled.current = ''; window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref)); notifyListLocation(); setStage('list') }
     else {
       setStage('edit')
       flushListUrlState()
@@ -913,7 +925,18 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         return saved
       },
       onCancel: toList,
-      initialMessage: detail && editKind === 'message' ? { name, messageType: current.template.messageType, messageContent: current.template.messageContent } : undefined,
+      onDraftChange: (content) => {
+        const scope = creationScope.current
+        if (!scope || detail !== null || createUncertain) return
+        const body = 'messageContent' in content && typeof content.messageContent === 'string' ? content.messageContent : JSON.stringify(content)
+        if (!content.name.trim() && !body.trim()) clearEditorDraft(window.sessionStorage, scope, type, kind)
+        else persistEditorDraft(window.sessionStorage, scope, type, kind, content)
+      },
+      initialMessage: detail && editKind === 'message'
+        ? { name, messageType: current.template.messageType, messageContent: current.template.messageContent }
+        : restoreDraft?.kind === 'message'
+          ? { name: String(restoreDraft.name ?? ''), messageType: String(restoreDraft.messageType ?? 'text'), messageContent: String(restoreDraft.messageContent ?? '') }
+          : undefined,
       /* 編集：カルーセル・質問・クーポン・リサーチ・リッチメッセージも店の作る画面で直す。 */
       initialContent: editContent,
       readOnly: !canEdit,

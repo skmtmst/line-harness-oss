@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyLayout } from '@line-crm/shared'
-import { clearCreationAttempt, creationStorageKey, loadCreationAttempt, persistCreationAttempt } from './hq-template-create-attempt'
+import { clearCreationAttempt, clearEditorDraft, creationStorageKey, editorDraftStorageKey, loadCreationAttempt, loadEditorDraft, persistCreationAttempt, persistEditorDraft } from './hq-template-create-attempt'
 
 const scope = { tenantId: 'tenant-a', actorId: 'owner' }
 const attempt = { requestId: 'request-123', distribute: true, input: { type: 'tag' as const, name: '来店', definition: { schemaVersion: 1 as const, tag: { name: '来店' }, folders: [] } } }
@@ -94,5 +94,34 @@ describe('HQ creation receipt storage', () => {
     s.setItem(other, s.getItem(key)!)
     expect(() => loadCreationAttempt(s, { ...scope, tenantId: 'tenant-b' }, 'tag')).toThrow()
     for (const raw of ['{broken', 'x'.repeat(32_001)]) { s.setItem(key, raw); expect(() => loadCreationAttempt(s, scope, 'tag')).toThrow(); expect(s.getItem(key)).toBe(raw) }
+  })
+})
+describe('HQ create editor draft (H-18原文の一時下書き）', () => {
+  const draft = { kind: 'message', name: '人工の下書き', messageType: 'text', messageContent: '人工の本文' }
+  it('所属・種別・タブで分離し、保存・読込・消去ができる', () => {
+    const s = storage()
+    persistEditorDraft(s, scope, 'template', 'message', draft)
+    expect(loadEditorDraft(s, scope, 'template', 'message')).toEqual(draft)
+    expect(loadEditorDraft(s, { ...scope, tenantId: 'tenant-b' }, 'template', 'message')).toBeNull()
+    expect(loadEditorDraft(s, scope, 'template', 'coupon')).toBeNull()
+    expect(loadEditorDraft(s, scope, 'form', 'message')).toBeNull()
+    clearEditorDraft(s, scope, 'template', 'message')
+    expect(loadEditorDraft(s, scope, 'template', 'message')).toBeNull()
+  })
+  it('破損・別所属・過大な下書きは捨てて本機能を止めない', () => {
+    const s = storage()
+    const key = editorDraftStorageKey(scope, 'template', 'message')
+    persistEditorDraft(s, scope, 'template', 'message', draft)
+    s.setItem(key, '{broken')
+    expect(loadEditorDraft(s, scope, 'template', 'message')).toBeNull()
+    expect(s.getItem(key)).toBeNull()
+    persistEditorDraft(s, scope, 'template', 'message', { ...draft, messageContent: 'x'.repeat(300_000) })
+    expect(s.getItem(key)).toBeNull()
+  })
+  it('置き場が使えなくても例外にせず本機能を止めない', () => {
+    const broken = { getItem: () => { throw new Error('unavailable') }, setItem: () => { throw new Error('unavailable') }, removeItem: () => { throw new Error('unavailable') } }
+    expect(loadEditorDraft(broken, scope, 'template', 'message')).toBeNull()
+    expect(() => persistEditorDraft(broken, scope, 'template', 'message', draft)).not.toThrow()
+    expect(() => clearEditorDraft(broken, scope, 'template', 'message')).not.toThrow()
   })
 })

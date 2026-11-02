@@ -117,3 +117,45 @@ export function clearCreationAttempt(storage: StoragePort, scope: CreationScope,
     if (storage.getItem(key) !== null) throw storageError()
   } catch { throw storageError() }
 }
+/*
+ * H-18原文（再読込で入力が消える）の子画面の通常入力の一時下書き。結果不明の送信依頼（attempt）とは
+ * 別キーで、所属・種別・タブ（kind）を区別する。保存・取消・作り直しで消す。壊れても本機能を止めない。
+ */
+export interface EditorDraftContent { kind: string; name: string; [key: string]: unknown }
+const DRAFT_LIMIT = 262_144
+const draftKind = (kind: string): boolean => /^[A-Za-z0-9_-]{1,64}$/.test(kind)
+export function editorDraftStorageKey(scope: CreationScope, type: TemplateType, kind: string): string {
+  if (!identifier(scope.tenantId) || !identifier(scope.actorId) || !draftKind(kind)) throw storageError()
+  return `lh_hq_create_draft_v1:${scope.tenantId}:${scope.actorId}:${type}:${kind}`
+}
+function validEditorDraft(value: unknown): value is EditorDraftContent {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+    && draftKind(String((value as { kind?: unknown }).kind)) && text(String((value as { name?: unknown }).name ?? ''), 200)
+}
+export function loadEditorDraft(storage: StoragePort, scope: CreationScope, type: TemplateType, kind: string): EditorDraftContent | null {
+  let key: string
+  try { key = editorDraftStorageKey(scope, type, kind) } catch { return null }
+  try {
+    const raw = storage.getItem(key)
+    if (raw === null) return null
+    const record: unknown = JSON.parse(raw)
+    if (!object(record, ['version', 'tenantId', 'actorId', 'type', 'kind', 'draft']) || record.version !== 1 || record.tenantId !== scope.tenantId || record.actorId !== scope.actorId || record.type !== type || record.kind !== kind || !validEditorDraft(record.draft)) throw new Error('draft')
+    return record.draft
+  } catch { try { storage.removeItem(key) } catch { /* 下書きの掃除失敗は無視する */ } return null }
+}
+export function persistEditorDraft(storage: StoragePort, scope: CreationScope, type: TemplateType, kind: string, draft: EditorDraftContent): void {
+  let key: string
+  try { key = editorDraftStorageKey(scope, type, kind) } catch { return }
+  if (!validEditorDraft(draft) || draft.kind !== kind) return
+  const raw = JSON.stringify({ version: 1, ...scope, type, kind, draft })
+  if (raw.length > DRAFT_LIMIT) return
+  try {
+    storage.setItem(key, raw)
+    if (storage.getItem(key) !== raw) storage.removeItem(key)
+  } catch { /* 下書きの保存失敗は本機能を止めない */ }
+}
+export function clearEditorDraft(storage: StoragePort, scope: CreationScope, type: TemplateType, kind: string): void {
+  let key: string
+  try { key = editorDraftStorageKey(scope, type, kind) } catch { return }
+  try { storage.removeItem(key) } catch { /* 下書きの掃除失敗は無視する */ }
+}

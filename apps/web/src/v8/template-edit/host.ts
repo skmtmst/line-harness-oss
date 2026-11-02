@@ -47,6 +47,8 @@ export interface TemplateEditHost {
   notice?: ReactNode
   /** 下書きを保存（distribute=false）・保存して配る（distribute=true）。 */
   onSave: (content: TemplateHostContent, distribute: boolean) => void | boolean | Promise<void | boolean>
+  /** 入力が変わるたびの一時下書き（H-18原文の再読込対策）。保存と同じ形。無い呼ぶ側では呼ばない。 */
+  onDraftChange?: (content: TemplateHostContent) => void
   onCancel: () => void
   /** 主ボタンの言葉（既定「保存して配る」）。 */
   primaryLabel?: string
