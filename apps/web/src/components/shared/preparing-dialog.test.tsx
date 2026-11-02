@@ -7,14 +7,16 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 
 afterEach(cleanup)
 
-test('機能の名前を入れて「現在準備中です」を出し、閉じるで閉じる（・fuQxi）', () => {
+test('機能の名前を入れて「現在準備中です」を出し、右上の×で閉じる（フッターの閉じるは置かない・UI-25）', () => {
   const close = vi.fn()
   render(<PreparingDialog open feature="お支払い" onClose={close} />)
   expect(screen.getByRole('dialog', { name: PREPARING_TITLE })).toBeTruthy()
   expect(screen.getByText('「お支払い」は、いま準備をしています。使えるようになったら、お知らせでお伝えします。')).toBeTruthy()
   expect(screen.getByText('今の予約やデータには影響ありません。')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'お知らせを見る' }).getAttribute('href')).toBe('/notifications')
-  fireEvent.click(screen.getAllByRole('button', { name: '閉じる' }).at(-1)!)
+  /* 「閉じる」という名の操作は右上の×だけ。 */
+  expect(screen.getAllByRole('button', { name: '閉じる' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
   expect(close).toHaveBeenCalled()
 })
 

@@ -4,7 +4,7 @@ import { DetailContent, DetailField, DetailSection, DetailSectionTitle } from '@
 import PeriodPicker from '@/components/shared/period-picker'
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Download } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { StoreComparisonDetail, HqAttentionKind, StoreComparisonResult, StoreComparisonRow } from '@line-crm/shared'
 import { ListPage, ListPagePagination, ListPageSection } from '@/components/templates'
@@ -21,7 +21,6 @@ import PageSizeSelect from '@/components/shared/page-size-select'
 import { pastPeriod } from '@/components/shared/period-picker'
 import Select from '@/components/shared/select'
 import { DataTable, SortTh, TableHeadRow, Td, Th, Tr, type SortDirection } from '@/components/shared/table'
-import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import Toggle from '@/components/shared/toggle'
 import TruncatedText from '@/components/shared/truncated-text'
 import { useAccount } from '@/contexts/account-context'
@@ -66,7 +65,6 @@ function rangeLabel(from: string, to: string): string {
 export default function StoreComparisonList() {
   usePageTitle('比較・分析')
   usePageCrumbs([{ label: 'ホーム', href: '/hq' }])
-  const preparing = usePreparingDialog()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -179,10 +177,6 @@ export default function StoreComparisonList() {
         <PeriodPicker days={days} onChange={(value) => { setPage(1); setDays(Number(value)) }} />
         <Select aria-label="比べる相手" value={compare} options={COMPARE_OPTIONS} onChange={(value) => { setPage(1); setCompare(value as 'previous' | 'average') }} />
         <DiffOnlyToggle checked={diffOnly} onChange={setDiffOnly} />
-        <Button variant="secondary" className="justify-between" onClick={() => preparing.open('店の組での絞り込み')}>
-          <span>店の組：すべて</span>
-          <ChevronDown size={16} aria-hidden="true" />
-        </Button>
       </>}
       trailing={<>
         <PageSizeSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next as 10 | 20 | 50) }} />
@@ -280,7 +274,6 @@ export default function StoreComparisonList() {
         {body}
       </ListPage>
       <StoreDrawer row={openRow} period={period} compare={compare} average={data?.average ?? null} diffOnly={diffOnly} onDiffOnly={setDiffOnly} onClose={() => setOpenId(null)} />
-      {preparing.dialog}
     </>
   )
 }

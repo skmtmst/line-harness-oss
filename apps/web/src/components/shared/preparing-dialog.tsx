@@ -11,7 +11,8 @@ import styles from './preparing-dialog.module.css'
  *
  * まだ口（API）が無い機能は、入口・ボタンを絵どおりに置き、押すとこの窓で「準備中」を伝える。
  * 壊れた画面・空の画面・押せないボタンは出さない。窓は 480・題・印の丸・本文2行・
- * ［お知らせを見る］［閉じる］（中央）。中身の文は機能の名前だけを差し替える。
+ * ［お知らせを見る］（中央）。閉じ方は右上の×に一本化し、フッターの「閉じる」は置かない（UI-25）。
+ * 中身の文は機能の名前だけを差し替える。
  *
  * 使い方（どの画面からも同じ）：
  *   const preparing = usePreparingDialog
@@ -53,7 +54,6 @@ export default function PreparingDialog({ open, feature, note = '今の予約や
       footer={(
         <DialogActions>
           {noticeHref ? <Button href={noticeHref} onClick={onClose}>お知らせを見る</Button> : null}
-          <Button variant="primary" onClick={onClose}>閉じる</Button>
         </DialogActions>
       )}
     >
