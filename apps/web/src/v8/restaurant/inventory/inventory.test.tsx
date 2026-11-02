@@ -282,3 +282,13 @@ it('指定店が見つからなければ別の店を開かない', async () => {
   await screen.findByText('指定された店舗を確認できません')
   expect(fixture.openingHours).not.toHaveBeenCalled()
 })
+
+it('営業時間への案内は対象へ一度移動し、店の指定を残して目印を消す', async () => {
+  const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
+  window.history.replaceState(null, '', '/restaurant-test/inventory?storeId=store-1#rs-hours-title')
+  render(<InventoryPage />)
+  await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: 'start' }))
+  expect(window.location.search).toBe('?storeId=store-1')
+  expect(window.location.hash).toBe('')
+  scroll.mockRestore()
+})
