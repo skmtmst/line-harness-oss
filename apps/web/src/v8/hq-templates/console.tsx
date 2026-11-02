@@ -124,7 +124,23 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const entryHandled = useRef('')
   const entryHref = (id: string, mode: 'detail' | 'edit') => `${listPath}?item=${encodeURIComponent(id)}&mode=${mode}`
   /* 作る画面にも URL を付ける（H-18）。読み直しても入力が消えないよう mode=create で開き直せる。 */
-  const showCreateUrl = () => { entryHandled.current = 'create'; window.history.replaceState(window.history.state, '', destination(`${listPath}?mode=create`)); notifyListLocation() }
+  /* 一覧の種別（?type=）は引き継ぎ、再読込で別種別へ落ちない（PR#2042中）。無い時は従来通り付けない。 */
+  const inheritedTypeParam = () => new URLSearchParams(location.split('?')[1]?.split('#')[0] ?? '').get('type') ?? ''
+  const createHref = () => {
+    const query = new URLSearchParams()
+    const inherited = inheritedTypeParam()
+    if (inherited) query.set('type', inherited)
+    query.set('mode', 'create')
+    return `${listPath}?${query.toString()}`
+  }
+  const listHrefKeepingType = (href: string) => {
+    const inherited = inheritedTypeParam()
+    if (!inherited) return href
+    const url = new URL(href, 'http://localhost')
+    url.searchParams.set('type', inherited)
+    return `${url.pathname}${url.search}${url.hash}`
+  }
+  const showCreateUrl = () => { entryHandled.current = 'create'; window.history.replaceState(window.history.state, '', destination(createHref())); notifyListLocation() }
   const [folderDistribution, setFolderDistribution] = useState<{ name: string; templates: HqTemplate[] } | null>(null)
   const [folderBatch, setFolderBatch] = useState<{ name: string; runs: FolderRun[]; index: number; history: FolderRun[] } | null>(null)
   const folderBatchRef = useRef(folderBatch)
@@ -344,7 +360,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
     flushListUrlState()
     entryHandled.current = ''
-    window.history.replaceState(window.history.state, '', returnHref)
+    window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref))
     notifyListLocation()
   }
   toListRef.current = toList
@@ -382,6 +398,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     if (params.get('mode') === 'create') {
       if (!canEdit || entryHandled.current === 'create') return
       entryHandled.current = 'create'
+      /* 結果不明の復旧依頼がある再読込では startCreate で依頼・入力を消さない（PR#2042高）。 */
+      if (createAttempt.current) return
       startCreate()
       return
     }
@@ -479,7 +497,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     }
     // R561: 「保存して続けて作る」は新規作成のときだけ、空の新規入力へ戻る。
     else if (andAnother && isNew) { setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
-    else if (isNew) { flushListUrlState(); entryHandled.current = ''; window.history.replaceState(window.history.state, '', returnHref); notifyListLocation(); setStage('list') }
+    else if (isNew) { flushListUrlState(); entryHandled.current = ''; window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref)); notifyListLocation(); setStage('list') }
     else {
       setStage('edit')
       flushListUrlState()

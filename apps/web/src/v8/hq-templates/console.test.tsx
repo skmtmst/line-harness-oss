@@ -647,6 +647,25 @@ it('種類を替えると前の種類の行を隠し、遅い前の応答も表�
   expect(screen.queryByRole('link', { name: '動画だけの案内' })).toBeNull()
 })
 
+it('?mode=createの再読込でも結果不明の復旧依頼を消さない（PR#2042高）', async () => {
+  const { persistCreationAttempt } = await import('@/lib/hq-template-create-attempt')
+  persistCreationAttempt(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'template', {
+    requestId: 'req-recovery-1',
+    distribute: false,
+    input: { type: 'template', name: '人工テスト', description: '', definition: message, folderId: null },
+  })
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  expect(await screen.findByDisplayValue('人工テスト')).toBeTruthy()
+  expect(await screen.findByText(/前回の保存結果がまだ確定していません/)).toBeTruthy()
+})
+it('作る画面のURLは一覧の種別（?type=）を引き継ぐ（PR#2042中）', async () => {
+  window.history.replaceState(null, '', '/hq/templates?type=scenario')
+  render(<HqTemplatesV8 type="template" />)
+  fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+  await waitFor(() => expect(new URLSearchParams(window.location.search).get('mode')).toBe('create'))
+  expect(new URLSearchParams(window.location.search).get('type')).toBe('scenario')
+})
 it('未配布ありの1件を消すと数の帯を取り直す（B25）', async () => {
   calls.listStats
     .mockResolvedValueOnce({ thisMonthSentCount: 0, outdatedTemplateCount: 1 })
