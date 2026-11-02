@@ -246,3 +246,17 @@ describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
   });
 
 });
+
+it('飲食メニューが使う登録画像は削除できず、影響から編集先へ進める', async () => {
+  raw.exec(`INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','架空組織');
+    INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','架空店','S','a');
+    INSERT INTO rt_menu_items(id,store_id,kind,name,price,image_media_id) VALUES('dish','store','course','架空コース',1000,'p');`);
+  const storageDelete = vi.fn();
+  const bindings = { DB: db, WORKER_URL:'https://worker.test', IMAGES:{ delete:storageDelete } } as unknown as Env['Bindings'];
+  const preview = await app.request('/api/media/p/delete-impact?accountId=a', {}, bindings);
+  expect(preview.status).toBe(200);
+  expect(await preview.json()).toMatchObject({ data:{ canDelete:false, usageCount:1, references:[expect.objectContaining({kind:'restaurant_menu', name:'架空コース', href:'/restaurant-test/menu/edit?id=dish'})] } });
+  const deletion = await app.request('/api/media/p?accountId=a', { method:'DELETE' }, bindings);
+  expect(deletion.status).toBe(409);
+  expect(storageDelete).not.toHaveBeenCalled();
+});

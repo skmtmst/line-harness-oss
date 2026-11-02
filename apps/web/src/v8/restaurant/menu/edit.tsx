@@ -23,14 +23,16 @@ import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
-import { Field } from '@/components/shared/form-controls'
+import { Field, TextArea } from '@/components/shared/form-controls'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
+import MediaThumbnail from '@/components/shared/media-thumbnail'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { TextField } from '@/components/shared/text-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifySaved } from '@/components/shared/toast'
 import { emptyValue } from '@/components/shared/empty-value'
 import { useAccount } from '@/contexts/account-context'
-import { fetchApi } from '@/lib/api'
+import { api, fetchApi } from '@/lib/api'
 import { formatDateTime as polishFormatDateTime, formatYen } from '@/lib/format'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -47,7 +49,7 @@ import styles from './edit.module.css'
  */
 
 type Period = 'lunch' | 'dinner' | 'both'
-type Draft = { kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string; status: 'draft' | 'active' }
+type Draft = { kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string; description: string; imageMediaId: string | null; status: 'draft' | 'active' }
 const LIST_HREF = '/restaurant-test/menu'
 
 
@@ -55,12 +57,12 @@ function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
 }
 function draftOf(item: RestaurantMenuItem | null): Draft {
-  if (!item) return { kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '', status: 'draft' }
+  if (!item) return { kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '', description: '', imageMediaId: null, status: 'draft' }
   const periods = storedStringList(item.service_periods_json)
   return {
     kind: item.kind, name: item.name, price: String(item.price),
     period: periods.length > 1 ? 'both' : periods[0] === 'lunch' ? 'lunch' : 'dinner',
-    effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '), status: item.status === 'draft' ? 'draft' : 'active',
+    effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '), description: item.description ?? '', imageMediaId: item.image_media_id ?? null, status: item.status === 'draft' ? 'draft' : 'active',
   }
 }
 
@@ -76,6 +78,10 @@ function MenuEditBody() {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [item, setItem] = useState<RestaurantMenuItem | null>(null)
   const [storeId, setStoreId] = useState<string | null>(null)
+  const [storeAccountId, setStoreAccountId] = useState<string | null>(null)
+  const [mediaOpen, setMediaOpen] = useState(false)
+  const [mediaName, setMediaName] = useState<string | null>(null)
+  const [imageFailed, setImageFailed] = useState(false)
   const [draft, setDraft] = useState<Draft>(draftOf(null))
   const [saved, setSaved] = useState<Draft>(draftOf(null))
   const [busy, setBusy] = useState(false)
@@ -91,7 +97,9 @@ function MenuEditBody() {
       const response = await restaurantTestApi.snapshot(selectedAccountId)
       const found = id ? response.data.menuItems.find((row) => row.id === id) ?? null : null
       setItem(found)
-      setStoreId(found?.store_id ?? storeParam ?? response.data.stores[0]?.id ?? null)
+      const nextStoreId = found?.store_id ?? storeParam ?? response.data.stores[0]?.id ?? null
+      setStoreId(nextStoreId)
+      setStoreAccountId(response.data.stores.find(store => store.id === nextStoreId)?.line_account_id ?? null)
       setDraft(draftOf(found)); setSaved(draftOf(found))
       setState('ready')
     } catch {
@@ -99,6 +107,16 @@ function MenuEditBody() {
     }
   }, [selectedAccountId, id, storeParam])
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    let active = true
+    setMediaName(null)
+    setImageFailed(false)
+    if (draft.imageMediaId && storeAccountId) void api.media.detail(draft.imageMediaId, storeAccountId)
+      .then(result => { if (active) setMediaName(result.success ? result.data.item.filename : '画像名を確認できませんでした') })
+      .catch(() => { if (active) setMediaName('画像名を確認できませんでした') })
+    return () => { active = false }
+  }, [draft.imageMediaId, storeAccountId])
 
   const editing = item
   const course = draft.kind === 'course'
@@ -116,7 +134,7 @@ function MenuEditBody() {
   const contextKey = JSON.stringify([selectedAccountId, id, storeParam])
   const mutationContext = useRef<{ key: string; menuSignature: string | null }>({ key: contextKey, menuSignature: null })
   if (mutationContext.current.key !== contextKey) mutationContext.current = { key: contextKey, menuSignature: null }
-  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setError(null) }, [contextKey])
+  useEffect(() => { setMediaOpen(false); setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setError(null) }, [contextKey])
 
   async function save() {
     if (!canEdit || !selectedAccountId || !valid) return
@@ -127,6 +145,7 @@ function MenuEditBody() {
     setBusy(true); setError(null)
     const body = {
       kind: draft.kind, name: draft.name, price: Number(draft.price),
+      description: draft.description.trim() || null, ...(editing && draft.imageMediaId === (editing.image_media_id ?? null) ? {} : { imageMediaId: draft.imageMediaId }),
       effectiveAt: draft.effectiveAt ? datetimeLocalJstToUtcIso(draft.effectiveAt) : null,
       allergens: draft.allergens.split(',').map((part) => part.trim()).filter(Boolean),
       servicePeriods: draft.period === 'both' ? ['lunch', 'dinner'] : [draft.period],
@@ -249,6 +268,15 @@ function MenuEditBody() {
                 <SaveErrorField names={['effectiveAt', 'draft.effectiveAt', 'effective_at', 'draft.effective_at']}><DateTimeField id="rs-menu-effective" aria-label={editing ? '新しい価格の開始日時' : '価格の開始日時'} value={draft.effectiveAt} onChange={(next) => setDraft({ ...draft, effectiveAt: next })} /></SaveErrorField>
               </Field>
             </SettingsFormRow>
+            <Field label="メニューの説明" htmlFor="rs-menu-description" note="2,000文字まで">
+              <SaveErrorField names={['description', 'draft.description']}><TextArea id="rs-menu-description" aria-label="メニューの説明" rows={3} maxLength={2000} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></SaveErrorField>
+            </Field>
+            <Field label="メニューの画像">
+              {draft.imageMediaId && storeAccountId && !imageFailed ? <span onErrorCapture={() => setImageFailed(true)}><MediaThumbnail size="compact" kind="image" src={api.media.contentUrl(draft.imageMediaId, storeAccountId)} alt="選択したメニューの画像" /></span> : imageFailed ? <p>画像なし</p> : null}
+              <Button type="button" disabled={!storeAccountId || busy} disabledReason={!storeAccountId ? '店舗にLINEアカウントを設定すると画像を選べます。' : undefined} onClick={() => setMediaOpen(true)}>登録メディアから選ぶ</Button>
+              {draft.imageMediaId ? <Button type="button" onClick={() => setDraft({ ...draft, imageMediaId: null })} disabled={busy}>選んだ画像を外す</Button> : null}
+              <p>{draft.imageMediaId ? mediaName ? `選択中：${mediaName}` : '選択中の画像名を確認しています' : '画像はまだ選んでいません'}</p>
+            </Field>
             <Field label="アレルギー（カンマ区切り）" htmlFor="rs-menu-allergens">
               <SaveErrorField names={['allergens', 'draft.allergens']}><TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} /></SaveErrorField>
             </Field>
@@ -264,6 +292,8 @@ function MenuEditBody() {
             ...(editing?.pendingPrice != null ? [{ label: '変更予定の価格', value: formatYen(editing.pendingPrice) }] : []),
             { label: '提供時間', value: editing ? periodLabel(storedStringList(editing.service_periods_json)) : emptyValue('unknown') },
             { label: '所要時間', value: editing?.duration_minutes ? `${editing.duration_minutes}分` : emptyValue('unknown') },
+            { label: '説明', value: draft.description || emptyValue('unconfigured') },
+            { label: '画像', value: draft.imageMediaId ? (mediaName || '画像名を確認中') : emptyValue('unconfigured') },
             { label: 'アレルギー', value: draft.allergens || emptyValue('none') },
             { label: '変更後の価格の開始日時', value: editing?.pendingEffectiveAt ? polishFormatDateTime(new Date(editing.pendingEffectiveAt)) : emptyValue('unconfigured') },
           ]} />
@@ -275,6 +305,7 @@ function MenuEditBody() {
           </Card>
         ) : course && canEdit ? <p className={styles.note}>お支払いの方法は、コースを追加したあとにこのページで決められます。</p> : null}
       </CreatePage>
+      <MediaPickerDialog open={mediaOpen} accountId={storeAccountId} kind="image" accountOnly title="メニューの画像を選ぶ" onClose={() => setMediaOpen(false)} onSelect={media => { setDraft(current => ({ ...current, imageMediaId: media.id })); setMediaName(media.filename); setMediaOpen(false) }} />
       <ConfirmDialog open={deleting} title="このメニューを削除しますか？" description={`「${editing?.name ?? ''}」を削除します。予約や設定で使われていないメニューだけ削除できます。元に戻せません。`}
         confirmLabel="削除する" destructive busy={busy} onCancel={() => setDeleting(false)} error={error || undefined} onSuccess={() => setDeleting(false)} onConfirm={() => remove()} />
       <ConfirmDialog open={confirmingPrice} title="価格変更を確定しますか？"

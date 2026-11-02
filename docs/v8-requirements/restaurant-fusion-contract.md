@@ -63,3 +63,7 @@ allergy/anniversary/seat_preference は friend_fixed_fields で既存の情報�
 ## 操作と挙動（受け入れ）
 
 操作したらどう動くか・連携とエラー・日々の手順・今の作りとの食い違いは [飲食 操作と挙動](behavior/restaurant-fusion.md) にまとめた（2026-10-16 B-333）。 お金まわり・業種のダッシュボードは [style-and-money](behavior/style-and-money.md)、外のサービスの失敗は [integration-failures](behavior/integration-failures.md)、毎日の流れは [daily-operations](behavior/daily-operations.md)。
+
+## 飲食メニューの説明と画像（R2-18）
+
+2026-10-31 オーナー決定 A：メニューに説明と画像を追加する。画像は店舗の LINE アカウントに属する登録メディアの画像から選び、説明・画像は未設定でも保存できる。並び順は今回扱わず、公開状態は既存の下書き・公開・停止の操作を使う。使用中の画像は使用先を確認でき、削除で画像を失わない。
