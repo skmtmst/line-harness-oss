@@ -443,7 +443,7 @@ function RewardEditorInner() {
       </>} dirty={false}
     >
       {failure && feedback.state.kind === 'idle' ? <Notice tone="danger" message={failure} /> : null}
-      <SaveFeedback state={feedback.state} onRetry={() => save(retryPublish.current)} />
+      <SaveFeedback state={feedback.state} onRetry={() => { if (retryPublish.current && !publishTarget) requestPublish(); else void save(retryPublish.current) }} />
       {testResult ? (
         <Notice tone={testResult.canDeliver ? 'success' : 'warn'}>
           {testResult.canDeliver

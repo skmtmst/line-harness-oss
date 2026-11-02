@@ -272,6 +272,32 @@ describe('V8 NEN配信の一覧', () => {
 
 afterEach(() => { verifiedStaffRole(null) })
 
+it('別アカウントの読み直し中は停止中の自動配信を動かせない', async () => {
+ const props = baseProps({ currentAccountData: false })
+ await render(props)
+ await act(async () => { fireEvent.click(button('「困っていませんか」の操作')!) })
+ const start = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim().startsWith('動かす'))!
+ await act(async () => { fireEvent.click(start) })
+ expect(props.onToggleSetting).not.toHaveBeenCalled()
+})
+it.each([true, false])('別アカウントの読み直し中はコラム配信の状態を変えない（有効=%s）', async enabled => {
+ const props = baseProps({ tab: 'columns', currentAccountData: false, settings: SETTINGS.map(item => item.campaignKey === 'column' ? { ...item, isEnabled: enabled } : item) })
+ await render(props)
+ await act(async () => { fireEvent.click(button('よく使う絞り込み')!) })
+ const item = [...document.querySelectorAll('[role="menuitem"]')].find(node => node.textContent?.trim().startsWith(enabled ? 'コラム配信を止める' : 'コラム配信を動かす'))!
+ await act(async () => { fireEvent.click(item) })
+ expect(props.onToggleSetting).not.toHaveBeenCalled()
+})
+it('コラム配信の停止は対象の確認を通す', async () => {
+ const props = baseProps({ tab: 'columns' })
+ await render(props)
+ await act(async () => { fireEvent.click(button('よく使う絞り込み')!) })
+ const item = [...document.querySelectorAll('[role="menuitem"]')].find(node => node.textContent?.trim() === 'コラム配信を止める')!
+ await act(async () => { fireEvent.click(item) })
+ expect(props.onToggleSetting).not.toHaveBeenCalled()
+ expect(screen.getByRole('alertdialog').textContent).toContain('LINEアカウント')
+})
+
 it('別アカウントの情報を読み直す間はコラム配信の確認を開けない', async () => {
  await render(baseProps({ tab: 'columns', selectedColumnId: 'c-1', currentAccountData: false }))
  expect(button('配信を予約する')?.disabled).toBe(true)

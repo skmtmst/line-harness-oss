@@ -296,8 +296,11 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
   const [stopTarget, setStopTarget] = useState<NenCampaignSetting | null>(null)
   const scope = useRef({ id: props.accountId, generation: 0 })
   if (scope.current.id !== props.accountId) scope.current = { id: props.accountId, generation: scope.current.generation + 1 }
+  const renderedScope = scope.current
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
+  const currentDataRef = useRef(props.currentAccountData)
+  currentDataRef.current = props.currentAccountData
   const alive = useRef(false)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const [stopScope, setStopScope] = useState<{ id: string; generation: number } | null>(null)
@@ -342,8 +345,8 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
       items.push({ id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestSend(setting) })
       if (setting.campaignKey === 'birthday_coupon') items.push({ id: 'coupon', label: 'クーポンの決めごと', onSelect: () => props.onCouponOpenChange(true) })
       items.push(setting.isEnabled
-        ? { id: 'stop', label: '止める', disabled: props.saving === setting.campaignKey || props.currentAccountData === false, onSelect: () => { if (!props.accountId || !canEditRef.current || props.currentAccountData === false) return; setStopScope({ id: props.accountId, generation: scope.current.generation }); setStopTried(false); setStopTarget(setting) } }
-        : { id: 'start', label: '動かす', disabled: props.saving === setting.campaignKey, onSelect: () => props.onToggleSetting(setting) })
+        ? { id: 'stop', label: '止める', disabled: props.saving === setting.campaignKey || props.currentAccountData === false, disabledReason: props.currentAccountData === false ? '選択中のLINEアカウントの情報を読み直してください。' : undefined, onSelect: () => { if (!props.accountId || renderedScope !== scope.current || !alive.current || !canEditRef.current || currentDataRef.current === false) return; setStopScope({ id: props.accountId, generation: scope.current.generation }); setStopTried(false); setStopTarget(setting) } }
+        : { id: 'start', label: '動かす', disabled: props.saving === setting.campaignKey || props.currentAccountData === false, disabledReason: props.currentAccountData === false ? '選択中のLINEアカウントの情報を読み直してください。' : undefined, onSelect: () => { if (renderedScope !== scope.current || !alive.current || !canEditRef.current || currentDataRef.current === false) return; return props.onToggleSetting(setting) } })
     } else if (setting.campaignKey === 'birthday_coupon') {
       items.push({ id: 'coupon', label: 'クーポンの決めごと', onSelect: () => props.onCouponOpenChange(true) })
     }
@@ -449,7 +452,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
       <ConfirmDialog open={stopTarget !== null && stopScope?.generation === scope.current.generation} title={`「${stopTarget?.label ?? ''}」を止めますか？`}
         description="止めると、そのあとの注文・発送・誕生日などのきっかけでは、この自動配信を送りません。すでに送った配信は取り消されません。"
         confirmLabel="止める" destructive busy={Boolean(stopTarget && props.saving === stopTarget.campaignKey)}
-        error={stopTried && props.notice?.tone === 'error' ? props.notice.text : undefined} onSuccess={() => setStopTarget(null)} onCancel={() => setStopTarget(null)} onConfirm={() => { if (!stopTarget || !stopScope || !alive.current || !canEditRef.current || stopScope.generation !== scope.current.generation) return; setStopTried(true); return props.onToggleSetting(stopTarget) }} >{stopScope ? <OperationTargetSummary accounts={[{ id: stopScope.id }]} /> : null}</ConfirmDialog>
+        error={stopTried && props.notice?.tone === 'error' ? props.notice.text : undefined} onSuccess={() => setStopTarget(null)} onCancel={() => setStopTarget(null)} onConfirm={() => { if (!stopTarget || !stopScope || !alive.current || !canEditRef.current || currentDataRef.current === false || stopScope.generation !== scope.current.generation) return; setStopTried(true); return props.onToggleSetting(stopTarget) }} >{stopScope ? <OperationTargetSummary accounts={[{ id: stopScope.id }]} /> : null}</ConfirmDialog>
       <CampaignPreviewDrawer {...props} canEdit={canEdit} />
     </>
   )
@@ -618,6 +621,17 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
   const [page, setPage] = useListUrlValue('page', 1)
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [savedOpen, setSavedOpen] = useState(false)
+  const [stopTarget, setStopTarget] = useState<{ setting: NenCampaignSetting; accountId: string; generation: number } | null>(null)
+  const [stopTried, setStopTried] = useState(false)
+  const scope = useRef({ id: props.accountId, generation: 0 })
+  if (scope.current.id !== props.accountId) scope.current = { id: props.accountId, generation: scope.current.generation + 1 }
+  const renderedScope = scope.current
+  const currentDataRef = useRef(props.currentAccountData)
+  currentDataRef.current = props.currentAccountData
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const savedRef = useRef<HTMLSpanElement | null>(null)
 
   const categories = useMemo(() => {
@@ -693,7 +707,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                   items={[
                     ...categories.map(([name, count]) => ({ id: name, label: `${name} ${count}`, onSelect: () => { setCategory(name); setPage(1); setSavedOpen(false) } })),
                     ...(category ? [{ id: 'clear', label: '絞り込みを外す', onSelect: () => { setCategory(''); setPage(1); setSavedOpen(false) } }] : []),
-                    ...(canEdit && columnSetting ? [{ id: 'toggle-column', label: columnSetting.isEnabled ? 'コラム配信を止める' : 'コラム配信を動かす', disabled: props.saving === columnSetting.campaignKey, onSelect: () => { props.onToggleSetting(columnSetting); setSavedOpen(false) } }] : []),
+                    ...(canEdit && columnSetting ? [{ id: 'toggle-column', label: columnSetting.isEnabled ? 'コラム配信を止める' : 'コラム配信を動かす', disabled: props.saving === columnSetting.campaignKey || props.currentAccountData === false, disabledReason: props.currentAccountData === false ? '選択中のLINEアカウントの情報を読み直してください。' : undefined, onSelect: () => { if (!props.accountId || renderedScope !== scope.current || !alive.current || !canEditRef.current || currentDataRef.current === false) return; if (columnSetting.isEnabled) { setStopTried(false); setStopTarget({ setting: columnSetting, accountId: props.accountId, generation: scope.current.generation }) } else void props.onToggleSetting(columnSetting); setSavedOpen(false) } }] : []),
                   ]}
                 />
               </span>
@@ -767,6 +781,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
         </>
       )}
       <SelectedColumn {...props} />
+      <ConfirmDialog open={stopTarget !== null && stopTarget.generation === scope.current.generation} title="コラム配信を止めますか？" description="止めるとコラムの配信を送れません。すでに送った配信は取り消されません。" confirmLabel="止める" destructive busy={Boolean(stopTarget && props.saving === stopTarget.setting.campaignKey)} error={stopTried && props.notice?.tone === 'error' ? props.notice.text : undefined} onCancel={() => setStopTarget(null)} onSuccess={() => setStopTarget(null)} onConfirm={() => { if (!stopTarget || !alive.current || !canEditRef.current || currentDataRef.current === false || stopTarget.generation !== scope.current.generation) return; setStopTried(true); return props.onToggleSetting(stopTarget.setting) }}>{stopTarget ? <OperationTargetSummary accounts={[{ id: stopTarget.accountId }]} /> : null}</ConfirmDialog>
       <Dialog open={previewColumn !== null} title="コラムのLINEでの見え方" onCancel={() => setPreviewId(null)}>
         {previewColumn ? <ColumnPreview column={previewColumn} introText={props.selectedColumnId === previewColumn.id ? props.introDraft : previewColumn.introText} buttonLabel={columnSetting?.buttonLabel ?? 'コラムを読む'} /> : null}
       </Dialog>

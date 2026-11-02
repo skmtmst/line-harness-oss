@@ -22,6 +22,18 @@ it('公開の確認に対象を表示する', async () => {
  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
  expect(within(dialog).getByText('環境')).toBeTruthy()
 })
+it('共通の質問はすべてのLINEアカウントと表示する', async () => {
+ state.get.mockResolvedValue({ success: true, data: { name: '質問', accountId: null, question: { text: 'よろしいですか', tapMode: 'single', choices: [{ key: 'yes', label: 'はい', behavior: 'none' }] }, usedBy: { scenarios: [{ id: 'scenario' }] }, publishedVersion: 1, draftRevision: 1 } })
+ render(<QuestionNewV8 />)
+ expect(within(await open()).getByText('すべてのLINEアカウント')).toBeTruthy()
+})
+it('所属の項目が欠けた質問は共通と断定しない', async () => {
+ state.get.mockResolvedValue({ success: true, data: { name: '質問', question: { text: 'よろしいですか', tapMode: 'single', choices: [{ key: 'yes', label: 'はい', behavior: 'none' }] }, usedBy: { scenarios: [{ id: 'scenario' }] }, publishedVersion: 1, draftRevision: 1 } })
+ render(<QuestionNewV8 />)
+ const dialog = await open()
+ expect(within(dialog).queryByText('すべてのLINEアカウント')).toBeNull()
+ expect(within(dialog).getByText('名前を確認できません')).toBeTruthy()
+})
 it('アカウントを切り替えて戻した古い確認では公開しない', async () => {
  const view = render(<QuestionNewV8 />)
  const dialog = await open()

@@ -71,6 +71,26 @@ it('公開だけ失敗したら下書きを重ねず、入力変更後は新し�
  ])
 })
 
+it('公開失敗後に確認を閉じて再試行すると対象をもう一度確認する',async()=>{
+ const { ApiError } = await import('@/lib/api')
+ f.publish.mockReset().mockRejectedValueOnce(new ApiError(500,'人工の公開失敗')).mockResolvedValue({success:true,data:{id:'synthetic-1',status:'published'}})
+ await act(async()=>root.render(<Editor/>))
+ await input('reward-name','人工の特典');await input('reward-miles','100')
+ await click('保存して出す')
+ const confirm=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開')!
+ await act(async()=>{confirm.click()})
+ expect(f.publish).toHaveBeenCalledTimes(1)
+ const dialog=document.querySelector('[role="dialog"]')!
+ const cancel=[...dialog.querySelectorAll('button')].find(b=>b.textContent?.trim()==='キャンセル')!
+ await act(async()=>{cancel.click()})
+ await click('残りだけもう一度')
+ expect(f.publish).toHaveBeenCalledTimes(1)
+ expect(document.querySelector('[role="dialog"]')?.textContent).toContain('LINEアカウント')
+ const retry=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開')!
+ await act(async()=>{retry.click()})
+ expect(f.publish).toHaveBeenCalledTimes(2)
+})
+
 it('公開確認に操作対象を表示する',async()=>{
  await act(async()=>root.render(<Editor/>))
  await input('reward-name','人工の特典');await input('reward-miles','100')

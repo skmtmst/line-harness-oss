@@ -96,6 +96,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [actionIndex, setActionIndex] = useState<number | null>(null)
   const [actionDraft, setActionDraft] = useState<ScenarioQuestion | null>(null)
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
+  const [templateAccountKnown, setTemplateAccountKnown] = useState(false)
   const [initialQuestion] = useState<ScenarioQuestion>(() => hostInitial?.question ?? emptyQuestion())
   const [question, setQuestion] = useState<ScenarioQuestion>(initialQuestion)
   const [usageCount, setUsageCount] = useState(0)
@@ -103,7 +104,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
-  const [publishTarget, setPublishTarget] = useState<{ accountId: string; generation: number } | null>(null)
+  const [publishTarget, setPublishTarget] = useState<{ accountId: string; allAccounts: boolean; generation: number } | null>(null)
   const canMutate = useFeatureAccess('templates')
   const canMutateRef = useRef(canMutate)
   canMutateRef.current = canMutate
@@ -148,6 +149,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         editVersion.current = { expectedVersion: template.data.publishedVersion, expectedDraftRevision: template.data.draftRevision }
         setName(template.data.name)
         setTemplateAccountId(template.data.accountId ?? null)
+        setTemplateAccountKnown(Object.prototype.hasOwnProperty.call(template.data, 'accountId') && template.data.accountId !== undefined)
         loadedScope.current = requestScope
         setCategory(template.data.category || '未分類')
         setFolderId(template.data.folderId ?? null)
@@ -228,7 +230,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     if (id && templateAccountId && templateAccountId !== selectedAccountId) return
     if (id && usageCount > 0) {
       if (!selectedAccountId || !canMutateRef.current || loadedScope.current !== scope.current.generation) return
-      setPublishTarget({ accountId: templateAccountId ?? '', generation: scope.current.generation })
+      setPublishTarget({ accountId: templateAccountId ?? '', allAccounts: templateAccountKnown && templateAccountId === null, generation: scope.current.generation })
       return
     }
     setPublishing(true)
@@ -406,7 +408,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           }
         }}
         onCancel={() => setPublishTarget(null)}
-      >{publishTarget ? <OperationTargetSummary accounts={[{ id: publishTarget.accountId }]} /> : null}</ConfirmDialog>
+      >{publishTarget ? <OperationTargetSummary allAccounts={publishTarget.allAccounts} accounts={publishTarget.allAccounts ? [] : [{ id: publishTarget.accountId }]} /> : null}</ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="質問への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </></SaveErrorScope>
   )
