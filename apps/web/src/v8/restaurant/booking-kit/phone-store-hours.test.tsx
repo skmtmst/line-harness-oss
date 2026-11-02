@@ -17,8 +17,8 @@ function deferred<T>() { let resolve!: (v: T) => void; const promise = new Promi
 const onSave=vi.fn()
 type Entry = 'page' | 'drawer'
 function node(entry: Entry, account: string, store: string) {
- if (entry==='drawer') return <PhoneReservationDrawer open accountId={account} storeId={store} tables={tables} onClose={vi.fn()} onSaved={vi.fn()} />
- return <PhoneReservation storeId={store} storeName="人工店舗" tables={tables} menuItems={[]} busy={false} preset={{hold:true,date:new Date('2026-11-03T00:00:00+09:00'),time:''}} onBack={vi.fn()} onSave={onSave} />
+ if (entry==='drawer') return <PhoneReservationDrawer staffRole="owner" storeName="人工店舗" open accountId={account} storeId={store} tables={tables} onClose={vi.fn()} onSaved={vi.fn()} />
+ return <PhoneReservation accountStyle="restaurant" staffRole="owner" storeId={store} storeName="人工店舗" tables={tables} menuItems={[]} busy={false} preset={{hold:true,date:new Date('2026-11-03T00:00:00+09:00'),time:''}} onBack={vi.fn()} onSave={onSave} />
 }
 const slot=(t:string)=>screen.queryByRole('button',{name:t,exact:true})
 beforeEach(()=>{scope.account='account-a'; vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-02T12:00:00+09:00')); api.openingHours.mockResolvedValue({data:{hours:aHours}});api.reservationsDay.mockResolvedValue({data:{reservations:[]}});api.customerSearch.mockResolvedValue({data:[]});api.customerHistory.mockResolvedValue({data:{visitCount:0,visits:[]}}); api.createReservation.mockResolvedValue({data:{lineNotice:{sent:false}}});onSave.mockResolvedValue(false)})
@@ -88,7 +88,7 @@ it.each<Entry>(['page','drawer'])('%s 未設定は受付を止め設定画面へ
  api.openingHours.mockResolvedValue({data:{hours:null,version:0}})
  render(node(entry,'account-a','store-a'))
  await screen.findByText(/営業時間が未設定/)
- expect(screen.getByRole('link',{name:'開ける時間を設定する'}).getAttribute('href')).toBe('/restaurant-test/inventory#rs-hours-title')
+ expect(screen.getByRole('link',{name:'開ける時間を設定する'}).getAttribute('href')).toBe('/restaurant-test/inventory?storeId=store-a#rs-hours-title')
  if(entry==='page')fireEvent.submit(document.querySelector('form')!)
  else expect((screen.getByRole('button',{name:'予約を入れる'}) as HTMLButtonElement).disabled).toBe(true)
  expect(onSave).not.toHaveBeenCalled();expect(api.createReservation).not.toHaveBeenCalled()
@@ -105,7 +105,7 @@ it.each<Entry>(['page','drawer'])('%s 休業日の理由と設定への入口を
  api.openingHours.mockResolvedValue({data:{hours:hours('17:00','23:00').map(day=>({...day,periods:[]})),version:1}})
  render(node(entry,'account-a','store-a'))
  if(entry==='drawer')fireEvent.click(screen.getByRole('button',{name:/明日/}))
- expect((await screen.findByRole('link',{name:'開ける時間を確認する'})).getAttribute('href')).toBe('/restaurant-test/inventory#rs-hours-title')
+ expect((await screen.findByRole('link',{name:'開ける時間を確認する'})).getAttribute('href')).toBe('/restaurant-test/inventory?storeId=store-a#rs-hours-title')
 })
 
 it.each<Entry>(['page','drawer'])('%s 営業時間の取得失敗から再試行し、旧応答を使わない',async entry=>{
@@ -161,4 +161,35 @@ it('drawer 日付越えの再描画前に押しても旧日付を送らない',a
  fireEvent.click(screen.getByRole('button',{name:'予約を入れる'}))
  expect(api.createReservation).not.toHaveBeenCalled()
  expect(await screen.findByText('日付が変わりました。予約日時を確認してください。')).toBeTruthy()
+})
+it.each<Entry>(['page','drawer'])('%s 店名付きの案内から対象店舗の設定へ移る', async entry => {
+ api.openingHours.mockResolvedValue({data:{hours:null,version:0}})
+ if(entry==='page') render(<PhoneReservation storeId="store-b" storeName="二号店" accountStyle="restaurant" staffRole="owner" tables={tables} menuItems={[]} busy={false} preset={{hold:true,date:new Date('2026-11-03T00:00:00+09:00'),time:''}} onBack={vi.fn()} onSave={onSave} />)
+ else render(<PhoneReservationDrawer open accountId="account-a" storeId="store-b" storeName="二号店" staffRole="owner" tables={tables} onClose={vi.fn()} onSaved={vi.fn()} />)
+ await screen.findByText(/二号店.*営業時間が未設定/)
+ expect(screen.getByRole('link',{name:'開ける時間を設定する'}).getAttribute('href')).toBe('/restaurant-test/inventory?storeId=store-b#rs-hours-title')
+})
+it.each<Entry>(['page','drawer'])('%s staff には設定を依頼する案内を出す', async entry => {
+ api.openingHours.mockResolvedValue({data:{hours:null,version:0}})
+ if(entry==='page') render(<PhoneReservation storeId="store-b" storeName="二号店" accountStyle="restaurant" staffRole="staff" tables={tables} menuItems={[]} busy={false} preset={{hold:true,date:new Date('2026-11-03T00:00:00+09:00'),time:''}} onBack={vi.fn()} onSave={onSave} />)
+ else render(<PhoneReservationDrawer open accountId="account-a" storeId="store-b" storeName="二号店" staffRole="staff" tables={tables} onClose={vi.fn()} onSaved={vi.fn()} />)
+ await screen.findByText(/管理者に営業時間の設定を依頼/)
+ expect(screen.queryByRole('link',{name:'開ける時間を設定する'})).toBeNull()
+})
+it.each([['salon','/booking/bookings/new'],['consult','/booking/bookings/new'],['lesson','/events'],['standard',null],['ec',null]] as const)('%s 旧画面では受付を止め適切な入口を案内する', async (style,href) => {
+ render(<PhoneReservation storeId="store-b" storeName="二号店" accountStyle={style} staffRole="owner" canUseAlternateBooking tables={tables} menuItems={[]} busy={false} preset={{hold:true,date:new Date('2026-11-03T00:00:00+09:00'),time:''}} onBack={vi.fn()} onSave={onSave} />)
+ await screen.findByText(/この画面は飲食店スタイルの古い予約/)
+ if(href) expect(screen.getByRole('link',{name:'予約画面へ'}).getAttribute('href')).toBe(href)
+ else expect(screen.queryByRole('link',{name:'予約画面へ'})).toBeNull()
+ fireEvent.submit(document.querySelector('form')!); expect(onSave).not.toHaveBeenCalled()
+})
+it('別スタイルの予約権限がない時はリンクを出さない', async () => {
+ render(<PhoneReservation storeId="store-b" storeName="二号店" accountStyle="salon" staffRole="staff" canUseAlternateBooking={false} tables={tables} menuItems={[]} busy={false} preset={{hold:true,date:new Date('2026-11-03T00:00:00+09:00'),time:''}} onBack={vi.fn()} onSave={onSave} />)
+ await screen.findByText(/この画面は飲食店スタイルの古い予約/)
+ expect(screen.queryByRole('link',{name:'予約画面へ'})).toBeNull()
+})
+it('教室で管理者でなければイベント管理の入口を案内しない', async () => {
+ render(<PhoneReservation storeId="store-b" storeName="二号店" accountStyle="lesson" staffRole="staff" tables={tables} menuItems={[]} busy={false} preset={{hold:true,date:new Date('2026-11-03T00:00:00+09:00'),time:''}} onBack={vi.fn()} onSave={onSave} />)
+ await screen.findByText(/この画面は飲食店スタイルの古い予約/)
+ expect(screen.queryByRole('link',{name:'予約画面へ'})).toBeNull()
 })

@@ -22,6 +22,7 @@ async function save() {
   await waitFor(() => expect(props.onSave).toHaveBeenCalled())
 }
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-02T12:00:00+09:00'))
   account.selectedAccountId = 'account-1'
   props.onSave.mockResolvedValue(false)
   api.openingHours.mockResolvedValue({ data: { hours: Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [{ opensAt: '17:00', closesAt: '23:00' }] })) } })
@@ -29,21 +30,21 @@ beforeEach(() => {
   api.customerSearch.mockResolvedValue({ data: [person] })
   api.customerHistory.mockResolvedValue({ data: { visitCount: 0, visits: [] } })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 it('顧客へのLINEは未選択では出さず、友だちを選んでも既定オフで保存する', async () => {
-  render(<PhoneReservation {...props} />)
+  render(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props} />)
   expect(screen.queryByRole('checkbox')).toBeNull()
   await choose(); expect(notice().checked).toBe(false)
   await save(); expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({ lineUid: 'U-one', notifyLine: false }))
 })
 it('顧客へのLINEは本人を選び明示的にオンにした時だけ送る', async () => {
-  render(<PhoneReservation {...props} />); await choose()
+  render(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props} />); await choose()
   expect(notice().checked).toBe(false); fireEvent.click(notice()); await save()
   expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({ lineUid: 'U-one', notifyLine: true }))
   expect(notice().checked).toBe(true)
 })
 it('顧客へのLINEは未連携の電話番号では出さず、送信もfalseにする', async () => {
-  render(<PhoneReservation {...props} />)
+  render(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props} />)
   fireEvent.click(screen.getByRole('button', { name: 'LINE 未連携の電話番号' }))
   fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '電話の本人' } })
   fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '09012345678' } })
@@ -51,28 +52,28 @@ it('顧客へのLINEは未連携の電話番号では出さず、送信もfalse�
   expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({ lineUid: null, notifyLine: false }))
 })
 it('顧客へのLINEの同意を別の本人へ引き継がない', async () => {
-  render(<PhoneReservation {...props} />); await choose(); if (!notice().checked) fireEvent.click(notice())
+  render(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props} />); await choose(); if (!notice().checked) fireEvent.click(notice())
   api.customerSearch.mockResolvedValue({ data: [{ ...person, name: '別の本人', lineUid: 'U-two' }] })
   await choose('別の本人'); expect(notice().checked).toBe(false); await save()
   expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({ lineUid: 'U-two', notifyLine: false }))
 })
 it('顧客へのLINEの同意を押さえとの切替で解除する', async () => {
-  render(<PhoneReservation {...props} />); await choose(); if (!notice().checked) fireEvent.click(notice())
+  render(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props} />); await choose(); if (!notice().checked) fireEvent.click(notice())
   fireEvent.click(screen.getByRole('radio', { name: /枠だけ押さえる/ }))
   expect(screen.queryByRole('checkbox')).toBeNull()
   fireEvent.click(screen.getByRole('radio', { name: /お客さまの予約を入れる/ }))
   expect(notice().checked).toBe(false)
 })
 it.each([{account:'account-2',store:'store-1'},{account:'account-1',store:'store-2'}])('顧客へのLINEの同意を別の店舗やアカウントへ引き継がない %o', async ({account:nextAccount,store}) => {
-  const view = render(<PhoneReservation {...props} />); await choose(); if (!notice().checked) fireEvent.click(notice())
+  const view = render(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props} />); await choose(); if (!notice().checked) fireEvent.click(notice())
   account.selectedAccountId = nextAccount
-  view.rerender(<PhoneReservation {...props} storeId={store} />)
+  view.rerender(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props} storeId={store} />)
   expect(notice().checked).toBe(false); await save()
   expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({ storeId: store, notifyLine: false }))
 })
 
 it('顧客へのLINEの同意を電話番号への切替と同じ本人の選び直しでも解除する',async()=>{
- render(<PhoneReservation {...props}/>);await choose();fireEvent.click(notice())
+ render(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props}/>);await choose();fireEvent.click(notice())
  fireEvent.click(screen.getByRole('button',{name:'LINE 未連携の電話番号'}))
  expect(screen.queryByRole('checkbox')).toBeNull()
  fireEvent.click(screen.getByRole('button',{name:'LINE の友だち'}))
@@ -80,7 +81,7 @@ it('顧客へのLINEの同意を電話番号への切替と同じ本人の選び
 })
 it('検索した人がLINE未連携なら顧客へのLINE操作を出さずfalseで保存する',async()=>{
  api.customerSearch.mockResolvedValue({data:[{...person,lineUid:''}]})
- render(<PhoneReservation {...props}/>);await choose()
+ render(<PhoneReservation accountStyle="restaurant" staffRole="owner" {...props}/>);await choose()
  expect(screen.queryByRole('checkbox')).toBeNull();await save()
  expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({lineUid:null,notifyLine:false}))
 })

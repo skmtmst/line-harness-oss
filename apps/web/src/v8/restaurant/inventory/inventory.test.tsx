@@ -18,7 +18,7 @@ const fixture = vi.hoisted(() => ({
 const fetchApi = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/inventory', useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/inventory', useSearchParams: () => new URLSearchParams(window.location.search) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
@@ -267,4 +267,18 @@ describe('予約枠・在庫の切り替え', () => {
     const inner = screen.getByRole('group', { name: '予約枠・在庫の切り替え' })
     expect(within(inner).getAllByRole('button')).toHaveLength(4)
   })
+})
+
+it('指定された店舗が先頭でなくても、その店舗の営業時間だけを開く', async () => {
+  window.history.replaceState(null, '', '/restaurant-test/inventory?storeId=store-2#rs-hours-title')
+  fixture.snapshot.mockResolvedValue({ data: snapshotOf({ stores: [{...snapshotOf().stores[0], id:'store-1',name:'先頭店'}, {...snapshotOf().stores[0], id:'store-2',name:'対象店'}] }) })
+  render(<InventoryPage />)
+  await waitFor(() => expect(fixture.openingHours).toHaveBeenCalledWith('account-1','store-2'))
+  expect(fixture.openingHours).not.toHaveBeenCalledWith('account-1','store-1')
+})
+it('指定店が見つからなければ別の店を開かない', async () => {
+  window.history.replaceState(null, '', '/restaurant-test/inventory?storeId=unknown#rs-hours-title')
+  render(<InventoryPage />)
+  await screen.findByText('指定された店舗を確認できません')
+  expect(fixture.openingHours).not.toHaveBeenCalled()
 })

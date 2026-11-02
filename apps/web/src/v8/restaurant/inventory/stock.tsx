@@ -103,6 +103,11 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const [channelsError,setChannelsError]=useState(false)
   const [channelsRetry,setChannelsRetry]=useState(0)
   const [channels, setChannels] = useState<RestaurantChannel[]>([])
+  useEffect(() => {
+    if (storeId && hours && window.location.hash === '#rs-hours-title') {
+      document.getElementById('rs-hours-title')?.scrollIntoView?.({ block: 'start' })
+    }
+  }, [storeId, hours])
 
   useEffect(() => {
     let current = true

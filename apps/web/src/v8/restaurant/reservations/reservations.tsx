@@ -1,4 +1,6 @@
 'use client'
+import { useAccountStyle } from '@/hooks/use-account-style'
+import { usePermissionAccess } from '@/lib/use-feature-access'
 
 /*
  * ★V8 予約台帳（板 `l9NlC0` 今日・`xzCK6` 今日 1152・`Z3FoM` 一覧・ 電話の予約を入れる）。
@@ -93,6 +95,8 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const canWrite = canWriteRole(role)
   const canImport = canManageRole(role)
   const accountId = selectedAccountId || ''
+  const accountStyle = useAccountStyle(selectedAccountId)
+  const canUseAlternateBooking = usePermissionAccess('/booking/bookings')
   const storeId = store?.id || ''
   const tables = useMemo(() => data.tables.filter((t) => !store || t.store_id === store.id), [data.tables, store])
   const menuItems = useMemo(() => data.menuItems.filter((m) => !store || m.store_id === store.id), [data.menuItems, store])
@@ -166,7 +170,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
 
   if (phone) {
     return (
-      <PhoneReservation
+      <PhoneReservation accountStyle={accountStyle.stale ? null : accountStyle.data?.style ?? null} staffRole={role} canUseAlternateBooking={canUseAlternateBooking}
         tableDefinition={ctx.tableDefinition}
         storeId={storeId}
         storeName={store?.name || ''}

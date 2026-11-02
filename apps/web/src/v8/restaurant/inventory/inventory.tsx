@@ -1,6 +1,7 @@
 'use client'
 
 import { useUrlTab } from '@/lib/use-url-tab'
+import { useSearchParams } from 'next/navigation'
 
 /*
  * ★V8 予約枠・在庫（板 `Y8SjT2`・媒体を閉じる知らせ ・予約経路の連携 `hQQlt`・競合 ・
@@ -99,13 +100,14 @@ function closuresDescription(ctx: RestaurantV8Context | null): string {
 }
 
 export default function InventoryPage() {
+  const initialStoreId = useSearchParams().get('storeId') || ''
   const [tab, setTab] = useUrlTab(['stock', 'channels', 'rules', 'closures'] as const, 'stock')
   const [dialog, setDialog] = useState<ClosureDialogTarget | null>(null)
   const role = useStaffRole()
   const changeTab = setTab
   const closures = tab === 'closures'
   return (
-    <RestaurantShell templateHeading
+    <RestaurantShell initialStoreId={initialStoreId} templateHeading
       boardId={closures ? 'UVnvR' : tab === 'rules' ? 'nGcY1' : 'Y8SjT2'}
       title="予約枠・在庫"
       explanation={tab === 'stock' ? 'ここは「席（卓）」に対して受ける予約の枠です。担当スタッフなど「人」に対して受ける予約は、予約設定（メニュー・受付枠・担当スタッフ）で決めます。' : undefined}

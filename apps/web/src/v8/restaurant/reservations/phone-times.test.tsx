@@ -12,7 +12,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 const hours = Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [{ opensAt: '17:00', closesAt: '23:00' }] }))
 const onSave = vi.fn()
 function open(time = '', day = '2026-11-02') {
-  render(<PhoneReservation storeId="store-1" storeName="模擬店舗" tables={tables} menuItems={[]} busy={false} preset={{ hold: true, date: new Date(`${day}T00:00:00+09:00`), time }} onBack={vi.fn()} onSave={onSave} />)
+  render(<PhoneReservation accountStyle="restaurant" staffRole="owner" storeId="store-1" storeName="模擬店舗" tables={tables} menuItems={[]} busy={false} preset={{ hold: true, date: new Date(`${day}T00:00:00+09:00`), time }} onBack={vi.fn()} onSave={onSave} />)
 }
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })

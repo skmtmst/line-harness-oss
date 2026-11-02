@@ -2,6 +2,7 @@
 import { tableCapacityReason, type RestaurantTableDefinition } from '../booking-kit/table-definition'
 import { DialogNote } from '../booking-kit/parts'
 import { describeApiFailure } from '@/components/shared/api-error-message'
+import { phoneReservationFailure } from '../booking-kit/phone-error'
 import Toggle from '@/components/shared/toggle';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
@@ -52,9 +53,11 @@ function md(day: Date): string {
   return polishFormatDate(day, { style: 'list-day' })
 }
 
-export default function PhoneReservationDrawer({ tableDefinition, open, accountId, storeId, tables, onClose, onSaved }: {
+export default function PhoneReservationDrawer({ staffRole, storeName, tableDefinition, open, accountId, storeId, tables, onClose, onSaved }: {
   open: boolean
   accountId: string
+  staffRole?: string | null
+  storeName?: string
   tableDefinition?: RestaurantTableDefinition
   storeId: string
   tables: RestaurantTable[]
@@ -62,6 +65,9 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
   /** 保存できたら呼ぶ（LINE の確認が送れなかったときは lineFailed）。 */
   onSaved: (result: { lineFailed: boolean }) => void
 }) {
+  const canConfigure = staffRole === 'owner' || staffRole === 'admin'
+  const canWrite = canConfigure || staffRole === 'staff'
+  const hoursHref = `/restaurant-test/inventory?storeId=${encodeURIComponent(storeId)}#rs-hours-title`
   const saveErrors = useSaveFormErrors()
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -192,7 +198,7 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
 
   const save = async () => {
     setError('')
-    if (fields.submit().length > 0) return
+    if (!canWrite || fields.submit().length > 0) return
     const currentNow = new Date()
     if (toYmd(now) !== toYmd(currentNow) || date < toYmd(currentNow)) { setNow(currentNow); setError('日付が変わりました。予約日時を確認してください。'); return }
     if (!dayReady || !hours || !date || !time || !openTimes(date, hours, currentNow).includes(time) || !chosenTable) return
@@ -219,7 +225,7 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
       { if (!fieldFailure)
 
 
-      setError(describeApiFailure(caught, '保存')) }
+      setError(phoneReservationFailure(caught, staffRole) || describeApiFailure(caught, '保存')) }
     } finally {
       setBusy(false)
     }
@@ -230,7 +236,7 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
   const footer = (
     <DialogActions align="center" padding="none">
       <Button onClick={onClose} disabled={busy}>キャンセル</Button>
-      <Button variant="primary" onClick={() => void save()} disabled={busy || !dayReady || !hours || !validTime || Boolean(inputReason)} disabledReason={hoursFailure === scopeKey || (hoursData?.key === scopeKey && hoursData.hours === null) ? '営業時間を確認してください。' : closedDay ? 'この日は営業時間が設定されていません。' : inputReason || (!dayReady || !hours ? '営業時間と予約を確認してください。' : timeReason)} busy={Boolean(busy)} busyLabel="処理中…">
+      <Button variant="primary" onClick={() => void save()} disabled={busy || !canWrite || !dayReady || !hours || !validTime || Boolean(inputReason)} disabledReason={!canWrite ? '予約を入れる権限を確認してください。' : hoursFailure === scopeKey || (hoursData?.key === scopeKey && hoursData.hours === null) ? '営業時間を確認してください。' : closedDay ? 'この曜日は休みです。' : inputReason || (!dayReady || !hours ? '営業時間と予約を確認してください。' : timeReason)} busy={Boolean(busy)} busyLabel="処理中…">
         <Check size={16} aria-hidden="true" />予約を入れる
       </Button>
     </DialogActions>
@@ -286,12 +292,12 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
           <span className={styles.label} id="e2-times">時刻（空いている時刻だけ）</span>
           {/* 時刻の札が1行出る高さを先に取る（空きが無い日・日付を選ぶ前でも下の卓・メモが上下しない）。 */}
           <div className={styles.timeBox} {...fields.bind('time')} aria-invalid={fields.invalid('time') || undefined} aria-describedby={describedBy('time')}>
-          {hoursFailure === scopeKey ? <><p className={styles.hint}>営業時間を読み込めませんでした。</p><Button onClick={() => { setHoursFailure(''); setHoursAttempt((n) => n + 1) }}>営業時間を再読み込み</Button></> : hoursData?.key === scopeKey && hoursData.hours === null ? <p className={styles.hint}>営業時間が未設定です。予約枠・在庫で対象の店舗を選び、開ける時間を設定してください。 <Button variant="text" size="inline" href="/restaurant-test/inventory#rs-hours-title">開ける時間を設定する</Button></p> : null}
+          {hoursFailure === scopeKey ? <><p className={styles.hint}>営業時間を読み込めませんでした。</p><Button onClick={() => { setHoursFailure(''); setHoursAttempt((n) => n + 1) }}>営業時間を再読み込み</Button></> : hoursData?.key === scopeKey && hoursData.hours === null ? <p className={styles.hint}>{`${storeName || 'この店舗'}の営業時間が未設定です。`} {canConfigure ? <>開ける時間を設定してください。 <Button variant="text" size="inline" href={hoursHref}>開ける時間を設定する</Button></> : staffRole === 'staff' ? '管理者に営業時間の設定を依頼してください。' : null}</p> : null}
           {dayFailure === dayKey ? <><p className={styles.hint}>この日の予約を読み込めませんでした。</p><Button onClick={() => { setDayFailure(''); setDayAttempt((n) => n + 1) }}>予約を再読み込み</Button></> : null}
           {!date ? (
             <p className={styles.hint}>日付を選ぶと空いている時刻が出ます。</p>
           ) : !hours || dayFailure === dayKey ? null : times.filter(freeAt).length === 0 ? (
-            closedDay ? <p className={styles.hint}>この日は営業時間が設定されていません。対象の店舗を選んで確認してください。 <Button variant="text" size="inline" href="/restaurant-test/inventory#rs-hours-title">開ける時間を確認する</Button></p> : capacityReason ? <DialogNote>{capacityReason}</DialogNote> : <p className={styles.hint}>{`この日に ${guests}名が入る空いた時刻はありません。別の日を選んでください。`}</p>
+            closedDay ? <p className={styles.hint}>{`${storeName || 'この店舗'}はこの曜日が休みです。`} {canConfigure ? <Button variant="text" size="inline" href={hoursHref}>開ける時間を確認する</Button> : staffRole === 'staff' ? '変更が必要なら管理者に依頼してください。' : null}</p> : capacityReason ? <DialogNote>{capacityReason}</DialogNote> : <p className={styles.hint}>{`この日に ${guests}名が入る空いた時刻はありません。別の日を選んでください。`}</p>
           ) : (
             <div className={styles.timeChips} role="group" aria-labelledby="e2-times">
               {times.filter(freeAt).map((label) => (

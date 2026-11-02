@@ -82,7 +82,10 @@ function recommendTable(tables: RestaurantTable[], count: number, free: (table: 
     .sort((a, b) => (a.max_capacity - count) - (b.max_capacity - count) || a.code.localeCompare(b.code, 'ja', { numeric: true }))[0] ?? null
 }
 
-export default function PhoneReservation({ tableDefinition, storeId, storeName, tables, menuItems, busy, preset, onBack, onSave }: {
+export default function PhoneReservation({ accountStyle, staffRole, canUseAlternateBooking = false, tableDefinition, storeId, storeName, tables, menuItems, busy, preset, onBack, onSave }: {
+  accountStyle?: import('@line-crm/shared').AccountStyle | null
+  staffRole?: string | null
+  canUseAlternateBooking?: boolean
   tableDefinition?: RestaurantTableDefinition
   storeId: string
   storeName: string
@@ -95,6 +98,11 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
   onSave: (body: Record<string, unknown>) => Promise<boolean>
 }) {
   const { selectedAccountId } = useAccount()
+  const legacy = Boolean(accountStyle && accountStyle !== 'restaurant')
+  const canConfigure = staffRole === 'owner' || staffRole === 'admin'
+  const canWrite = canConfigure || staffRole === 'staff'
+  const hoursHref = `/restaurant-test/inventory?storeId=${encodeURIComponent(storeId)}#rs-hours-title`
+  const legacyHref = accountStyle === 'salon' || accountStyle === 'consult' ? '/booking/bookings/new' : accountStyle === 'lesson' ? '/events' : null
   const todayInput = toYmd(new Date())
   const [kind, setKind] = useState(preset.hold ? 'hold' : 'customer')
   const [holdMinutes, setHoldMinutes] = useState('15')
@@ -157,7 +165,7 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
     let current = true
     setDayData(null)
     setDayFailure('')
-    if (!selectedAccountId || !storeId) return
+    if (!selectedAccountId || !storeId || !date) return
     void restaurantTestApi.reservationsDay(selectedAccountId, storeId, date).then((res) => {
       if (current) { setDayData({ key: dayKey, rows: Array.isArray(res.data?.reservations) ? res.data.reservations : [] }); setError(null) }
     }).catch(() => { if (current) setDayFailure(dayKey) })
@@ -238,6 +246,7 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
   const save = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
     setError(null)
+    if (accountStyle !== 'restaurant' || !canWrite) return
     if (!storeId) { setError('店舗を選んでください。'); return }
     if (fields.submit().length > 0) {
       requestAnimationFrame(() => {
@@ -318,13 +327,14 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
         footerActions={(
           <>
             <Button onClick={onBack} disabled={busy}>キャンセル</Button>
-            <Button variant="primary" disabled={busy || !storeId || !dayReady || !hours || Boolean(inputReason)} disabledReason={hoursFailure === scopeKey || (hoursData?.key === scopeKey && hoursData.hours === null) ? '営業時間を確認してください。' : closedDay ? 'この日は営業時間が設定されていません。' : inputReason || (!dayReady || !hours ? '営業時間と予約を確認してください。' : undefined)} onClick={() => formRef.current?.requestSubmit()}>
+            <Button variant="primary" disabled={busy || accountStyle !== 'restaurant' || !canWrite || !storeId || !dayReady || !hours || Boolean(inputReason)} disabledReason={accountStyle !== 'restaurant' ? 'この画面から新しい予約は入れられません。' : !canWrite ? '予約を入れる権限を確認してください。' : hoursFailure === scopeKey || (hoursData?.key === scopeKey && hoursData.hours === null) ? '営業時間を確認してください。' : closedDay ? 'この曜日は休みです。' : inputReason || (!dayReady || !hours ? '営業時間と予約を確認してください。' : undefined)} onClick={() => formRef.current?.requestSubmit()}>
               {kind === 'hold' ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}{kind === 'hold' ? '枠を押さえる' : '台帳に入れる'}
             </Button>
           </>
         )} dirty={false}
       >
         <form ref={formRef} className={styles.phoneForm} onSubmit={save} noValidate>
+          {legacy ? <Notice tone="info" message="この画面は飲食店スタイルの古い予約を確認するためのものです。新しい予約はこのスタイルの予約画面から入れてください。" action={legacyHref && (accountStyle === 'lesson' ? canConfigure : canUseAlternateBooking) ? <Button variant="text" size="inline" href={legacyHref}>予約画面へ</Button> : undefined} /> : null}
           <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-kind">
             <h2 id="rs-phone-kind" className={styles.phoneCardTitle}>何を入れますか</h2>
             <SaveErrorField names={["rs-phone-kind","kind"]}><RadioCardGroup legend="何を入れますか" className={styles.kindCards}>
@@ -400,10 +410,10 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
               {fields.invalid('time') ? <Field label="時間" error={fields.error('time')} requirement={fields.requirement('time')}><SaveErrorField names={["time"]}><TimeField aria-label="時間" invalid value={time} onChange={setTime} /></SaveErrorField></Field> : null}
               <p className={styles.timeLabel}>{`空いている時間（${guests}名が入る卓がある時間）`}</p>
               {capacityReason ? <DialogNote>{capacityReason}</DialogNote> : null}
-              {hoursFailure === scopeKey ? <><p className={styles.sideText}>営業時間を読み込めませんでした。</p><Button type="button" onClick={() => { setHoursFailure(''); setHoursAttempt((n) => n + 1) }}>営業時間を再読み込み</Button></> : hoursData?.key === scopeKey && hoursData.hours === null ? <p className={styles.sideText}>営業時間が未設定です。予約枠・在庫で対象の店舗を選び、開ける時間を設定してください。 <Button variant="text" size="inline" href="/restaurant-test/inventory#rs-hours-title">開ける時間を設定する</Button></p> : null}
+              {hoursFailure === scopeKey ? <><p className={styles.sideText}>営業時間を読み込めませんでした。</p><Button type="button" onClick={() => { setHoursFailure(''); setHoursAttempt((n) => n + 1) }}>営業時間を再読み込み</Button></> : hoursData?.key === scopeKey && hoursData.hours === null ? <p className={styles.sideText}>{`${storeName}の営業時間が未設定です。`} {accountStyle === 'restaurant' && canConfigure ? <>開ける時間を設定してください。 <Button variant="text" size="inline" href={hoursHref}>開ける時間を設定する</Button></> : accountStyle === 'restaurant' && staffRole === 'staff' ? '管理者に営業時間の設定を依頼してください。' : null}</p> : null}
               {dayFailure === dayKey ? <><p className={styles.sideText}>この日の予約を読み込めませんでした。</p><Button type="button" onClick={() => { setDayFailure(''); setDayAttempt((n) => n + 1) }}>予約を再読み込み</Button></> : null}
               {times.length === 0 && hours ? (
-                <p className={styles.sideText}>{closedDay ? <>この日は営業時間が設定されていません。対象の店舗を選んで確認してください。 <Button variant="text" size="inline" href="/restaurant-test/inventory#rs-hours-title">開ける時間を確認する</Button></> : 'この日に受け付けられる時間はありません。別の日を選んでください。'}</p>
+                <p className={styles.sideText}>{closedDay ? <>{`${storeName}はこの曜日が休みです。`} {accountStyle === 'restaurant' && canConfigure ? <Button variant="text" size="inline" href={hoursHref}>開ける時間を確認する</Button> : accountStyle === 'restaurant' && staffRole === 'staff' ? '変更が必要なら管理者に依頼してください。' : null}</> : 'この日に受け付けられる時間はありません。別の日を選んでください。'}</p>
               ) : (
                 <div className={styles.timeChips}>
                   {times.map((label) => {
