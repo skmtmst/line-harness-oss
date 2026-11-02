@@ -78,7 +78,7 @@ function UpdateCardView({ card, historyState }: { card: UpdateCard; historyState
     : [card.version ? `${card.version}` : null, environment ? `${environment}へ${card.deployment && isAutomatic(card.deployment) ? '自動' : '手動'}で配備` : null].filter(Boolean).join('・') || undefined
   const badges = <>
     {card.latest ? <StatusBadge tone="info" dot={false}>最新</StatusBadge> : null}
-    {card.source === 'archive' ? <StatusBadge tone="neutral" dot={false}>{`保管用の版（${formatCount(card.entryCount, '行')}）`}</StatusBadge> : null}
+    {card.source === 'archive' ? <StatusBadge tone="neutral" dot={false}>{`前の版のまとめ（${formatCount(card.entryCount, '行')}）`}</StatusBadge> : null}
     {result ? <StatusBadge tone={result.tone}>{result.label}</StatusBadge> : null}
   </>
   const hasMore = card.entries.length > card.highlights.length
@@ -93,7 +93,7 @@ function UpdateCardView({ card, historyState }: { card: UpdateCard; historyState
       {card.source === 'pending' ? (
         <p className={styles.note}>次の版に入る予定の変更です。版に入ると、ここから日付の1枚へ移ります。</p>
       ) : card.source === 'archive' && card.entries.length === 0 ? (
-        <p className={styles.note}>この版の行は保管用の記録にまとめてあり、この画面には出していません。</p>
+        <p className={styles.note}>この版の行は前の版のまとめに集めてあり、この画面には出していません。</p>
       ) : card.highlights.length > 0 ? (
         <ul className={styles.lines} aria-label={card.highlightSource === 'written' ? 'この回のまとめ' : 'この回のおもな変更'}>
           {card.highlights.map((line, index) => <li key={`${index}|${line}`} className={styles.line}>{line}</li>)}
@@ -186,7 +186,7 @@ export default function UpdateHistoryV8() {
 
       <SearchField aria-label="変更内容を探す" placeholder="変更内容を探す" value={query}
         onChange={(value) => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
-      <p className={styles.footText}>これから入る変更と、保管用の版を含む公開済みの本文を検索します。</p>
+      <p className={styles.footText}>これから入る変更と、前の版のまとめを含む公開済みの本文を検索します。</p>
 
       {query.trim() && fullReleases === null ? searchError
         ? <ListState kind="error" title="変更の本文を読み込めませんでした" description="画面にある要約だけを検索しています。検索語を入れ直すと再試行します。" />
