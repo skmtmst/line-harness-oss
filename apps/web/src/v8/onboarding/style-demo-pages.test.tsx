@@ -103,6 +103,7 @@ it('飲食店では来店のあとの見本を見せ、選ばずに戻れる', (
   expect(screen.getByText('18:00–20:00 見本 たろう さま・2名・テーブル席')).toBeTruthy()
   expect(screen.getByText('昨日はありがとうございました。またのお越しをお待ちしています。')).toBeTruthy()
   expect(screen.getByText('送り始めるには設定と承認が必要で、保存しただけでは始まりません。', { exact: false })).toBeTruthy()
+  expect(screen.queryByText('画面と操作の見本です')).toBeNull()
   expect(choose).not.toHaveBeenCalled()
 })
 it('サロンでは来店のあとの見本を見せ、選ばずに戻れる', () => {

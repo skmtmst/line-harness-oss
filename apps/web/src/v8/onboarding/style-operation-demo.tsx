@@ -126,7 +126,7 @@ const RESTAURANT_AFTER_SAMPLE = {
 /** 飲食店4ページ目「来店のあとも、つながりが続く」の静止見本。保存・送信はしない。 */
 export function RestaurantAfterDemo() {
   return <section aria-label="来店のあとの見本">
-    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
     <Card layout="vertical" padding="default" gap="normal" aria-label="来店のあと">
       <strong>来店のあと（見本）</strong>
       <section aria-label="来店の記録">
