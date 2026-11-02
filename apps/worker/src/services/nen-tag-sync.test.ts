@@ -21,6 +21,8 @@ vi.mock('../features/friends/friend-tag-attach.js', () => ({
   detachTagAndFireSideEffects: tagMocks.detach,
 }));
 
+vi.mock('./feature-enforcement.js', () => ({ createFeatureJobGate: () => ({ canRun: async () => true }) }));
+
 const { deriveEcTagIds, derivePetTagIds, NEN_TAG, RankTagResolver, refreshAllNenTags } =
   await import('./nen-tag-sync.js');
 
@@ -48,10 +50,11 @@ function queryCaptureDb() {
   return { db, queries };
 }
 
-function loadTestDb(friendCount: number, healthLogsPerFriend: number) {
+function loadTestDb(friendCount: number, healthLogsPerFriend: number, options: { ranks?: Array<Record<string, unknown>>; key?: string | null; failRank?: boolean } = {}) {
   const friends = Array.from({ length: friendCount }, (_, index) => ({
     id: `friend-${String(index).padStart(4, '0')}`,
     user_id: `ec-${index}`,
+    line_account_id: options.ranks || options.failRank ? 'account-1' : null,
   }));
   let state = { lastFriendId: '', cycleStartedAt: '2026-09-04T00:00:00.000Z' };
   let rowsRead = 0;
@@ -86,6 +89,10 @@ function loadTestDb(friendCount: number, healthLogsPerFriend: number) {
           return null;
         },
         async all() {
+          if (sql.includes('FROM nen_rank_settings')) {
+            if (options.failRank) throw new Error('rank read failed');
+            return { results: options.ranks ?? [] };
+          }
           if (sql.includes('FROM friends')) {
             const after = String(bindings[0]);
             const limit = Number(bindings[1]);
@@ -102,7 +109,7 @@ function loadTestDb(friendCount: number, healthLogsPerFriend: number) {
               subscription_json: null,
               purchase_count: 0,
               purchase_amount: 0,
-              member_rank: '会員',
+              member_rank: '会員', member_rank_key: options.key ?? null,
             }));
             rowsRead += rows.length;
             return { results: rows };
@@ -307,6 +314,61 @@ describe('NEN bulk refresh scope', () => {
     expect(getState().lastFriendId).toBe('');
     await refreshAllNenTags(db, { allTenants: true }, 500, now);
     expect(tagMocks.tags.has('friend-0000')).toBe(true);
+  });
+
+  it.each([
+    { ranks: [{ rank_key: 'gold', name: 'ゴールド', tag_id: NEN_TAG.rankGold }], key: null, removed: false },
+    { ranks: [{ rank_key: 'gold', name: 'ゴールド', tag_id: NEN_TAG.rankGold }], key: 'vip', removed: true },
+    { ranks: [], key: 'vip', removed: false },
+  ])('定期更新は設定とキーに応じて古いランクタグを保護する %#', async ({ ranks, key, removed }) => {
+    const { db } = loadTestDb(1, 0, { ranks, key });
+    tagMocks.tags.set('friend-0000', new Set([NEN_TAG.rankGold]));
+    await refreshAllNenTags(db, { allTenants: true }, 500, new Date('2026-09-04T00:00:00Z'));
+    expect(tagMocks.tags.get('friend-0000')?.has(NEN_TAG.rankGold)).toBe(!removed);
+  });
+
+  it('ランク表の読取が失敗したらタグを外さず全員失敗としてカーソルを進めない', async () => {
+    const { db, getState } = loadTestDb(2, 0, { failRank: true });
+    tagMocks.tags.set('friend-0000', new Set([NEN_TAG.rankGold]));
+    await expect(refreshAllNenTags(db, { allTenants: true }, 500, new Date('2026-09-04T00:00:00Z'))).rejects.toThrow('nen_tag_refresh_all_failed');
+    expect(tagMocks.tags.get('friend-0000')?.has(NEN_TAG.rankGold)).toBe(true);
+    expect(getState().lastFriendId).toBe('');
+  });
+
+  it('ECタグの失敗後も他グループを更新し、失敗件数を返す', async () => {
+    const { db } = loadTestDb(2, 0);
+    tagMocks.attach.mockRejectedValueOnce(new Error('tag failure'));
+    const result = await refreshAllNenTags(db, { allTenants: true }, 500, new Date('2026-09-04T00:00:00Z'));
+    expect(result.failed).toBe(1);
+    expect(tagMocks.tags.get('friend-0000')?.has(NEN_TAG.petRegistered)).toBe(true);
+    expect(tagMocks.tags.get('friend-0001')?.has(NEN_TAG.petRegistered)).toBe(true);
+  });
+
+  it('ランクタグの書込みが失敗してもペットなど別のタグは更新する', async () => {
+    const ranks = [{ rank_key: 'gold', name: 'ゴールド', tag_id: NEN_TAG.rankGold }];
+    const { db } = loadTestDb(2, 0, { ranks, key: 'gold' });
+    const original = tagMocks.attach.getMockImplementation()!;
+    tagMocks.attach.mockImplementation(async (db, friendId, tagId) => {
+      if (friendId === 'friend-0000' && tagId === NEN_TAG.rankGold) throw new Error('foreign key constraint');
+      return original(db, friendId, tagId);
+    });
+    try {
+      const result = await refreshAllNenTags(db, { allTenants: true }, 500, new Date('2026-09-04T00:00:00Z'));
+      expect(result.failed).toBe(1);
+      expect(tagMocks.tags.get('friend-0000')?.has(NEN_TAG.petRegistered)).toBe(true);
+      expect(tagMocks.tags.get('friend-0001')?.has(NEN_TAG.rankGold)).toBe(true);
+    } finally { tagMocks.attach.mockImplementation(original); }
+  });
+
+  it('全員が失敗した場合はカーソルを進めずジョブ失敗にする', async () => {
+    const { db, getState } = loadTestDb(1, 0);
+    tagMocks.attach.mockRejectedValue(new Error('tag failure'));
+    try {
+      await expect(refreshAllNenTags(db, { allTenants: true }, 500, new Date('2026-09-04T00:00:00Z'))).rejects.toThrow('nen_tag_refresh_all_failed');
+      expect(getState().lastFriendId).toBe('');
+    } finally { tagMocks.attach.mockReset(); tagMocks.attach.mockImplementation(async (_db, friendId, tagId) => {
+      const tags = tagMocks.tags.get(friendId) ?? new Set<string>(); const added = !tags.has(tagId); tags.add(tagId); tagMocks.tags.set(friendId, tags); return { added };
+    }); }
   });
 
   it('keeps account filtering when an explicit account list is requested', async () => {

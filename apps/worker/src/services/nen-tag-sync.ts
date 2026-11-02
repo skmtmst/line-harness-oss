@@ -392,7 +392,7 @@ export async function syncNenEcTags(db: D1Database, friendId: string, now = new 
   const resolver = new RankTagResolver(db);
   const rankTag = await resolver.desiredTagId(friend?.line_account_id ?? null, snapshot);
   if (rankTag) desired.add(rankTag);
-  const managed = [...EC_STATE_TAGS, ...((await resolver.ranksFor(friend?.line_account_id ?? null)).length ? await resolver.managedTagIds(friend?.line_account_id ?? null) : [])];
+  const managed = [...EC_STATE_TAGS, ...(snapshot?.member_rank_key?.trim() && (await resolver.ranksFor(friend?.line_account_id ?? null)).length ? await resolver.managedTagIds(friend?.line_account_id ?? null) : [])];
   return syncManagedTags(db, friendId, managed, desired, undefined, historySourceId);
 }
 
@@ -497,6 +497,7 @@ type ScheduledRefreshResult = {
   friends: number;
   added: number;
   removed: number;
+  failed: number;
   hasMore?: boolean;
   cursor?: string | null;
 };
@@ -559,7 +560,7 @@ async function refreshScheduledNenTags(
 
   if (friends.length === 0) {
     await saveRefreshState(db, { lastFriendId: '', cycleStartedAt: nowText }, nowText);
-    return { friends: 0, added: 0, removed: 0, hasMore: false, cursor: null };
+    return { friends: 0, added: 0, removed: 0, failed: 0, hasMore: false, cursor: null };
   }
 
   const friendIds = friends.map((friend) => friend.id);
@@ -636,11 +637,16 @@ async function refreshScheduledNenTags(
   let added = 0;
   let removed = 0;
   const gate = createFeatureJobGate();
+  let failed = 0;
+  let attempted = 0;
 
   for (const friend of friends) {
+    let friendFailed = false;
+    attempted++;
     try {
       // 機能オフ中は付け替えしない。再オンで再開する。
       if (!await gate.canRun(db, friend.line_account_id, 'photo_review', 'NEN tag refresh')) {
+        attempted--;
         continue;
       }
       const current = new Set((tagsByFriend.get(friend.id) ?? []).map((row) => row.tag_id));
@@ -649,7 +655,7 @@ async function refreshScheduledNenTags(
       if (friend.user_id) ecDesired.add(NEN_TAG.ecLinked);
       const rankTag = await rankResolver.desiredTagId(friend.line_account_id, snapshot);
       if (rankTag) ecDesired.add(rankTag);
-      const rankManaged = (await rankResolver.ranksFor(friend.line_account_id)).length ? await rankResolver.managedTagIds(friend.line_account_id) : [];
+      const rankManaged = snapshot?.member_rank_key?.trim() && (await rankResolver.ranksFor(friend.line_account_id)).length ? await rankResolver.managedTagIds(friend.line_account_id) : [];
       const desiredGroups: Array<[readonly string[], Set<string>]> = [
         [[...EC_STATE_TAGS, ...rankManaged], ecDesired],
         [PET_STATE_TAGS, derivePetTagIds(petsByFriend.get(friend.id) ?? [], now)],
@@ -663,21 +669,27 @@ async function refreshScheduledNenTags(
           new Set(current.has(NEN_TAG.deliveryOptout) ? [] : DELIVERY_ELIGIBILITY_TAGS)],
       ];
       for (const [managed, desired] of desiredGroups) {
-        const changed = await syncManagedTags(db, friend.id, managed, desired, current);
-        added += changed.added;
-        removed += changed.removed;
+        try {
+          const changed = await syncManagedTags(db, friend.id, managed, desired, current);
+          added += changed.added;
+          removed += changed.removed;
+        } catch {
+          friendFailed = true;
+        }
       }
     } catch {
-      // 失敗した友だちは次の全件巡回で再試行し、残りの友だちを妨げない。
-      logger.error('nen_tag_refresh.friend_failed');
+      friendFailed = true;
     }
+    if (friendFailed) failed++;
   }
+  if (failed) logger.error('nen_tag_refresh.friend_failed', { failedCount: failed });
+  if (attempted > 0 && failed === attempted) throw new Error('nen_tag_refresh_all_failed');
 
   const cursor = hasMore ? friends.at(-1)!.id : null;
   await saveRefreshState(db, hasMore
     ? { ...state, lastFriendId: cursor! }
     : { lastFriendId: '', cycleStartedAt: nowText }, nowText);
-  return { friends: friends.length, added, removed, hasMore, cursor };
+  return { friends: friends.length, added, removed, failed, hasMore, cursor };
 }
 
 export async function refreshAllNenTags(
@@ -705,5 +717,5 @@ export async function refreshAllNenTags(
     added += result.added;
     removed += result.removed;
   }
-  return { friends: friends.results.length, added, removed };
+  return { friends: friends.results.length, added, removed, failed: 0 };
 }

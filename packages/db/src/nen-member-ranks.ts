@@ -123,6 +123,12 @@ export async function ensureNenRankDefaults(db: D1Database, lineAccountId: strin
 
   // 各表の空判定と書き込みを同じトランザクションで行い、途中失敗や同時実行による部分作成を防ぐ。
   await db.batch([
+    db.prepare(`WITH defaults(id, threshold_yen, title, sort_order) AS (VALUES ${milestoneValues})
+      INSERT INTO nen_lifetime_milestones (id, line_account_id, threshold_yen, title, notify_on_reach, sort_order, created_at, updated_at)
+      SELECT id, ?, threshold_yen, title, 1, sort_order, ?, ? FROM defaults
+      WHERE NOT EXISTS (SELECT 1 FROM nen_rank_settings WHERE line_account_id = ?)
+        AND NOT EXISTS (SELECT 1 FROM nen_lifetime_milestones WHERE line_account_id = ?)`)
+      .bind(...milestoneArgs, lineAccountId, now, now, lineAccountId, lineAccountId),
     db.prepare(`WITH defaults(id, rank_key, name, threshold_yen, rate, tag_id, sort_order) AS (VALUES ${rankValues})
       INSERT INTO nen_rank_settings (id, line_account_id, rank_key, name, annual_threshold_yen, mile_rate_percent, tag_id, sort_order, created_at, updated_at)
       SELECT id, ?, rank_key, name, threshold_yen, rate, tag_id, sort_order, ?, ? FROM defaults
@@ -130,11 +136,6 @@ export async function ensureNenRankDefaults(db: D1Database, lineAccountId: strin
       .bind(...rankArgs, lineAccountId, now, now, lineAccountId),
     db.prepare(`INSERT OR IGNORE INTO nen_rank_rules (line_account_id, updated_at) VALUES (?, ?)`)
       .bind(lineAccountId, now),
-    db.prepare(`WITH defaults(id, threshold_yen, title, sort_order) AS (VALUES ${milestoneValues})
-      INSERT INTO nen_lifetime_milestones (id, line_account_id, threshold_yen, title, notify_on_reach, sort_order, created_at, updated_at)
-      SELECT id, ?, threshold_yen, title, 1, sort_order, ?, ? FROM defaults
-      WHERE NOT EXISTS (SELECT 1 FROM nen_lifetime_milestones WHERE line_account_id = ?)`)
-      .bind(...milestoneArgs, lineAccountId, now, now, lineAccountId),
   ]);
 }
 

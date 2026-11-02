@@ -100,6 +100,13 @@ describe('ensureNenRankDefaults', () => {
     expect((await getNenLifetimeMilestones(db, ACCOUNT)).map((m) => m.threshold_yen)).toEqual([300_000, 600_000, 1_000_000, 2_000_000]);
   });
 
+  it('初期化済みの店が節目を空にした後は再初期化で復活しない', async () => {
+    await ensureNenRankDefaults(db, ACCOUNT, NOW);
+    sqlite.prepare('DELETE FROM nen_lifetime_milestones WHERE line_account_id = ?').run(ACCOUNT);
+    await ensureNenRankDefaults(db, ACCOUNT, NOW);
+    expect(await getNenLifetimeMilestones(db, ACCOUNT)).toEqual([]);
+  });
+
   it.each(['rank', 'milestone'])('%s の途中失敗は全体を巻き戻し、再試行で全件作る', async (target) => {
     const table = target === 'rank' ? 'nen_rank_settings' : 'nen_lifetime_milestones';
     const condition = target === 'rank' ? "NEW.rank_key = 'silver'" : 'NEW.threshold_yen = 600000';
@@ -164,19 +171,20 @@ describe('ensureNenRankDefaults', () => {
     } finally { rmSync(directory, { recursive: true, force: true }); }
   }, 20000);
 
-  it('ランクの部分設定は保持し、別の空表だけ初期化する', async () => {
+  it('ランクの部分設定と空の節目は保持し、ルールだけ初期化する', async () => {
     sqlite.exec(`INSERT INTO nen_rank_settings (id, line_account_id, rank_key, name, annual_threshold_yen, mile_rate_percent, sort_order, created_at, updated_at)
       VALUES ('partial-rank', '${ACCOUNT}', 'custom', '独自', 0, 4, 0, '${NOW}', '${NOW}')`);
     const before = sqlite.prepare('SELECT * FROM nen_rank_settings WHERE line_account_id = ?').all(ACCOUNT);
     await ensureNenRankDefaults(db, ACCOUNT, NOW);
     expect(sqlite.prepare('SELECT * FROM nen_rank_settings WHERE line_account_id = ?').all(ACCOUNT)).toEqual(before);
-    expect(await getNenLifetimeMilestones(db, ACCOUNT)).toHaveLength(4);
+    expect(await getNenLifetimeMilestones(db, ACCOUNT)).toEqual([]);
+    expect(await getNenRankRules(db, ACCOUNT)).not.toBeNull();
   });
 
   it('既存設定がある状態で失敗しても、既存行を保ち新規分は戻す', async () => {
     sqlite.exec(`INSERT INTO nen_rank_settings (id, line_account_id, rank_key, name, annual_threshold_yen, mile_rate_percent, sort_order, created_at, updated_at)
       VALUES ('partial-rank', '${ACCOUNT}', 'custom', '独自', 0, 4, 0, '${NOW}', '${NOW}');
-      CREATE TRIGGER fail_milestone BEFORE INSERT ON nen_lifetime_milestones BEGIN SELECT RAISE(ABORT, 'injected failure'); END`);
+      CREATE TRIGGER fail_rules BEFORE INSERT ON nen_rank_rules BEGIN SELECT RAISE(ABORT, 'injected failure'); END`);
     const before = sqlite.prepare('SELECT * FROM nen_rank_settings WHERE line_account_id = ?').all(ACCOUNT);
     await expect(ensureNenRankDefaults(db, ACCOUNT, NOW)).rejects.toThrow('injected failure');
     expect(sqlite.prepare('SELECT * FROM nen_rank_settings WHERE line_account_id = ?').all(ACCOUNT)).toEqual(before);

@@ -241,6 +241,15 @@ describe('DELETE /api/nen/rank-settings/:id', () => {
     expect(sql.prepare('SELECT member_rank_key FROM nen_ec_member_snapshots WHERE friend_id = ?').get('friend-a')).toEqual({ member_rank_key: 'platinum' });
   });
 
+  it('ランク削除ではキーが無い会員の既存タグを外さない', async () => {
+    const data = await initial();
+    const source = data.ranks.find((rank: any) => rank.key === 'gold');
+    sql.prepare('INSERT INTO friend_tags (friend_id, tag_id) VALUES (?, ?)').run('friend-b', source.tagId);
+    const result = await deletion(source.id, { accountId: ACCOUNT, expectedVersion: 1 });
+    expect(result.status).toBe(200);
+    expect(sql.prepare('SELECT tag_id FROM friend_tags WHERE friend_id = ?').all('friend-b')).toEqual([{ tag_id: source.tagId }]);
+  });
+
   it('会員がいるなら移す先を必須にし、会員がいないなら省略できる', async () => {
     const data = await initial();
     const platinum = data.ranks.find((r: any) => r.key === 'platinum');
@@ -592,14 +601,34 @@ describe('空のランク設定', () => {
     expect(sql.prepare("SELECT member_rank_key FROM nen_ec_member_snapshots WHERE friend_id = 'friend-b'").get()).toEqual({ member_rank_key: null });
     expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_member_rank_sync').get()).toEqual({ n: 0 });
   });
-  it('設定のある店は不明キーの古いランクタグを外し、空の店は保持する', async () => {
+  it('キーなしは保持し、不明なキーだけ古いランクタグを外し、空の店は保持する', async () => {
     sql.prepare("INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-b', 'nen-tag-member-rank-gold')").run();
+    await syncNenEcTags(db, 'friend-b');
+    expect(tagSide.detach).not.toHaveBeenCalledWith(expect.anything(), 'friend-b', 'nen-tag-member-rank-gold');
+    sql.prepare("UPDATE nen_ec_member_snapshots SET member_rank_key = 'vip' WHERE friend_id = 'friend-b'").run();
     await syncNenEcTags(db, 'friend-b');
     expect(tagSide.detach).toHaveBeenCalledWith(expect.anything(), 'friend-b', 'nen-tag-member-rank-gold');
     tagSide.detach.mockClear();
     sql.prepare("UPDATE friends SET line_account_id = 'account-empty' WHERE id = 'friend-b'").run();
     await syncNenEcTags(db, 'friend-b');
     expect(tagSide.detach).not.toHaveBeenCalledWith(expect.anything(), 'friend-b', 'nen-tag-member-rank-gold');
+  });
+  it('ランク表の読取失敗ではタグを外さない', async () => {
+    sql.prepare("INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-b', 'nen-tag-member-rank-gold')").run();
+    const bad = new Proxy(db, { get(target, key) {
+      if (key === 'prepare') return (query: string) => {
+        if (query.includes('FROM nen_rank_settings')) throw new Error('rank lookup failed');
+        return target.prepare(query);
+      };
+      return Reflect.get(target, key);
+    }});
+    await expect(syncNenEcTags(bad, 'friend-b')).rejects.toThrow('rank lookup failed');
+    expect(tagSide.detach).not.toHaveBeenCalled();
+  });
+  it('別の統括は初期作成できずデータも作られない', async () => {
+    const result = await json(harness('admin', {}, { tenantId: 'tenant-other' }), 'POST', '/api/nen/rank-settings/initialize', { accountId });
+    expect(result.status).toBe(403);
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_rank_settings WHERE line_account_id = ?').get(accountId)).toEqual({ n: 0 });
   });
   it('タグ作成で途中失敗しても再試行で不足分を作れる', async () => {
     sql.exec("DELETE FROM tags; CREATE TRIGGER fail_tag BEFORE INSERT ON tags BEGIN SELECT RAISE(ABORT, 'tag failure'); END");

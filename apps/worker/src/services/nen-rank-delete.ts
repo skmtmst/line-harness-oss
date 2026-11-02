@@ -46,7 +46,7 @@ export async function deleteNenRank(
   }
   if (sourceTag) {
     statements.push(db.prepare(`DELETE FROM friend_tags WHERE tag_id = ? AND friend_id IN
-      (SELECT id FROM friends WHERE line_account_id = ?) AND ${gate}`).bind(sourceTag, accountId, accountId, operation));
+      (${members}) AND ${gate}`).bind(sourceTag, accountId, source.rank_key, accountId, operation));
   }
   const updateIndex = statements.length;
   if (target) {
