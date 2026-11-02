@@ -739,6 +739,8 @@ export async function getScenarioRuns(
 export type ScenarioFriendPlanStep = {
   stepId: string;
   stepOrder: number;
+  /** 固定された版の全ての通の中での表示順。保存された順序値とは別。 */
+  displayOrder?: number;
   /** 配信予定。未確定のときは null。 */
   scheduledAt: string | null;
   /**
@@ -946,6 +948,8 @@ export async function simulateFriendPlan(
   const deliverableSteps = steps
     .filter((step) => (step.is_draft ?? 0) === 0)
     .sort((a, b) => a.step_order - b.step_order);
+  const displaySteps = [...steps].sort((a, b) => a.step_order - b.step_order);
+  const displayOrderFor = (order: number) => displaySteps.findIndex((step) => step.step_order === order) + 1;
 
   /*
    * 登録の可否。実行側の enrollFriendInScenario と同じ判定：
@@ -1133,8 +1137,8 @@ export async function simulateFriendPlan(
               scheduledAt,
               outcome: 'branch',
               reason: forward
-                ? `${label}を現在満たしていないため ${jump.step_order}通目へ進みます（配信時に再判定）`
-                : `${label}を現在満たしていないため ${jump.step_order}通目へ戻ります（配信時に再判定）`,
+                ? `${label}を現在満たしていないため ${displayOrderFor(jump.step_order)}通目へ進みます（配信時に再判定）`
+                : `${label}を現在満たしていないため ${displayOrderFor(jump.step_order)}通目へ戻ります（配信時に再判定）`,
               dynamic: true,
             });
             /*
@@ -1271,7 +1275,7 @@ export async function simulateFriendPlan(
           },
     basis,
     start: { state: blocked ? 'blocked' : 'ok', reasons },
-    steps: planSteps,
+    steps: planSteps.map((step) => ({ ...step, displayOrder: displayOrderFor(step.stepOrder) })),
     warnings,
   };
 }

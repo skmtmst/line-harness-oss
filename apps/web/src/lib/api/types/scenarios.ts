@@ -150,6 +150,8 @@ export type ScenarioRuns = {
 export type ScenarioFriendPlanStep = {
   stepId: string
   stepOrder: number
+  /** 版の全ての通を含めた表示順。旧APIでは返らない。 */
+  displayOrder?: number
   /** 配信予定。未確定のときは null。 */
   scheduledAt: string | null
   outcome: 'deliver' | 'skip' | 'branch' | 'pause' | 'undetermined'

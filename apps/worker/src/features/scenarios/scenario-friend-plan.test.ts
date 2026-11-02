@@ -200,6 +200,20 @@ describe('友だち単位の配信予定（IDEA-05）', () => {
     expect(plan.steps.map((step) => step.stepOrder)).toEqual([1, 2, 3, 4]);
   });
 
+  it('固定版が0始まり・欠番でも配信済みの通を含めた順番を返す', async () => {
+    const steps = JSON.parse(STEPS_SNAPSHOT) as Array<Record<string, unknown>>;
+    for (const [index, order] of [0, 3, 8, 9].entries()) steps[index].step_order = order;
+    steps[1].next_step_on_false = 9;
+    store.raw.prepare("INSERT INTO scenarios (id,name,trigger_type,line_account_id,is_active,allow_concurrent,delivery_mode) VALUES ('legacy','旧版','manual','acc-1',1,1,'relative')").run();
+    store.raw.prepare("INSERT INTO scenario_versions (id,scenario_id,version_number,delivery_mode,steps_snapshot,status,published_at,created_at,updated_at) VALUES ('v-legacy','legacy',1,'relative',?,'published','2026-09-01','2026-09-01','2026-09-01')").run(JSON.stringify(steps));
+    store.raw.prepare("UPDATE scenarios SET current_published_version_id = 'v-legacy' WHERE id = 'legacy'").run();
+    store.raw.prepare("UPDATE friend_scenarios SET scenario_id = 'legacy', published_version_id = 'v-legacy', current_step_order = 0 WHERE id = 'sub-active'").run();
+    const plan = await simulateFriendPlan(store.db, { scenarioId: 'legacy', lineAccountId: 'acc-1', friendId: 'f-active' });
+    expect(plan.steps.map((step) => step.stepOrder)).toEqual([3, 8, 9]);
+    expect(plan.steps.map((step) => step.displayOrder)).toEqual([2, 3, 4]);
+    expect(plan.steps[0].reason).toContain('4通目');
+  });
+
   it('存在しない友だち・シナリオはエラーになる', async () => {
     await expect(
       simulateFriendPlan(store.db, {

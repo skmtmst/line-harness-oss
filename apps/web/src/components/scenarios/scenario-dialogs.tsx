@@ -1381,7 +1381,7 @@ function FriendPlanStepRow({ step }: { step: ScenarioFriendPlanStep }) {
   return (
     <li className="border-hairline border-b px-4 py-2.5 text-sm last:border-b-0">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-ink shrink-0 font-medium tabular-nums">{step.stepOrder}通目</span>
+        <span className="text-ink shrink-0 font-medium tabular-nums">{step.displayOrder ? `${step.displayOrder}通目` : '通の順番は未取得'}</span>
         <span className="text-ink-secondary shrink-0 tabular-nums">
           {step.scheduledAt ?? '—'}
         </span>
