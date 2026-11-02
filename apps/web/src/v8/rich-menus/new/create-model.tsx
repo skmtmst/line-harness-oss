@@ -53,3 +53,25 @@ export function firstUnconfiguredArea(pages: Page[]): { pageId: string; areaId: 
   }
   return null
 }
+
+/** 公開確認に、選択した表示先の影響を示す。 */
+export function publishConfirmNoteFor(audience: 'all' | 'none' | 'targeted' | 'tag', conditionEmpty: boolean) {
+  return audience === 'all'
+    ? '個別に指定した人を除く、すべての友だちの既定メニューになります。'
+    : audience === 'none'
+      ? 'この操作だけでは、友だちのトーク画面には出ません。出すには登録後に一覧の「表示先」から操作してください。'
+      : conditionEmpty
+        ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください。'
+        : '条件に当てはまる人の画面に、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。'
+}
+
+/** 公開時に友だちへ反映される範囲を示す。 */
+export function publishEffectNoteFor(audience: 'all' | 'none' | 'targeted' | 'tag', conditionEmpty: boolean) {
+  return audience === 'all'
+    ? '個別に指定した人を除く、すべての友だちのトーク画面に出ます。既定のメニューが入れ替わります。'
+    : audience === 'none'
+      ? 'LINEへの登録だけでは、友だちのトーク画面は変わりません。「表示先」で出す相手を決めてください。'
+      : conditionEmpty
+        ? '公開しても今は誰の画面にも出ません（0人）。条件を1つ以上足してください。'
+        : '条件に当てはまる人の画面は、その人に関係する出来事のタイミングで順次切り替わります。すぐ全員に出るわけではありません。'
+}

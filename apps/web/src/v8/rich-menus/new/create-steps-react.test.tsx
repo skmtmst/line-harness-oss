@@ -183,6 +183,15 @@ describe('リッチメニューを作る：面の動きの欄', () => {
     expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
   })
 
+  it('表示先を決めない公開確認では、友だちの画面に出ないと示す', async () => {
+    groupBody = { ...GROUP, isDefaultForAll: false, targetingEnabled: false }
+    await open('?id=rmg-x&step=publish')
+    await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) })
+    const dialog = await screen.findByRole('dialog', { name: '公開の確認' })
+    expect(dialog.textContent).toContain('この操作だけでは、友だちのトーク画面には出ません')
+    expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
   it('確認中にアカウントを切り替えて戻した後、古い公開を送らない', async () => {
     await open('?id=rmg-x&step=publish')
     await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) }); await settle()

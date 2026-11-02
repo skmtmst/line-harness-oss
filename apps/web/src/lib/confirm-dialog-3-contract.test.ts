@@ -112,9 +112,6 @@ describe('リッチメニュー編集の確認窓', () => {
     expect(dialog).toContain('onCancel')
     expect(dialog, '処理中を窓に渡していない').toContain('busy={publishing || saving}')
     expect(dialog, '対象に応じた説明を窓に渡していない').toContain('description={publishConfirmNote}')
-    const note = src.slice(src.indexOf('const publishConfirmNote ='), src.indexOf('  /*', src.indexOf('const publishConfirmNote =')))
-    expect(note).toContain("audience === 'none'")
-    expect(note).toContain('この操作だけでは、友だちのトーク画面には出ません')
   })
 
   it('LINE取り下げは二度押しを止め、失敗を握りつぶさない', () => {
