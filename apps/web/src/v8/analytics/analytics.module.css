@@ -75,6 +75,17 @@
   margin-inline-end: var(--tpl-an-actions-extra);
 }
 
+/* CSV の理由は、隣の主操作へ流さず同じ組の下に置く。 */
+.csvAction { display: contents; }
+.csvAction[data-blocked] {
+  display: inline-flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+}
+
 /* 数の帯：上下に線（タブの線と重ねる）。 */
 .band {
   border-block: 1px solid var(--color-hairline);

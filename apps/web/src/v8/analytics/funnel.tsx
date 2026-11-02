@@ -278,7 +278,8 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       ...result.map((step) => measurable ? [step.label, step.reached, step.conversionFromPrevious === null ? null : `${Math.round(step.conversionFromPrevious * 1000) / 10}%`, step.droppedAfter, step.inProgressAfter] : [step.label, null, null, null, null]),
     ])
   }
-  useRegisterExport(exportFunnel, !result)
+  const exportReason = loading ? 'ファネルを読み込んでいます。' : listError || (!selected ? 'ファネルを選んでください。' : running ? '集計しています。' : runError || (noRun ? 'まだ集計していません。' : run ? '書き出せる段の集計結果がありません。' : '書き出す集計結果を確認しています。'))
+  useRegisterExport(exportFunnel, !result, exportReason)
 
   /** 選んだ段の対象者を24時間の対象者として作り、その先（友だち一覧・配信）へ進む。 */
   const openAudience = async (to: 'friends' | 'broadcast') => {

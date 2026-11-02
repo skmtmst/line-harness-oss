@@ -329,7 +329,8 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       ['合計', ...cols.map((column) => colTotals.get(column.key) ?? 0), grandTotal],
     ])
   }
-  useRegisterExport(exportCross, !crossResult)
+  const exportReason = fieldsLoading ? '友だち情報欄を読み込んでいます。' : fieldsError || error || (loading ? (crossQueue?.state === 'running' ? '集計しています。' : '集計の完了を待っています。') : crossRunId ? (crossAutoStopped ? '集計結果をもう一度確認してください。' : '集計の完了を待っています。') : '集計してから書き出してください。')
+  useRegisterExport(exportCross, !crossResult, exportReason)
 
   const openAudience = async (to: 'friends' | 'broadcast') => {
     if (!picked || !crossResultId) return

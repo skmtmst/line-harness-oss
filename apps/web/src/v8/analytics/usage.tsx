@@ -86,7 +86,8 @@ export default function UsageV8({ accountId }: { accountId: string }) {
     ])
   }
   const exportDisabled = !overview || overview.categories.length === 0
-  useRegisterExport(exportUsage, exportDisabled)
+  const exportReason = state.loading ? '集計結果を読み込んでいます。' : state.error || '書き出せる機能の集計はありません。'
+  useRegisterExport(exportUsage, exportDisabled, exportReason)
 
   if (!state.data || !overview) {
     return <div className={styles.body} data-gap="tab">
