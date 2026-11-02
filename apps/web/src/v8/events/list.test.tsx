@@ -14,6 +14,8 @@ vi.hoisted(() => {
 })
 
 const duplicate = vi.hoisted(() => vi.fn())
+const remove = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ id: 'account-a' }))
 const fetchApi = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
@@ -21,7 +23,7 @@ const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   const api = (actual as unknown as { api: Record<string, object> }).api
-  return { ...actual, fetchApi, eventsApi: { ...actual.eventsApi, duplicate }, api: { ...api, folders: { ...api.folders, list: listFolders } } }
+  return { ...actual, fetchApi, eventsApi: { ...actual.eventsApi, duplicate, deleteEvent: remove }, api: { ...api, folders: { ...api.folders, list: listFolders } } }
 })
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
@@ -32,8 +34,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, loading: false }),
 }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '対象の店' }] })) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -56,6 +59,28 @@ const event = {
   visible_tag_id: null, visible_tag_name: null,
 }
 
+it('イベント削除の確認に操作先と環境を示す', async () => {
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: /秋のしつけ教室.*操作/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  expect(screen.getByText('LINEアカウント')).toBeTruthy()
+  expect(screen.getByText('環境')).toBeTruthy()
+  expect(await screen.findByText('対象の店')).toBeTruthy()
+})
+
+it('アカウントを切り替えて戻しても古いイベント削除は送らない', async () => {
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: /秋のしつけ教室.*操作/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  const button = screen.getByRole('button', { name: '削除する', exact: true })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+  account.id = 'account-b'; await render()
+  account.id = 'account-a'; await render()
+  await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+  expect(remove).not.toHaveBeenCalled()
+})
+
 async function render() {
   await act(async () => {
     root.render(<EventsListV8 />)
@@ -67,6 +92,8 @@ async function render() {
 }
 
 beforeEach(() => {
+  account.id = 'account-a'
+  remove.mockReset()
   duplicate.mockReset()
   fetchApi.mockReset()
   fetchApi.mockImplementation(async () => ({ items: [event], total: 1, summary: null }))

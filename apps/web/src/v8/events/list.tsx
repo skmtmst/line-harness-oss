@@ -32,6 +32,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shar
 import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
@@ -127,10 +128,13 @@ export default function EventsListV8() {
   const [highlightedId, setHighlightedId] = useState<string | null>(useSearchParams().get('highlight'))
   const activeAccountRef = useRef(selectedAccountId)
   activeAccountRef.current = selectedAccountId
+  const accountScope = useRef({ accountId: selectedAccountId })
+  if (accountScope.current.accountId !== selectedAccountId) accountScope.current = { accountId: selectedAccountId }
   const duplicateLock = useRef(false)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [duplicateError, setDuplicateError] = useState('')
   const [items, setItems] = useState<EventListItem[]>([])
+  const [itemsScope, setItemsScope] = useState<object | null>(null)
   const [listTotal, setListTotal] = useState(0)
   const [summary, setSummary] = useState<EventListSummary | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
@@ -146,7 +150,7 @@ export default function EventsListV8() {
   const [pendingTotal, setPendingTotal] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [activeId, setActiveId] = useDetailPanelUrl('event')
-  const [deleteTarget, setDeleteTarget] = useState<EventListItem | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ event: EventListItem; accountId: string; scope: object } | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const loadRequestRef = useRef(0)
@@ -177,6 +181,7 @@ export default function EventsListV8() {
 
   const refresh = useCallback(async () => {
     const requestId = ++loadRequestRef.current
+    const scope = accountScope.current
     if (!selectedAccountId) {
       setItems([])
       setListTotal(0)
@@ -197,13 +202,14 @@ export default function EventsListV8() {
       const res = await withRequestTimeout(
         fetchApi<{ items: EventListItem[]; total?: number; summary?: EventListSummary | null }>(`/api/events/admin/events?${params}`),
       )
-      if (requestId !== loadRequestRef.current) return
+      if (requestId !== loadRequestRef.current || accountScope.current !== scope) return
       setItems(res.items)
+      setItemsScope(scope)
       setListTotal(res.total ?? res.items.length)
       setSummary(res.summary ?? null)
       setLoadStatus('ready')
     } catch (cause) {
-      if (requestId !== loadRequestRef.current) return
+      if (requestId !== loadRequestRef.current || accountScope.current !== scope) return
       setItems([])
       setListTotal(0)
       setSummary(null)
@@ -218,6 +224,7 @@ export default function EventsListV8() {
       loadRequestRef.current += 1
     }
   }, [refresh])
+  useEffect(() => { setDeleteTarget(null); setDeleteBusy(false); setDeleteError('') }, [selectedAccountId])
 
   useEffect(() => {
     setPage(1)
@@ -251,22 +258,24 @@ export default function EventsListV8() {
   }
 
   async function confirmDeleteEvent() {
-    if (!deleteTarget || deleteBusy || !selectedAccountId) return
+    if (!deleteTarget || deleteBusy || deleteTarget.scope !== accountScope.current || activeAccountRef.current !== deleteTarget.accountId) return
     setDeleteBusy(true)
     setDeleteError('')
     try {
-      await eventsApi.deleteEvent(selectedAccountId, deleteTarget.id)
+      await eventsApi.deleteEvent(deleteTarget.accountId, deleteTarget.event.id)
+      if (deleteTarget.scope !== accountScope.current) return
       setDeleteTarget(null)
       await refresh()
       void loadFolders()
     } catch (cause) {
+      if (deleteTarget.scope !== accountScope.current) return
       setDeleteError(
         cause instanceof ApiError && (cause.code === 'event_has_active_bookings' || cause.status === 409)
           ? '申込中・確定済みの予約、またはキャンセル待ちの人がいるため削除できません。先に申込者への対応を終えてください。'
           : '削除できませんでした。時間をおいて、もう一度お試しください。',
       )
     } finally {
-      setDeleteBusy(false)
+      if (deleteTarget.scope === accountScope.current) setDeleteBusy(false)
     }
   }
 
@@ -282,9 +291,10 @@ export default function EventsListV8() {
   }
 
   const requestDelete = useCallback((target: EventListItem) => {
+    if (!selectedAccountId || itemsScope !== accountScope.current) return
     setDeleteError('')
-    setDeleteTarget(target)
-  }, [])
+    setDeleteTarget({ event: target, accountId: selectedAccountId, scope: itemsScope })
+  }, [selectedAccountId, itemsScope])
 
   const duplicateEvent = async (event: EventListItem) => {
     if (!selectedAccountId || !canEdit || duplicateLock.current) return
@@ -651,7 +661,7 @@ export default function EventsListV8() {
       <ConfirmDialog
         open={deleteTarget !== null}
         destructive
-        title={`「${deleteTarget?.name ?? ''}」を削除しますか？`}
+        title={`「${deleteTarget?.event.name ?? ''}」を削除しますか？`}
         description="このイベントは一覧から外れ、公開中の予約URLは受け付けを止めます。いまある枠も使えなくなります。これまでの申込の記録は残ります。この操作は元に戻せません。"
         confirmLabel="削除する"
         busy={deleteBusy}
@@ -662,7 +672,9 @@ export default function EventsListV8() {
           setDeleteError('')
           setDeleteTarget(null)
         }}
-      />
+      >
+        {deleteTarget ? <OperationTargetSummary accounts={[{ id: deleteTarget.accountId }]} /> : null}
+      </ConfirmDialog>
     </>
   )
 

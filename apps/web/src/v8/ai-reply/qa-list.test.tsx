@@ -9,12 +9,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
  * 自動で答えるのオンはオーナーだけ・確かめの窓（NmTj4）を通す・閲覧のみは隠す・読めないときは読み直しの押し口。
  */
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const account = vi.hoisted(() => ({ id: 'acc-1' }))
 const apiMock = vi.hoisted(() => ({
   settings: vi.fn(), saveSettings: vi.fn(), listQa: vi.fn(), test: vi.fn(),
+  publishQa: vi.fn(), stopQa: vi.fn(), deleteQa: vi.fn(),
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/auto-replies' }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: { id: 'acc-1', name: '渋谷店' }, accounts: [] }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.id, selectedAccount: { id: account.id, name: '渋谷店' }, accounts: [] }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'acc-1', name: '渋谷店' }] })) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => null, useStaffRole: () => role.value }))
 vi.mock('./api', async (importOriginal) => {
@@ -27,6 +30,7 @@ const QA = { id: 'qa-1', questions: ['駐車場はありますか'], answerText:
 
 beforeEach(() => {
   vi.clearAllMocks()
+  account.id = 'acc-1'
   role.value = verifiedStaffRole('owner')
   apiMock.settings.mockResolvedValue({ success: true, data: { mode: 'draft_only', suspendedReason: null, publishedQaCount: 18, draftQaCount: 1, version: 4 } })
   apiMock.saveSettings.mockResolvedValue({ success: true, data: { mode: 'auto_qa', suspendedReason: null, publishedQaCount: 18, draftQaCount: 1, version: 5 } })
@@ -39,6 +43,30 @@ async function open() {
   await act(async () => {})
 }
 
+it.each([['draft', '公開する'], ['published', '止める'], ['published', '削除する']] as const)('%s の %s 確認に操作先と環境を示す', async (status, action) => {
+  apiMock.listQa.mockResolvedValue({ success: true, data: { items: [{ ...QA, status }], total: 1 } })
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '「駐車場はありますか」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: action }))
+  const dialog = screen.getByRole(action === '削除する' ? 'alertdialog' : 'dialog')
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+  expect(await within(dialog).findByText('渋谷店')).toBeTruthy()
+})
+
+it('アカウント切替後は古い Q&A 削除確定を送らない', async () => {
+  const view = render(<QaListV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: '「駐車場はありますか」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  const button = within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+  account.id = 'acc-2'; view.rerender(<QaListV8 />)
+  account.id = 'acc-1'; view.rerender(<QaListV8 />)
+  await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+  expect(apiMock.deleteQa).not.toHaveBeenCalled()
+})
+
 it('オーナーが自動で答えるを選ぶと確かめの窓が開き、窓で押すまで段は変わらない', async () => {
   await open()
   fireEvent.click(screen.getByRole('button', { name: '変える' }))
@@ -47,9 +75,48 @@ it('オーナーが自動で答えるを選ぶと確かめの窓が開き、窓�
   expect(within(dialog).getByText('自動で答える前の確かめ')).toBeTruthy()
   expect(within(dialog).getByText(/公開中の Q&A 18 件/)).toBeTruthy()
   expect(within(dialog).getByText('自動で送った答えは取り消せません。')).toBeTruthy()
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
   expect(apiMock.saveSettings).not.toHaveBeenCalled()
   await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /自動で答えるをオンにする/ })) })
   expect(apiMock.saveSettings).toHaveBeenCalledWith('acc-1', { mode: 'auto_qa', expectedVersion: 4 }, undefined)
+})
+
+it('AI を使わない確認に操作先と環境を示す', async () => {
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '使わない' }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+  expect(apiMock.saveSettings).not.toHaveBeenCalled()
+})
+
+it('AI の使い方を選んだ後に切り替えて戻しても古い確定を送らない', async () => {
+  const view = render(<QaListV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: '変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '自動で答える' }))
+  const button = within(screen.getByRole('dialog')).getByRole('button', { name: /自動で答えるをオンにする/ })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+  account.id = 'acc-2'; view.rerender(<QaListV8 />)
+  account.id = 'acc-1'; view.rerender(<QaListV8 />)
+  await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+  expect(apiMock.saveSettings).not.toHaveBeenCalled()
+})
+
+it('切替先の AI 設定を読んでいる間は前のアカウントの操作を出さない', async () => {
+  const seen: boolean[] = []
+  function Probe() {
+    React.useLayoutEffect(() => { if (account.id === 'acc-2') seen.push(Boolean(screen.queryByRole('button', { name: '変える' }))) })
+    return <QaListV8 />
+  }
+  const view = render(<Probe />)
+  expect(await screen.findByRole('button', { name: '変える' })).toBeTruthy()
+  apiMock.settings.mockReturnValueOnce(new Promise(() => {}))
+  account.id = 'acc-2'; view.rerender(<Probe />)
+  expect(seen).toEqual([false])
+  expect(screen.queryByRole('button', { name: '変える' })).toBeNull()
 })
 
 it('管理者には自動で答えるの選択肢を出さない（オーナーだけ）', async () => {
