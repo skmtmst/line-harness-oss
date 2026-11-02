@@ -74,7 +74,7 @@ type LessonEntry = { time: string; name: string; note: string; tone: 'success' |
  * 実データの読み書きはしない。
  */
 const LESSON_BOARD_SAMPLE: LessonEntry[] = [
-  { time: '9:00–10:00', name: '朝のヨガ', note: '出席済み 12人', tone: 'success', stateLabel: '出席済み' },
+  { time: '9:00–10:00', name: '朝のヨガ', note: '12人', tone: 'success', stateLabel: '出席済み' },
   { time: '10:00–11:00', name: 'はじめてのヨガ', note: '残り 3・出欠待ち 2人', tone: 'info', stateLabel: '出欠待ち' },
   { time: '14:00–15:00', name: 'おひるのヨガ', note: '残り 8', tone: 'info', stateLabel: '受付中' },
 ]
