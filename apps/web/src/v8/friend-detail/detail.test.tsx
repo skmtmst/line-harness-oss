@@ -185,7 +185,7 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     expect(text).toContain('基本メニュー（会員）')
     expect(text).toContain('新規登録7日間フォロー')
     expect(text).toContain('『秋の新商品はいつ届きますか？』')
-    expect(host.querySelectorAll('[role="tab"]').length).toBe(10)
+    expect(host.querySelectorAll('[role="tab"]').length).toBe(6)
     // 履歴は概要を開いたときに8件だけ取る。
     expect(fetchApi).toHaveBeenCalledWith(expect.stringContaining('/api/friends/friend-1/timeline?limit=8'), expect.anything())
   })

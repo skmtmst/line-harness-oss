@@ -362,6 +362,7 @@ export default function OverviewTab({
         <section className={styles.section} aria-labelledby="fdt-running">
           <div className={styles.secHead}>
             <h2 id="fdt-running" className={styles.secTitle}>進行中の配信・自動処理</h2>
+            <TextLink href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=reminders`}>この友だちのリマインダを見る</TextLink>
             <TextLink href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=scenario`}>すべてを見る</TextLink>
           </div>
           {upcomingStatus === 'loading' || upcomingStatus === 'idle' ? (

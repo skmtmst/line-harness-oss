@@ -187,6 +187,23 @@ function deleteDialog(_view: ReturnType<typeof render>, name: string) {
 }
 
 describe('削除の影響の読み込み', () => {
+  test('既定の印がある下書きはLINE側の状態を断定せず、削除を止める', async () => {
+    mocks.deleteImpact.mockResolvedValue({ success: true, data: impact('g-draft', {
+      blockers: ['default_for_all'], canDelete: false, recommendedAction: 'unpublish',
+      lineResources: { pageCount: 1, pagesWithLineRichMenuId: 0, isDefaultForAll: true, publishing: false },
+    }) })
+    const view = render(<RichMenusListV8 />)
+    await openDelete(view, '秋の下書き')
+    const dialog = await findDialog(/「秋の下書き」はまだ消せません/)
+    expect(dialog.textContent).toContain('既定の印があり、LINE側の状態を確認できない')
+    expect(dialog.textContent).toContain('削除せずに残しておいて問題ありません。')
+    expect(dialog.textContent).not.toContain('出なくなる友だちがいます')
+    expect(within(dialog).queryByRole('button', { name: 'ほかのメニューを既定に' })).toBeNull()
+    expect(mocks.remove).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+    await waitFor(() => expect(queryDialog(/「秋の下書き」はまだ消せません/)).toBeNull())
+  })
+
   test('一覧を出しただけでは影響を読まず、窓を開けたときにそのメニューの影響を読む', async () => {
     const view = render(<RichMenusListV8 />)
     await view.findByText('秋の下書き')
