@@ -37,6 +37,22 @@ it('サロンでは担当ごとの予定の見本を見せ、選ばずに戻れ�
   expect(screen.getByText('見本のため実際の設定は変わりません。', { exact: false })).toBeTruthy()
   expect(choose).not.toHaveBeenCalled()
 })
+it('面談・相談では相談の予定の見本を見せ、選ばずに戻れる', () => {
+  const choose = vi.fn()
+  function Subject() {
+    const [viewing, setViewing] = useState<AccountStyle>('consult')
+    return <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={null} onChoose={choose} />
+  }
+  render(<Subject />)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  fireEvent.click(screen.getByRole('button', { name: 'よく使う操作に進む' }))
+  expect(screen.getByRole('heading', { name: '相談の予定を確認する' })).toBeTruthy()
+  expect(screen.getByRole('region', { name: '相談の予定' })).toBeTruthy()
+  expect(screen.getByText('見本 かい・次の空き 11:00')).toBeTruthy()
+  expect(screen.getByText('10:00–10:45 見本 ひな さま・オンライン')).toBeTruthy()
+  expect(screen.getByText('見本のため実際の設定は変わりません。', { exact: false })).toBeTruthy()
+  expect(choose).not.toHaveBeenCalled()
+})
 it('スタイルを変えると最初のページに戻り、標準ではお知らせを見せる', () => {
   function Subject() {
     const [viewing, setViewing] = useState<AccountStyle>('restaurant')

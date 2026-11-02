@@ -24,8 +24,27 @@ const SALON_BOARD_SAMPLE: SalonColumn[] = [
   },
 ]
 
+type ConsultEntry = { time: string; name: string; meet: string; stateLabel: string }
+type ConsultColumn = { staff: string; next: string; entries: ConsultEntry[] }
+
+/** script.ts の面談盤の見本と同じ架空の値。実データの読み書きはしない。 */
+const CONSULT_BOARD_SAMPLE: ConsultColumn[] = [
+  {
+    staff: '見本 かい', next: '次の空き 11:00',
+    entries: [
+      { time: '10:00–10:45', name: '見本 ひな', meet: 'オンライン', stateLabel: '予約' },
+    ],
+  },
+  {
+    staff: '見本 なな', next: '次の空き 10:00',
+    entries: [
+      { time: '10:30–11:15', name: '見本 りく', meet: '対面', stateLabel: '予約' },
+    ],
+  },
+]
+
 /** サロン3ページ目「担当ごとの予定を確認する」の静止見本。保存・送信はしない。 */
-export default function SalonOperationDemo() {
+export function SalonOperationDemo() {
   return <section aria-label="担当ごとの予定の見本">
     <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
     <Card layout="vertical" padding="default" gap="normal" aria-label="担当ごとの予定">
@@ -38,6 +57,30 @@ export default function SalonOperationDemo() {
               <li key={`${column.staff}-${entry.time}`}>
                 <StatusBadge tone={entry.state === 'done' ? 'success' : 'info'}>{entry.stateLabel}</StatusBadge>
                 <span>{entry.time} {entry.name} さま・{entry.menu}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      <p className={styles.note}>名前・数は架空です。見本のため実際の設定は変わりません。</p>
+    </Card>
+  </section>
+}
+
+/** 面談・相談3ページ目「相談の予定を確認する」の静止見本。保存・送信はしない。 */
+export function ConsultOperationDemo() {
+  return <section aria-label="相談の予定の見本">
+    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="相談の予定">
+      <strong>相談の予定（見本）</strong>
+      {CONSULT_BOARD_SAMPLE.map(column => (
+        <section key={column.staff} aria-label={`${column.staff}の予定`}>
+          <p className={styles.description}>{column.staff}・{column.next}</p>
+          <ul className={styles.can}>
+            {column.entries.map(entry => (
+              <li key={`${column.staff}-${entry.time}`}>
+                <StatusBadge tone="info">{entry.stateLabel}</StatusBadge>
+                <span>{entry.time} {entry.name} さま・{entry.meet}</span>
               </li>
             ))}
           </ul>
