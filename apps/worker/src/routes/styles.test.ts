@@ -658,6 +658,36 @@ describe('style setup', () => {
   });
 });
 describe('industry metrics', () => {
+  test('new bookings exclude cancelled records while using the creation date', async () => {
+    booking('kept', '2026-10-16T01:00:00Z', 'confirmed', 'f', 's', { requested: '2026-10-15T01:30:00Z' });
+    booking('cancelled', '2026-10-16T02:00:00Z', 'cancelled', 'f', 's', { requested: '2026-10-15T01:45:00Z' });
+    const result = await styleSnapshot(db, 'a', 'salon', {});
+    expect(result.metrics.newBookings.value).toBe(1);
+    expect(result.newBookings.map(row => row.id)).toEqual(['kept']);
+  });
+
+  test('restaurant unseated counts the selected day including past starts, excluding departed, held, cancelled and no-show', async () => {
+    raw.exec(`INSERT INTO rt_organizations(id,account_id,name) VALUES('org-count','a','架空店');
+      INSERT INTO rt_stores(id,organization_id,line_account_id,name,code) VALUES('store-count','org-count','a','架空店','C');`);
+    const insert = raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,status,departed_at,hold_expires_at)
+      VALUES (?, 'store-count', 'phone', '架空', 2, ?, ?, ?, ?, ?)`);
+    insert.run('past', '2026-10-15T01:00:00Z', '2026-10-15T02:00:00Z', 'confirmed', null, null);
+    insert.run('future', '2026-10-15T05:00:00Z', '2026-10-15T06:00:00Z', 'confirmed', null, null);
+    insert.run('tomorrow', '2026-10-16T01:00:00Z', '2026-10-16T02:00:00Z', 'confirmed', null, null);
+    insert.run('no-show', '2026-10-15T06:00:00Z', '2026-10-15T07:00:00Z', 'no_show', null, null);
+    insert.run('cancelled', '2026-10-15T06:00:00Z', '2026-10-15T07:00:00Z', 'cancelled', null, null);
+    insert.run('departed', '2026-10-15T07:00:00Z', '2026-10-15T08:00:00Z', 'visited', '2026-10-15T08:30:00Z', null);
+    insert.run('hold', '2026-10-15T08:00:00Z', '2026-10-15T09:00:00Z', 'pending', null, '2026-10-15T09:00:00Z');
+    insert.run('linked', '2026-10-15T08:00:00Z', '2026-10-15T09:00:00Z', 'confirmed', null, null);
+    raw.exec(`INSERT INTO rt_tables(id,store_id,code,label,seat_type,min_capacity,max_capacity)
+      VALUES('linked-table','store-count','T1','T1','table',1,4);
+      INSERT INTO rt_reservation_table_links(reservation_id,table_id) VALUES('linked','linked-table');`);
+    const result = await styleSnapshot(db, 'a', 'restaurant', { range: 'today', date: '2026-10-15' });
+    expect(result.metrics.unseated.value).toBe(2);
+    const week = await styleSnapshot(db, 'a', 'restaurant', { range: 'week', date: '2026-10-15' });
+    expect(week.metrics.unseated.value).toBe(3);
+  });
+
   test('no-show help uses the configured period and keeps the same numerator and denominator', async () => {
     booking('recent-no-show', '2026-10-14T01:00:00Z', 'no_show');
     booking('older-confirmed', '2026-10-01T01:00:00Z');

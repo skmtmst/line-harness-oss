@@ -31,7 +31,7 @@ it.each([
   ['all', '1970-01-01T00:00:00Z', '2100-01-01T00:00:00Z', 'すべての予約'],
 ])('印刷も画面の期間 %s・状態・店舗を使って全ページを読む', async (period, from, to, label) => {
   render(<ListView view="list" rows={[]} total={0} tables={[]} page={1} period={period} status="confirmed"
-    busy={false} canWrite={false} canImport={false} day={new Date()} storeId="store" storeName="試験店"
+    busy={false} canWrite={false} canImport={false} day={new Date()} onDay={vi.fn()} storeId="store" storeName="試験店"
     onView={vi.fn()} onPeriod={vi.fn()} onStatus={vi.fn()} onPage={vi.fn()} onImport={vi.fn()}
     onCreate={vi.fn()} onEdit={vi.fn()} onOpen={vi.fn()} onCancel={vi.fn()} onRestore={vi.fn()} />)
   expect(await fixture.board!.loadPrintEntries()).toEqual([{ status: 'confirmed' }])
@@ -47,7 +47,7 @@ it('R11: 帯は4枚で未配席は下の1行、行き先は今日の配席', () 
     reservation('r2', { status: 'confirmed', table_id: 't1', guest_count: 3 }),
   ]
   const view = render(<ListView view="list" rows={rows as never} total={2} tables={[]} page={1} period="all" status="all"
-    busy={false} canWrite={false} canImport={false} day={new Date()} storeId="store" storeName="試験店"
+    busy={false} canWrite={false} canImport={false} day={new Date()} onDay={vi.fn()} storeId="store" storeName="試験店"
     onView={onView} onPeriod={vi.fn()} onStatus={vi.fn()} onPage={vi.fn()} onImport={vi.fn()}
     onCreate={vi.fn()} onEdit={vi.fn()} onOpen={vi.fn()} onCancel={vi.fn()} onRestore={vi.fn()} />)
   // 帯の中は4枚だけ。

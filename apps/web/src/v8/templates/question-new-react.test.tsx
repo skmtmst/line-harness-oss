@@ -135,6 +135,15 @@ describe('質問を作る：保存で欄に知らせる', () => {
     expect(templatesApi.create).not.toHaveBeenCalled()
   })
 
+  it('空欄の前文と質問文の例は入力済みと区別できる', () => {
+    const intro = screen.getByLabelText('前文（空なら送らない）') as HTMLInputElement
+    const text = screen.getByLabelText('質問文（160文字まで）') as HTMLInputElement
+    expect(intro.value).toBe('')
+    expect(intro.placeholder).toBe('例：いつもありがとうございます。')
+    expect(text.value).toBe('')
+    expect(text.placeholder).toBe('例：来月も定期便を続けますか？')
+  })
+
   it('空のまま保存すると、名前・質問文・選択肢の欄が赤くなり理由が出て、名前の欄へ移る。直すと消える', async () => {
     // 2つ目の選択肢の文字を消しておく（はい・いいえ が最初から入っている）。
     const choiceInputs = Array.from(document.querySelectorAll('input[maxlength="20"]')) as HTMLInputElement[]
@@ -144,7 +153,7 @@ describe('質問を作る：保存で欄に知らせる', () => {
     await frames()
     expect(templatesApi.create).not.toHaveBeenCalled()
     const name = document.querySelector('input[placeholder="例：継続の意思をうかがう"]') as HTMLInputElement
-    const text = document.querySelector('input[placeholder="来月も定期便を続けますか？"]') as HTMLInputElement
+    const text = document.querySelector('input[placeholder="例：来月も定期便を続けますか？"]') as HTMLInputElement
     expect(name.getAttribute('aria-invalid')).toBe('true')
     expect(text.getAttribute('aria-invalid')).toBe('true')
     expect(document.getElementById('q-name-error')?.textContent).toBe('テンプレート名を入力してください。')

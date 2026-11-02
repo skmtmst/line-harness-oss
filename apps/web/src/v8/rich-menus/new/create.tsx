@@ -14,7 +14,7 @@ import { renderAudienceStep,renderHqAudienceStep } from './create-audience-step'
 import { renderButtonsStep } from './create-buttons-step'
 import { hydrateMenuDraft } from './create-hydration'
 import { getSlotImage,renderSingleImageSlot,renderTabSlot } from './create-image-slots'
-import { groupFromSeed } from './create-model'
+import { firstUnconfiguredArea, groupFromSeed } from './create-model'
 import { renderMenuLinePreview,renderPreviewRail } from './create-preview-rail'
 import { renderHqPublishStep,renderPublishStep } from './create-publish-step'
 import { createMenuDraft,persistMenuDraft,saveMenuDraft } from './create-save-actions'
@@ -598,6 +598,13 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   async function goNext() {
     const idx = STEP_KEYS.indexOf(step)
     if (idx >= STEP_KEYS.length - 1) return
+    const missing = step === 'buttons' ? firstUnconfiguredArea(pages) : null
+    if (missing) {
+      setActivePageId(missing.pageId)
+      setSelectedAreaId(missing.areaId)
+      setError(missing.reason)
+      return
+    }
     const ok = await saveDraft()
     if (!ok) return
     const next = STEP_KEYS[idx + 1]

@@ -426,6 +426,23 @@ describe('?view= で板を入れ替える', () => {
     expect(screen.getByText('注文履歴・売上')).toBeTruthy()
   })
 
+  it('商品が未登録ならメニュー管理への案内とリンクを出す', async () => {
+    fixture.menuItems.mockResolvedValue({ success: true, store: { id: 'store-1', name: '架空店' }, items: [] })
+    at('/restaurant-test/delivery?view=sold-out')
+    render(<DeliveryPage />)
+    expect(await screen.findByText('メニュー管理で商品を作ると表示されます。')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'メニュー管理を開く' }).getAttribute('href')).toBe('/restaurant-test/menu')
+  })
+
+  it('検索結果だけが空なら商品登録を促さず条件の見直しを案内する', async () => {
+    at('/restaurant-test/delivery?view=sold-out')
+    render(<DeliveryPage />)
+    await screen.findByText('唐揚げ弁当')
+    fireEvent.change(screen.getByLabelText('商品名で探す'), { target: { value: '存在しない商品' } })
+    expect(await screen.findByText('条件を変えて、もう一度お試しください。')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'メニュー管理を開く' })).toBeNull()
+  })
+
   it('sold-out は品切れ一括設定（h7OeT）を出す', async () => {
     at('/restaurant-test/delivery?view=sold-out')
     render(<DeliveryPage />)

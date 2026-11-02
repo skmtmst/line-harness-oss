@@ -76,6 +76,15 @@ describe('Y8SjT2 予約枠・在庫', () => {
     expect(board.textContent).toContain('休み（定休日）・お客さまの画面に出ません')
   })
 
+  it('変更前の配分と開ける時間は保存できず、変更後は保存できる', async () => {
+    render(<InventoryPage />)
+    await screen.findByText('19:00 の卓')
+    const save = screen.getByRole('button', { name: /開ける時間と配分を保存/ }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
+    expect(save.disabled).toBe(false)
+  })
+
   it('下の帯の保存は、配分（全部の時間帯）と開ける時間を今の口へ送る', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
@@ -90,6 +99,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     fixture.saveInventoryAllocation.mockRejectedValue(new ApiError(409, 'conflict'))
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
+    fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
     fireEvent.click(screen.getByRole('button', { name: /開ける時間と配分を保存/ }))
     const band = await screen.findByRole('alert')
     expect(band.textContent).toContain('中川さんが 14:02 に予約枠・在庫を保存しました')

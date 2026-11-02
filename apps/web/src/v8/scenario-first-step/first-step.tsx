@@ -796,7 +796,7 @@ export default function ScenarioFirstStepV8() {
                   ref={bodyRef}
                   value={body}
                   onValueChange={(next) => editBody(next)}
-                  placeholder="はじめまして。友だち追加ありがとうございます。"
+                  placeholder="例：はじめまして。友だち追加ありがとうございます。"
                   aria-label="本文"
                   editorSize="message"
                 /></SaveErrorField>

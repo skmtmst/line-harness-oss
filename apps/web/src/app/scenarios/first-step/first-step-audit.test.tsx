@@ -220,7 +220,7 @@ describe('SCENARIO-03：詳細条件が未設定なら全員対象にしない',
     m.get.mockResolvedValue(ok(scenario({ steps: [] })))
     await mount(<FirstStep />)
     fireEvent.click(screen.getByRole('radio', { name: /詳細条件で絞る/ }))
-    fireEvent.change(screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。'), {
+    fireEvent.change(screen.getByPlaceholderText('例：はじめまして。友だち追加ありがとうございます。'), {
       target: { value: '本文' },
     })
     await click('作って編集へ')
@@ -232,7 +232,7 @@ describe('SCENARIO-03：詳細条件が未設定なら全員対象にしない',
     m.get.mockResolvedValue(ok(scenario({ steps: [] })))
     await mount(<FirstStep />)
     fireEvent.click(screen.getByRole('radio', { name: /詳細条件で絞る/ }))
-    fireEvent.change(screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。'), {
+    fireEvent.change(screen.getByPlaceholderText('例：はじめまして。友だち追加ありがとうございます。'), {
       target: { value: '本文' },
     })
     await click('作って編集へ')
@@ -290,13 +290,13 @@ describe('SCENARIO-04：シナリオが確定するまで保存しない', () =>
     m.params = new URLSearchParams('id=sc-b')
     await act(async () => rerender(<FirstStep />))
     expect(
-      (screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。') as HTMLTextAreaElement).value,
+      (screen.getByPlaceholderText('例：はじめまして。友だち追加ありがとうございます。') as HTMLTextAreaElement).value,
     ).toBe('B本文')
     await act(async () =>
       slow.resolve(ok(scenario({ steps: [step({ id: 'a-step', messageContent: 'A本文' })] }))),
     )
     expect(
-      (screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。') as HTMLTextAreaElement).value,
+      (screen.getByPlaceholderText('例：はじめまして。友だち追加ありがとうございます。') as HTMLTextAreaElement).value,
     ).toBe('B本文')
     await click('作って編集へ')
     expect(m.updateStep.mock.calls[0].slice(0, 2)).toEqual(['sc-b', 'b-step'])
@@ -308,7 +308,7 @@ describe('SCENARIO-05：保存失敗で「保存中」のままにしない', ()
     m.updateStep.mockRejectedValueOnce(new Error('offline'))
     await mount(<FirstStep />)
     const body = screen.getByPlaceholderText(
-      'はじめまして。友だち追加ありがとうございます。',
+      '例：はじめまして。友だち追加ありがとうございます。',
     ) as HTMLTextAreaElement
     fireEvent.change(body, { target: { value: '書きかけの本文' } })
     await click('作って編集へ')
@@ -338,7 +338,7 @@ describe('入力が足りないときの欄への案内', () => {
     await mount(<FirstStep />)
     await click('作って編集へ')
     expect(m.addStep).not.toHaveBeenCalled()
-    const field = screen.getByPlaceholderText('はじめまして。友だち追加ありがとうございます。')
+    const field = screen.getByPlaceholderText('例：はじめまして。友だち追加ありがとうございます。')
     expect(field.getAttribute('aria-invalid')).toBe('true')
     expect(document.activeElement).toBe(field)
     expect(screen.getAllByText(/内容を入力してください/)).toHaveLength(1)

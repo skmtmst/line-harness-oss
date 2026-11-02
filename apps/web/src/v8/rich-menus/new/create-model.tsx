@@ -5,7 +5,8 @@ import {
 RICH_MENU_MAX_PAGES
 } from '@line-crm/shared'
 import { TAB_COUNT_OPTIONS } from './create-options'
-import { type Group } from './create-types'
+import { type Group, type Page } from './create-types'
+import { isAreaActionConfigured } from '@/components/rich-menus/action-drafts'
 
 
 /** ①で選べる切替タブの数の上限（ページの数。LINE 側の上限より多くしない）。 */
@@ -38,4 +39,17 @@ export function groupFromSeed(seed: HqRichMenuSeed): Group {
       imageR2Key: page.imageR2Key, imageContentType: null, areas: page.areas,
     })),
   }
+}
+
+/** 次の手順へ移る前に、最初の未設定の面を示す。下書き保存は妨げない。 */
+export function firstUnconfiguredArea(pages: Page[]): { pageId: string; areaId: string | null; reason: string } | null {
+  for (const [pageIndex, page] of pages.entries()) {
+    if (page.areas.length === 0) return { pageId: page.id, areaId: null, reason: `タブ${pageIndex + 1}に面が設定されていません。面を追加して動きを設定してください。` }
+    const areaIndex = page.areas.findIndex((area) => !isAreaActionConfigured(area))
+    if (areaIndex >= 0) {
+      const area = page.areas[areaIndex]
+      return { pageId: page.id, areaId: area.id, reason: `タブ${pageIndex + 1}の面${String.fromCharCode(65 + areaIndex)}の動きが未設定です。${area.intent === 'url' ? '正しいURLを入力してください。' : '動きと内容を設定してください。'}` }
+    }
+  }
+  return null
 }
