@@ -246,6 +246,22 @@ describe('来店スタンプ（管理画面）', () => {
     expect(screen.queryByRole('button', { name: '却下' })).toBeNull()
   })
 
+  it('受け取りボーナスと押印間隔は入力時に範囲外の理由をそれぞれ表示する', async () => {
+    render(<VisitStampsV8 />)
+    await screen.findByDisplayValue('然 来店スタンプカード')
+    const bonus = screen.getByRole('spinbutton', { name: 'カードを受け取った時のボーナス' })
+    fireEvent.change(bonus, { target: { value: '99' } })
+    expect(screen.getByText('受け取りボーナスは0〜50個です。')).toBeTruthy()
+    fireEvent.click(screen.getByRole('radio', { name: '前の押印から' }))
+    const hours = screen.getByRole('spinbutton', { name: '押印をあける時間' })
+    fireEvent.change(hours, { target: { value: '30' } })
+    expect(screen.getByText('押印の間隔は1〜23時間です。')).toBeTruthy()
+    expect(screen.getByText('受け取りボーナスは0〜50個です。')).toBeTruthy()
+    fireEvent.change(bonus, { target: { value: '2' } })
+    expect(screen.queryByText('受け取りボーナスは0〜50個です。')).toBeNull()
+    expect(screen.getByText('押印の間隔は1〜23時間です。')).toBeTruthy()
+  })
+
   it('誤った受け取りボーナスは欄を赤くし、その欄に移動して保存を止める', async () => {
     render(<VisitStampsV8 />)
     await screen.findByDisplayValue('然 来店スタンプカード')
