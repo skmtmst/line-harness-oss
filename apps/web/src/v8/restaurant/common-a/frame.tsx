@@ -1,4 +1,6 @@
 'use client'
+
+import { BoundaryBanner } from './boundary-banner'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 
@@ -48,15 +50,7 @@ export interface RestaurantContext {
 /** 店舗を選ぶ欄（絵の「選ぶ欄」：幅210・高さ36）。 */
 export const STORE_PICKER_WIDTH = 210
 
-/** 検証環境の帯（CHz31「検証環境の帯」）。右の注意は板ごとに替えられる。 */
-export function BoundaryBanner({ note = '予約サイトは受信専用・外部更新なし' }: { note?: string }) {
-  return (
-    <Notice tone="warn" marker="dot" heading={<span className={styles.boundaryBadge}>検証環境専用</span>}>
-      <TruncatedText value="既存のmusubo運用とは分離された飲食店向けテスト領域です。" />
-      <TruncatedText value={note} />
-    </Notice>
-  )
-}
+export { BoundaryBanner } from './boundary-banner'
 
 /** 板の頭と中身の並び（取得を持たない画面でも使う）。 */
 export function RestaurantPage({ boardId, title, description, descriptionAs, descriptionSize, subtitle, picker, actions, readOnly, readOnlyNeed, headPadTop, headTextGap, titleSize, bodyPadTop, bodyGap, children }: {

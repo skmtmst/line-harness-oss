@@ -14,6 +14,7 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManage
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', setSelectedAccountId: vi.fn(), accounts: [], loading: fixture.accountLoading }) }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/restaurant-test/google', useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}`), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
+vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: async () => ({version:'1',deploy_env:'staging'}) }))
 vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { connection: fixture.connection } }))
 vi.mock('./posts', () => ({ PostsBoard: () => <div>投稿の見本</div>, PostEditor: () => null, PostConfirm: () => null }))
 vi.mock('./reviews', () => ({ ReviewsBoard: () => <div>口コミの見本</div>, ReviewDraft: () => null }))
@@ -65,9 +66,10 @@ it.each([
   expect(header.querySelectorAll('[data-read-only-notice]')).toHaveLength(0)
   expect(header.querySelector('h1')?.textContent).toBe('Googleビジネス')
   const group = document.querySelector('[data-google-notices]')!
+  await screen.findByText('検証環境です。予約サイトへは送りません')
   expect(group.querySelectorAll('[data-design-part="notice"]')).toHaveLength(2)
   expect(group.firstElementChild).toBe(notices()[0])
-  expect(group.lastElementChild?.textContent).toContain('検証環境専用')
+  expect(group.lastElementChild?.textContent).toContain('検証環境です。予約サイトへは送りません')
   expect(header.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 it.each(['reviews', 'posts', 'performance', 'profile'])('閲覧のみの %s も標準の帯が1本だけ', async tab => {
