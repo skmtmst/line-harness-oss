@@ -51,17 +51,16 @@ describe.each([false, true])('案内の見出し（席=%s）', seat => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'この待ちは終了しました' })).toBeTruthy(), { timeout: 3000 });
     expect(screen.queryByRole('button', { name: 'この枠で予約する' })).toBeNull();
   });
-  it('処理中・失敗・完了を見出しに示し同じ受付キーで再試行する', async () => {
+  it('通信断では結果不明を伝え、同じ画面から予約を再送させない', async () => {
     setup(seat); const accept = seat ? mocks.acceptSeatWaitlist : mocks.acceptWaitlist;
     let reject: (error: Error) => void = () => {};
-    accept.mockReturnValueOnce(new Promise((_, no) => { reject = no; })).mockResolvedValueOnce(seat ? { status: 'confirmed' } : { booking_id: 'b', status: 'confirmed' });
+    accept.mockReturnValueOnce(new Promise((_, no) => { reject = no; }));
     draw(seat); fireEvent.click(await screen.findByRole('button', { name: 'この枠で予約する' }));
     expect(screen.getByRole('heading', { name: '手続き中です' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'この枠で予約する' })).toHaveProperty('disabled', true);
-    reject(new Error('offline')); await screen.findByRole('alert'); expect(screen.getByRole('heading', { name: '手続きを完了できませんでした' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'この枠で予約する' })); await screen.findByText('予約が確定しました。');
-    expect(screen.getByRole('heading', { name: '手続きが完了しました' })).toBeTruthy(); expect(accept.mock.calls[0]).toEqual(accept.mock.calls[1]);
-    expect(accept.mock.calls[0][1]).toMatch(/^[\da-f-]{36}$/);
+    reject(new Error('offline')); await screen.findByText(/結果を確認できませんでした/);
+    expect(screen.getByText(/予約の状態を確認/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'この枠で予約する' })).toBeNull();
+    expect(accept).toHaveBeenCalledTimes(1);
   });
 });
 it('予約後の支払いは既存部品に任せ、空きの案内を見出しに残さない', async () => {
@@ -85,6 +84,36 @@ it('期限切れなら次の日時を選ぶよう案内し、再送を止める'
 it('不明な席予約の状態は確定と断定せず確認先を案内する', async () => {
   setup(true); mocks.acceptSeatWaitlist.mockResolvedValue({ reservation_id: 'r', status: 'pending' }); draw(true);
   fireEvent.click(await screen.findByRole('button', { name: 'この枠で予約する' }));
-  await screen.findByText(/予約履歴を確認するか/);
+  await screen.findByText(/予約の状態を確認/);
   expect(screen.queryByText('予約が確定しました。')).toBeNull();
+});
+
+it.each([
+  ['confirmed', '予約が確定しました。'],
+  ['pending', '予約は確認待ちです。予約の状態を確認してください。'],
+  ['seated', 'この予約は来店中です。予約の状態を確認してください。'],
+  ['visited', 'この予約は来店済みです。予約の状態を確認してください。'],
+  ['cancelled', 'この予約は取り消されています。別の日時を選んで予約してください。'],
+  ['no_show', 'この予約は来店なしとして記録されています。予約の状態を確認してください。'],
+  ['unexpected', '予約の状態を確認できませんでした。予約の状態を確認してください。'],
+])('席の %s を正しく表示する', async (status, text) => {
+  setup(true); mocks.acceptSeatWaitlist.mockResolvedValue({ reservation_id: 'r', status }); draw(true);
+  fireEvent.click(await screen.findByRole('button', { name: 'この枠で予約する' }));
+  await screen.findByText(text);
+  if (status !== 'confirmed') expect(screen.queryByText('予約が確定しました。')).toBeNull();
+});
+it.each([
+  ['requested', '予約を受け付けました。担当の確認をお待ちください。'],
+  ['confirmed', '予約が確定しました。'],
+  ['cancelled', 'この予約は取り消されています。別の日時を選んで予約してください。'],
+  ['expired', 'この予約の期限は切れています。別の日時を選んで予約してください。'],
+  ['rejected', 'この予約は受け付けられませんでした。別の日時を選んで予約してください。'],
+  ['completed', 'この予約は終了しています。予約の状態を確認してください。'],
+  ['no_show', 'この予約は欠席として記録されています。予約の状態を確認してください。'],
+  ['unexpected', '予約の状態を確認できませんでした。予約の状態を確認してください。'],
+])('個人の %s を正しく表示し、終了した予約を支払いへ進めない', async (status, text) => {
+  setup(false); mocks.acceptWaitlist.mockResolvedValue({ booking_id: 'b', status, ...(!['requested', 'confirmed'].includes(status) ? { payment: { id: 'p', status: 'unpaid' } } : {}) }); draw(false);
+  fireEvent.click(await screen.findByRole('button', { name: 'この枠で予約する' }));
+  await screen.findByText(text);
+  expect(screen.queryByText('既存の支払い部品')).toBeNull();
 });

@@ -16,14 +16,45 @@ export default function WaitlistOfferSheet({ id, seat = false, decline = false, 
   const [readAttempt, setReadAttempt] = useState(0);
   useEffect(() => { let alive = true; setEntry(null); setError(null); const request = seat ? api.seatWaitlists(id) : api.bookingWaitlists(id); request.then(r => { if (!alive) return; const own = r.waitlist.find(w => w.id === id); if (own) setEntry(own); else setError('この案内が見つかりません。'); }).catch(() => { if (alive) setError('案内を読み込めません。もう一度お試しください。'); }); const timer = setInterval(() => setNow(Date.now()), 1000); return () => { alive = false; clearInterval(timer); }; }, [id, seat, readAttempt]);
   const active = entry?.status === 'invited' && !!entry.hold_expires_at && Date.parse(entry.hold_expires_at) > now;
-  const title = outcome ? '予約を確定できませんでした' : message ? '手続きが完了しました' : working ? '手続き中です' : error ? (entry ? '手続きを完了できませんでした' : '案内を確認できません') : !entry ? '案内を確認しています' : active ? (decline ? '今回は見送る' : '空きが出ました') : entry.status === 'waiting' ? '空きの案内を待っています' : entry.status === 'converted' ? 'この案内は予約になりました' : 'この待ちは終了しました';
+  const title = outcome ? '予約の状態をご確認ください' : message ? '手続きが完了しました' : working ? '手続き中です' : error ? (entry ? '手続きを完了できませんでした' : '案内を確認できません') : !entry ? '案内を確認しています' : active ? (decline ? '今回は見送る' : '空きが出ました') : entry.status === 'waiting' ? '空きの案内を待っています' : entry.status === 'converted' ? 'この案内は予約になりました' : 'この待ちは終了しました';
   const remaining = Math.max(0, Math.ceil(((entry?.hold_expires_at ? Date.parse(entry.hold_expires_at) : now) - now) / 1000));
   async function accept() {
-if (!entry || !active || busy.current) return; busy.current = true; setWorking(true); setError(null); try {
-      if (seat) { const result = await api.acceptSeatWaitlist(id, key.current); if (result.status === 'confirmed') setMessage('予約が確定しました。'); else setOutcome(result.status === 'cancelled' ? 'この予約は取り消されています。別の日時を選んで予約してください。' : '予約の状態を確認できませんでした。予約履歴を確認するか、お店にお問い合わせください。'); }
-      else { const person = entry as CustomerBookingWaitlist; const result = await api.acceptWaitlist({ menu_id: person.menu_id, staff_id: person.staff_id, starts_at: person.starts_at, waitlist_id: id }, key.current); if (result.payment && result.payment.status !== 'paid') setPaymentBooking(result.booking_id); else setMessage(result.status === 'confirmed' ? '予約が確定しました。' : '予約を受け付けました。お店の承認をお待ちください。'); }
-    } catch (e) { const code = (e as { body?: { error?: string ;} ;}).body?.error; if (code === 'offer_expired') setOutcome('仮押さえの期限が切れました。別の日時を選んで予約してください。'); else setError(code === 'slot_conflict' || code === 'slot_not_available' ? 'この枠は予約できなくなりました。' : '予約できませんでした。期限内にもう一度お試しください。'); } finally { busy.current = false; setWorking(false); }
-}
+    if (!entry || !active || busy.current || outcome) return;
+    busy.current = true; setWorking(true); setError(null);
+    try {
+      if (seat) {
+        const { status } = await api.acceptSeatWaitlist(id, key.current);
+        const statuses: Record<string, string> = {
+          pending: '予約は確認待ちです。予約の状態を確認してください。',
+          seated: 'この予約は来店中です。予約の状態を確認してください。',
+          visited: 'この予約は来店済みです。予約の状態を確認してください。',
+          cancelled: 'この予約は取り消されています。別の日時を選んで予約してください。',
+          no_show: 'この予約は来店なしとして記録されています。予約の状態を確認してください。',
+        };
+        if (status === 'confirmed') setMessage('予約が確定しました。');
+        else setOutcome((Object.hasOwn(statuses, status) ? statuses[status] : undefined) ?? '予約の状態を確認できませんでした。予約の状態を確認してください。');
+      } else {
+        const person = entry as CustomerBookingWaitlist;
+        const result = await api.acceptWaitlist({ menu_id: person.menu_id, staff_id: person.staff_id, starts_at: person.starts_at, waitlist_id: id }, key.current);
+        const statuses: Record<string, string> = {
+          cancelled: 'この予約は取り消されています。別の日時を選んで予約してください。',
+          expired: 'この予約の期限は切れています。別の日時を選んで予約してください。',
+          rejected: 'この予約は受け付けられませんでした。別の日時を選んで予約してください。',
+          completed: 'この予約は終了しています。予約の状態を確認してください。',
+          no_show: 'この予約は欠席として記録されています。予約の状態を確認してください。',
+        };
+        if (result.status !== 'requested' && result.status !== 'confirmed') setOutcome((Object.hasOwn(statuses, result.status) ? statuses[result.status] : undefined) ?? '予約の状態を確認できませんでした。予約の状態を確認してください。');
+        else if (result.payment && result.payment.status !== 'paid') setPaymentBooking(result.booking_id);
+        else setMessage(result.status === 'confirmed' ? '予約が確定しました。' : '予約を受け付けました。担当の確認をお待ちください。');
+      }
+    } catch (e) {
+      const code = (e as { body?: { error?: string } }).body?.error;
+      if (code === 'offer_expired') setOutcome('仮押さえの期限が切れました。別の日時を選んで予約してください。');
+      else if (code === 'slot_conflict' || code === 'slot_not_available' || code === 'closure_conflict') setOutcome('この枠は予約できなくなりました。別の日時を選んで予約してください。');
+      else setOutcome('予約の結果を確認できませんでした。もう一度申し込む前に、予約の状態を確認してください。');
+    } finally { busy.current = false; setWorking(false); }
+  }
+
   async function cancel() { if (busy.current) return; busy.current = true; setWorking(true); setError(null); try { if (seat) await api.cancelSeatWaitlist(id); else await api.cancelWaitlist(id); setMessage('取り消しました。次の方へ案内します。'); } catch { setError('取り消せませんでした。もう一度お試しください。'); } finally { busy.current = false; setWorking(false); } }
   return <div className="fixed inset-0 z-50 text-ink" role="dialog" aria-modal="true" aria-label="空いたら知らせる">
     <Button variant="overlay" aria-label="閉じる" onClick={onClose} />

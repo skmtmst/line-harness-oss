@@ -81,7 +81,7 @@ export default function RecurringCard({ menu, staff, startsAt, onChange }: {
                 <Button variant="icon" aria-label="回数を増やす" disabled={count >= max} onClick={() => { onChange('checking'); setList(null); setCount((n) => Math.min(max, n + 1)); }}>＋</Button>
               </span>
             </div>
-            {failed ? <p role="alert" className="text-[13px] text-danger">空きを確かめられませんでした。再読み込みしてから予約してください。<Button variant="link" onClick={() => setRetry((n) => n + 1)}>もう一度</Button></p> : null}
+            {failed ? <p role="alert" className="text-[13px] text-danger">空きを確かめられませんでした。<Button variant="link" onClick={() => setRetry((n) => n + 1)}>もう一度</Button></p> : null}
             {!list && !failed ? <p className="text-[13px] text-liff-sub" aria-busy="true">空きを確かめています…</p> : null}
             {list ? (
               <ul className="divide-y divide-liff-divider rounded-(--liff-radius) outline-1 -outline-offset-1 outline-liff-line">
