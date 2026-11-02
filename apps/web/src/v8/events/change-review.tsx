@@ -305,11 +305,12 @@ function ChangeReview({ eventId }: { eventId: string }) {
               /></SaveErrorField>
 {capacityError ? <p id="ev-cr-cap-error" className={styles.fieldError} role="alert">{capacityError}</p> : null}</Field></div>
             <div className={styles.field}>
-              <span className={styles.pickLabel}>受付の有無</span>
-              <SaveErrorField names={["ev-cr-active","isActive","activeEdit.isActive"]}><RadioCardGroup legend="受付の有無" className={styles.radioRow}>
+              <span className={styles.pickLabel}>受付の設定</span>
+              <SaveErrorField names={["ev-cr-active","isActive","activeEdit.isActive"]}><RadioCardGroup legend="受付の設定" className={styles.radioRow}>
                 <RadioCard variant="row" name="ev-cr-active" value="on" checked={activeEdit.isActive} onChange={() => updateActive({ isActive: true })} title="受付する" />
                 <RadioCard variant="row" name="ev-cr-active" value="off" checked={!activeEdit.isActive} onChange={() => updateActive({ isActive: false })} title="止める" />
               </RadioCardGroup></SaveErrorField>
+              {Date.parse(activeSlot.ends_at) < Date.now() ? <p className={styles.note}>現在は開催終了のため受付できません。開催日時を未来に変更すると、保存後に受付の設定が適用されます。</p> : null}
             </div>
           </SettingsFormRow>
           <div className={styles.field}><Field label="変える理由" htmlFor="ev-cr-reason"><SaveErrorField names={["reason"]}><TextField
