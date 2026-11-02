@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { hasLineConnectionProblem, lineAccountConnectionState, tokenExpiryBadge, tokenExpiryNotice, tokenExpirySummary, tokenExpiryBreakdown } from './line-account-state'
+import { hasLineConnectionProblem, lineAccountConnectionState, tokenExpiryBadge, tokenExpiryNotice, tokenExpirySummary, tokenExpiryBreakdown, tokenExpiryBreakdownText } from './line-account-state'
 
 it('稼働中の要確認だけを問題として数え、未確認・停止中・アーカイブを混ぜない', () => {
   const warning = { isActive: true, connection: { status: 'warn' as const } }
@@ -21,6 +21,12 @@ it('期限切れの内訳は接続に問題の共通部分だけで、残りと�
     { isActive: true, connection: { status: 'warn' } },
     { isActive: true, connection: { status: 'warn' }, tokenExpiry: expiry('expired'), archivedAt: '2026-10-01' },
   ])).toEqual({ inProblem: 1, outsideProblem: 2, unknown: 2 })
+})
+
+it('期限不明だけでは警告しないが、期限切れがある場合は不明も別に知らせる', () => {
+  const unknown = { isActive: true, connection: { status: 'ok' as const }, tokenExpiry: expiry('unknown') }
+  expect(tokenExpiryBreakdownText([unknown])).toBeNull()
+  expect(tokenExpiryBreakdownText([unknown, { ...unknown, isActive: false, tokenExpiry: expiry('expired') }])).toContain('トークン期限未確認 1 件')
 })
 
 it('トークンの期限は切れた・近い時だけ行に出し、記録なし・余裕あり・アーカイブには出さない', () => {

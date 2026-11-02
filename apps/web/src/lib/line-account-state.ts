@@ -27,6 +27,7 @@ export function tokenExpiryBreakdown(accounts: readonly (ConnectionAccount & Tok
 
 export function tokenExpiryBreakdownText(accounts: readonly (ConnectionAccount & TokenAccount)[]): string | null {
   const { inProblem, outsideProblem, unknown } = tokenExpiryBreakdown(accounts)
+  if (!inProblem && !outsideProblem) return null
   const parts = [
     inProblem ? `接続に問題のうちトークン期限切れ ${inProblem} 件` : null,
     outsideProblem ? `接続に問題以外のトークン期限切れ ${outsideProblem} 件` : null,

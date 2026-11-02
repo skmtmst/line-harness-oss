@@ -115,6 +115,10 @@ it('対応一覧の取得失敗は 0 件とせず不明を示す', async () => {
   await render()
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
   expect(container.querySelector('tbody tr')!.children[3].textContent).not.toContain('0 件')
+  expect(container.textContent).toContain('対応件数を取得できませんでした')
+  attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { unhandledChats: 1, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 0 } }] } })
+  await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === 'もう一度読み込む')!.click() })
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('1 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
 })
 
@@ -126,6 +130,24 @@ it('対応一覧に対象アカウントが無い場合は別店舗の件数を�
   expect(count).not.toContain('9 件')
   expect(count).not.toContain('0 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
+})
+
+it('接続情報を更新したら対応件数も取り直す', async () => {
+  attention.mockResolvedValueOnce({ success: true, data: { items: [{ accountId: 'acc-1', counts: { unhandledChats: 0, pendingBookings: 0, unpaid: 0, connections: 1, stoppedDeliveries: 0 } }] } })
+    .mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { unhandledChats: 0, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 0 } }] } })
+  await render()
+  await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === '更新する')!.click() })
+  await act(async () => { await Promise.resolve() })
+  expect(attention.mock.calls.length).toBeGreaterThanOrEqual(2)
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('0 件')
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
+})
+
+it('期限未確認だけでは警告の帯を出さない', async () => {
+  accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, connection: { status: 'ok', issues: [] }, tokenExpiry: { status: 'unknown', label: '未確認' } }] })
+  await render()
+  expect(container.querySelector('[data-design-part="notice"]')).toBeNull()
 })
 
 describe('統括のアカウント', () => {
