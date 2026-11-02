@@ -183,7 +183,7 @@ describe('NEN automatic tag rules', () => {
     expect(tags.has(NEN_TAG.purchaseNone)).toBe(false);
   });
 
-  it('ランクのタグは設定（nen_rank_settings）から選ぶ。設定が無ければ初期の4ランクで通年から決める', async () => {
+  it('ランクのタグはECのキーと設定が一致した場合に選ぶ', async () => {
     const settings = new Map<string, Array<Record<string, unknown>>>();
     const db = {
       prepare(sql: string) {
@@ -211,16 +211,11 @@ describe('NEN automatic tag rules', () => {
       member_rank: '会員', annual_miles_yen: annual, member_rank_key: key,
     });
 
-    // 設定が無いアカウント：初期4ランク。通年 72,400 → ゴールド。
-    expect(await resolver.desiredTagId('account-default', snapshot(72_400, null))).toBe(NEN_TAG.rankGold);
-    // ECから届いたランクキーを優先する。
-    expect(await resolver.desiredTagId('account-default', snapshot(0, 'platinum'))).toBe(NEN_TAG.rankPlatinum);
-    // 通年が無い（EC未対応）友だちは、これまでの足し算で暫定判定する。
-    expect(await resolver.desiredTagId('account-default', snapshot(0, null, 35_000))).toBe(NEN_TAG.rankSilver);
-    // 連携前（スナップショット無し）はレギュラー。
-    expect(await resolver.desiredTagId('account-default', null)).toBe(NEN_TAG.rankBasic);
-    // 設定があるアカウント：設定のタグで判定し、付け替え対象には既存4つ＋設定のタグが含まれる。
-    expect(await resolver.desiredTagId('account-custom', snapshot(60_000, null))).toBe('tag-vip');
+    expect(await resolver.desiredTagId('account-default', snapshot(72_400, null))).toBeNull();
+    expect(await resolver.desiredTagId('account-default', snapshot(0, 'platinum'))).toBeNull();
+    expect(await resolver.desiredTagId('account-default', null)).toBeNull();
+    expect(await resolver.desiredTagId('account-custom', snapshot(60_000, null))).toBeNull();
+    expect(await resolver.desiredTagId('account-custom', snapshot(0, 'vip'))).toBe('tag-vip');
     expect(await resolver.managedTagIds('account-custom')).toEqual(expect.arrayContaining([NEN_TAG.rankBasic, NEN_TAG.rankPlatinum, 'tag-vip']));
   });
 
@@ -326,4 +321,13 @@ describe('NEN bulk refresh scope', () => {
     expect(queries[0].sql).toContain('OR line_account_id IS NULL');
     expect(queries[0].bindings).toEqual([JSON.stringify(['account-1', 'account-2']), 500]);
   });
+});
+
+it('does not infer rank tags when EC does not provide a rank key', async () => {
+  const { db } = queryCaptureDb();
+  const resolver = new RankTagResolver(db);
+  expect(await resolver.desiredTagId('account-1', {
+    customer_id: 'customer', orders_json: '[]', subscription_json: null,
+    purchase_count: 1, purchase_amount: 150000, member_rank: '', member_rank_key: null,
+  })).toBeNull();
 });

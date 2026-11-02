@@ -14,6 +14,7 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { ensureNenRankDefaults } from '@line-crm/db';
 
 const tagSide = vi.hoisted(() => ({
   attach: vi.fn(async (_db: D1Database, _friendId: string, _tagId: string) => ({ added: true })),
@@ -35,7 +36,7 @@ let ecSecret: string;
 function seed(raw: Database.Database): void {
   raw.exec(`
     INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
-    VALUES ('${ACCOUNT}', 'channel-nen', '然', 'token', 'secret'), ('account-other', 'channel-o', '別', 'token', 'secret');
+    VALUES ('${ACCOUNT}', 'channel-nen', '然', 'token', 'secret'), ('account-other', 'channel-o', '別', 'token', 'secret'), ('account-empty', 'channel-e', '空', 'token', 'secret');
     INSERT INTO tenants (id, name) VALUES ('tenant-default', '既定') ON CONFLICT DO NOTHING;
     INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following, user_id, created_at, updated_at) VALUES
       ('friend-a', 'U-a', '山田 太郎', '${ACCOUNT}', 1, 'ec-a', '2026-09-01', '2026-09-01'),
@@ -70,11 +71,18 @@ async function json(app: Hono<any>, method: string, path: string, body?: unknown
   return { status: res.status, body: await res.json() as any };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   const created = createTestD1();
   sql = created.raw;
   db = created.db;
   seed(sql);
+  await ensureNenRankDefaults(db, ACCOUNT);
+  await ensureNenRankDefaults(db, 'account-other');
+  sql.exec(`INSERT INTO tags (id, name, color) VALUES
+    ('nen-tag-member-rank-basic', '[会員] ランク：レギュラー', '#10B981'),
+    ('nen-tag-member-rank-silver', '[会員] ランク：シルバー', '#10B981'),
+    ('nen-tag-member-rank-gold', '[会員] ランク：ゴールド', '#10B981'),
+    ('nen-tag-member-rank-platinum', '[会員] ランク：プラチナ', '#10B981')`);
   ecSecret = randomBytes(32).toString('hex');
   fetchMock = vi.fn(async () => new Response('{"success":true}', { status: 200 }));
   vi.stubGlobal('fetch', fetchMock);
@@ -164,8 +172,8 @@ describe('PUT /api/nen/rank-settings', () => {
     const attachedFor = (friendId: string) => tagSide.attach.mock.calls.filter((call) => call[1] === friendId).map((call) => call[2]);
     expect(attachedFor('friend-a')).toContain(tagOf('プラチナ'));
     expect(attachedFor('friend-a')).not.toContain(tagOf('ゴールド'));
-    // friend-b はECのランク未着（通年 72,400）→ ゴールド（60,000〜）。
-    expect(attachedFor('friend-b')).toContain(tagOf('ゴールド'));
+    // EC のキーがないときは金額からタグを推測しない。
+    expect(attachedFor('friend-b')).not.toContain(tagOf('ゴールド'));
     expect(attachedFor('friend-c')).toEqual([]);
   });
 
@@ -364,7 +372,7 @@ describe('ランク削除時の会員別EC送信とやり直し', () => {
       const resent = await json(harness('admin', enabled), 'POST', retryPath(result.body.data.operationId), { accountId: ACCOUNT });
       expect(resent.body.data.status).toBe('synced');
       // 次のケースは独立したDBで確認する。
-      const created = createTestD1(); sql.close(); sql = created.raw; db = created.db; seed(sql); fetchMock.mockReset();
+      const created = createTestD1(); sql.close(); sql = created.raw; db = created.db; seed(sql); await ensureNenRankDefaults(db, ACCOUNT); fetchMock.mockReset();
     }
   });
   it('変更がECへ届いた後に応答が失われても、同じ本文・担当者・鍵・版で送り直す', async () => {
@@ -539,7 +547,7 @@ describe('GET /api/nen/members', () => {
     expect(body.data.total).toBe(2);
     expect(body.data.items.map((i: any) => [i.name, i.rankName, i.mileRatePercent, i.annualMilesYen])).toEqual([
       ['山田 太郎', 'プラチナ', 3, 138600],
-      ['鈴木 一郎', 'ゴールド', 2, 72400],
+      ['鈴木 一郎', 'ゴールド', null, 72400],
     ]);
     expect(body.data.kpis.byRank).toEqual({ platinum: 1, '': 1 });
     expect(body.data.ranks).toHaveLength(4);
@@ -548,5 +556,51 @@ describe('GET /api/nen/members', () => {
   it('ランクで絞り込める', async () => {
     const { body } = await json(harness('staff'), 'GET', `/api/nen/members?accountId=${ACCOUNT}&rank=platinum`);
     expect(body.data.items.map((i: any) => i.name)).toEqual(['山田 太郎']);
+  });
+});
+
+describe('空のランク設定', () => {
+  const accountId = 'account-empty';
+  it('読み取り・再同期は初期値を作らず未設定と伝え、明示操作だけで作る', async () => {
+    const app = harness('owner');
+    const read = await json(app, 'GET', `/api/nen/rank-settings?accountId=${accountId}`);
+    expect(read.body.data.ranks).toEqual([]);
+    const resync = await json(app, 'POST', '/api/nen/rank-settings/resync', { accountId });
+    expect(resync.status).toBe(409);
+    expect(resync.body.error).toContain('未設定');
+    expect(fetchMock).not.toHaveBeenCalled();
+    const initialized = await json(app, 'POST', '/api/nen/rank-settings/initialize', { accountId });
+    expect(initialized.status).toBe(200);
+    expect(initialized.body.data.ranks).toHaveLength(4);
+  });
+  it('作成途中のエラーは全体を取り消し、再試行できる', async () => {
+    sql.exec("CREATE TRIGGER fail_init BEFORE INSERT ON nen_lifetime_milestones WHEN NEW.threshold_yen = 600000 BEGIN SELECT RAISE(ABORT, 'injected failure'); END");
+    const app = harness('owner');
+    expect((await json(app, 'POST', '/api/nen/rank-settings/initialize', { accountId })).status).toBe(500);
+    for (const table of ['nen_rank_settings', 'nen_rank_rules', 'nen_lifetime_milestones']) {
+      expect(sql.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE line_account_id = ?`).get(accountId)).toEqual({ n: 0 });
+    }
+    sql.exec('DROP TRIGGER fail_init');
+    expect((await json(app, 'POST', '/api/nen/rank-settings/initialize', { accountId })).status).toBe(200);
+  });
+  it('ランクが空で決まりだけ残っていても EC に空の設定を送らない', async () => {
+    sql.prepare('INSERT INTO nen_rank_rules (line_account_id, updated_at) VALUES (?, ?)').run(accountId, '2026-01-01');
+    const resync = await json(harness('owner'), 'POST', '/api/nen/rank-settings/resync', { accountId });
+    expect(resync.status).toBe(409);
+    expect(resync.body.error).toContain('未設定');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('ランクがない店で節目を保存すると未設定のため同期できないと返す', async () => {
+    const result = await json(harness('owner'), 'PUT', '/api/nen/lifetime-milestones', {
+      accountId, milestones: [{ thresholdYen: 10000, title: '節目', notifyOnReach: true }],
+    });
+    expect(result.status).toBe(200);
+    expect(result.body.data.sync).toMatchObject({ status: 'failed', error: expect.stringContaining('未設定') });
+    expect(result.body.data.ranks).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('閲覧のみの人は初期化できない', async () => {
+    const response = await json(harness('owner', {}, { readOnly: true }), 'POST', '/api/nen/rank-settings/initialize', { accountId });
+    expect(response.status).toBe(403);
   });
 });

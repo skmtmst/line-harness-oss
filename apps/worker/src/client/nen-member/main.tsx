@@ -31,6 +31,8 @@ type MemberPhoto = {
   createdAt?: string;
 };
 type Membership = {
+  rankConfigured?: boolean;
+  rankPositionKnown?: boolean;
   rankKey: string | null; rankName: string; mileRatePercent: number | null;
   annualMilesYen: number; lifetimeMilesYen: number; mileBalance: number; validUntil: string | null;
   next: { name: string; thresholdYen: number; remainingYen: number } | null;
@@ -670,8 +672,9 @@ const man = (value: number) => (value % 10_000 === 0 ? `${value / 10_000}` : (va
  * 画面を開くと弧は0から現在位置まで、数字は0から現在値まで約1.1秒で動く。
  */
 function MembershipSheet({ membership, ownerName }: { membership: Membership; ownerName: string }) {
-  const ranks = membership.ranks.length ? membership.ranks : [{ key: 'regular', name: 'レギュラー', thresholdYen: 0, mileRatePercent: 1 }];
-  const top = Math.max(1, ranks[ranks.length - 1]!.thresholdYen);
+  const positionKnown = membership.rankPositionKnown ?? (membership.rankConfigured !== false && membership.ranks.some(rank => rank.key === membership.rankKey));
+  const ranks = positionKnown ? membership.ranks : [];
+  const top = Math.max(1, ranks[ranks.length - 1]?.thresholdYen ?? 0);
   const rankIndex = Math.max(0, ranks.findIndex(rank => rank.key === membership.rankKey));
   const progress = Math.max(0, Math.min(1, membership.annualMilesYen / top));
   const [drawn, setDrawn] = useState(0);
@@ -681,22 +684,24 @@ function MembershipSheet({ membership, ownerName }: { membership: Membership; ow
   const gaugeLength = 346;
   const gaugeOffset = gaugeLength * (1 - drawn);
   return <section className="nm-membership-sheet" data-rank={Math.min(3, rankIndex)} aria-label={`${ownerName}さんの会員情報`}>
-      <div className="nm-rank-summary"><span className="nm-rank-pill">{membership.rankName}会員</span><small>MEMBERSHIP STATUS</small></div>
+      <div className="nm-rank-summary"><span className="nm-rank-pill">{membership.rankName === '未設定' || membership.rankName.endsWith('会員') ? membership.rankName : `${membership.rankName}会員`}</span><small>MEMBERSHIP STATUS</small></div>
       <div className="nm-gauge" aria-label={`使えるマイル ${membership.mileBalance.toLocaleString()}マイル。今年のマイル ${yen(membership.annualMilesYen)}`}>
         <svg viewBox="0 0 260 150" aria-hidden="true">
           <path className="nm-gauge-base" d="M20 130 A110 110 0 0 1 240 130"/>
-          <path className="nm-gauge-value" d="M20 130 A110 110 0 0 1 240 130" style={{ strokeDashoffset: gaugeOffset }}/>
+          {positionKnown && <path className="nm-gauge-value" d="M20 130 A110 110 0 0 1 240 130" style={{ strokeDashoffset: gaugeOffset }}/> }
           {ranks.map(rank => { const reached = membership.annualMilesYen >= rank.thresholdYen && rankIndex >= ranks.indexOf(rank); const { x, y } = point(rank.thresholdYen / top); return <g className={`nm-gauge-checkpoint ${reached ? 'reached' : ''}`} key={rank.key}><circle cx={x} cy={y} r="16"/><text x={x} y={y + 4} textAnchor="middle">{reached ? '✓' : man(rank.thresholdYen)}</text></g>; })}
         </svg>
         <div className="nm-gauge-number"><strong>{animatedMiles.toLocaleString()}</strong><span>使えるマイル</span></div>
       </div>
-      <div className="nm-rank-levels" style={{ gridTemplateColumns: `repeat(${ranks.length}, 1fr)` }}>{ranks.map((rank, index) => <div className={index <= rankIndex ? 'reached' : ''} key={rank.key}><i/><b>{rank.name}</b><span>{rank.thresholdYen === 0 ? '0円〜' : `年${man(rank.thresholdYen)}万円〜`}</span></div>)}</div>
+      {positionKnown && <div className="nm-rank-levels" style={{ gridTemplateColumns: `repeat(${ranks.length}, 1fr)` }}>{ranks.map((rank, index) => <div className={index <= rankIndex ? 'reached' : ''} key={rank.key}><i/><b>{rank.name}</b><span>{rank.thresholdYen === 0 ? '0円〜' : `年${man(rank.thresholdYen)}万円〜`}</span></div>)}</div>}
       <div className="nm-member-summary">
         <div><span>通年</span><b>{yen(membership.annualMilesYen)}</b></div>
         <div className="nm-member-next">
-          {membership.next
+          {positionKnown && membership.next
             ? <strong>{membership.next.name}まで あと {yen(membership.next.remainingYen)}</strong>
-            : <strong>最高ランクです</strong>}
+            : positionKnown
+              ? <strong>最高ランクです</strong>
+              : <strong>ランクの位置を確認できません</strong>}
           {membership.validUntil ? <span>{membership.rankName}は {displayDate(membership.validUntil)} まで維持</span> : null}
         </div>
       </div>
@@ -719,7 +724,7 @@ function App({ ctx }: { ctx: Ctx }) {
   const load = useCallback(async () => { try { const r = await call<{ data: MemberData }>(ctx, '/api/liff/nen/member'); setData(r.data); } catch (e) { setError(e instanceof Error ? e.message : '読み込めませんでした'); } }, [ctx]);
   useEffect(() => { void load(); }, [load]);
   if (!data) return <main className="nm-app"><p>{error || '読み込み中…'}</p></main>;
-  const membership: Membership = data.membership ?? { rankKey: null, rankName: data.commerce.rank || 'レギュラー', mileRatePercent: null, annualMilesYen: data.commerce.purchaseAmount, lifetimeMilesYen: data.commerce.purchaseAmount, mileBalance: data.commerce.points, validUntil: null, next: null, ranks: [], milestones: [], nextMilestone: null };
+  const membership: Membership = data.membership ?? { rankConfigured: false, rankPositionKnown: false, rankKey: null, rankName: data.commerce.rank || '未設定', mileRatePercent: null, annualMilesYen: data.commerce.purchaseAmount, lifetimeMilesYen: data.commerce.purchaseAmount, mileBalance: data.commerce.points, validUntil: null, next: null, ranks: [], milestones: [], nextMilestone: null };
   const tabLabel = tabItems.find(item => item.value === tab)?.label || '';
   const subscriptions: SubscriptionContract[] = Array.isArray(data.commerce.subscription?.contracts)
     ? data.commerce.subscription.contracts

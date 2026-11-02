@@ -112,29 +112,30 @@ function rankKeyFor(name: string, index: number, existing: Set<string>): string 
  * 設定が無いアカウントに初期値を入れる。何度呼んでも増えない。
  */
 export async function ensureNenRankDefaults(db: D1Database, lineAccountId: string, now = jstNow()): Promise<void> {
-  const ranks = await db.prepare(`SELECT COUNT(*) AS count FROM nen_rank_settings WHERE line_account_id = ?`)
-    .bind(lineAccountId).first<{ count: number }>();
-  if (!ranks || Number(ranks.count) === 0) {
-    for (const [index, rank] of DEFAULT_NEN_RANKS.entries()) {
-      await db.prepare(
-        `INSERT INTO nen_rank_settings (id, line_account_id, rank_key, name, annual_threshold_yen, mile_rate_percent, tag_id, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(crypto.randomUUID(), lineAccountId, rank.key, rank.name, rank.thresholdYen, rank.ratePercent, rank.tagId, index, now, now).run();
-    }
-  }
-  await db.prepare(
-    `INSERT OR IGNORE INTO nen_rank_rules (line_account_id, updated_at) VALUES (?, ?)`,
-  ).bind(lineAccountId, now).run();
-  const milestones = await db.prepare(`SELECT COUNT(*) AS count FROM nen_lifetime_milestones WHERE line_account_id = ?`)
-    .bind(lineAccountId).first<{ count: number }>();
-  if (!milestones || Number(milestones.count) === 0) {
-    for (const [index, milestone] of DEFAULT_NEN_MILESTONES.entries()) {
-      await db.prepare(
-        `INSERT INTO nen_lifetime_milestones (id, line_account_id, threshold_yen, title, notify_on_reach, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 1, ?, ?, ?)`,
-      ).bind(crypto.randomUUID(), lineAccountId, milestone.thresholdYen, milestone.title, index, now, now).run();
-    }
-  }
+  const rankValues = DEFAULT_NEN_RANKS.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
+  const milestoneValues = DEFAULT_NEN_MILESTONES.map(() => '(?, ?, ?, ?)').join(', ');
+  const rankArgs = DEFAULT_NEN_RANKS.flatMap((rank, index) => [
+    crypto.randomUUID(), rank.key, rank.name, rank.thresholdYen, rank.ratePercent, rank.tagId, index,
+  ]);
+  const milestoneArgs = DEFAULT_NEN_MILESTONES.flatMap((milestone, index) => [
+    crypto.randomUUID(), milestone.thresholdYen, milestone.title, index,
+  ]);
+
+  // 各表の空判定と書き込みを同じトランザクションで行い、途中失敗や同時実行による部分作成を防ぐ。
+  await db.batch([
+    db.prepare(`WITH defaults(id, rank_key, name, threshold_yen, rate, tag_id, sort_order) AS (VALUES ${rankValues})
+      INSERT INTO nen_rank_settings (id, line_account_id, rank_key, name, annual_threshold_yen, mile_rate_percent, tag_id, sort_order, created_at, updated_at)
+      SELECT id, ?, rank_key, name, threshold_yen, rate, tag_id, sort_order, ?, ? FROM defaults
+      WHERE NOT EXISTS (SELECT 1 FROM nen_rank_settings WHERE line_account_id = ?)`)
+      .bind(...rankArgs, lineAccountId, now, now, lineAccountId),
+    db.prepare(`INSERT OR IGNORE INTO nen_rank_rules (line_account_id, updated_at) VALUES (?, ?)`)
+      .bind(lineAccountId, now),
+    db.prepare(`WITH defaults(id, threshold_yen, title, sort_order) AS (VALUES ${milestoneValues})
+      INSERT INTO nen_lifetime_milestones (id, line_account_id, threshold_yen, title, notify_on_reach, sort_order, created_at, updated_at)
+      SELECT id, ?, threshold_yen, title, 1, sort_order, ?, ? FROM defaults
+      WHERE NOT EXISTS (SELECT 1 FROM nen_lifetime_milestones WHERE line_account_id = ?)`)
+      .bind(...milestoneArgs, lineAccountId, now, now, lineAccountId),
+  ]);
 }
 
 export async function getNenRankSettings(db: D1Database, lineAccountId: string): Promise<NenRankSetting[]> {
