@@ -98,7 +98,7 @@ it('飲食店では来店のあとの見本を見せ、選ばずに戻れる', (
   fireEvent.click(screen.getByRole('button', { name: '来店のあともに進む' }))
   expect(screen.getByRole('heading', { name: '来店のあとも、つながりが続く' })).toBeTruthy()
   expect(screen.getByRole('region', { name: '来店のあと' })).toBeTruthy()
-  expect(screen.getByText('11:30–12:30 見本 みお さま・カット・担当 見本 あおい')).toBeTruthy()
+  expect(screen.getByText('18:00–20:00 見本 たろう さま・2名・テーブル席')).toBeTruthy()
   expect(screen.getByText('昨日はありがとうございました。またのお越しをお待ちしています。')).toBeTruthy()
   expect(screen.getByText('送り始めるには設定と承認が必要で、保存しただけでは始まりません。', { exact: false })).toBeTruthy()
   expect(choose).not.toHaveBeenCalled()
