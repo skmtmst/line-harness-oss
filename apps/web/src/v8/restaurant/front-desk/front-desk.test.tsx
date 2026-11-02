@@ -30,7 +30,7 @@ beforeEach(() => {
   api.createReservation.mockResolvedValue({ success: true, data: { id: 'new-1', tableId: 't1', lineNotice: { sent: true, reason: null } } })
   api.postSeatVisitMark.mockResolvedValue({ success: true, data: { status: 'seated' } })
   api.reservationsDay.mockResolvedValue({ success: true, data: { date: '', reservations: [] } })
-  api.openingHours.mockResolvedValue({ success: true, data: { hours: null } })
+  api.openingHours.mockResolvedValue({ success: true, data: { hours: Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [{ opensAt: '17:00', closesAt: '23:00' }] })) } })
   api.customerSearch.mockResolvedValue({ success: true, data: [{ name: '鈴木 美咲', phone: '090-1234-5678', lineUid: 'U-1' }] })
 })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })

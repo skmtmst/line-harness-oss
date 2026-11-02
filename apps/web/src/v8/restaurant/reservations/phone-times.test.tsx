@@ -39,7 +39,9 @@ it.each(['closed', 'null', 'undefined', 'loading', 'failed'])('R1-12: %sでは�
   else api.openingHours.mockResolvedValue({ data: { hours: mode === 'closed' ? hours.map(day => ({ ...day, periods: [] })) : mode === 'null' ? null : undefined } })
   open()
   await waitFor(() => expect(api.openingHours).toHaveBeenCalled())
-  expect(screen.getByText('この日は予約を受ける時間がありません（予約枠・在庫の開ける時間）。')).toBeTruthy()
+  if (mode === 'closed') await screen.findByRole('link', { name: '開ける時間を確認する' });
+  if (mode === 'null') await screen.findByText(/営業時間が未設定/);
+  if (mode === 'failed' || mode === 'undefined') await screen.findByText('営業時間を読み込めませんでした。')
   for (const time of ['17:00', '18:30', '21:00']) expect(screen.queryByRole('button', { name: time, exact: true })).toBeNull()
 })
 it.each(['past', 'closed', 'null'])('R1-31: %sの候補外のプリセット時刻は確定できない', async mode => {
