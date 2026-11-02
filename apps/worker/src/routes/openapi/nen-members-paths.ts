@@ -37,6 +37,15 @@ export const nenMembersPaths = {
       responses: { '200': { description: 'Saved settings with sync result' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
     },
   },
+  '/api/nen/rank-settings/initialize': {
+    post: {
+      tags: ['NEN Members'], summary: '初期ランクとランク用タグを用意して設定を取得する',
+      description: 'オーナーまたは管理者が操作できます。accountId は本文またはクエリに指定します。',
+      parameters: [{ name: 'accountId', in: 'query', required: false, schema: { type: 'string' } }],
+      requestBody: { required: false, content: { 'application/json': { schema: { type: 'object', properties: { accountId: { type: 'string' } } } } } },
+      responses: { '200': { description: '初期化後のランク設定' }, '400': { description: 'accountId が必要' }, '403': { description: '権限またはアカウントへのアクセスがない' } },
+    },
+  },
   '/api/nen/rank-settings/{id}': {
     delete: {
       tags: ['NEN Members'], summary: 'ランクを削除し、会員を移し先へ変更する',
