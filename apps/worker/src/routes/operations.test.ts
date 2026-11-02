@@ -1179,9 +1179,13 @@ describe('W: 運用状態の確認項目の追加（-32）', () => {
     { plan: 'light', line: 'fail', used: 4250, planned: 0, status: 'warning' },
     { plan: 'light', line: 'fail', used: 4800, planned: 0, status: 'danger' },
     { plan: 'light', line: 'fail', used: 4800, planned: 500, status: 'danger' },
+    { plan: 'light', line: 'fail', used: 3000, planned: 3000, status: 'danger' },
+    { plan: 'light', line: 'fail', used: 3000, planned: 1000, status: 'unknown' },
     { plan: 'unknown-plan', line: 'low', used: 0, planned: 0, status: 'unknown' },
     { plan: 'unknown-plan', line: 'high', used: 0, planned: 0, status: 'warning' },
     { plan: 'unknown-plan', line: 'high', used: 0, planned: 500, status: 'danger' },
+    { plan: 'light', line: 'large', used: 3000, planned: 3000, status: 'danger' },
+    { plan: 'light', line: 'sixty', used: 0, planned: 500, status: 'danger' },
   ])('片側不明の $plan / $line / $used / $planned を判定する', async ({ plan, line, used, planned, status }) => {
     testDb.raw.prepare("INSERT INTO tenants (id, name, plan_key, plan_status) VALUES ('tenant-1', '統括', ?, 'active')").run(plan);
     testDb.raw.prepare("UPDATE line_accounts SET tenant_id = 'tenant-1' WHERE id = 'account-1'").run();
@@ -1190,13 +1194,18 @@ describe('W: 運用状態の確認項目の追加（-32）', () => {
     for (let n = 0; n < used; n += 1) add.run(`m-${n}`);
     if (planned) testDb.raw.prepare("INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, scheduled_at, created_at, line_account_id, total_count) VALUES ('bc', '予定', 'text', '{}', 'all', 'scheduled', '2026-09-16T01:00:00Z', '2026-09-15T01:00:00Z', 'account-1', ?)").run(planned);
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => String(input).endsWith('/quota/consumption')
-      ? Response.json({ totalUsage: line === 'high' ? 850 : 10 })
-      : line === 'fail' ? new Response(null, { status: 503 }) : Response.json({ type: 'limited', value: 1000 })));
+      ? Response.json({ totalUsage: line === 'high' ? 850 : line === 'sixty' ? 600 : 10 })
+      : line === 'fail' ? new Response(null, { status: 503 }) : Response.json({ type: 'limited', value: line === 'large' ? 10000 : 1000 })));
     const { runOperationHealthChecks } = await import('../services/operations-health.js');
     const checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T05:00:00.000Z' });
-    expect(checked.run.results.find((item) => item.checkKey === 'message_quota')).toMatchObject({ status, value: { sendable: null } });
+    const item = checked.run.results.find((entry) => entry.checkKey === 'message_quota');
+    expect(item).toMatchObject({ status });
+    if (line === 'fail' || plan === 'unknown-plan') expect(item?.value?.sendable).toBeNull();
+    if ((line === 'fail' && planned === 3000) || (plan === 'light' && (line === 'large' || line === 'sixty'))) {
+      expect(item?.summary).toBe('予定済みの配信を送ると、今月の配信枠を超える見込みです');
+    }
   });
-  it('候補DBで配信枠の失敗を挟んでも受領済みの注意を維持する', async () => {
+  it('配信枠の失敗を挟んでも受領済みの注意を維持する', async () => {
     let fail = false;
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       if (fail) return new Response(null, { status: 503 });
