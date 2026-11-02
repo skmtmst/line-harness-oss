@@ -12,7 +12,6 @@ import { RowMenu } from '@/components/shared/row-actions'
 import { ActionCell, DataTable, RowNameButton, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Card from '@/components/shared/card'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
-import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { jstDate } from '@/lib/jst-datetime'
 import type { RestaurantTable } from '@/lib/restaurant-test-api'
@@ -42,7 +41,7 @@ export default function TablesAssignBoard({ ctx, canEdit, heading, notice }: { c
   const todayCount = (id: string) => data.reservations.filter((item) => item.table_id === id && jstDate(new Date(item.starts_at)) === today && !['cancelled', 'no_show', 'rejected'].includes(item.status)).length
 
   return (
-    <PageFrame kind="restaurant" standalone boardId="jmVYJ" hasFooter={canEdit}>
+    <PageFrame kind="restaurant" standalone heightMode="viewport" boardId="jmVYJ" hasFooter={canEdit}>
       {heading}
       <div data-template-region="body">
       <div className={styles.assignStack}>
@@ -75,7 +74,7 @@ export default function TablesAssignBoard({ ctx, canEdit, heading, notice }: { c
       {canEdit ? (
         <PageFooter actions={<>
           <Button onClick={assignment.reset} disabled={assignment.saving}>キャンセル</Button>
-          <Button variant="primary" busy={assignment.saving} onClick={() => { if (!assignment.dirty) { notifyToast('変更はありません。'); return } if (assignment.status === 'not-ready') { preparing.open('卓の割り当て方の保存'); return } void assignment.save(order) }}><Check size={16} aria-hidden="true" />保存する</Button>
+          <Button variant="primary" busy={assignment.saving} disabled={!assignment.dirty} disabledReason={!assignment.dirty ? '変更していません' : undefined} onClick={() => { if (assignment.status === 'not-ready') { preparing.open('卓の割り当て方の保存'); return } void assignment.save(order) }}><Check size={16} aria-hidden="true" />保存する</Button>
         </>} />
       ) : null}
       {preparing.dialog}

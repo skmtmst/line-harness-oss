@@ -60,9 +60,12 @@ describe('BERxg 座席・卓管理', () => {
     const footer = frame.querySelector(':scope > [data-template-region="footer"]')!
     expect(body.querySelectorAll('tbody > tr')).toHaveLength(tables.filter(table => table.is_active).length)
     expect(body.querySelector('[data-shared-part="sticky-bar"]')).toBeNull()
-    expect(footer.contains(screen.getByRole('button', { name: /保存する/ }))).toBe(true)
+    const save = screen.getByRole('button', { name: /保存する/ }) as HTMLButtonElement
+    expect(footer.contains(save)).toBe(true)
+    expect(save.disabled).toBe(true)
     fireEvent.click(screen.getByRole('radio', { name: /ランダム/ }))
-    fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
     await waitFor(() => expect(assignmentApi.saveTables).toHaveBeenCalledWith('account-1', 'store-1', expect.objectContaining({ method: 'random', expectedVersion: 4 })))
   })
 
