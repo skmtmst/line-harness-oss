@@ -22,6 +22,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/analytics/funnel-form.tsx',
   'v8/restaurant/line-followup/followup-board.tsx',
   'v8/events/use-event-absence.tsx',
   'v8/hq-starter-sets/catalog-editor.tsx',
@@ -40,6 +41,7 @@ const GUARDED = [
   'v8/webhooks/incoming-actions.tsx',
   'components/shared/restaurant-floor-editor.tsx',
   'app/booking/bookings/detail/page.tsx',
+  'app/analytics/page.tsx',
   'v8/automations/create/create.tsx',
   'v8/settings/pools/create.tsx',
   'v8/broadcasts/quick-send.tsx',
