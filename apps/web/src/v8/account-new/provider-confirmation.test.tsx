@@ -123,9 +123,22 @@ it('最初は未確認で、接続確認とフォームからの登録を起動�
   open()
   expect(confirmation().checked).toBe(false)
   expect(checkButton().disabled).toBe(true)
-  expect(screen.getAllByText('接続の確認と登録の前に、このチェックで確認してください。').length).toBeGreaterThan(0)
+  expect(screen.getAllByText('接続の確認と登録の前に、このチェックで確認してください。')).toHaveLength(1)
   fireEvent.click(checkButton()); submit()
   expect(calls.check).not.toHaveBeenCalled(); expect(calls.connect).not.toHaveBeenCalled()
+})
+it('引き継ぎを選んだ時だけ行う説明と、自然な確認ボタンを出す', () => {
+  open()
+  expect(screen.getByText('チェックすると、登録後にいまの友だちを musubo に引き継ぎます（数分かかります）')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '登録内容を見る' })).toBeTruthy()
+})
+it.each([false, true])('登録したアカウントの引き継ぎ選択 %s を本人の端末に保存する', async choice => {
+  open()
+  if (choice) fireEvent.click(screen.getByRole('checkbox', { name: 'いまの友だちの引き継ぎ' }))
+  await confirmProviderAndCheck(); submit()
+  await screen.findByText('友だち追加できるか確かめます')
+  const key = registrationStorageKey(REGISTRATION_STYLE_KEY, { id: 'owner-a', tenantId: 'tenant-a' })!
+  expect(localStorage.getItem(`${key}:import:mock-account`)).toBe(String(choice))
 })
 it.each([false, true])('人が確認し5行も通った時だけ登録し、既存の引き継ぎ選択%sを送る', async importFriends => {
   open()

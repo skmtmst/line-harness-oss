@@ -35,16 +35,16 @@ afterEach(() => {
   cleanup(); forgetStaffIdentity(); vi.restoreAllMocks()
 })
 
-function savedChoice(value: boolean) {
+function savedChoice(value: boolean, explicit = false) {
   const key = registrationStorageKey(DRAFT_KEY, readStaffIdentity())!
   localStorage.setItem(key, JSON.stringify({ step: 3, sub: 1, connectionStepsVersion: 4,
     precheckAt: 'done', precheck: { q1: 'yes', q2: value ? 'no' : 'yes', q4: 'no' },
-    channelId: '1234567890', importFriends: value }))
+    channelId: '1234567890', importFriends: value, importFriendsExplicit: explicit }))
   return key
 }
 
-async function confirmation(answer: boolean, restored?: boolean) {
-  if (restored !== undefined) savedChoice(restored)
+async function confirmation(answer: boolean, restored?: boolean, explicit = false) {
+  if (restored !== undefined) savedChoice(restored, explicit)
   render(<AccountRegisterV8 />)
   fireEvent.click(screen.getByRole('radio', { name: 'はい、あります' }))
   fireEvent.click(screen.getByRole('radio', { name: answer ? 'はい、引き継ぎます' : 'いいえ、引き継ぎません' }))
@@ -72,6 +72,33 @@ it.each([undefined, true])('引き継ぎを断った回答は、接続確認で�
 
 it('引き継ぐ回答は、保存済みのオフより優先する', async () => {
   expect((await confirmation(true, false)).checked).toBe(true)
+})
+
+it('本人が手で選んだ値は、事前確認に戻って答え直しても変えない', async () => {
+  expect((await confirmation(false, true, true)).checked).toBe(true)
+})
+
+it('以前の確認画面まで進んだ下書きの選択も、答え直しで失わない', async () => {
+  const key = savedChoice(true)
+  const draft = JSON.parse(localStorage.getItem(key)!)
+  delete draft.importFriendsExplicit
+  localStorage.setItem(key, JSON.stringify(draft))
+  expect((await confirmation(false)).checked).toBe(true)
+})
+
+it('画面で手動オフにして戻り、事前確認を変えてもオフのまま', async () => {
+  const checkbox = await confirmation(true)
+  fireEvent.click(checkbox)
+  const key = registrationStorageKey(DRAFT_KEY, readStaffIdentity())!
+  expect(JSON.parse(localStorage.getItem(key)!).importFriendsExplicit).toBe(true)
+  for (const name of ['LINEログインへ戻る', 'Webhook の設定へ戻る', 'プロバイダーIDへ戻る', 'Messaging API へ戻る', '事前確認へ戻る']) {
+    fireEvent.click(screen.getByRole('button', { name }))
+  }
+  for (let i = 0; i < 3; i++) fireEvent.click(screen.getByRole('button', { name: '戻る', exact: true }))
+  fireEvent.click(screen.getByRole('radio', { name: 'いいえ、引き継ぎません' }))
+  fireEvent.click(screen.getByRole('button', { name: '戻る', exact: true }))
+  fireEvent.click(screen.getByRole('radio', { name: 'はい、引き継ぎます' }))
+  expect(JSON.parse(localStorage.getItem(key)!).importFriends).toBe(false)
 })
 
 it.each([false, true])('最終確認の選択 %s を、接続確認と登録の両方へ明示して送る', async finalChoice => {

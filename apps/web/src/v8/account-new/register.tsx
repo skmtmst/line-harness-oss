@@ -39,7 +39,7 @@ import Step4Template from './step4-template'
 import RegistrationStyleDialog from './registration-style-dialog'
 import Step5Completion from './step5-completion'
 import RegistrationSession from './registration-session'
-import { registrationStorageKey } from './registration-storage'
+import { registrationImportChoiceKey, registrationStorageKey } from './registration-storage'
 import { REGISTRATION_STYLE_KEY, useRegistrationStyle } from './use-registration-style'
 import styles from './register.module.css'
 import { qrToDataURL } from '@/lib/qr-image'
@@ -104,6 +104,8 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const [currentStep, setCurrentStep] = useState<StepNumber>(1)
   const [sub, setSub] = useState(1)
   const [form, setForm] = useState<FormState>(emptyForm)
+  const [importFriendsExplicit, setImportFriendsExplicit] = useState(false)
+  const importFriendsExplicitRef = useRef(false)
   const [acks, setAcks] = useState<Record<string, boolean>>({})
   const [providerConfirmed, setProviderConfirmed] = useState(false)
   const [providerRevision, setProviderRevision] = useState(0)
@@ -181,7 +183,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const answerPrecheck = (key: PrecheckKey, value: string) => {
     const answers = { ...precheck, [key]: value } as PrecheckAnswers
     setPrecheck(answers)
-    if (key === 'q2') setForm(previous => ({ ...previous, importFriends: value === 'yes' }))
+    if (key === 'q2' && !importFriendsExplicitRef.current) setForm(previous => ({ ...previous, importFriends: value === 'yes' }))
     setError('')
     if (key !== precheckAt || precheckBlocked(key, answers, acks)) return
     const nextAt = precheckNext(key, answers)
@@ -220,6 +222,8 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       return null } })()
     setDraftReady(true)
     if (!draft) return
+    importFriendsExplicitRef.current = draft.importFriendsExplicit === true
+    setImportFriendsExplicit(importFriendsExplicitRef.current)
     setForm((current) => ({
       ...current, name: draft.name, channelId: draft.channelId, providerId: draft.providerId, loginChannelId: draft.loginChannelId, lineId: draft.lineId,
       tagIds: draft.tagIds, parentId: draft.parentId, staffIds: draft.staffIds, liffId: draft.liffId, importFriends: draft.importFriends,
@@ -240,10 +244,11 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       name: form.name, channelId: form.channelId, providerId: form.providerId, loginChannelId: form.loginChannelId,
       lineId: form.lineId, tagIds: form.tagIds, parentId: form.parentId, staffIds: form.staffIds, liffId: form.liffId,
       importFriends: form.importFriends,
+      importFriendsExplicit,
     }
     try { window.localStorage.setItem(draftKey, JSON.stringify(draft)) } catch (saveFailure) {
       saveErrors.capture(saveFailure) /* 書けなくても入力は続ける。 */ }
-  }, [draftReady, draftKey, createdId, currentStep, sub, accountMethod, precheck, precheckAt, form.name, form.channelId, form.providerId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, saveErrors])
+  }, [draftReady, draftKey, createdId, currentStep, sub, accountMethod, precheck, precheckAt, form.name, form.channelId, form.providerId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, importFriendsExplicit, saveErrors])
 
   /* ③-1：応答が返ったあと、5行を1行ずつ送る。止まった行（error）が出たらそこで終わる。 */
   useEffect(() => {
@@ -367,6 +372,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   }, [currentStep, connection, importRunning, noticeDialog])
 
   const update = (key: keyof FormState, value: string | string[] | boolean) => {
+    if (key === 'importFriends') { importFriendsExplicitRef.current = true; setImportFriendsExplicit(true) }
     if (key === 'channelId' || key === 'channelSecret' || key === 'providerId' || key === 'loginChannelId' || key === 'loginChannelSecret') changeProviderConfirmation(false)
     setForm((current) => ({ ...current, [key]: value } as FormState))
     setFieldErrors((current) => {
@@ -524,6 +530,8 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       providerGuard.current.confirmed = false
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
+      const choiceKey = registrationImportChoiceKey(resumeKey, response.data.id ?? '')
+      try { if (choiceKey) localStorage.setItem(choiceKey, String(form.importFriends)) } catch (failure) { saveErrors.capture(failure) }
       try { if (response.data.id && resumeKey) sessionStorage.setItem(resumeKey, response.data.id) } catch (failure) { saveErrors.capture(failure) }
       // v07：登録できたら③の2つめ（友だち追加のためし）へ進む。
       setCurrentStep(3)
@@ -736,7 +744,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
           )}
 
           {currentStep === 3 && sub === 1 && (
-            <CreateStepColumns data-design-node="Lwxyh" previewTitle="ここで登録します" preview={(
+            <CreateStepColumns data-design-node="Lwxyh" previewTitle="ここで登録します" previewLabel="登録内容を見る" preview={(
                 <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ここで登録します">
                 <h2 className={styles.asideH2}>ここで登録します</h2>
                 <p className={styles.asideP}>5つの確認がすべて通るまで、アカウントは作られません。</p>
@@ -746,7 +754,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続確認">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>接続確認</h2>
-                <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p><Checkbox required checked={providerConfirmed} onCheckedChange={changeProviderConfirmation} description={PROVIDER_CONFIRMATION_REASON}>{PROVIDER_CONFIRMATION_LABEL}</Checkbox></Notice>
+                <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p><Checkbox required checked={providerConfirmed} onCheckedChange={changeProviderConfirmation}>{PROVIDER_CONFIRMATION_LABEL}</Checkbox></Notice>
                 <ul className={styles.checkList}>
                   {checkRows.map((row) => (
                     <li key={row.key} className={styles.checkRow} data-phase={row.phase}>
@@ -768,14 +776,14 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
                   </Notice>
                 )}
                 <Card surface="inset" contentPadding="var(--polish-space-card)">
-                  <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><Checkbox checked={form.importFriends} onCheckedChange={(next) => update('importFriends', next)} description="登録のあと、いまの友だちを musubo に引き継ぎます（数分かかります）">いまの友だちの引き継ぎ</Checkbox></SaveErrorField>
+                  <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><Checkbox checked={form.importFriends} onCheckedChange={(next) => update('importFriends', next)} description="チェックすると、登録後にいまの友だちを musubo に引き継ぎます（数分かかります）">いまの友だちの引き継ぎ</Checkbox></SaveErrorField>
                 </Card>
               </Card>
             </CreateStepColumns>
           )}
 
           {currentStep === 3 && sub === 2 && connection && (
-            <CreateStepColumns data-design-node="Lwxyh" previewTitle="ためしに友だち追加" preview={(
+            <CreateStepColumns data-design-node="Lwxyh" previewTitle="ためしに友だち追加" previewLabel="友だち追加の方法を見る" preview={(
                 <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ためしに友だち追加">
                 <h2 className={styles.asideH2}>ためしに友だち追加</h2>
                 <p className={styles.asideP}>まだ友だちでなければ、スマホの LINE で QR を読み取って追加してください。</p>
