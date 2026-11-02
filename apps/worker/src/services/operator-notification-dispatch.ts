@@ -642,7 +642,7 @@ export async function dispatchOperatorRule(
     const preview = recipientPreview(recipient, channels);
     for (const requestedChannel of channels) {
       if (rule.event_type === 'inbox_assigned_reply' && input.executionMode !== 'test'
-        && (requestedChannel === 'push' || requestedChannel === 'dashboard') && recipient.id !== assignedRecipient) continue;
+        && requestedChannel === 'push' && recipient.id !== assignedRecipient) continue;
       if(requestedChannel==='push'){
         const message=await db.prepare('SELECT c.id,c.operator_id FROM messages_log m JOIN chats c ON c.friend_id=m.friend_id WHERE m.id=? AND m.line_account_id=?').bind(input.sourceEventId,input.lineAccountId).first<{id:string;operator_id:string|null}>();
         if(message&&['inbox_new_inquiry','inbox_assigned_reply'].includes(rule.event_type)){
@@ -843,7 +843,7 @@ export async function sweepOperatorNotifications(
       const chat = await assignedReplyChat(db, row.line_account_id, instance.source_event_id);
       const legacy = Boolean(chat && !chat.assignee_staff_id && chat.operator_id);
       const specified = Boolean(teamConditions?.teamId) || Array.isArray(teamConditions?.recipientIds);
-      const mustMatch = row.channel === 'in_app' || (!specified && !legacy);
+      const mustMatch = !specified && !legacy;
       assigned = Boolean(chat) && await canAssignChatTo(db, row.recipient_id, row.line_account_id)
         && (!mustMatch || await assignedReplyRecipient(db, row.line_account_id, instance.source_event_id) === row.recipient_id);
     }
