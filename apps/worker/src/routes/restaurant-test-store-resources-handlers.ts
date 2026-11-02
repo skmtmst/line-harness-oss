@@ -8,6 +8,7 @@ import { validateTemplateMessage } from '../services/template-message-validation
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { validRestaurantFloor, readRestaurantFloor, firstTablePlacement, tablePlacementFits } from '../services/restaurant-floor.js';
 import { inputError } from '../lib/input-errors.js';
+import { auditLog } from '../lib/audit-log.js';
 import { publicClosure, closuresForRange, closureAffectsTable, openSeatTables } from '../services/restaurant-closures.js';
 import type { RestaurantTableLayoutInput } from '@line-crm/shared';
 import { updateStaffPolicy } from './staff.js';
@@ -71,6 +72,37 @@ export const post__api_restaurant_test_tables_2 = async (c: Context<Env, "/api/r
    db.prepare('INSERT INTO rt_tables (id,store_id,code,label,seat_type,min_capacity,max_capacity,floor_x,floor_y,join_group,floor_id) SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE changes()=1').bind(id,body.storeId,body.code.trim(),body.label.trim(),body.seatType,min,max,position.x,position.y,body.joinGroup?.trim()||null,floorId)
   ]);if(!saved[0].meta.changes)return c.json({success:false,code:'version_conflict',error:'座席図が変わりました。読み直してください'},409);
   return c.json({ success: true, data: { id } }, 201);
+};
+
+// Current references, including stored snapshots, prevent physical deletion.
+export const delete__api_restaurant_test_tables_id = async (c: Context<Env, "/api/restaurant-test/tables/:id">) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const db = dbFor(c.env);
+  const table = await db.prepare(`SELECT t.id,t.store_id,t.floor_id FROM rt_tables t JOIN rt_stores s ON s.id=t.store_id
+    WHERE t.id=? AND s.organization_id=? AND (? IS NULL OR s.id=?)`)
+    .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<{id:string;store_id:string;floor_id:string|null}>();
+  if (!table || !await storeBelongsTo(c, organization.id, table.store_id)) return c.json({success:false,error:'卓が見つかりません'},404);
+  const key = `reservation:${table.store_id}`, owner = crypto.randomUUID();
+  if (!await acquireLock(db,key,owner)) return c.json({success:false,code:'resource_busy',error:'店舗を更新中です。少し待ってからお試しください'},409);
+  try {
+    const result = await db.batch([
+      db.prepare(`DELETE FROM rt_tables WHERE id=? AND store_id=?
+        AND NOT EXISTS (SELECT 1 FROM rt_reservations WHERE table_id=rt_tables.id)
+        AND NOT EXISTS (SELECT 1 FROM rt_reservation_table_links WHERE table_id=rt_tables.id)
+        AND NOT EXISTS (SELECT 1 FROM rt_seat_waitlist WHERE table_id=rt_tables.id)
+        AND NOT EXISTS (SELECT 1 FROM rt_seat_waitlist_table_links WHERE table_id=rt_tables.id)
+        AND NOT EXISTS (SELECT 1 FROM booking_assignment_settings a, json_each(a.resources_json) j WHERE a.scope_kind='table' AND a.scope_id=rt_tables.store_id AND json_extract(j.value,'$.resourceId')=rt_tables.id)
+        AND NOT EXISTS (SELECT 1 FROM rt_closures c WHERE c.store_id=rt_tables.store_id AND (NOT json_valid(c.table_ids_json) OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(c.table_ids_json) THEN c.table_ids_json ELSE '[]' END) WHERE value=rt_tables.id)))
+        AND NOT EXISTS (SELECT 1 FROM rt_closure_close_tasks c WHERE c.store_id=rt_tables.store_id AND (NOT json_valid(c.table_ids_json) OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(c.table_ids_json) THEN c.table_ids_json ELSE '[]' END) WHERE value=rt_tables.id)))`).bind(table.id,table.store_id),
+      db.prepare("UPDATE rt_floors SET version=version+1 WHERE id=? AND changes()=1").bind(table.floor_id),
+    ]);
+    if (!result[0].meta.changes) return c.json({success:false,code:'resource_in_use',error:'予約や休業・卓の割り当て設定などで使われている卓は削除できません。停止してください'},409);
+    auditLog(c,'restaurant.table.delete',{id:table.id,kind:'rt_table'});
+    return c.json({success:true,data:{id:table.id}});
+  } finally { await releaseLock(db,key,owner); }
 };
 
 export const post__api_restaurant_test_memberships_3 = async (c: Context<Env, "/api/restaurant-test/memberships">) => {
@@ -296,19 +328,35 @@ export const delete__api_restaurant_test_menus_id_12 = async (c: Context<Env, "/
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const db = dbFor(c.env);
-  const menu = await db.prepare(`SELECT m.id, m.status, m.published_once, m.publication_history_unknown FROM rt_menu_items m JOIN rt_stores s ON s.id = m.store_id
+  const menu = await db.prepare(`SELECT m.id,m.store_id FROM rt_menu_items m JOIN rt_stores s ON s.id = m.store_id
     WHERE m.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
-    .first<{ id: string; status: string; published_once: number; publication_history_unknown: number }>();
-  if (!menu) return c.json({ success: false, error: 'メニューが見つかりません' }, 404);
-  if (menu.publication_history_unknown) return c.json({ success: false, error: 'このメニューは過去の公開履歴を確認できません。削除せず停止してください' }, 409);
-  if (menu.status !== 'draft' || menu.published_once) return c.json({ success: false, error: '公開したメニューは削除できません。停止してください' }, 409);
-  const result = await db.prepare(`DELETE FROM rt_menu_items WHERE id = ? AND status = 'draft' AND published_once = 0 AND publication_history_unknown = 0
-    AND NOT EXISTS (SELECT 1 FROM rt_menu_change_requests WHERE menu_id = rt_menu_items.id)
-    AND NOT EXISTS (SELECT 1 FROM rt_reservations WHERE course_id = rt_menu_items.id)`)
-    .bind(menu.id).run();
-  if (!result.meta.changes) return c.json({ success: false, error: '申請や予約で使われているメニューは削除できません。停止してください' }, 409);
-  return c.json({ success: true, data: { id: menu.id } });
+    .first<{ id: string; store_id: string }>();
+  if (!menu || !await storeBelongsTo(c,organization.id,menu.store_id)) return c.json({ success: false, error: 'メニューが見つかりません' }, 404);
+  const key=`reservation:${menu.store_id}`,owner=crypto.randomUUID();
+  if (!await acquireLock(db,key,owner)) return c.json({success:false,code:'resource_busy',error:'店舗を更新中です。少し待ってからお試しください'},409);
+  try {
+    const result = await db.prepare(`DELETE FROM rt_menu_items WHERE id = ? AND store_id = ?
+      AND NOT EXISTS (SELECT 1 FROM rt_resource_locks l WHERE substr(l.resource_key,1,length('form-course:'||rt_menu_items.id||':'))='form-course:'||rt_menu_items.id||':' AND datetime(l.expires_at)>datetime('now'))
+      AND NOT EXISTS (SELECT 1 FROM rt_menu_change_requests WHERE menu_id = rt_menu_items.id)
+      AND NOT EXISTS (SELECT 1 FROM restaurant_course_payment_settings WHERE menu_id = rt_menu_items.id)
+      AND NOT EXISTS (SELECT 1 FROM rt_reservations r WHERE r.course_id=rt_menu_items.id OR (r.store_id=rt_menu_items.store_id AND r.dining_snapshot_json IS NOT NULL AND (NOT json_valid(r.dining_snapshot_json) OR json_extract(CASE WHEN json_valid(r.dining_snapshot_json) THEN r.dining_snapshot_json ELSE '{}' END,'$.courseId')=rt_menu_items.id)))
+      AND NOT EXISTS (SELECT 1 FROM rt_approval_requests a WHERE a.store_id=rt_menu_items.store_id AND a.kind='menu_change' AND (NOT json_valid(a.payload_json) OR json_extract(CASE WHEN json_valid(a.payload_json) THEN a.payload_json ELSE '{}' END,'$.menuId')=rt_menu_items.id))
+      AND NOT EXISTS (SELECT 1 FROM forms f WHERE (instr(f.layout,rt_menu_items.id)>0 OR instr(f.layout,char(92))>0) AND (NOT json_valid(f.layout) OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE '{}' END) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)))
+      AND NOT EXISTS (SELECT 1 FROM forms f WHERE (instr(f.fields,rt_menu_items.id)>0 OR instr(f.fields,char(92))>0) AND (NOT json_valid(f.fields) OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(f.fields) THEN f.fields ELSE '[]' END) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)))
+      AND NOT EXISTS (SELECT 1 FROM form_versions f WHERE (instr(f.layout,rt_menu_items.id)>0 OR instr(f.layout,char(92))>0) AND (NOT json_valid(f.layout) OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE '{}' END) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)))
+      AND NOT EXISTS (SELECT 1 FROM form_versions f WHERE (instr(f.fields,rt_menu_items.id)>0 OR instr(f.fields,char(92))>0) AND (NOT json_valid(f.fields) OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(f.fields) THEN f.fields ELSE '[]' END) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)))
+      AND NOT EXISTS (SELECT 1 FROM form_submissions f WHERE (instr(f.data,rt_menu_items.id)>0 OR instr(f.data,char(92))>0) AND (NOT json_valid(f.data) OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(f.data) THEN f.data ELSE '{}' END) j WHERE j.type='object' AND json_extract(j.value,'$.kind')='seats' AND json_extract(j.value,'$.storeId')=rt_menu_items.store_id AND json_extract(j.value,'$.courseId')=rt_menu_items.id)))
+      AND NOT EXISTS (SELECT 1 FROM hq_template_versions f WHERE (instr(f.definition_json,rt_menu_items.id)>0 OR instr(f.definition_json,char(92))>0) AND (NOT json_valid(f.definition_json) OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(f.definition_json) THEN f.definition_json ELSE '{}' END) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)))
+      AND NOT EXISTS (SELECT 1 FROM style_starter_catalog_resources f, json_tree(f.source_snapshot) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)
+      AND NOT EXISTS (SELECT 1 FROM style_starter_items f, json_tree(COALESCE(f.source_snapshot,'{}')) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)
+      AND NOT EXISTS (SELECT 1 FROM style_starter_items f, json_tree(COALESCE(f.pending_update,'{}')) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)
+      AND NOT EXISTS (SELECT 1 FROM style_starter_sets f, json_tree(f.definition_json) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)` )
+      .bind(menu.id,menu.store_id).run();
+    if (!result.meta.changes) return c.json({ success: false, code:'resource_in_use', error: '予約やフォーム、設定などで使われているメニューは削除できません。停止してください' }, 409);
+    auditLog(c,'restaurant.menu.delete',{id:menu.id,kind:'rt_menu_item'});
+    return c.json({ success: true, data: { id: menu.id } });
+  } finally { await releaseLock(db,key,owner); }
 };
 
 export const post__api_restaurant_test_gbp_posts_13 = async (c: Context<Env, "/api/restaurant-test/gbp/posts">) => {

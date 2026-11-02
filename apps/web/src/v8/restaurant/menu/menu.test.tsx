@@ -30,6 +30,7 @@ vi.mock('next/navigation', async (load) => ({
   usePathname: () => '/restaurant-test/menu',
 }))
 
+import { ApiError } from '@/lib/api/transport/errors'
 import MenuPage from './menu'
 import MenuEditPage from './edit'
 import { snapshotOf } from '../booking-kit/test-data'
@@ -59,7 +60,7 @@ describe('MJoJR メニュー管理', () => {
     expect(board.textContent).not.toContain('要承認')
     expect(board.textContent).not.toContain('「…」の中身')
     fireEvent.click(screen.getByRole('button', { name: 'メニュー一覧の説明' }))
-    expect(await screen.findByText(/「…」の中身/)).toBeTruthy()
+    expect(await screen.findByText(/参照中のメニューは削除できません/)).toBeTruthy()
     expect(screen.getAllByRole('button', { name: '再開' })).toHaveLength(1)
   })
 
@@ -83,16 +84,28 @@ describe('MJoJR メニュー管理', () => {
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived' }))
   })
 
-  it('一度も公開していない下書きだけ削除でき、DELETE の口へ届く', async () => {
+  it('公開中と下書きのメニューに削除があり、確認して DELETE の口へ届く', async () => {
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
     openMenu('秋の鹿肉コース')
-    expect(screen.queryByRole('menuitem', { name: '削除' })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: '削除' })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     openMenu('春の下書きコース')
     fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
     await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE' }))
+  })
+
+  it('参照中のメニューは確認窓に理由を出して残す', async () => {
+    fetchApi.mockRejectedValueOnce(new ApiError(409, '予約で使われているメニューは削除できません。停止してください', 'resource_in_use'))
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    openMenu('秋の鹿肉コース')
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    expect(screen.getAllByText('秋の鹿肉コース').length).toBeGreaterThan(0)
+    expect(screen.getByText(/元に戻せません/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+    expect(await screen.findByText(/予約で使われているメニューは削除できません/)).toBeTruthy()
   })
 
   it('メニューを作るは選んでいる店舗で編集ページを開く', async () => {
@@ -242,11 +255,11 @@ describe('mauOC コースの編集ページ', () => {
     expect(nav.push).not.toHaveBeenCalled()
   })
 
-  it('一度も公開していない下書きだけ、下の帯の［削除する］から DELETE の口へ届く', async () => {
+  it('公開中と下書きの［削除する］から確認して DELETE の口へ届く', async () => {
     nav.params = new URLSearchParams('id=m1')
     const { unmount } = render(<MenuEditPage />)
     await screen.findByLabelText('メニュー名')
-    expect(screen.queryByRole('button', { name: '削除する' })).toBeNull()
+    expect(screen.getByRole('button', { name: '削除する' })).toBeTruthy()
     unmount()
     nav.params = new URLSearchParams('id=m4')
     render(<MenuEditPage />)

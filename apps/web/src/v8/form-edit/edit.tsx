@@ -704,7 +704,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       } catch (updateError) {
         if (isCurrent()) saveErrors.capture(updateError);
 
-        if (!(updateError instanceof ApiError) || updateError.status !== 409) throw updateError
+        if (!(updateError instanceof ApiError) || updateError.status !== 409 || updateError.code === 'restaurant_course_unavailable') throw updateError
         const ownRevision = await confirmOwnSave();
 
         if (ownRevision === null) throw updateError
@@ -762,6 +762,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       if (!isCurrent()) return false
       const fieldFailure = saveErrors.capture(e)
       // ほかの人が先に保存していた（409）。入力はそのまま残し、読み直すかは運用者が決める。
+      if (e instanceof ApiError && e.code === 'restaurant_course_unavailable') {
+        setError('選んだメニューが見つかりません。メニューを選び直してください。')
+        return false
+      }
       if (e instanceof ApiError && e.status === 409) {
         const data = e.data as { updatedAt?: unknown } | null
         const updatedAt = typeof data?.updatedAt === 'string' ? data.updatedAt : ''

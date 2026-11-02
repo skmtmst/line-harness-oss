@@ -101,11 +101,14 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof Draft, string>>>({})
   const editorRef = useRef<HTMLDivElement>(null)
   const [showPlacement, setShowPlacement] = useState(false)
+  const [deleteId, setDeleteId] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const [stopId, setStopId] = useState('')
   const [stopError, setStopError] = useState('')
   const [moveMode, setMoveMode] = useState<MoveMode>('move')
   useEffect(()=>{if(addRequest>0)openNew()},[addRequest]) // eslint-disable-line react-hooks/exhaustive-deps
   const editing = editor && editor !== 'new' ? rows.find((row) => row.id === editor) ?? null : null
+  const deleting = rows.find((row) => row.id === deleteId)
   const stopping = rows.find((row) => row.id === stopId)
   const now = Date.now()
   /* この卓に入っている、これから先の予約（取消・無断キャンセル・来店済みは除く）。 */
@@ -261,6 +264,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
                 </div>
                 <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} /></span>
                 <TableRowActions table={item} canEdit={canEdit} busy={busy} onEdit={openEdit} onResume={resume}
+                  onDelete={(table) => { setDeleteError(''); setDeleteId(table.id) }}
                   onStop={(table) => { setStopError(''); setMoveMode('move'); setStopId(table.id) }} />
               </li>
             ))}
@@ -275,6 +279,22 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         <Panel fusion title="結合のルール" description="結合グループ"><p className={styles.ruleText}>同じ結合グループの卓は全卓を一緒に確保します。配置と結合グループは卓の変更から設定できます。</p></Panel>
         <Panel fusion title="卓を止めるとき"><p className={styles.ruleText}>先の予約を同じ人数が入る別の卓へ自動で移すか、未配席に戻します。お客さまへの通知はこの画面からは送りません。</p></Panel>
       </div>
+      <RsDialog open={Boolean(deleting)} title="この卓を削除しますか？" width={480} top={300} busy={busy}
+        onCancel={() => setDeleteId('')} actions={<>
+          <Button disabled={busy} onClick={() => setDeleteId('')}>キャンセル</Button>
+          <Button variant="danger" disabled={busy} onClick={() => {
+            if (!selectedAccountId || !deleting) return
+            setDeleteError('')
+            void mutate(async () => {
+              try { await restaurantTestApi.deleteTable(selectedAccountId, deleting.id) }
+              catch (error) { setDeleteError(japaneseDetailOf(error) || '削除できませんでした。'); throw new QuietError() }
+            }, '卓を削除しました。').then((ok) => { if (ok) setDeleteId('') })
+          }}>削除する</Button>
+        </>}>
+        <p>{deleting?.code}・{deleting?.label}</p>
+        <DialogNote>予約や設定で使われていない卓だけ削除できます。元に戻せません。</DialogNote>
+        {deleteError ? <Notice tone="danger">{deleteError}</Notice> : null}
+      </RsDialog>
       <RsDialog
         open={editor !== null && draft !== null}
         title={editing ? `卓「${editing.code}・${editing.label}」を変更` : '新しい卓'}

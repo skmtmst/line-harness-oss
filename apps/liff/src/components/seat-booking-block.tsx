@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { normalizeBookingValue, type FormBookingValue, type FormInputBlock, type RestaurantCustomerSlot, type RestaurantCustomerCourse } from '@line-crm/shared';
 import { restaurantBookingApi } from '../lib/api.js';
 import { zonedToday, zonedParts, addDays } from '../lib/seat-reserve.js';
@@ -6,10 +6,12 @@ import { FieldLabel, TextInput } from './forms/controls.js';
 import CourseChoice from './course-choice.js';
 import Button from './ui/button/index.js';
 
-export default function SeatBookingBlock({block,value,onChange}:{block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void}) {
+export default function SeatBookingBlock({block,value,onChange,courseRefresh=0}:{block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void;courseRefresh?:number}) {
  const storeId=block.booking?.storeId??'';
  const picked=normalizeBookingValue(value);
  const [timeZone,setTimeZone]=useState('Asia/Tokyo');
+ const firstLoad=useRef(true);
+ useEffect(()=>{firstLoad.current=true},[storeId]);
  const [coursesFailed,setCoursesFailed]=useState(false);
  const [count,setCount]=useState(picked?.guestCount??2);
  const [courseId,setCourseId]=useState<string|null>(block.booking?.courseId??picked?.courseId??null);
@@ -21,9 +23,9 @@ export default function SeatBookingBlock({block,value,onChange}:{block:FormInput
  const [retry,setRetry]=useState(0);
  useEffect(()=>{let live=true;
   setCoursesFailed(false);
-  restaurantBookingApi.courses(storeId).then(r=>{if(live){setCourses(r.data);if(r.timezone){setTimeZone(r.timezone);setDate(zonedToday(r.timezone));}}}).catch(()=>{if(live)setCoursesFailed(true);});
+  restaurantBookingApi.courses(storeId).then(r=>{if(live){setCourses(r.data);if(courseRefresh>0 && courseId && !block.booking?.courseId && !r.data.some(course=>course.id===courseId)){setCourseId(null);onChange('');}if(r.timezone){setTimeZone(r.timezone);if(firstLoad.current)setDate(zonedToday(r.timezone));}firstLoad.current=false;}}).catch(()=>{if(live)setCoursesFailed(true);});
   return()=>{live=false;};
- },[storeId,retry]);
+ },[storeId,retry,courseRefresh]);
  useEffect(()=>{let live=true;setLoading(true);setFailed(false);
   restaurantBookingApi.availability(storeId,date,count,courseId).then(r=>{if(live)setSlots(r.data.slots);}).catch(()=>{if(live){setFailed(true);setSlots([]);}}).finally(()=>{if(live)setLoading(false);});
   return()=>{live=false;};
@@ -33,7 +35,7 @@ export default function SeatBookingBlock({block,value,onChange}:{block:FormInput
  return <div className="space-y-3">
   <FieldLabel htmlFor={`${block.id}-guests`} required>人数</FieldLabel>
   <TextInput id={`${block.id}-guests`} type="number" min={1} max={100} value={count} onChange={e=>{setCount(Number(e.target.value));clear();}} />
-  {!block.booking?.courseId && courses.length>0 && <CourseChoice courses={courses} value={courseId} onChange={id=>{setCourseId(id);clear();}} />}
+  {!block.booking?.courseId && (courses.length>0 || courseId!==null || courseRefresh>0) && <CourseChoice courses={courses} value={courseId} onChange={id=>{setCourseId(id);clear();}} />}
   {fixedCourse && <p className="truncate text-sm text-liff-sub" title={`${fixedCourse.name}・${fixedCourse.durationMinutes}分`}>{fixedCourse.name}・{fixedCourse.durationMinutes}分</p>}
   <FieldLabel htmlFor={`${block.id}-date`} required>日にち</FieldLabel>
   <TextInput id={`${block.id}-date`} type="date" min={zonedToday(timeZone)} max={addDays(zonedToday(timeZone),Math.min(60,Math.max(1,block.booking?.daysAhead??14))-1)} value={date} onChange={e=>{setDate(e.target.value);clear();}} />
