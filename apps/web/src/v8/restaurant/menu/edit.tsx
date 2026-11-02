@@ -208,7 +208,7 @@ function MenuEditBody() {
         dirty={dirty && !busy}
         busy={busy}
         readOnly={!canEdit}
-        title={<span className={styles.title}><span className={styles.titleParent}>メニュー管理 ›</span>{title}</span>}
+        title={title}
         help={<>コースと単品の名前・値段・提供時間・アレルギーと、お支払いの方法を決めます。価格変更は確認して保存すると確定します。</>}
         preview={side}
         previewSurface="plain"

@@ -146,6 +146,16 @@ beforeEach(() => {
 afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot() })
 
 describe('作る①（dnzqC）', () => {
+  test('名前を入力しても情報と配信方式は同じ作業中の手順に留まる', () => {
+    render(<ScenarioCreateV8 />)
+    fireEvent.change(screen.getByRole('textbox', { name: 'シナリオ名' }), { target: { value: '新しいシナリオ' } })
+    const steps = screen.getByRole('navigation', { name: 'シナリオ作成の進み方' })
+    const items = within(steps).getAllByRole('listitem')
+    expect(items).toHaveLength(2)
+    expect(items[0].textContent).toContain('シナリオ情報・配信方式')
+    expect(items[0].getAttribute('data-step-state')).toBe('current')
+    expect(items[1].getAttribute('data-step-state')).toBe('todo')
+  })
   test('F7: 画面の説明が開け、名前の必須と欄の理由を読む', async () => {
     render(<ScenarioCreateV8 />)
     const name = screen.getByRole('textbox', { name: 'シナリオ名' })

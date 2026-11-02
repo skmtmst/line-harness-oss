@@ -60,6 +60,14 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot(); vi.useRealTimers(); localStorage.clear(); sessionStorage.clear() })
 
+it('1通目から情報と方式の画面に戻れる', async () => {
+  await ready()
+  const steps = screen.getByRole('navigation', { name: 'シナリオ作成の進み方' })
+  expect(steps.querySelectorAll('ol > li')).toHaveLength(2)
+  fireEvent.click(within(steps).getByRole('button', { name: 'シナリオ情報・配信方式に戻る' }))
+  expect(calls.push).toHaveBeenCalledWith('/scenarios/new?id=sc-a')
+})
+
 it.each(['owner', 'admin', 'staff'] as const)('%sの編集鍵による1通目の通常更新は1回', async role => {
   person(role, role === 'staff' ? { permissionKeys: ['/scenarios', 'scenario.definition.edit'] } : {})
   await ready(); await invoke(held.save)

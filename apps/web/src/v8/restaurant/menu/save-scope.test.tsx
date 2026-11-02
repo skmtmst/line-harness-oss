@@ -41,6 +41,12 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
+it('新規メニューの見出しに親の名前を重ねない', async () => {
+ render(<MenuEditPage />)
+ await screen.findByLabelText('メニュー名')
+ expect(screen.getByRole('heading', { name: 'コースを追加する' })).toBeTruthy()
+})
+
 it('メニューの保存中に店を切り替えても次の店で保存でき、旧応答で次の保存を解放しない', async () => {
  nav.params = new URLSearchParams('id=m1')
  let old!: (value: unknown) => void, fresh!: (value: unknown) => void
