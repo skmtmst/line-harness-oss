@@ -357,6 +357,16 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
     }
   }
 
+  /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。組み立て不可の途中は通知しない。 */
+  useEffect(() => {
+    if (!host?.onDraftChange) return
+    try {
+      const built = buildPayload()
+      if ('error' in built) return
+      host.onDraftChange({ kind, name, payload: built.payload })
+    } catch { /* 組み立て不可の途中入力は通知しない */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot])
   /* 統括の入口：中身を組み立てて呼ぶ側へ渡す（保存・配る・失敗の知らせは呼ぶ側）。 */
   const hostSave = async (distribute: boolean) => {
     if (!host || !canMutate) return

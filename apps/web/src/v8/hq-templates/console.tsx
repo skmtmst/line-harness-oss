@@ -100,7 +100,7 @@ const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る
 type Stage = 'saved' | 'list' | 'detail' | 'edit' | 'accounts' | 'duplicates' | 'result'
 const errorText = (error: unknown) => describeApiFailure(error, '読み込み', { scope: 'hq' })
 /* H-18原文の一時下書きを復元できるタブ（message先行、他は実装順に追加）。 */
-const DRAFT_RESTORE_KINDS = ['message', 'carousel', 'question', 'rich_message', 'rich_video'] as const
+const DRAFT_RESTORE_KINDS = ['message', 'carousel', 'question', 'rich_message', 'rich_video', 'coupon', 'research'] as const
 
 export default function HqTemplatesV8(props: ConsoleProps) {
   const attribute = useAttributeTab('/hq/friend-attributes')
