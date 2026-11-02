@@ -110,6 +110,22 @@ const buttonByLabel = (label: string) =>
 const rowOf = (refCode: string) => host.querySelector(`[data-row-id="${ROUTES.find(row => row.refCode === refCode)?.id ?? refCode}"]`)
 
 describe('V8 流入と計測の一覧', () => {
+  it('未分類が0件でもフォルダから選んで空の一覧を見られる', async () => {
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/api/entry-routes') return json({ success: true, data: ROUTES.filter(row => row.genre) })
+      if (url.pathname === '/api/analytics/ref-summary') return json({ success: true, data: { ...SUMMARY, routes: [] } })
+      return originalFetch(input, init)
+    })
+    await render()
+    const folder = [...host.querySelectorAll('button')].find(button => (button.textContent ?? '').includes('未分類'))
+    expect(folder).toBeTruthy()
+    await act(async () => { folder!.click() })
+    expect(host.textContent).not.toContain('夏のInstagram投稿')
+    expect(host.textContent).toContain('未分類')
+  })
+
   it('受付を止める時だけ確認し、再開は押した直後に反映する', async () => {
     const originalFetch = globalThis.fetch
     const updates: Array<{ url: string; active: boolean }> = []

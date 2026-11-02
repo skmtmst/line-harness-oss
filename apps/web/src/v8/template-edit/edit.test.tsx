@@ -579,6 +579,8 @@ describe('V8 テンプレートの公開と送信の違い', () => {
 
   it('リッチメッセージでも注記を出す', async () => {
     await mount('kind=rich_message&visual=1')
+    expect(screen.queryByText('配信日 10:00')).toBeNull()
+    expect(screen.getByText('今日')).toBeTruthy()
     expect(screen.getByRole('button', { name: '保存して公開' })).toBeTruthy()
     expect(screen.getByText(note)).toBeTruthy()
   })
