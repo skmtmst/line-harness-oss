@@ -157,7 +157,9 @@ const shortDay = (value: string): string => {
 /** 消せない理由の短い言い方（：「何になっているか」だけ。外し方は右の操作）。 */
 function blockerLabel(key: string, impact: RichMenuDeleteImpact): string {
   switch (key) {
-    case 'default_for_all': return 'すべての友だちの既定になっている'
+    case 'default_for_all': return impact.group.status === 'draft'
+      ? '既定の印があり、LINE側の状態を確認できない'
+      : 'すべての友だちの既定になっている'
     case 'published': return 'LINEに登録されている'
     case 'line_resources': return 'LINE上にこのメニューが残っている'
     case 'publishing': return 'いまLINEへ反映している'
@@ -1151,7 +1153,7 @@ export default function RichMenusListV8() {
         blockerRows.push({
           key,
           text: blockerLabel(key, impact),
-          action: canEdit ? { label: 'ほかのメニューを既定に', onSelect: closeDelete } : null,
+          action: canEdit && impact.group.status !== 'draft' ? { label: 'ほかのメニューを既定に', onSelect: closeDelete } : null,
         })
       } else if (key === 'published' || key === 'line_resources') {
         if (blockerRows.some((row) => row.key === 'published' || row.key === 'line_resources')) continue
@@ -1171,7 +1173,9 @@ export default function RichMenusListV8() {
   const blockedDialog = blockedDelete && managedDelete && impact ? (
     <BlockedDeleteDialog
       title={`「${managedDelete.name}」はまだ消せません`}
-      description={impact.nextDisplay.candidates.length === 0
+      description={impact.group.status === 'draft' && impact.blockers.includes('default_for_all')
+        ? 'この下書きには既定の印があります。LINE側の状態を確認できないため、削除できません。'
+        : impact.nextDisplay.candidates.length === 0
         ? `消すと、リッチメニューが出なくなる友だちがいます（${audienceText(impact.currentAudience)}）。先に下の順に外してください。`
         : `${nextDisplayText(impact.nextDisplay)}先に下の順に外してください。`}
       rows={blockerRows}
