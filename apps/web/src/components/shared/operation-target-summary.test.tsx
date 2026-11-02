@@ -48,3 +48,11 @@ it('アカウント一覧を読めない時は先頭や他の店の名前で補�
   expect(screen.getByText('名前を確認できません').title).toBe('missing')
   expect(screen.queryByText('店舗')).toBeNull()
 })
+it('連携先の名前を店名と分けて表示し、不明なら不明のまま示す', () => {
+  const view = render(<OperationTargetSummary accounts={[{ id: 'a', name: 'LINE' }]} store={{ id: 's', name: '管理する店' }} externalTarget={{ label: 'Googleの店舗', name: '外部の店' }} />)
+  expect(screen.getByText('管理する店')).toBeTruthy()
+  expect(screen.getByText('外部の店')).toBeTruthy()
+  view.rerender(<OperationTargetSummary accounts={[{ id: 'a', name: 'LINE' }]} store={{ id: 's', name: '管理する店' }} externalTarget={{ label: 'Googleの店舗', name: null }} />)
+  expect(screen.queryByText('外部の店')).toBeNull()
+  expect(screen.getByText('名前を確認できません')).toBeTruthy()
+})
