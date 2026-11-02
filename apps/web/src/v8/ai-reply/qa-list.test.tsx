@@ -39,6 +39,43 @@ async function open() {
   await act(async () => {})
 }
 
+it('取り込む窓の入力を画面移動から守り、続行で保持する', async () => {
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '取り込む（PDF・Web）' }))
+  fireEvent.change(screen.getByRole('textbox', { name: /ページの URL/ }), { target: { value: 'https://example.test/faq' } })
+  const a = document.createElement('a'); a.href = '/templates'; document.body.appendChild(a)
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+  act(() => { a.dispatchEvent(event) })
+  expect(event.defaultPrevented).toBe(true)
+  fireEvent.click(within(screen.getByRole('dialog', { name: '保存していない変更があります' })).getByRole('button', { name: '編集を続ける' }))
+  expect(screen.getByRole('textbox', { name: /ページの URL/ })).toHaveProperty('value', 'https://example.test/faq')
+  a.remove()
+})
+
+it('取り込む窓の入力を戻る操作から守る', async () => {
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '取り込む（PDF・Web）' }))
+  fireEvent.change(screen.getByRole('textbox', { name: /ページの URL/ }), { target: { value: 'https://example.test/faq' } })
+  const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+  fireEvent.popState(window)
+  expect(go).toHaveBeenCalledExactlyOnceWith(1)
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})
+
+it('取り込む窓を閉じて開き直すと保留先を残さない', async () => {
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '取り込む（PDF・Web）' }))
+  const dialog = screen.getByRole('dialog', { name: 'Q&A を取り込む' })
+  fireEvent.change(within(dialog).getByRole('textbox', { name: /ページの URL/ }), { target: { value: 'https://example.test/faq' } })
+  const unload = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(unload); expect(unload.defaultPrevented).toBe(true)
+  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: '入力を破棄しますか？' })).getByRole('button', { name: '破棄する' }))
+  fireEvent.click(screen.getByRole('button', { name: '取り込む（PDF・Web）' }))
+  expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+  expect(screen.getByRole('textbox', { name: /ページの URL/ })).toHaveProperty('value', '')
+})
+
 it('オーナーが自動で答えるを選ぶと確かめの窓が開き、窓で押すまで段は変わらない', async () => {
   await open()
   fireEvent.click(screen.getByRole('button', { name: '変える' }))

@@ -27,6 +27,7 @@ const GUARDED = [
   'v8/hq-starter-sets/catalog-editor.tsx',
   // 会社・連絡先とプール名の下書きは、共通の FormLeaveGuard が画面離脱を守る。
   'v8/hq/company-contact.tsx',
+  'v8/ai-reply/qa-list.tsx',
   'v8/settings/pools/pools.tsx',
   // 友だち詳細の情報欄。保存前の入力があればタブ・ほかの画面へ移る前に確認する。
   'v8/friend-detail/info-tab.tsx',
@@ -143,6 +144,9 @@ const GUARDED = [
   'v8/templates/question-new.tsx',
   'v8/settings/manual-links/screen.tsx',
   'components/shared/form-leave-guard.tsx',
+  'v8/restaurant/line-followup/followup-editor.tsx',
+  'v8/restaurant/line-followup/reservation-form-editor.tsx',
+  'v8/ai-reply/qa-edit-dialog.tsx',
 ] as const
 
 /*
@@ -244,8 +248,6 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
 const EXEMPTIONS: Record<string, string> = {
   'v8/restaurant/line-followup/demo.tsx': 'phaseだけで描く静的な見本。編集状態・保存・API呼出はなく、全操作はaria-hiddenとinertの内側、文字入力はreadOnly。未保存は見本の札であり利用者の下書きではない。',
   'v8/restaurant/common-a/frame.tsx': '取得と店の選択だけを持つ共通の器。未保存の入力を持たず、店の切り替えはrequestUnsavedActionで子の実際の番兵へ委ねる。',
-  'v8/restaurant/line-followup/followup-editor.tsx': '入力は共通Dialogの中だけ。dirtyをDialogへ渡して閉じる前の破棄確認を守り、確定した下書きはFollowupBoardの番兵が守る。',
-  'v8/restaurant/line-followup/reservation-form-editor.tsx': '予約フォームの編集は共通Dialogの中だけ。dirtyを渡して破棄を確認し、確定後はFollowupBoardが未保存の定義を保持して画面離脱を守る。',
   'v8/mileage/adjust-dialog.tsx': '入力中は共通Dialogの自動dirty検出とuseOverlayDiscardが閉じる操作を止める。確認・完了の段だけdirty=false。adjust-dialog-field-errorsの実描画で入力→閉じるの破棄確認とAPI/close未実行を確かめる。',
   'components/shared/table-body.tsx':
     '共有の仮想行表示。structureDirty は列とスクロール領域の寸法キャッシュを再計測する印で、入力の下書きではない。行の表示範囲・実測高さ・フォーカス行を管理するだけで、編集値や保存処理は呼び出し元が持つ。',
@@ -273,8 +275,6 @@ const EXEMPTIONS: Record<string, string> = {
     '編集を持たない電話の外枠。下のタブ・アカウント切替を共通の未保存確認へ委ね、今の画面自身の番兵が止める',
   'components/shared/command-palette.tsx':
     '編集を持たない探す窓（⌘K）。選んだ行き先への移動を共通の未保存確認へ委ねる',
-  'v8/ai-reply/qa-edit-dialog.tsx': 'G2 の Q&A を作る・直す窓（y4nixm）。保存の口は窓の中だけで、開くたびに元の Q&A か記録の質問から作り直し、入力のある窓は Dialog の dirty で閉じる前に確かめる。',
-  'v8/ai-reply/qa-list.tsx': 'G2 の Q&A タブ（y4nixm）。一覧上の操作（公開・止める・削除・AI の使い方）は確認窓で確定し、画面に残る下書きを持たない。取り込む窓の URL は閉じると戻る窓の中の入力',
   'v8/mcp-connect/section.tsx': 'G9 AI とつなぐの区画（Xb0yc）。作る窓の入力は閉じると何も作らない窓の中だけで、止める・作り直すは確認窓で確定する。画面に残る下書きを持たない',
   'v8/restaurant/closures/closure-dialog.tsx': '臨時休業・貸切を足す・変える窓（提案 E-10 nVvXy）。保存の口は窓の中だけで、開くたびに押した日か記録から作り直し、閉じると入力を破棄する。',
   'v8/restaurant/front-desk/phone-drawer.tsx': '電話予約の引き出し（提案 E-2）。保存の口は引き出しの中だけで、開くたびに空から始まり、閉じると入力を破棄する（入力中は題に * が付く）。',

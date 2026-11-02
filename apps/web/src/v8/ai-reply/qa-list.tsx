@@ -8,11 +8,14 @@ import { PAGE_SIZES, pageSizeOptions } from '@/components/shared/page-size-optio
  * 見出しの右に［取り込む（PDF・Web）］［Q&A を追加］、タブ、AI の使い方の帯、探す・状態・件数、平らな表。
  */
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { MessageSquareText, Plus, Upload } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import EmptyList from '@/components/shared/empty-list'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
@@ -235,6 +238,20 @@ function QaImportDialog({ open, accountId, onClose }: { open: boolean; accountId
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [fieldError, setFieldError] = useState('')
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: open && (address.trim() !== '' || busy), busy: open && busy, onDiscard: onClose })
+  useEffect(() => { if (!open) guard.cancelLeave() }, [open, guard.cancelLeave])
+  useEffect(() => { guard.cancelLeave() }, [accountId, guard.cancelLeave])
+  const current = useRef({ open, busy, accountId, target: guard.leaveTarget })
+  current.current = { open, busy, accountId, target: guard.leaveTarget }
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const discardAndLeave = () => {
+    const target = guard.leaveTarget
+    if (!alive.current || !current.current.open || current.current.busy || current.current.accountId !== accountId || !target || current.current.target !== target) return
+    current.current.target = null
+    guard.disarm(); guard.confirmLeave()
+  }
   useEffect(() => { if (open) { setAddress(''); setError(''); setFieldError('') } }, [open])
   const run = async () => {
     const value = address.trim()
@@ -253,7 +270,7 @@ function QaImportDialog({ open, accountId, onClose }: { open: boolean; accountId
     }
   }
   return (
-    <Dialog
+    <><Dialog
       open={open}
       title="Q&A を取り込む"
       description="ページの内容から Q&A の案を作ります。案は下書きで入り、公開するまでお客さまには使いません。1 回 20 件まで。"
@@ -268,6 +285,6 @@ function QaImportDialog({ open, accountId, onClose }: { open: boolean; accountId
       <Field label="ページの URL" htmlFor="qa-import-url" required error={fieldError || undefined}>
         <TextField id="qa-import-url" value={address} invalid={Boolean(fieldError)} onChange={(event) => setAddress(event.target.value)} placeholder="https://example.com/faq" />
       </Field>
-    </Dialog>
+    </Dialog><OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={open && guard.leaveTarget !== null} subject="取り込み先の URL" onConfirm={discardAndLeave} onCancel={guard.cancelLeave} busy={busy} /></OverlayDepthContext.Provider></>
   )
 }
