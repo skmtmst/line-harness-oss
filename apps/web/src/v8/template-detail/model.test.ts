@@ -20,6 +20,11 @@ describe('テンプレートの詳細の計算', () => {
     expect(rows[3].href).toBeNull()
   })
 
+  it('削除で番号が飛んだ使用先は表示用の順番を使う', () => {
+    const rows = buildUsageRows({ ...usage, scenarioSteps: [{ ...usage.scenarioSteps[0], stepOrder: 3, displayOrder: 2 }] })
+    expect(rows[2].name).toBe('フォロー・2 通目')
+  })
+
   it('公開の窓の右：版を決めた所は「予約中・版2のまま」、ほかは状態だけ', () => {
     const rows = buildUsageRows(usage)
     expect(publishRowState(rows[0])).toBe('予約中・版2のまま')

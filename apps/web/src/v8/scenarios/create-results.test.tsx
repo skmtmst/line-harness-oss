@@ -314,6 +314,27 @@ describe('作る①：書きかけをシナリオの下書きの口へ残す（�
 })
 
 describe('配信結果（X4STXS）', () => {
+  test('途中の通を削除した後も結果と購読者は画面上の順番で示す', async () => {
+    const oldOrder = scenario.steps[1].stepOrder
+    const oldCurrent = runs.subscriptions[1].currentStepOrder
+    scenario.steps[1].stepOrder = 3
+    runs.subscriptions[1].currentStepOrder = 3
+    try {
+      search = 'id=sc-1'; render(<ScenarioResultsV8 />)
+      await screen.findByText('中村 彩')
+      expect(screen.getByRole('progressbar', { name: '2 通目の届いた率' })).toBeTruthy()
+      expect(within(screen.getByText('中村 彩').closest('[role="row"]')!).getByText('2 通目まで')).toBeTruthy()
+    } finally { scenario.steps[1].stepOrder = oldOrder; runs.subscriptions[1].currentStepOrder = oldCurrent }
+  })
+  test('公開版に固定された購読にはAPIからの表示順を使う', async () => {
+    const previous = runs.subscriptions[1]
+    runs.subscriptions[1] = { ...previous, currentStepOrder: 3, currentDisplayOrder: 2 } as typeof previous
+    try {
+      search = 'id=sc-1'; render(<ScenarioResultsV8 />)
+      await screen.findByText('中村 彩')
+      expect(within(screen.getByText('中村 彩').closest('[role="row"]')!).getByText('2 通目まで')).toBeTruthy()
+    } finally { runs.subscriptions[1] = previous }
+  })
   test('再参加の古い完了と新しい途中を人数から引かず、購読件数と未取得を分ける', async () => {
     const previous = { total: stats.enrolledTotal, summary: { ...runs.summary } }
     stats.enrolledTotal = 1; runs.summary = { active: 1, paused: 0, completed: 2, delivering: 0 }
@@ -359,7 +380,7 @@ describe('配信結果（X4STXS）', () => {
     expect(screen.getByText('送れずに止まった')).toBeTruthy()
     expect(screen.getByText('止まっている')).toBeTruthy()
     expect(screen.getAllByText('読み終えた').length).toBeGreaterThan(0)
-    expect(screen.getByText('3 通目まで')).toBeTruthy()
+    expect(within(screen.getByText('高橋 直人').closest('[role="row"]')!).getByText('—')).toBeTruthy()
     expect(screen.getAllByText('—（止めている）').length).toBe(2)
     expect(screen.getByText('届いた率 100.0%・開いた —・押した 4人')).toBeTruthy()
   })

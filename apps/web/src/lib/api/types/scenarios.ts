@@ -109,6 +109,7 @@ export type ScenarioRuns = {
     friendName: string
     status: string
     currentStepOrder: number
+    currentDisplayOrder?: number | null
     startedAt: string
     nextDeliveryAt: string | null
     /** なぜ止まっているか（432）。止まっていない行・古い行は null。 */

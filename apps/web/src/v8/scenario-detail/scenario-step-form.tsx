@@ -63,7 +63,7 @@ export function ScenarioStepForm({
   stepFormPreview: { offsetDays: number; offsetHours: number; offsetMinutes: number; }
 }) {
   const tokenNames = useInsertTokenNames(scenario?.lineAccountId ?? null)
-  const displayOrder = editingStepId ? [...(scenario?.steps ?? [])].sort((a, b) => a.stepOrder - b.stepOrder).findIndex((step) => step.id === editingStepId) + 1 : stepForm.stepOrder
+  const displayOrder = editingStepId ? [...(scenario?.steps ?? [])].sort((a, b) => a.stepOrder - b.stepOrder).findIndex((step) => step.id === editingStepId) + 1 : (scenario?.steps ?? []).filter((step) => step.stepOrder < stepForm.stepOrder).length + 1
   return (    <div className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}>
       {!editingStepId && (
         <h4 className="text-sm font-semibold text-ink-secondary mb-3">新しいステップを追加</h4>

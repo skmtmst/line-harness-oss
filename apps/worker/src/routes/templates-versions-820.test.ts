@@ -290,6 +290,18 @@ describe('参照表と削除の止め', () => {
     expect(againBody.data.scenarioSteps[0].templateVersion).toBe(1);
   });
 
+  it('シナリオの使用先は保存番号と別に画面の通数を返す', async () => {
+    const id = await createTemplateOnApi('本文');
+    await publishOnApi(id, '', 'testkey-v1');
+    store.raw.prepare(`INSERT INTO scenarios (id, name, trigger_type, line_account_id) VALUES ('sc-gap', '間のあるシナリオ', 'manual', 'account-1')`).run();
+    for (const order of [1, 3, 5]) await createScenarioStep(store.db, {
+      scenarioId: 'sc-gap', stepOrder: order, messageType: 'text', messageContent: '控え', ...(order === 3 ? { templateId: id } : {}),
+    });
+    const response = await json('GET', `/api/templates/${id}/usages`, {});
+    const body = await response.json() as { data: { scenarioSteps: Array<{ stepOrder: number; displayOrder: number }> } };
+    expect(body.data.scenarioSteps).toEqual([expect.objectContaining({ stepOrder: 3, displayOrder: 2 })]);
+  });
+
   it('一斉配信の参照は送った時の版で残る', async () => {
     const id = await createTemplateOnApi('最初の本文');
     await publishOnApi(id, '', 'testkey-v1');
