@@ -208,7 +208,7 @@ export function ConsultAfterDemo() {
         <p className={styles.description}>次のご案内（{CONSULT_AFTER_SAMPLE.thanks.when}・停止中）</p>
         <p className={styles.description}>{CONSULT_AFTER_SAMPLE.thanks.text}</p>
       </section>
-      <p className={styles.note}>名前・数は架空です。お礼の自動送信の条件は確認中のため、この見本では送り始める手順を示しません。実際の設定は変わりません。</p>
+      <p className={styles.note}>名前・数は架空です。お礼を自動で送る機能の有無と条件は確認中のため、「翌日 12:00」や「停止中」を含め、この見本では送り始める手順を示しません。実際の設定は変わりません。</p>
     </Card>
   </section>
 }
@@ -241,7 +241,7 @@ export function LessonAfterDemo() {
         <p className={styles.description}>参加のお礼（{LESSON_AFTER_SAMPLE.thanks.when}・停止中）</p>
         <p className={styles.description}>{LESSON_AFTER_SAMPLE.thanks.text}</p>
       </section>
-      <p className={styles.note}>名前・数は架空です。お礼の自動送信の条件は確認中のため、この見本では送り始める手順を示しません。実際の設定は変わりません。</p>
+      <p className={styles.note}>名前・数は架空です。お礼を自動で送る機能の有無と条件は確認中のため、「翌日 12:00」や「停止中」を含め、この見本では送り始める手順を示しません。実際の設定は変わりません。</p>
     </Card>
   </section>
 }

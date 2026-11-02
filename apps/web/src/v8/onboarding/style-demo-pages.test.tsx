@@ -132,7 +132,8 @@ it('面談・相談では相談のあとの見本を見せ、選ばずに戻れ�
   expect(screen.getByRole('region', { name: '相談のあと' })).toBeTruthy()
   expect(screen.getByText('10:00–10:45 見本 ひな さま・オンライン・担当 見本 かい')).toBeTruthy()
   expect(screen.getByText('昨日はご相談ありがとうございました。次のご案内をお待ちください。')).toBeTruthy()
-  expect(screen.getByText('お礼の自動送信の条件は確認中のため、この見本では送り始める手順を示しません。', { exact: false })).toBeTruthy()
+  expect(screen.getByText('お礼を自動で送る機能の有無と条件は確認中のため', { exact: false })).toBeTruthy()
+  expect(screen.getByText('「翌日 12:00」や「停止中」を含め', { exact: false })).toBeTruthy()
   expect(choose).not.toHaveBeenCalled()
 })
 it('教室・レッスンではレッスンのあとの見本を見せ、選ばずに戻れる', () => {
@@ -148,7 +149,8 @@ it('教室・レッスンではレッスンのあとの見本を見せ、選ば�
   expect(screen.getByRole('region', { name: 'レッスンのあと' })).toBeTruthy()
   expect(screen.getByText('9:00–10:00 朝のヨガ・出席 12人')).toBeTruthy()
   expect(screen.getByText('昨日はご参加ありがとうございました。ご質問がありましたら、このトークでお知らせください。')).toBeTruthy()
-  expect(screen.getByText('お礼の自動送信の条件は確認中のため、この見本では送り始める手順を示しません。', { exact: false })).toBeTruthy()
+  expect(screen.getByText('お礼を自動で送る機能の有無と条件は確認中のため', { exact: false })).toBeTruthy()
+  expect(screen.getByText('「翌日 12:00」や「停止中」を含め', { exact: false })).toBeTruthy()
   expect(choose).not.toHaveBeenCalled()
 })
 it('標準では問い合わせのあとの見本を見せ、選ばずに戻れる', () => {
