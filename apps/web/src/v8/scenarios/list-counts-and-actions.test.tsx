@@ -96,6 +96,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: state.account, loading: false }),
   useOptionalAccount: () => ({ selectedAccountId: state.account, loading: false }),
 }))
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: () => {}, back: () => {} }),
@@ -412,7 +413,21 @@ describe('右詳細の情報と操作', () => {
     fireEvent.click(within(detail).getByRole('button', { name: '「新規登録7日間フォロー」のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '削除する', exact: true }))
     const confirmation = await screen.findByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？', exact: true })
+    expect(within(confirmation).getByText('LINEアカウント')).toBeTruthy()
+    expect(await within(confirmation).findByText('本店')).toBeTruthy()
+    expect(within(confirmation).getByText('検証環境')).toBeTruthy()
     fireEvent.click(within(confirmation).getByRole('button', { name: 'キャンセル', exact: true }))
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  test('全アカウント共通のシナリオは選択中の1件と区別して削除前に示す', async () => {
+    listPage.mockResolvedValue({ success: true, data: { items: [{ ...rows[0], lineAccountId: null }], total: 1, limit: 20, sort: [] } })
+    const detail = await panel()
+    fireEvent.click(within(detail).getByRole('button', { name: '「新規登録7日間フォロー」のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する', exact: true }))
+    const dialog = within(await screen.findByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？' }))
+    expect(dialog.getByText('すべてのLINEアカウント')).toBeTruthy()
+    expect(dialog.queryByText('本店', { exact: true })).toBeNull()
     expect(remove).not.toHaveBeenCalled()
   })
 

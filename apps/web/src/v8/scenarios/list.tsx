@@ -1448,6 +1448,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
         >
           {deleteTarget && (
             <div className={styles.deleteBody}>
+              <OperationTargetSummary accounts={deleteTarget.lineAccountId === null ? [] : [{ id: deleteTarget.lineAccountId ?? '' }]} allAccounts={deleteTarget.lineAccountId === null} />
               <MoveReferrersNotice scenarioId={deleteTarget.id} />
               <p>
                 配信中 {scenarioCountLabel(deleteTarget.subscriberCount)} ／ 通数{' '}

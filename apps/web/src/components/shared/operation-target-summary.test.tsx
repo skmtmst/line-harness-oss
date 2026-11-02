@@ -56,3 +56,8 @@ it('連携先の名前を店名と分けて表示し、不明なら不明のま�
   expect(screen.queryByText('外部の店')).toBeNull()
   expect(screen.getByText('名前を確認できません')).toBeTruthy()
 })
+it('全アカウント共通の操作を、選択中の1件ではなく全件として示す', () => {
+  render(<OperationTargetSummary accounts={[]} allAccounts />)
+  expect(screen.getByText('すべてのLINEアカウント')).toBeTruthy()
+  expect(net.accounts).not.toHaveBeenCalled()
+})

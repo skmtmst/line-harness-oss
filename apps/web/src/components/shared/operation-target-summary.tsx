@@ -10,8 +10,9 @@ export type OperationAccountTarget = { id: string; name?: string | null; label?:
 export type OperationStoreTarget = { id: string; name?: string | null }
 
 /** 操作先を呼び出し側から受け取り、現在選択中の別の対象で穴埋めしない。 */
-export default function OperationTargetSummary({ accounts, store, externalTarget }: {
+export default function OperationTargetSummary({ accounts, allAccounts = false, store, externalTarget }: {
   accounts: OperationAccountTarget[]
+  allAccounts?: boolean
   store?: OperationStoreTarget
   externalTarget?: { label: string; name?: string | null }
 }) {
@@ -29,6 +30,7 @@ export default function OperationTargetSummary({ accounts, store, externalTarget
   const environment = deployEnvLabel(version.detail?.deploy_env)
     ?? (version.statusText === '確認中' ? '確認中' : '確認できません')
   return <DetailContent><DetailSection label="操作の対象"><DetailFields>
+    {allAccounts ? <div><dt>LINEアカウント</dt><dd>すべてのLINEアカウント</dd></div> : null}
     {accounts.map((target, index) => { const account = { ...target, name: target.name?.trim() || names[target.id] }; return <div key={`${account.id}:${index}`}>
       <dt>{account.label ?? 'LINEアカウント'}</dt>
       <dd><span className="block min-w-0 truncate" title={account.name?.trim() ? `${account.name}（${account.id}）` : account.id}>{account.name?.trim() || '名前を確認できません'}</span></dd>
