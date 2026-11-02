@@ -44,6 +44,6 @@ export function FollowupEditor({row,accountId,storeName,pageDirty,pageBusy,onDis
    </div>
   </DetailColumns>
  </Dialog>
- <OverlayDepthContext.Provider value={depth+1}><UnsavedLeaveDialog open={pageGuard.leaveTarget!==null} subject="LINE来店フォローの変更" onConfirm={discardAndLeave} onCancel={pageGuard.cancelLeave} busy={pageBusy}/></OverlayDepthContext.Provider>
+ <OverlayDepthContext.Provider value={depth+1}><UnsavedLeaveDialog open={pageGuard.leaveTarget !== null} subject="LINE来店フォローの変更" onConfirm={discardAndLeave} onCancel={pageGuard.cancelLeave} busy={pageBusy}/></OverlayDepthContext.Provider>
  </>
 }

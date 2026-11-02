@@ -54,5 +54,5 @@ export function ReservationFormEditor({definition,storeName,pageDirty,pageBusy,o
     <Field label="完了後の文" required><SaveErrorField names={["completionMessage","definition.completionMessage"]}><TextArea value={draft.completionMessage} maxLength={500} onChange={e=>setDraft({...draft,completionMessage:e.target.value})}/></SaveErrorField></Field>
    </div>
   </DetailColumns>
- </Dialog><OverlayDepthContext.Provider value={depth+1}><UnsavedLeaveDialog open={pageGuard.leaveTarget!==null} subject="LINE来店フォローの変更" onConfirm={discardAndLeave} onCancel={pageGuard.cancelLeave} busy={pageBusy}/></OverlayDepthContext.Provider></>
+ </Dialog><OverlayDepthContext.Provider value={depth+1}><UnsavedLeaveDialog open={pageGuard.leaveTarget !== null} subject="LINE来店フォローの変更" onConfirm={discardAndLeave} onCancel={pageGuard.cancelLeave} busy={pageBusy}/></OverlayDepthContext.Provider></>
 }
