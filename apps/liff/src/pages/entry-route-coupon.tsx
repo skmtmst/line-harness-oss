@@ -12,6 +12,7 @@ import ConfirmDialog from '../components/ui/confirm-dialog.js';
 import LoadingView from '../components/loading-view.js';
 
 const partialUseMessage = 'クーポンの使用を記録しました。使用後の処理に失敗したため、お店に確認してください';
+const replayUseMessage = 'クーポンの使用は記録済みです。使用後の処理の結果は確認できません。お店に確認してください。';
 const couponUseReasons = new Set(['このクーポンは使えません', 'クーポンの設定を確認してください', 'まだクーポンの利用期間ではありません', 'クーポンの期限が切れています', 'このクーポンは使える回数に達しています']);
 function couponUseError(error: unknown): string {
   if (error instanceof LiffApiError && error.status === 409 && couponUseReasons.has(error.message)) return error.message;
@@ -55,7 +56,7 @@ export default function EntryRouteCoupon() {
     try {
       const outcome = await api.entryRouteCoupon.use(coupon.receiptId, requestId.current);
       if (activeResultScope.current === resultScope) setResult({ scope: resultScope, receiptId: coupon.receiptId,
-        message: outcome?.message === partialUseMessage ? partialUseMessage : 'クーポンの使用を記録しました', failed: false });
+        message: outcome?.message === partialUseMessage ? partialUseMessage : outcome?.replayed === true ? replayUseMessage : 'クーポンの使用を記録しました', failed: false });
       setCoupon((current) => current?.receiptId === coupon.receiptId ? { ...current, usedCount: current.usedCount + 1 } : current);
       if (activeRef.current === ref) { requestId.current = null; setConfirm(false); }
     } catch (error) {

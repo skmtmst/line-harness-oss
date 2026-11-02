@@ -17,6 +17,7 @@ vi.mock('../lib/api.js', async (importOriginal) => {
 import EntryRouteCoupon from './entry-route-coupon.js';
 const recorded = 'クーポンの使用を記録しました';
 const partial = 'クーポンの使用を記録しました。使用後の処理に失敗したため、お店に確認してください';
+const replayNotice = 'クーポンの使用は記録済みです。使用後の処理の結果は確認できません。お店に確認してください。';
 const unknown = '使用結果を確認できませんでした。お店の方と確認してから、もう一度お試しください。';
 const receipt = { receiptId: 'receipt-a', name: '割引A', assetId: 'c', usedCount: 0, receivedAt: '2026-11-01', payload: { description: 'お会計の割引', startsAt: '2026-01-01', endsAt: '2026-12-01', oncePerFriend: true } };
 const envelope = (data: unknown) => ({ success: true, data });
@@ -95,8 +96,20 @@ it.each(['network', 'server'])('結果不明の同じ操作を再試行し、連
   expect((await screen.findByRole('alert')).textContent).toBe(unknown);
   use = async () => reply(envelope({ message: recorded, replayed: true }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '使用を確定' }));
-  expect(await screen.findByText(recorded)).toBeTruthy(); expect(writes).toHaveLength(2);
+  expect(await screen.findByText(replayNotice)).toBeTruthy(); expect(writes).toHaveLength(2);
   expect(writes[0]).toEqual(writes[1]); expect(screen.getByText('このクーポンは使用済みです')).toBeTruthy();
+});
+it('再送の既知の失敗文は、結果不明ではなく失敗として表示する', async () => {
+  use = async () => reply(envelope({ message: partial, replayed: true })); mount(); await confirmUse();
+  expect(await screen.findByText(partial)).toBeTruthy();
+  expect(screen.queryByText(replayNotice)).toBeNull();
+});
+it('再送の結果を別の券に持ち越さない', async () => {
+  receive = async (ref) => reply(envelope({ ...receipt, receiptId: ref, name: ref === 'a' ? '割引A' : '割引B', payload: { ...receipt.payload, oncePerFriend: false } }));
+  use = async () => reply(envelope({ message: recorded, replayed: true })); mount(); await confirmUse(); await screen.findByText(replayNotice);
+  commits.length = 0; fireEvent.click(screen.getByRole('button', { name: '経路B' })); await screen.findByRole('heading', { name: '割引B' });
+  expect(commits.length).toBeGreaterThan(0);
+  expect(commits.every(text => !text.includes(replayNotice))).toBe(true);
 });
 it('既に表示した結果文を経路切替の最初の描画にも残さない', async () => {
   receive = async (ref) => reply(envelope({ ...receipt, receiptId: ref, name: ref === 'a' ? '割引A' : '割引B', payload: { ...receipt.payload, oncePerFriend: false } }));
@@ -104,7 +117,7 @@ it('既に表示した結果文を経路切替の最初の描画にも残さな�
   commits.length = 0; fireEvent.click(screen.getByRole('button', { name: '経路B' })); await screen.findByRole('heading', { name: '割引B' });
   expect(commits.length).toBeGreaterThan(0); expect(commits.every(text => !text.includes(partial))).toBe(true);
 });
-for (const route of ['b', 'back', 'reload']) it.each(['success', 'error'])('古い応答の結果文を混ぜない '+route+'：%s', async (outcome) => {
+for (const route of ['b', 'back', 'reload']) it.each(['success', 'replay', 'error'])('古い応答の結果文を混ぜない '+route+'：%s', async (outcome) => {
   const pending = deferred<Response>(); let visitsA = 0;
   receive = async (ref) => {
     if (ref === 'a') { visitsA++; if (route === 'reload' && visitsA === 2) return reply({ error: 'unavailable' }, 503); }
@@ -118,9 +131,9 @@ for (const route of ['b', 'back', 'reload']) it.each(['success', 'error'])('古�
     await screen.findByRole('heading', { name: '割引A' });
   }
   commits.length = 0;
-  await act(async () => pending.resolve(outcome === 'success' ? reply(envelope({ message: partial, replayed: false })) : reply(modern(reasons[3]), 409)));
+  await act(async () => pending.resolve(outcome === 'success' ? reply(envelope({ message: partial, replayed: false })) : outcome === 'replay' ? reply(envelope({ message: recorded, replayed: true })) : reply(modern(reasons[3]), 409)));
   await waitFor(() => expect(screen.queryByText(partial)).toBeNull());
   expect(commits.length).toBeGreaterThan(0);
-  expect(commits.every(text => !text.includes(partial) && !text.includes(reasons[3]))).toBe(true);
+  expect(commits.every(text => !text.includes(partial) && !text.includes(replayNotice) && !text.includes(reasons[3]))).toBe(true);
   expect(screen.queryByRole('alert')).toBeNull();
 });
