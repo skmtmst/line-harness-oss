@@ -2,6 +2,7 @@
 import { tableCapacityReason, type RestaurantTableDefinition } from '../booking-kit/table-definition'
 import { DialogNote } from '../booking-kit/parts'
 import { describeApiFailure } from '@/components/shared/api-error-message'
+import { phoneReservationFailure } from '../booking-kit/phone-error'
 import Toggle from '@/components/shared/toggle';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
@@ -52,9 +53,11 @@ function md(day: Date): string {
   return polishFormatDate(day, { style: 'list-day' })
 }
 
-export default function PhoneReservationDrawer({ tableDefinition, open, accountId, storeId, tables, onClose, onSaved }: {
+export default function PhoneReservationDrawer({ staffRole, storeName, tableDefinition, open, accountId, storeId, tables, onClose, onSaved }: {
   open: boolean
   accountId: string
+  staffRole?: string | null
+  storeName?: string
   tableDefinition?: RestaurantTableDefinition
   storeId: string
   tables: RestaurantTable[]
@@ -62,8 +65,20 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
   /** 保存できたら呼ぶ（LINE の確認が送れなかったときは lineFailed）。 */
   onSaved: (result: { lineFailed: boolean }) => void
 }) {
+  const canConfigure = staffRole === 'owner' || staffRole === 'admin'
+  const canWrite = canConfigure || staffRole === 'staff'
+  const hoursHref = `/restaurant-test/inventory?storeId=${encodeURIComponent(storeId)}#rs-hours-title`
   const saveErrors = useSaveFormErrors()
-  const now = useMemo(() => new Date(), [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    if (!open) return
+    const refresh = () => setNow(new Date())
+    refresh()
+    const timer = setInterval(refresh, 30_000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
+  }, [open])
   const [phone, setPhone] = useState('')
   const [friends, setFriends] = useState<Friend[]>([])
   const [friend, setFriend] = useState<Friend | null>(null)
@@ -81,8 +96,14 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
   const notify = Boolean(friend?.lineUid) && notifyTarget === notifyKey
   const setNotify = (next: boolean) => setNotifyTarget(next ? notifyKey : null)
   useEffect(() => { setNotifyTarget(null) }, [accountId, storeId])
-  const [hours, setHours] = useState<RestaurantOpeningDay[] | null>(null)
-  const [dayRows, setDayRows] = useState<RestaurantReservation[]>([])
+  const [hoursAttempt, setHoursAttempt] = useState(0)
+  const [dayAttempt, setDayAttempt] = useState(0)
+  const [hoursFailure, setHoursFailure] = useState('')
+  const [dayFailure, setDayFailure] = useState('')
+  const scopeKey = JSON.stringify([accountId, storeId])
+  const [hoursData, setHoursData] = useState<{ key: string; hours: RestaurantOpeningDay[] | null } | null>(null)
+  const hours = open && accountId && storeId && hoursData?.key === scopeKey ? hoursData.hours : null
+  const [dayData, setDayData] = useState<{ key: string; rows: RestaurantReservation[] } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -95,25 +116,33 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
 
   const date = dayChoice === 'today' ? toYmd(now) : dayChoice === 'tomorrow' ? toYmd(addDays(now, 1)) : picked
+  useEffect(() => { setTime('') }, [date])
 
   useEffect(() => {
     let current = true
+    setHoursData(null)
+    setHoursFailure('')
     if (!open || !accountId || !storeId) return
     void restaurantTestApi.openingHours(accountId, storeId)
-      .then((res) => { if (current) setHours(res.data.hours ?? null) })
-      .catch(() => { if (current) setHours(null) })
+      .then((res) => { if (current) { if (res.data.hours === undefined) setHoursFailure(scopeKey); else setHoursData({ key: scopeKey, hours: res.data.hours }) } })
+      .catch(() => { if (current) setHoursFailure(scopeKey) })
     return () => { current = false }
-  }, [open, accountId, storeId])
+  }, [open, accountId, storeId, scopeKey, hoursAttempt])
+
+  const dayKey = JSON.stringify([accountId, storeId, date])
+  const dayReady = Boolean(open && accountId && storeId && date && dayData?.key === dayKey)
+  const dayRows = dayReady ? dayData!.rows : []
 
   useEffect(() => {
     let current = true
-    setDayRows([])
+    setDayData(null)
+    setDayFailure('')
     if (!open || !accountId || !storeId || !date) return
     void restaurantTestApi.reservationsDay(accountId, storeId, date)
-      .then((res) => { if (current) setDayRows(Array.isArray(res.data?.reservations) ? res.data.reservations : []) })
-      .catch(() => { if (current) setError('この日の予約を読み込めませんでした。日付を選び直してください。') })
+      .then((res) => { if (current) setDayData({ key: dayKey, rows: Array.isArray(res.data?.reservations) ? res.data.reservations : [] }) })
+      .catch(() => { if (current) setDayFailure(dayKey) })
     return () => { current = false }
-  }, [open, accountId, storeId, date])
+  }, [open, accountId, storeId, date, dayKey, dayAttempt])
 
   /* 電話番号で LINE の友だちを探す（4桁から・打つのが止まってから）。 */
   useEffect(() => {
@@ -132,7 +161,10 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
     return () => { current = false; clearTimeout(timer) }
   }, [open, accountId, storeId, phone])
 
-  const times = useMemo(() => (date ? openTimes(date, hours, now) : []), [date, hours, now])
+  const times = useMemo(() => (date ? openTimes(date, hours ?? [], now) : []), [date, hours, now])
+  const [hoursYear, hoursMonth, hoursDay] = date.split('-').map(Number)
+  const hoursWeekday = hoursYear && hoursMonth && hoursDay ? new Date(Date.UTC(hoursYear, hoursMonth - 1, hoursDay)).getUTCDay() : -1
+  const closedDay = Boolean(hours && hoursWeekday >= 0 && !hours.find((day) => day.weekday === hoursWeekday)?.periods.length)
   const freeAt = (label: string) => freeTables(tables, guests, startOf(date, label), dayRows).length > 0
   const candidates = useMemo(
     () => (time && date ? freeTables(tables, guests, startOf(date, time), dayRows) : []),
@@ -166,8 +198,10 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
 
   const save = async () => {
     setError('')
-    if (fields.submit().length > 0) return
-    if (!date || !time || !chosenTable) return
+    if (!canWrite || fields.submit().length > 0) return
+    const currentNow = new Date()
+    if (toYmd(now) !== toYmd(currentNow) || date < toYmd(currentNow)) { setNow(currentNow); setError('日付が変わりました。予約日時を確認してください。'); return }
+    if (!dayReady || !hours || !date || !time || !openTimes(date, hours, currentNow).includes(time) || !chosenTable) return
     const startsAt = new Date(startOf(date, time))
     setBusy(true)
     try {
@@ -191,16 +225,18 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
       { if (!fieldFailure)
 
 
-      setError(describeApiFailure(caught, '保存')) }
+      setError(phoneReservationFailure(caught, staffRole) || describeApiFailure(caught, '保存')) }
     } finally {
       setBusy(false)
     }
   }
 
+  const validTime = Boolean(date && time && hours && openTimes(date, hours, new Date()).includes(time))
+  const timeReason = time && !validTime ? '営業時間内の時刻を選んでください。' : undefined
   const footer = (
     <DialogActions align="center" padding="none">
       <Button onClick={onClose} disabled={busy}>キャンセル</Button>
-      <Button variant="primary" onClick={() => void save()} disabled={busy || Boolean(inputReason)} disabledReason={inputReason} busy={Boolean(busy)} busyLabel="処理中…">
+      <Button variant="primary" onClick={() => void save()} disabled={busy || !canWrite || !dayReady || !hours || !validTime || Boolean(inputReason)} disabledReason={!canWrite ? '予約を入れる権限を確認してください。' : hoursFailure === scopeKey || (hoursData?.key === scopeKey && hoursData.hours === null) ? '営業時間を確認してください。' : closedDay ? 'この曜日は休みです。' : inputReason || (!dayReady || !hours ? '営業時間と予約を確認してください。' : timeReason)} busy={Boolean(busy)} busyLabel="処理中…">
         <Check size={16} aria-hidden="true" />予約を入れる
       </Button>
     </DialogActions>
@@ -256,10 +292,12 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
           <span className={styles.label} id="e2-times">時刻（空いている時刻だけ）</span>
           {/* 時刻の札が1行出る高さを先に取る（空きが無い日・日付を選ぶ前でも下の卓・メモが上下しない）。 */}
           <div className={styles.timeBox} {...fields.bind('time')} aria-invalid={fields.invalid('time') || undefined} aria-describedby={describedBy('time')}>
+          {hoursFailure === scopeKey ? <><p className={styles.hint}>営業時間を読み込めませんでした。</p><Button onClick={() => { setHoursFailure(''); setHoursAttempt((n) => n + 1) }}>営業時間を再読み込み</Button></> : hoursData?.key === scopeKey && hoursData.hours === null ? <p className={styles.hint}>{`${storeName || 'この店舗'}の営業時間が未設定です。`} {canConfigure ? <>開ける時間を設定してください。 <Button variant="text" size="inline" href={hoursHref}>開ける時間を設定する</Button></> : staffRole === 'staff' ? '管理者に営業時間の設定を依頼してください。' : null}</p> : null}
+          {dayFailure === dayKey ? <><p className={styles.hint}>この日の予約を読み込めませんでした。</p><Button onClick={() => { setDayFailure(''); setDayAttempt((n) => n + 1) }}>予約を再読み込み</Button></> : null}
           {!date ? (
             <p className={styles.hint}>日付を選ぶと空いている時刻が出ます。</p>
-          ) : times.filter(freeAt).length === 0 ? (
-            capacityReason ? <DialogNote>{capacityReason}</DialogNote> : <p className={styles.hint}>{`この日に ${guests}名が入る空いた時刻はありません。`}</p>
+          ) : !hours || dayFailure === dayKey ? null : times.filter(freeAt).length === 0 ? (
+            closedDay ? <p className={styles.hint}>{`${storeName || 'この店舗'}はこの曜日が休みです。`} {canConfigure ? <Button variant="text" size="inline" href={hoursHref}>開ける時間を確認する</Button> : staffRole === 'staff' ? '変更が必要なら管理者に依頼してください。' : null}</p> : capacityReason ? <DialogNote>{capacityReason}</DialogNote> : <p className={styles.hint}>{`この日に ${guests}名が入る空いた時刻はありません。別の日を選んでください。`}</p>
           ) : (
             <div className={styles.timeChips} role="group" aria-labelledby="e2-times">
               {times.filter(freeAt).map((label) => (
