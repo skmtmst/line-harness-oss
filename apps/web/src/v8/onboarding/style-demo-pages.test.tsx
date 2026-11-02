@@ -21,6 +21,22 @@ it('ページを飛ばしてもスタイルは自動で選ばれない', () => {
   expect(screen.getByText('保存の結果を確認します。まだ送信されていません。 見本のため実際の設定は変わりません。')).toBeTruthy()
   expect(choose).not.toHaveBeenCalled()
 })
+it('サロンでは担当ごとの予定の見本を見せ、選ばずに戻れる', () => {
+  const choose = vi.fn()
+  function Subject() {
+    const [viewing, setViewing] = useState<AccountStyle>('salon')
+    return <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={null} onChoose={choose} />
+  }
+  render(<Subject />)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  fireEvent.click(screen.getByRole('button', { name: 'よく使う操作に進む' }))
+  expect(screen.getByRole('heading', { name: '担当ごとの予定を確認する' })).toBeTruthy()
+  expect(screen.getByRole('region', { name: '担当ごとの予定' })).toBeTruthy()
+  expect(screen.getByText('見本 あおい・次の空き 14:00')).toBeTruthy()
+  expect(screen.getByText('11:30–12:30 見本 みお さま・カット')).toBeTruthy()
+  expect(screen.getByText('見本のため実際の設定は変わりません。', { exact: false })).toBeTruthy()
+  expect(choose).not.toHaveBeenCalled()
+})
 it('スタイルを変えると最初のページに戻り、標準ではお知らせを見せる', () => {
   function Subject() {
     const [viewing, setViewing] = useState<AccountStyle>('restaurant')
