@@ -56,8 +56,8 @@ export const get__api_liff_nen_member_1 = async (c: Context<Env, "/api/liff/nen/
       orders: JSON.parse(String(snapshot.orders_json || '[]')),
       subscription: snapshot.subscription_json ? JSON.parse(String(snapshot.subscription_json)) : null,
       purchaseCount: snapshot.purchase_count, purchaseAmount: snapshot.purchase_amount,
-      points: snapshot.point_balance, rank: snapshot.member_rank, syncedAt: snapshot.synced_at,
-    } : { orders: [], subscription: null, purchaseCount: 0, purchaseAmount: 0, points: 0, rank: 'レギュラー', syncedAt: null },
+      points: snapshot.point_balance, rank: membership.rankName, syncedAt: snapshot.synced_at,
+    } : { orders: [], subscription: null, purchaseCount: 0, purchaseAmount: 0, points: 0, rank: '未設定', syncedAt: null },
     photos: photos.results.map((r) => ({
       id: r.id, petId: r.pet_id, petName: r.pet_name, imageUrl: r.image_url,
       caption: r.caption, status: r.status, awardedPoints: r.awarded_points,

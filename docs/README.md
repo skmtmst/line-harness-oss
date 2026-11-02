@@ -465,6 +465,7 @@
 - [配信枠の確認の修正](release-log/unreleased/2053-kenta-operations-quota.md)
 - [履歴と数の単位の表示修正](release-log/unreleased/2056-kenta-review-wording.md)
 - [使い方デモと管理画面の操作の修正](release-log/unreleased/2057-kenta-demo-operations.md)
+- [予約と会員ランクの操作の修正](release-log/unreleased/2058-kenta-reservations-ranks.md)
 - [SNS連携の設定表示と接続](release-log/unreleased/2010-masato-sns-settings-access.md)
 - [リッチメニューを作る画像欄の箱の大きさ](release-log/unreleased/1984-kenta-muse-media-drop.md)
 - [飲食店3画面の共通タブ整理](release-log/unreleased/1972-kenta-muse-ledger-tabs.md)

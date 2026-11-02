@@ -328,52 +328,43 @@ export /**
 type RankLookup = { rank_key: string; name: string; annual_threshold_yen: number; mile_rate_percent: number };
 export type MilestoneLookup = { threshold_yen: number; title: string };
 
-export // packages/db の DEFAULT_NEN_RANKS と同じ値。多くのテストが @line-crm/db を丸ごと mock するため、
-// 設定の読み出しは実行時に引き、無ければこの値で組み立てる。
-const FALLBACK_RANKS: RankLookup[] = [
-  { rank_key: 'regular', name: 'レギュラー', annual_threshold_yen: 0, mile_rate_percent: 1 },
-  { rank_key: 'silver', name: 'シルバー', annual_threshold_yen: 30_000, mile_rate_percent: 1.5 },
-  { rank_key: 'gold', name: 'ゴールド', annual_threshold_yen: 60_000, mile_rate_percent: 2 },
-  { rank_key: 'platinum', name: 'プラチナ', annual_threshold_yen: 120_000, mile_rate_percent: 3 },
-];
-
-export async function loadRankSetup(db: D1Database, lineAccountId: string | null): Promise<{ ranks: RankLookup[]; milestones: MilestoneLookup[] }> {
-  if (!lineAccountId) return { ranks: FALLBACK_RANKS, milestones: [] };
-  try {
-    // 丸ごと mock された @line-crm/db は、無い名前を読むだけで投げる。読み出しごと try に入れる。
+export async function loadRankSetup(db: D1Database, lineAccountId: string | null): Promise<{ ranks: RankLookup[]; milestones: MilestoneLookup[]; rankConfigured: boolean }> {
+  if (!lineAccountId) return { ranks: [], milestones: [], rankConfigured: false };
+  {
     const pkg = dbPackage as {
-      ensureNenRankDefaults?: (db: D1Database, id: string) => Promise<void>;
       getNenRankSettings?: (db: D1Database, id: string) => Promise<RankLookup[]>;
       getNenLifetimeMilestones?: (db: D1Database, id: string) => Promise<MilestoneLookup[]>;
     };
     const load = pkg.getNenRankSettings;
-    if (typeof load !== 'function') return { ranks: FALLBACK_RANKS, milestones: [] };
-    await pkg.ensureNenRankDefaults?.(db, lineAccountId);
+    if (typeof load !== 'function') return { ranks: [], milestones: [], rankConfigured: false };
     const ranks = await load(db, lineAccountId);
     const milestones = (await pkg.getNenLifetimeMilestones?.(db, lineAccountId)) ?? [];
-    return { ranks: ranks.length ? ranks : FALLBACK_RANKS, milestones };
-  } catch {
-    return { ranks: FALLBACK_RANKS, milestones: [] };
+    // D-48：ランク表が空のときは決めていない予備のランクで組み立てない。呼び出し側が EC の値だけを使う。
+    if (!ranks.length) return { ranks: [], milestones, rankConfigured: false };
+    return { ranks, milestones, rankConfigured: true };
   }
 }
 
 export async function buildMembership(db: D1Database, lineAccountId: string | null, snapshot: Record<string, unknown> | null) {
-  const { ranks, milestones } = await loadRankSetup(db, lineAccountId);
+  const { ranks, milestones, rankConfigured } = await loadRankSetup(db, lineAccountId);
   const num = (value: unknown) => (Number.isFinite(Number(value)) ? Math.max(0, Math.round(Number(value))) : 0);
   const ecRankKey = typeof snapshot?.member_rank_key === 'string' && snapshot.member_rank_key ? snapshot.member_rank_key : null;
+  const ecRankName = typeof snapshot?.ec_member_rank_name === 'string' && snapshot.ec_member_rank_name.trim() ? snapshot.ec_member_rank_name : null;
   const annualMilesYen = num(snapshot?.annual_miles_yen) || (ecRankKey ? 0 : num(snapshot?.purchase_amount));
   const lifetimeMilesYen = Math.max(num(snapshot?.lifetime_miles_yen), num(snapshot?.purchase_amount));
   const mileBalance = num(snapshot?.mile_balance) || num(snapshot?.point_balance);
-  const sortedRanks = [...ranks].sort((a, b) => a.annual_threshold_yen - b.annual_threshold_yen);
-  let index = ecRankKey ? sortedRanks.findIndex((r) => r.rank_key === ecRankKey) : -1;
-  if (index < 0) { index = 0; sortedRanks.forEach((r, i) => { if (annualMilesYen >= r.annual_threshold_yen) index = i; }); }
+  const sortedRanks = rankConfigured ? [...ranks].sort((a, b) => a.annual_threshold_yen - b.annual_threshold_yen) : [];
+  const index = ecRankKey ? sortedRanks.findIndex((r) => r.rank_key === ecRankKey) : -1;
   const rank = sortedRanks[index] ?? null;
-  const next = sortedRanks[index + 1] ?? null;
+  const rankPositionKnown = index >= 0;
+  const next = rankPositionKnown ? sortedRanks[index + 1] ?? null : null;
   const sortedMilestones = [...milestones].sort((a, b) => a.threshold_yen - b.threshold_yen);
   const nextMilestone = sortedMilestones.find((m) => m.threshold_yen > lifetimeMilesYen) ?? null;
   return {
-    rankKey: rank?.rank_key ?? null,
-    rankName: rank?.name ?? String(snapshot?.member_rank ?? 'レギュラー'),
+    rankConfigured,
+    rankPositionKnown,
+    rankKey: ecRankKey ?? rank?.rank_key ?? null,
+    rankName: rank?.name ?? (ecRankKey ? ecRankName : null) ?? '未設定',
     mileRatePercent: Number.isFinite(Number(snapshot?.mile_rate_percent)) && snapshot?.mile_rate_percent != null
       ? Number(snapshot.mile_rate_percent)
       : rank?.mile_rate_percent ?? null,
