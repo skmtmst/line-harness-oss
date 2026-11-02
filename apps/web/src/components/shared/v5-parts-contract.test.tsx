@@ -21,6 +21,9 @@ describe('共通Pagination', () => {
     expect(paginationItems(2, 4)).toEqual([1, 2, 3, 4])
     expect(paginationItems(1, 6)).toEqual([1, 2, 3, 4, 5, 6])
     expect(paginationItems(4, 7)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(paginationItems(1, 8)).toEqual([1, 2, 3, 'ellipsis', 8])
+    expect(paginationItems(4, 8)).toEqual([1, 'ellipsis', 4, 'ellipsis', 8])
+    expect(paginationItems(8, 8)).toEqual([1, 'ellipsis', 6, 7, 8])
   })
 
   it('現在地と前後の無効状態を出す', () => {
