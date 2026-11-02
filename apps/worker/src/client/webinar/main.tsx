@@ -145,6 +145,7 @@ interface ChatItem {
   body: string;
   mine?: boolean;
   failed?: boolean;
+  commentPosition?: { sessionStartAt: number; atSeconds: number };
   ctaCard?: WebinarCtaCard;
 }
 
@@ -550,6 +551,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
     } else {
       return;
     }
+    if (retry?.commentPosition) ({ sessionStartAt, atSeconds } = retry.commentPosition);
     const text = retry?.body ?? input.trim();
     if (!text) return;
     const key = retry?.key ?? `u-${crypto.randomUUID()}`;
@@ -557,17 +559,17 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
     setCommentBusy(true);
     if (!retry || input.trim() === text) setInput('');
     setChat(prev => retry ? prev.map(item => item.key === key ? { ...item, failed: false } : item)
-      : [...prev, { key, authorName: 'あなた', body: text, mine: true }]);
+      : [...prev, { key, authorName: 'あなた', body: text, mine: true, commentPosition: { sessionStartAt, atSeconds } }]);
     try {
       await apiPost(`/api/liff/webinars/${encodeURIComponent(slug)}/comments`, {
         sessionStartAt,
         atSeconds,
         body: text,
+        requestId: key,
       }, ctx);
     } catch (err) {
       clientLogger.warn("webinar_main_warn");
       setChat(prev => prev.map(item => item.key === key ? { ...item, failed: true } : item));
-      setInput(current => current === '' ? text : current);
     } finally {
       commentInFlight.current = false;
       setCommentBusy(false);
@@ -704,7 +706,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
                 <span className={item.mine ? 'font-medium text-night-mine' : 'font-medium text-gray-400'}>
                   {item.authorName}
                 </span>{' '}
-                <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送れませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
+                <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送信結果を確認できませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
               </div>
             ))}
           </div>
@@ -955,7 +957,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
               <span data-liff-comment-author className={item.mine ? 'font-medium text-night-mine' : 'text-night-body'}>
                 {item.authorName}
               </span>{' '}
-              <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送れませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
+              <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送信結果を確認できませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
             </div>
           ),
         )}
@@ -1222,9 +1224,9 @@ export function FormSheet({
           <div className="py-6 text-center">
             <p className="text-2xl">🎉</p>
             <p className="mt-2 text-lg font-bold">回答を送信しました</p>
-            <p className="mt-1 text-sm text-gray-500">
+            {completionUrl && <p className="mt-1 text-sm text-gray-500">
               予約画面へ移動しています。空いている15分枠を1つ選んでください。
-            </p>
+            </p>}
             {completionUrl && (
               <button
                 onClick={openCompletionUrl}
@@ -1237,7 +1239,7 @@ export function FormSheet({
               onClick={onClose}
               className="mt-4 rounded-full border border-gray-300 px-8 py-2.5 font-bold text-gray-600 active:opacity-80"
             >
-              あとで予約する
+              {completionUrl ? 'あとで予約する' : '閉じる'}
             </button>
           </div>
         )}
