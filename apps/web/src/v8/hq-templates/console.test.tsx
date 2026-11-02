@@ -91,6 +91,17 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
     // 一覧の段では、パンくずは「ホーム」だけ
     expect(chrome.crumbs?.some((item) => item.onSelect)).toBe(false)
   })
+  it('作る画面を開くとURLにmode=createが付く（H-18）', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('mode')).toBe('create'))
+  })
+  it('?mode=createで開くと作る画面が直接開く（H-18）', async () => {
+    window.history.replaceState(null, '', '/hq/templates?mode=create')
+    render(<HqTemplatesV8 type="template" />)
+    expect(await screen.findByRole('button', { name: '保存する' })).toBeTruthy()
+    expect(screen.getByLabelText('テンプレート名')).toBeTruthy()
+  })
   it('作る画面から一覧へは、下の帯の［キャンセル］でも戻る', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
