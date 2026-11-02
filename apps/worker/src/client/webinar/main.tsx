@@ -1054,13 +1054,6 @@ export function FormSheet({
   const idemKeyRef = useRef<{ defId: string; key: FormIdempotencyKey } | null>(null);
   const startedRef = useRef(false);
   const completedFieldsRef = useRef(new Set<string>());
-  const bookingRedirectTimerRef = useRef<number | null>(null);
-
-  useEffect(() => () => {
-    if (bookingRedirectTimerRef.current !== null) {
-      window.clearTimeout(bookingRedirectTimerRef.current);
-    }
-  }, []);
 
   const hasValue = (value: string | string[] | undefined) =>
     Array.isArray(value) ? value.length > 0 : typeof value === 'string' && value.trim() !== '';
@@ -1165,16 +1158,6 @@ export function FormSheet({
       }
       onFunnelEvent('submit_success');
       onSubmitted(def);
-      const bookingUrl = def.onSubmitMessageContent?.match(/https?:\/\/[^\s]+/)?.[0] ?? null;
-      if (bookingUrl) {
-        // フォーム送信後にもう一度ボタンを押させると、予約画面へ進む前に
-        // 離脱しやすい。同一の in-app browser で予約画面へ自動遷移し、
-        // 完了画面のボタンは自動遷移できなかった場合のフォールバックにする。
-        bookingRedirectTimerRef.current = window.setTimeout(
-          () => window.location.assign(bookingUrl),
-          900,
-        );
-      }
     } catch {
       onFunnelEvent('submit_error');
       setError('送信に失敗しました。通信環境をご確認ください。');
@@ -1186,19 +1169,6 @@ export function FormSheet({
     'w-full min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-base text-gray-900';
   const todayJst = jstDate();
   const meetingDateOptions = buildMeetingDateOptions(todayJst);
-
-  const completionUrl = sheet.phase === 'done'
-    ? sheet.def.onSubmitMessageContent?.match(/https?:\/\/[^\s]+/)?.[0] ?? null
-    : null;
-
-  const openCompletionUrl = () => {
-    if (!completionUrl) return;
-    if (bookingRedirectTimerRef.current !== null) {
-      window.clearTimeout(bookingRedirectTimerRef.current);
-      bookingRedirectTimerRef.current = null;
-    }
-    window.location.assign(completionUrl);
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -1224,22 +1194,20 @@ export function FormSheet({
           <div className="py-6 text-center">
             <p className="text-2xl">🎉</p>
             <p className="mt-2 text-lg font-bold">回答を送信しました</p>
-            {completionUrl && <p className="mt-1 text-sm text-gray-500">
-              予約画面へ移動しています。空いている15分枠を1つ選んでください。
-            </p>}
-            {completionUrl && (
-              <button
-                onClick={openCompletionUrl}
-                className="mt-5 w-full rounded-full bg-[#06C755] px-6 py-3 font-bold text-white active:opacity-80"
-              >
-                予約画面をすぐ開く
-              </button>
+            {sheet.def.onSubmitMessageContent && (
+              <p className="mt-3 whitespace-pre-wrap break-words text-sm text-gray-700">
+                {sheet.def.onSubmitMessageContent.split(/(https?:\/\/[^\s<>"']+)/g).map((part, index) =>
+                  /^https?:\/\//.test(part)
+                    ? <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">{part}</a>
+                    : part,
+                )}
+              </p>
             )}
             <button
               onClick={onClose}
               className="mt-4 rounded-full border border-gray-300 px-8 py-2.5 font-bold text-gray-600 active:opacity-80"
             >
-              {completionUrl ? 'あとで予約する' : '閉じる'}
+              閉じる
             </button>
           </div>
         )}
@@ -1425,12 +1393,9 @@ export function FormSheet({
                 {submitting
                   ? '送信中...'
                   : canSubmit
-                    ? '回答を送信して相談日時を選ぶ'
+                    ? '回答を送信する'
                     : `あと${remainingRequiredCount}項目を選択`}
               </button>
-              <p className="mt-2 text-center text-xs text-gray-500">
-                送信後、空いている15分枠を選べます
-              </p>
             </div>
           </div>
         )}

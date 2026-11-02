@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react';
+import { fireEvent, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { FormSheet } from '../../../worker/src/client/webinar/main.js';
 vi.mock('@line/liff', () => ({ default: {} }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const cta = { id:'c', atSeconds:0, kind:'form' as const, title:'アンケート', body:null, buttonLabel:'開く', autoOpen:false, formId:'f', url:null };
 const def = { id:'f', name:'見本', description:null, isActive:true, fields:[] };
 it('移動先がない送信完了は、予約画面へ移動中と表示しない', () => {
@@ -11,4 +11,24 @@ it('移動先がない送信完了は、予約画面へ移動中と表示しな�
   expect(screen.getByText('回答を送信しました')).toBeTruthy();
   expect(screen.queryByText(/予約画面へ移動/)).toBeNull();
   expect(screen.getAllByRole('button',{name:'閉じる'}).length).toBeGreaterThan(0);
+});
+it('送信後メッセージとリンクを表示し、自動で移動しない', () => {
+  const withMessage={...def,onSubmitMessageContent:'詳しいご案内はこちら https://example.com/help'};
+  render(<FormSheet sheet={{cta,phase:'done',def:withMessage}} ctx={{liffId:'l',lineUserId:'u',idToken:'t'}} onFunnelEvent={()=>{}} onClose={()=>{}} onSubmitted={()=>{}} />);
+  expect(screen.getByText(/詳しいご案内はこちら/)).toBeTruthy();
+  expect(screen.getByRole('link',{name:'https://example.com/help'}).getAttribute('href')).toBe('https://example.com/help');
+  expect(screen.queryByText(/予約画面へ移動/)).toBeNull();
+  expect(screen.queryByRole('button',{name:/予約画面/})).toBeNull();
+});
+
+it('リンクを含む回答送信の成功でも自動遷移を予約しない', async () => {
+  const withMessage={...def,onSubmitMessageContent:'案内 https://example.com/help'};
+  const done=vi.fn();
+  const timers=vi.spyOn(window,'setTimeout');
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({success:true}),{status:200})));
+  render(<FormSheet sheet={{cta,phase:'form',def:withMessage}} ctx={{liffId:'l',lineUserId:'u',idToken:'t'}} onFunnelEvent={()=>{}} onClose={()=>{}} onSubmitted={done} />);
+  expect(screen.queryByText(/15分枠/)).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:/回答を送信/}));
+  await waitFor(()=>expect(done).toHaveBeenCalledTimes(1));
+  expect(timers.mock.calls.some(([,delay])=>delay===900)).toBe(false);
 });
