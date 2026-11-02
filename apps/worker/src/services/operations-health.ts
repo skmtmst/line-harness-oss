@@ -201,7 +201,7 @@ async function collectChecks(
       const scheduledPlanned = Number(scheduledRow?.planned ?? 0);
 
       if (quota.limit === null && harnessLimit === null) {
-        return result('message_quota', 'unknown', 'LINEとHarnessの配信上限をどちらも取得できませんでした', 'line_messaging_api', observedAt);
+        return result('message_quota', 'unknown', '配信上限を確認できませんでした（LINE・musubo）', 'line_messaging_api', observedAt);
       }
       const lineRemaining = quota.limit === null || quota.used === null
         ? null : Math.max(0, quota.limit - quota.used);

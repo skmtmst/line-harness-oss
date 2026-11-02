@@ -1150,6 +1150,20 @@ describe('停止不可理由の機械コード(N-453/N-455)', () => {
 });
 
 describe('W: 運用状態の確認項目の追加（-32）', () => {
+  it.each(['unavailable', 'unlimited'])('配信上限が数値で分からない場合は確認できないと案内する（%s）', async (lineState) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      if (String(input).endsWith('/quota/consumption')) return Response.json({ totalUsage: 10 });
+      return lineState === 'unlimited' ? Response.json({ type: 'none' }) : new Response(null, { status: 503 });
+    }));
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    const checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T05:00:00.000Z' });
+    expect(checked.run.results.find((item) => item.checkKey === 'message_quota')).toMatchObject({
+      status: 'unknown',
+      summary: '配信上限を確認できませんでした（LINE・musubo）',
+      source: 'line_messaging_api',
+      value: null,
+    });
+  });
   it('月間配信数はLINEとHarnessの小さい方を送れる数にし、予定分と翌月1日(JST)のresetを返す', async () => {
     const now = '2026-09-15T05:00:00.000Z';
     testDb.raw.prepare(
