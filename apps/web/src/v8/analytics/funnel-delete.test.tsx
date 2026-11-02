@@ -58,8 +58,10 @@ it('アカウントを切り替えた後の古い削除確定は送らない', a
   const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
   const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
   view.rerender(<FunnelV8 accountId="b" canManage />)
+  view.rerender(<FunnelV8 accountId="a" canManage />)
   await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button })
   expect(net.setStatus).not.toHaveBeenCalled()
+  expect(screen.queryByRole('alertdialog')).toBeNull()
 })
 
 it('削除が完了した後に保持した古い確定は再送しない', async () => {

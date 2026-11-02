@@ -217,20 +217,20 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   }
 
   // 停止は再開できる。保管は終端で、一覧と再集計から外れて戻せない。
-  const [statusTarget, setStatusTarget] = useState<{ funnel: { id: string; name: string; status: FunnelStatus }; to: FunnelStatus; accountId: string } | null>(null)
+  const [statusTarget, setStatusTarget] = useState<{ funnel: { id: string; name: string; status: FunnelStatus }; to: FunnelStatus; accountId: string; window: object } | null>(null)
   const statusWindow = useRef<object>({})
-  const renderedStatusWindow = statusWindow.current
   const currentAccount = useRef(accountId)
+  if (currentAccount.current !== accountId) statusWindow.current = {}
   currentAccount.current = accountId
   const statusMounted = useRef(false)
   useEffect(() => { statusMounted.current = true; return () => { statusMounted.current = false } }, [])
   const openStatus = (funnel: { id: string; name: string; status: FunnelStatus }, to: FunnelStatus) => {
     statusWindow.current = {}
-    setStatusTarget({ funnel, to, accountId })
+    setStatusTarget({ funnel, to, accountId, window: statusWindow.current })
   }
   const [statusBusy, setStatusBusy] = useState(false)
   const applyStatusChange = async () => {
-    if (!statusTarget || statusBusy || !statusMounted.current || currentAccount.current !== statusTarget.accountId || statusWindow.current !== renderedStatusWindow) return
+    if (!statusTarget || statusBusy || !statusMounted.current || currentAccount.current !== statusTarget.accountId || statusWindow.current !== statusTarget.window) return
     setStatusBusy(true); setRunError('')
     try {
       const res = await api.analytics.v6Funnels.setStatus(accountId, statusTarget.funnel.id, { status: statusTarget.to, expectedStatus: statusTarget.funnel.status })
@@ -442,7 +442,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
         </>}
     </div>
     <ConfirmDialog
-      open={statusTarget !== null && statusTarget.accountId === accountId}
+      open={statusTarget !== null && statusTarget.accountId === accountId && statusTarget.window === statusWindow.current}
       title={statusTarget?.to === 'stopped' ? 'ファネルを停止しますか' : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除しますか？` : 'ファネルを再開しますか'}
       description={statusTarget?.to === 'stopped' ? `「${statusTarget.funnel.name}」の再集計と対象者づくりを止めます。過去の結果は残り、あとから再開できます。`
         : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除すると、選ぶ一覧から外れ、再集計と対象者づくりはできません。あとから戻せません。過去の結果は残ります。`
