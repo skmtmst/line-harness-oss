@@ -1,7 +1,6 @@
 'use client'
 
 import { tokenExpiryBadge, tokenExpirySummary, tokenExpiryBreakdownText } from '@/lib/line-account-state'
-import { hqStyleApi } from '@/lib/api/helpers/styles'
 
 import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { jstDate } from '@/lib/jst-datetime'
@@ -148,7 +147,7 @@ export default function HqHomeV8() {
     const epoch = attentionEpoch.current
     setAttentionCounts(null)
     setAttentionError(null)
-    void hqStyleApi.attention().then((result) => {
+    void import('@/lib/api/helpers/styles').then(({ hqStyleApi }) => hqStyleApi.attention()).then((result) => {
       if (cancelled || epoch !== attentionEpoch.current) return
       if (!result.success) { setAttentionError(new Error('attention failed')); return }
       const kinds = ['unhandledChats', 'pendingBookings', 'unpaid', 'connections', 'stoppedDeliveries'] as const
