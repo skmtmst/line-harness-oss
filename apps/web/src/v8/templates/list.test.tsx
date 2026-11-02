@@ -353,3 +353,11 @@ it('E-20: 質問タブのURLから開き、タブ切替もURLに残す', async (
   fireEvent.click(screen.getByRole('tab',{name:/^メッセージ/}))
   expect(new URLSearchParams(currentListLocation().search).get('tab')).not.toBe('question')
 })
+
+it('C-10: 下書きが1通でも公開中の複数通を見失わない', async () => {
+  listTemplates.mockResolvedValue({ success: true, data: [{ ...used, id: 'published-multi', name: '公開中は複数通', messageBubbles: [{ id:'1',type:'text',content:{text:'a'} },{ id:'2',type:'text',content:{text:'b'} }], draftMessageBubbles: null }] })
+  await renderList()
+  const multiple = within(screen.getByRole('group', { name: 'メッセージの数' })).getByRole('button', { name: '複数通' })
+  fireEvent.click(multiple)
+  expect(screen.getByText('公開中は複数通')).toBeTruthy()
+})

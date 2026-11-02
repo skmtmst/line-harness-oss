@@ -125,7 +125,7 @@ export function isRichVideoTemplate(template: Template): boolean {
   try { return Boolean(JSON.parse(latestContentOf(template)).video) } catch { return false }
 }
 
-/** 本文の空行やカルーセルは複数メッセージではない。下書きがある場合はその通数を見る。 */
+/** 本文の空行やカルーセルは複数メッセージではない。公開版か下書きのいずれかに複数通があるかを見る。 */
 export function hasMultipleMessages(t: Template): boolean {
-  return ((t.hasDraft ? t.draftMessageBubbles : t.messageBubbles)?.length ?? 0) > 1
+  return (t.messageBubbles?.length ?? 0) > 1 || (t.hasDraft && (t.draftMessageBubbles?.length ?? 0) > 1) === true
 }
