@@ -32,6 +32,8 @@ const fx = vi.hoisted(() => ({
   folders: vi.fn(),
   formSubmissions: vi.fn(),
   scenarios: vi.fn(),
+  disabledFeatures: [] as string[],
+  featureStatus: 'ready' as 'ready' | 'loading' | 'error',
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -73,7 +75,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', name: '本店' }, accounts: [], loading: false }),
 }))
-vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => true }) }))
+vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ status: fx.featureStatus, enabled: (key: string) => fx.featureStatus === 'ready' && !fx.disabledFeatures.includes(key) }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -115,6 +117,8 @@ let root: Root
 
 beforeEach(() => {
   fx.role = 'owner'
+  fx.disabledFeatures = []
+  fx.featureStatus = 'ready'
   fx.params = new URLSearchParams('id=friend-1')
   fx.pushed.length = 0
   fx.getFriend.mockReset().mockImplementation(async (id: string) => ({ success: true, data: friend(id) }))
@@ -179,6 +183,10 @@ describe('受信箱への口', () => {
 })
 
 describe('概要の行き先リンク', () => {
+  it('この友だちのリマインダを開く入口を示す', async () => {
+    await open('id=a b/c')
+    expect(hrefOf('この友だちのリマインダを見る')).toBe('/friends/detail?id=a%20b%2Fc&tab=reminders')
+  })
   it('マイルの「詳細を見る」はこの友だちのマイル詳細、「すべて見る」は履歴タブへつながる', async () => {
     await open('id=a b')
     expect(hrefOf('詳細を見る')).toBe('/mileage/friends/detail?id=a%20b')
@@ -188,6 +196,35 @@ describe('概要の行き先リンク', () => {
 })
 
 describe('タブの切り替え（Q5F2QE）', () => {
+  it('予約機能がオフなら回数券タブを隠し、直接URLではオフの案内を出す', async () => {
+    fx.disabledFeatures = ['booking']
+    await open('id=friend-1')
+    expect(byText('[role="tab"]', '回数券・月謝')).toHaveLength(0)
+    await open('id=friend-1&tab=orders')
+    expect(host.querySelector('[data-feature-disabled="booking"]')).toBeTruthy()
+    expect(host.textContent).not.toContain('回数券・月謝は、データの準備が済むと')
+  })
+
+  it('情報欄がオフなら情報欄タブを隠す', async () => {
+    fx.disabledFeatures = ['friend_fields']
+    await open('id=friend-1')
+    expect(byText('[role="tab"]', '情報欄')).toHaveLength(0)
+    expect(byText('[role="tab"]', '回数券・月謝')).toHaveLength(1)
+  })
+
+  it.each([['loading', '機能の設定を確認しています'], ['error', '機能の設定を確認できませんでした']] as const)(
+    '機能設定が%sの時は直接URLで券を表示しない', async (status, message) => {
+      fx.featureStatus = status
+      await open('id=friend-1&tab=orders')
+      if (status === 'loading') {
+        expect(host.querySelector('[data-list-state="loading"]')?.getAttribute('aria-label')).toBe(message)
+      } else {
+        expect(host.textContent).toContain(message)
+      }
+      expect(host.querySelector('[data-feature-disabled="booking"]')).toBeNull()
+      expect(byText('[role="tab"]', '回数券・月謝')).toHaveLength(0)
+    },
+  )
   it('通常のタブは内容のあるものに絞り、回数券・月謝を内容に合う名前で出す', async () => {
     await open('id=friend-1')
     const labels = [...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim())
@@ -199,6 +236,8 @@ describe('タブの切り替え（Q5F2QE）', () => {
     await open('id=friend-1&tab=scenario')
     const selected = [...host.querySelectorAll('[role="tab"][aria-selected="true"]')].map((tab) => tab.textContent?.trim())
     expect(selected).toEqual(['配信・シナリオ'])
+    const labels = [...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim())
+    expect(labels.at(-1)).toBe('配信・シナリオ')
     expect(hrefOf('シナリオ一覧を見る ↗')).toBe('/scenarios')
   })
 

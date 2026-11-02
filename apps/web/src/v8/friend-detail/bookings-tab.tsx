@@ -1,6 +1,6 @@
 'use client'
 
-/* 予約タブ。回数券・月謝（ 追記：店が手で入れる）と、この友だちの予約への行き先。 */
+/* 回数券・月謝と、この友だちの予約への行き先。 */
 import { CalendarDays } from 'lucide-react'
 import EmptyTab from './empty-tab'
 import EntitlementsCard from './entitlements'

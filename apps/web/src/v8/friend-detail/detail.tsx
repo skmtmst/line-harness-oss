@@ -11,6 +11,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
@@ -78,9 +79,12 @@ function FriendDetailV8Inner() {
   const group = params.get('group') ?? ALL_GROUP
   const { selectedAccountId, selectedAccount } = useAccount()
   // 情報欄タブは friend_fields の画面。オフのアカウントではタブごと出さない。
-  const fieldsEnabled = useFeatureVisibility(selectedAccountId).enabled('friend_fields')
+  const visibility = useFeatureVisibility(selectedAccountId)
+  const fieldsEnabled = visibility.enabled('friend_fields')
+  const bookingEnabled = visibility.enabled('booking')
   const visibleTabs = FRIEND_DETAIL_TABS.filter((t) =>
-    (fieldsEnabled || t.key !== 'info') && (!LINK_ONLY_TABS.includes(t.key) || t.key === tab))
+    (fieldsEnabled || t.key !== 'info') && (bookingEnabled || t.key !== 'orders') && !LINK_ONLY_TABS.includes(t.key))
+  const activeLinkOnlyTab = FRIEND_DETAIL_TABS.find((t) => t.key === tab && LINK_ONLY_TABS.includes(t.key))
   const data = useFriendDetail(friendId, selectedAccountId, tab)
   const perms = useFriendDetailPermissions()
   const { friend } = data
@@ -188,7 +192,7 @@ function FriendDetailV8Inner() {
       <div className={styles.tabs}>
         <Tabs
           label="友だち詳細の中身"
-          items={visibleTabs.map((t) => ({
+          items={[...visibleTabs, ...(activeLinkOnlyTab ? [activeLinkOnlyTab] : [])].map((t) => ({
             label: t.label,
             href: `/friends/detail?id=${encodeURIComponent(friendId)}&tab=${t.key}${group === ALL_GROUP ? '' : `&group=${encodeURIComponent(group)}`}`,
             current: tab === t.key,
@@ -235,7 +239,10 @@ function FriendDetailV8Inner() {
       ) : tab === 'scenario' ? (
         <ScenarioTab canEnroll={perms.manage} onEnroll={() => void scenario.openPicker()} />
       ) : tab === 'orders' ? (
-        <BookingsTab accountId={selectedAccountId} friendId={friendId} friendName={realName || friend?.displayName || ''} canEdit={perms.manage} />
+        bookingEnabled ? <BookingsTab accountId={selectedAccountId} friendId={friendId} friendName={realName || friend?.displayName || ''} canEdit={perms.manage} />
+          : visibility.status === 'ready' ? <FeatureDisabledScreen featureId="booking" />
+          : visibility.status === 'error' ? <ListState kind="error" title="機能の設定を確認できませんでした" />
+          : <ListState kind="loading" title="機能の設定を確認しています" />
       ) : tab === 'reminders' ? (
         <RemindersTab friendId={friendId} />
       ) : tab === 'actions' ? (
