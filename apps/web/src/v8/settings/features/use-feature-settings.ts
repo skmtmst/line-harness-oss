@@ -298,7 +298,13 @@ export function useFeatureSettings() {
   const usageByItemId = useMemo(() => {
     const result = new Map<string, UsageCategory>()
     for (const category of usageCategories) {
-      for (const itemId of USAGE_ITEM_IDS_BY_KEY[category.key] ?? []) result.set(itemId, category)
+      for (const itemId of USAGE_ITEM_IDS_BY_KEY[category.key] ?? []) {
+        if (category.key !== 'friend_attributes') { result.set(itemId, category); continue }
+        const tags = category.breakdown?.find(item => item.key === 'tags')
+        const unknown = { value: null, state: 'unavailable' as const, reason: 'タグの内訳を確認できません。もう一度読み込んでください' }
+        result.set(itemId, { ...category, label: 'タグ', created: tags?.created ?? unknown,
+          inUse: tags?.inUse ?? unknown, unused: tags?.unused ?? unknown })
+      }
     }
     return result
   }, [usageCategories])
