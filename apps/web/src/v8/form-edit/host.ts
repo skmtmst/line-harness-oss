@@ -26,6 +26,8 @@ export interface FormEditHost {
   backHref: string
   /** 読み込んだ中身（新しく作るときは空のフォーム）。 */
   initial: FormHostContent
+  /** 復元入力とは別の保存済み基準。未送信入力の離脱確認に使う。 */
+  baseline?: FormHostContent
   /** 選べる参照先（配った先で直せるものだけ）。 */
   refs: FormRefs
   /** スマホの見本の頭に出す名前。 */
@@ -40,6 +42,8 @@ export interface FormEditHost {
   notice?: ReactNode
   /** 保存の確定を待つ。下書きはdistribute=false、保存して配るはtrue。失敗・未確定はfalse。 */
   onSave: (content: FormHostContent, distribute: boolean) => Promise<boolean>
+  /** 未送信の入力を呼ぶ側へ渡す（保存・正規化はしない）。 */
+  onDraftChange?: (content: FormHostContent) => void
   onCancel: () => void
   /** 閲覧のみ（押せる操作を出さない）。 */
   readOnly?: boolean

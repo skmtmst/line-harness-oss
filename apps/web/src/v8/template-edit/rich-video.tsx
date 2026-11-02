@@ -72,6 +72,15 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
   const saveLock = useRef(false)
   const editVersion = useRef<{ expectedVersion: number; expectedDraftRevision: number } | null>(null)
   const patch = (next: Partial<RichVideoDraft>) => {setIssue(null);setDraft(current=>({...current,...next}))}
+  /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。 */
+  const richVideoDraftSnapshot = JSON.stringify([draft, media.current.map((item) => item.publicUrl)])
+  useEffect(() => {
+    if (!host?.onDraftChange) return
+    try {
+      host.onDraftChange({ kind: 'rich_video', name: draft.name, messageContent: JSON.stringify({ ...richVideoContent(draft), baseUrl: baseUrl.current }), media: [...media.current] })
+    } catch { /* 組み立て不可の途中入力は通知しない */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [richVideoDraftSnapshot])
 
   useEffect(()=> {
     setFolders([])

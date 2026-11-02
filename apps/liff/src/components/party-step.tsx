@@ -19,7 +19,7 @@ export function PartySummary({ party, first, withFee = false }: { party: PartySt
     <div data-party-summary className="space-y-1 pb-1 text-[13px] leading-5 text-ink">
       {sum.rows.map((r) => (
         <div key={r.index}>
-          <p className="flex justify-between gap-3"><span className="min-w-0 truncate"><span className="mr-2">{personShort(r.index)}</span>{menuLine(r.menu, r.member)}{withFee && r.fee === 0 ? `・${r.member.staff && !r.member.staff.is_designation_optional ? r.member.staff.display_name : '指名なし'}` : ''}</span><span className="liff-num shrink-0">{yen(r.price)}</span></p>
+          <p className="flex justify-between gap-3"><span className="min-w-0 truncate"><span className="mr-2">{personShort(r.index)}</span>{menuLine(r.menu, r.member)}{withFee && r.fee === 0 ? `・${r.member.designated && r.member.staff && !r.member.staff.is_designation_optional ? r.member.staff.display_name : '指名なし'}` : ''}</span><span className="liff-num shrink-0">{yen(r.price)}</span></p>
           {withFee && r.fee > 0 ? <p className="flex justify-between gap-3 pl-[3.2em]"><span>指名料（{r.member.staff?.display_name}）</span><span className="liff-num">{yen(r.fee)}</span></p> : null}
         </div>
       ))}

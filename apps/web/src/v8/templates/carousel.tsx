@@ -213,6 +213,15 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     }).catch(() => {})
     return () => { cancelled = true }
   }, [folderAccountId])
+  /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。 */
+  const carouselDraftSnapshot = JSON.stringify([name, panels, tapLimitMode, tapLimitText, uploadedMedia])
+  useEffect(() => {
+    if (!host?.onDraftChange) return
+    try {
+      host.onDraftChange({ kind: 'carousel', name, messageContent: buildCarouselContent(panels, hqHost ? 'hq' : (createdId ?? ''), liffId), tapLimitMode, tapLimitText: tapLimitText.trim() || null, templateId: createdId ?? '', carouselActions: buildCarouselActions(panels), media: uploadedMedia.filter((media) => panels.some((p) => p.thumbnailImageUrl === media.publicUrl)) })
+    } catch { /* 組み立て不可の途中入力は通知しない */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carouselDraftSnapshot])
 
   useEffect(() => {
     if (!id) return

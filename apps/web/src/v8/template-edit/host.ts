@@ -7,19 +7,35 @@
  *   - フォルダの候補・板の頭の説明・下の帯の主ボタン（［保存して配る］）を呼ぶ側が決める
  *   - 店のアカウントに結びつく欄（登録メディア・タグ・シナリオ・行うこと）は出さない（配った先の ID に直せないため）
  */
+import type { CouponDraft } from './coupon-draft'
+import type { ResearchQuestion } from './asset-initial'
+import type { InlineAction } from '@/components/auto-replies/draft-fields'
+import type { TapActionKind } from '@/lib/tap-actions'
 import type { ReactNode } from 'react'
-import type { TemplateImagemapUpload, MessageTemplateMediaDefinition } from '@line-crm/shared'
+import type { TemplateImagemapUpload, MessageTemplateMediaDefinition, TapExtras, MediaItem } from '@line-crm/shared'
+
+export interface AssetEditorState {
+  couponDraft: CouponDraft; description: string; couponTitle: string; imageUrl: string
+  tapExtras?: TapExtras; pickedMedia: MediaItem | null; couponOnce: 'once' | 'unlimited' | 'limited'
+  countTouched: boolean; couponVisibility: 'friends' | 'link'; lottery: boolean; lotteryRate: string; winnerLimit: string
+  couponStartsAt: string; couponEndsAt: string; couponUseActions: InlineAction[]
+  researchStartsAt: string; researchEndsAt: string; targetTagId: string; questions: ResearchQuestion[]; answerActions: InlineAction[]
+}
+
+export interface RichEditorState {
+  imageUrl: string; pickedMedia: MediaItem | null; shapeValue: string; areas: Record<string, { tapExtras?: TapExtras; kind: 'none' | TapActionKind; uri: string; text: string; refId: string }>; uploaded: TemplateImagemapUpload | null
+}
 
 /** 画面が組み立てて渡す中身。メッセージは形と本文、クーポン・リサーチは店と同じ形の payload。 */
 export type TemplateHostContent =
   | { kind: 'message'; name: string; messageType: string; messageContent: string }
-  | { kind: 'coupon' | 'research'; name: string; payload: Record<string, unknown> }
+  | { kind: 'coupon' | 'research'; name: string; payload: Record<string, unknown>; editorState?: AssetEditorState }
   /** 質問：店の質問テンプレートと同じ形（質問文・選択肢）。本文は前文か質問文。 */
   | { kind: 'question'; name: string; question: Record<string, unknown>; messageContent: string }
   /** カルーセル：店のカルーセルと同じ形の本文（LINE のカルーセルの列）。押したら動く選択肢は使わない。 */
   | { kind: 'carousel'; name: string; messageContent: string; tapLimitMode: 'none' | 'once'; tapLimitText: string | null; templateId?: string; carouselActions?: Record<string, Record<string, unknown[]>>; media?: MessageTemplateMediaDefinition[] }
   /** リッチメッセージ：統括の口で作った5サイズの画像（media）と、店と同じ形の payload（面と URL）。 */
-  | { kind: 'rich_message'; name: string; payload: Record<string, unknown>; media: TemplateImagemapUpload['media'] }
+  | { kind: 'rich_message'; name: string; payload: Record<string, unknown>; media: TemplateImagemapUpload['media']; editorState?: RichEditorState }
   | { kind: 'rich_video'; name: string; messageContent: string; media: MessageTemplateMediaDefinition[] }
 
 export interface TemplateEditHost {
@@ -47,6 +63,8 @@ export interface TemplateEditHost {
   notice?: ReactNode
   /** 下書きを保存（distribute=false）・保存して配る（distribute=true）。 */
   onSave: (content: TemplateHostContent, distribute: boolean) => void | boolean | Promise<void | boolean>
+  /** 入力が変わるたびの一時下書き（H-18原文の再読込対策）。未完成の入力も記録する。無い呼ぶ側では呼ばない。 */
+  onDraftChange?: (content: TemplateHostContent) => void
   onCancel: () => void
   /** 主ボタンの言葉（既定「保存して配る」）。 */
   primaryLabel?: string

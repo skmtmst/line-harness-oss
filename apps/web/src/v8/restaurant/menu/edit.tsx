@@ -228,7 +228,7 @@ function MenuEditBody() {
               <Field label={course ? 'コースの名前' : 'メニューの名前'} htmlFor="rs-menu-name" required>
                 <SaveErrorField names={['name', 'draft.name']}><TextField id="rs-menu-name" aria-label="メニュー名" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></SaveErrorField>
               </Field>
-              <Field label={course ? '1名の値段' : '値段'} htmlFor="rs-menu-price" required>
+              <Field label={course ? '1名の値段' : '値段'} htmlFor="rs-menu-price" required error={draft.price !== '' && Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : undefined}>
                 <SaveErrorField names={['price', 'draft.price']}><NumberInput id="rs-menu-price" aria-label="価格（税込）" unit="円" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></SaveErrorField>
               </Field>
               <Field label="時間" htmlFor="rs-menu-duration">

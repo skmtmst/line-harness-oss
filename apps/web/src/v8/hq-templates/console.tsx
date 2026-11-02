@@ -40,8 +40,10 @@ import { fetchHqDistributionTargets } from '@/lib/api/helpers/hq-distribution-ta
 import { hqMediaApi } from '@/lib/api/helpers/hq-media'
 import { formatNumber } from '@/lib/format'
 import { HqRichMenuCompatibilityError,hqRichMenuDefinitionFromSeed,hqRichMenuSeedFromDefinition } from '@/lib/hq-rich-menu-create'
+import { readScenarioEditorDraft } from '@/lib/hq-scenario-editor-draft'
+import { readFormEditorDraft } from '@/lib/hq-form-editor-draft'
 import { freshDefinition } from '@/lib/hq-template-authoring'
-import { clearCreationAttempt,loadCreationAttempt,persistCreationAttempt,sameCreationScope,type CreationAttempt,type CreationScope } from '@/lib/hq-template-create-attempt'
+import { clearCreationAttempt,clearEditorDraft,loadCreationAttempt,loadEditorDraft,persistCreationAttempt,persistEditorDraft,sameCreationScope,type CreationAttempt,type CreationScope,type EditorDraftContent } from '@/lib/hq-template-create-attempt'
 import { hqTemplatesApi,type DistributionMode,type DistributionResult,type FormDefinition,type HqAccount,type HqTemplate,type HqTemplateListItem,type MessageTemplateDefinition,type Preflight,type RichMenuDefinition,type TagDefinition,type TemplateDefinition,type TemplateDetail,type TemplateInput,type TemplateType } from '@/lib/hq-templates-api'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { useStaffRole,useTenantWideAccess } from '@/lib/staff-role'
@@ -49,7 +51,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { FormEditV8 } from '@/v8/form-edit/public/edit/index'
 import type { FormEditHost } from '@/v8/form-edit/public/host/index'
 import { TemplateAssetEditor } from '@/v8/template-edit/public/asset/index'
-import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
+import type { TemplateEditHost,TemplateHostContent } from '@/v8/template-edit/public/host/index'
 import { TemplateMessageEditor } from '@/v8/template-edit/public/message/index'
 import { TemplateRichEditor } from '@/v8/template-edit/public/rich/index'
 import { TemplateRichVideoEditor } from '@/v8/template-edit/public/rich-video/index'
@@ -99,6 +101,8 @@ const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る
 
 type Stage = 'saved' | 'list' | 'detail' | 'edit' | 'accounts' | 'duplicates' | 'result'
 const errorText = (error: unknown) => describeApiFailure(error, '読み込み', { scope: 'hq' })
+/* メッセージ系の復元タブ。タグ・回答フォームは固有の初期値を下で復元する。 */
+const DRAFT_RESTORE_KINDS = ['message', 'carousel', 'question', 'rich_message', 'rich_video', 'coupon', 'research'] as const
 
 export default function HqTemplatesV8(props: ConsoleProps) {
   const attribute = useAttributeTab('/hq/friend-attributes')
@@ -123,6 +127,25 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const returnHref = useListReturnHref(listPath)
   const entryHandled = useRef('')
   const entryHref = (id: string, mode: 'detail' | 'edit') => `${listPath}?item=${encodeURIComponent(id)}&mode=${mode}`
+  /* 作る画面にも URL を付ける（H-18）。読み直しても入力が消えないよう mode=create で開き直せる。 */
+  /* 一覧の種別（?type=）は引き継ぎ、再読込で別種別へ落ちない（PR#2042中）。無い時は従来通り付けない。 */
+  const inheritedTypeParam = () => new URLSearchParams(location.split('?')[1]?.split('#')[0] ?? '').get('type') ?? ''
+  const createHref = () => {
+    const query = new URLSearchParams()
+    const inherited = inheritedTypeParam()
+    if (inherited) query.set('type', inherited)
+    if (folderFilter !== 'all') query.set('folderFilter', folderFilter)
+    query.set('mode', 'create')
+    return `${listPath}?${query.toString()}`
+  }
+  const listHrefKeepingType = (href: string) => {
+    const inherited = inheritedTypeParam()
+    if (!inherited) return href
+    const url = new URL(href, 'http://localhost')
+    url.searchParams.set('type', inherited)
+    return `${url.pathname}${url.search}${url.hash}`
+  }
+  const showCreateUrl = () => { entryHandled.current = 'create'; window.history.replaceState(window.history.state, '', destination(createHref())); notifyListLocation() }
   const [folderDistribution, setFolderDistribution] = useState<{ name: string; templates: HqTemplate[] } | null>(null)
   const [folderBatch, setFolderBatch] = useState<{ name: string; runs: FolderRun[]; index: number; history: FolderRun[] } | null>(null)
   const folderBatchRef = useRef(folderBatch)
@@ -130,6 +153,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [stage, setStage] = useState<Stage>('list')
   const [folders, setFolders] = useState<HqTemplateFolder[]>([])
   const [folderLoadFailed, setFolderLoadFailed] = useState(false)
+  const [foldersReady, setFoldersReady] = useState(false)
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folderFilter, setFolderFilter] = useListUrlValue<string>('folderFilter', 'all')
   const [textOverrides, setTextOverrides] = useState<Record<string, string>>({})
@@ -139,6 +163,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [accounts, setAccounts] = useState<HqAccount[]>([])
   const [detail, setDetail] = useState<TemplateDetail | null>(null)
   const [name, setName] = useState('')
+  /* H-18原文の再読込対策：子画面の通常入力の一時下書きの復元（message先行、他は未完）。 */
+  const [restoreDraft, setRestoreDraft] = useState<EditorDraftContent | null>(null)
   const [description, setDescription] = useState('')
   const [definition, setDefinition] = useState<TemplateDefinition>(() => freshDefinition(type))
   const editBaseline = useRef(JSON.stringify({ name, description, definition, folderId }))
@@ -193,6 +219,13 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const creationScope = useRef<CreationScope | null>(null)
   const createSettlement = useRef<{ kind: 'saved'; detail: TemplateDetail } | { kind: 'rejected' } | null>(null)
   const [createUncertain, setCreateUncertain] = useState(false)
+  const lastDraftEdit = useRef(0)
+  const [draftFailure, setDraftFailure] = useState(false)
+  const persistDraft = (scope: CreationScope, draftType: TemplateType, draftKind: string, content: EditorDraftContent) => {
+    lastDraftEdit.current = Math.max(Date.now(), lastDraftEdit.current + 1)
+    const saved = persistEditorDraft(window.sessionStorage, scope, draftType, draftKind, { ...content, lastEditedAt: lastDraftEdit.current })
+    if (!saved) setDraftFailure(true)
+  }
   const alive = useRef(true)
   /** リッチメニューの作る④で選んだ配るアカウント。 */
   const [menuTargets, setMenuTargets] = useState<string[]>([])
@@ -242,7 +275,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }, [])
   useEffect(() => {
     let current = true
-    void hqTemplatesApi.folders.list().then((rows) => { if (current) setFolders(rows) }).catch(() => { if (current) setFolderLoadFailed(true) })
+    void hqTemplatesApi.folders.list().then((rows) => { if (current) { setFolders(rows); setFoldersReady(true) } }).catch(() => { if (current) setFolderLoadFailed(true) })
     return () => { current = false }
   }, [])
   useEffect(() => {
@@ -254,7 +287,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       creationScope.current = scope
       if (attempt) {
         createAttempt.current = attempt; setCreateUncertain(true); setDetail(null)
-        setName(attempt.input.name); setDescription(attempt.input.description ?? ''); setDefinition(attempt.input.definition); setStage('edit')
+        if (type === 'template' && 'template' in attempt.input.definition) setKind(templateKind(attempt.input.definition))
+        setName(attempt.input.name); setDescription(attempt.input.description ?? ''); setDefinition(attempt.input.definition); setFolderId(attempt.input.folderId ?? null); setStage('edit')
       }
       setTemplates(rows); setAccounts(stores); setReady(true)
     }).catch((e) => { if (current) setError(errorText(e)) }).finally(() => { if (current) setBusy(false) })
@@ -294,7 +328,43 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     return () => clearInterval(timer)
   }, [stage])
 
+  const freshFormBaseline = useRef(freshDefinition('form') as FormDefinition)
   const tagDraft = useRef<TemplateDefinition | null>(null)
+  /* H-18原文の再読込対策：タグの作る画面の通常入力の一時下書き。結果不明の送信依頼とは別キーで所属・種別を区別し、保存・取消・作り直しで消す。 */
+  const TAG_DRAFT_KIND = 'tag'
+  const persistTagCreateDraft = (next: TagDefinition) => {
+    const scope = creationScope.current
+    /* 編集・結果不明の復旧中は作る画面の下書きに混ぜない（衝突表示は tagDraft が今までどおり持つ）。 */
+    if (!scope || detail !== null || createUncertain) return
+    try {
+      const draftName = definitionName('tag', next)
+      if (!draftName.trim() && JSON.stringify(next) === JSON.stringify(freshDefinition('tag'))) {
+        clearEditorDraft(window.sessionStorage, scope, 'tag', TAG_DRAFT_KIND)
+        return
+      }
+      persistDraft(scope, 'tag', TAG_DRAFT_KIND, { kind: TAG_DRAFT_KIND, name: draftName, definition: next })
+    } catch { /* 下書きの保存失敗は本機能を止めない */ }
+  }
+  const clearScenarioCreateDraft = () => {
+    if (type === 'scenario' && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, 'scenario', 'scenario')
+  }
+  useEffect(() => {
+    const scope = creationScope.current
+    if (type !== 'scenario' || stage !== 'edit' || !canEdit || !scope || detail || createUncertain || createAttempt.current) return
+    try {
+      if (JSON.stringify({ name, description, definition, folderId }) === editBaseline.current) {
+        clearEditorDraft(window.sessionStorage, scope, 'scenario', 'scenario')
+        return
+      }
+      persistDraft(scope, 'scenario', 'scenario', { kind: 'scenario', name, description, definition, folderId })
+    } catch { /* 一時保存できなくても入力を続けられる。 */ }
+  }, [type, stage, canEdit, detail, createUncertain, name, description, definition, folderId])
+  const clearFormCreateDraft = () => {
+    if (type === 'form' && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, 'form', 'form')
+  }
+  const clearTagCreateDraft = () => {
+    if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, 'tag', TAG_DRAFT_KIND)
+  }
   const conflictScope = JSON.stringify([type, detail?.template.id, creationScope.current?.tenantId])
   const conflictScopeRef = useRef(conflictScope)
   conflictScopeRef.current = conflictScope
@@ -338,11 +408,14 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     if (batchKey) window.sessionStorage.removeItem(batchKey)
     setFolderBatch(null); setFolderDistribution(null)
     if (createUncertain) return
+    setDraftFailure(false)
     reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : [])
-    createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false)
+    createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false); setRestoreDraft(null)
+    /* 下書きは新規作成の分だけ消す。editKind は一覧の描画では未初期化のため kind を使う（新規では同値）。 */
+    if (!detail && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); if (!detail) { clearFormCreateDraft(); clearScenarioCreateDraft() }
     flushListUrlState()
     entryHandled.current = ''
-    window.history.replaceState(window.history.state, '', returnHref)
+    window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref))
     notifyListLocation()
   }
   toListRef.current = toList
@@ -377,6 +450,53 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   useEffect(() => {
     if (!ready || busy || lock.current || !location) return
     const params = new URLSearchParams(location.split('?')[1]?.split('#')[0] ?? '')
+    if (params.get('mode') === 'create') {
+      if (!canEdit || entryHandled.current === 'create') return
+      entryHandled.current = 'create'
+      /* 結果不明の復旧依頼がある再読込では startCreate で依頼・入力を消さない（PR#2042高）。 */
+      if (createAttempt.current) return
+      /* H-18原文：子画面の通常入力の一時下書きがあれば initial として戻す。別タブの下書きはタブごと戻す。 */
+      const creation = creationScope.current
+      let restored: { kind: TemplateKind; draft: EditorDraftContent } | null = null
+      if (creation) {
+        for (const draftKind of DRAFT_RESTORE_KINDS) {
+          const loaded = loadEditorDraft(window.sessionStorage, creation, type, draftKind, () => setDraftFailure(true))
+          if (loaded && loaded.kind === draftKind && (!restored || Number(loaded.lastEditedAt ?? 0) > Number(restored.draft.lastEditedAt ?? 0))) restored = { kind: draftKind, draft: loaded }
+        }
+      }
+      if (restored) {
+        setKind(restored.kind); setRestoreDraft(restored.draft); setDetail(null); setFolderId(typeof restored.draft.folderId === 'string' ? restored.draft.folderId : null); setName(''); setDescription(''); setStage('edit'); setError(''); setConflict(false)
+        return
+      }
+      if (type === 'scenario' && creation) {
+        const draft = readScenarioEditorDraft(loadEditorDraft(window.sessionStorage, creation, 'scenario', 'scenario', () => setDraftFailure(true)))
+        if (draft) {
+          editBaseline.current = JSON.stringify({ name: '', description: '', definition: freshDefinition('scenario'), folderId: null })
+          setDetail(null); setFolderId(draft.folderId); setName(draft.name); setDescription(draft.description); setDefinition(draft.definition); setStage('edit'); setError(''); setConflict(false)
+          return
+        }
+      }
+      if (type === 'form' && creation) {
+        const loaded = loadEditorDraft(window.sessionStorage, creation, 'form', 'form', () => setDraftFailure(true))
+        if (readFormEditorDraft(loaded)) {
+          setRestoreDraft(loaded); setDetail(null); setFolderId(typeof loaded?.folderId === 'string' ? loaded.folderId : null); setName(''); setDescription(''); setDefinition(freshFormBaseline.current); setStage('edit'); setError(''); setConflict(false)
+          return
+        }
+      }
+      /* H-18原文：タグの作る画面の一時下書きがあれば戻す（編集・結果不明の復旧は対象外）。 */
+      if (type === 'tag' && creation) {
+        const loaded = loadEditorDraft(window.sessionStorage, creation, 'tag', TAG_DRAFT_KIND, () => setDraftFailure(true))
+        const tagDef = loaded && loaded.kind === TAG_DRAFT_KIND && loaded.definition && typeof loaded.definition === 'object' && 'tag' in (loaded.definition as Record<string, unknown>) ? loaded.definition as TagDefinition : null
+        if (tagDef) {
+          const restoredFolder = typeof tagDef.tag.folderId === 'string' ? tagDef.tag.folderId : null
+          editBaseline.current = JSON.stringify({ name: '', description: '', definition: freshDefinition('tag'), folderId: null })
+          setDetail(null); setFolderId(restoredFolder); setName(String(loaded?.name ?? '')); setDescription(''); setDefinition(tagDef); setStage('edit'); setError(''); setConflict(false)
+          return
+        }
+      }
+      startCreate()
+      return
+    }
     const id = params.get('item')
     const next = params.get('mode') === 'edit' && canEdit ? 'edit' : 'detail'
     const key = `${id}:${next}`
@@ -387,13 +507,34 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, busy, location, canEdit])
   const startCreate = () => {
-    createAttempt.current = null; sessionUploads.current = []; setMenuTargets([])
+    createAttempt.current = null; sessionUploads.current = []; sharedDraft.current = null; sharedDraftBaseline.current = null; setMenuTargets([]); setRestoreDraft(null)
+    if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); clearFormCreateDraft(); clearScenarioCreateDraft()
     const fresh = freshDefinition(type), nextFolder = folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null
+    if (type === 'form') freshFormBaseline.current = fresh as FormDefinition
     editBaseline.current = JSON.stringify({ name: '', description: '', definition: fresh, folderId: nextFolder })
     setDetail(null); setFolderId(nextFolder); setName(''); setDescription(''); setDefinition(fresh); setStage('edit'); setError(''); setConflict(false)
+    showCreateUrl()
   }
   /* 店のひな形（テキスト・カード）の保存で落ちた欄。MessageForm が欄ごとに検査し、1つ目へ移る。 */
   const messageFields = useFormErrors()
+  const sharedDraft = useRef<TemplateHostContent | null>(null)
+  const sharedDraftBaseline = useRef<{ content: string; folderId: string | null } | null>(null)
+  const persistSharedDraft = (content: TemplateHostContent, nextFolder: string | null) => {
+    sharedDraft.current = content
+    const serialized = JSON.stringify(content)
+    sharedDraftBaseline.current ??= {
+      content: serialized,
+      folderId: restoreDraft?.emptyAtBaseline === true ? (typeof restoreDraft.baselineFolderId === 'string' ? restoreDraft.baselineFolderId : null) : nextFolder,
+    }
+    const baseline = sharedDraftBaseline.current
+    const scope = creationScope.current
+    if (!scope || detail !== null || createUncertain) return
+    const body = 'messageContent' in content ? content.messageContent : JSON.stringify(content)
+    const emptyAtBaseline = !content.name.trim() && (!restoreDraft || restoreDraft.emptyAtBaseline === true) && baseline.content === serialized
+    const untouched = emptyAtBaseline && baseline.folderId === nextFolder
+    if (!content.name.trim() && (untouched || (!body.trim() && !nextFolder && baseline.folderId === null))) clearEditorDraft(window.sessionStorage, scope, type, kind)
+    else persistDraft(scope, type, kind, { ...content, folderId: nextFolder, emptyAtBaseline, baselineFolderId: baseline.folderId })
+  }
   /** 今の画面の MessageForm で作っているか。店の作る画面（共通）のときは、その画面が欄を検査する。 */
   const sharedEditorRef = useRef(false)
   const sharedEditorNow = () => sharedEditorRef.current
@@ -402,7 +543,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     const preparedDefinition = definitionForName(type, sourceDefinition, sourceName.trim(), sourceDescription.trim())
     const validation = !sourceName.trim() ? 'ひな形の名前を入力してください。' : definitionError(type, preparedDefinition, creationScope.current?.tenantId)
     if (validation) throw new Error(validation)
-    const input = { type, name: sourceName.trim(), description: sourceDescription.trim(), folderId: options.folderId !== undefined ? options.folderId : folderId, definition: preparedDefinition } as TemplateInput
+    const createFolderId = !detail && foldersReady && !folderLoadFailed && !folders.some(folder => folder.id === folderId) ? null : folderId
+    const input = { type, name: sourceName.trim(), description: sourceDescription.trim(), folderId: options.folderId !== undefined ? options.folderId : createFolderId, definition: preparedDefinition } as TemplateInput
     let saved: TemplateDetail
     let continueToAccounts = distribute
     if (detail) {
@@ -425,7 +567,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       }
       if (createSettlement.current?.kind === 'rejected') {
         clearReceipt()
-        createSettlement.current = null; createAttempt.current = null; setCreateUncertain(false)
+        createSettlement.current = null; createAttempt.current = null; setCreateUncertain(false); setRestoreDraft(null)
         setMessage('前回の保存は受け付けられていません。内容を確認して保存し直してください。')
         return
       }
@@ -450,10 +592,15 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         createSettlement.current = { kind: 'saved', detail: saved }
       }
       clearReceipt()
+      clearEditorDraft(window.sessionStorage, scope, type, kind)
+      clearTagCreateDraft()
+      clearScenarioCreateDraft()
+      if (type === 'form') { clearFormCreateDraft(); setRestoreDraft(null) }
       createSettlement.current = null
     }
     if (!alive.current) return
     const isNew = !detail
+    setDraftFailure(false)
     loadDetailIntoForm(saved)
     reconcileSessionUploads(uploadedKeysIn(saved.definition))
     createAttempt.current = null
@@ -469,8 +616,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       setStage('saved')
     }
     // R561: 「保存して続けて作る」は新規作成のときだけ、空の新規入力へ戻る。
-    else if (andAnother && isNew) { setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
-    else if (isNew) setStage('list')
+    else if (andAnother && isNew) { setRestoreDraft(null); if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey((current) => current + 1); setStage('edit') }
+    else if (isNew) { setRestoreDraft(null); if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); flushListUrlState(); entryHandled.current = ''; window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref)); notifyListLocation(); setStage('list') }
     else {
       setStage('edit')
       flushListUrlState()
@@ -699,8 +846,10 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       ] : null} />
   </> : null
 
+  const draftFailureNotice = draftFailure ? <Notice tone="danger" message="一時保存できなかった入力があります。この画面の内容を確認し、再読み込み前に控えるか下書きを保存してください。" /> : null
   const notices = <>
     {!canEdit && stage === 'list' ? <div className={styles.readonlyBand}><ReadOnlyNotice role="note">閲覧のみで見ています。変える操作は統括の管理者に頼んでください。</ReadOnlyNotice></div> : null}
+    {draftFailureNotice}
     {conflictNotice}
     {error && !conflictNotice && stage !== 'saved' ? <Notice tone="danger" message={error} /> : null}
     {message ? <Notice tone="success" message={message} onClose={() => setMessage('')} /> : null}
@@ -874,7 +1023,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       primaryLabel: '保存する',
       folders: folders.map((folder) => ({ value: folder.id, label: folder.name, color: folder.color })),
       folder: folderId ?? '',
-      onFolderChange: (value) => setFolderId(value || null),
+      onFolderChange: (value) => {
+        const nextFolder = value || null
+        setFolderId(nextFolder)
+        if (sharedDraft.current) persistSharedDraft(sharedDraft.current, nextFolder)
+      },
       createFolder: canEdit ? createFolder : undefined,
       busy,
       notice: notices,
@@ -886,9 +1039,14 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         return saved
       },
       onCancel: toList,
-      initialMessage: detail && editKind === 'message' ? { name, messageType: current.template.messageType, messageContent: current.template.messageContent } : undefined,
-      /* 編集：カルーセル・質問・クーポン・リサーチ・リッチメッセージも店の作る画面で直す。 */
-      initialContent: editContent,
+      onDraftChange: (content) => persistSharedDraft(content, folderId),
+      initialMessage: detail && editKind === 'message'
+        ? { name, messageType: current.template.messageType, messageContent: current.template.messageContent }
+        : restoreDraft?.kind === 'message'
+          ? { name: String(restoreDraft.name ?? ''), messageType: String(restoreDraft.messageType ?? 'text'), messageContent: String(restoreDraft.messageContent ?? '') }
+          : undefined,
+      /* 編集：カルーセル・質問・クーポン・リサーチ・リッチメッセージも店の作る画面で直す。新規の一時下書きは保存と同じ形で戻す。 */
+      initialContent: editContent ?? (restoreDraft && restoreDraft.kind !== 'message' ? restoreDraft as unknown as TemplateHostContent : undefined),
       readOnly: !canEdit,
       uploadCarouselImage: async (file) => {
         setUploadBusy(true)
@@ -1019,7 +1177,16 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     const listRow = detail ? templates.find((item) => item.id === detail.template.id) as HqTemplateListItem | undefined : undefined
     const host: FormEditHost = {
       backHref: '/hq/form-submissions',
-      initial: { name: value.name, description: value.description, layout: value.layout, onSubmitTagId: value.onSubmitTagId },
+      initial: (!detail && readFormEditorDraft(restoreDraft)) || { name: value.name, description: value.description, layout: value.layout, onSubmitTagId: value.onSubmitTagId },
+      baseline: !detail ? hqFormDefinitionToEditor(freshFormBaseline.current) : undefined,
+      onDraftChange: (content) => {
+        const scope = creationScope.current
+        if (!scope || detail || createUncertain || !canEdit) return
+        // 初回描画の空入力は保存しない。名前が空でも設問・見た目の変更は残す。
+        const baseline = hqFormDefinitionToEditor(freshFormBaseline.current)
+        if (JSON.stringify(content, (key, value) => key === 'id' ? undefined : value) === JSON.stringify({ name: baseline.name, description: baseline.description, layout: baseline.layout, onSubmitTagId: baseline.onSubmitTagId }, (key, value) => key === 'id' ? undefined : value)) { clearFormCreateDraft(); return }
+        persistDraft(scope, 'form', 'form', { kind: 'form', ...content, folderId })
+      },
       // 配った先で直せる参照先だけ（統括のタグのひな形）。友だち情報・テンプレート・リマインダは店ごとの ID なので選ばせない。
       refs: { tags: referenceOptions('tag'), friendFields: [], scenarios: [], reminders: [], templates: [] },
       accountName: '公式アカウント',
@@ -1041,7 +1208,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         }
         setDefinition(next); setName(next.form.name); setDescription(next.form.description ?? '')
         let saved = false
-        await save(distribute, next, next.form.name, next.form.description ?? '', false, { onSaved: () => { saved = true } })
+        await save(distribute, next, next.form.name, next.form.description ?? '', false, { folderId: !detail && foldersReady && !folderLoadFailed && !folders.some(folder => folder.id === folderId) ? null : folderId, onSaved: () => { saved = true } })
         return saved
       },
       onCancel: toList,
@@ -1053,11 +1220,11 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   /* ───── 作る・編集（：前回の保存の再確認・カード型・カルーセル・質問・リッチメッセージ） ───── */
   if (stage === 'edit' && type === 'tag' && 'tag' in definition && !createUncertain) {
     /* 所属フォルダは統括のフォルダ（左の列）から選ぶ。選んだフォルダに、一覧でもこのひな形を置く。 */
-    const folderOf = (next: TagDefinition) => folders.some((folder) => folder.id === next.tag.folderId) ? next.tag.folderId ?? null : next.tag.folderId ? folderId : null
+    const folderOf = (next: TagDefinition) => folders.some((folder) => folder.id === next.tag.folderId) ? next.tag.folderId ?? null : !detail && foldersReady && !folderLoadFailed ? null : next.tag.folderId ? folderId : null
     return <SaveErrorScope errors={saveErrors}><HqTagEditorV8 key={formKey} definition={definition} folders={folders} onCreateFolder={canEdit ? createFolder : undefined} editing={Boolean(detail)} saving={busy} readOnly={!canEdit}
       onSaveDraft={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(false, next, nextName, description, false, { folderId: nextFolder }) }}
-      conflictNotice={conflictNotice} onDraftChange={(next) => { tagDraft.current = next }} conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}
-      error={error} notice={message || undefined} onCancel={toList} onSave={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(true, next, nextName, description, false, { folderId: nextFolder }) }} /></SaveErrorScope>
+      conflictNotice={conflictNotice} onDraftChange={(next) => { tagDraft.current = next; persistTagCreateDraft(next) }} conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}
+      error={error} draftNotice={draftFailureNotice} notice={message || undefined} onCancel={toList} onSave={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(true, next, nextName, description, false, { folderId: nextFolder }) }} /></SaveErrorScope>
   }
 
   if (stage === 'edit') {

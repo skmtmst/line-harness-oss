@@ -164,6 +164,7 @@ export function buildRichPayload(input: {
 function richInitial(host: TemplateEditHost | undefined) {
   const content = host?.initialContent
   if (!content || content.kind !== 'rich_message') return null
+  if (content.editorState) return { name: content.name, shape: content.editorState.shapeValue, ...content.editorState }
   const payload = content.payload
   const taps = Array.isArray(payload.tapAreas) ? payload.tapAreas as Array<Record<string, unknown>> : []
   const shape = RICH_SHAPES.find((candidate) => candidate.value === payload.shape)
@@ -210,7 +211,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const [folder, setFolder] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
   const [imageUrl, setImageUrl] = useState(hostInitial?.imageUrl ?? '')
-  const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
+  const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(hostInitial && 'pickedMedia' in hostInitial ? hostInitial.pickedMedia : null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [shapeValue, setShapeValue] = useState(hostInitial ? hostInitial.shape : visual ? '2v' : '3')
   const [pendingShape, setPendingShape] = useState<string | null>(null)
@@ -242,6 +243,13 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     // 統括では上のバーのアカウントに結びつかない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
+  // 画像や動きの準備前も、保存時の整形を通さず途中入力を記録する。
+  const richDraftSnapshot = JSON.stringify([name, imageUrl, pickedMedia, shapeValue, areas, uploaded])
+  useEffect(() => {
+    host?.onDraftChange?.({ kind: 'rich_message', name, payload: { ...uploaded?.payload }, media: uploaded?.media ?? [],
+      editorState: { imageUrl, pickedMedia, shapeValue, areas, uploaded } })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [richDraftSnapshot])
 
   /* フォルダはアカウントの置き場一覧から選ぶ（保存値はフォルダ名のまま。今と同じ）。 */
   useEffect(() => {

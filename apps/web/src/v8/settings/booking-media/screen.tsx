@@ -183,6 +183,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
   const [loadError, setLoadError] = useState<unknown>(null)
   const [link, setLink] = useState<{ url: string; html: string; available: boolean } | null>(null)
   const [linkError, setLinkError] = useState('')
+  const [linkSetupRequired, setLinkSetupRequired] = useState(false)
   const [linkAsked, setLinkAsked] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -279,10 +280,11 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
     let current = true
     if (!selectedAccountId || !storeId || role === null || !canManageRole(role)) return
     void restaurantTestApi.reservationLink(selectedAccountId, storeId)
-      .then((res) => { if (current) { setLink(res.data); setLinkError('') } })
+      .then((res) => { if (current) { setLink(res.data); setLinkError(''); setLinkSetupRequired(false) } })
       .catch((caught) => {
         if (!current) return
         setLink(null)
+        setLinkSetupRequired(caught instanceof ApiError && caught.status === 503)
         setLinkError(caught instanceof ApiError && caught.status === 503 ? 'お客さま向けの予約ページの設定がまだ無いため、URL を出せません。' : '予約ページの URL を読み込めませんでした。')
       })
     return () => { current = false }
@@ -538,13 +540,18 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
               help="LINE で予約できるページの URL と、ホームページなどに貼るボタンのコードです。"
               helpLabel="LINE 予約を他のサイトに貼るの説明"
             />
+            {canManage && linkError ? (
+              <Notice tone="danger" message={linkError} action={linkSetupRequired ? (
+                <TextLink href={selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(selectedAccountId)}` : '/accounts'}>LINEアカウントの設定を見る</TextLink>
+              ) : undefined} actionLayout="stack-on-narrow" />
+            ) : null}
             <div className={styles.cards}>
               <Card appearance="outlined" layout="vertical" padding="default" gap="tight" className={styles.card}>
                 <p className={styles.cardTitle}>予約ページの URL</p>
                 <p className={styles.cardText}>Instagram のプロフィール・Google ビジネスの予約ボタン・ホームページに貼れます</p>
                 {canManage ? (
                   <div className={styles.urlRow}>
-                    <span className={styles.urlBox} title={link?.url}>{link?.url ?? (linkError || '読み込んでいます…')}</span>
+                    <span className={styles.urlBox} title={link?.url}>{link?.url ?? (linkError ? <EmptyCell /> : '読み込んでいます…')}</span>
                     <CopyTextButton value={link?.url ?? ""} aria-label="予約ページのURLをコピー" disabled={!link} />
                   </div>
                 ) : (
@@ -562,7 +569,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
                 </div>
                 {canManage ? (
                   <>
-                    <code className={styles.code} title={link?.html}>{link?.html ?? (linkError || '読み込んでいます…')}</code>
+                    <code className={styles.code} title={link?.html}>{link?.html ?? (linkError ? <EmptyCell /> : '読み込んでいます…')}</code>
                     <span className={styles.copyRow}>
                       <CopyTextButton value={link?.html ?? ""} aria-label="コードをコピー" disabled={!link} />
                     </span>

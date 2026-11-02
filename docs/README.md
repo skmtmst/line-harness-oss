@@ -12,6 +12,7 @@
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
+
 ## 使う人の手引き
 
 - [LINE Harness](../README.en.md)
@@ -700,6 +701,7 @@
 - [pending-kenta-one-f2x-j7-1015.md](release-log/unreleased/pending-kenta-one-f2x-j7-1015.md)
 - [pending-kenta-testfix-1015.md](release-log/unreleased/pending-kenta-testfix-1015.md)
 - [pending-kenta-train40-evening.md](release-log/unreleased/pending-kenta-train40-evening.md)
+- [H-18 作成途中の復元](release-log/unreleased/2049-kenta-form-draft-restore.md)
 - [pending-kenta-fix1-bugs-1025.md](release-log/unreleased/pending-kenta-fix1-bugs-1025.md)
 - [1781-kenta-cleanup-f01.md](release-log/unreleased/1781-kenta-cleanup-f01.md)
 - [1775-masato-line-webhook-v07.md](release-log/unreleased/1775-masato-line-webhook-v07.md)
@@ -1124,3 +1126,5 @@
 - [予約操作・読込中と配信前の案内](release-log/unreleased/2032-kenta-train-1031p.md) — 反映履歴、確認 2026-11-01。
 
 - [振替券・空き待ちと入力表示の改善](release-log/unreleased/2034-kenta-train-1031r.md) — 反映履歴、確認 2026-11-01。
+
+- [予約案内・クーポンと入力理由の改善](release-log/unreleased/2035-kenta-train-1031s.md) — 反映履歴、確認 2026-11-01。

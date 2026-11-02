@@ -109,6 +109,13 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     setAutoCreated(null)
   }
   const { name, folderId, messageType, messageContent } = editor.draft
+  /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。 */
+  const draftSnapshot = snapshot(editor.draft)
+  useEffect(() => {
+    if (!host?.onDraftChange) return
+    host.onDraftChange({ kind: 'message', name: editor.draft.name, messageType: editor.draft.messageType, messageContent: editor.draft.messageContent })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftSnapshot])
   /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る。 */
   const fields = useFormErrors()
   fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'), { required: true })
