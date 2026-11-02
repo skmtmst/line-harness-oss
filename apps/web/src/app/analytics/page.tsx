@@ -3,13 +3,15 @@
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import AnalyticsV8, { type AnalyticsSlotsV8 } from '@/v8/analytics/analytics'
 import FunnelFormV8 from '@/v8/analytics/funnel-form'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { Bookmark } from 'lucide-react'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
 import TextLink from '@/components/shared/text-link'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 
 export default function AnalyticsPage() {
@@ -63,6 +65,19 @@ function SaveAnalysisAction({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const dirty = !saved && name !== defaultName
+  const guard = useUnsavedGuard({ dirty: dirty || saving, busy: saving, onDiscard: () => { setName(defaultName); setOpen(false) } })
+  const current = useRef({ saving, accountId, sourceResultId, target: guard.leaveTarget })
+  current.current = { saving, accountId, sourceResultId, target: guard.leaveTarget }
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  useEffect(() => { guard.cancelLeave() }, [accountId, sourceResultId, defaultName, guard.cancelLeave])
+  const discardAndLeave = () => {
+    const target = guard.leaveTarget
+    if (!alive.current || current.current.saving || current.current.accountId !== accountId || current.current.sourceResultId !== sourceResultId || !target || current.current.target !== target) return
+    current.current.target = null
+    guard.disarm(); guard.confirmLeave()
+  }
 
   useEffect(() => {
     setOpen(false)
@@ -132,6 +147,7 @@ function SaveAnalysisAction({
       )}
       {error && <p className="text-danger text-xs">{error}</p>}
       {!compact && <p className="text-ink-faint text-xs">条件の定義と、いま表示している結果を別々に固定して残します。</p>}
+      <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="保存する分析名" onConfirm={discardAndLeave} onCancel={guard.cancelLeave} busy={saving} />
     </div>
   )
 }

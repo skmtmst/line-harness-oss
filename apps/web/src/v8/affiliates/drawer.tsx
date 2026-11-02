@@ -7,7 +7,10 @@ import { Tabs } from '@/components/shared/tabs'
 import { useUrlTab } from '@/lib/use-url-tab'
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard, type UnsavedLeaveTarget } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { Check, Copy, PauseCircle, Pencil } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -105,6 +108,16 @@ export default function AffiliateDrawer({
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null)
   const settlementFormId = useId()
   const [savingSettlement, setSavingSettlement] = useState(false)
+  const [settlementDirty, setSettlementDirty] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const pendingLeave = useRef<UnsavedLeaveTarget | null>(null)
+  const localActions = useRef(new WeakSet<() => void>())
+  const guard = useUnsavedGuard({ dirty: settlementDirty || savingSettlement, busy: savingSettlement, onDiscard: () => {
+    const target = pendingLeave.current
+    if (target?.kind !== 'action' || !localActions.current.has(target.run)) onClose()
+  } })
+  pendingLeave.current = guard.leaveTarget
+  const protectLocal = (action: () => void) => { localActions.current.add(action); guard.guarded(action) }
   const [editing, setEditing] = useState(startInEdit)
   const [paymentOpen, setPaymentOpen] = useState(false)
   const journeyCursor = useRef<{ beforeAt: string; beforeId: string } | null>(null)
@@ -442,7 +455,9 @@ export default function AffiliateDrawer({
       </section>
       {editing && !readonly ? (
         <SettlementEditor
+          key={affiliate.id}
           formId={settlementFormId}
+          onDirtyChange={setSettlementDirty}
           onBusyChange={setSavingSettlement}
           affiliate={affiliate}
           onSaved={() => {
@@ -464,15 +479,15 @@ export default function AffiliateDrawer({
     <SaveErrorScope errors={saveErrors}><>
       <Drawer open title={affiliate.name} description={subLine} width="editor" heightMode="viewport" layout="inset" initialFocus="panel" busy={paymentOpen || savingSettlement} onClose={onClose}
         status={<StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill>}
-        toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => setTab(item.key) }))} />}
+        toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => { if (item.key !== tab) protectLocal(() => { if (settlementDirty) setEditing(false); setTab(item.key) }) } }))} />}
         actions={{ primary: (editing && tab === 'payment' && !readonly ? <Button variant="primary" type="submit" form={settlementFormId} busy={savingSettlement} busyLabel="保存しています">取り決めを保存する</Button> : <Button type="button" variant="primary" disabled={!accountId || settlementState !== 'ready' || !settlement} title={settlement ? undefined : '今回締められる報酬がありません'} onClick={() => setPaymentOpen(true)}>
                 <Check size={16} aria-hidden="true"/>
                 支払いを確定する
               </Button>),
-    secondary: (<Button variant="secondary" type="button" disabled={savingSettlement} onClick={() => { setTab('payment'); setEditing((current) => !current); }}>
+    secondary: (<Button variant="secondary" type="button" disabled={savingSettlement} onClick={() => protectLocal(() => { setTab('payment'); setEditing((current) => !current) })}>
                 <Pencil size={16} aria-hidden/>{editing ? '編集をやめる' : '編集する'}
               </Button>),
-    menuItems: [...([{ allowed: !readonly, id: 'stop-referral', label: '紹介を止める', tone: 'danger' as const, disabled: !affiliate.isActive, onSelect: () => { onClose(); onStopRequest(affiliate.id, affiliate.name); } }])], primaryAllowed: !readonly, secondaryAllowed: !readonly }}
+    menuItems: [...([{ allowed: !readonly, id: 'stop-referral', label: '紹介を止める', tone: 'danger' as const, disabled: !affiliate.isActive, onSelect: () => protectLocal(() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }) }])], primaryAllowed: !readonly, secondaryAllowed: !readonly }}
       >
 <DetailContent>
 <DetailField label="紹介者の名前"><DetailInlineEdit allowed={!(readonly)} value={affiliate.name} label="紹介者の名前を直す" maxLength={100} onSave={async (next) => {
@@ -483,10 +498,12 @@ export default function AffiliateDrawer({
         }} /></DetailField>
         {loading ? (
             <ListState kind="loading" title="詳細を読み込んでいます" />
-          ) : tab === 'summary' ? summary : tab === 'breakdown' ? breakdown : tab === 'friends' ? friends : payment}
+          ) : <>{tab === 'summary' ? summary : tab === 'breakdown' ? breakdown : tab === 'friends' ? friends : null}
+            <div hidden={tab !== 'payment'}>{payment}</div></>}
 
 </DetailContent>
 </Drawer>
+      <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="支払いの取り決め" busy={savingSettlement} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
       {accountId ? (
         <AffiliatePaymentConfirmDialog
           target={paymentOpen ? { id: affiliate.id, name: affiliate.name } : null}
@@ -504,11 +521,13 @@ export default function AffiliateDrawer({
 /** 報酬の約束（連絡先・保留日数・支払いサイクル・知らせる）。写し元：tabs.tsx の SettlementEditor。 */
 function SettlementEditor({
   formId,
+  onDirtyChange,
   onBusyChange,
   affiliate,
   onSaved,
 }: {
   formId: string
+  onDirtyChange: (dirty: boolean) => void
   onBusyChange: (busy: boolean) => void
   affiliate: { id: string; rewardMode?: 'none' | 'fixed' | 'rate'; commissionRate: number; email?: string | null; holdDays?: number | null; payoutCycle?: string | null; notifyOnConversion?: boolean }
   onSaved: () => void
@@ -521,6 +540,10 @@ function SettlementEditor({
   const [holdDays, setHoldDays] = useState(affiliate.holdDays == null ? '' : String(affiliate.holdDays))
   const [payoutCycle, setPayoutCycle] = useState(affiliate.payoutCycle ?? '')
   const [notify, setNotify] = useState(affiliate.notifyOnConversion ?? false)
+  const initial = useRef(JSON.stringify({ rewardMode, rate, email, holdDays, payoutCycle, notify }))
+  const dirty = initial.current !== JSON.stringify({ rewardMode, rate, email, holdDays, payoutCycle, notify })
+  useEffect(() => { onDirtyChange(dirty) }, [dirty, onDirtyChange])
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<'email' | 'hold', string>>>({})
@@ -577,7 +600,7 @@ function SettlementEditor({
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><DetailSection title="支払いの取り決め"><form id={formId} noValidate onSubmit={event => { event.preventDefault(); void save() }}>
+    <SaveErrorScope errors={saveErrors}><DetailSection title="支払いの取り決め"><form id={formId} inert={saving} noValidate onSubmit={event => { event.preventDefault(); void save() }}>
       <div className={styles.fields}>
         <SaveErrorField names={["rewardMode","reward_mode"]}><Select aria-label="報酬の方式" value={rewardMode} onChange={(value) => setRewardMode(value as typeof rewardMode)} options={[
           { value: 'none', label: '報酬なし（計測のみ）' },

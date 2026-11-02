@@ -8,13 +8,16 @@ const FIELD_REQUIREMENTS = {
 
 
 import { jstDateOffset } from '@/lib/jst-datetime'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { Field } from '@/components/shared/form-controls'
@@ -138,6 +141,22 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
   const [expectedVersion, setExpectedVersion] = useState(edit?.expectedVersionNumber ?? 0)
   const [versionContext, setVersionContext] = useState({ segment: edit?.segment, comparisonGroups: edit?.comparisonGroups })
   const [saving, setSaving] = useState(false)
+  const saved = useRef(JSON.stringify({ name, windowDays, steps }))
+  const snapshot = JSON.stringify({ name, windowDays, steps })
+  const dirty = snapshot !== saved.current
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: dirty || saving, busy: saving, onDiscard: onCancel })
+  const current = useRef({ saving, accountId, target: guard.leaveTarget })
+  current.current = { saving, accountId, target: guard.leaveTarget }
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  useEffect(() => { guard.cancelLeave() }, [accountId, guard.cancelLeave])
+  const discardAndLeave = () => {
+    const target = guard.leaveTarget
+    if (!alive.current || current.current.saving || current.current.accountId !== accountId || !target || current.current.target !== target) return
+    current.current.target = null
+    guard.disarm(); guard.confirmLeave()
+  }
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const formRef = useRef<HTMLDivElement>(null)
@@ -240,13 +259,16 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
     reload: async () => {
       const latest = await fetchLatest()
       if (!latest?.currentVersion) throw new Error('最新の内容を読み込めませんでした')
-      setName(latest.name)
-      setWindowDays(String(latest.currentVersion.windowDays))
-      setSteps(latest.currentVersion.steps.map(step => ({
+      const latestWindow = String(latest.currentVersion.windowDays)
+      const latestSteps = latest.currentVersion.steps.map(step => ({
         label: step.label, kind: step.kind,
         value: step.match[funnelStepPrimaryKey(step.kind) ?? ''] ?? '',
         matchBase: step.match, other: false,
-      })))
+      }))
+      saved.current = JSON.stringify({ name: latest.name, windowDays: latestWindow, steps: latestSteps })
+      setName(latest.name)
+      setWindowDays(latestWindow)
+      setSteps(latestSteps)
       setExpectedVersion(latest.currentVersion.versionNumber)
       setVersionContext({ segment: latest.currentVersion.segment, comparisonGroups: latest.currentVersion.comparisonGroups })
       setFieldErrors({}); setError(''); conflict.clear()
@@ -292,12 +314,14 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
           return
         }
         setExpectedVersion(res.data.versionNumber)
+        saved.current = snapshot
         conflict.clear()
         notifySaved()
         onCreated(edit.funnelId, res.data.usageWarnings)
       } else {
         const res = await api.analytics.v6Funnels.create(accountId, { name: name.trim(), windowDays: Number(windowDays), steps: payloadSteps })
         if (!res.success) return setError(res.error)
+        saved.current = snapshot
         notifySaved()
         onCreated(res.data.funnelId, res.data.usageWarnings)
       }
@@ -320,6 +344,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
       designTop={120}
       designNode={edit ? undefined : 'VDPz5'}
       busy={saving}
+      dirty={dirty}
       error={error || undefined}
       onCancel={onCancel}
       footer={(<DialogActions>
@@ -329,7 +354,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
           </Button>
         </DialogActions>)}
     >
-      <div className={styles.form} ref={formRef}>
+      <div className={styles.form} ref={formRef} inert={saving}>
         {conflict.conflict ? <SaveConflictBand title="ほかの人が先にこのファネルを保存しました" compareBusy={conflict.compareBusy} onCompare={conflict.compare} onReload={conflict.reloadLatest} /> : null}
         <SaveConflictCompareDialog open={conflict.compareOpen} onCancel={conflict.closeCompare} onReload={conflict.reloadLatest} error={conflict.compareError} lines={conflict.latest ? [
           { text: `あなたの入力：${name}／${windowDays}日／${JSON.stringify(steps)}` },
@@ -420,6 +445,6 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
           <span className={styles.addNote}>段は2つ以上10個まで。上から順に、次へ進んだ人を数えます。</span>
         </div>
       </div>
-    </Dialog></SaveErrorScope>
+    </Dialog><OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="ファネルの変更" onConfirm={discardAndLeave} onCancel={guard.cancelLeave} busy={saving} /></OverlayDepthContext.Provider></SaveErrorScope>
   )
 }
