@@ -762,6 +762,21 @@ it('リッチメッセージの通常入力は再読込後も一時下書きか�
   render(<HqTemplatesV8 type="template" />)
   expect(await screen.findByDisplayValue('未保存リッチ')).toBeTruthy()
 })
+it('リッチビデオの通常入力は再読込後も一時下書きから復元する（H-18原文）', async () => {
+  const { unmount } = render(<HqTemplatesV8 type="template" />)
+  fireEvent.click(await screen.findByRole('tab', { name: /リッチビデオ/ }))
+  fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+  expect(await screen.findByRole('heading', { name: 'リッチビデオを作る' })).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '未保存ビデオ' } })
+  fireEvent.change(screen.getByLabelText('通知に出る文'), { target: { value: '未保存の通知文' } })
+  await waitFor(() => expect(window.sessionStorage.getItem('lh_hq_create_draft_v1:tenant-a:owner:template:rich_video') ?? '').toContain('未保存の通知文'), { timeout: 5000 })
+  unmount()
+  cleanup()
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  expect(await screen.findByDisplayValue('未保存ビデオ')).toBeTruthy()
+  expect((screen.getByLabelText('通知に出る文') as HTMLInputElement).value).toContain('未保存の通知文')
+})
 it('未配布ありの1件を消すと数の帯を取り直す（B25）', async () => {
   calls.listStats
     .mockResolvedValueOnce({ thisMonthSentCount: 0, outdatedTemplateCount: 1 })
