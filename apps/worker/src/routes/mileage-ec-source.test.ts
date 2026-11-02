@@ -4,6 +4,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { ensureNenRankDefaults, getMileageAdminHistory } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { get__api_mileage_friends_21 } from './scoring-reward-catalog-handlers.js';
+import { get__api_friends_id_mileage_1 } from './friends-summaries-handlers.js';
 
 let fixture: SqliteD1;
 const now = '2026-11-03T00:00:00';
@@ -11,6 +12,7 @@ function app(db = fixture.db) {
   const a = new Hono<any>();
   a.use('*', async (c, next) => { c.env = { DB: db }; c.set('staff', { id: 'owner', role: 'owner', tenantId: DEFAULT_TENANT_ID, accountScope: 'all' }); await next(); });
   a.get('/api/mileage/friends', get__api_mileage_friends_21);
+  a.get('/api/friends/:id/mileage', get__api_friends_id_mileage_1);
   return a;
 }
 const request = (account: string, extra = '') => app().request(`/api/mileage/friends?accountId=${account}${extra}`);
@@ -35,6 +37,24 @@ beforeEach(async () => {
 afterEach(() => fixture.raw.close());
 
 describe('ECの正本を使うマイル残高', () => {
+  it('友だち詳細はECの29を返し、未取得は不明として返す', async () => {
+    let data = (await (await app().request('/api/friends/f-nen/mileage?accountId=nen')).json() as any).data;
+    expect(data.summary).toMatchObject({ available: 29, balanceSource: 'ec', ecRank: 'ゴールド' });
+    fixture.raw.prepare("DELETE FROM nen_ec_member_snapshots WHERE friend_id='f-nen'").run();
+    data = (await (await app().request('/api/friends/f-nen/mileage?accountId=nen')).json() as any).data;
+    expect(data.summary).toMatchObject({ available: null, balanceSource: 'ec' });
+  });
+  it('EC機能が無効なら会員データが残っていてもmusuboを使う', async () => {
+    fixture.raw.prepare("INSERT INTO account_settings (id,line_account_id,key,value) VALUES ('ec-off','nen','feature.ec_commerce','false')").run();
+    const data = (await (await request('nen')).json() as any).data;
+    expect(data.balanceSource).toBe('musubo');
+    expect(data.items[0].available).toBe(7);
+  });
+  it.each([['shopify', 'connected'], ['ec_cube', 'paused']])('会員データがなく %s / %s の接続だけならmusuboを使う', async (provider, status) => {
+    fixture.raw.prepare("DELETE FROM nen_ec_member_snapshots WHERE friend_id='f-nen'").run();
+    fixture.raw.prepare("UPDATE ec_connectors SET provider=?, status=? WHERE line_account_id='nen'").run(provider, status);
+    expect((await (await request('nen')).json() as any).data.balanceSource).toBe('musubo');
+  });
   it('NEN はEC残高と設定名を出し、別のEC店と接続もデータもない店は従来どおり', async () => {
     const nen = await (await request('nen')).json() as any;
     expect(nen.data.balanceSource).toBe('ec');

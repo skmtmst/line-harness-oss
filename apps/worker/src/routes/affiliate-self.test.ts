@@ -43,6 +43,8 @@ vi.mock('@line-crm/db', () => dbMocks);
 
 const deliveryMocks = { deliverMileageReward: vi.fn() };
 vi.mock('../features/mileage/mileage-reward-delivery.js', () => deliveryMocks);
+const mileageSourceMocks = vi.hoisted(() => ({ resolveMileageSource: vi.fn().mockResolvedValue('musubo'), getEcMileageBalance: vi.fn() }));
+vi.mock('../services/mileage-ec-source.js', () => mileageSourceMocks);
 
 // 差替済みのヘルパを入口へ接続するため、モック登録後に読み込む。
 const worker = (await import('../index.js')).default;
@@ -300,6 +302,23 @@ describe('POST /api/liff/affiliate/register — idempotency', () => {
 });
 
 describe('GET /api/liff/mileage/me — generic wallet', () => {
+  it('ECの店では顧客にもECの残高を返す', async () => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    mileageSourceMocks.getEcMileageBalance.mockResolvedValueOnce(29);
+    const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice');
+    expect((await res.json() as any).mileage).toMatchObject({ available: 29, balanceSource: 'ec' });
+  });
+  it('EC残高未取得はmusubo残高や0にしない', async () => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    mileageSourceMocks.getEcMileageBalance.mockResolvedValueOnce(null);
+    const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice');
+    expect((await res.json() as any).mileage).toMatchObject({ available: null, balanceSource: 'ec' });
+  });
+  it('取得元を判定できないときはmusubo残高を返さない', async () => {
+    mileageSourceMocks.resolveMileageSource.mockRejectedValueOnce(new Error('unreadable'));
+    const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice');
+    expect(res.status).toBeGreaterThanOrEqual(500);
+  });
   it('returns mileage without requiring affiliate registration', async () => {
     const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice&limit=10');
     expect(res.status).toBe(200);

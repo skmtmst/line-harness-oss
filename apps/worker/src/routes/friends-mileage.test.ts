@@ -27,6 +27,7 @@ vi.mock('../services/account-access.js', () => accountAccessMocks);
 
 vi.mock('../services/event-bus.js', () => ({ fireEvent: vi.fn() }));
 vi.mock('../services/step-delivery.js', () => ({ buildMessage: vi.fn() }));
+vi.mock('../services/mileage-ec-source.js', () => ({ resolveMileageSource: vi.fn().mockResolvedValue('musubo'), getEcMileageBalance: vi.fn() }));
 
 const { authMiddleware } = await import('../middleware/auth.js');
 const { friends } = await import('./friends.js');

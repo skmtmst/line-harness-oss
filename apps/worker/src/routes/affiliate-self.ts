@@ -2,6 +2,7 @@ import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.j
 import { getCookie, setCookie } from 'hono/cookie';
 import { logger } from '@line-crm/shared/server';
 import { resolveFriendFromLineToken, unresolvedResponse } from '../services/affiliate-self-auth.js';
+import { resolveMileageSource, getEcMileageBalance } from '../services/mileage-ec-source.js';
 import { customerDownloadEntry } from '../services/download-entrypoints.js';
 import { signDownload, validDownload } from '../services/download-capability.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -102,6 +103,12 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
       getMileageSelfInsights(c.env.DB, resolved.friend.id),
       getMileageEarningOpportunitiesForFriend(c.env.DB, resolved.friend.id),
     ]);
+    const accountId = resolved.friend.line_account_id;
+    const source = accountId ? await resolveMileageSource(c.env.DB, accountId) : 'musubo';
+    if (source === 'ec' && (!resolved.lineAccountId || resolved.lineAccountId !== accountId)) return fail(c, 404, 'FRIEND_NOT_FOUND');
+    const visibleMileage = source === 'ec' && accountId
+      ? { ...mileage, available: await getEcMileageBalance(c.env.DB, accountId, resolved.friend.id), balanceSource: 'ec' as const }
+      : { ...mileage, balanceSource: 'musubo' as const };
     const browserNonce = getCookie(c, '__Host-lh_cross_account') || crypto.randomUUID();
     setCookie(c, '__Host-lh_cross_account', browserNonce, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 15 * 60 });
     const opportunities = await Promise.all(rawOpportunities.map(async (opportunity) => {
@@ -119,7 +126,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
       const separator = opportunity.url.includes('?') ? '&' : '?';
       return { ...opportunity, url: `${opportunity.url}${separator}crossAccountToken=${encodeURIComponent(token)}` };
     }));
-    return c.json(buildOffsetListResponse({ success: true, mileage, history, insights, opportunities, items: history, total: null, paging: { limit, offset: 0 }, sort: [] }));
+    return c.json(buildOffsetListResponse({ success: true, mileage: visibleMileage, history, insights, opportunities, items: history, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (err) {
     throw err;
   }

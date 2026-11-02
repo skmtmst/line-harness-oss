@@ -1,4 +1,5 @@
 import { getNenRankSettings } from '@line-crm/db';
+import { accountFeatureIsEnabled } from './feature-enforcement.js';
 
 /** 専用カタログの旧アカウント既定値と、実際の EC 接続・会員データの両方で判定する。 */
 export async function resolveMileageSource(db: D1Database, accountId: string): Promise<'ec' | 'musubo'> {
@@ -8,13 +9,18 @@ export async function resolveMileageSource(db: D1Database, accountId: string): P
     if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === 'string')) throw new Error('mileage_source_catalog_invalid');
     if (!parsed.includes('ec_commerce')) return 'musubo';
   }
-  const connected = await db.prepare(`SELECT 1 AS present WHERE EXISTS (SELECT 1 FROM ec_connectors WHERE line_account_id = ?)
+  if (!await accountFeatureIsEnabled(db, accountId, 'ec_commerce')) return 'musubo';
+  const connected = await db.prepare(`SELECT 1 AS present WHERE EXISTS (SELECT 1 FROM ec_connectors WHERE line_account_id = ? AND provider = 'ec_cube' AND status = 'connected')
     OR EXISTS (SELECT 1 FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id WHERE f.line_account_id = ?)`)
     .bind(accountId, accountId).first<{ present: number }>();
   return connected?.present === 1 ? 'ec' : 'musubo';
 }
 
 type Input = { lineAccountId: string; search: string; friendId?: string; limit: number; offset: number };
+export async function getEcMileageBalance(db: D1Database, accountId: string, friendId: string): Promise<number | null> {
+  const row = await db.prepare(`SELECT s.mile_balance FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id WHERE f.line_account_id = ? AND f.id = ?`).bind(accountId, friendId).first<{ mile_balance: number }>();
+  return row == null ? null : Number(row.mile_balance);
+}
 /** 会員スナップショットがない友だちは残高不明。musubo の財布で埋めない。 */
 export async function getEcMileageFriends(db: D1Database, input: Input) {
   const where = `f.line_account_id = ? AND (? = '' OR f.display_name LIKE '%' || ? || '%') AND (? = '' OR f.id = ?)`;
