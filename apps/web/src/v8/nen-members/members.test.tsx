@@ -94,6 +94,63 @@ async function click(target: Element | undefined) {
 }
 
 describe('V8 会員（src/v8/nen-members）', () => {
+  it('失われたランクタグの復旧方法を案内する', async () => {
+    const ranks = SETTINGS.ranks.map((rank, i) => i === 0 ? { ...rank, tagName: null } : rank)
+    const onSaved = vi.fn()
+    fetchApi.mockResolvedValue({ success: true, data: SETTINGS })
+    await act(async () => { root.render(<MembersV8 accountId="acc-1" tab="ranks" status="ready" settings={{ ...SETTINGS, ranks }} onRetry={() => {}} onSaved={onSaved} onChangeTab={() => {}} />) })
+    await settle()
+    expect(host.textContent).toContain('ランクのタグが見つかりません')
+    expect(host.textContent).toContain('ランク設定を保存')
+    expect(byText('保存して EC へ同期')?.disabled).toBe(false)
+    await click(byText('保存して EC へ同期'))
+    expect(fetchApi.mock.calls.some(([path, options]) => path === '/api/nen/rank-settings' && options?.method === 'PUT')).toBe(true)
+    expect(onSaved).toHaveBeenCalled()
+  })
+
+  it('未設定なら初期ランクを作る操作を出し、押すと設定を受け取る', async () => {
+    const onSaved = vi.fn()
+    fetchApi.mockResolvedValue({ success: true, data: SETTINGS })
+    await act(async () => { root.render(<MembersV8 accountId="acc-1" tab="ranks" status="ready" settings={{ ...SETTINGS, ranks: [], rules: null }} onRetry={() => {}} onSaved={onSaved} onChangeTab={() => {}} />) })
+    await settle()
+    await click(byText('初期ランクを作る'))
+    expect(fetchApi.mock.calls.some(([path, options]) => path === '/api/nen/rank-settings/initialize' && options?.method === 'POST')).toBe(true)
+    expect(onSaved).toHaveBeenCalledWith('acc-1', SETTINGS)
+  })
+
+  it('作成失敗を知らせて再試行できる', async () => {
+    let attempts = 0
+    fetchApi.mockImplementation(async (path: string) => {
+      if (path === '/api/nen/rank-settings/initialize' && ++attempts === 1) throw new Error('failed')
+      return { success: true, data: SETTINGS }
+    })
+    const onSaved = vi.fn()
+    await act(async () => { root.render(<MembersV8 accountId="acc-1" tab="ranks" status="ready" settings={{ ...SETTINGS, ranks: [], rules: null }} onRetry={() => {}} onSaved={onSaved} onChangeTab={() => {}} />) })
+    await settle()
+    await click(byText('初期ランクを作る'))
+    expect(onSaved).not.toHaveBeenCalled()
+    expect(host.querySelector('[role="alert"]')).toBeTruthy()
+    await click(byText('初期ランクを作る'))
+    expect(onSaved).toHaveBeenCalledWith('acc-1', SETTINGS)
+  })
+
+  it('機能オフなどで閲覧できない時は初期化を出さない', async () => {
+    await act(async () => { root.render(<MembersV8 accountId="acc-1" tab="ranks" status="forbidden" settings={null} onRetry={() => {}} onSaved={() => {}} onChangeTab={() => {}} />) })
+    await settle()
+    expect(byText('初期ランクを作る')).toBeUndefined()
+    expect(host.textContent).toContain('権限')
+  })
+
+  it('閲覧のみでは初期化を押せず理由が示される', async () => {
+    role.value = verifiedStaffRole('viewer')
+    await act(async () => { root.render(<MembersV8 accountId="acc-1" tab="ranks" status="ready" settings={{ ...SETTINGS, ranks: [], rules: null }} onRetry={() => {}} onSaved={() => {}} onChangeTab={() => {}} />) })
+    await settle()
+    const button = byText('初期ランクを作る')!
+    expect(button).toBeTruthy()
+    expect(button.disabled || button.getAttribute('aria-disabled') === 'true').toBe(true)
+    expect(host.textContent).toContain('閲覧のみ')
+  })
+
   it('ペット未登録でも絞り込めて、札を外すと全員へ戻る', async () => {
     await render('members')
     expect(byLabel('ペットの有無で絞り込む')).toBeUndefined()
@@ -212,6 +269,22 @@ describe('V8 会員（src/v8/nen-members）', () => {
     expect(name.getAttribute('aria-invalid')).toBe('true')
     expect(document.getElementById('rank-name-0-error')?.textContent).toBe('ランク名を入れるか、行を消してください。')
     expect(document.activeElement).toBe(name)
+  })
+
+  it('ランク未設定で節目を保存したら同期できない理由を知らせる', async () => {
+    const empty = { ...SETTINGS, ranks: [], rules: null }
+    fetchApi.mockImplementation(async (path: string) => path === '/api/nen/lifetime-milestones'
+      ? { success: true, data: { ...empty, sync: { status: 'failed', error: 'ランクが未設定です。初期ランクを作成してください' } } }
+      : { success: true, data: empty })
+    await act(async () => { root.render(<MembersV8 accountId="acc-1" tab="lifetime" status="ready" settings={empty} onRetry={() => {}} onSaved={() => {}} onChangeTab={() => {}} />) })
+    await settle()
+    await click(byLabel('節目「なかよし」のその他操作'))
+    await click(byText('編集する'))
+    const title = document.getElementById('milestone-title') as HTMLInputElement
+    await act(async () => { fireEvent.change(title, { target: { value: 'はじめまして' } }) })
+    await click(byText('決める'))
+    await click(buttons().find((b) => b.textContent?.includes('保存して EC へ同期する')))
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('ランクが未設定')
   })
 
   it('ライフタイム：称号を消して決めると、窓は閉じず称号の欄が赤くなり、そこへ移る', async () => {

@@ -56,6 +56,13 @@ describe('invocation context', () => {
     expect(JSON.parse(String(log.mock.calls[1][0]))).not.toHaveProperty('scheduledJob');
     expect(JSON.parse(String(log.mock.calls[1][0]))).not.toHaveProperty('failureKind');
   });
+  it('失敗数は数値だけを記録する', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    logger.error('nen_tag_refresh.friend_failed', { failedCount: 2 });
+    logger.error('nen_tag_refresh.friend_failed', { failedCount: 'customer' } as never);
+    expect(JSON.parse(String(log.mock.calls[0][0])).failedCount).toBe(2);
+    expect(JSON.parse(String(log.mock.calls[1][0]))).not.toHaveProperty('failedCount');
+  });
   it('構造化ログに秘密・個人情報・例外や任意の値を混ぜない', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     withInvocation('http', () => logger.error('fixed.failure', {

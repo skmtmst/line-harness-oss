@@ -142,7 +142,9 @@ export default function LifetimeV8({
       setDirty(false)
       onSaved(accountId, res.data)
       notifySaved(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。')
-      if (res.data.sync?.status !== 'synced') setError('ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
+      if (res.data.sync?.status !== 'synced') setError(res.data.ranks.length === 0
+        ? 'ランクが未設定のため、ECへ同期できません。ランク設定から初期ランクを作成してください。'
+        : 'ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
     } catch (caught) {
       if (activeAccount.current !== target) return
       const fieldFailure = saveErrors.capture(caught)
