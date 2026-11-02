@@ -46,6 +46,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 vi.mock('@/components/shared/image-uploader', () => ({ default: () => null }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '店A' }, { id: 'account-b', name: '店B' }] })) }))
 
 /*
  * 時刻の選び欄は共通 Select（listbox）。ここで見たいのは選んだ後の
@@ -231,6 +232,7 @@ it('D09: 早い枠が先頭へ入っても、選んだ元の枠IDだけを更新
 })
 
 it('D11: 一括追加の途中失敗後は、残りだけを同じ鍵で再送する', async () => {
+  st.getEvent.mockResolvedValue({ ...ev, target_type: 'multi-account-dedup', account_ids: '["account-a","account-b"]' })
   await renderSlots()
   await click('一括追加する')
   await pickDate('開始日', '2026-10-01')
@@ -243,6 +245,8 @@ it('D11: 一括追加の途中失敗後は、残りだけを同じ鍵で再送�
   expect(document.body.textContent).toContain('3件の予約枠を作りますか？')
   expect([...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].at(-1)?.textContent).toContain('LINEアカウント')
   expect([...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].at(-1)?.textContent).toContain('環境')
+  expect(await screen.findByText('店B')).toBeTruthy()
+  expect(screen.getByText('2件')).toBeTruthy()
   expect(st.createSlots).not.toHaveBeenCalled()
   st.createSlots.mockRejectedValueOnce(new EventSlotsPartialError('1件まで追加されました', [early]))
   await click('まとめて作る')
@@ -260,14 +264,18 @@ it('D11: 一括追加の途中失敗後は、残りだけを同じ鍵で再送�
 
 
 it('イベントの削除確認に操作先と環境を出す', async () => {
+  st.getEvent.mockResolvedValue({ ...ev, target_type: 'multi-account-dedup', account_ids: '["account-a","account-b"]' })
   await act(async () => root.render(<EventForm accountId="account-a" eventId="event-1" />))
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
   await click('削除する')
   let dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
   expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
+  expect(await screen.findByText('店B')).toBeTruthy()
+  expect(screen.getByText('2件')).toBeTruthy()
 })
 
 it('予約枠の削除確認に操作先と環境を出す', async () => {
+  st.getEvent.mockResolvedValue({ ...ev, target_type: 'multi-account-dedup', account_ids: '["account-a","account-b"]' })
   await renderSlots()
   let dialog: Element
 
@@ -276,4 +284,6 @@ it('予約枠の削除確認に操作先と環境を出す', async () => {
   await act(async () => { (await screen.findByRole('menuitem', { name: '削除する' })).click() })
   dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
   expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
+  expect(await screen.findByText('店B')).toBeTruthy()
+  expect(screen.getByText('2件')).toBeTruthy()
 })

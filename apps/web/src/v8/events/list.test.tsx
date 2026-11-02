@@ -36,7 +36,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: account.id, loading: false }),
 }))
-vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '対象の店' }] })) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '対象の店' }, { id: 'account-b', name: 'もう一つの店' }] })) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -56,8 +56,17 @@ const event = {
   cancel_deadline_hours_before: 24, reminder_day_before_enabled: 1, reminder_hours_before: null, is_published: 1,
   lifecycle_status: 'published', folderId: 'folder-class', sort_order: 1, created_at: '2026-09-01', updated_at: '2026-09-02',
   version: 1, next_slot_starts_at: '2099-10-12T05:00:00.000Z', total_capacity: 20, total_active: 18, pending_count: 2,
-  visible_tag_id: null, visible_tag_name: null,
+  visible_tag_id: null, visible_tag_name: null, target_type: 'single',
 }
+
+it('共有イベントの削除では全アカウントの名前と件数を示す', async () => {
+  fetchApi.mockImplementation(async () => ({ items: [{ ...event, target_type: 'multi-account-dedup', account_ids: '["account-a","account-b"]' }], total: 1, summary: null }))
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: /秋のしつけ教室.*操作/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  expect(await screen.findByText('もう一つの店')).toBeTruthy()
+  expect(screen.getByText('2件')).toBeTruthy()
+})
 
 it('イベント削除の確認に操作先と環境を示す', async () => {
   await render()

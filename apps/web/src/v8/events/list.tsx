@@ -33,6 +33,7 @@ import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/ma
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
+import { eventOperationAccounts } from '@/components/events/event-draft-shared'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
@@ -673,7 +674,7 @@ export default function EventsListV8() {
           setDeleteTarget(null)
         }}
       >
-        {deleteTarget ? <OperationTargetSummary accounts={[{ id: deleteTarget.accountId }]} /> : null}
+        {deleteTarget ? <OperationTargetSummary allAccounts accounts={eventOperationAccounts(deleteTarget.event, deleteTarget.accountId)} /> : null}
       </ConfirmDialog>
     </>
   )
