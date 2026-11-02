@@ -1,3 +1,4 @@
+import { getAttributeResourceUsage } from './analytics-resource-usage.js';
 import { FEATURE_IDS } from '@line-crm/shared';
 import { type AnalyticsOverviewContext } from './analytics-overviews-types.js';
 import { FEATURE_USAGE_WINDOW_DAYS, collectFeatureUsage, FEATURE_USAGE_DEFINITIONS } from './analytics-overviews-usage-measures.js';
@@ -11,7 +12,7 @@ export async function getAnalyticsUsageOverview(
   const usageSince = new Date(
     Date.parse(context.dataCutoffAt || context.toExclusive) - FEATURE_USAGE_WINDOW_DAYS * 86_400_000,
   ).toISOString();
-  const [templates, scenarios, forms, richMenus, tagsFields, inflow, automations, mediaVars, activity, referenceHealth, featureUsage] = await Promise.all([
+  const [templates, scenarios, forms, richMenus, attributes, inflow, automations, mediaVars, activity, referenceHealth, featureUsage] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS created,
               SUM(CASE WHEN EXISTS (SELECT 1 FROM messages_log m
@@ -24,7 +25,7 @@ export async function getAnalyticsUsageOverview(
                 THEN 1 ELSE 0 END) AS in_use,
               (SELECT MAX(m.created_at) FROM messages_log m
                 WHERE m.line_account_id = ? AND m.template_id_at_send IS NOT NULL) AS last_used_at
-         FROM templates t WHERE t.line_account_id = ?`,
+         FROM templates t WHERE t.line_account_id = ? AND t.deleted_at IS NULL`,
     ).bind(...Array(5).fill(context.lineAccountId)).first<{ created: number; in_use: number; last_used_at: string | null }>(),
     db.prepare(
       `SELECT COUNT(*) AS created,
@@ -37,12 +38,18 @@ export async function getAnalyticsUsageOverview(
          FROM scenarios s WHERE s.line_account_id = ?`,
     ).bind(...Array(3).fill(context.lineAccountId)).first<{ created: number; in_use: number; last_used_at: string | null }>(),
     db.prepare(
-      `SELECT COUNT(DISTINCT fs.form_id) AS created,
-              COUNT(DISTINCT CASE WHEN fs.id IS NOT NULL THEN fs.form_id END) AS in_use,
-              MAX(fs.created_at) AS last_used_at
-         FROM form_submissions fs JOIN friends f ON f.id = fs.friend_id
-        WHERE f.line_account_id = ?`,
-    ).bind(context.lineAccountId).first<{ created: number; in_use: number; last_used_at: string | null }>(),
+      `SELECT COUNT(*) AS created,
+              SUM(CASE WHEN EXISTS (
+                SELECT 1 FROM form_submissions fs JOIN friends fr ON fr.id = fs.friend_id
+                 WHERE fs.form_id = f.id AND fs.is_test = 0 AND fr.line_account_id = ?
+              ) THEN 1 ELSE 0 END) AS in_use,
+              (SELECT MAX(fs.created_at) FROM form_submissions fs JOIN friends fr ON fr.id = fs.friend_id
+                JOIN forms used ON used.id = fs.form_id
+                WHERE fr.line_account_id = ? AND fs.is_test = 0 AND used.status = 'active'
+                  AND EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = used.id AND fa.line_account_id = ?)) AS last_used_at
+         FROM forms f WHERE f.status = 'active'
+           AND EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id AND fa.line_account_id = ?)`,
+    ).bind(...Array(4).fill(context.lineAccountId)).first<{ created: number; in_use: number; last_used_at: string | null }>(),
     db.prepare(
       `SELECT COUNT(*) AS created,
               SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) AS in_use,
@@ -50,23 +57,7 @@ export async function getAnalyticsUsageOverview(
          FROM rich_menu_groups WHERE account_id = ?`,
     ).bind(context.lineAccountId, context.lineAccountId)
       .first<{ created: number; in_use: number; last_used_at: string | null }>(),
-    db.prepare(
-      `SELECT
-         (SELECT COUNT(*) FROM tags WHERE line_account_id = ? OR line_account_id IS NULL) +
-         (SELECT COUNT(DISTINCT fv.field_id) FROM friend_field_values fv JOIN friends f ON f.id = fv.friend_id
-           WHERE f.line_account_id = ?) AS created,
-         (SELECT COUNT(DISTINCT ft.tag_id) FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id
-           WHERE f.line_account_id = ?) +
-         (SELECT COUNT(DISTINCT fv.field_id) FROM friend_field_values fv JOIN friends f ON f.id = fv.friend_id
-           WHERE f.line_account_id = ?) AS in_use,
-         MAX(last_used_at) AS last_used_at FROM (
-           SELECT MAX(ft.assigned_at) AS last_used_at FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id
-            WHERE f.line_account_id = ?
-           UNION ALL SELECT MAX(fv.updated_at) FROM friend_field_values fv JOIN friends f ON f.id = fv.friend_id
-            WHERE f.line_account_id = ?
-         )`,
-    ).bind(...Array(6).fill(context.lineAccountId))
-      .first<{ created: number; in_use: number; last_used_at: string | null }>(),
+    getAttributeResourceUsage(db, context.lineAccountId),
     db.prepare(
       `SELECT
          (SELECT COUNT(*) FROM tracked_links WHERE line_account_id = ?) +
@@ -84,8 +75,8 @@ export async function getAnalyticsUsageOverview(
       .first<{ created: number; in_use: number; last_used_at: string | null }>(),
     db.prepare(
       `SELECT
-         (SELECT COUNT(*) FROM automation_definitions WHERE line_account_id = ?) +
-         (SELECT COUNT(*) FROM common_actions WHERE line_account_id = ?) AS created,
+         (SELECT COUNT(*) FROM automation_definitions WHERE line_account_id = ? AND status <> 'archived') +
+         (SELECT COUNT(*) FROM common_actions WHERE line_account_id = ? AND status <> 'archived') AS created,
          (SELECT COUNT(*) FROM automation_definitions WHERE line_account_id = ? AND status = 'active') +
          (SELECT COUNT(*) FROM common_actions WHERE line_account_id = ? AND status = 'published') AS in_use,
          MAX(last_used_at) AS last_used_at FROM (
@@ -122,9 +113,16 @@ export async function getAnalyticsUsageOverview(
   const categories = [
     usageCategory({ key: 'templates', label: 'テンプレート', href: '/templates', created: Number(templates?.created ?? 0), inUse: Number(templates?.in_use ?? 0), lastUsedAt: templates?.last_used_at ?? null, brokenReferences: referenceHealth.templates }),
     usageCategory({ key: 'scenarios', label: 'シナリオ', href: '/scenarios', created: Number(scenarios?.created ?? 0), inUse: Number(scenarios?.in_use ?? 0), lastUsedAt: scenarios?.last_used_at ?? null, brokenReferences: referenceHealth.scenarios }),
-    usageCategory({ key: 'forms', label: '回答フォーム', href: '/form-submissions', created: Number(forms?.created ?? 0), inUse: Number(forms?.in_use ?? 0), lastUsedAt: forms?.last_used_at ?? null, state: 'partial', reason: '回答実績から所属を確認できるフォームのみです', brokenReferences: referenceHealth.forms }),
+    usageCategory({ key: 'forms', label: '回答フォーム', href: '/form-submissions', created: Number(forms?.created ?? 0), inUse: Number(forms?.in_use ?? 0), lastUsedAt: forms?.last_used_at ?? null, brokenReferences: referenceHealth.forms }),
     usageCategory({ key: 'rich_menus', label: 'リッチメニュー', href: '/rich-menus', created: Number(richMenus?.created ?? 0), inUse: Number(richMenus?.in_use ?? 0), lastUsedAt: richMenus?.last_used_at ?? null, brokenReferences: referenceHealth.rich_menus }),
-    usageCategory({ key: 'friend_attributes', label: 'タグ・友だち情報', href: '/tags', created: Number(tagsFields?.created ?? 0), inUse: Number(tagsFields?.in_use ?? 0), lastUsedAt: tagsFields?.last_used_at ?? null, state: 'partial', reason: '旧共通項目はLINEアカウント所属を持たないため、利用実績から判定しています', brokenReferences: referenceHealth.friend_attributes }),
+    {
+      ...usageCategory({ key: 'friend_attributes', label: 'タグ・友だち情報', href: '/tags', created: attributes.tags.created + attributes.fields.created, inUse: attributes.tags.inUse + attributes.fields.inUse, lastUsedAt: attributes.lastUsedAt, state: 'partial', reason: '友だち情報欄の利用中は、このアカウントで値が登録された項目のみです。設定からの参照は含みません', brokenReferences: referenceHealth.friend_attributes }),
+      breakdown: [attributes.tags, attributes.fields].map(item => ({
+        key: item.key, label: item.label, href: item.href,
+        created: metric(item.created, 'available', '保管を除く現役の定義数です'), inUse: metric(item.inUse, item.state, item.reason),
+        unused: metric(item.created - item.inUse, item.state, item.reason),
+      })),
+    },
     usageCategory({ key: 'inflow_conversion', label: '流入リンク・成果地点', href: '/inflow-links', created: Number(inflow?.created ?? 0), inUse: Number(inflow?.in_use ?? 0), lastUsedAt: inflow?.last_used_at ?? null, brokenReferences: referenceHealth.inflow_conversion }),
     usageCategory({ key: 'automations', label: 'オートメーション・共通アクション', href: '/automations', created: Number(automations?.created ?? 0), inUse: Number(automations?.in_use ?? 0), lastUsedAt: automations?.last_used_at ?? null, brokenReferences: referenceHealth.automations }),
     usageCategory({ key: 'media_vars', label: '登録メディア・共通情報', href: '/contents', created: mediaVars.created, inUse: mediaVars.in_use, lastUsedAt: mediaVars.last_used_at, state: 'unavailable', reason: '旧データにLINEアカウント所属がないため、安全に分けられません', brokenReferences: metric<number>(null, 'unavailable', '旧データにLINEアカウント所属がないため、参照切れを取得できません') }),
