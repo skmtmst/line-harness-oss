@@ -87,6 +87,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const [publishing, setPublishing] = useState(false)
   const [discarding, setDiscarding] = useState(false)
   const [discardError, setDiscardError] = useState('')
+  const [discardUnknown, setDiscardUnknown] = useState(false)
   const discardLock = useRef(false)
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState<Conflict | null>(null)
@@ -355,11 +356,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       if (!response.success) throw new Error(response.error)
       confirmLeave()
     } catch (cause) {
+      setDiscardUnknown(!(cause instanceof ApiError && (cause.code === 'IN_USE' || cause.status === 409)))
       setDiscardError(cause instanceof ApiError && cause.code === 'IN_USE'
         ? '使われているため消せません。利用先を確認してください。'
         : cause instanceof ApiError && cause.status === 409
         ? '下書きの状態が変わったため消せません。編集を続けて最新の状態を確かめてください。'
-        : '下書きの削除結果を確認できません。編集を続けるか、一覧で状態を確認してください。')
+        : '下書きの削除結果を確認できません。一覧で下書きが残っているか確認してください。移動すると未保存の変更は失われます。')
     } finally {
       discardLock.current = false
       setDiscarding(false)
@@ -716,15 +718,16 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="テンプレートの変更"
         busy={saving || discarding}
-        title={autoCreated ? '下書きをどうしますか？' : undefined}
-        description={autoCreated ? '自動で作られた下書きがあります。残すか、消して移るか選んでください。' : undefined}
-        saveLabel={autoCreated ? '下書きを残して移る' : undefined}
+        title={discardUnknown ? '下書きの確認' : autoCreated ? '下書きをどうしますか？' : undefined}
+        description={discardUnknown ? discardError : autoCreated ? '自動で作られた下書きがあります。残すか、消して移るか選んでください。' : undefined}
+        saveLabel={discardUnknown ? '一覧で確認する' : autoCreated ? '下書きを残して移る' : undefined}
         discardLabel={autoCreated ? '下書きを消して移る' : undefined}
-        error={discardError}
-        onSave={autoCreated ? async () => { while (inFlightRef.current) await inFlightRef.current.catch(() => undefined); return !dirty || (await saveNow()) !== null } : undefined}
-        onSavedLeave={confirmLeave}
+        discardDisabled={discardUnknown}
+        error={discardUnknown ? undefined : discardError}
+        onSave={discardUnknown ? async () => true : autoCreated ? async () => { while (inFlightRef.current) await inFlightRef.current.catch(() => undefined); return !dirty || (await saveNow()) !== null } : undefined}
+        onSavedLeave={discardUnknown ? () => { disarm(); router.push('/templates') } : confirmLeave}
         onConfirm={autoCreated ? () => void discardCreatedDraft() : confirmLeave}
-        onCancel={() => { setDiscardError(''); cancelLeave() }} />
+        onCancel={() => { setDiscardError(''); setDiscardUnknown(false); cancelLeave() }} />
     </></SaveErrorScope>
   )
 }

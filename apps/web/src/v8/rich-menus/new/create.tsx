@@ -1,5 +1,6 @@
 'use client'
 
+import { useListNavigationRouter } from '@/components/shared/list-navigation'
 import { useMenuMediaScope } from './use-menu-media-scope'
 
 import { useMenuShapeDraft } from './use-menu-shape-draft'
@@ -119,6 +120,7 @@ function stepFromParam(key: string | null): StepKey | null {
  * （/rich-menus/edit の V8）。読み込むまでは手順の中身を出さず、すべての手順へ戻れる。
  */
 export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: string; host?: RichMenuCreateHost } = {}) {
+  const router = useListNavigationRouter()
   const saveErrors = useSaveFormErrors()
   usePageTitle(host ? 'リッチメニュー' : 'リッチメニューを作る')
   /*
@@ -211,6 +213,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [publishing, setPublishing] = useState(false)
   const [discardingDraft, setDiscardingDraft] = useState(false)
   const [discardDraftError, setDiscardDraftError] = useState('')
+  const [discardUnknown, setDiscardUnknown] = useState(false)
   const discardDraftLock = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
@@ -326,7 +329,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const publishDirty = JSON.stringify(publishPlan) !== JSON.stringify(publishBaseline)
   const dirty = baselineSignature !== null && (signatureNow() !== baselineSignature || publishDirty)
   const createdDraft = !host && !editGroupId && !done && group?.status === 'draft' ? group : null
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({
     dirty: dirty || Boolean(createdDraft),
     busy: saving || publishing || discardingDraft,
   })
@@ -354,11 +357,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       if (!response.success) throw new Error(response.error)
       confirmLeaveAndDiscard()
     } catch (cause) {
+      setDiscardUnknown(!(cause instanceof ApiError && (cause.code === 'rich_menu_delete_blocked' || cause.status === 409)))
       setDiscardDraftError(cause instanceof ApiError && cause.code === 'rich_menu_delete_blocked'
         ? '公開状態や使われている場所を確認してから、一覧で削除してください。'
         : cause instanceof ApiError && cause.status === 409
         ? '下書きの状態が変わったため消せません。編集を続けて最新の状態を確かめてください。'
-        : '下書きの削除結果を確認できません。編集を続けるか、一覧で状態を確認してください。')
+        : '下書きの削除結果を確認できません。一覧で下書きが残っているか確認してください。移動すると未保存の変更は失われます。')
     } finally {
       discardDraftLock.current = false
       setDiscardingDraft(false)
@@ -1396,14 +1400,15 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         </div>
       </Dialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力"
-        title={createdDraft ? '下書きをどうしますか？' : undefined}
-        description={createdDraft ? '保存された下書きがあります。残すか、消して移るか選んでください。' : undefined}
-        saveLabel={createdDraft ? '下書きを残して移る' : undefined}
+        title={discardUnknown ? '下書きの確認' : createdDraft ? '下書きをどうしますか？' : undefined}
+        description={discardUnknown ? discardDraftError : createdDraft ? '保存された下書きがあります。残すか、消して移るか選んでください。' : undefined}
+        saveLabel={discardUnknown ? '一覧で確認する' : createdDraft ? '下書きを残して移る' : undefined}
         discardLabel={createdDraft ? '下書きを消して移る' : undefined}
-        busy={saving || discardingDraft} error={discardDraftError}
-        onSave={createdDraft ? async () => !dirty || await saveDraft() : undefined}
-        onSavedLeave={confirmLeave} onConfirm={createdDraft ? () => void discardCreatedDraft() : confirmLeaveAndDiscard}
-        onCancel={() => { setDiscardDraftError(''); cancelLeave() }} />
+        discardDisabled={discardUnknown}
+        busy={saving || discardingDraft} error={discardUnknown ? undefined : discardDraftError}
+        onSave={discardUnknown ? async () => true : createdDraft ? async () => !dirty || await saveDraft() : undefined}
+        onSavedLeave={discardUnknown ? () => { disarm(); router.push('/rich-menus') } : confirmLeave} onConfirm={createdDraft ? () => void discardCreatedDraft() : confirmLeaveAndDiscard}
+        onCancel={() => { setDiscardDraftError(''); setDiscardUnknown(false); cancelLeave() }} />
       <Dialog open={priorityOpen} title="出す順番" description="一覧で上にあるメニューが優先されます。1がいちばん先です。"
         confirmLabel="順番を変える" onConfirm={() => {
           setTargetingPriority(Math.max(0, (parseInt(priorityInput, 10) || 1) - 1))

@@ -18,8 +18,9 @@ vi.hoisted(() => {
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: ACCOUNT, loading: false }),
 }))
+const push = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useRouter: () => ({ push, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(window.location.search),
   usePathname: () => '/rich-menus/new',
 }))
@@ -315,6 +316,21 @@ describe('リッチメニューの出す相手は明示的に決める', () => {
     await settle()
     expect(leave).not.toHaveBeenCalled()
     expect(screen.getByText(/下書きの削除結果を確認できません/)).toBeTruthy()
+  })
+
+  it('削除結果が不明なら一覧で確認する操作を案内する', async () => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き', exact: true })) })
+    await settle()
+    failing['/api/rich-menu-groups/rmg-x'] = 1
+    await act(async () => { requestUnsavedAction(vi.fn()) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを消して移る' })) })
+    await settle()
+    expect(screen.getByText(/削除結果を確認できません/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '下書きを残して移る' })).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '一覧で確認する' })) })
+    expect(push).toHaveBeenCalledWith('/rich-menus')
   })
 
   it('初めの下書き保存と手順の保存でも全員の既定にしない', async () => {

@@ -355,6 +355,22 @@ describe('V8 テンプレートの下書き自動保存（一斉配信と同じ�
     expect(push).toHaveBeenCalled()
   })
 
+  it('削除結果が不明なら一覧で確認する操作を案内する', async () => {
+    templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-auto', publishedVersion: 0, draftRevision: 1 } })
+    templatesApi.delete.mockRejectedValue(new Error('通信断'))
+    await mount()
+    type(screen.getByLabelText('テンプレート名'), '案内')
+    type(screen.getByLabelText('本文'), 'こんにちは')
+    await wait(2100); await flush()
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを消して移る' })) })
+    await flush()
+    expect(screen.getByText(/削除結果を確認できません/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '下書きを残して移る' })).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '一覧で確認する' })) })
+    expect(push).toHaveBeenCalledWith('/templates')
+  })
+
   it('下書きの版が変わったら消さずに理由を表示して移らない', async () => {
     templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-auto', publishedVersion: 0, draftRevision: 1 } })
     templatesApi.delete.mockRejectedValue(new ApiError(409, '版が変わりました'))
