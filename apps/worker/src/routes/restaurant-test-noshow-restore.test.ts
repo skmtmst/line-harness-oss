@@ -6,12 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-/*
- * R1-20：無断（no_show）の印は「予約を有効に戻す」（PATCH status=confirmed）の
- * 対象外に残る。来店数・到着時刻・占有は状態で数えるため表示は正しいが、
- * 印の残り方が後の訂正で崩れないことをこの列で固定する。
- * 監査（印の取消）と競合（版）の条件は変えていない。
- */
 const authMocks = vi.hoisted(() => ({
   getPlatformSetting: async () => 'false',
   getStaffByApiKey: vi.fn(async (): Promise<null> => null),
@@ -98,7 +92,7 @@ beforeEach(() => {
 });
 
 describe('無断→有効に戻す→来店→訂正', () => {
-  it('印が残っても状態・版・来店数は正しく、後の訂正で収束する', async () => {
+  it('通常の復旧で無断の印と監査を更新し、次の来店を訂正できる', async () => {
     seedRestaurantData(testDb);
     const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
     const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
@@ -116,12 +110,25 @@ describe('無断→有効に戻す→来店→訂正', () => {
     expect(row(id)).toEqual({ status: 'no_show', customer_version: 2 });
     expect(marks(id)).toEqual([{ kind: 'no_show', undone: 0 }]);
 
-    /* 画面の「予約を有効に戻す」と同じ口。印は残るが状態は戻る。 */
-    expect((await restore(id)).status).toBe(200);
-    expect(row(id)).toEqual({ status: 'confirmed', customer_version: 3 });
+    const staleRestore = await app().request(`/api/restaurant-test/reservations/${id}?account_id=account-1`, {
+      method: 'PATCH', headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'confirmed', expectedVersion: 1 }),
+    }, env);
+    expect(staleRestore.status).toBe(409);
+    expect(row(id)).toEqual({ status: 'no_show', customer_version: 2 });
     expect(marks(id)).toEqual([{ kind: 'no_show', undone: 0 }]);
 
-    /* 来店数は状態で数えるため、残った印で増えない。 */
+    /* 通常の復旧でも無断の印を取り消す。 */
+    expect((await restore(id)).status).toBe(200);
+    expect(row(id)).toEqual({ status: 'confirmed', customer_version: 3 });
+    expect(marks(id)).toEqual([{ kind: 'no_show', undone: 1 }]);
+
+    const audit = testDb.raw.prepare('SELECT undone_at, undone_request_id, result_version FROM rt_seat_visit_marks WHERE reservation_id=?').get(id) as { undone_at: string | null; undone_request_id: string | null; result_version: number };
+    expect(audit.undone_at).not.toBeNull();
+    expect(audit.undone_request_id).not.toBeNull();
+    expect(audit.result_version).toBe(3);
+
+    /* 復旧だけでは来店数は増えない。 */
     const counted = testDb.raw.prepare(
       `SELECT COUNT(*) AS total FROM rt_reservations r WHERE r.store_id = ? AND r.status IN ('visited','seated')`)
       .get(store.id) as { total: number };
@@ -131,11 +138,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
     expect(row(id).status).toBe('visited');
     expect((await attend(id, 'undo_visit')).status).toBe(200);
     expect(row(id).status).toBe('confirmed');
-    expect(marks(id)).toEqual([{ kind: 'no_show', undone: 0 }, { kind: 'visited', undone: 1 }]);
-
-    /* 残っていた無断印は次の訂正で取り消され、状態は有効のまま収束する。 */
-    expect((await attend(id, 'undo_visit')).status).toBe(200);
-    expect(row(id).status).toBe('confirmed');
+    expect((await attend(id, 'undo_visit')).status).toBe(404);
     expect(marks(id)).toEqual([{ kind: 'no_show', undone: 1 }, { kind: 'visited', undone: 1 }]);
   });
 
@@ -175,7 +178,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
     expect(missing.status).toBe(404);
   });
 
-  it('印のない無断（PATCH直送・旧記録）も来店取消口で有効に戻す', async () => {
+  it('印のない無断（PATCH直送・旧記録）も通常の復旧で有効に戻す', async () => {
     seedRestaurantData(testDb);
     const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
     const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
@@ -193,7 +196,7 @@ describe('無断→有効に戻す→来店→訂正', () => {
     expect((await patch(id, { status: 'no_show' })).status).toBe(200);
     expect(marks(id)).toEqual([]);
 
-    const undone = await attend(id, 'undo_visit');
+    const undone = await restore(id);
     expect(undone.status).toBe(200);
     expect(row(id)).toEqual({ status: 'confirmed', customer_version: 3 });
     expect(marks(id)).toEqual([]);

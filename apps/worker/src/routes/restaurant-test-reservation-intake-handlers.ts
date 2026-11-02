@@ -357,13 +357,22 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
     )) {
     return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため変更できません' }, 409);
   }
-  const savedUpdate = await dbFor(c.env, current.store_id).prepare(`UPDATE rt_reservations SET
+  const db = dbFor(c.env, current.store_id);
+  const update = db.prepare(`UPDATE rt_reservations SET
     customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
     table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, customer_version=customer_version+1, updated_at = datetime('now')
     WHERE id = ? AND customer_version = ?`).bind(
       next.customer_name, next.customer_phone, next.guest_count, next.starts_at, next.ends_at,
       next.table_id, next.course_id, next.status, next.allergy_note, next.note, current.id, Number(body.expectedVersion),
-    ).run();
+    );
+  const statements = [update];
+  if (current.status === 'no_show' && next.status !== 'no_show') {
+    statements.push(db.prepare(`UPDATE rt_seat_visit_marks SET undone_at=?, undone_by=?, undone_request_id=?, result_version=?
+      WHERE reservation_id=? AND kind='no_show' AND undone_at IS NULL AND changes()=1`).bind(
+      new Date().toISOString(), c.get('staff')?.id ?? null, crypto.randomUUID(), current.customer_version + 1, current.id,
+    ));
+  }
+  const [savedUpdate] = await db.batch(statements);
   if (!savedUpdate.meta.changes) return c.json({success:false,error:"ほかの人が変更しました。最新を読み込んでください",code:"version_conflict"},409);
   await applyReservationInventoryChange(
     dbFor(c.env, current.store_id), current.store_id,
