@@ -16,7 +16,6 @@ import {
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
-import TruncatedText from '@/components/shared/truncated-text'
 import Select from '@/components/shared/select'
 import styles from './frame.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
