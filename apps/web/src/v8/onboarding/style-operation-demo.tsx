@@ -46,7 +46,7 @@ const CONSULT_BOARD_SAMPLE: ConsultColumn[] = [
 /** サロン3ページ目「担当ごとの予定を確認する」の静止見本。保存・送信はしない。 */
 export function SalonOperationDemo() {
   return <section aria-label="担当ごとの予定の見本">
-    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
     <Card layout="vertical" padding="default" gap="normal" aria-label="担当ごとの予定">
       <strong>担当ごとの予定（見本）</strong>
       {SALON_BOARD_SAMPLE.map(column => (
@@ -82,7 +82,7 @@ const LESSON_BOARD_SAMPLE: LessonEntry[] = [
 /** 面談・相談3ページ目「相談の予定を確認する」の静止見本。保存・送信はしない。 */
 export function ConsultOperationDemo() {
   return <section aria-label="相談の予定の見本">
-    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
     <Card layout="vertical" padding="default" gap="normal" aria-label="相談の予定">
       <strong>相談の予定（見本）</strong>
       {CONSULT_BOARD_SAMPLE.map(column => (
@@ -103,10 +103,105 @@ export function ConsultOperationDemo() {
   </section>
 }
 
+type EcEntry = { name: string; detail: string }
+
+/**
+ * ECの商品案内の見本の値。購入・連携・クーポン・定期便の動作は描かない
+ * （未検証のため完成済みとしない）。実データの読み書きはしない。
+ */
+const EC_BOARD_SAMPLE: EcEntry[] = [
+  { name: '見本 焼き菓子セット', detail: '¥1,200' },
+  { name: '見本 ハーブティー', detail: '¥800' },
+]
+
+/**
+ * 飲食店の来店後の見本の値。来店後の送信は設定・公開・承認が必要で、
+ * 保存しただけでは始まらない。実データの読み書き・送信はしない。
+ */
+const RESTAURANT_AFTER_SAMPLE = {
+  visit: { time: '18:00–20:00', name: '見本 たろう', detail: '2名・テーブル席' },
+  thanks: { when: '翌日 12:00', text: '昨日はありがとうございました。またのお越しをお待ちしています。' },
+}
+
+/** 飲食店4ページ目「来店のあとも、つながりが続く」の静止見本。保存・送信はしない。 */
+export function RestaurantAfterDemo() {
+  return <section aria-label="来店のあとの見本">
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="来店のあと">
+      <strong>来店のあと（見本）</strong>
+      <section aria-label="来店の記録">
+        <p className={styles.description}>予約台帳の来店記録</p>
+        <ul className={styles.can}>
+          <li>
+            <StatusBadge tone="success">来店済み</StatusBadge>
+            <span>{RESTAURANT_AFTER_SAMPLE.visit.time} {RESTAURANT_AFTER_SAMPLE.visit.name} さま・{RESTAURANT_AFTER_SAMPLE.visit.detail}</span>
+          </li>
+        </ul>
+      </section>
+      <section aria-label="お礼の見本">
+        <p className={styles.description}>LINEのお礼（{RESTAURANT_AFTER_SAMPLE.thanks.when}・停止中）</p>
+        <p className={styles.description}>{RESTAURANT_AFTER_SAMPLE.thanks.text}</p>
+      </section>
+      <p className={styles.note}>名前・数は架空です。送り始めるには設定と承認が必要で、保存しただけでは始まりません。</p>
+    </Card>
+  </section>
+}
+
+/**
+ * サロンの来店後の見本の値。来店後の送信は設定・公開・承認が必要で、
+ * 保存しただけでは始まらない。実データの読み書き・送信はしない。
+ */
+const SALON_AFTER_SAMPLE = {
+  visit: { time: '11:30–12:30', name: '見本 みお', menu: 'カット', staff: '見本 あおい' },
+  thanks: { when: '翌日 12:00', text: '昨日はご来店ありがとうございました。またのご利用をお待ちしています。' },
+}
+
+/** サロン4ページ目「来店のあとも、つながりが続く」の静止見本。保存・送信はしない。 */
+export function SalonAfterDemo() {
+  return <section aria-label="来店のあとの見本">
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="来店のあと">
+      <strong>来店のあと（見本）</strong>
+      <section aria-label="来店の記録">
+        <p className={styles.description}>予約台帳の来店記録</p>
+        <ul className={styles.can}>
+          <li>
+            <StatusBadge tone="success">来店済み</StatusBadge>
+            <span>{SALON_AFTER_SAMPLE.visit.time} {SALON_AFTER_SAMPLE.visit.name} さま・{SALON_AFTER_SAMPLE.visit.menu}・担当 {SALON_AFTER_SAMPLE.visit.staff}</span>
+          </li>
+        </ul>
+      </section>
+      <section aria-label="お礼の見本">
+        <p className={styles.description}>LINEのお礼（{SALON_AFTER_SAMPLE.thanks.when}・停止中）</p>
+        <p className={styles.description}>{SALON_AFTER_SAMPLE.thanks.text}</p>
+      </section>
+      <p className={styles.note}>名前・数は架空です。送り始めるには設定と承認が必要で、保存しただけでは始まりません。</p>
+    </Card>
+  </section>
+}
+
+/** EC3ページ目「商品の案内を用意する」の静止見本。保存・送信はしない。 */
+export function EcOperationDemo() {
+  return <section aria-label="商品の案内の見本">
+    <p className={styles.note}>画面の見本です。店のECサイトの商品案内の例で、在庫の管理はしません。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="商品の案内">
+      <strong>商品の案内（見本）</strong>
+      <ul className={styles.can}>
+        {EC_BOARD_SAMPLE.map(entry => (
+          <li key={entry.name}>
+            <span>{entry.name}・{entry.detail}</span>
+          </li>
+        ))}
+      </ul>
+      <p className={styles.note}>名前・値段は架空です。見本のため実際の設定は変わりません。</p>
+    </Card>
+  </section>
+}
+
 /** 教室・レッスン3ページ目「クラスの予定を確認する」の静止見本。保存・送信はしない。 */
 export function LessonOperationDemo() {
   return <section aria-label="クラスの予定の見本">
-    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <p className={styles.note}>画面の見本です。実際の設定は変わりません。</p>
     <Card layout="vertical" padding="default" gap="normal" aria-label="クラスの予定">
       <strong>クラスの予定（見本）</strong>
       <ul className={styles.can}>
