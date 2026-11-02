@@ -50,6 +50,7 @@ it('アカウント切替後には古い確認ボタンを保持しても操作�
  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
  const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
  view.rerender(<Saved accountId="other" canManage />)
+ view.rerender(<Saved accountId="account" canManage />)
  await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
  expect(net.status).not.toHaveBeenCalled()
 })

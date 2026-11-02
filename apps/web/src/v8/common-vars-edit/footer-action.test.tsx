@@ -119,6 +119,7 @@ it('確認と理由がそろったら対象アカウントで一度だけ削除�
   fireEvent.click(within(dialog).getByRole('button', { name: '削除する', exact: true }))
   await waitFor(() => expect(state.remove).toHaveBeenCalledWith('var-1', 'a', '整理のため'))
   expect(state.remove).toHaveBeenCalledTimes(1)
+  expect(screen.queryByText(/LINEアカウントが切り替わりました/)).toBeNull()
 })
 
 it('アカウントを切り替えて戻しても古い削除確定は送らない', async () => {

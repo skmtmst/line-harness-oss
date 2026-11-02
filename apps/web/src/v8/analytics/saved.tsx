@@ -122,6 +122,9 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   const [archiveTarget, setArchiveTarget] = useState<AnalyticsReportSchedule | null>(null)
   const [archiveAccount, setArchiveAccount] = useState('')
   const archiveWindow = useRef<object>({})
+  const archiveWindowAccount = useRef(accountId)
+  if (archiveWindowAccount.current !== accountId) archiveWindow.current = {}
+  archiveWindowAccount.current = accountId
   const renderedArchiveWindow = archiveWindow.current
   const currentAccount = useRef(accountId)
   currentAccount.current = accountId

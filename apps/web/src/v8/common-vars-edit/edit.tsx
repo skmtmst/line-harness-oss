@@ -346,6 +346,7 @@ function EditCommonVarV8Inner() {
       if (!res.success) throw new Error(res.error)
       setDeleting(false)
       deleteWindow.current = {}
+      setDeleteTarget(null)
       router.push('/contents/vars')
     } catch (e) {
       if (latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return
