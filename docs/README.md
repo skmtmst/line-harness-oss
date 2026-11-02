@@ -1132,3 +1132,5 @@
 - [振替券・空き待ちと入力表示の改善](release-log/unreleased/2034-kenta-train-1031r.md) — 反映履歴、確認 2026-11-01。
 
 - [予約案内・クーポンと入力理由の改善](release-log/unreleased/2035-kenta-train-1031s.md) — 反映履歴、確認 2026-11-01。
+
+- [電話予約・卓とメニューの削除・下書き保存](release-log/unreleased/2059-kenta-telephone-delete-draft.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
