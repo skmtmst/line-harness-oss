@@ -114,6 +114,39 @@ const EC_BOARD_SAMPLE: EcEntry[] = [
   { name: '見本 ハーブティー', detail: '¥800・残り 35' },
 ]
 
+/**
+ * 飲食店の来店後の見本の値。来店後の送信は設定・公開・承認が必要で、
+ * 保存しただけでは始まらない。実データの読み書き・送信はしない。
+ */
+const RESTAURANT_AFTER_SAMPLE = {
+  visit: { time: '11:30–12:30', name: '見本 みお', menu: 'カット', staff: '見本 あおい' },
+  thanks: { when: '翌日 12:00', text: '昨日はありがとうございました。またのお越しをお待ちしています。' },
+}
+
+/** 飲食店4ページ目「来店のあとも、つながりが続く」の静止見本。保存・送信はしない。 */
+export function RestaurantAfterDemo() {
+  return <section aria-label="来店のあとの見本">
+    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="来店のあと">
+      <strong>来店のあと（見本）</strong>
+      <section aria-label="来店の記録">
+        <p className={styles.description}>予約台帳の来店記録</p>
+        <ul className={styles.can}>
+          <li>
+            <StatusBadge tone="success">来店済み</StatusBadge>
+            <span>{RESTAURANT_AFTER_SAMPLE.visit.time} {RESTAURANT_AFTER_SAMPLE.visit.name} さま・{RESTAURANT_AFTER_SAMPLE.visit.menu}・担当 {RESTAURANT_AFTER_SAMPLE.visit.staff}</span>
+          </li>
+        </ul>
+      </section>
+      <section aria-label="お礼の見本">
+        <p className={styles.description}>LINEのお礼（{RESTAURANT_AFTER_SAMPLE.thanks.when}・停止中）</p>
+        <p className={styles.description}>{RESTAURANT_AFTER_SAMPLE.thanks.text}</p>
+      </section>
+      <p className={styles.note}>名前・数は架空です。送り始めるには設定と承認が必要で、保存しただけでは始まりません。</p>
+    </Card>
+  </section>
+}
+
 /** EC3ページ目「商品の案内を用意する」の静止見本。保存・送信はしない。 */
 export function EcOperationDemo() {
   return <section aria-label="商品の案内の見本">
