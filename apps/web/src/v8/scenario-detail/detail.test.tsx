@@ -411,3 +411,35 @@ describe('整理後も保存・開始・停止と通の状態を保つ', () => {
     expect(within(dialog).getByRole('button', { name: '一時停止する', exact: true }).hasAttribute('disabled')).toBe(false)
   })
 })
+
+describe('通の編集中の見え方', () => {
+  it('新しい通の編集中はその内容だけを下見し、閉じると選択中の通に戻る', async () => {
+    await render()
+    expect(screen.getAllByRole('region', { name: 'LINEでの見え方' })).toHaveLength(1)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'メッセージを追加する' })) })
+    expect(screen.getAllByRole('region', { name: 'LINEでの見え方' })).toHaveLength(1)
+    const current = screen.getByRole('complementary', { name: '3通目の下見' })
+    fireEvent.change(screen.getByPlaceholderText('メッセージ内容を入力…'), { target: { value: '新しい本文' } })
+    expect(within(current).getByRole('region', { name: 'LINEでの見え方' }).textContent).toContain('新しい本文')
+    const actions = screen.getByRole('button', { name: '追加する', exact: true }).parentElement!
+    fireEvent.click(within(actions).getByRole('button', { name: 'キャンセル' }))
+    expect(screen.queryByRole('complementary', { name: '3通目の下見' })).toBeNull()
+    expect(screen.getByText('選んだ通（1通目）の見え方')).toBeTruthy()
+    expect(screen.getAllByRole('region', { name: 'LINEでの見え方' })).toHaveLength(1)
+  })
+
+  it('既存の通を編集中も編集中の通の下見を1つだけ表示する', async () => {
+    await render()
+    fireEvent.click(screen.getByRole('button', { name: '使い方のポイント' }))
+    expect(screen.getByRole('complementary', { name: '2通目の下見' })).toBeTruthy()
+    expect(screen.getAllByRole('region', { name: 'LINEでの見え方' })).toHaveLength(1)
+  })
+})
+
+it.each(['テンプレートを追加する', '分岐を追加する', '＋ ここに挿入'])('%s でも編集中の下見だけを表示する', async (name) => {
+  await render()
+  const button = screen.getAllByRole('button', { name })[0]
+  await act(async () => { fireEvent.click(button) })
+  expect(screen.getByRole('complementary', { name: /通目の下見/ })).toBeTruthy()
+  expect(screen.getAllByRole('region', { name: 'LINEでの見え方' })).toHaveLength(1)
+})

@@ -316,3 +316,20 @@ export function LessonOperationDemo() {
     </Card>
   </section>
 }
+
+/** 架空の注文数と問い合わせを示す、読み取り専用の見本。 */
+export function EcAfterDemo() {
+  return <section aria-label="注文のあとの見本">
+    <Card layout="vertical" padding="default" gap="normal" aria-label="注文とお問い合わせ">
+      <strong>注文とお問い合わせ（見本）</strong>
+      <p className={styles.description}>今日の注文 5件</p>
+      <ul className={styles.can}>
+        <li><StatusBadge tone="neutral">注文</StatusBadge><span>見本 焼き菓子セット・2件</span></li>
+        <li><StatusBadge tone="neutral">注文</StatusBadge><span>見本 ハーブティー・1件</span></li>
+        <li><StatusBadge tone="neutral">注文</StatusBadge><span>見本 クッキー缶・2件</span></li>
+      </ul>
+      <p className={styles.description}>お問い合わせ・未返信 1件</p>
+      <p className={styles.note}>見本 あかり さま・届き日のご相談</p>
+    </Card>
+  </section>
+}

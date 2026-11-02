@@ -71,8 +71,8 @@ export function ScenarioStepForm({
       <ScenarioDraftConflictNotice ago={stepDraft.conflictAgo} onLoadLatest={loadLatestStepDraft} onOverwrite={stepDraft.overwrite} />
       {/* 左が編集、右が「いまどの通を触っているか」。任意値の桁指定ではなく
           3列の標準段で組む（2:1）。直書きの数を増やさない。 */}
-      <div className="grid gap-4 lg:grid-cols-3">
-      <div className="min-w-0 space-y-4 lg:col-span-2">
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="min-w-0 space-y-4 xl:col-span-2">
         <FormSection
           node="xfYLn"
           title="配信タイミング"
