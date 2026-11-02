@@ -9,7 +9,7 @@ vi.hoisted(() => {
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
 })
 
-const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), updateTable: vi.fn(), updateReservation: vi.fn(), saveTableLayout: vi.fn() }))
+const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), deleteTable: vi.fn(), updateTable: vi.fn(), updateReservation: vi.fn(), saveTableLayout: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const floorApi = vi.hoisted(() => ({ floors: vi.fn() }))
 const assignmentApi = vi.hoisted(() => ({ getTables: vi.fn(), saveTables: vi.fn() }))
@@ -24,6 +24,7 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRo
 
 import TablesPage from './tables'
 import { pickMoveTarget } from './move'
+import { ApiError } from '@/lib/api/transport/errors'
 import { at, reservation, snapshotOf, store, tables } from '../booking-kit/test-data'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
@@ -45,7 +46,7 @@ beforeEach(() => {
   assignmentApi.saveTables.mockImplementation(async (_account, _store, input) => ({ success: true, data: { ...assignment, ...input, version: 5 } }))
   floorApi.floors.mockResolvedValue({ success: true, data: [] })
   fixture.snapshot.mockResolvedValue({ data: snapshotOf({ reservations: upcoming }) })
-  for (const fn of [fixture.createTable, fixture.updateTable, fixture.updateReservation, fixture.saveTableLayout]) fn.mockResolvedValue({ success: true })
+  for (const fn of [fixture.createTable, fixture.deleteTable, fixture.updateTable, fixture.updateReservation, fixture.saveTableLayout]) fn.mockResolvedValue({ success: true })
 })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
@@ -125,6 +126,29 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true }))
     expect(fixture.updateTable).not.toHaveBeenCalled()
     expect(fixture.updateReservation).not.toHaveBeenCalled()
+  })
+
+  it('卓を名前と復元不可の確認を経て削除する', async () => {
+    render(<TablesPage />)
+    const row = (await screen.findByText('T3 · 窓側4人卓')).closest('li')!
+    fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    expect(screen.getByText('T3・窓側4人卓')).toBeTruthy()
+    expect(screen.getByText(/元に戻せません/)).toBeTruthy()
+    expect(fixture.deleteTable).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+    await waitFor(() => expect(fixture.deleteTable).toHaveBeenCalledWith('account-1', 't3'))
+  })
+
+  it('参照中の卓は確認窓に理由を出して残す', async () => {
+    fixture.deleteTable.mockRejectedValueOnce(new ApiError(409, '予約で使われている卓は削除できません。停止してください', 'resource_in_use'))
+    render(<TablesPage />)
+    const row = (await screen.findByText('T3 · 窓側4人卓')).closest('li')!
+    fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+    expect(await screen.findByText(/予約で使われている卓は削除できません/)).toBeTruthy()
+    expect(screen.getByText('T3・窓側4人卓')).toBeTruthy()
   })
 
   it('止めるときは先の予約を出し、入る卓へ移し、入らない予約は未配席にしてから止める', async () => {

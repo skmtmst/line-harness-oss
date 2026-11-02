@@ -63,7 +63,6 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
     fireEvent.click(save)
     expect(calls.create).not.toHaveBeenCalled()
     fireEvent.change(screen.getByLabelText(/^統括での名前/), { target: { value: '予約の返事' } })
-    expect(save.isConnected).toBe(false)
     const enabled = getPageAction({ name: '下書きとして保存' }) as HTMLButtonElement
     expect(enabled.disabled).toBe(false)
     expect(enabled.title).toBe('')

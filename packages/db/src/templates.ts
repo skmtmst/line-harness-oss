@@ -282,6 +282,25 @@ export async function deleteTemplate(db: D1Database, id: string): Promise<void> 
   ]);
 }
 
+/** 自動作成した未公開の下書きだけ、読み取った版のままなら消す。 */
+export async function deleteCreatedTemplateDraft(db: D1Database, id: string, revision: number): Promise<boolean> {
+  const now = jstNow();
+  try {
+    await db.batch([
+      db.prepare(`SELECT json('__TEMPLATE_DRAFT_CHANGED__') WHERE NOT EXISTS (
+        SELECT 1 FROM templates WHERE id = ? AND deleted_at IS NULL
+          AND COALESCE(published_version, 0) = 0 AND COALESCE(draft_revision, 0) = ?
+      )`).bind(id, revision),
+      db.prepare(`UPDATE templates SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`).bind(now, now, id),
+      db.prepare(`DELETE FROM media_usages WHERE ref_kind = 'template' AND ref_id = ?`).bind(id),
+    ]);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && /malformed JSON/i.test(error.message)) return false;
+    throw error;
+  }
+}
+
 export interface TemplateDraftUpdates {
   /** 編集画面を読み込んだ時点の版。保存直前の読み直しで置き換えない。 */
   expectedVersion?: number;

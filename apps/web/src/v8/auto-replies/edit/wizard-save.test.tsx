@@ -259,7 +259,7 @@ it('現行の5段の順序と現在の段を明示する',async()=>{
 it('狭幅用の見本は操作して開き、保存は見本の外の下部帯に置く',async()=>{
   await mount('response')
   expect(document.querySelector('[data-template-region="preview"]')?.getAttribute('data-preview-narrow')).toBe('hidden')
-  expect(getPageAction({name:'下書きとして保存'}).getAttribute('role')).toBe('menuitem')
+  expect(document.querySelector('[data-template-region="footer"]')?.contains(getPageAction({name:'下書きとして保存'}))).toBe(true)
   expect(document.querySelector('[data-template-region="footer"]')?.textContent).toContain('次へ')
   fireEvent.click(screen.getByRole('button',{name:'LINEの見え方を確認'}))
   expect(await screen.findByRole('dialog',{name:'LINEの見え方'})).toBeTruthy()

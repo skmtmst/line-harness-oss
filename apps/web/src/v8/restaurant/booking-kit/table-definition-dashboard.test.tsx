@@ -27,7 +27,7 @@ afterEach(() => { cleanup(); vi.useRealTimers() })
 beforeEach(() => {
   vi.clearAllMocks(); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   state.data = snapshotOf({ tables: tables.filter(t => t.is_active).map(t => ({ ...t, max_capacity: Math.min(t.max_capacity, 6) })), stores: [store] }) as RestaurantSnapshot
-  api.openingHours.mockResolvedValue({ data: { hours: null } }); api.reservationsDay.mockResolvedValue({ data: { reservations: [] } })
+  api.openingHours.mockResolvedValue({ data: { hours: Array.from({length:7}, (_, weekday) => ({weekday, periods:[{opensAt:'17:00',closesAt:'23:00'}]})) } }); api.reservationsDay.mockResolvedValue({ data: { reservations: [] } })
 })
 it.each(['phone', 'walk-in'] as const)('業種ダッシュボードの親から %s へ取得情報を渡し、追加取得・保存せず理由を出す', async entry => {
   state.entry = entry

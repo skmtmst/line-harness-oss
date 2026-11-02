@@ -30,7 +30,7 @@ beforeEach(() => {
   api.createReservation.mockResolvedValue({ success: true, data: { id: 'new-1', tableId: 't1', lineNotice: { sent: true, reason: null } } })
   api.postSeatVisitMark.mockResolvedValue({ success: true, data: { status: 'seated' } })
   api.reservationsDay.mockResolvedValue({ success: true, data: { date: '', reservations: [] } })
-  api.openingHours.mockResolvedValue({ success: true, data: { hours: null } })
+  api.openingHours.mockResolvedValue({ success: true, data: { hours: Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [{ opensAt: '17:00', closesAt: '23:00' }] })) } })
   api.customerSearch.mockResolvedValue({ success: true, data: [{ name: '鈴木 美咲', phone: '090-1234-5678', lineUid: 'U-1' }] })
 })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
@@ -49,10 +49,10 @@ describe('空いている時刻・卓の決まり', () => {
     expect(freeTables(T, 2, start, gone, today(12).getTime()).map((t) => t.code)).toEqual(['T1', 'T2', 'T3', 'T4'])
   })
 
-  it('開ける時間が読めないときは 17:00〜21:00、今日は過ぎた時刻を出さない', () => {
+  it('開ける時間が読めないときは予約時刻を出さない', () => {
     const day = toYmd(new Date())
-    expect(openTimes(day, null, today(18, 10))).toEqual(['18:30', '19:00', '19:30', '20:00', '20:30', '21:00'])
-    expect(openTimes('2099-01-01', null, today(18)).length).toBe(9)
+    expect(openTimes(day, null, today(18, 10))).toEqual([])
+    expect(openTimes('2099-01-01', null, today(18))).toEqual([])
   })
 
   it('満席のとき、人数が入る卓がいちばん早く空く時刻を出す', () => {
@@ -99,7 +99,7 @@ describe('ウォークイン（E-3）', () => {
 describe('電話予約（E-2）', () => {
   it('電話番号で友だちを探し、押すと名前が入り、時刻を選んで source=phone で保存する（LINE で確認を送る）', async () => {
     const onSaved = vi.fn()
-    render(<PhoneReservationDrawer open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={onSaved} />)
+    render(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={onSaved} />)
     const changeTable = screen.getByRole('button', { name: '変える' }) as HTMLButtonElement
     expect(changeTable.disabled).toBe(true)
     expect(changeTable.title).toBe('空いている時刻を選ぶと卓を変えられます')
@@ -119,7 +119,7 @@ describe('電話予約（E-2）', () => {
   })
 
   it('お名前も時刻も無い間は保存を止め、欄を離れた時の2つの理由も保つ', async () => {
-    render(<PhoneReservationDrawer open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
+    render(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
     fireEvent.click(screen.getByText(/明日/))
     const time = await screen.findByRole('button', { name: '19:00' })
     const submit = screen.getByRole('button', { name: /予約を入れる/ }) as HTMLButtonElement
@@ -137,7 +137,7 @@ describe('電話予約（E-2）', () => {
 
   it('友だちでないときは「LINE で確認を送る」を出さず、送らない', async () => {
     api.customerSearch.mockResolvedValue({ success: true, data: [] })
-    render(<PhoneReservationDrawer open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
+    render(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
     fireEvent.change(screen.getByRole('textbox', { name: 'お名前' }), { target: { value: '田中' } })
     fireEvent.click(screen.getByText(/明日/))
     fireEvent.click(await screen.findByRole('button', { name: '19:00' }))
@@ -164,7 +164,7 @@ it('UTCの端末でも日付と受け付ける時刻を日本時間で選ぶ', (
 
 it('顧客へのLINEは引き出しでも既定オフで、選び直しや再開で同意を引き継がない', async () => {
  const props={open:true,accountId:'acc',storeId:'store-1',tables:T,onClose:vi.fn(),onSaved:vi.fn()}
- const view=render(<PhoneReservationDrawer {...props}/>)
+ const view=render(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" {...props}/>)
  fireEvent.change(screen.getByRole('textbox',{name:'電話番号'}),{target:{value:'09012345678'}})
  fireEvent.click(await screen.findByRole('button',{name:/鈴木 美咲/}))
  const toggle=()=>screen.getByRole('switch',{name:'LINE で確認を送る'})
@@ -175,7 +175,7 @@ it('顧客へのLINEは引き出しでも既定オフで、選び直しや再開
  fireEvent.click(screen.getByRole('button',{name:/鈴木 美咲/}))
  expect(toggle().getAttribute('aria-checked')).toBe('false')
  fireEvent.click(toggle())
- view.rerender(<PhoneReservationDrawer {...props} open={false}/>);view.rerender(<PhoneReservationDrawer {...props}/>)
+ view.rerender(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" {...props} open={false}/>);view.rerender(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" {...props}/>)
  fireEvent.change(screen.getByRole('textbox',{name:'電話番号'}),{target:{value:'09012345678'}})
  fireEvent.click(await screen.findByRole('button',{name:/鈴木 美咲/}))
  expect(toggle().getAttribute('aria-checked')).toBe('false')
@@ -186,12 +186,12 @@ it('顧客へのLINEは引き出しでも既定オフで、選び直しや再開
 
 it.each([{accountId:'other',storeId:'store-1'},{accountId:'acc',storeId:'other'}])('引き出しの顧客へのLINE同意を別の文脈へ引き継がず、戻しても復活させない %o',async(next)=>{
  const props={open:true,accountId:'acc',storeId:'store-1',tables:T,onClose:vi.fn(),onSaved:vi.fn()}
- const view=render(<PhoneReservationDrawer {...props}/>)
+ const view=render(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" {...props}/>)
  fireEvent.change(screen.getByRole('textbox',{name:'電話番号'}),{target:{value:'09012345678'}})
  fireEvent.click(await screen.findByRole('button',{name:/鈴木 美咲/}))
  const toggle=()=>screen.getByRole('switch',{name:'LINE で確認を送る'})
  fireEvent.click(toggle());expect(toggle().getAttribute('aria-checked')).toBe('true')
- view.rerender(<PhoneReservationDrawer {...props} {...next}/>);expect(toggle().getAttribute('aria-checked')).toBe('false')
- view.rerender(<PhoneReservationDrawer {...props}/>);expect(toggle().getAttribute('aria-checked')).toBe('false')
+ view.rerender(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" {...props} {...next}/>);expect(toggle().getAttribute('aria-checked')).toBe('false')
+ view.rerender(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" {...props}/>);expect(toggle().getAttribute('aria-checked')).toBe('false')
  expect(api.createReservation).not.toHaveBeenCalled()
 })

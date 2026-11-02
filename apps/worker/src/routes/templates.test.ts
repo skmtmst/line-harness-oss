@@ -13,6 +13,7 @@ const mocks = {
   publishTemplate: vi.fn(),
   hasTemplateDraft: vi.fn().mockReturnValue(false),
   deleteTemplate: vi.fn(),
+  deleteCreatedTemplateDraft: vi.fn(),
   getCarouselTapTotals: vi.fn(),
   getFolderById: vi.fn(),
   listTemplateVersions: vi.fn().mockResolvedValue([]),
@@ -104,6 +105,22 @@ describe('テンプレートの削除', () => {
     expect(response.status).toBe(409);
     expect(body).toMatchObject({ code: 'IN_USE', usageCount: 1 });
     expect(body.error).toContain('送信待ちの通知1件');
+    expect(mocks.deleteTemplate).not.toHaveBeenCalled();
+  });
+
+  it('自動保存した下書きの削除では版が進んだら消さない', async () => {
+    mocks.getTemplateById.mockResolvedValue({ id: 'tpl-1', line_account_id: 'account-1', published_version: 0, draft_revision: 3 });
+    const response = await makeApp().fetch(new Request('https://example.com/api/templates/tpl-1?expectedDraftRevision=2', { method: 'DELETE' }), env);
+    expect(response.status).toBe(409);
+    expect(mocks.deleteTemplate).not.toHaveBeenCalled();
+  });
+
+  it('削除直前に版が変わったら409で止める', async () => {
+    mocks.getTemplateById.mockResolvedValue({ id: 'tpl-1', line_account_id: 'account-1', published_version: 0, draft_revision: 2 });
+    mocks.deleteCreatedTemplateDraft.mockResolvedValue(false);
+    const response = await makeApp().fetch(new Request('https://example.com/api/templates/tpl-1?expectedDraftRevision=2', { method: 'DELETE' }), env);
+    expect(response.status).toBe(409);
+    expect(mocks.deleteCreatedTemplateDraft).toHaveBeenCalledWith(env.DB, 'tpl-1', 2);
     expect(mocks.deleteTemplate).not.toHaveBeenCalled();
   });
 

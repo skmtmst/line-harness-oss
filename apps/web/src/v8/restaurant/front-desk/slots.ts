@@ -9,8 +9,6 @@ import type { RestaurantOpeningDay } from '@line-crm/shared'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 
 export const STAY_MINUTES = 120
-const FALLBACK_START = 17 * 60
-const FALLBACK_END = 21 * 60
 const INACTIVE = ['cancelled', 'no_show']
 
 export function pad2(value: number): string {
@@ -58,7 +56,7 @@ export function startOf(date: string, time: string): number {
 
 /**
  * 受けられる時刻：その曜日の開ける時間のうち、2時間いられる30分ごとの始まり。
- * 開ける時間が読めないときは 17:00〜21:00。今日は過ぎた時刻を出さない。
+ * 開ける時間が読めないときは候補を出さない。今日は過ぎた時刻を出さない。
  */
 export function openTimes(date: string, hours: RestaurantOpeningDay[] | null, now = new Date()): string[] {
   const [y, m, d] = date.split('-').map(Number)
@@ -69,8 +67,6 @@ export function openTimes(date: string, hours: RestaurantOpeningDay[] | null, no
     for (const period of periods) {
       for (let t = toMinutes(period.opensAt); t + STAY_MINUTES <= toMinutes(period.closesAt); t += 30) list.push(t)
     }
-  } else if (!hours) {
-    for (let t = FALLBACK_START; t <= FALLBACK_END; t += 30) list.push(t)
   }
   const today = toYmd(now) === date
   const calendar = jstCalendar(now)

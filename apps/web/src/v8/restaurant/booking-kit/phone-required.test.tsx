@@ -14,9 +14,9 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 type Entry = 'page' | 'drawer'
 const onSave = vi.fn()
 function open(entry: Entry) {
-  if (entry === 'drawer') render(<PhoneReservationDrawer open accountId="account-1" storeId="store-1" tables={tables} onClose={vi.fn()} onSaved={vi.fn()} />)
+  if (entry === 'drawer') render(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" open accountId="account-1" storeId="store-1" tables={tables} onClose={vi.fn()} onSaved={vi.fn()} />)
   else {
-    render(<PhoneReservation storeId="store-1" storeName="模擬店舗" tables={tables} menuItems={[]} busy={false} preset={{ date: new Date('2026-10-11T00:00:00+09:00') }} onBack={vi.fn()} onSave={onSave} />)
+    render(<PhoneReservation accountStyle="restaurant" staffRole="owner" storeId="store-1" storeName="模擬店舗" tables={tables} menuItems={[]} busy={false} preset={{ date: new Date('2026-10-11T00:00:00+09:00') }} onBack={vi.fn()} onSave={onSave} />)
     fireEvent.click(screen.getByRole('button', { name: 'LINE 未連携の電話番号' }))
   }
 }
