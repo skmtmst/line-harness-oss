@@ -19,6 +19,7 @@ export const templatesMethods = {
         messageBubbles?: BroadcastBubble[] | null;
         /** R194: 管理一覧の抜粋・検索が読む最新の下書き本文。公開版だけのときは null。 */
         draftMessageContent: string | null;
+        draftMessageBubbles?: BroadcastBubble[] | null;
         folderId: string | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';

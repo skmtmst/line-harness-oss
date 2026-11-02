@@ -3,7 +3,7 @@
 import { isRichVideoTemplate } from './list-model'
 
 import { renderTemplateDialogs } from './list-dialogs'
-import { ChipKey,FolderCountSection,PAGE_SIZE_OPTIONS,PendingDelete,SAVED_FILTER_OPTIONS,Section,Template,latestContentOf,normalizeTemplateSearchText } from './list-model'
+import { ChipKey,FolderCountSection,PAGE_SIZE_OPTIONS,PendingDelete,SAVED_FILTER_OPTIONS,Section,Template,latestContentOf, hasMultipleMessages,normalizeTemplateSearchText } from './list-model'
 import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { renderTemplateList } from './list-table'
 
@@ -323,9 +323,9 @@ export default function TemplatesListV8() {
     if (selectedCategory === 'unfiled' && t.folderId !== null) return []
     if (selectedCategory !== 'all' && selectedCategory !== 'unfiled' && t.folderId !== selectedCategory) return []
     if (chips.unused && t.usageCount !== 0) return []
-    if (chips.single && (t.question !== null || t.messageType === 'carousel')) return []
+    if (chips.single && hasMultipleMessages(t)) return []
     const content = latestContentOf(t)
-    if (chips.multiple && t.messageType !== 'carousel' && !content.includes('\n\n')) return []
+    if (chips.multiple && !hasMultipleMessages(t)) return []
     if (chips.variables && !content.includes('{{')) return []
     if (savedFilter === 'used' && !(t.usageCount > 0)) return []
     if (savedFilter === 'draft-changes' && !(t.hasDraft && t.publishedAt != null)) return []
@@ -817,7 +817,7 @@ export default function TemplatesListV8() {
     <div role="group" aria-label="中身で絞り込む" className={styles.chipGroup}>
       <SegmentedControl aria-label="メッセージの数" value={chips.single ? 'single' : chips.multiple ? 'multiple' : 'all'}
         onChange={value => setChips(current => ({ ...current, single: value === 'single', multiple: value === 'multiple' }))}
-        options={[{ value: 'all', label: 'すべて' }, { value: 'single', label: '1通のみ' }, { value: 'multiple', label: '複数通' }]} />
+        options={[{ value: 'all', label: 'すべて' }, { value: 'single', label: '1通のみ' }, ...(tabItems.some(hasMultipleMessages) ? [{ value: 'multiple', label: '複数通' }] : [])]} />
       <FilterChip selected={chips.variables} onChange={() => toggleChip('variables')} title="名前や情報を差し込むテンプレート" icon={<Braces size={16} aria-hidden="true" />}>
         差し込みあり
       </FilterChip>

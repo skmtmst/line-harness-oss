@@ -297,6 +297,7 @@ it('U2：題の共通説明を開いて閉じ、一覧の操作を保つ', async
 afterEach(() => { verifiedStaffRole(null) })
 
 it('通数は排他的な切り替えで、差し込みと未使用は併用し、矢印でも条件を保つ', async () => {
+  listTemplates.mockResolvedValue({ success: true, data: [used, unused, { ...used, id: 'multi', name: '複数', hasDraft: false, messageBubbles: [{ id: '1', type: 'text', text: 'a' }, { id: '2', type: 'text', text: 'b' }] }] })
   await renderList()
   const group = screen.getByRole('group', { name: 'メッセージの数' })
   const single = within(group).getByRole('button', { name: '1通のみ' })
@@ -315,4 +316,24 @@ it('通数は排他的な切り替えで、差し込みと未使用は併用し�
   expect(single.getAttribute('aria-pressed')).toBe('false')
   expect(multiple.getAttribute('aria-pressed')).toBe('false')
   expect(screen.getByRole('button', { name: '使っていない' }).getAttribute('aria-pressed')).toBe('true')
+})
+
+
+it('C-10: 単一メッセージの改行やカルーセルを複数通と誤認せず、作成案内はテキストに限る', async () => {
+  window.history.replaceState(null, '', '/templates')
+  listTemplates.mockResolvedValue({ success: true, data: [{ ...used, messageContent: '一行目\n\n二行目' }, { ...unused, messageType: 'carousel' }] })
+  await renderList()
+  expect(within(screen.getByRole('group', { name: 'メッセージの数' })).queryByRole('button', { name: '複数通' })).toBeNull()
+  fireEvent.click(screen.getAllByRole('button', { name: '種類を選んで作る' })[0])
+  expect(screen.queryByText('テキスト・カード型・画像。差し込みも使える')).toBeNull()
+  expect(screen.getByText('テキスト。差し込みも使える')).toBeTruthy()
+})
+
+it('C-10: 保存された複数通だけを絞り込み、複数通の下書きも見つけられる', async () => {
+  window.history.replaceState(null, '', '/templates')
+  listTemplates.mockResolvedValue({ success: true, data: [used, { ...used, id: 'multi', name: '複数通の下書き', draftMessageBubbles: [{ id: '1', type: 'text', text: 'a' }, { id: '2', type: 'text', text: 'b' }] }] })
+  await renderList()
+  fireEvent.click(within(screen.getByRole('group', { name: 'メッセージの数' })).getByRole('button', { name: '複数通' }))
+  expect(screen.getByText('複数通の下書き')).toBeTruthy()
+  expect(screen.queryByText('予約前日のご案内')).toBeNull()
 })

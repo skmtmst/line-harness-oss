@@ -343,3 +343,18 @@ describe(': 版を作った人', () => {
     expect((await json('GET', `/api/templates/${id}/versions`)).status).toBe(404);
   });
 });
+
+
+it('一覧は公開版と編集途中の複数通を分けて返す', async () => {
+  const id = await createTemplateOnApi();
+  await publishOnApi(id, '', 'testkey-multiple-list');
+  const published = [{id:'p',type:'text',content:{text:'公開'}}];
+  const draft = [{id:'d1',type:'text',content:{text:'一通目'}},{id:'d2',type:'text',content:{text:'二通目'}}];
+  store.raw.prepare('UPDATE templates SET message_bubbles_json=?, draft_message_bubbles_json=?, draft_message_content=?, draft_revision=1 WHERE id=?').run(JSON.stringify(published),JSON.stringify(draft),'編集途中',id);
+  const response = await json('GET', '/api/templates?account_id=account-1');
+  expect(response.status).toBe(200);
+  const result = await response.json() as {data:Array<{id:string;messageBubbles:unknown;draftMessageBubbles:unknown}>};
+  const row = result.data.find(item => item.id === id)!;
+  expect(row.messageBubbles).toEqual(published);
+  expect(row.draftMessageBubbles).toEqual(draft);
+});
