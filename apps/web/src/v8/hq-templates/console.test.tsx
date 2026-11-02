@@ -746,6 +746,22 @@ it('質問の通常入力は再読込後も一時下書きから復元する（H
   expect(await screen.findByDisplayValue('未保存の質問名')).toBeTruthy()
   expect((screen.getByLabelText(/^質問文/) as HTMLInputElement).value).toContain('未保存の質問文ですか？')
 })
+it('リッチメッセージの通常入力は再読込後も一時下書きから復元する（H-18原文）', async () => {
+  const media = [1040].map((width) => ({ id: `m-${width}`, kind: 'image', filename: `${width}.png`, mimeType: 'image/png', sizeBytes: 1, width, height: width, durationMs: null, r2Key: `hq/rich/${width}`, publicUrl: null, versionId: 'v1', versionNo: 1, contentHash: 'h' }))
+  calls.uploadRichMessageImage.mockResolvedValue({ media, payload: { imageUrl: 'https://img.test/rich/1040', baseUrl: 'https://img.test/rich', baseSize: { width: 1040, height: 1040 } } })
+  const { unmount } = render(<HqTemplatesV8 type="template" />)
+  fireEvent.click(await screen.findByRole('tab', { name: /リッチメッセージ/ }))
+  fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+  expect(await screen.findByRole('heading', { name: 'リッチメッセージを作る' })).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '未保存リッチ' } })
+  fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [new File(['png'], 'rich.png', { type: 'image/png' })] } })
+  await waitFor(() => expect(window.sessionStorage.getItem('lh_hq_create_draft_v1:tenant-a:owner:template:rich_message') ?? '').toContain('未保存リッチ'), { timeout: 5000 })
+  unmount()
+  cleanup()
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  expect(await screen.findByDisplayValue('未保存リッチ')).toBeTruthy()
+})
 it('未配布ありの1件を消すと数の帯を取り直す（B25）', async () => {
   calls.listStats
     .mockResolvedValueOnce({ thisMonthSentCount: 0, outdatedTemplateCount: 1 })

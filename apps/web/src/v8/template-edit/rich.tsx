@@ -242,6 +242,20 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     // 統括では上のバーのアカウントに結びつかない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
+  /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。画像の無い途中は通知しない。 */
+  const richDraftSnapshot = JSON.stringify([name, imageUrl, shapeValue, areas, uploaded])
+  useEffect(() => {
+    if (!host?.onDraftChange) return
+    try {
+      const built = buildRichPayload({ imageUrl, pickedMedia: hqHost ? null : pickedMedia, shape: shapeDef, areas, liffId })
+      if ('error' in built) return
+      const { imageMediaId: _id, imageMediaKind: _kind, ...rest } = built.payload
+      void _id; void _kind
+      if (hqHost && !uploaded) return
+      host.onDraftChange({ kind: 'rich_message', name, payload: hqHost ? { ...uploaded!.payload, ...rest } : built.payload, media: uploaded?.media ?? [] })
+    } catch { /* 組み立て不可の途中入力は通知しない */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [richDraftSnapshot])
 
   /* フォルダはアカウントの置き場一覧から選ぶ（保存値はフォルダ名のまま。今と同じ）。 */
   useEffect(() => {
