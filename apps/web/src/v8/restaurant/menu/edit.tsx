@@ -31,7 +31,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { notifySaved } from '@/components/shared/toast'
 import { emptyValue } from '@/components/shared/empty-value'
 import { useAccount } from '@/contexts/account-context'
-import { api, fetchApi } from '@/lib/api'
+import { api, ApiError, fetchApi } from '@/lib/api'
 import { formatDateTime as polishFormatDateTime, formatYen } from '@/lib/format'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -79,6 +79,7 @@ function MenuEditBody() {
   const [storeId, setStoreId] = useState<string | null>(null)
   const [storeAccountId, setStoreAccountId] = useState<string | null>(null)
   const [mediaName, setMediaName] = useState<string | null>(null)
+  const [imageError, setImageError] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft>(draftOf(null))
   const [saved, setSaved] = useState<Draft>(draftOf(null))
   const [busy, setBusy] = useState(false)
@@ -138,7 +139,7 @@ function MenuEditBody() {
     if (!isCurrent()) return
     const attempt = mutationContext.current
     const stillHere = () => isCurrent() && mutationContext.current === attempt
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); setImageError(null)
     const body = {
       kind: draft.kind, name: draft.name, price: Number(draft.price),
       description: draft.description.trim() || null, ...(editing && draft.imageMediaId === (editing.image_media_id ?? null) ? {} : { imageMediaId: draft.imageMediaId }),
@@ -172,6 +173,7 @@ function MenuEditBody() {
       /* お支払いの版が古い（409）ときは共通の帯と比べる窓で選んでもらう。ページの中身は保存済み。 */
       if (cause instanceof PaymentConflictError) { setSaved(draft); setError('メニュー本体は保存しました。お支払いの設定は、閉じて最新の内容と比べてください。'); return false }
       saveErrors.capture(cause)
+      if (cause instanceof ApiError && cause.code === 'MENU_IMAGE_UNAVAILABLE') setImageError('選択した画像を利用できません。登録メディアから選び直してください。')
       setError('保存できませんでした。入力を確かめて、もう一度お試しください。')
       return false
     } finally {
@@ -267,17 +269,17 @@ function MenuEditBody() {
             <Field label="メニューの説明" htmlFor="rs-menu-description" note="2,000文字まで">
               <SaveErrorField names={['description', 'draft.description']}><TextArea id="rs-menu-description" aria-label="メニューの説明" rows={3} maxLength={2000} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></SaveErrorField>
             </Field>
-            <Field label="メニューの画像">
+            <Field label="メニューの画像" error={imageError ?? undefined}>
               <RegisteredImageSelect accountId={storeAccountId} imageId={draft.imageMediaId} imageName={mediaName} disabled={busy}
-                onSelect={media => { setDraft(current => ({ ...current, imageMediaId: media.id })); setMediaName(media.filename) }}
-                onRemove={() => setDraft(current => ({ ...current, imageMediaId: null }))} />
+                onSelect={media => { setImageError(null); setDraft(current => ({ ...current, imageMediaId: media.id })); setMediaName(media.filename) }}
+                onRemove={() => { setImageError(null); setDraft(current => ({ ...current, imageMediaId: null })) }} />
             </Field>
             <Field label="アレルギー（カンマ区切り）" htmlFor="rs-menu-allergens">
               <SaveErrorField names={['allergens', 'draft.allergens']}><TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} /></SaveErrorField>
             </Field>
             <p className={styles.note}>{editing
               ? `価格を変える場合は保存時に確認します。開始日時を空欄にすると保存後すぐに反映します。現在の価格は${formatYen(editing.price)}です。`
-              : '追加したメニューは、予約台帳・Google投稿・LINEカードで同じマスターとして使われます。'}</p>
+              : '追加したメニューは予約台帳で使います。説明と画像は管理画面で確認できます。'}</p>
           </Card>
         ) : (
           <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? (editing.priceChangeStatus === 'approved' ? '確定した新価格は指定した開始日時に反映します。' : '以前の価格変更申請が残っています。メニュー一覧から確認してください。') : undefined} rows={[

@@ -8,7 +8,7 @@ const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createMenu: vi.fn(), upda
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import MenuV8 from '@/v8/restaurant/menu/menu'
 import MenuEditV8 from '@/v8/restaurant/menu/edit'
 const nav = vi.hoisted(() => ({ params: new URLSearchParams('id=m1') }))
@@ -93,6 +93,15 @@ describe('MJoJR メニュー管理のV8', () => {
     expect(await screen.findByText('画像を読めません。登録メディアから選び直してください。')).toBeTruthy()
     expect(screen.queryByText(/選択中：/)).toBeNull()
     expect(screen.queryByAltText('選択したメニューの画像')).toBeNull()
+  })
+
+  it('画像が利用できず保存に失敗したら画像欄に選び直しを案内する', async () => {
+    fixture.updateMenu.mockRejectedValueOnce(new ApiError(400, '画像を選び直してください', 'MENU_IMAGE_UNAVAILABLE'))
+    render(<MenuEditV8 />)
+    fireEvent.change(await screen.findByDisplayValue('秋の鹿肉コース'), { target:{value:'変更した名前'} })
+    fireEvent.click(screen.getByRole('button', { name:'保存する' }))
+    expect(await screen.findByText('選択した画像を利用できません。登録メディアから選び直してください。')).toBeTruthy()
+    expect(screen.getByDisplayValue('変更した名前')).toBeTruthy()
   })
 
   it('必須項目がない時は保存できない理由を表示する', async () => {

@@ -1,4 +1,4 @@
-import type { SqliteD1 } from '../test-utils/d1-sqlite.js';
+import type { SqliteD1 } from './d1-sqlite.js';
 
 export function seedNoticeFriend(testDb: SqliteD1, seed: () => void, lineUid: string, following: number, accountId: string): void {
   seed();

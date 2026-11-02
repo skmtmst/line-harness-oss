@@ -1,7 +1,7 @@
 import { seedRestaurantFixture as seedRestaurantData } from '../test-utils/restaurant-fixture.js';
 import { publishScenarioVersion } from '@line-crm/db';
-import { checkRestaurantMenuMedia } from './restaurant-menu-media-test-utils.js';
-import { seedNoticeFriend } from './restaurant-test-fixture-helpers.js';
+import { checkRestaurantMenuMedia } from '../test-utils/restaurant-menu-media.js';
+import { seedNoticeFriend } from '../test-utils/restaurant-test-fixture-helpers.js';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

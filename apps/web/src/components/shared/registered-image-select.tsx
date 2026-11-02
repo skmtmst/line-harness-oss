@@ -21,7 +21,7 @@ export default function RegisteredImageSelect({ accountId, imageId, imageName, d
   const [failed, setFailed] = useState(false)
   useEffect(() => { setFailed(false); setOpen(false) }, [accountId, imageId])
   return <div className={styles.root}>
-    {imageId && accountId && !failed ? <span onErrorCapture={() => setFailed(true)}><MediaThumbnail size="compact" kind="image" src={apiUrl(imageId, accountId)} alt="選択したメニューの画像" /></span> : null}
+    {imageId && accountId && !failed ? <span className={styles.preview} onErrorCapture={() => setFailed(true)}><MediaThumbnail size="compact" kind="image" src={apiUrl(imageId, accountId)} alt="選択したメニューの画像" /></span> : null}
     <div className={styles.actions}>
       <Button type="button" disabled={!accountId || disabled} disabledReason={!accountId ? '店舗にLINEアカウントを設定すると画像を選べます。' : undefined} onClick={() => setOpen(true)}>登録メディアから選ぶ</Button>
       {imageId ? <Button type="button" onClick={onRemove} disabled={disabled}>選んだ画像を外す</Button> : null}
