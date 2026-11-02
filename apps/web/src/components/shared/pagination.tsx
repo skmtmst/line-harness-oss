@@ -31,7 +31,7 @@ export type PaginationProps = {
   correctOutOfRange?: boolean
 }
 
-/** Pencil の5枠に収め、先頭・現在地・末尾を常に辿れる並びを返す。 */
+/** 7ページまでは全て表示し、多い場合も先頭・現在地・末尾を辿れる並びを返す。 */
 /**
  * ページ番号として使える数に直す。
  *
@@ -52,7 +52,7 @@ export function paginationItems(page: number, pageCount: number): PaginationItem
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
 
-  if (total <= 5) return Array.from({ length: total }, (_, index) => index + 1)
+  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1)
   if (current <= 3) return [1, 2, 3, 'ellipsis', total]
   if (current >= total - 2) return [1, 'ellipsis', total - 2, total - 1, total]
   return [1, 'ellipsis', current, 'ellipsis', total]

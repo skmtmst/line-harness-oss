@@ -276,11 +276,11 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
     const preparing = FEATURES[warning.feature]?.preparing
     rows.push({
       key: `warning-${warning.feature}`,
-      title: `${featureName(warning.feature)}の決まりを入れる`,
+      title: `${featureName(warning.feature)}を設定する`,
       note: 'リッチメニューにボタンがあるのに中身が未設定です',
       badge: { tone: 'warning', label: '未設定' },
       alert: true,
-      action: preparing ? { label: '決まりを入れる', preparing } : { label: '決まりを入れる', href: featureHref(warning.feature, warning.href, state.style) },
+      action: preparing ? { label: `${featureName(warning.feature)}を設定する`, preparing } : { label: `${featureName(warning.feature)}を設定する`, href: featureHref(warning.feature, warning.href, state.style) },
     })
   }
   if (!state.styleSelected && state.styleMode !== 'manual') rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '選ぶ', step: 'style' } })
