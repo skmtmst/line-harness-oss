@@ -116,3 +116,20 @@ it('別テナントの店では既定テナントの旧共通欄も見えず、�
   const overview = await getAnalyticsUsageOverview(db,{...context,lineAccountId:'account-b'});
   expect(overview.data.categories.find(item => item.key === 'friend_attributes')?.breakdown?.find(item => item.key === 'fields')?.created.value).toBe(1);
 });
+
+it('最終利用日は選択店の現役タグと所属する現役情報欄だけから求める', async () => {
+  sqlite.exec(`INSERT INTO tenants (id,name) VALUES ('tenant-other','他社');
+    INSERT INTO tags (id,name,line_account_id,status) VALUES
+      ('tag-a','自店','account-a','active'),('tag-old','保管','account-a','archived'),('tag-b','別店','account-b','active');
+    INSERT INTO friend_tags (friend_id,tag_id,assigned_at) VALUES
+      ('friend-a','tag-a','2026-10-01'),('friend-a','tag-old','2026-12-01'),('friend-a','tag-b','2026-12-02');
+    INSERT INTO friend_fields (id,name,field_key,type,status) VALUES
+      ('field-a','自店','use_a','text','active'),('field-old','保管','use_old','text','archived'),('field-b','他社','use_b','text','active');
+    INSERT INTO friend_field_scopes (field_id,tenant_id,line_account_id,created_at) VALUES
+      ('field-a','${DEFAULT_TENANT_ID}','account-a','2026-01-01'),('field-old','${DEFAULT_TENANT_ID}','account-a','2026-01-01'),('field-b','tenant-other',NULL,'2026-01-01');
+    INSERT INTO friend_field_values (friend_id,field_id,value,updated_at) VALUES
+      ('friend-a','field-a','x','2026-10-02'),('friend-a','field-old','x','2026-12-03'),('friend-a','field-b','x','2026-12-04'),('friend-b','field-a','x','2026-12-05');`);
+  const row = (await getAnalyticsUsageOverview(db, context)).data.categories.find(item => item.key === 'friend_attributes')!;
+  expect(row.lastUsedAt.value).toBe('2026-10-02');
+  expect(row.breakdown?.find(item => item.key === 'fields')?.inUse.value).toBe(1);
+});

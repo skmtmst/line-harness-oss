@@ -13,16 +13,21 @@ export async function getAttributeResourceUsage(db: D1Database, accountId: strin
     tenantId: account.tenant_id ?? DEFAULT_TENANT_ID, lineAccountId: accountId,
   })).filter(field => field.status !== 'archived') : [];
   const [values, assigned] = await Promise.all([
-    db.prepare(`SELECT COUNT(DISTINCT v.field_id) AS in_use, MAX(v.updated_at) AS last_used_at
-    FROM friend_field_values v JOIN friends f ON f.id = v.friend_id
-    WHERE f.line_account_id = ? AND v.value IS NOT NULL AND v.value != ''
-      AND v.field_id IN (SELECT value FROM json_each(?))`)
-    .bind(accountId, JSON.stringify(fields.map(field => field.id)))
-    .first<{ in_use: number; last_used_at: string | null }>(),
+    account ? db.prepare(`SELECT COUNT(DISTINCT v.field_id) AS in_use, MAX(v.updated_at) AS last_used_at
+    FROM friend_fields ff
+    LEFT JOIN friend_field_scopes ffs ON ffs.field_id = ff.id
+    JOIN friend_field_values v ON v.field_id = ff.id
+    JOIN friends f ON f.id = v.friend_id
+    WHERE ff.status <> 'archived' AND COALESCE(ffs.tenant_id, ?) = ?
+      AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)
+      AND f.line_account_id = ? AND v.value IS NOT NULL AND v.value != ''`)
+    .bind(DEFAULT_TENANT_ID, account.tenant_id ?? DEFAULT_TENANT_ID, accountId, accountId)
+    .first<{ in_use: number; last_used_at: string | null }>() : Promise.resolve(null),
     db.prepare(`SELECT MAX(ft.assigned_at) AS last_used_at
     FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id
-    WHERE f.line_account_id = ? AND ft.tag_id IN (SELECT value FROM json_each(?))`)
-    .bind(accountId, JSON.stringify(tags.map(tag => tag.id))).first<{ last_used_at: string | null }>(),
+    JOIN tags t ON t.id = ft.tag_id
+    WHERE f.line_account_id = ? AND t.line_account_id = ? AND t.status <> 'archived'`)
+    .bind(accountId, accountId).first<{ last_used_at: string | null }>(),
   ]);
   const times = [assigned?.last_used_at, values?.last_used_at].filter((value): value is string => Boolean(value));
   return {
