@@ -104,6 +104,7 @@ describe('Y8SjT2 予約枠・在庫のV8', () => {
     fixture.saveInventoryAllocation.mockRejectedValueOnce(new ApiError(409, '競合しました', 'conflict'))
     render(<InventoryV8 />)
     await screen.findByText('席と枠の配分（卓とつながる）')
+    fireEvent.change(await screen.findByRole('spinbutton', { name: '予約サイト' }), { target: { value: '2' } })
     await waitFor(()=>expect(screen.getByRole('button',{name:'受付時間と配分を保存'}).hasAttribute('disabled')).toBe(false))
     fireEvent.click(screen.getByRole('button', { name: '受付時間と配分を保存' }))
     expect((await screen.findByRole('alert')).textContent).toContain('予約枠・在庫を保存しました')
@@ -115,7 +116,7 @@ describe('Y8SjT2 予約枠・在庫のV8', () => {
 it('週の営業時間を保存し、その版を使って30分刻みの枠を作る', async () => {
   fixture.saveOpeningHours.mockImplementation(async()=>{fixture.openingHours.mockResolvedValue({data:{storeId:'store-1',hours:Array.from({length:7},(_,weekday)=>({weekday,periods:[]})),version:2,updatedBy:null,updatedAt:null}});return {success:true,data:{version:2}}})
   render(<InventoryV8 />)
-  await screen.findByRole('button',{name:/受付時間と配分を保存/})
+  fireEvent.click(await screen.findByRole('switch', { name: '月曜日に予約を受ける' }))
   await waitFor(()=>expect(screen.getByRole('button',{name:/受付時間と配分を保存/}).hasAttribute('disabled')).toBe(false))
   fireEvent.click(screen.getByRole('button',{name:/受付時間と配分を保存/}))
   await waitFor(()=>expect(fixture.saveOpeningHours).toHaveBeenCalledWith('account-1',expect.objectContaining({expectedVersion:1,hours:expect.any(Array)})))
@@ -126,6 +127,8 @@ it('週の営業時間を保存し、その版を使って30分刻みの枠を�
 })
 it('全時間帯の配分は各枠の版を添えて一回で保存する', async () => {
   render(<InventoryV8 />)
+  await screen.findByRole('button', { name: '19:00' })
+  fireEvent.change(await screen.findByRole('spinbutton', { name: '予約サイト' }), { target: { value: '2' } })
   await waitFor(()=>expect(screen.getByRole('button',{name:'受付時間と配分を保存'}).hasAttribute('disabled')).toBe(false))
   fireEvent.click(screen.getByRole('button',{name:'受付時間と配分を保存'}))
   await waitFor(()=>expect(fixture.saveInventoryAllocation).toHaveBeenCalledWith('account-1',expect.objectContaining({slots:[{id:'s1',expectedVersion:1},{id:'s2',expectedVersion:1}]})))

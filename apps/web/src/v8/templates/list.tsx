@@ -74,6 +74,10 @@ export default function TemplatesListV8() {
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
+  /*
+   * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
+   * テンプレートを開いて「戻る」と同じ一覧に戻る。
+   */
   const [urlView, setUrlView] = useListUrlState({ q: '', folder: 'all', chips: '', view: '', size: '20', page: '1', tab: 'message' })
   const knownSections: Section[] = ['message', 'question', 'rich_video', 'card_message', 'rich_message', 'coupon', 'research']
   const activeSection: Section = knownSections.includes(urlView.tab as Section) ? urlView.tab as Section : 'message'
@@ -86,11 +90,6 @@ export default function TemplatesListV8() {
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
   const [failure, setFailure] = useState<TemplatesFailure | null>(null)
-  /*
-   * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
-   * テンプレートを開いて「戻る」と同じ一覧に戻る。
-   */
-
   const templateQuery = urlView.q
   const setTemplateQuery = useCallback((next: string) => setUrlView({ q: next, page: '1' }), [setUrlView])
   const chips = useMemo<Record<ChipKey, boolean>>(() => {

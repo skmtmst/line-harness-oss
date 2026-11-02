@@ -27,7 +27,7 @@ import { Field } from '@/components/shared/form-controls'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { TextField } from '@/components/shared/text-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { notifySaved } from '@/components/shared/toast'
 import { emptyValue } from '@/components/shared/empty-value'
 import { useAccount } from '@/contexts/account-context'
 import { fetchApi } from '@/lib/api'
@@ -120,7 +120,7 @@ function MenuEditBody() {
 
   async function save() {
     if (!canEdit || !selectedAccountId || !valid) return
-    if (editing && !dirty) { notifyToast('変更はありません。'); return }
+    if (editing && !dirty) return
     const isCurrent = captureResource()
     if (!isCurrent()) return
     const attempt = mutationContext.current
