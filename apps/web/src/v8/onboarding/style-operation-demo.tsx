@@ -213,6 +213,39 @@ export function ConsultAfterDemo() {
   </section>
 }
 
+/**
+ * 教室のレッスン後の見本の値。参加後の送信は設定・公開・承認が必要で、
+ * 保存しただけでは始まらない。実データの読み書き・送信はしない。
+ */
+const LESSON_AFTER_SAMPLE = {
+  attendance: { time: '9:00–10:00', name: '朝のヨガ', note: '出席 12人' },
+  thanks: { when: '翌日 12:00', text: '昨日はご参加ありがとうございました。ご質問がありましたら、このトークでお知らせください。' },
+}
+
+/** 教室・レッスン4ページ目「レッスンのあとも、つながりが続く」の静止見本。保存・送信はしない。 */
+export function LessonAfterDemo() {
+  return <section aria-label="レッスンのあとの見本">
+    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="レッスンのあと">
+      <strong>レッスンのあと（見本）</strong>
+      <section aria-label="出席の記録">
+        <p className={styles.description}>名簿の出席記録</p>
+        <ul className={styles.can}>
+          <li>
+            <StatusBadge tone="success">出席済み</StatusBadge>
+            <span>{LESSON_AFTER_SAMPLE.attendance.time} {LESSON_AFTER_SAMPLE.attendance.name}・{LESSON_AFTER_SAMPLE.attendance.note}</span>
+          </li>
+        </ul>
+      </section>
+      <section aria-label="参加のお礼の見本">
+        <p className={styles.description}>参加のお礼（{LESSON_AFTER_SAMPLE.thanks.when}・停止中）</p>
+        <p className={styles.description}>{LESSON_AFTER_SAMPLE.thanks.text}</p>
+      </section>
+      <p className={styles.note}>名前・数は架空です。送り始めるには設定と承認が必要で、保存しただけでは始まりません。</p>
+    </Card>
+  </section>
+}
+
 /** EC3ページ目「商品の案内を用意する」の静止見本。保存・送信はしない。 */
 export function EcOperationDemo() {
   return <section aria-label="商品の案内の見本">

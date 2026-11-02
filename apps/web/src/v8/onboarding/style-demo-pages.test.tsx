@@ -135,6 +135,22 @@ it('面談・相談では相談のあとの見本を見せ、選ばずに戻れ�
   expect(screen.getByText('送り始めるには設定と承認が必要で、保存しただけでは始まりません。', { exact: false })).toBeTruthy()
   expect(choose).not.toHaveBeenCalled()
 })
+it('教室・レッスンではレッスンのあとの見本を見せ、選ばずに戻れる', () => {
+  const choose = vi.fn()
+  function Subject() {
+    const [viewing, setViewing] = useState<AccountStyle>('lesson')
+    return <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={null} onChoose={choose} />
+  }
+  render(<Subject />)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  fireEvent.click(screen.getByRole('button', { name: 'レッスンのあともに進む' }))
+  expect(screen.getByRole('heading', { name: 'レッスンのあとも、つながりが続く' })).toBeTruthy()
+  expect(screen.getByRole('region', { name: 'レッスンのあと' })).toBeTruthy()
+  expect(screen.getByText('9:00–10:00 朝のヨガ・出席 12人')).toBeTruthy()
+  expect(screen.getByText('昨日はご参加ありがとうございました。ご質問がありましたら、このトークでお知らせください。')).toBeTruthy()
+  expect(screen.getByText('送り始めるには設定と承認が必要で、保存しただけでは始まりません。', { exact: false })).toBeTruthy()
+  expect(choose).not.toHaveBeenCalled()
+})
 it('スタイルを変えると最初のページに戻り、標準ではお知らせを見せる', () => {
   function Subject() {
     const [viewing, setViewing] = useState<AccountStyle>('restaurant')

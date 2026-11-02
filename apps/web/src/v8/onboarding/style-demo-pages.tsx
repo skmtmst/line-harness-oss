@@ -9,7 +9,7 @@ import { Field, TextInput } from '@/components/shared/form-controls'
 import { Steps } from '@/components/templates/steps'
 import { Check } from 'lucide-react'
 import { RestaurantFollowupDemo } from '@/v8/restaurant/line-followup/public/demo'
-import { ConsultAfterDemo, ConsultOperationDemo, EcOperationDemo, LessonOperationDemo, RestaurantAfterDemo, SalonAfterDemo, SalonOperationDemo } from './style-operation-demo'
+import { ConsultAfterDemo, ConsultOperationDemo, EcOperationDemo, LessonAfterDemo, LessonOperationDemo, RestaurantAfterDemo, SalonAfterDemo, SalonOperationDemo } from './style-operation-demo'
 import { STYLE_EXPERIENCE_SCRIPT, StyleExperiencePlayer } from './style-experience-player'
 import StyleSettingDemo from './style-setting-demo'
 import styles from './style-demo-pages.module.css'
@@ -77,6 +77,7 @@ export default function StyleDemoPages({ accountName, viewing, page, onPage, cho
         : page === 3 && viewing === 'restaurant' ? <RestaurantAfterDemo />
         : page === 3 && viewing === 'salon' ? <SalonAfterDemo />
         : page === 3 && viewing === 'consult' ? <ConsultAfterDemo />
+        : page === 3 && viewing === 'lesson' ? <LessonAfterDemo />
         : page === 2 && viewing === 'standard' ? <Card layout="vertical" padding="default" gap="normal" aria-label="お知らせの見本">
           <strong>一斉配信</strong><Field label="本文"><TextInput value="営業時間のお知らせ" readOnly /></Field><p className={styles.note}>お知らせの文の見本です。</p>
         </Card> : <Card layout="vertical" padding="default" gap="normal" aria-label="使い方の見本">
