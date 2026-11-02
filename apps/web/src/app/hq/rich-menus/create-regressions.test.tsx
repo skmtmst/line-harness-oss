@@ -238,8 +238,8 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     click('次へ：ボタンの動き')
     const name = document.getElementById('rm-name') as HTMLInputElement
     await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'))
-    expect(screen.getByText('名前を入力してください')).toBeTruthy()
-    expect(screen.getByText('トーク画面の下の文言を入力してください')).toBeTruthy()
+    expect(screen.getByText('名前を入力してください。')).toBeTruthy()
+    expect(screen.getByText('トーク画面の下の文言を入力してください。')).toBeTruthy()
     expect(document.getElementById('rm-chatbar')?.getAttribute('aria-invalid')).toBe('true')
     await waitFor(() => expect(document.activeElement).toBe(name))
     expect(screen.queryByText('画像の上で面を選ぶ')).toBeNull()

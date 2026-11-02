@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 統括「店の比較」（G7）：店×7つの数・平均との差の札・並べ替え・行の引き出し・準備中の窓。
+ * 統括「店の比較」（G7）：店×7つの数・平均との差の札・並べ替え・行の引き出し（店の組は使えるまで描かない・H-16）。
  */
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -146,11 +146,11 @@ describe('店の比較の表', () => {
     expect(await screen.findByText(/CSV を書き出せませんでした/)).toBeTruthy()
   })
 
-  it('店の組は口が無いので「現在準備中です」の窓を出す', async () => {
+  it('店の組は使えるまで描かない（H-16：出す＝使える）', async () => {
     render(<StoreComparisonList />)
     await screen.findByText('大宮店')
-    fireEvent.click(screen.getByRole('button', { name: '店の組：すべて' }))
-    expect((await screen.findByRole('dialog')).textContent).toContain('現在準備中です')
+    expect(screen.queryByRole('button', { name: '店の組：すべて' })).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('失敗したら「もう一度」を出す', async () => {

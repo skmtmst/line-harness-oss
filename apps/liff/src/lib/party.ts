@@ -41,7 +41,7 @@ export function memberPrice(menu: MenuItem, member: PartyMember): number {
 }
 /** APIが返した指名料。指名なしの人には加算しない。 */
 export function designationFee(_menu: MenuItem, member: PartyMember): number {
-  return member.staff ? staffNominationFee(member.staff) : 0;
+  return member.designated && member.staff ? staffNominationFee(member.staff) : 0;
 }
 
 export function totals(party: PartyState, first: MenuItem) {

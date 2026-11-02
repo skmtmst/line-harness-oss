@@ -26,4 +26,17 @@ describe('上の帯のパンくずの仕上げ', () => {
     expect(finishPageCrumbs('/nen-campaigns', null, 'NEN配信')).toBeNull()
     expect(finishPageCrumbs('/hq/settings', null, '統括の設定', true)).toBeNull()
   })
+
+  it('行き先なし「設定」は店舗LINEアカウント設定経路でのみそろえる', () => {
+    expect(finishPageCrumbs('/accounts/handover', [{ label: '設定' }], '乗り換え'))
+      .toEqual([{ label: '設定', href: '/settings' }])
+    const onSelect = () => {}
+    expect(finishPageCrumbs('/accounts/detail', [{ label: '設定', onSelect } as { label: string; onSelect: () => void }], '店A'))
+      .toEqual([{ label: '設定', href: '/settings', onSelect }])
+  })
+
+  it('統括と設定区画外の行き先なし「設定」は変えない', () => {
+    expect(finishPageCrumbs('/hq/members', [{ label: '設定' }], '人工', true)).toEqual([{ label: '設定' }])
+    expect(finishPageCrumbs('/friends', [{ label: '設定' }], '人工')).toEqual([{ label: '設定' }])
+  })
 })
