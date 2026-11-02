@@ -466,9 +466,9 @@ export function ScenarioDetailDialogs({
 
       <ConfirmDialog
         open={deleteStepTarget !== null}
-        title={deleteStepTarget ? `${deleteStepTarget.stepOrder} 通目を削除しますか？` : 'この通を削除しますか？'}
+        title={deleteStepTarget ? `${sortedSteps.findIndex((step) => step.id === deleteStepTarget.id) + 1} 通目を削除しますか？` : 'この通を削除しますか？'}
         description={deleteStepTarget
-          ? `${deleteStepTarget.stepOrder} 通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
+          ? `${sortedSteps.findIndex((step) => step.id === deleteStepTarget.id) + 1} 通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
           : ''}
         confirmLabel="この通を削除する"
         destructive
@@ -599,6 +599,7 @@ export function ScenarioDetailDialogs({
           ).map((row) => ({
             id: row.id,
             stepOrder: row.stepOrder,
+            displayOrder: sortedSteps.findIndex((step) => step.id === row.id) + 1,
             timing: formatScheduleLabel(deliveryMode, row),
             kind:
               (row.templateId ? templates.find((t) => t.id === row.templateId)?.name : null) ??

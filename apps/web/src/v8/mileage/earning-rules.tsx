@@ -269,13 +269,11 @@ export default function EarningRulesTab() {
       setRuleOrder(items.map((rule) => rule.id))
       setOrderDirty(false)
       setPage(1)
-    } catch (saveFailure) {
+    } catch {
       if (isStale()) return
-      const fieldFailure = saveErrors.capture(saveFailure)
       loadedAccountScope.current = -1
       setRules([])
-      { if (!fieldFailure)
-      setLoadError(true) }
+      setLoadError(true)
     } finally {
       if (!isStale()) setLoading(false)
     }

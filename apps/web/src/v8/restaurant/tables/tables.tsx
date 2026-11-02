@@ -233,7 +233,8 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     )
   }
 
-  const groups = new Set(rows.filter((item) => item.join_group).map((item) => item.join_group))
+  const activeRows = rows.filter((item) => item.is_active)
+  const groups = new Set(activeRows.filter((item) => item.join_group).map((item) => item.join_group))
   const placementFields = draft ? (
     <>
       <div className={styles.pair}>
@@ -256,7 +257,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     <SaveErrorScope errors={saveErrors}><>
       <StatRow fusion>
         <KpiCard title="卓数" value={rows.length} unit="卓" detail="稼働・停止を含む" icon={<Inbox size={16} aria-hidden />} presentation="band" />
-        <KpiCard title="総席数" value={rows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="席" detail="最大収容人数" icon={<Inbox size={16} aria-hidden />} presentation="band" />
+        <KpiCard title="総席数" value={activeRows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="席" detail="稼働中の最大収容人数" icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="結合可能" value={groups.size} unit="組" detail="結合グループ" icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={<Inbox size={16} aria-hidden />} presentation="band" />
       </StatRow>

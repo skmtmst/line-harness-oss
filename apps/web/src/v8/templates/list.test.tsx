@@ -1,3 +1,4 @@
+import { currentListLocation, flushListUrlState } from '@/components/shared/list-url-state'
 import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
@@ -90,6 +91,9 @@ function openMenuAndDelete(name: string) {
 }
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   document.documentElement.dataset.theme = 'v8'
   role.value = verifiedStaffRole('owner')
   listTemplates.mockResolvedValue({ success: true, data: [used, unused] })
@@ -297,6 +301,7 @@ it('U2：題の共通説明を開いて閉じ、一覧の操作を保つ', async
 afterEach(() => { verifiedStaffRole(null) })
 
 it('通数は排他的な切り替えで、差し込みと未使用は併用し、矢印でも条件を保つ', async () => {
+  listTemplates.mockResolvedValue({ success: true, data: [used, unused, { ...used, id: 'multi', name: '複数', hasDraft: false, messageBubbles: [{ id: '1', type: 'text', text: 'a' }, { id: '2', type: 'text', text: 'b' }] }] })
   await renderList()
   const group = screen.getByRole('group', { name: 'メッセージの数' })
   const single = within(group).getByRole('button', { name: '1通のみ' })
@@ -315,4 +320,44 @@ it('通数は排他的な切り替えで、差し込みと未使用は併用し�
   expect(single.getAttribute('aria-pressed')).toBe('false')
   expect(multiple.getAttribute('aria-pressed')).toBe('false')
   expect(screen.getByRole('button', { name: '使っていない' }).getAttribute('aria-pressed')).toBe('true')
+})
+
+
+it('C-10: 単一メッセージの改行やカルーセルを複数通と誤認せず、作成案内はテキストに限る', async () => {
+  window.history.replaceState(null, '', '/templates')
+  listTemplates.mockResolvedValue({ success: true, data: [{ ...used, messageContent: '一行目\n\n二行目' }, { ...unused, messageType: 'carousel' }] })
+  await renderList()
+  expect(within(screen.getByRole('group', { name: 'メッセージの数' })).queryByRole('button', { name: '複数通' })).toBeNull()
+  fireEvent.click(screen.getAllByRole('button', { name: '種類を選んで作る' })[0])
+  expect(screen.queryByText('テキスト・カード型・画像。差し込みも使える')).toBeNull()
+  expect(screen.getByText('テキスト。差し込みも使える')).toBeTruthy()
+})
+
+it('C-10: 保存された複数通だけを絞り込み、複数通の下書きも見つけられる', async () => {
+  window.history.replaceState(null, '', '/templates')
+  listTemplates.mockResolvedValue({ success: true, data: [used, { ...used, id: 'multi', name: '複数通の下書き', draftMessageBubbles: [{ id: '1', type: 'text', text: 'a' }, { id: '2', type: 'text', text: 'b' }] }] })
+  await renderList()
+  fireEvent.click(within(screen.getByRole('group', { name: 'メッセージの数' })).getByRole('button', { name: '複数通' }))
+  expect(screen.getByText('複数通の下書き')).toBeTruthy()
+  expect(screen.queryByText('予約前日のご案内')).toBeNull()
+})
+
+
+it('E-20: 質問タブのURLから開き、タブ切替もURLに残す', async () => {
+  window.history.replaceState(null, '', '/templates?tab=question')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+  listTemplates.mockResolvedValue({success:true,data:[used,{...unused,id:'q',name:'質問の内容',question:{type:'single'}}]})
+  await renderList()
+  expect(screen.getByRole('tab',{name:/^質問/}).getAttribute('aria-selected')).toBe('true')
+  expect(screen.getByText('質問の内容')).toBeTruthy()
+  fireEvent.click(screen.getByRole('tab',{name:/^メッセージ/}))
+  expect(new URLSearchParams(currentListLocation().search).get('tab')).not.toBe('question')
+})
+
+it('C-10: 下書きが1通でも公開中の複数通を見失わない', async () => {
+  listTemplates.mockResolvedValue({ success: true, data: [{ ...used, id: 'published-multi', name: '公開中は複数通', messageBubbles: [{ id:'1',type:'text',content:{text:'a'} },{ id:'2',type:'text',content:{text:'b'} }], draftMessageBubbles: null }] })
+  await renderList()
+  const multiple = within(screen.getByRole('group', { name: 'メッセージの数' })).getByRole('button', { name: '複数通' })
+  fireEvent.click(multiple)
+  expect(screen.getByText('公開中は複数通')).toBeTruthy()
 })

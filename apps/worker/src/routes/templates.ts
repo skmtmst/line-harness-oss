@@ -286,6 +286,7 @@ templates.get('/api/templates', async (c) => {
        * 送信の候補選びは `messageContent`（公開版）だけを見る決まりは変えない。
        */
       draftMessageContent: t.draft_message_content ?? null,
+      draftMessageBubbles: t.draft_message_bubbles_json ? JSON.parse(t.draft_message_bubbles_json) : null,
       question: questionValue(t.question_json),
       questionStatus: t.question_status,
       folderId: t.folder_id ?? null,

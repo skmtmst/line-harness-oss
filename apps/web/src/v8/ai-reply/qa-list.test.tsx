@@ -43,30 +43,6 @@ async function open() {
   await act(async () => {})
 }
 
-it.each([['draft', '公開する'], ['published', '止める'], ['published', '削除する']] as const)('%s の %s 確認に操作先と環境を示す', async (status, action) => {
-  apiMock.listQa.mockResolvedValue({ success: true, data: { items: [{ ...QA, status }], total: 1 } })
-  await open()
-  fireEvent.click(screen.getByRole('button', { name: '「駐車場はありますか」の操作' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: action }))
-  const dialog = screen.getByRole(action === '削除する' ? 'alertdialog' : 'dialog')
-  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
-  expect(within(dialog).getByText('環境')).toBeTruthy()
-  expect(await within(dialog).findByText('渋谷店')).toBeTruthy()
-})
-
-it('アカウント切替後は古い Q&A 削除確定を送らない', async () => {
-  const view = render(<QaListV8 />)
-  fireEvent.click(await screen.findByRole('button', { name: '「駐車場はありますか」の操作' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
-  const button = within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })
-  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
-  const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
-  account.id = 'acc-2'; view.rerender(<QaListV8 />)
-  account.id = 'acc-1'; view.rerender(<QaListV8 />)
-  await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
-  expect(apiMock.deleteQa).not.toHaveBeenCalled()
-})
-
 it('取り込む窓の入力を画面移動から守り、続行で保持する', async () => {
   await open()
   fireEvent.click(screen.getByRole('button', { name: '取り込む（PDF・Web）' }))
@@ -102,6 +78,30 @@ it('取り込む窓を閉じて開き直すと保留先を残さない', async (
   fireEvent.click(screen.getByRole('button', { name: '取り込む（PDF・Web）' }))
   expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
   expect(screen.getByRole('textbox', { name: /ページの URL/ })).toHaveProperty('value', '')
+})
+
+it.each([['draft', '公開する'], ['published', '止める'], ['published', '削除する']] as const)('%s の %s 確認に操作先と環境を示す', async (status, action) => {
+  apiMock.listQa.mockResolvedValue({ success: true, data: { items: [{ ...QA, status }], total: 1 } })
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '「駐車場はありますか」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: action }))
+  const dialog = screen.getByRole(action === '削除する' ? 'alertdialog' : 'dialog')
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+  expect(await within(dialog).findByText('渋谷店')).toBeTruthy()
+})
+
+it('アカウント切替後は古い Q&A 削除確定を送らない', async () => {
+  const view = render(<QaListV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: '「駐車場はありますか」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  const button = within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+  account.id = 'acc-2'; view.rerender(<QaListV8 />)
+  account.id = 'acc-1'; view.rerender(<QaListV8 />)
+  await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+  expect(apiMock.deleteQa).not.toHaveBeenCalled()
 })
 
 it('オーナーが自動で答えるを選ぶと確かめの窓が開き、窓で押すまで段は変わらない', async () => {

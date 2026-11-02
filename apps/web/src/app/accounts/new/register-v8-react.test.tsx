@@ -151,12 +151,15 @@ describe('V8 登録ウィザードの gated 進行', () => {
   it('②Step1の2項目が空では次の段へ進めない', async () => {
     render(<RegisterV8 />)
     clearPrecheck()
+    const button = screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    expect(button.getAttribute('aria-description')).toBe('チャネルIDとチャネルシークレットを入力してください。')
     nextStep()
-    expect(screen.getByText('チャネルIDを入力してください。')).toBeTruthy()
-    const channel = document.getElementById('v8-channel-id')!
-    expect(channel.getAttribute('aria-invalid')).toBe('true')
-    await waitFor(() => expect(document.activeElement).toBe(channel))
-    expect(screen.queryByText('入力内容を確認してください。')).toBeNull()
+    expect(screen.queryByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeNull()
+    fill('v8-channel-id', '2007123456')
+    expect(button.disabled).toBe(true)
+    fill('v8-channel-secret', 'a'.repeat(32))
+    expect(button.disabled).toBe(false)
     expect(calls.connectCheck).not.toHaveBeenCalled()
     expect(screen.queryByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeNull()
   })
@@ -428,7 +431,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
     // 行の文字は止まった時点で出るが、案内は5行の演出が終わってから出る。
     expect(await screen.findByText('「Webhookの利用」をONにしてください', {}, { timeout: 5000 })).toBeTruthy()
-    const failedRow = screen.getByText('URLは登録できましたが、「Webhookの利用」がOFFのままです。上の案内のとおりONにしてください。').closest('li')
+    const failedRow = screen.getByText('URLは登録できましたが、「Webhookの利用」がOFFのままです。下の案内のとおりONにしてください。').closest('li')
     expect(failedRow?.getAttribute('data-phase')).toBe('error')
     expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
     expect(calls.connect).not.toHaveBeenCalled()

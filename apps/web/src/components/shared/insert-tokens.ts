@@ -28,12 +28,12 @@ export interface InsertTokenNames {
 }
 
 const DATE_HINTS: Record<string, string> = {
-  '': '8月20日(水)',
-  ymd_w: '2026年8月20日(水)',
+  '': '8月20日(木)',
+  ymd_w: '2026年8月20日(木)',
   md: '8月20日',
   ymd: '2026年8月20日',
-  slash_md_w: '8/20(水)',
-  slash_ymd_w: '2026/8/20(水)',
+  slash_md_w: '8/20(木)',
+  slash_ymd_w: '2026/8/20(木)',
   slash_md: '8/20',
   slash_ymd: '2026/8/20',
 }

@@ -1139,3 +1139,4 @@
 - [LINE通知の運用上の騒音を減らす](release-log/unreleased/2037-masato-operation-alert-line-noise.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [通知量の警告](release-log/unreleased/2039-masato-operation-alert-quota.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [担当者・登録・未保存の保護と利用数の改善](release-log/unreleased/2060-kenta-assignee-registration-guards.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [操作案内と予約・LIFFの改善](release-log/unreleased/2061-kenta-operations-reservations.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。

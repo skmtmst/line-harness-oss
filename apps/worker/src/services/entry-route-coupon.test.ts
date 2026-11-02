@@ -133,4 +133,13 @@ describe('クーポンQR: 受け取り・送信・使用（実SQLite）', () => 
     expect(receipts()).toHaveLength(1);
     expect(test.raw.prepare('SELECT entry_route_coupon_receipt_id,payload_snapshot FROM coupon_redemptions').get()).toEqual({ entry_route_coupon_receipt_id: receipt.receiptId, payload_snapshot: JSON.stringify(payload) });
   });
+  it('同じクーポンを別経路で使っていても、本人の使用回数を表示する', async () => {
+    test.raw.exec("UPDATE entry_routes SET coupon_audience='all_friends'");
+    const receipt = (await receiveEntryRouteCoupon(test.db, await route(), friend, now))!;
+    expect((await redeemCoupon(test.db, friend, 'a', 'c', 'ordinary-use', now)).ok).toBe(true);
+    expect((await receiveEntryRouteCoupon(test.db, await route(), friend, now))?.usedCount).toBe(1);
+    expect((await receiveEntryRouteCoupon(test.db, await route(), {...friend,id:'f2'}, now))?.usedCount).toBe(0);
+    expect(receipt.assetId).toBe('c');
+  });
+
 });

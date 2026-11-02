@@ -481,7 +481,7 @@ export default function MediaSlot({
       <span className={styles.center} role="status">
         <Loader aria-hidden="true" className={styles.spin} />
         <span className={styles.title}>{progress == null ? 'アップロード中…' : `アップロード中… ${progress}%`}</span>
-        {compact ? null : <span className={styles.desc}>そのまま待つか、ほかの欄を入れて進めます</span>}
+        {compact ? null : <span className={styles.desc}>アップロードが終わるまでお待ちください</span>}
       </span>
     )
   } else if (filled && drag === 'idle') {

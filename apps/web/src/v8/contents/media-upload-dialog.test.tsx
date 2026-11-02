@@ -138,6 +138,8 @@ describe('メディアを入れる窓', () => {
     await press('1件を登録する')
     const row = dialog().querySelector('li[aria-live="polite"]')
     expect(row?.textContent).toContain('送信中 40%')
+    expect(dialog().querySelector('[role=progressbar][aria-label=登録しています]')?.getAttribute('aria-valuenow')).toBe('40')
+    expect(dialog().textContent).not.toContain('ほかの欄を入れて進めます')
     await act(async () => { release() })
     await settle()
     expect(dialog().textContent).toContain('1 件を登録しました')
@@ -230,4 +232,16 @@ describe('メディアを入れる窓', () => {
     go.mockRestore()
   })
 
+})
+
+
+it('すべて登録後は件数を完了と示し、完了ボタンで閉じる', async () => {
+  await render()
+  await pick(png('done.png'))
+  await press('1件を登録する')
+  expect(dialog().textContent).not.toContain('1件を選択中')
+  expect(dialog().textContent).not.toContain('0件を登録する')
+  await press('完了')
+  expect(onClose).toHaveBeenCalledTimes(1)
+  expect(onComplete).toHaveBeenCalledTimes(1)
 })

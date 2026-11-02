@@ -210,12 +210,14 @@ describe('下書き編集の選択可能一覧(#734)', () => {
     expect(mockUpdateDraft.mock.calls[0][2]).toMatchObject({ eventType: 'restaurant.arrived', triggerConfig: { storeId: 'store-1' } })
   })
 
-  it('きっかけのタグが未選択なら保存せず欄の理由を出す', async () => {
+  it('きっかけのタグが未選択でも下書きを保存し、公開前には選択を求める', async () => {
     const el = await mountWithDraft('tag_change', { tagId: '', action: 'add' })
     await act(async () => { saveButton(el).click() })
-    expect(mockUpdateDraft).not.toHaveBeenCalled()
-    expect(el.textContent).toContain('きっかけのタグを選んでください')
-    expect(el.querySelector('#v8-trigger-tag')?.getAttribute('aria-invalid')).toBe('true')
+    expect(mockUpdateDraft).toHaveBeenCalledOnce()
+    expect(mockUpdateDraft.mock.calls[0][2].triggerConfig).toMatchObject({ tagId: '', action: 'add' })
+    const { validateAutomationInput } = await import('@/v8/automations/create/draft-validation')
+    expect(validateAutomationInput({ name: 'ルール', eventType: 'tag_change', triggerConfig: { tagId: '' }, conditionUnreadable: false, actions: [], forPublish: true }))
+      .toMatchObject({ target: 'v8-trigger-tag', message: 'きっかけのタグを選んでください' })
   })
 
   it('保存の失敗で内部の文を出さず入力を残し、同じ下書きを保存し直せる', async () => {

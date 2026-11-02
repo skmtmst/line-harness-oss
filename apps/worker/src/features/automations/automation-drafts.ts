@@ -388,6 +388,7 @@ async function validateTriggerConfig(
   eventType: AutomationDraftTriggerType,
   value: unknown,
   lineAccountId: string,
+  allowMissingTag = false,
 ): Promise<Record<string, unknown>> {
   const config = value !== null && typeof value === 'object' && !Array.isArray(value)
     ? { ...value as Record<string, unknown> }
@@ -421,8 +422,8 @@ async function validateTriggerConfig(
     return storeId?{storeId}:{};
   }
   if (eventType === 'tag_change') {
-    const tagId = requiredString(config.tagId, 'triggerTagId', 'きっかけのタグ');
-    await requireResource(db, 'tags', tagId, lineAccountId, 'triggerTagId', 'きっかけのタグ');
+    const tagId = allowMissingTag ? optionalString(config.tagId, 'triggerTagId') ?? '' : requiredString(config.tagId, 'triggerTagId', 'きっかけのタグ');
+    if (tagId) await requireResource(db, 'tags', tagId, lineAccountId, 'triggerTagId', 'きっかけのタグ');
     if (config.action !== 'add' && config.action !== 'remove') {
       throw new AutomationDraftError('trigger_config_invalid', 'タグを付けたときか外したときを選んでください', 'triggerAction');
     }
@@ -830,7 +831,7 @@ export async function updateAutomationDraft(
     throw new AutomationDraftError('trigger_unsupported', 'このきっかけはまだ実行まで接続されていません', 'eventType');
   }
   const triggerConfig = await validateTriggerConfig(
-    db, eventType as AutomationDraftTriggerType, input.triggerConfig, input.lineAccountId,
+    db, eventType as AutomationDraftTriggerType, input.triggerConfig, input.lineAccountId, true,
   );
   const conditions = input.conditions === undefined
     ? parseObject(current.condition_config, '下書きの条件')
@@ -861,8 +862,8 @@ export async function updateAutomationDraft(
       ? { ...raw.params }
       : {};
     if (raw.type === 'add_tag') {
-      const tagId = requiredString(params.tagId, `actions.${index}.tagId`, '付けるタグ');
-      await requireResource(db, 'tags', tagId, input.lineAccountId, `actions.${index}.tagId`, '付けるタグ');
+      const tagId = optionalString(params.tagId, `actions.${index}.tagId`) ?? '';
+      if (tagId) await requireResource(db, 'tags', tagId, input.lineAccountId, `actions.${index}.tagId`, '付けるタグ');
       params.tagId = tagId;
     } else if (raw.type === 'start_scenario') {
       const scenarioId = requiredString(params.scenarioId, `actions.${index}.scenarioId`, '始めるシナリオ');
@@ -1035,6 +1036,14 @@ export async function publishAutomationDraft(
       WHERE id = ? AND automation_id = ? AND status = 'draft'`,
   ).bind(expectedVersionId, current.id).first<{ version_number: number }>();
   if (!version) throw new AutomationDraftError('not_found', '公開する下書きが見つかりません');
+  if (current.trigger_type === 'tag_change') {
+    await validateTriggerConfig(db, 'tag_change', parseObject(current.trigger_config, 'きっかけ'), input.lineAccountId);
+  }
+  for (const [index, action] of parseActions(current.action_config).entries()) {
+    if (action.type !== 'add_tag') continue;
+    const tagId = requiredString(action.params?.tagId, `actions.${index}.tagId`, '付けるタグ');
+    await requireResource(db, 'tags', tagId, input.lineAccountId, `actions.${index}.tagId`, '付けるタグ');
+  }
   /*
    * 古い保存口を通った壊れた条件を、そのまま公開しない。
    * 修復は `updateAutomationDraft` で条件を直して保存し直すだけでよい。

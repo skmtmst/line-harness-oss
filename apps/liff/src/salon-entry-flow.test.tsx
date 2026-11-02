@@ -26,6 +26,7 @@ beforeEach(() => {
     if (url.pathname.endsWith('/cost-estimate')) return reply({ success: true, data: { cancellation: { enabled: false, version: 0, price: 1000, cardRequired: true, tiers: [{ beforeHours: 24, percent: 0 }, { beforeHours: 0, percent: 50 }], noShowPercent: 100, freeUntil: null }, deposit: { amount: 0 } } });
     if (url.pathname.endsWith('/entitlements')) return reply({ success: true, data: [] });
     if (url.pathname.endsWith('/settings')) return reply({ liff_calendar_mode: calendarMode, booking_window_days: 60 });
+    if (url.pathname.endsWith('/addons')) return reply({ success: true, data: [] });
     if (url.pathname.endsWith('/menus')) return reply({ menus: [{ id: 'm', name: '試験メニュー', duration_minutes: 30, base_price: 1000 }] });
     if (url.pathname.endsWith('/staff')) return reply({ staff: [{ id: 's', display_name: '試験担当', price: 1000, duration_minutes: 30 }] });
     if (url.pathname.endsWith('/last-booking')) return reply({ available: false });

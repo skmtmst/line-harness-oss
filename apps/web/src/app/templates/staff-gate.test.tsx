@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { findDetailMenuItem } from '@/test-utils/detail-menu'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 /*
  * N-144: staff はテンプレートを「読めるが変えられない」。
  *
@@ -103,7 +104,9 @@ const ASSETS = [
 ]
 
 beforeEach(() => {
+  flushListUrlState()
   window.history.replaceState(null, '', '/templates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   searchParams.value = new URLSearchParams()
   templateGet.mockReset()
   assetList.mockReset()
@@ -219,6 +222,15 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
   })
 })
 
+function expectCreateHref(actual: string | null, expected: string) {
+  expect(actual).not.toBeNull()
+  const url = new URL(actual!, 'http://localhost')
+  const target = new URL(expected, 'http://localhost')
+  expect(url.pathname).toBe(target.pathname)
+  for (const [key, value] of target.searchParams) expect(url.searchParams.get(key)).toBe(value)
+  if (url.searchParams.has('returnTo')) expect(url.searchParams.get('returnTo')).toMatch(/^\/templates(?:\?|$)/)
+}
+
 describe('種類ごとの作成入口', () => {
   test.each([
     ['メッセージ', '/templates/edit'],
@@ -235,13 +247,13 @@ describe('種類ごとの作成入口', () => {
     await act(async () => { await Promise.resolve() })
     const column = document.querySelector('[data-template-region="folders"]')!
     const create = within(column as HTMLElement).getByRole('link', { name: `${label}を作る` })
-    expect(create.getAttribute('href')).toBe(href)
+    expectCreateHref(create.getAttribute('href'), href)
     const folderHeading = within(column as HTMLElement).getByText('フォルダ', { selector: 'p' })
     expect(create.compareDocumentPosition(folderHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.queryByRole('dialog', { name: 'どの種類を作りますか' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'テンプレートを作る' })).toBeNull()
     const empty = screen.queryByRole('link', { name: `最初の${label}を作る` })
-    if (empty) expect(empty.getAttribute('href')).toBe(href)
+    if (empty) expectCreateHref(empty.getAttribute('href'), href)
   })
 })
 
@@ -270,7 +282,7 @@ describe('資産タブのstaffゲート (N-144)', () => {
 
     fireEvent.click(screen.getByText('カルーセル'))
     // owner には作成ボタンと各カードの編集・削除が出る
-    expect((await screen.findAllByRole('link', { name: 'カルーセルを作る' }))[0].getAttribute('href')).toBe('/templates/carousel')
+    expectCreateHref((await screen.findAllByRole('link', { name: 'カルーセルを作る' }))[0].getAttribute('href'), '/templates/carousel')
     // 資産カードは別フェッチで遅れて届く。作成ボタンだけ先に出るため、
     // カード名を待ってから編集・削除を同期確認する（staff側と同じ待ち方）。
     expect(await screen.findByText('秋キャンペーン')).toBeTruthy()

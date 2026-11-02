@@ -86,7 +86,9 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
     } catch { setExportError('CSVを書き出せませんでした。もう一度お試しください。') } finally { setExporting(false) }
   }
 
-  return <RoutesFrame customRange={customRange} onRangeChange={(value) => { setRange(value); setPointId(null) }} accountId={accountId} days={days} onDaysChange={(value) => { setDays(value); setPointId(null) }} exportCsv={() => void exportCsv()} exportDisabled={!report || exporting}>
+  const exportReason = exporting ? 'CSVを書き出しています。' : loading ? '成果レポートを読み込んでいます。' : error || (noRun ? 'まだ集計していません。' : '書き出す集計結果を確認しています。')
+
+  return <RoutesFrame customRange={customRange} onRangeChange={(value) => { setRange(value); setPointId(null) }} accountId={accountId} days={days} onDaysChange={(value) => { setDays(value); setPointId(null) }} exportCsv={() => void exportCsv()} exportDisabled={!report || exporting} exportDisabledReason={exportReason}>
     {() => <div className={styles.reportStack}>
       <AggregationStatus state={loading ? { kind: 'running', startedAt } : error ? { kind: 'failed', reason: error } : report ? { kind: 'complete', dataAt: completedAt } : { kind: 'empty' }} onRun={retry} />
       {noRun ? <ListState kind="empty" title="まだ集計していません" /> : null}

@@ -249,6 +249,14 @@ describe('リッチメニューを作る：候補の読み込み', () => {
 })
 
 describe('リッチメニューを作る：選ぶ札と終わりの欄', () => {
+  it('未設定の面から、画面に表示された手順名で設定画面に戻れる', async () => {
+    groupBody = { ...GROUP, pages: [{ ...GROUP.pages[0], areas: [{ ...GROUP.pages[0].areas[0], actionData: { uri: '' } }] }] }
+    await open('?id=rmg-x&step=publish')
+    expect(screen.getByText('押しても何も起きません。「ボタンの動き」で設定します')).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'ボタンの動きを設定する' })) })
+    expect(currentStep()).toContain('ボタンの動き')
+  })
+
   it('出す相手は共通の選ぶ札（fieldset と legend）で選ぶ', async () => {
     await open('?id=rmg-x&step=audience')
     const group = screen.getByRole('group', { name: '出す相手' })
@@ -263,6 +271,7 @@ describe('リッチメニューを作る：選ぶ札と終わりの欄', () => {
     expect(new Set((within(timing).getAllByRole('radio') as HTMLInputElement[]).map((radio) => radio.name))).toEqual(new Set(['timing']))
     const ends = () => screen.getByLabelText('終わる日時') as HTMLInputElement
     expect(ends().disabled).toBe(true)
+    expect(screen.getByText('終わる日時を選ぶと、')).toBeTruthy()
     expect(screen.getByText('「終わりを決める」をオンにすると設定できます').id).toBe(ends().getAttribute('aria-describedby'))
     await act(async () => { fireEvent.click(screen.getByRole('switch', { name: '終わりを決める' })) })
     expect(ends().disabled).toBe(false)

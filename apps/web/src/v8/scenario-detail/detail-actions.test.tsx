@@ -684,3 +684,14 @@ describe('通ごとの数と通の行', () => {
     expect(document.body.textContent).toContain('配信前チェックはまだ繋がっていません。残りの送信枠とテスト送信の記録を返す取得口が接続されると表示されます。')
   })
 })
+
+it('古い0始まりや欠番のある通は並び順で1から表示し、操作の対象は変えない', async () => {
+  stubScenario({ steps: base.steps.map((step, index) => ({ ...step, stepOrder: [0, 3, 8][index] })) })
+  await render()
+  expect(screen.getByRole('button', { name: '1 通目のその他操作' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: '2 通目のその他操作' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: '3 通目のその他操作' })).toBeTruthy()
+  expect(host.textContent).not.toContain('0 通目')
+  expect(host.textContent).not.toContain('8 通目')
+  expect(screen.getByTitle('1 通目と2 通目のあいだに足します')).toBeTruthy()
+})

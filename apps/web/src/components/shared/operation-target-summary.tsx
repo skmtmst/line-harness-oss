@@ -10,12 +10,12 @@ export type OperationAccountTarget = { id: string; name?: string | null; label?:
 export type OperationStoreTarget = { id: string; name?: string | null }
 
 /** 操作先を呼び出し側から受け取り、現在選択中の別の対象で穴埋めしない。 */
-export default function OperationTargetSummary({ accounts, allAccounts = false, store, externalTarget, showAccountCount = false }: {
+export default function OperationTargetSummary({ accounts, allAccounts = false, showAccountCount = false, store, externalTarget }: {
   accounts: OperationAccountTarget[]
   allAccounts?: boolean
+  showAccountCount?: boolean
   store?: OperationStoreTarget
   externalTarget?: { label: string; name?: string | null }
-  showAccountCount?: boolean
 }) {
   const [names, setNames] = useState<Record<string, string>>({})
   const missingKey = JSON.stringify(accounts.filter(account => account.id && !account.name?.trim()).map(account => account.id))

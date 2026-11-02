@@ -93,3 +93,14 @@ it('確保の直前に満席になったら、残った振替と近い3回を出
   expect(api.useMakeup).toHaveBeenLastCalledWith('mine', 'next-23', expect.any(String))
   expect(vi.mocked(api.useMakeup).mock.calls[0][2]).not.toBe(vi.mocked(api.useMakeup).mock.calls[1][2])
 })
+
+it('空きのない週に、別の週の候補を混ぜない', async () => {
+  vi.mocked(api.makeupOptions).mockResolvedValue({ options: [option] });
+  render(<MakeupPicker credit={credit} onUsed={() => {}} />);
+  expect(await screen.findByText('人工クラス')).toBeTruthy();
+  const calls = vi.mocked(api.makeupOptions).mock.calls.length;
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次の週' })); });
+  expect(vi.mocked(api.makeupOptions).mock.calls.length).toBeGreaterThan(calls);
+  expect(screen.queryByText('人工クラス')).toBeNull();
+  expect(screen.getByRole('button', { name: '振替先を選んでください' }).hasAttribute('disabled')).toBe(true);
+});
