@@ -201,6 +201,8 @@ export default function EarningRulesTab() {
   const [publishError, setPublishError] = useState('')
   useEffect(() => { setPublishTarget(null); setPublishAccount(null) }, [selectedAccountId])
   const [deleteTarget, setDeleteTarget] = useState<MileageEarningRuleV6 | null>(null)
+  const [deleteAccount, setDeleteAccount] = useState<{ id: string; generation: number } | null>(null)
+  useEffect(() => { setDeleteTarget(null); setDeleteAccount(null) }, [selectedAccountId])
   const [deleteError, setDeleteError] = useState('')
   const [testTarget, setTestTarget] = useState<MileageEarningRuleV6 | null>(null)
   const [testResult, setTestResult] = useState<MileageEarningRuleTestResult | null>(null)
@@ -806,7 +808,7 @@ export default function EarningRulesTab() {
               dividerBefore: true,
               disabled: savingId !== null,
               disabledReason: 'ほかの操作を反映しています',
-              onSelect: () => { setDeleteError(''); setDeleteTarget(rule) },
+              onSelect: () => { if (!selectedAccountId || loadedAccountScope.current !== accountScope.current.generation) return; setDeleteError(''); setDeleteAccount({ id: selectedAccountId, generation: accountScope.current.generation }); setDeleteTarget(rule) },
             }] : []),
           ]}
         />
@@ -965,7 +967,7 @@ export default function EarningRulesTab() {
           {publishAccount ? <OperationTargetSummary accounts={[{ id: publishAccount.id }]} /> : null}
         </ConfirmDialog>
         <ConfirmDialog
-          open={deleteTarget !== null}
+          open={deleteTarget !== null && deleteAccount?.generation === accountScope.current.generation}
           title={deleteTarget ? `「${deleteTarget.draft.name}」を削除しますか？` : '決めごとを削除しますか？'}
           description="まだ公開していない決めごとの下書きごと消えます。取り消せません。すでに動いている決めごとは、削除ではなく停止を選んでください。"
           confirmLabel="削除する"
@@ -973,8 +975,8 @@ export default function EarningRulesTab() {
           busy={deleteTarget !== null && savingId === deleteTarget.id}
           error={deleteError || undefined}
           onCancel={() => { if (savingId === null) setDeleteTarget(null) }}
-          onConfirm={() => { if (deleteTarget) void deleteRule(deleteTarget) }}
-        />
+          onConfirm={() => { if (deleteTarget && deleteAccount?.generation === accountScope.current.generation && !readonlyRef.current) void deleteRule(deleteTarget) }}
+        >{deleteAccount ? <OperationTargetSummary accounts={[{ id: deleteAccount.id }]} /> : null}</ConfirmDialog>
         <Dialog
           open={testTarget !== null}
           title={testTarget ? `「${testTarget.draft.name}」をテスト` : '決めごとをテスト'}

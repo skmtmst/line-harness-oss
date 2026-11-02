@@ -283,6 +283,43 @@ describe('実行結果の数と状態', () => {
     expect(host.textContent).toContain('配信を止めました。')
     expect((buttonByText('一時停止する') as HTMLButtonElement).disabled).toBe(true)
   })
+
+  it('配信停止の確認に対象アカウントと環境を示す', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')?.click() })
+    const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
+  })
+
+  it('アカウントを切り替えて戻しても古い確認から停止しない', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')?.click() })
+    const button = buttonByText('止める')!
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    account.id = 'account-b'; await render()
+    account.id = 'account-a'; await render()
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(stopped).toBe(false)
+  })
+
+  it('停止前の読み取り中に対象が変わったら停止要求を送らない', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')?.click() })
+    const original = globalThis.fetch
+    let resolve!: (value: Response) => void
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      const target = new URL(String(input))
+      if (target.pathname === '/api/friend-add-rules/rule-shop' && (init?.method ?? 'GET') === 'GET') return new Promise<Response>(done => { resolve = done })
+      return original(input, init)
+    })
+    await act(async () => { buttonByText('止める')?.click() })
+    expect(resolve).toBeTypeOf('function')
+    account.id = 'account-b'; await render()
+    await act(async () => { resolve(json({ success: true, data: { rule: { version: 3 } } })); await Promise.resolve() })
+    expect(stopped).toBe(false)
+  })
 })
 
 describe('CSV の書き出し', () => {

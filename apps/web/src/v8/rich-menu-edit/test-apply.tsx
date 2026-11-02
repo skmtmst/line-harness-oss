@@ -5,6 +5,7 @@ import { api, ApiError, type RichMenuTestApplyItem, type RichMenuTestApplyUserMe
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from '@/app/rich-menus/new/create-v8.module.css'
@@ -33,7 +34,7 @@ function revertNotice(action: RichMenuTestApplyUserMenuAction | undefined): stri
 }
 
 /** 要件5-6：本人に連携済みのLINEだけで試し、元の表示へ戻す。 */
-export default function RichMenuTestApply({ groupId }: { groupId: string }) {
+export default function RichMenuTestApply({ groupId, accountId }: { groupId: string; accountId: string }) {
   const [open, setOpen] = useState(false)
   const [state, setState] = useState<TestApplyState | null>(null)
   const [loadError, setLoadError] = useState('')
@@ -44,6 +45,12 @@ export default function RichMenuTestApply({ groupId }: { groupId: string }) {
   const keyRef = useRef('')
   const busyRef = useRef(false)
   const generation = useRef(0)
+  const mounted = useRef(false)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const load = useCallback(async () => {
     const request = ++generation.current
@@ -72,7 +79,7 @@ export default function RichMenuTestApply({ groupId }: { groupId: string }) {
   }
 
   async function run() {
-    if (!confirmKind || busyRef.current) return
+    if (!mounted.current || !confirmKind || busyRef.current) return
     busyRef.current = true
     setBusy(true)
     setActionError('')
@@ -137,10 +144,10 @@ export default function RichMenuTestApply({ groupId }: { groupId: string }) {
     <ConfirmDialog open={confirmKind === 'apply'} title="自分のLINEにこのメニューを出しますか？"
       description={`${destination ? `${destination}。` : ''}あなたのトーク画面のメニューだけがこの内容に変わります。ほかの友だちには出ません。「元のメニューに戻す」でいつでも戻せます。`}
       confirmLabel="自分のLINEに適用する" busy={busy} error={actionError || undefined}
-      onConfirm={() => void run()} onCancel={() => { if (!busyRef.current) setConfirmKind(null) }} />
+      onConfirm={() => void run()} onCancel={() => { if (!busyRef.current) setConfirmKind(null) }}><OperationTargetSummary accounts={[{ id: accountId }]} /></ConfirmDialog>
     <ConfirmDialog open={confirmKind === 'revert'} title="テスト適用を取り消しますか？"
       description={`${destination ? `${destination}。` : ''}あなたのトーク画面のメニューを、適用前の表示へ戻します。適用後に表示が変わっていた場合は上書きしません。テスト用に作ったメニューがあればLINE上から削除します。`}
       confirmLabel="元のメニューに戻す" busy={busy} error={actionError || undefined}
-      onConfirm={() => void run()} onCancel={() => { if (!busyRef.current) setConfirmKind(null) }} />
+      onConfirm={() => void run()} onCancel={() => { if (!busyRef.current) setConfirmKind(null) }}><OperationTargetSummary accounts={[{ id: accountId }]} /></ConfirmDialog>
   </>
 }
