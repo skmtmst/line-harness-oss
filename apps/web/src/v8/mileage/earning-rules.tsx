@@ -19,6 +19,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
@@ -160,6 +161,12 @@ export default function EarningRulesTab() {
   const router = useRouter()
   const { readonly, narrow, setCount } = useMileageShell()
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const loadedAccountScope = useRef(-1)
+  const readonlyRef = useRef(readonly)
+  readonlyRef.current = readonly
+  const [publishAccount, setPublishAccount] = useState<{ id: string; generation: number } | null>(null)
   const latestAccountRef = useRef(selectedAccountId)
   useEffect(() => {
     latestAccountRef.current = selectedAccountId
@@ -192,6 +199,7 @@ export default function EarningRulesTab() {
   const [menuNotice, setMenuNotice] = useState('')
   const [publishTarget, setPublishTarget] = useState<MileageEarningRuleV6 | null>(null)
   const [publishError, setPublishError] = useState('')
+  useEffect(() => { setPublishTarget(null); setPublishAccount(null) }, [selectedAccountId])
   const [deleteTarget, setDeleteTarget] = useState<MileageEarningRuleV6 | null>(null)
   const [deleteError, setDeleteError] = useState('')
   const [testTarget, setTestTarget] = useState<MileageEarningRuleV6 | null>(null)
@@ -205,10 +213,11 @@ export default function EarningRulesTab() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: orderDirty, busy: savingOrder })
 
   const load = useCallback(async () => {
+    const scopeGeneration = accountScope.current.generation
     const accountAtRequest = selectedAccountId
     const generation = ++generationRef.current
     const isStale = () =>
-      generation !== generationRef.current || accountAtRequest !== latestAccountRef.current
+      generation !== generationRef.current || accountAtRequest !== latestAccountRef.current || scopeGeneration !== accountScope.current.generation
     if (!accountAtRequest) {
       setRules([])
       setLoading(false)
@@ -246,6 +255,7 @@ export default function EarningRulesTab() {
       const byType = (historyRes.data as MileageAdminHistory).summary.byType
       const grant = byType.find((item) => item.entryType === 'grant')
       const spend = byType.find((item) => item.entryType === 'spend')
+      loadedAccountScope.current = scopeGeneration
       setRules(items)
       setGrantedMiles(grant?.amount ?? 0)
       setGrantedCount(grant?.count ?? 0)
@@ -260,6 +270,7 @@ export default function EarningRulesTab() {
     } catch (saveFailure) {
       if (isStale()) return
       const fieldFailure = saveErrors.capture(saveFailure)
+      loadedAccountScope.current = -1
       setRules([])
       { if (!fieldFailure)
       setLoadError(true) }
@@ -773,7 +784,7 @@ export default function EarningRulesTab() {
                 label: '公開して反映',
                 disabled: savingId !== null,
                 disabledReason: '別の決めごとを反映しています',
-                onSelect: () => { setPublishError(''); setPublishTarget(rule) },
+                onSelect: () => { if (!selectedAccountId || loadedAccountScope.current !== accountScope.current.generation) return; setPublishError(''); setPublishAccount({ id: selectedAccountId, generation: accountScope.current.generation }); setPublishTarget(rule) },
               },
               {
                 id: 'duplicate',
@@ -941,7 +952,7 @@ export default function EarningRulesTab() {
           </> : null}
         </Dialog>
         <ConfirmDialog
-          open={publishTarget !== null}
+          open={publishTarget !== null && publishAccount?.generation === accountScope.current.generation}
           title={publishTarget ? `「${publishTarget.draft.name}」の下書きを公開して反映しますか？` : '下書きを公開して反映しますか？'}
           description="公開後に受け付けたイベントから新しい内容になります。公開前に受け付けた分と、すでについたマイルは変わりません。取り消せません。"
           confirmLabel="公開して反映"
@@ -949,8 +960,10 @@ export default function EarningRulesTab() {
           busy={publishTarget !== null && savingId === publishTarget.id}
           error={publishError || undefined}
           onCancel={() => { if (savingId === null) setPublishTarget(null) }}
-          onConfirm={() => { if (publishTarget) void publishRule(publishTarget) }}
-        />
+          onConfirm={() => { if (publishTarget && publishAccount?.generation === accountScope.current.generation && !readonlyRef.current) void publishRule(publishTarget) }}
+        >
+          {publishAccount ? <OperationTargetSummary accounts={[{ id: publishAccount.id }]} /> : null}
+        </ConfirmDialog>
         <ConfirmDialog
           open={deleteTarget !== null}
           title={deleteTarget ? `「${deleteTarget.draft.name}」を削除しますか？` : '決めごとを削除しますか？'}

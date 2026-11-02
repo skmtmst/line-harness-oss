@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const api = vi.hoisted(() => ({
   rules: vi.fn(), sends: vi.fn(), save: vi.fn(), enableMock: vi.fn(), test: vi.fn(),
 }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account', name: '対象アカウント' }] })) }))
 vi.mock('@/lib/api/helpers/gap3', () => ({ ecAutoLineApi: api }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/ec-commerce', useSearchParams: () => new URLSearchParams() }))
 
@@ -27,6 +28,18 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
+it('アカウントを切り替えて戻しても古い有効化を送らない', async () => {
+ const view = render(<EcAutoLine accountId="account" canEdit />)
+ fireEvent.click(await screen.findByRole('switch', { name: '閲覧落ちの自動の LINE' }))
+ const button = within(await screen.findByRole('dialog')).getByRole('button', { name: 'オンにする' })
+ const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+ const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+ view.rerender(<EcAutoLine accountId="other" canEdit />)
+ view.rerender(<EcAutoLine accountId="account" canEdit />)
+ await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+ expect(api.enableMock).not.toHaveBeenCalled()
+})
+
 it('自動のLINEをオンにする409で窓を残し、再確認後の最新の版だけで送る', async () => {
  const { ApiError } = await import('@/lib/api')
  api.rules.mockResolvedValueOnce({ success: true, data: RULES }).mockResolvedValue({ success: true, data: RULES.map(row => row.kind === 'browse' ? { ...row, version: 4 } : row) })
@@ -34,6 +47,8 @@ it('自動のLINEをオンにする409で窓を残し、再確認後の最新の
  render(<EcAutoLine accountId="account" canEdit />)
  const open = async () => { fireEvent.click(await screen.findByRole('switch', { name: '閲覧落ちの自動の LINE' })); return screen.findByRole('dialog', { name: '閲覧落ちの自動の LINE をオンにしますか？' }) }
  const dialog = await open()
+ expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+ expect(within(dialog).getByText('環境')).toBeTruthy()
  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'オンにする' })) })
  expect(within(dialog).getByRole('alert').textContent).toContain('最新の運用状態')
  const retry = within(dialog).getByRole('button', { name: 'もう一度' }); expect(retry.hasAttribute('disabled')).toBe(true)

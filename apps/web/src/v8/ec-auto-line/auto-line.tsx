@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AutoLineKind, AutoLineRule } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -38,39 +39,48 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
   const [rules, setRules] = useState<AutoLineRule[]>([])
   const [counts, setCounts] = useState<Counts>({})
   const [notice, setNotice] = useState('')
-  const [confirmKind, setConfirmKind] = useState<AutoLineKind | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<{ kind: AutoLineKind; accountId: string; scope: object } | null>(null)
   const [busyKind, setBusyKind] = useState<AutoLineKind | null>(null)
   const [editKind, setEditKind] = useState<AutoLineKind | null>(null)
   const [menuKind, setMenuKind] = useState<AutoLineKind | null>(null)
   const current = useRef<string | null>(null)
+  const accountScope = useRef({ accountId })
+  if (accountScope.current.accountId !== accountId) accountScope.current = { accountId }
+  const loadedScope = useRef<object | null>(null)
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
   const errors = useSaveFormErrors()
 
   const load = useCallback(async () => {
     if (!accountId) return
+    const scope = accountScope.current
+    loadedScope.current = null
     current.current = accountId
     setStatus('loading')
     try {
       const response = await ecAutoLineApi.rules(accountId)
       if (!response.success) throw new Error('rules_failed')
-      if (current.current !== accountId) return
+      if (current.current !== accountId || accountScope.current !== scope) return
       setRules(response.data)
+      loadedScope.current = scope
       setStatus('ready')
       /* 送った数（試験運転で記録した件数）。取れなかった種類は「—」のまま。 */
       const sent = await Promise.allSettled(KIND_ORDER.map((kind) => ecAutoLineApi.sends(accountId, kind, 'simulated', 0)))
-      if (current.current !== accountId) return
+      if (current.current !== accountId || accountScope.current !== scope) return
       const next: Counts = {}
       sent.forEach((item, index) => {
         if (item.status === 'fulfilled' && item.value.success) next[KIND_ORDER[index]] = item.value.data.total
       })
       setCounts(next)
     } catch (reason) {
-      if (current.current !== accountId) return
+      if (current.current !== accountId || accountScope.current !== scope) return
       setError(reason)
       setStatus('error')
     }
   }, [accountId])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => { setConfirmTarget(null); setBusyKind(null) }, [accountId])
 
   const ruleOf = (kind: AutoLineKind) => rules.find((rule) => rule.kind === kind)
 
@@ -94,23 +104,26 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
   const [enableReviewRequired, setEnableReviewRequired] = useState(false)
   const turnOn = async (kind: AutoLineKind) => {
     const rule = ruleOf(kind)
-    if (!accountId || !rule || enableReviewRequired) return
+    const target = confirmTarget
+    if (!target || !canEditRef.current || target.scope !== accountScope.current || target.kind !== kind || !rule || enableReviewRequired) return
     setBusyKind(kind)
     setNotice('')
     try {
-      const response = await ecAutoLineApi.enableMock(accountId, kind, rule.version, crypto.randomUUID())
+      const response = await ecAutoLineApi.enableMock(target.accountId, kind, rule.version, crypto.randomUUID())
+      if (target.scope !== accountScope.current) return
       if (!response.success) throw new Error('enable_failed')
-      setConfirmKind(null)
+      setConfirmTarget(null)
       notifySaved(`${KIND_LABEL[kind]}の自動の LINE をオンにしました（試験運転）。`)
       await load()
       return true
     } catch (reason) {
+      if (target.scope !== accountScope.current) return
       errors.capture(reason)
       setEnableReviewRequired(true)
       setNotice(`${failureText(reason, 'オンにする')} 閉じて、最新の運用状態を確認してください。`)
       return false
     } finally {
-      setBusyKind(null)
+      if (target.scope === accountScope.current) setBusyKind(null)
     }
   }
 
@@ -173,7 +186,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
                       label={`${KIND_LABEL[kind]}の自動の LINE`}
                       checked={rule.enabled}
                       disabled={busyKind === kind}
-                      onChange={(next) => { if (next) { setNotice(''); setEnableReviewRequired(false); setConfirmKind(kind) } else void turnOff(rule) }}
+                      onChange={(next) => { if (next) { if (!accountId || loadedScope.current !== accountScope.current) return; setNotice(''); setEnableReviewRequired(false); setConfirmTarget({ kind, accountId, scope: accountScope.current }) } else void turnOff(rule) }}
                     />
                   ) : (
                     <StatusBadge tone={rule.enabled ? 'success' : 'neutral'}>{rule.enabled ? 'オン' : 'オフ'}</StatusBadge>
@@ -207,15 +220,17 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
       <p className={styles.foot}>1 人に送るのは 1 日 1 通・1 週間に 3 通まで。配信を止めている人には送りません。</p>
 
       <ConfirmDialog
-        open={confirmKind !== null}
-        title={confirmKind ? `${KIND_LABEL[confirmKind]}の自動の LINE をオンにしますか？` : ''}
-        description={confirmKind ? `これから ${KIND_WHEN[confirmKind]} に自動で送る準備をします。宣伝を止めている人には送りません。今は試験運転で、LINE へは送らず、送る予定だけを記録します。` : ''}
+        open={confirmTarget !== null && confirmTarget.scope === accountScope.current}
+        title={confirmTarget ? `${KIND_LABEL[confirmTarget.kind]}の自動の LINE をオンにしますか？` : ''}
+        description={confirmTarget ? `これから ${KIND_WHEN[confirmTarget.kind]} に自動で送る準備をします。宣伝を止めている人には送りません。今は試験運転で、LINE へは送らず、送る予定だけを記録します。` : ''}
         confirmLabel="オンにする"
-        busy={busyKind !== null && busyKind === confirmKind}
+        busy={busyKind !== null && busyKind === confirmTarget?.kind}
         confirmDisabled={enableReviewRequired} confirmDisabledReason="閉じて最新の運用状態を確認してください。"
-        error={notice || undefined} onSuccess={() => setConfirmKind(null)} onConfirm={() => confirmKind ? turnOn(confirmKind) : false}
-        onCancel={() => { setConfirmKind(null); setNotice(''); if (enableReviewRequired) void load(); setEnableReviewRequired(false) }}
-      />
+        error={notice || undefined} onSuccess={() => setConfirmTarget(null)} onConfirm={() => confirmTarget ? turnOn(confirmTarget.kind) : false}
+        onCancel={() => { setConfirmTarget(null); setNotice(''); if (enableReviewRequired) void load(); setEnableReviewRequired(false) }}
+      >
+        {confirmTarget ? <OperationTargetSummary accounts={[{ id: confirmTarget.accountId }]} /> : null}
+      </ConfirmDialog>
       <EditDrawer
         accountId={accountId}
         rule={editKind ? ruleOf(editKind) ?? null : null}

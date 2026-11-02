@@ -198,6 +198,19 @@ describe('V8 一斉配信の詳細', () => {
     expect(host.textContent).toContain('「3 メッセージから続ける」で作るのを続けられます。')
   })
 
+  it.each(['削除する', '予約を取り消す'])('詳細の%sは記録済みの対象を示し配信の変更で閉じる', async action => {
+    const first = broadcast({ status: 'scheduled', scheduledAt: '2026-08-24T01:00:00.000Z' })
+    await render(<BroadcastDetail {...detailProps({ broadcast: first })} />)
+    await act(async () => { (document.querySelector('[aria-label="配信「未購入者フォロー」の操作"]') as HTMLButtonElement).click() })
+    const item = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(node => node.textContent?.trim() === action)!
+    await act(async () => item.click())
+    const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
+    expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
+    expect(dialog.querySelector('[title="account-a"]')).toBeTruthy()
+    await render(<BroadcastDetail {...detailProps({ broadcast: { ...first, id: 'other' } })} />)
+    expect(document.querySelector('[role="alertdialog"], [role="dialog"]')).toBeNull()
+  })
+
   it('閲覧のみには変える操作を置かない（押せないボタンも残さない）。CSV は出す', async () => {
     access.role = 'staff'
     rememberStaffIdentity({ role: 'staff', permissionViewKeys: ['/broadcasts', 'broadcast.result.export'] } as StaffMember)
@@ -283,10 +296,28 @@ describe('V8 一斉配信を予約したあと', () => {
     const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
     expect(dialog.textContent).toContain('「8月キャンペーンのお知らせ」の予約を取り消しますか？')
     expect(dialog.textContent).toContain('1,213 人 に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
     const order = [...dialog.querySelectorAll('button')].map((button) => button.textContent?.trim()).filter((text) => text && text !== '')
     expect(order.slice(-3)).toEqual(['予約を取り消す', 'やめる', '予約のまま残す'])
     await act(async () => { buttonText('予約を取り消す')!.click() })
     expect(props.confirmCancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('予約取消は配信記録の複数アカウントを示し、対象が変わると旧窓を閉じる', async () => {
+    const multi = broadcast({ id: 'one', targetType: 'multi-account-dedup', lineAccountId: null, accountIds: ['account-a', 'account-b'] })
+    const props = reservedProps({ broadcast: multi, cancelOpen: true })
+    await render(<Reserved {...props} />)
+    const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
+    expect(dialog.querySelector('[title="account-a"]')).toBeTruthy()
+    expect(dialog.querySelector('[title="account-b"]')).toBeTruthy()
+    await render(<Reserved {...props} broadcast={{ ...multi, id: 'two' }} />)
+    expect(document.querySelector('[role="alertdialog"], [role="dialog"]')).toBeNull()
+    expect(props.confirmCancel).not.toHaveBeenCalled()
+  })
+  it('送信元が記録されていない配信は選択中のアカウントで埋めない', async () => {
+    await render(<Reserved {...reservedProps({ cancelOpen: true, broadcast: broadcast({ lineAccountId: null, accountIds: null }) })} />)
+    expect(document.querySelector('[role="alertdialog"], [role="dialog"]')?.textContent).toContain('名前を確認できません')
   })
 
   it('閲覧のみには 次にできること の操作を置かない（押せないボタンも残さない）', async () => {

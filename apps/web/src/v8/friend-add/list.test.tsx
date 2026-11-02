@@ -8,12 +8,13 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const accountState = vi.hoisted(() => ({ id: 'account-a' }))
 const navigation = vi.hoisted(() => ({ query: '' }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
@@ -22,7 +23,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
+  useAccount: () => ({ selectedAccountId: accountState.id, accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
@@ -70,6 +71,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  accountState.id = 'account-a'
   navigation.query = ''
   window.history.replaceState(null, '', '/friend-add-settings')
   window.dispatchEvent(new PopStateEvent('popstate'))
@@ -178,6 +180,29 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     expect(sink).toContain('止められない理由を見る')
     expect(sink).not.toContain('止める')
     expect(sink).not.toContain('保管する')
+  })
+
+  it('保管前に実際のアカウントと環境を確認する', async () => {
+    await render(); await openMenu('店頭QRの初回案内')
+    await act(async () => { screen.getByRole('menuitem', { name: '保管する' }).click() })
+    const dialog = screen.getByRole('alertdialog')
+    expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('本店'); expect(dialog.textContent).toContain('環境')
+  })
+
+  it('アカウントを切り替えて戻しても古い保管を実行しない', async () => {
+    const existingFetch = globalThis.fetch
+    const requests = vi.fn((...args: Parameters<typeof fetch>) => existingFetch(...args))
+    vi.stubGlobal('fetch', requests)
+    await render(); await openMenu('店頭QRの初回案内')
+    await act(async () => { screen.getByRole('menuitem', { name: '保管する' }).click() })
+    const dialog = screen.getByRole('alertdialog')
+    const button = within(dialog).getByRole('button', { name: '保管する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    await act(async () => { accountState.id = 'account-b'; root.render(<FriendAddListV8 />) })
+    await act(async () => { accountState.id = 'account-a'; root.render(<FriendAddListV8 />) })
+    await act(async () => { await handler({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+    expect(requests.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
   })
 
   it('81: 止められない案内の窓は［キャンセル］［受け皿の中身を編集する］の順', async () => {

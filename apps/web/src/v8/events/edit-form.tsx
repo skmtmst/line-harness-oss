@@ -14,7 +14,8 @@ import OgEditor from '@/components/shared/og-editor';
 import { useAccount } from '@/contexts/account-context';
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from '@/components/events/bulk-slot-generator';
 import { splitBand } from '@/components/events/jst';
-import ConfirmDialog from '@/components/shared/confirm-dialog';
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import Dialog from '@/components/shared/dialog';
@@ -370,7 +371,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         </Button>
       </>} /> : null}
  <ConfirmDialog open={deleteOpen} title={`「${draft.name || 'このイベント'}」を削除しますか？`} description="削除すると元に戻せません。申込中・確定済みの予約やキャンセル待ちがあるときは削除できません。"
-      confirmLabel="削除する" destructive busy={deleteBusy} error={deleteError || undefined} onCancel={() => { if (!deleteBusy) setDeleteOpen(false) }} onConfirm={() => void removeEvent()} />
+      confirmLabel="削除する" destructive busy={deleteBusy} error={deleteError || undefined} onCancel={() => { if (!deleteBusy) setDeleteOpen(false) }} onConfirm={() => void removeEvent()}><OperationTargetSummary accounts={[{ id: accountId }]} /></ConfirmDialog>
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="イベントへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </></SaveErrorScope>
 }
@@ -810,7 +811,7 @@ export function SlotsTab({
           setDeleteSlotError('')
           setDeleteSlotTarget(null)
         }}
-      />
+      ><OperationTargetSummary accounts={[{ id: accountId }]} /></ConfirmDialog>
 
       <ConfirmDialog
         open={bulkPreview !== null}
@@ -833,7 +834,7 @@ export function SlotsTab({
           setBulkDone(0)
           setBulkPreview(null)
         }}
-      />
+      ><OperationTargetSummary accounts={[{ id: accountId }]} /></ConfirmDialog>
     </FormSection></SaveErrorScope>
   )
 }

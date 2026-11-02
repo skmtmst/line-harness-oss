@@ -241,6 +241,8 @@ it('D11: 一括追加の途中失敗後は、残りだけを同じ鍵で再送�
   await act(async () => { fireEvent.change(document.querySelector('[role="dialog"] input[type="number"]')!, { target: { value: '10' } }) })
   await click('生成')
   expect(document.body.textContent).toContain('3件の予約枠を作りますか？')
+  expect([...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].at(-1)?.textContent).toContain('LINEアカウント')
+  expect([...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].at(-1)?.textContent).toContain('環境')
   expect(st.createSlots).not.toHaveBeenCalled()
   st.createSlots.mockRejectedValueOnce(new EventSlotsPartialError('1件まで追加されました', [early]))
   await click('まとめて作る')
@@ -254,4 +256,24 @@ it('D11: 一括追加の途中失敗後は、残りだけを同じ鍵で再送�
   expect(resent).toEqual(original.slice(1))
   expect(new Set(original.map((slot) => slot.client_key)).size).toBe(3)
   expect(resent.every((slot) => typeof slot.client_key === 'string' && slot.client_key.length > 0)).toBe(true)
+})
+
+
+it('イベントの削除確認に操作先と環境を出す', async () => {
+  await act(async () => root.render(<EventForm accountId="account-a" eventId="event-1" />))
+  await act(async () => { await Promise.resolve(); await Promise.resolve() })
+  await click('削除する')
+  let dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
+  expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
+})
+
+it('予約枠の削除確認に操作先と環境を出す', async () => {
+  await renderSlots()
+  let dialog: Element
+
+  const row = host.querySelector('tbody tr')!
+  await act(async () => { (row.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement).click() })
+  await act(async () => { (await screen.findByRole('menuitem', { name: '削除する' })).click() })
+  dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
+  expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
 })

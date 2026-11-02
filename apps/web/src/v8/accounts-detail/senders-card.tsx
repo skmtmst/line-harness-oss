@@ -14,7 +14,7 @@ import { OptionalBadge } from '@/components/shared/form-controls'
  * 名前は 20 文字まで・「LINE」「ライン」は使えない（サーバーが拒否し、理由をそのまま出す）。
  * 閲覧のみには追加・使わないを出さない。スタッフは自分用だけ、オーナー・管理者は全員用も作れる。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ImagePlus, Plus } from 'lucide-react'
 import type { LineSender } from '@line-crm/shared'
 import { lineSenderApi } from '@/lib/api/helpers/gap1'
@@ -23,6 +23,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
@@ -46,23 +47,35 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
   const [visibility, setVisibility] = useState<'all' | 'owner_only'>('all')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [stopping, setStopping] = useState<LineSender | null>(null)
+  const accountScope = useRef({ id: accountId, generation: 0 })
+  if (accountScope.current.id !== accountId) accountScope.current = { id: accountId, generation: accountScope.current.generation + 1 }
+  const loadedScope = useRef(-1)
+  const loadRequest = useRef(0)
+  const roleRef = useRef(role)
+  roleRef.current = role
+  const [stopping, setStopping] = useState<{ sender: LineSender; accountId: string; accountName: string; generation: number } | null>(null)
   /* アイコン（任意）：登録メディアの共通の選ぶ窓から。正方形の PNG/JPEG・1MB 以内はサーバーが確かめる。 */
   const [icon, setIcon] = useState<MediaItem | null>(null)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
 
   const load = useCallback(async () => {
+    const generation = accountScope.current.generation
+    const request = ++loadRequest.current
     setFailed(false)
     try {
       const res = await lineSenderApi.list(accountId)
       if (!res.success) throw new Error('senders_failed')
+      if (generation !== accountScope.current.generation || request !== loadRequest.current) return
+      loadedScope.current = generation
       setSenders(res.data.filter((row) => row.status === 'active'))
     } catch {
+      if (generation !== accountScope.current.generation || request !== loadRequest.current) return
+      loadedScope.current = -1
       setFailed(true)
     }
   }, [accountId])
-  useEffect(() => { setSenders(null); void load() }, [load])
+  useEffect(() => { setSenders(null); setStopping(null); void load() }, [load])
 
   const create = async () => {
     const trimmed = name.trim()
@@ -85,14 +98,14 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
   }
   const [stopReviewRequired, setStopReviewRequired] = useState(false)
   const stop = async () => {
-    if (!stopping || busy || stopReviewRequired) return
+    if (!stopping || busy || stopReviewRequired || stopping.generation !== accountScope.current.generation || !(canManageRole(roleRef.current) || (roleRef.current !== 'viewer' && roleRef.current !== null && stopping.sender.visibility === 'owner_only'))) return
     setBusy(true)
     try {
-      await lineSenderApi.deactivate(accountId, stopping.id, stopping.version)
-      setStopping(null)
-      await load()
+      await lineSenderApi.deactivate(stopping.accountId, stopping.sender.id, stopping.sender.version)
+      if (stopping.generation === accountScope.current.generation) { setStopping(null); await load() }
       return true
     } catch {
+      if (stopping.generation !== accountScope.current.generation) return false
       setStopReviewRequired(true)
       setError('使わない設定にできませんでした。閉じて最新の送り手を読み直し、状態を確認してください。')
       return false
@@ -126,7 +139,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
               <span className={styles.name} title={sender.name}>{sender.name}{sender.iconMissing ? '（画像が見つかりません）' : ''}</span>
               <span className={styles.who}>{sender.visibility === 'all' ? '全員' : '本人だけ'}</span>
               {canManage || sender.visibility === 'owner_only' ? (
-                <RowMenu label={`送り手「${sender.name}」の操作`} items={[{ id: 'stop', label: '使わない', tone: 'danger', onSelect: () => { setError(''); setStopReviewRequired(false); setStopping(sender) } }]} />
+                <RowMenu label={`送り手「${sender.name}」の操作`} items={[{ id: 'stop', label: '使わない', tone: 'danger', onSelect: () => { if (loadedScope.current !== accountScope.current.generation) return; setError(''); setStopReviewRequired(false); setStopping({ sender, accountId, accountName, generation: accountScope.current.generation }) } }]} />
               ) : null}
             </li>
           ))}
@@ -170,8 +183,8 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
       </ConfirmDialog>
       <MediaPickerDialog open={iconPickerOpen} accountId={accountId} kind="image" title="アイコンを選ぶ" onClose={() => setIconPickerOpen(false)} onSelect={(item) => { setIcon(item); setIconPickerOpen(false) }} />
       <ConfirmDialog
-        open={stopping !== null}
-        title={`「${stopping?.name ?? ''}」を使わなくしますか？`}
+        open={stopping !== null && stopping.generation === accountScope.current.generation}
+        title={`「${stopping?.sender.name ?? ''}」を使わなくしますか？`}
         description="これから送るメッセージでは選べなくなります。すでに送った分の名前・アイコンはそのまま残ります。"
         confirmLabel="使わない"
         destructive
@@ -179,7 +192,9 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
         confirmDisabled={stopReviewRequired} confirmDisabledReason="閉じて最新の送り手を確認してください。"
         error={error || undefined} onSuccess={() => setStopping(null)} onConfirm={() => stop()}
         onCancel={() => { if (busy) return; setStopping(null); setError(''); if (stopReviewRequired) void load(); setStopReviewRequired(false) }}
-      />
+      >
+        {stopping ? <OperationTargetSummary accounts={[{ id: stopping.accountId, name: stopping.accountName }]} /> : null}
+      </ConfirmDialog>
     </Card>
   )}</SaveErrorScope>)
 }

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { PERMISSION_LOCK_REASON, PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
@@ -9,15 +9,16 @@ import { rememberSessionSnapshot, forgetSessionSnapshot } from '@/lib/session-sn
 import type { EcNotificationSetting, OperatorNotificationRule, OpsImpersonation } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
 
-const fixture = vi.hoisted(() => ({ tab: 'customer', role: 'viewer', settings: vi.fn(), operators: vi.fn(), write: vi.fn() }))
+const fixture = vi.hoisted(() => ({ tab: 'customer', role: 'viewer', account: 'account-a', settings: vi.fn(), operators: vi.fn(), write: vi.fn() }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/line-notifications', useSearchParams: () => new URLSearchParams(), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', loading: false }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.account, selectedAccount: { id: fixture.account, name: `${fixture.account}のLINEアカウント` }, loading: false }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({ default: () => null, useMergedTab: () => fixture.tab }))
 vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return { ...actual, fetchApi: vi.fn(async () => ({ success: true, data: {} })), api: { ...actual.api,
     staff: { ...actual.api.staff, me: async () => fixture.role ? { success: true, data: { role: fixture.role === 'viewer' ? 'staff' : fixture.role, readOnly: fixture.role === 'viewer', roleBundle: fixture.role === 'viewer' ? 'view_only' : undefined } } : { success: false, error: 'unavailable' } },
     ecCommerce: { ...actual.api.ecCommerce, settings: fixture.settings, overview: async () => ({ success: true, data: { last24h: 0, failed: 0, byType: [] } }), testSend: fixture.write },
+    accountSettings: { ...actual.api.accountSettings, getTestRecipients: async () => ({ success: true, data: [{ id: 'test-1', displayName: 'テスト一郎', pictureUrl: null }] }) },
     lineNotifications: { ...actual.api.lineNotifications, definitions: async () => ({ success: true, data: [] }), sendCounts: async () => ({ success: true, data: { sentToday: 0, sentLast30d: 0, byEventType: [] } }),
       createDefinition: fixture.write, updateDraft: fixture.write, publishDefinition: fixture.write, stopDefinition: fixture.write,
       operatorRules: { ...actual.api.lineNotifications.operatorRules, list: fixture.operators, test: fixture.write, publish: fixture.write, stop: fixture.write, exportCsv: fixture.write },
@@ -31,7 +32,7 @@ const setting: EcNotificationSetting = { eventType: 'ec.order.confirmed', title:
   category: 'order', introText: '', outroText: '', buttonLabel: '', buttonUrl: '', imageUrl: '', displayOrder: 0, fixedFields: [], fixedPreview: '', updatedAt: '' }
 const rule = (status: 'draft' | 'published'): OperatorNotificationRule => ({ id: status, lineAccountId: 'account-a', name: `予約-${status}`, eventType: 'reservation.created', conditions: {}, channels: ['line'], status, recipientCount: 1, occurredToday: 0, version: 1, updatedAt: '' })
 beforeEach(() => {
-  vi.clearAllMocks(); fixture.tab = 'customer'; fixture.role = 'viewer'
+  vi.clearAllMocks(); fixture.tab = 'customer'; fixture.role = 'viewer'; fixture.account = 'account-a'
   fixture.settings.mockResolvedValue({ success: true, data: [setting] })
   fixture.operators.mockResolvedValue({ success: true, data: { items: [rule('draft'), rule('published')], summary: { total: 2, published: 1, stopped: 1, missingRecipients: 0, recipients: 1, acceptedToday: 0, excludedToday: 0 } } })
   vi.stubGlobal('React', React)
@@ -90,6 +91,8 @@ it.each(['owner', 'admin'])('%sの切替は元の確認窓を開き、確認前�
   expect(screen.queryByRole('region', { name: '操作権限の案内' })).toBeNull()
   fireEvent.click(toggle)
   expect(await screen.findByRole('dialog')).toBeTruthy()
+  expect(screen.getByText('LINEアカウント')).toBeTruthy()
+  expect(screen.getByText('環境')).toBeTruthy()
   expect(fixture.write).not.toHaveBeenCalled()
 })
 
@@ -141,5 +144,26 @@ it('閲覧の代理ログインでは帯と操作に代理閲覧の理由を出�
   expect(screen.queryByText(READ_ONLY_MESSAGE)).toBeNull()
   expect(screen.queryByText(PERMISSION_LOCK_SUMMARY.manager)).toBeNull()
   assertLocked(toggle, PERMISSION_LOCK_REASON.impersonation)
+  expect(fixture.write).not.toHaveBeenCalled()
+})
+
+
+it.each(['toggle', 'test'])('確認中にアカウントを切り替えて戻した後は古い%s操作を送らない', async kind => {
+  fixture.role = 'owner'
+  const view = render(<LineNotificationsPage />)
+  if (kind === 'toggle') {
+    fireEvent.click(await screen.findByRole('switch', { name: /出す・止める/ }))
+  } else {
+    fireEvent.click(await screen.findByRole('button', { name: /の内容を編集$/ }))
+    await screen.findByLabelText('ご案内文')
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
+  }
+  const dialog = await screen.findByRole('dialog')
+  const button = await within(dialog).findByRole('button', { name: kind === 'toggle' ? /お知らせを(?:止める|出す)/ : /テスト受信者 1名へ送信/ })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+  await act(async () => { fixture.account = 'account-b'; view.rerender(<LineNotificationsPage />) })
+  await act(async () => { fixture.account = 'account-a'; view.rerender(<LineNotificationsPage />) })
+  await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
   expect(fixture.write).not.toHaveBeenCalled()
 })
