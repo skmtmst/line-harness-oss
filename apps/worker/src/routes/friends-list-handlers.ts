@@ -211,7 +211,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       conditions.push(
         `EXISTS (
           SELECT 1 FROM chats c
-          WHERE c.friend_id = f.id AND c.operator_id = ?
+          WHERE c.friend_id = f.id AND COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) = ?
         )`,
       );
       binds.push(operatorId);
@@ -328,8 +328,8 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
     const baseSelect = includeChatStatus
       ? `f.*, tl.name AS first_tracked_link_name,
          COALESCE(lc.status, 'resolved') AS chat_status,
-         lc.operator_id AS operator_id,
-         op.name AS operator_name,
+         COALESCE(CASE WHEN lc.assignee_staff_id IS NOT NULL THEN 'staff:' || lc.assignee_staff_id END, lc.operator_id) AS operator_id,
+         CASE WHEN lc.assignee_staff_id IS NOT NULL THEN COALESCE(assignee.name, '担当者不明') WHEN lc.operator_id IS NOT NULL THEN COALESCE(op.name, '担当者不明') END AS operator_name,
          sm.id AS support_mark_id,
          sm.name AS support_mark_name,
          sm.color AS support_mark_color`
@@ -339,6 +339,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
          LEFT JOIN tracked_links tl ON tl.id = f.first_tracked_link_id
          LEFT JOIN chats lc ON lc.friend_id = f.id
          LEFT JOIN operators op ON op.id = lc.operator_id
+         LEFT JOIN staff_members assignee ON assignee.id = lc.assignee_staff_id
          LEFT JOIN support_marks sm ON sm.id = f.support_mark_id`
       : `FROM friends f`;
     // 作成日時は通常の第1順位、検索時は一致度の次の順位とし、sort で方向を選ぶ。

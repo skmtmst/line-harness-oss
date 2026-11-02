@@ -33,10 +33,10 @@ test('G4-08: 夜の3件は送らず、朝にまとめて1件だけ',async()=>{
 });
 test.each(['assignment','preference'])('G4-07 G4-08: 朝のまとめも変更後の担当と好みで確認する（%s）',async change=>{
  const {sweepOperatorPush}=await import('../services/operator-push.js');await gapCall(gapApp(d,[operatorPush]),'/api/me/push/subscriptions','POST',body);
- d.raw.exec("UPDATE chats SET operator_id='o';INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES('changed-night','f','incoming','text','秘密の本文','a')");
+ d.raw.exec("UPDATE chats SET assignee_staff_id='o';INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES('changed-night','f','incoming','text','秘密の本文','a')");
  await gapCall(gapApp(d,[operatorPush]),'/api/me/push/preferences','PUT',{kinds:['assigned_reply'],quietStart:'00:00',quietEnd:'23:59',quietAllowCritical:false,expectedVersion:0});
  const send=vi.fn(async()=>({ok:true,status:201}));await deliverOperatorPush(d.db,{}, {staffId:'o',account:'a',kind:'assigned_reply',refId:'changed-night',chatId:'chat'},send);
- d.raw.exec("UPDATE operator_push_preferences SET quiet_start='22:00',quiet_end='08:00'");if(change==='assignment')d.raw.exec("UPDATE chats SET operator_id='s'");else d.raw.exec("UPDATE operator_push_preferences SET kinds_json='[]'");
+ d.raw.exec("UPDATE operator_push_preferences SET quiet_start='22:00',quiet_end='08:00'");if(change==='assignment')d.raw.exec("UPDATE chats SET assignee_staff_id='s'");else d.raw.exec("UPDATE operator_push_preferences SET kinds_json='[]'");
  await sweepOperatorPush(d.db,{},new Date('2026-11-20T00:00:00Z'),send);expect(send).not.toHaveBeenCalled();expect(d.raw.prepare('SELECT status,error_code FROM operator_push_deliveries').get()).toEqual({status:'failed',error_code:'push_no_longer_authorized'});
 });
 test('G4-12: 5xxだけ上限つきで再試行し、成功した物は繰り返さない',async()=>{

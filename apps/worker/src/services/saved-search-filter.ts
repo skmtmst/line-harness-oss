@@ -157,7 +157,7 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
       }
       return {
         sql: `${condition.op === 'ne' ? 'NOT ' : ''}EXISTS (
-          SELECT 1 FROM chats sac WHERE sac.friend_id = f.id AND sac.operator_id = ?
+          SELECT 1 FROM chats sac WHERE sac.friend_id = f.id AND COALESCE(CASE WHEN sac.assignee_staff_id IS NOT NULL THEN 'staff:' || sac.assignee_staff_id END, sac.operator_id) = ?
         )`,
         binds: [value],
       };

@@ -1,3 +1,4 @@
+import { chatAssigneeId } from '../services/chat-assignees.js';
 import { slaChatList, enrichSlaChats } from '../services/inbox-sla-list.js';
 import { refreshInboxSla } from '../services/inbox-sla.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -62,7 +63,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       const chatRows = await c.env.DB.prepare(
         `SELECT f.id AS friend_id, f.display_name, f.picture_url,
                 CASE WHEN json_valid(f.metadata) THEN json_extract(f.metadata, '$.__attention') = '1' ELSE 0 END AS is_attention,
-                c.operator_id, c.status, c.revision, c.notes,
+                COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) AS operator_id, CASE WHEN c.assignee_staff_id IS NOT NULL THEN COALESCE((SELECT name FROM staff_members WHERE id=c.assignee_staff_id), '担当者不明') WHEN c.operator_id IS NOT NULL THEN COALESCE((SELECT name FROM operators WHERE id=c.operator_id), '担当者不明') END AS operator_name, c.status, c.revision, c.notes,
                 CASE
                   WHEN c.last_customer_message_at IS NOT NULL
                    AND (sr.last_read_at IS NULL OR c.last_customer_message_at > sr.last_read_at)
@@ -88,6 +89,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
           friendPictureUrl: row.pictureUrl,
           isAttention: Boolean(chat.is_attention),
           operatorId: chat.operator_id,
+          operatorName: chat.operator_name,
           status: chat.status,
           revision: Number(chat.revision ?? 0),
           notes: chat.notes,
@@ -149,9 +151,9 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       conditionBindings.push(status);
     }
     if (operatorId) {
-      if (operatorId === 'unassigned') conditions.push('c.operator_id IS NULL');
+      if (operatorId === 'unassigned') conditions.push("COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) IS NULL");
       else {
-        conditions.push('c.operator_id = ?');
+        conditions.push("COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) = ?");
         conditionBindings.push(operatorId);
       }
     }
@@ -308,7 +310,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         CASE WHEN json_valid(f.metadata) THEN json_extract(f.metadata, '$.__attention') = '1' ELSE 0 END AS is_attention,
         f.line_user_id,
         f.line_account_id,
-        c.operator_id,
+        COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) AS operator_id, CASE WHEN c.assignee_staff_id IS NOT NULL THEN COALESCE((SELECT name FROM staff_members WHERE id=c.assignee_staff_id), '担当者不明') WHEN c.operator_id IS NOT NULL THEN COALESCE((SELECT name FROM operators WHERE id=c.operator_id), '担当者不明') END AS operator_name,
         COALESCE(c.status, 'resolved') AS status,
         COALESCE(c.revision, 0) AS revision,
         c.notes,
@@ -360,6 +362,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       friendPictureUrl: ch.picture_url || null,
       isAttention: Boolean(ch.is_attention),
       operatorId: ch.operator_id,
+      operatorName: ch.operator_name,
       status: ch.status,
       revision: Number(ch.revision ?? 0),
       notes: ch.notes,
@@ -405,7 +408,8 @@ export const get__api_chats_id_2 = async (c: Context<Env, "/api/chats/:id">) => 
     const resolvedFriendId = chatRow?.friend_id ?? friendId!;
     // 公開 ID は常に friend_id に統一する（lazy-create で ID が変わるのを防ぐため）。
     const responseId = resolvedFriendId;
-    const operatorId = chatRow?.operator_id ?? null;
+    const operatorId = chatRow ? chatAssigneeId(chatRow) : null;
+    const operatorName = chatRow?.assignee_staff_id ? (await c.env.DB.prepare('SELECT name FROM staff_members WHERE id=?').bind(chatRow.assignee_staff_id).first<{name:string}>())?.name ?? '担当者不明' : chatRow?.operator_id ? (await c.env.DB.prepare('SELECT name FROM operators WHERE id=?').bind(chatRow.operator_id).first<{name:string}>())?.name ?? '担当者不明' : null;
     const status = chatRow?.status ?? 'resolved';
     const notes = chatRow?.notes ?? null;
     const revision = chatRow?.revision ?? 0;
@@ -492,6 +496,7 @@ export const get__api_chats_id_2 = async (c: Context<Env, "/api/chats/:id">) => 
         friendPictureUrl: friend?.picture_url || null,
         isAttention: friendMetadata.__attention === '1',
         operatorId,
+        operatorName,
         status,
         notes,
         revision,

@@ -115,7 +115,7 @@ function queryFilters(opts: UnansweredInboxOptions, includeSearch: boolean): {
     bindings.push(opts.status);
   }
   if (opts.operatorId) {
-    conditions.push('c.operator_id = ?');
+    conditions.push("COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) = ?");
     bindings.push(opts.operatorId);
   }
   if (opts.minWaitMinutes && opts.minWaitMinutes > 0) {

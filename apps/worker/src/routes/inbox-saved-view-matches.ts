@@ -28,9 +28,9 @@ export async function countInboxSavedViewMatches(
   if (conditions.assignees.length > 0) {
     const named = conditions.assignees.filter((id) => id !== 'unassigned');
     const clauses: string[] = [];
-    if (conditions.assignees.includes('unassigned')) clauses.push('c.operator_id IS NULL');
+    if (conditions.assignees.includes('unassigned')) clauses.push("COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) IS NULL");
     if (named.length > 0) {
-      clauses.push(`c.operator_id IN (${sqlIdSet(named).sql})`);
+      clauses.push(`COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) IN (${sqlIdSet(named).sql})`);
       bindings.push(...(named.length ? sqlIdSet(named).binds : []));
     }
     where.push(`(${clauses.join(' OR ')})`);
@@ -114,7 +114,7 @@ export async function countInboxSavedViewMatches(
     emailBindings.push(...conditions.statuses);
   }
   if (conditions.assignees.length > 0) {
-    const named = conditions.assignees.filter((id) => id !== 'unassigned');
+    const named = conditions.assignees.filter((id) => id !== 'unassigned').map(id => id.startsWith('staff:') ? id.slice(6) : id);
     const clauses: string[] = [];
     if (conditions.assignees.includes('unassigned')) clauses.push('t.assigned_staff_id IS NULL');
     if (named.length > 0) {

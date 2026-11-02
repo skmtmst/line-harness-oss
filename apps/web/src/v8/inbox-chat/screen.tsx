@@ -745,7 +745,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
             }}
             operatorName={
               chatDetail?.operatorId
-                ? operators.find((operator) => operator.id === chatDetail.operatorId)?.name ?? null
+                ? operators.find((operator) => operator.id === chatDetail.operatorId)?.name ?? chatDetail.operatorName ?? '担当者不明'
                 : null
             }
             chatStatus={

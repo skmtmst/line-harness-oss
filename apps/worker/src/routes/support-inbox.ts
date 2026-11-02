@@ -223,7 +223,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
         if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
         else {
           searchSql += ' AND t.assigned_staff_id = ?';
-          bindings.push(assignee);
+          bindings.push(assignee.startsWith('staff:') ? assignee.slice(6) : assignee);
         }
       }
       if (unreadOnly) {

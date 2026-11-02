@@ -13,7 +13,8 @@ describe('一括操作の追加分の実行と結果件数', () => {
     testDb = createTestD1();
     testDb.raw.exec(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
       VALUES ('a1', 'channel-1', '試験店舗', '', '', 'default');
-      INSERT INTO operators (id, name, email) VALUES ('operator-1', '試験担当', 'fixture@example.invalid');
+      INSERT INTO tenants(id,name) VALUES ('default','試験会社');
+      INSERT INTO staff_members(id,name,role,api_key,tenant_id,permission_keys) VALUES ('operator-1','試験担当','staff','key','default','["/chats"]');
       INSERT INTO support_marks (id, name) VALUES ('mark-1', '対応中');
       INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at)
       VALUES ('mark-1', 'default', 'a1', '${NOW}');
@@ -36,8 +37,8 @@ describe('一括操作の追加分の実行と結果件数', () => {
   }
 
   it('2人の担当者と対応マークを変え、成功件数と変更済みの件数を返す', async () => {
-    expect(await execute({ kind: 'assign_operator', operatorId: 'operator-1' })).toMatchObject({ successCount: 2 });
-    expect(testDb.raw.prepare('SELECT operator_id FROM chats').all()).toEqual([{ operator_id: 'operator-1' }, { operator_id: 'operator-1' }]);
+    expect(await execute({ kind: 'assign_operator', operatorId: 'staff:operator-1' })).toMatchObject({ successCount: 2 });
+    expect(testDb.raw.prepare('SELECT assignee_staff_id FROM chats').all()).toEqual([{ assignee_staff_id: 'operator-1' }, { assignee_staff_id: 'operator-1' }]);
     expect(await execute({ kind: 'set_support', markId: 'mark-1' })).toMatchObject({ successCount: 2 });
     expect(testDb.raw.prepare('SELECT support_mark_id FROM friends').all()).toEqual([{ support_mark_id: 'mark-1' }, { support_mark_id: 'mark-1' }]);
     expect(await execute({ kind: 'set_support', markId: 'mark-1' })).toMatchObject({ successCount: 0, skippedCount: 2 });

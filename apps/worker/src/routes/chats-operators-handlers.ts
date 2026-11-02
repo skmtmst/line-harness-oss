@@ -1,7 +1,8 @@
+import { listChatAssignees } from '../services/chat-assignees.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 
-import { getOperators, getOperatorById, createOperator, updateOperator, deleteOperator } from '@line-crm/db';
+import { getOperatorById, createOperator, updateOperator, deleteOperator } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 
@@ -11,7 +12,13 @@ import type { Context } from 'hono';
 
 export const get__api_operators_1 = async (c: Context<Env, "/api/operators">) => {
   try {
-    const items = await getOperators(c.env.DB);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const requested = c.req.query('lineAccountId');
+    if (requested && !scope.allowedAccountIds.includes(requested)) return c.json({success:false,error:'アカウントが見つかりません'}, 404);
+    if (c.req.query('channel') === 'email' && !scope.canSeeUnassigned) return c.json({success:false,error:'受信箱が見つかりません'}, 404);
+    const accounts = c.req.query('channel') === 'email' ? [null] : requested ? [requested] : scope.allowedAccountIds;
+    const groups = await Promise.all(accounts.map(account => listChatAssignees(c.env.DB, account)));
+    const items = [...new Map(groups.flat().map(item => [item.id, item])).values()];
     return c.json({
       success: true,
       data: items.map((o) => ({
@@ -63,9 +70,11 @@ export const get__api_chats_stats_5 = async (c: Context<Env, "/api/chats/stats">
     const { getVisibleLineAccountScope } = await import('../services/account-access.js');
     const staff = c.get('staff');
     const accountScope = await getVisibleLineAccountScope(c.env.DB, staff);
+    const requested = c.req.query('lineAccountId');
+    if (requested && !accountScope.allowedAccountIds.includes(requested)) return c.json({ success: false, error: '受信箱が見つかりません' }, 404);
     const stats = await getInboxStats(c.env.DB, staff?.id ?? null, {
-      allowedAccountIds: accountScope.allowedAccountIds,
-      includeUnassigned: accountScope.canSeeUnassigned,
+      allowedAccountIds: requested ? [requested] : accountScope.allowedAccountIds,
+      includeUnassigned: requested ? false : accountScope.canSeeUnassigned,
     });
     return c.json({ success: true as const, data: stats });
   } catch (err) {
@@ -128,9 +137,9 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
         conditionBindings.push(status);
       }
       if (operatorId) {
-        if (operatorId === 'unassigned') conditions.push('c.operator_id IS NULL');
+        if (operatorId === 'unassigned') conditions.push("COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) IS NULL");
         else {
-          conditions.push('c.operator_id = ?');
+          conditions.push("COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) = ?");
           conditionBindings.push(operatorId);
         }
       }
@@ -242,7 +251,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
         if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
         else {
           searchSql += ' AND t.assigned_staff_id = ?';
-          bindings.push(assignee);
+          bindings.push(assignee.startsWith('staff:') ? assignee.slice(6) : assignee);
         }
       }
       if (unreadOnly) {

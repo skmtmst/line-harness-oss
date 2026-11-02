@@ -395,7 +395,7 @@ export async function handleEvent(
       await replay('incoming_chat',()=>upsertChatOnMessage(execution?.mutationDb('incoming_chat') ?? db, friend.id, toJstString(new Date(event.timestamp))));
       if(friend.line_account_id) await assignInbox(db,friend.line_account_id,friend.id);
       if(operatorMailEnv&&lineAccountId)await replay('operator_push',async()=>{
-        const chat=await db.prepare('SELECT id,operator_id FROM chats WHERE friend_id=?').bind(friend.id).first<{id:string;operator_id:string|null}>();if(!chat)return;
+        const chat=await db.prepare('SELECT id,COALESCE(assignee_staff_id,operator_id) AS operator_id FROM chats WHERE friend_id=?').bind(friend.id).first<{id:string;operator_id:string|null}>();if(!chat)return;
         const {dispatchOperatorEvent}=await import('../services/operator-notification-dispatch.js');
         await dispatchOperatorEvent(db,operatorMailEnv!,{lineAccountId:lineAccountId!,eventType:chat.operator_id?'inbox_assigned_reply':'inbox_new_inquiry',sourceEventId:logId,executionMode:'automatic'});
       });
@@ -533,7 +533,7 @@ export async function handleEvent(
       await replay('incoming_chat',()=>upsertChatOnMessage(execution?.mutationDb('incoming_chat') ?? db, friend.id, toJstString(new Date(event.timestamp))));
       if(friend.line_account_id) await assignInbox(db,friend.line_account_id,friend.id);
       if(operatorMailEnv&&lineAccountId)await replay('operator_push',async()=>{
-        const chat=await db.prepare('SELECT id,operator_id FROM chats WHERE friend_id=?').bind(friend.id).first<{id:string;operator_id:string|null}>();if(!chat)return;
+        const chat=await db.prepare('SELECT id,COALESCE(assignee_staff_id,operator_id) AS operator_id FROM chats WHERE friend_id=?').bind(friend.id).first<{id:string;operator_id:string|null}>();if(!chat)return;
         const {dispatchOperatorEvent}=await import('../services/operator-notification-dispatch.js');
         await dispatchOperatorEvent(db,operatorMailEnv!,{lineAccountId:lineAccountId!,eventType:chat.operator_id?'inbox_assigned_reply':'inbox_new_inquiry',sourceEventId:logId,executionMode:'automatic'});
       });

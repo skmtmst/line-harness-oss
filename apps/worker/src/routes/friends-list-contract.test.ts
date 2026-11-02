@@ -10,7 +10,7 @@ describe('友だち一覧API契約', () => {
   it('担当者とシナリオをページング前のSQLで絞る', () => {
     expect(SOURCE).toContain("c.req.query('operatorId')")
     expect(SOURCE).toContain("c.req.query('scenarioId')")
-    expect(SOURCE).toContain('WHERE c.friend_id = f.id AND c.operator_id = ?')
+    expect(SOURCE).toContain('WHERE c.friend_id = f.id AND COALESCE(CASE WHEN c.assignee_staff_id')
     expect(SOURCE).toContain('SELECT 1 FROM friend_scenarios fs')
     expect(SOURCE).toContain("fs.status IN ('active', 'delivering')")
   })
