@@ -2464,7 +2464,7 @@ CREATE TABLE "chats" (
   last_customer_message_at TEXT,
   last_operator_message_at TEXT,
   next_response_due_at     TEXT
-, assigned_by TEXT CHECK(assigned_by IN ('auto','manual')), pending_since TEXT, sla_due_at TEXT, first_response_at TEXT, sla_notified_stage INTEGER NOT NULL DEFAULT 0, assignment_token TEXT, assigned_at TEXT);
+, assigned_by TEXT CHECK(assigned_by IN ('auto','manual')), pending_since TEXT, sla_due_at TEXT, first_response_at TEXT, sla_notified_stage INTEGER NOT NULL DEFAULT 0, assignment_token TEXT, assigned_at TEXT, assignee_staff_id TEXT);
 
 CREATE TABLE codex_cloud_tasks (
   slack_event_id               TEXT PRIMARY KEY,
@@ -10075,6 +10075,8 @@ CREATE INDEX idx_calendar_bookings_start ON calendar_bookings (start_at);
 CREATE INDEX idx_carousel_taps_action ON carousel_taps(template_id, column_index, action_index);
 
 CREATE INDEX idx_carousel_taps_friend ON carousel_taps(template_id, friend_id);
+
+CREATE INDEX idx_chats_assignee_staff ON chats(assignee_staff_id);
 
 CREATE INDEX idx_chats_friend_status_message ON chats (friend_id, status, last_message_at);
 
