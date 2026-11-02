@@ -334,6 +334,7 @@ export default function RankSettingsV8({
     } />
   </SaveErrorScope>
 
+  const missingTags = settings.ranks.some((rank) => !rank.tagName)
   const rules = settings.rules
   const removeRow = removeTarget !== null ? drafts[removeTarget] : null
   const removeCandidates = removeRow ? drafts.filter((row) => row.id && row.id !== removeRow.id) : []
@@ -342,6 +343,7 @@ export default function RankSettingsV8({
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.rankBody}>
+      {missingTags ? <Notice tone="warn">ランクのタグが見つかりません。ランク設定を保存すると作り直します。</Notice> : null}
       {notice || error ? (
         <div className={styles.messages}>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
@@ -451,7 +453,7 @@ export default function RankSettingsV8({
       {readonly ? null : (
         <div className={styles.saveRow}>
           <Button variant="secondary" onClick={cancel} disabled={busy || !dirty} title={busy ? '処理しています' : !dirty ? '変更がありません' : undefined}>キャンセル</Button>
-          <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty} title={busy ? '処理しています' : !dirty ? '変更がありません' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
+          <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || (!dirty && !missingTags)} title={busy ? '処理しています' : !dirty && !missingTags ? '変更がありません' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
             <Check size={16} aria-hidden="true" />{conflict ? '比べてから保存' : '保存して EC へ同期'}
           </Button>
         </div>

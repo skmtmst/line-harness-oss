@@ -94,6 +94,20 @@ async function click(target: Element | undefined) {
 }
 
 describe('V8 会員（src/v8/nen-members）', () => {
+  it('失われたランクタグの復旧方法を案内する', async () => {
+    const ranks = SETTINGS.ranks.map((rank, i) => i === 0 ? { ...rank, tagName: null } : rank)
+    const onSaved = vi.fn()
+    fetchApi.mockResolvedValue({ success: true, data: SETTINGS })
+    await act(async () => { root.render(<MembersV8 accountId="acc-1" tab="ranks" status="ready" settings={{ ...SETTINGS, ranks }} onRetry={() => {}} onSaved={onSaved} onChangeTab={() => {}} />) })
+    await settle()
+    expect(host.textContent).toContain('ランクのタグが見つかりません')
+    expect(host.textContent).toContain('ランク設定を保存')
+    expect(byText('保存して EC へ同期')?.disabled).toBe(false)
+    await click(byText('保存して EC へ同期'))
+    expect(fetchApi.mock.calls.some(([path, options]) => path === '/api/nen/rank-settings' && options?.method === 'PUT')).toBe(true)
+    expect(onSaved).toHaveBeenCalled()
+  })
+
   it('未設定なら初期ランクを作る操作を出し、押すと設定を受け取る', async () => {
     const onSaved = vi.fn()
     fetchApi.mockResolvedValue({ success: true, data: SETTINGS })
