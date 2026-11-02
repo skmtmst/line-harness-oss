@@ -22,7 +22,7 @@
 - 来店にする・退店にする・無断にする：今の来店の口（`attendance`）へ送る。無断は `no_show`（口と版は来店と同じ）。予約時刻より前の来店は止めない（早く来る客がいる）。
 - 取り消す：詳細を閉じ、確かめの窓（「この予約を取り消しますか？」）を通してから `updateReservation(id, { status: 'cancelled' })`。
 - 変更する：詳細を閉じ、今の変更の窓（`EditReservationDialog`）を開く。保存は `updateReservation`。
-- 予約を有効に戻す：`updateReservation(id, { status: 'confirmed' })`。
+- 予約を有効に戻す：取消は `updateReservation(id, { status: 'confirmed' })`。無断だけ来店の口（`attendance` の `undo_visit`）へ送り、無断の印も取り消す。
 
 ## 閲覧のみ
 - 予約の口は owner・admin・staff に開いている。それ以外（閲覧のみ）には 取り消す・変更する を置かない（閉じるだけ）。

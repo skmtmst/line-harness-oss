@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), reservationsDay: vi.fn(), updateReservation: vi.fn(), createReservation: vi.fn(), holdReservation: vi.fn(),
   floors: vi.fn(), importReservation: vi.fn(), openingHours: vi.fn(), customerSearch: vi.fn(), customerHistory: vi.fn(),
+  attendance: vi.fn(),
 }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
@@ -41,6 +42,7 @@ beforeEach(() => {
   fixture.reservationsDay.mockResolvedValue({ data: { date: '', reservations: today } })
   fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: null, version: 1, updatedBy: null, updatedAt: null } })
   for (const fn of [fixture.updateReservation, fixture.importReservation]) fn.mockResolvedValue({ success: true })
+  fixture.attendance.mockResolvedValue({ success: true, data: { stamp: { status: 'pending_or_unavailable', count: 0 } } })
   fixture.createReservation.mockResolvedValue({ success: true, data: { id: 'new', tableId: 't2', lineNotice: { sent: true, reason: null } } })
   fixture.customerSearch.mockResolvedValue({ data: [] })
   fixture.customerHistory.mockResolvedValue({ data: { visitCount: 0, visits: [] } })
@@ -164,6 +166,19 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('menuitem', { name: '予約を有効に戻す' }))
     await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'confirmed', expectedVersion: 1 }))
+  })
+
+  it('無断の行の復活は来店取消口へ送り、通常復活は呼ばない（R1-20）', async () => {
+    today[0].status = 'no_show'
+    fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 3 }) })
+    render(<ReservationsPage />)
+    await screen.findByText('山田 太郎')
+    fireEvent.click(screen.getByRole('button', { name: '一覧' }))
+    const row = (await screen.findByRole('button', { name: '佐藤 健' })).closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: '佐藤 健のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '予約を有効に戻す' }))
+    await waitFor(() => expect(fixture.attendance).toHaveBeenCalledWith('account-1', 'r1', expect.objectContaining({ action: 'undo_visit', expectedVersion: 1 })))
+    expect(fixture.updateReservation).not.toHaveBeenCalled()
   })
 
   it('閲覧者の一覧は予約を読めても行の変更メニューを出さない', async () => {

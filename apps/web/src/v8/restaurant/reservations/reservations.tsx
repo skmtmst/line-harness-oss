@@ -160,6 +160,12 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     const row=rows.find(r=>r.id===id)??data.reservations.find(r=>r.id===id);if(!row)return;
     void save(async()=>{const result=await restaurantTestApi.attendance(accountId,id,{action,expectedVersion:row.customer_version??1,requestId:crypto.randomUUID()});if(action==='visited')notifyToast(result.data.stamp.status==='recorded'?`来店スタンプ ${result.data.stamp.count} 個を確認しました。`:'スタンプは会計待ち・停止中・未連携の場合には増えません。');return result},action==='visited'?'来店にしました。':action==='depart'?'退店にしました。卓が空きました。':action==='no_show'?'無断にしました。':'来店・退店の記録を訂正しました。');
   }
+  /* 無断の復活だけ既存の来店取消口へ送り、印も取り消す。取消の通常復活は変えない。 */
+  const restoreReservation=(id:string)=>{
+    const target=rows.find(r=>r.id===id)??data.reservations.find(r=>r.id===id);
+    if(target?.status==='no_show')return restaurantTestApi.attendance(accountId,id,{action:'undo_visit',expectedVersion:target.customer_version??1,requestId:crypto.randomUUID()});
+    return restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:target?.customer_version??1});
+  }
   const opened = rows.find((r) => r.id === openId) ?? data.reservations.find((r) => r.id === openId) ?? null
   const detailed = rows.find((r) => r.id === detailId) ?? data.reservations.find((r) => r.id === detailId) ?? null
   const cancelling = rows.find((r) => r.id === cancelId) ?? data.reservations.find((r) => r.id === cancelId) ?? null
@@ -217,7 +223,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onDetail={id=>{const r=rows.find(r=>r.id===id);if(r?.hold_expires_at)setOpenId(id);else setDetailId(id)}}
         />
       ) : (
-        <ListView pageSize={pageSize} onPageSize={(next) => { onPageSize(next); onPage(1) }} selectedId={detailId==='closed'?undefined:(detailed??rows[0])?.id} onEdit={setOpenId} onView={onView} day={day} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:rows.find(r=>r.id===id)?.customer_version??1}),'予約を有効に戻しました。')}}/>}
+        <ListView pageSize={pageSize} onPageSize={(next) => { onPageSize(next); onPage(1) }} selectedId={detailId==='closed'?undefined:(detailed??rows[0])?.id} onEdit={setOpenId} onView={onView} day={day} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restoreReservation(id),'予約を有効に戻しました。')}}/>}
           view={view}
           rows={rows}
           total={total}
@@ -235,7 +241,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onCreate={() => onPhone({})}
           onOpen={setDetailId}
           onCancel={setCancelId}
-          onRestore={(id) => { void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), '予約を有効に戻しました。') }}
+          onRestore={(id) => { void save(() => restoreReservation(id), '予約を有効に戻しました。') }}
         />
       )}
       <ReservationDetailDialog
@@ -249,7 +255,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         onClose={() => setDetailId('')}
         onCancel={(id) => { setDetailId(''); setCancelId(id) }}
         onRestore={(id) => {
-          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), '予約を有効に戻しました。').then((ok) => { if (ok) setDetailId('') })
+          void save(() => restoreReservation(id), '予約を有効に戻しました。').then((ok) => { if (ok) setDetailId('') })
         }}
         onEdit={(id) => { setDetailId(''); setOpenId(id) }}
       />
@@ -266,7 +272,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         }}
         onCancelReservation={(id) => { setOpenId(''); setCancelId(id) }}
         onRestore={(id) => {
-          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), '予約を有効に戻しました。').then((ok) => { if (ok) setOpenId('') })
+          void save(() => restoreReservation(id), '予約を有効に戻しました。').then((ok) => { if (ok) setOpenId('') })
         }}
       />
       <CancelReservationDialog

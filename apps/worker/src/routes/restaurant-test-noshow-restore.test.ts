@@ -1,0 +1,171 @@
+import { seedRestaurantFixture as seedRestaurantData } from '../test-utils/restaurant-fixture.js';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Hono } from 'hono';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+
+/*
+ * R1-20：無断（no_show）の印は「予約を有効に戻す」（PATCH status=confirmed）の
+ * 対象外に残る。来店数・到着時刻・占有は状態で数えるため表示は正しいが、
+ * 印の残り方が後の訂正で崩れないことをこの列で固定する。
+ * 監査（印の取消）と競合（版）の条件は変えていない。
+ */
+const authMocks = vi.hoisted(() => ({
+  getPlatformSetting: async () => 'false',
+  getStaffByApiKey: vi.fn(async (): Promise<null> => null),
+  getStaffByAdminSession: vi.fn(async (): Promise<null> => null),
+  lineAccounts: [] as Array<Record<string, unknown>>,
+}));
+
+vi.mock('@line-crm/db', async () => {
+  const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
+  return {
+    ...actual,
+    getStaffByApiKey: authMocks.getStaffByApiKey,
+    getStaffByAdminSession: authMocks.getStaffByAdminSession,
+    getLineAccounts: vi.fn(async () => authMocks.lineAccounts),
+    getLineAccountScopeEntries: vi.fn(async () => authMocks.lineAccounts),
+  };
+});
+
+const { authMiddleware } = await import('../middleware/auth.js');
+const { restaurantTest } = await import('./restaurant-test.js');
+type Env = import('../index.js').Env;
+
+const here = dirname(fileURLToPath(import.meta.url));
+let testDb: SqliteD1;
+let env: Env['Bindings'];
+let seq = 0;
+
+function app() {
+  const instance = new Hono<Env>();
+  instance.use('*', authMiddleware);
+  instance.route('/', restaurantTest);
+  return instance;
+}
+const versionOf = (id: string) => (testDb.raw.prepare(
+  'SELECT customer_version FROM rt_reservations WHERE id=?').get(id) as { customer_version: number }).customer_version;
+const attend = (id: string, action: string) => app().request(
+  `/api/restaurant-test/reservations/${id}/attendance?account_id=account-1`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, expectedVersion: versionOf(id), requestId: `noshow-restore-${(seq += 1)}` }),
+  }, env);
+const restore = (id: string) => app().request(
+  `/api/restaurant-test/reservations/${id}?account_id=account-1`, {
+    method: 'PATCH',
+    headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'confirmed', expectedVersion: versionOf(id) }),
+  }, env);
+const row = (id: string) => testDb.raw.prepare(
+  'SELECT status,customer_version FROM rt_reservations WHERE id=?').get(id) as { status: string; customer_version: number };
+const marks = (id: string) => testDb.raw.prepare(
+  'SELECT kind,undone_at IS NOT NULL AS undone FROM rt_seat_visit_marks WHERE reservation_id=? ORDER BY marked_at,rowid').all(id);
+
+beforeEach(() => {
+  authMocks.lineAccounts = [
+    { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
+    { id: 'account-2', name: '店舗A', is_active: 1, channel_access_token: 'token-2' },
+    { id: 'account-3', name: '店舗B', is_active: 1, channel_access_token: 'token-3' },
+    { id: 'account-4', name: '予備', is_active: 1, channel_access_token: 'token-4' },
+  ];
+  testDb = createTestD1({ loginPolicy: 'off' });
+  testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/168_restaurant_test_foundation.sql'), 'utf8'));
+  testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/175_restaurant_terms_agreement.sql'), 'utf8'));
+  testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = '00000000-0000-4000-8000-000000000001'`).run();
+  env = {
+    DB: testDb.db,
+    API_KEY: 'owner-key',
+    IMAGES: {} as R2Bucket,
+    RAW_MAIL: {} as R2Bucket,
+    ASSETS: {} as Fetcher,
+    RESTAURANT_INTAKE_DOMAIN: 'intake.example.test',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true',
+    LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
+    LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
+    LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
+    WORKER_URL: 'https://worker.example.test',
+    LINE_CREDENTIAL_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+  };
+});
+
+describe('無断→有効に戻す→来店→訂正', () => {
+  it('印が残っても状態・版・来店数は正しく、後の訂正で収束する', async () => {
+    seedRestaurantData(testDb);
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        storeId: store.id, customerName: '無断 客', guestCount: 2,
+        startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z',
+      }),
+    }, env);
+    expect(created.status).toBe(201);
+    const { data: { id } } = await created.json() as { data: { id: string } };
+
+    expect((await attend(id, 'no_show')).status).toBe(200);
+    expect(row(id)).toEqual({ status: 'no_show', customer_version: 2 });
+    expect(marks(id)).toEqual([{ kind: 'no_show', undone: 0 }]);
+
+    /* 画面の「予約を有効に戻す」と同じ口。印は残るが状態は戻る。 */
+    expect((await restore(id)).status).toBe(200);
+    expect(row(id)).toEqual({ status: 'confirmed', customer_version: 3 });
+    expect(marks(id)).toEqual([{ kind: 'no_show', undone: 0 }]);
+
+    /* 来店数は状態で数えるため、残った印で増えない。 */
+    const counted = testDb.raw.prepare(
+      `SELECT COUNT(*) AS total FROM rt_reservations r WHERE r.store_id = ? AND r.status IN ('visited','seated')`)
+      .get(store.id) as { total: number };
+    expect(counted.total).toBe(0);
+
+    expect((await attend(id, 'visited')).status).toBe(200);
+    expect(row(id).status).toBe('visited');
+    expect((await attend(id, 'undo_visit')).status).toBe(200);
+    expect(row(id).status).toBe('confirmed');
+    expect(marks(id)).toEqual([{ kind: 'no_show', undone: 0 }, { kind: 'visited', undone: 1 }]);
+
+    /* 残っていた無断印は次の訂正で取り消され、状態は有効のまま収束する。 */
+    expect((await attend(id, 'undo_visit')).status).toBe(200);
+    expect(row(id).status).toBe('confirmed');
+    expect(marks(id)).toEqual([{ kind: 'no_show', undone: 1 }, { kind: 'visited', undone: 1 }]);
+  });
+
+  it('無断の復活は既存の来店取消口で印・監査・版を保って戻す', async () => {
+    seedRestaurantData(testDb);
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const created = await app().request('/api/restaurant-test/reservations/manual?account_id=account-1', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        storeId: store.id, customerName: '無断 客', guestCount: 2,
+        startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z',
+      }),
+    }, env);
+    expect(created.status).toBe(201);
+    const { data: { id } } = await created.json() as { data: { id: string } };
+
+    expect((await attend(id, 'no_show')).status).toBe(200);
+    const undone = await attend(id, 'undo_visit');
+    expect(undone.status).toBe(200);
+    expect(row(id)).toEqual({ status: 'confirmed', customer_version: 3 });
+    const mark = testDb.raw.prepare(
+      'SELECT kind,undone_at,undone_request_id,result_version FROM rt_seat_visit_marks WHERE reservation_id=?')
+      .get(id) as { kind: string; undone_at: string | null; undone_request_id: string | null; result_version: number };
+    expect(mark.kind).toBe('no_show');
+    expect(mark.undone_at).not.toBeNull();
+    expect(mark.undone_request_id).toMatch(/^noshow-restore-/);
+    expect(mark.result_version).toBe(3);
+
+    /* 印が無い予約の取消は来店取消口では戻せない（通常復活のまま）。 */
+    const missing = await app().request(
+      `/api/restaurant-test/reservations/no-such-id/attendance?account_id=account-1`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'undo_visit', expectedVersion: 1, requestId: 'noshow-restore-missing' }),
+      }, env);
+    expect(missing.status).toBe(404);
+  });
+});
