@@ -487,7 +487,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       if (type === 'tag' && creation) {
         const loaded = loadEditorDraft(window.sessionStorage, creation, 'tag', TAG_DRAFT_KIND, () => setDraftFailure(true))
         const tagDef = loaded && loaded.kind === TAG_DRAFT_KIND && loaded.definition && typeof loaded.definition === 'object' && 'tag' in (loaded.definition as Record<string, unknown>) ? loaded.definition as TagDefinition : null
-        if (tagDef && definitionName('tag', tagDef)) {
+        if (tagDef) {
           const restoredFolder = typeof tagDef.tag.folderId === 'string' ? tagDef.tag.folderId : null
           editBaseline.current = JSON.stringify({ name: '', description: '', definition: freshDefinition('tag'), folderId: null })
           setDetail(null); setFolderId(restoredFolder); setName(String(loaded?.name ?? '')); setDescription(''); setDefinition(tagDef); setStage('edit'); setError(''); setConflict(false)
@@ -1220,7 +1220,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   /* ───── 作る・編集（：前回の保存の再確認・カード型・カルーセル・質問・リッチメッセージ） ───── */
   if (stage === 'edit' && type === 'tag' && 'tag' in definition && !createUncertain) {
     /* 所属フォルダは統括のフォルダ（左の列）から選ぶ。選んだフォルダに、一覧でもこのひな形を置く。 */
-    const folderOf = (next: TagDefinition) => folders.some((folder) => folder.id === next.tag.folderId) ? next.tag.folderId ?? null : next.tag.folderId ? folderId : null
+    const folderOf = (next: TagDefinition) => folders.some((folder) => folder.id === next.tag.folderId) ? next.tag.folderId ?? null : !detail && foldersReady && !folderLoadFailed ? null : next.tag.folderId ? folderId : null
     return <SaveErrorScope errors={saveErrors}><HqTagEditorV8 key={formKey} definition={definition} folders={folders} onCreateFolder={canEdit ? createFolder : undefined} editing={Boolean(detail)} saving={busy} readOnly={!canEdit}
       onSaveDraft={async (next) => { const nextName = definitionName(type, next); const nextFolder = folderOf(next); setDefinition(next); setName(nextName); setFolderId(nextFolder); await save(false, next, nextName, description, false, { folderId: nextFolder }) }}
       conflictNotice={conflictNotice} onDraftChange={(next) => { tagDraft.current = next; persistTagCreateDraft(next) }} conflict={conflict} onReloadLatest={detail ? () => { void open(detail.template.id, 'edit') } : undefined}

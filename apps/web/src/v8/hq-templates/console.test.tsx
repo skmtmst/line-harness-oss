@@ -1222,3 +1222,31 @@ it('本文未入力でもフォルダだけの変更を記録し、再読込で�
   expect(await screen.findByRole('button', { name: 'フォルダ' })).toBeTruthy()
   await waitFor(() => expect(screen.getByRole('button', { name: 'フォルダ' }).textContent).toContain('予約'))
 })
+
+
+describe('H-18 必須再レビュー修正', () => {
+  it('空名でもフォルダ入力のあるタグ下書きを再読込で消さない', async () => {
+    const { persistEditorDraft } = await import('@/lib/hq-template-create-attempt')
+    const key = 'lh_hq_create_draft_v1:tenant-a:owner:tag:tag'
+    const definition = { schemaVersion: 1, tag: { name: '', folderId: 'f-1' }, folders: [{ id: 'f-1', name: '架空フォルダ' }] }
+    persistEditorDraft(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'tag', 'tag', { kind: 'tag', name: '', definition })
+    window.history.replaceState(null, '', '/hq/templates?mode=create')
+    render(<HqTemplatesV8 type="tag" />)
+    await screen.findByLabelText('タグ名')
+    await waitFor(() => expect(window.sessionStorage.getItem(key)).toContain('f-1'))
+    expect((screen.getByLabelText('タグ名') as HTMLInputElement).value).toBe('')
+    expect(screen.getByRole('button', { name: '所属フォルダ' }).textContent).toContain('予約')
+  })
+
+  it.each(['下書きを保存', '保存する'])('削除済みフォルダのタグ下書きを未分類で%s', async (label) => {
+    const { persistEditorDraft } = await import('@/lib/hq-template-create-attempt')
+    const definition = { schemaVersion: 1, tag: { name: '架空の復元タグ', folderId: 'f-gone' }, folders: [{ id: 'f-gone', name: '架空の削除済み' }] }
+    persistEditorDraft(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'tag', 'tag', { kind: 'tag', name: '架空の復元タグ', definition })
+    window.history.replaceState(null, '', '/hq/templates?mode=create')
+    render(<HqTemplatesV8 type="tag" />)
+    await screen.findByDisplayValue('架空の復元タグ')
+    fireEvent.click(await findPageAction({ name: label }))
+    await waitFor(() => expect(calls.create).toHaveBeenCalled())
+    expect(calls.create.mock.calls[0][0].folderId).toBeNull()
+  })
+})
