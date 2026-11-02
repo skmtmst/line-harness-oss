@@ -22,7 +22,8 @@ describe("管理画面 友だち追加時配信 7画面の契約", () => {
   it('モック固定値ではなく友だち追加時配信APIで読み書きする', () => {
     expect(LIST_PAGE).toContain('api.friendAddRules.list(selectedAccountId, kind, {')
     expect(LIST_PAGE).toContain('api.friendAddRules.createFolder(selectedAccountId, name, folderKey.current, folderColor)')
-    expect(LIST_PAGE).toContain("api.friendAddRules.archive(selectedAccountId, deleteTarget.id)")
+    expect(LIST_PAGE).toContain("api.friendAddRules.archive(deleteScope.id, deleteTarget.id)")
+    expect(LIST_PAGE).toContain("deleteScope.generation !== accountScope.current.generation")
     expect(EDITOR).toContain('api.friendAddRules.createDraft(payload, saveIdempotencyKey.current)')
     expect(EDITOR).toContain('api.friendAddRules.saveDraft(ruleId, payload, saveIdempotencyKey.current)')
     // R262: テストは試す流入リンク・想定日時・友だちを実行側の判定へ渡す。

@@ -263,7 +263,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
     ])
   }
   const exportDisabled = visibleItems.length === 0
-  const exportReason = loading ? '保存した分析を読み込んでいます。' : error || (query.trim() ? '条件に合う分析がありません。' : '保存した分析はまだありません。')
+  const exportReason = loading ? '保存した分析を読み込んでいます。' : error ? '保存した分析を読み込めないため書き出せません。' : (query.trim() ? '条件に合う分析がありません。' : '保存した分析はまだありません。')
   const snapshotExportReason = snapshotLoading ? '結果の履歴を読み込んでいます。' : snapshotError || '保存された結果はありません。'
   useRegisterExport(exportSaved, exportDisabled, exportReason)
   const failed = error ? '読み込めませんでした' : null

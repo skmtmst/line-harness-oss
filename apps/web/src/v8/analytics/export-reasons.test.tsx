@@ -98,7 +98,7 @@ it.each(['friends', 'reactions', 'routes', 'usage', 'url-clicks', 'saved', 'cros
   const initial = headerCsv().getAttribute('aria-description')
   await act(async () => { pending.reject(new Error('模擬の取得失敗')) })
   await waitFor(() => expect(headerCsv().getAttribute('aria-description')).not.toBe(initial))
-  const expected = tab === 'saved' ? '模擬の取得失敗' : tab === 'cross' ? '友だち情報欄を読み込めませんでした'
+  const expected = tab === 'saved' ? '保存した分析を読み込めないため書き出せません。' : tab === 'cross' ? '友だち情報欄を読み込めませんでした'
     : tab === 'funnel' ? 'ファネルを読み込めませんでした' : tab === 'conversion-report' ? '成果レポートを読み込めませんでした'
       : tab === 'url-clicks' ? '集計結果を取得できず、CSVを書き出せません。' : '分析を表示できませんでした。時間をおいて、もう一度お試しください。'
   expect(headerCsv().getAttribute('aria-description')).toBe(expected)

@@ -66,7 +66,7 @@ it.each([
   expect(header.querySelectorAll('[data-read-only-notice]')).toHaveLength(0)
   expect(header.querySelector('h1')?.textContent).toBe('Googleビジネス')
   const group = document.querySelector('[data-google-notices]')!
-  await screen.findByText('検証環境です。予約サイトへは送りません')
+  await screen.findByText(/検証環境です。予約サイトへは送りません/)
   expect(group.querySelectorAll('[data-design-part="notice"]')).toHaveLength(2)
   expect(group.firstElementChild).toBe(notices()[0])
   expect(group.lastElementChild?.textContent).toContain('検証環境です。予約サイトへは送りません')

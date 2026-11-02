@@ -304,7 +304,7 @@ describe('種類と数の書き方', () => {
       success: true,
       data: [
         row('tpl-single', '1通だけ', { messageContent: 'こんにちは' }),
-        row('tpl-multi', '2通に分かれる', { messageContent: '1通目\n\n2通目' }),
+        row('tpl-multi', '2通に分かれる', { messageBubbles: [{ id: '1', type: 'text', content: { text: '1通目' } }, { id: '2', type: 'text', content: { text: '2通目' } }] }),
         row('tpl-var', '名前を入れる', { messageContent: '{{name}}さん、こんにちは' }),
       ],
     })
