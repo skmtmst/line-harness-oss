@@ -5,8 +5,11 @@
  * 入るのはいつも下書き。公開は一覧の「…」から（管理者以上）。スタッフには公開のお願いの一言を出す。
  */
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import Dialog from '@/components/shared/dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { Field } from '@/components/shared/form-controls'
 import { TextArea } from '@/components/shared/text-field'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -43,6 +46,20 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
 
   const initialQuestions = seed?.entry ? seed.entry.questions.join('\n') : seed?.question ?? ''
   const dirty = questions !== initialQuestions || answer !== (seed?.entry?.answerText ?? '')
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: open && (dirty || busy), busy: open && busy, onDiscard: onClose })
+  useEffect(() => { if (!open) guard.cancelLeave() }, [open, guard.cancelLeave])
+  useEffect(() => { guard.cancelLeave() }, [accountId, guard.cancelLeave])
+  const current = useRef({ open, busy, accountId, target: guard.leaveTarget })
+  current.current = { open, busy, accountId, target: guard.leaveTarget }
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const discardAndLeave = () => {
+    const target = guard.leaveTarget
+    if (!alive.current || !current.current.open || current.current.busy || current.current.accountId !== accountId || !target || current.current.target !== target) return
+    current.current.target = null
+    guard.disarm(); guard.confirmLeave()
+  }
 
   const save = async () => {
     const list = questions.split('\n').map((line) => line.trim()).filter(Boolean)
@@ -87,6 +104,6 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
         </Field>
         {!canPublish ? <p className={styles.formNote}>公開は管理者にお願いしてください。保存すると下書きで入ります。</p> : null}
       </div>
-    </Dialog></SaveErrorScope>
+    </Dialog><OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={open && guard.leaveTarget !== null} subject="Q&A の変更" onConfirm={discardAndLeave} onCancel={guard.cancelLeave} busy={busy} /></OverlayDepthContext.Provider></SaveErrorScope>
   )
 }
