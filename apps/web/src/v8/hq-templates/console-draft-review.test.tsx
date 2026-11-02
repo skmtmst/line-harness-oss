@@ -90,7 +90,7 @@ describe('R1 通知', () => {
     await waitFor(() => expect(document.body.textContent).toContain(BANNER))
   })
   it('R1b tag も保存失敗を画面に出す', async () => {
-    
+
     calls.list.mockResolvedValue([]); calls.folderList.mockResolvedValue([])
     render(<HqTemplatesV8 type="tag" />)
     fireEvent.click((await screen.findAllByRole('button', { name: /タグを作る/ }))[0])
