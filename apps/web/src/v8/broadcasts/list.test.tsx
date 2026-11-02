@@ -75,14 +75,15 @@ vi.mock('next/link', () => ({
 }))
 
 const routerPush = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ id: 'account-a' }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useOptionalAccount: () => ({ selectedAccountId: 'account-a' }),
-  useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
+  useOptionalAccount: () => ({ selectedAccountId: account.id }),
+  useAccount: () => ({ selectedAccountId: account.id, accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
@@ -139,6 +140,7 @@ const base = {
 const rowB = { ...base, id: 'bc-2', title: '未購入者フォロー', messageContent: 'まだお買い物していない方へ', status: 'draft', displayStatus: 'draft', displayStatusLabel: '下書き', scheduledAt: null }
 
 beforeEach(() => {
+  account.id = 'account-a'
   updateBroadcast.mockClear()
   heldConfirm.broadcast = null; heldConfirm.folder = null
   deleteFolder.mockClear(); swapFolders.mockClear(); createFolder.mockClear(); updateFolder.mockClear()
@@ -949,6 +951,25 @@ describe('保持した一斉配信一覧の変更操作', () => {
     act(() => fireEvent.click(menuItem('＋ 今の条件を保存する'))); await flush()
     act(() => fireEvent.change(host.querySelector('input[aria-label="保存する検索の名前"]')!, { target: { value: '残しておく条件' } }))
   }
+
+  it('配信の削除確認に記録されたLINEアカウントと環境を出す', async () => {
+    resetUrl()
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    await openDraftDelete()
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
+  })
+  it('アカウントを切り替えて戻しても古い配信削除を実行しない', async () => {
+    deleteBroadcast.mockClear(); resetUrl()
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    await openDraftDelete()
+    const retained = heldConfirm.broadcast!
+    account.id = 'account-b'; act(() => root.render(<BroadcastListV8 />)); await flush()
+    account.id = 'account-a'; act(() => root.render(<BroadcastListV8 />)); await flush()
+    await act(async () => { await retained() })
+    expect(deleteBroadcast).not.toHaveBeenCalled()
+  })
 
   it.each(['unknown', 'viewer', 'staff', 'read-proxy', 'readOnly', 'view_only'])('削除確認を開いた後の%sでは確定を書き込まず、窓を残す', async denied => {
     deleteBroadcast.mockClear(); resetUrl()

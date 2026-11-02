@@ -8,6 +8,7 @@ import { type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { type BroadcastBubble } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -42,6 +43,7 @@ type RenderBroadcastEditorDialogsContext = {
   evaluatedAtLabel: string | null
   exclusionNote: string | null
   handleTestSend: () => Promise<boolean | void>
+  testTargetAccountId: string | null
   inlineComposer: { index: number; kind: "carousel" | "rich_message" | "rich_video"; } | null
   inlineHost: TemplateEditHost | undefined
   measureOpens: boolean
@@ -77,7 +79,7 @@ type RenderBroadcastEditorDialogsContext = {
   trackLinks: boolean
 }
 
-export function renderBroadcastEditorDialogs({ confirmationBlocked, confirmationFields, ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks }: RenderBroadcastEditorDialogsContext) {
+export function renderBroadcastEditorDialogs({ confirmationBlocked, confirmationFields, ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, testTargetAccountId, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks }: RenderBroadcastEditorDialogsContext) {
   return (<><div data-design-node="FpgxH">
       <ConfirmDialog
         open={confirmOpen && needsApprovalSingle}
@@ -217,6 +219,7 @@ export function renderBroadcastEditorDialogs({ confirmationBlocked, confirmation
       onConfirm={testRecipientState === 'ready' && testRecipients.length > 0 ? () => handleTestSend() : undefined}
     >
       <div className="space-y-3">
+        <OperationTargetSummary accounts={[{ id: testTargetAccountId ?? '' }]} />
         {testRecipientState === 'loading' && <p className="text-sm text-ink-faint">読み込んでいます</p>}
         {testRecipientState === 'error' && <Notice tone="danger">テスト送信先を読み込めませんでした。</Notice>}
         {testRecipientState === 'ready' && testRecipients.length === 0 && (

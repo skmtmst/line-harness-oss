@@ -27,6 +27,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage, LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
@@ -73,6 +74,13 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const canMutate = host ? !host.readOnly : featureAccess
   const narrow = useNarrowViewport(1351)
   const { accounts, selectedAccountId } = useAccount()
+  const scopeKey = JSON.stringify([id, selectedAccountId])
+  const scope = useRef({ key: scopeKey, generation: 0 })
+  if (scope.current.key !== scopeKey) scope.current = { key: scopeKey, generation: scope.current.generation + 1 }
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const canMutateRef = useRef(canMutate)
+  canMutateRef.current = canMutate
 
   const initialState = (): TemplateEditorState => {
     const fresh = newTemplateEditorState(id, visual)
@@ -94,7 +102,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const [compareOpen, setCompareOpen] = useState(false)
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
-  const [publishCheck, setPublishCheck] = useState<{ id: string; entries: ReturnType<typeof templateUsageEntries> } | null>(null)
+  const [publishCheck, setPublishCheck] = useState<{ id: string; entries: ReturnType<typeof templateUsageEntries>; accountId: string; generation: number } | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   /*
    * 新しく作る画面で自動保存が先に作ったテンプレート（一斉配信と同じく、
@@ -372,8 +380,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     if (!id) { disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
 
-  const publishNow = async (templateId: string): Promise<boolean> => {
+  const publishNow = async (templateId: string, generation: number): Promise<boolean> => {
     const got = await api.templates.get(templateId)
+    if (!alive.current || !canMutateRef.current || generation !== scope.current.generation) return false
     if (!got.success || !isTemplateDetailData(got.data)) {
       setError('いまの状態を読み込めませんでした。もう一度お試しください。')
       return false
@@ -421,21 +430,23 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   /* 保存して公開：使っている場所があれば、どこへ届くかを見せてから。 */
   const onPublish = async () => {
     if (host) { hostSave(true); return }
+    const generation = scope.current.generation
     const savedId = await saveNow()
-    if (!savedId) return
+    if (!savedId || !alive.current || !canMutateRef.current || generation !== scope.current.generation) return
     setPublishing(true)
     try {
       const detail = await api.templates.get(savedId)
+      if (!alive.current || !canMutateRef.current || generation !== scope.current.generation) return
       if (!detail.success || !isTemplateDetailData(detail.data)) {
         setError('いまの状態を読み込めませんでした。一覧の詳細から公開してください。')
         return
       }
       const entries = detail.data.usedBy ? templateUsageEntries(detail.data.usedBy) : []
       if (entries.length > 0) {
-        setPublishCheck({ id: savedId, entries })
+        setPublishCheck({ id: savedId, entries, accountId: detail.data.accountId ?? '', generation })
         return
       }
-      if (await publishNow(savedId)) {
+      if (await publishNow(savedId, generation) && alive.current && generation === scope.current.generation) {
         notifyToast('公開しました')
         leave(savedId)
       }
@@ -686,7 +697,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       </ConfirmDialog>
 
       <ConfirmDialog
-        open={publishCheck !== null}
+        open={publishCheck !== null && publishCheck.generation === scope.current.generation}
         title="この内容を公開しますか？"
         description={`このテンプレートは ${publishCheck?.entries.length ?? 0}か所で使われています。公開すると、使っている場所へ新しい内容が届きます。`}
         confirmLabel="公開する"
@@ -694,11 +705,11 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         error={error || undefined}
         designNode="cuR8I"
         onConfirm={async () => {
-          if (!publishCheck) return
+          if (!publishCheck || !alive.current || !canMutateRef.current || publishCheck.generation !== scope.current.generation) return
           setPublishing(true)
           setError('')
           try {
-            if (await publishNow(publishCheck.id)) {
+            if (await publishNow(publishCheck.id, publishCheck.generation) && alive.current && publishCheck.generation === scope.current.generation) {
               setPublishCheck(null)
               notifyToast('公開しました')
               leave(publishCheck.id)
@@ -709,6 +720,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         }}
         onCancel={() => setPublishCheck(null)}
       >
+        {publishCheck ? <OperationTargetSummary accounts={[{ id: publishCheck.accountId }]} /> : null}
         <ul className={styles.sideList}>
           {publishCheck?.entries.map((entry) => (
             <li key={entry.key}>{entry.href ? <Link href={entry.href}>{entry.label}</Link> : entry.label}</li>

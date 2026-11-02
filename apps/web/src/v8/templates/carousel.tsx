@@ -24,6 +24,7 @@ import Dialog from '@/components/shared/dialog'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import CarouselOrderChip from './carousel-order-chip'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
@@ -159,6 +160,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const hqHost = Boolean(host && !host.composer?.accountId)
   const router = useRouter()
   const { selectedAccountId, selectedAccount, accounts } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const params = useSearchParams()
   /* 統括の入口（host）では店のテンプレートを読まない（新しく作るだけ）。 */
   const id = host ? null : params.get('id')
@@ -192,9 +197,11 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [urlOpen, setUrlOpen] = useState(false)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
-  const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number } | null>(null)
+  const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number; accountId: string; generation: number } | null>(null)
   const [publishError, setPublishError] = useState('')
   const canMutate = useFeatureAccess('templates')
+  const canMutateRef = useRef(canMutate)
+  canMutateRef.current = canMutate
   const readOnly = host ? Boolean(host.readOnly) : !canMutate
   const readOnlyReason = usePermissionLockReason(!readOnly)
   const actionOptions = useActionOptions()
@@ -330,8 +337,9 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     }
   }
 
-  const publishNow = async (templateId: string, detail?: { publishedVersion: number; draftRevision: number }) => {
+  const publishNow = async (templateId: string, generation: number, detail?: { publishedVersion: number; draftRevision: number }) => {
     const got = detail ? { success: true as const, data: detail } : await api.templates.get(templateId)
+    if (!alive.current || !canMutateRef.current || generation !== accountScope.current.generation) return false
     if (!got.success || !got.data) { setPublishError('いまの状態を読み込めませんでした。もう一度お試しください。'); return false }
     try {
       const res = await api.templates.publish(templateId, { expectedVersion: got.data.publishedVersion ?? 0, expectedDraftRevision: got.data.draftRevision ?? 0 })
@@ -346,16 +354,17 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     return true
   }
   /* 保存して公開。使用先があるときは確認の窓を出してから公開する。 */
-  const publishSaved = async (templateId: string) => {
+  const publishSaved = async (templateId: string, generation: number) => {
     setPublishing(true)
     setPublishError('')
     try {
       const detail = await api.templates.get(templateId)
+      if (!alive.current || !canMutateRef.current || generation !== accountScope.current.generation) return
       if (!detail.success || !detail.data) { setPublishError('いまの状態を読み込めませんでした。一覧の詳細から公開してください。'); return }
       const usedBy = detail.data.usedBy
       const usageCount = usedBy ? Object.values(usedBy).reduce((total, items) => total + (Array.isArray(items) ? items.length : 0), 0) : 0
-      if (usageCount > 0) { setPublishCheck({ id: templateId, usageCount }); return }
-      if (await publishNow(templateId, detail.data)) { notifySaved('公開しました'); if (!id) { disarm(); router.push(createPageReturnHref('/templates', templateId)) } }
+      if (usageCount > 0) { setPublishCheck({ id: templateId, usageCount, accountId: detail.data.accountId ?? '', generation }); return }
+      if (await publishNow(templateId, generation, detail.data) && alive.current && generation === accountScope.current.generation) { notifySaved('公開しました'); if (!id) { disarm(); router.push(createPageReturnHref('/templates', templateId)) } }
     } finally {
       setPublishing(false)
     }
@@ -382,7 +391,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     } finally { savingRef.current = false; setSaving(false) }
   }
   const onSaveDraft = async () => { if (host) { hostSave(false); return } const savedId = await saveNow(); if (savedId) { notifySaved('下書きを保存しました'); if (!id) { disarm(); router.push(createPageReturnHref('/templates', savedId)) } } }
-  const onPublish = async () => { if (host) { hostSave(true); return } const savedId = await saveNow(); if (savedId) await publishSaved(savedId) }
+  const onPublish = async () => { if (host) { hostSave(true); return } const generation = accountScope.current.generation; const savedId = await saveNow(); if (savedId && alive.current && canMutateRef.current && generation === accountScope.current.generation) await publishSaved(savedId, generation) }
 
   const panel = panels[selected] ?? panels[0]
   const selectedIndex = panels[selected] ? selected : 0
@@ -608,7 +617,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
       </TemplateEditFrame>
 
       <ConfirmDialog
-        open={publishCheck !== null}
+        open={publishCheck !== null && publishCheck.generation === accountScope.current.generation}
         title="この内容を公開しますか？"
         description={`このテンプレートは ${publishCheck?.usageCount ?? 0}か所で使われています。公開すると、使っている場所へ新しい内容が届きます。`}
         confirmLabel="公開する"
@@ -616,17 +625,17 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         error={publishError || undefined}
         designNode="cuR8I"
         onConfirm={async () => {
-          if (!publishCheck) return
+          if (!publishCheck || !alive.current || !canMutateRef.current || publishCheck.generation !== accountScope.current.generation) return
           setPublishing(true)
           setPublishError('')
           try {
-            if (await publishNow(publishCheck.id)) { setPublishCheck(null); notifySaved('公開しました'); if (!id) { disarm(); router.push(createPageReturnHref('/templates', publishCheck.id)) } }
+            if (await publishNow(publishCheck.id, publishCheck.generation) && alive.current && publishCheck.generation === accountScope.current.generation) { setPublishCheck(null); notifySaved('公開しました'); if (!id) { disarm(); router.push(createPageReturnHref('/templates', publishCheck.id)) } }
           } finally {
             setPublishing(false)
           }
         }}
         onCancel={() => setPublishCheck(null)}
-      />
+      >{publishCheck ? <OperationTargetSummary accounts={[{ id: publishCheck.accountId }]} /> : null}</ConfirmDialog>
       <MediaPickerDialog
         open={pickerOpen}
         accountId={folderAccountId}

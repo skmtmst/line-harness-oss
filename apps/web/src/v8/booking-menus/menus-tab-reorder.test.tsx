@@ -211,3 +211,33 @@ it('予約メニューの削除は確認まで送らず、予約がある場合�
   expect(dialog.textContent).toContain('予約が付いているため削除できません')
   expect(server).toHaveLength(3)
 })
+
+it('予約メニュー削除の対象を示し、切替前の確定は送らない', () => {
+  const props = { menus: server.map(toMenu), status: 'ready' as const, error: null, menuCount: 3, canEdit: true, onReload: vi.fn(), onOpenStaff: vi.fn() }
+  const view = render(<MenusTabV8 {...props} accountId="account-a" />)
+  fireEvent.click(screen.getByRole('button', { name: '「カット」のそのほかの操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  const dialog = screen.getByRole('alertdialog')
+  expect(dialog.textContent).toContain('LINEアカウント')
+  const confirm = within(dialog).getByRole('button', { name: '削除する' })
+  const key = Object.keys(confirm).find(item => item.startsWith('__reactProps$'))!
+  const oldConfirm = (confirm as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+  view.rerender(<MenusTabV8 {...props} accountId="account-b" />)
+  view.rerender(<MenusTabV8 {...props} accountId="account-a" />)
+  act(() => oldConfirm({ preventDefault() {}, stopPropagation() {} }))
+  expect(deleteMenu).not.toHaveBeenCalled()
+})
+
+it('アカウント切替中の古い行は削除できず、再取得後は選べる', () => {
+  const props = { menus: server.map(toMenu), status: 'ready' as const, error: null, menuCount: 3, canEdit: true, onReload: vi.fn(), onOpenStaff: vi.fn() }
+  const view = render(<MenusTabV8 {...props} accountId="account-a" />)
+  view.rerender(<MenusTabV8 {...props} accountId="account-b" />)
+  fireEvent.click(screen.getByRole('button', { name: '「カット」のそのほかの操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  view.rerender(<MenusTabV8 {...props} accountId="account-b" status="loading" />)
+  view.rerender(<MenusTabV8 {...props} accountId="account-b" />)
+  fireEvent.click(screen.getByRole('button', { name: '「カット」のそのほかの操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  expect(screen.getByRole('alertdialog').textContent).toContain('LINEアカウント')
+})

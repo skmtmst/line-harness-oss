@@ -6,7 +6,7 @@ import SharedStatusPill from '@/components/shared/status-pill'
 import StatusAction from '@/components/shared/status-action'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import TagPill from '@/components/shared/tag-pill'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Plus } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -32,6 +32,7 @@ import styles from '../settings.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 /* ① メニュー（settings-v8.tsx から分割。見た目・動きは変えない） */
 
@@ -40,7 +41,18 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   const router = useRouter()
   const [query, setQuery] = useListUrlValue('q', '')
   const [page, setPage] = useListUrlValue('page', 1)
-  const [deleteTarget, setDeleteTarget] = useState<BookingMenu | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ menu: BookingMenu; accountId: string; generation: number } | null>(null)
+  const scope = useRef({ accountId, generation: 0, awaitingLoad: false })
+  if (scope.current.accountId !== accountId) scope.current = { accountId, generation: scope.current.generation + 1, awaitingLoad: true }
+  if (scope.current.awaitingLoad && status === 'loading') scope.current.awaitingLoad = false
+  const renderedScope = scope.current
+  const statusRef = useRef(status)
+  statusRef.current = status
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
+  const alive = useRef(false)
+  const deleteLock = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [historyTarget, setHistoryTarget] = useState<BookingMenu | null>(null)
@@ -57,16 +69,19 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   const reorderBusyRef = useRef(false)
 
   async function deleteMenu() {
-    if (!deleteTarget || deleting || !canEdit) return
+    if (!deleteTarget || deleting || deleteLock.current || !alive.current || !canEditRef.current || statusRef.current !== 'ready' || scope.current.awaitingLoad || deleteTarget.generation !== scope.current.generation) return
+    deleteLock.current = true
     setDeleting(true); setDeleteError('')
     try {
-      await bookingApi.deleteMenu(accountId, deleteTarget.id)
+      await bookingApi.deleteMenu(deleteTarget.accountId, deleteTarget.menu.id)
+      if (!alive.current || deleteTarget.generation !== scope.current.generation) return
       setDeleteTarget(null); onReload(); notifyToast('予約メニューを削除しました')
     } catch (cause) {
+      if (!alive.current || deleteTarget.generation !== scope.current.generation) return
       setDeleteError(cause instanceof Error && 'status' in cause && cause.status === 409
         ? '予約が付いているため削除できません。新しい予約を止めるには「止める」を使ってください。'
         : '削除できませんでした。状態を読み直してお試しください。')
-    } finally { setDeleting(false) }
+    } finally { deleteLock.current = false; if (alive.current) setDeleting(false) }
   }
 
   const orderedBase = useMemo(() => {
@@ -236,7 +251,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   return (
     <SaveErrorScope errors={saveErrors}>
     <div className={styles.tabStack} data-design="Table">
-      <ConfirmDialog open={deleteTarget !== null} title={`「${deleteTarget?.name ?? ''}」を削除しますか？`} description="予約が付いているメニューは削除できません。" confirmLabel="削除する" destructive busy={deleting} error={deleteError} onConfirm={() => deleteMenu()} onCancel={() => { if (!deleting) setDeleteTarget(null) }} />
+      <ConfirmDialog open={deleteTarget !== null && deleteTarget.generation === scope.current.generation} title={`「${deleteTarget?.menu.name ?? ''}」を削除しますか？`} description="予約が付いているメニューは削除できません。" confirmLabel="削除する" destructive busy={deleting} error={deleteError} onConfirm={() => deleteMenu()} onCancel={() => { if (!deleting) setDeleteTarget(null) }}>{deleteTarget ? <OperationTargetSummary accounts={[{ id: deleteTarget.accountId }]} /> : null}</ConfirmDialog>
       <Band tone="hint">上から並んだ順に、お客さまの画面に出ます。つまみで並べ替えます。</Band>
 
       <div className={styles.toolbar}>
@@ -304,7 +319,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
               ...(canEdit ? [
                 /* つまみと同じ入口の「上へ／下へ」。検索中・保存中は出さない（つまみも出さない）。 */
                 ...reorder.menuItems(menu.id, () => setOpenMenuId(null)),
-                { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setDeleteError(''); setDeleteTarget(menu) } },
+                { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { if (renderedScope !== scope.current || renderedScope.awaitingLoad || statusRef.current !== 'ready' || !canEditRef.current || !alive.current) return; setDeleteError(''); setDeleteTarget({ menu, accountId, generation: renderedScope.generation }) } },
                 {
                   id: 'visibility',
                   label: (visOverride[menu.id] ?? menu.is_active) ? '止める' : '出す',

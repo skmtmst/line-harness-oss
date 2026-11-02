@@ -1,11 +1,12 @@
 'use client'
 import { jstDate } from '@/lib/jst-datetime'
 import { closedOn, closedRanges } from '../lib/closed-ranges'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import DateField from '@/components/shared/date-field'
 import { ApiError, bookingApi, type BookingException, type BookingSettings } from '@/lib/api'
@@ -77,6 +78,14 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
   const [editError, setEditError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<BookingException | null>(null)
+  const [deleteScope, setDeleteScope] = useState<{ accountId: string; generation: number } | null>(null)
+  const scope = useRef({ accountId, generation: 0 })
+  if (scope.current.accountId !== accountId) scope.current = { accountId, generation: scope.current.generation + 1 }
+  const renderedScope = scope.current
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   /* WEB055：削除の失敗は、開いている削除の確認の中に出す（閉じた編集の窓へ書かない）。 */
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const inFlightRef = useRef(false)
@@ -165,15 +174,17 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
 
   async function remove() {
     const target = deleteTarget
-    if (!target || inFlightRef.current) return
+    if (!target || !deleteScope || !alive.current || !canEditRef.current || deleteScope.generation !== scope.current.generation || target.lineAccountId !== deleteScope.accountId || inFlightRef.current) return
     inFlightRef.current = true
     setBusy(true)
     try {
-      await bookingApi.deleteException(accountId, target.id, target.version)
+      await bookingApi.deleteException(deleteScope.accountId, target.id, target.version)
+      if (!alive.current || deleteScope.generation !== scope.current.generation) return
       if (settings) onSaved({ ...settings, exceptions: settings.exceptions.filter((entry) => entry.id !== target.id) })
       setDeleteTarget(null)
       setEditing(null)
     } catch (cause) {
+      if (!alive.current || !deleteScope || deleteScope.generation !== scope.current.generation) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
@@ -277,7 +288,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
                 </Button>
                 <span className={styles.exceptionReason} title={item.reason || item.note || '臨時休業'}>{item.reason || item.note || '臨時休業'}</span>
                 <Button type="button" variant="text" textTone={canEdit ? 'danger' : undefined} size="inline" disabled={!canEdit} lockedReason={lockedReason}
-                  onClick={() => { if (!canEdit) return; setEditError(null); setDeleteError(null); setDeleteTarget(item) }}>削除</Button>
+                  onClick={() => { if (!canEditRef.current || !alive.current || renderedScope !== scope.current || item.lineAccountId !== accountId) return; setEditError(null); setDeleteError(null); setDeleteScope(renderedScope); setDeleteTarget(item) }}>削除</Button>
               </div>
             )
           })}
@@ -311,7 +322,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
       </Dialog>
 
       <ConfirmDialog
-        open={deleteTarget !== null}
+        open={deleteTarget !== null && deleteScope?.generation === scope.current.generation}
         title="この休業日を消しますか？"
         deleteName={deleteTarget?.reason?.trim() || `${deleteTarget?.dateFrom ?? ''}〜${deleteTarget?.dateTo ?? ''}の休業日`}
         description="削除すると、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
@@ -321,7 +332,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
         error={deleteError ?? undefined}
         onCancel={() => { if (!busy) { setDeleteTarget(null); setDeleteError(null) } }}
         onConfirm={() => remove()}
-      />
+      >{deleteScope ? <OperationTargetSummary accounts={[{ id: deleteScope.accountId }]} /> : null}</ConfirmDialog>
     </div></SaveErrorScope>
   )
 }
