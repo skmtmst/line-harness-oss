@@ -166,8 +166,8 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     return scoped
   }, [data.reservations, store, view, day, todayRows])
 
-  const save = useCallback(async (action: () => Promise<unknown>, success: string) => {
-    const ok = await mutate(action, success)
+  const save = useCallback(async (action: () => Promise<unknown>, success: string, onCommitted?: () => boolean) => {
+    const ok = await mutate(action, success, onCommitted ? { onCommitted } : undefined)
     /* 失敗時は取り直す（競合 409 の古い表示で残さない）。 */
     if (!ok) void reload()
     return ok
@@ -215,7 +215,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           : restaurantTestApi.createReservation(accountId, body).then((res) => {
             if (body.notifyLine && !res.data.lineNotice.sent) setLineWarning('予約は保存しました。LINE の確認は送れていません。友だちの連携と送信の状態を確かめてください。')
             return res
-          })), body.kind === 'hold' ? '枠を押さえました。期限になると解除します。' : '台帳に入れました。').then((ok) => { if (ok) onPhone(null); return ok })}
+          })), body.kind === 'hold' ? '枠を押さえました。期限になると解除します。' : '台帳に入れました。', () => { if (editContext.current.accountId !== accountId || editContext.current.storeId !== storeId) return false; onPhone(null); return true })}
       />
     )
   }

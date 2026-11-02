@@ -99,7 +99,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const [editor, setEditor] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof Draft, string>>>({})
-  const editorRef = useRef<HTMLDivElement>(null)
+  const editorRef = useRef<HTMLFormElement>(null)
   const [showPlacement, setShowPlacement] = useState(false)
   const [deleteId, setDeleteId] = useState('')
   const [deleteError, setDeleteError] = useState('')
@@ -298,27 +298,23 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       <RsDialog
         open={editor !== null && draft !== null}
         title={editing ? `卓「${editing.code}・${editing.label}」を変更` : '新しい卓'}
+        actionsPlacement="footer"
         width={520}
         top={200}
         busy={busy}
         designNode="gBrCz"
         onCancel={() => setEditor(null)}
-        noValidate
-        onSubmit={() => void save()}
         actions={(
           <>
-            <Button presentation="restaurant" type="button" variant="text" size="inline" aria-expanded={showPlacement} onClick={() => setShowPlacement((open) => !open)}>
-              {showPlacement ? '配置・結合グループを閉じる' : '配置・結合グループ'}
-            </Button>
             <Button presentation="restaurant" type="button" onClick={() => setEditor(null)} disabled={busy}>キャンセル</Button>
-            <Button presentation="restaurant" type="submit" variant="primary" disabled={busy}>
+            <Button presentation="restaurant" type="submit" form="rs-table-editor" variant="primary" disabled={busy}>
               {editing ? <Check size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}{editing ? '保存する' : '追加する'}
             </Button>
           </>
         )}
       >
         {draft ? (
-          <div ref={editorRef} className={styles.editorFields}>
+          <form id="rs-table-editor" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
             <div className={styles.pair}>
               <Field label="卓番" htmlFor="rs-table-code" error={fieldErrors.code} requirement={b244Requirements.draft_code}>
                 <SaveErrorField names={["code","draft.code"]}><TextField id="rs-table-code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} /></SaveErrorField>
@@ -338,9 +334,12 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
                 <SaveErrorField names={["maxCapacity","draft.maxCapacity","max_capacity","draft.max_capacity"]}><NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => setDraft({ ...draft, maxCapacity: event.target.value })} /></SaveErrorField>
               </Field>
             </div>
+            <Button presentation="restaurant" type="button" aria-expanded={showPlacement} onClick={() => setShowPlacement((open) => !open)}>
+              {showPlacement ? '配置・結合グループを閉じる' : '配置・結合グループ'}
+            </Button>
             {showPlacement ? placementFields : null}
             <DialogNote>{editing ? '人数を変えると、予約枠・在庫の総数も変わります。' : '卓を足すと、予約枠・在庫の総数も増えます。'}</DialogNote>
-          </div>
+          </form>
         ) : null}
       </RsDialog>
       <RsDialog

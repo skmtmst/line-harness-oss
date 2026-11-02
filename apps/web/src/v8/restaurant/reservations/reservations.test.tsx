@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
@@ -137,6 +137,45 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     fireEvent.click(screen.getByRole('button', { name: '17:00' }))
     fireEvent.click(await screen.findByRole('button', { name: /台帳に入れる/ }))
     await waitFor(() => expect(fixture.createReservation).toHaveBeenCalledWith('account-1', expect.objectContaining({ customerName: '鈴木 花子', customerPhone: '09000001111', guestCount: 2, source: 'phone', kind: 'customer', startsAt: '2026-10-10T08:00:00.000Z', endsAt: '2026-10-10T10:00:00.000Z' })))
+  })
+
+  it('電話予約の保存成功後は再読込を待たず台帳に戻り、更新中を知らせる', async () => {
+    render(<ReservationsPage />)
+    await screen.findByText('山田 太郎')
+    let finish!: (value: unknown) => void
+    fixture.createReservation.mockImplementationOnce(async () => {
+      fixture.snapshot.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+      return { success: true, data: { id: 'new', tableId: 't2', lineNotice: { sent: true, reason: null } } }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /電話の予約を入れる/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'LINE 未連携の電話番号' }))
+    fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '架空 太郎' } })
+    fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '09000001111' } })
+    fireEvent.click(await screen.findByRole('button', { name: '17:00' }))
+    fireEvent.click(screen.getByRole('button', { name: /台帳に入れる/ }))
+    await waitFor(() => expect(fixture.createReservation).toHaveBeenCalledOnce())
+    expect(await screen.findByRole('button', { name: '電話の予約を入れる', exact: true }, { timeout: 500 })).toBeTruthy()
+    expect(screen.getByText(/最新の表示を読み込んでいます/)).toBeTruthy()
+    await act(async () => { finish({ data: snapshotOf({ reservations: reservationsToday(), reservationTotal: 3 }) }) })
+    await waitFor(() => expect(screen.queryByText(/最新の表示を読み込んでいます/)).toBeNull())
+  })
+
+  it('電話予約が保存済みで再読込に失敗したら、台帳で再取得失敗を知らせる', async () => {
+    render(<ReservationsPage />)
+    await screen.findByText('山田 太郎')
+    fixture.createReservation.mockImplementationOnce(async () => {
+      fixture.snapshot.mockRejectedValue(new Error('offline'))
+      return { success: true, data: { id: 'new', tableId: 't2', lineNotice: { sent: true, reason: null } } }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /電話の予約を入れる/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'LINE 未連携の電話番号' }))
+    fireEvent.change(screen.getByLabelText('お名前'), { target: { value: '架空 太郎' } })
+    fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '09000001111' } })
+    fireEvent.click(await screen.findByRole('button', { name: '17:00' }))
+    fireEvent.click(screen.getByRole('button', { name: /台帳に入れる/ }))
+    expect(await screen.findByText(/保存しましたが、最新の表示を読み込めませんでした/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '電話の予約を入れる', exact: true })).toBeTruthy()
+    expect(fixture.createReservation).toHaveBeenCalledOnce()
   })
 
   it('電話予約の保存時に営業時間未設定のコードを受け取ると設定を案内する', async () => {
