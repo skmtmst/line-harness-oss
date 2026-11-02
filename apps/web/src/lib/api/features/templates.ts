@@ -19,6 +19,7 @@ export const templatesMethods = {
         messageBubbles?: BroadcastBubble[] | null;
         /** R194: 管理一覧の抜粋・検索が読む最新の下書き本文。公開版だけのときは null。 */
         draftMessageContent: string | null;
+        draftMessageBubbles?: BroadcastBubble[] | null;
         folderId: string | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
@@ -119,7 +120,7 @@ export const templatesMethods = {
         usedBy: {
           autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null; templateVersion: number | null }>;
           automations: Array<{ id: string; name: string; eventType: string }>;
-          scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number; templateVersion: number | null }>;
+          scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number; displayOrder?: number; templateVersion: number | null }>;
           reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>;
           richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>;
           trackedLinks: Array<{ id: string; name: string }>;
@@ -215,7 +216,7 @@ export const templatesMethods = {
       fetchApi<ApiResponse<{
         autoReplies: Array<{ id: string; keyword: string; lineAccountId: string | null; templateVersion: number | null }>;
         automations: Array<{ id: string; name: string; eventType: string }>;
-        scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number; templateVersion: number | null }>;
+        scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number; displayOrder?: number; templateVersion: number | null }>;
         reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>;
         richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>;
         trackedLinks: Array<{ id: string; name: string }>;

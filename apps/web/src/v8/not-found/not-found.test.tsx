@@ -102,3 +102,16 @@ describe('見つからない画面の道とリンクの決め方', () => {
     expect(frequentDestinations('admin', [], []).map((d) => d.href)).toEqual(['/chats', '/friends', '/broadcasts'])
   })
 })
+
+it('統括の未知のページでは統括内へ戻れる', () => {
+  nav.pathname = '/hq/missing-example'
+  const { host, close } = render()
+  try {
+    const links = [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'))
+    expect(links).toContain('/hq')
+    expect(links).toContain('/hq/attention')
+    expect(links).not.toContain('/')
+    expect(links).not.toContain('/chats')
+    expect(links).not.toContain('/friends')
+  } finally { close() }
+})

@@ -659,6 +659,7 @@ export interface TemplateUsage {
     scenarioName: string;
     stepId: string;
     stepOrder: number;
+    displayOrder: number;
   }>;
   reminderSteps: Array<{
     reminderId: string;
@@ -736,14 +737,15 @@ export async function getTemplateUsage(
 
   const scenarioRes = await db
     .prepare(
-      `SELECT ss.id AS step_id, ss.step_order, ss.scenario_id, s.name AS scenario_name
+      `SELECT ss.id AS step_id, ss.step_order, ss.scenario_id, s.name AS scenario_name,
+              (SELECT COUNT(*) FROM scenario_steps preceding WHERE preceding.scenario_id = ss.scenario_id AND preceding.step_order <= ss.step_order) AS display_order
        FROM scenario_steps ss
        JOIN scenarios s ON s.id = ss.scenario_id
        WHERE ss.template_id = ?${scope('s.line_account_id')}
        ORDER BY s.name, ss.step_order`,
     )
     .bind(...scopeBinds([templateId]))
-    .all<{ step_id: string; step_order: number; scenario_id: string; scenario_name: string }>();
+    .all<{ step_id: string; step_order: number; display_order: number; scenario_id: string; scenario_name: string }>();
 
   const reminderRes = await db
     .prepare(
@@ -797,6 +799,7 @@ export async function getTemplateUsage(
       scenarioName: r.scenario_name,
       stepId: r.step_id,
       stepOrder: r.step_order,
+      displayOrder: r.display_order,
     })),
     reminderSteps: (reminderRes.results ?? []).map((r) => ({
       reminderId: r.reminder_id,

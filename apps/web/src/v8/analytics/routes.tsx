@@ -13,7 +13,6 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Download, Target, TrendingUp, UserPlus, Wallet } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -21,7 +20,7 @@ import { api, type AnalyticsMetric, type AnalyticsRoutesOverview } from '@/lib/a
 import { formatNumber } from '@/lib/format'
 import { RangePickerV8, dataRangeCaption } from './common'
 import { MetricText } from './reactions'
-import { downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
+import { downloadCsv, metricText, rangeFor, shownValue, useOverview, useRegisterExport, CsvExportButton } from './parts'
 import styles from './analytics.module.css'
 import { useReportPeriod, type PeriodRange } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
@@ -48,7 +47,7 @@ export function useRoutesOverview(accountId: string, controlled?: { days: number
   return { days, setDays, range, customRange, setRange, state }
 }
 
-export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, days: controlledDays, onDaysChange, customRange: controlledRange, onRangeChange }: {
+export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, exportDisabledReason, days: controlledDays, onDaysChange, customRange: controlledRange, onRangeChange }: {
   accountId: string
   /** 期間を呼び出し側で持つとき（成果地点ごとのレポートは同じ期間で成果を読む）。 */
   days?: number
@@ -59,6 +58,7 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
   children?: (overview: AnalyticsRoutesOverview['data'] | null) => ReactNode
   exportCsv?: () => void
   exportDisabled?: boolean
+  exportDisabledReason?: string
 }) {
   const { days, setDays, customRange, setRange, state } = useRoutesOverview(accountId, controlledDays !== undefined && onDaysChange ? { days: controlledDays, setDays: onDaysChange, customRange: controlledRange, setRange: onRangeChange } : undefined)
   const overview = state.data?.data ?? null
@@ -71,7 +71,8 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
   }
   const onExport = exportCsv ?? exportRoutes
   const disabled = exportCsv ? Boolean(exportDisabled) : !overview || overview.routes.length === 0
-  useRegisterExport(onExport, disabled)
+  const exportReason = exportCsv ? exportDisabledReason : state.loading ? '集計結果を読み込んでいます。' : state.error || 'この期間に書き出せる経路はありません。'
+  useRegisterExport(onExport, disabled, exportReason)
 
   if (!state.data || !overview) {
     return <div className={styles.body} data-gap="tab">
@@ -104,7 +105,7 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
         <span className={styles.caption}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
         <TextLink href={overview.searchConsoleHref} truncate>Search Console を見る</TextLink>
-        <Button variant="secondary" onClick={onExport} disabled={disabled}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
+        <CsvExportButton variant="secondary" onClick={onExport} disabled={disabled} disabledReason={exportReason}><Download size={16} aria-hidden="true" />CSVで書き出す</CsvExportButton>
       </div>
       {children ? children(overview) : <RoutesTable overview={overview} clicks={clicks} />}
     </div>

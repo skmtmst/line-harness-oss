@@ -4,7 +4,7 @@ import TextLink from '@/components/shared/text-link'
 import { BroadcastAbResult, abStatusDefinition, useAbResult } from '@/v8/broadcast-ab/public/result/index'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { useState, type ReactNode, type RefObject } from 'react'
+import { useRef, useState, type ReactNode, type RefObject } from 'react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -36,6 +36,7 @@ import { DetailColumns } from '@/components/templates/detail-columns'
 import { ListPageSection } from '@/components/templates/list-page'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary, { type OperationAccountTarget } from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Progress from '@/components/shared/progress'
 import Notice from '@/components/shared/notice'
@@ -63,6 +64,12 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import StatusBadge from '@/components/shared/status-badge'
 
+
+/** 配信の記録にある送信元だけを確認画面へ渡す。未記録は不明として扱う。 */
+export function broadcastOperationAccounts(broadcast: ApiBroadcast): OperationAccountTarget[] {
+  const ids = broadcast.targetType === 'multi-account-dedup' ? broadcast.accountIds : broadcast.lineAccountId ? [broadcast.lineAccountId] : null
+  return ids?.length ? [...new Set(ids)].map(id => ({ id })) : [{ id: '' }]
+}
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
 const DELIVERY_STEPS: ReadonlyArray<{ key: string; label: string }> = [
@@ -170,6 +177,11 @@ export default function BroadcastDetail({
   const isDraft = broadcast.status === 'draft'
   const isSent = broadcast.status === 'sent'
   const isScheduled = broadcast.status === 'scheduled'
+  const broadcastScopeKey = JSON.stringify([broadcast.id, broadcast.targetType, broadcast.lineAccountId, broadcast.accountIds])
+  const broadcastScope = useRef({ key: broadcastScopeKey, generation: 0 })
+  if (broadcastScope.current.key !== broadcastScopeKey) broadcastScope.current = { key: broadcastScopeKey, generation: broadcastScope.current.generation + 1 }
+  const [deleteGeneration, setDeleteGeneration] = useState(-1)
+  const [cancelGeneration, setCancelGeneration] = useState(-1)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [asideExpanded, setAsideExpanded] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -253,7 +265,7 @@ export default function BroadcastDetail({
     menuItems.push({
       id: 'cancel-reservation',
       label: '予約を取り消す',
-      onSelect: () => { setCancelError(''); setCancelOpen(true) },
+      onSelect: () => { setCancelError(''); setCancelGeneration(broadcastScope.current.generation); setCancelOpen(true) },
     })
   }
   menuItems.push({
@@ -262,7 +274,7 @@ export default function BroadcastDetail({
     tone: 'danger',
     icon: <Trash2 size={16} aria-hidden="true" />,
     dividerBefore: true,
-    onSelect: () => { setDeleteError(''); setDeleteOpen(true) },
+    onSelect: () => { setDeleteError(''); setDeleteGeneration(broadcastScope.current.generation); setDeleteOpen(true) },
   })
 
   const total = broadcast.totalCount
@@ -397,25 +409,28 @@ export default function BroadcastDetail({
 </DetailColumns></ListPageSection>
 
       <ConfirmDialog
-        open={deleteOpen}
+        open={deleteOpen && deleteGeneration === broadcastScope.current.generation}
         title={`「${broadcast.title}」を削除しますか？`}
         description="削除すると配信設定と確認画面から消えます。予約中の配信は中止され、この操作は取り消せません。"
         confirmLabel="削除する"
         destructive
         busy={deleting}
         error={deleteError || undefined}
-        onConfirm={() => deleteBroadcast()}
+        onConfirm={() => { if (deleteGeneration === broadcastScope.current.generation && canEdit) void deleteBroadcast() }}
         onCancel={() => { if (!deleting) setDeleteOpen(false) }}
-      />
+      >
+        <OperationTargetSummary accounts={broadcastOperationAccounts(broadcast)} />
+      </ConfirmDialog>
       <CancelReservationDialog
-        open={cancelOpen}
+        open={cancelOpen && cancelGeneration === broadcastScope.current.generation}
+        broadcastId={broadcast.id} accounts={broadcastOperationAccounts(broadcast)}
         title={broadcast.title}
         description={broadcast.scheduledAt
           ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に送る予定の ${formatNumber(total)} 人 に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。${approvalStatus && approvalStatus !== 'none' ? '承認はやり直しになります。' : ''}`
           : '予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。'}
         busy={cancelling}
         error={cancelError}
-        onConfirm={() => cancelReservation()}
+        onConfirm={() => { if (cancelGeneration === broadcastScope.current.generation && canEdit) void cancelReservation() }}
         onClose={() => { if (!cancelling) setCancelOpen(false) }}
       />
     </PageFrame>
@@ -428,6 +443,8 @@ export default function BroadcastDetail({
  */
 export function CancelReservationDialog({
   open,
+  broadcastId,
+  accounts,
   title,
   description,
   busy,
@@ -436,6 +453,8 @@ export function CancelReservationDialog({
   onClose,
 }: {
   open: boolean
+  broadcastId: string
+  accounts: OperationAccountTarget[]
   title: string
   description: string
   busy: boolean
@@ -443,9 +462,14 @@ export function CancelReservationDialog({
   onConfirm: () => void
   onClose: () => void
 }) {
+  const key = JSON.stringify([broadcastId, accounts.map(account => account.id)])
+  const target = useRef({ active: false, key: '', invalid: false })
+  if (!open) target.current = { active: false, key: '', invalid: false }
+  else if (!target.current.active) target.current = { active: true, key, invalid: false }
+  else if (target.current.key !== key) target.current.invalid = true
   return (
     <Dialog
-      open={open}
+      open={open && !target.current.invalid}
       title={`「${title}」の予約を取り消しますか？`}
       description={description}
       designNode="BeNtj"
@@ -456,7 +480,7 @@ export function CancelReservationDialog({
       onCancel={onClose}
       footer={
         <DialogActions>
-          <Button type="button" variant="danger" onClick={onConfirm} disabled={busy} busy={busy} busyLabel="取り消しています…">
+          <Button type="button" variant="danger" onClick={() => { if (!target.current.invalid && target.current.key === key) onConfirm() }} disabled={busy} busy={busy} busyLabel="取り消しています…">
             予約を取り消す
           </Button>
           <Button type="button" className={styles.cancelKeep} onClick={onClose} disabled={busy}>
@@ -468,7 +492,9 @@ export function CancelReservationDialog({
           </Button>
         </DialogActions>
       }
-    />
+    >
+      <OperationTargetSummary accounts={accounts} />
+    </Dialog>
   )
 }
 

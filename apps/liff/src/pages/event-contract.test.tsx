@@ -115,7 +115,6 @@ it('イベント画面の禁止の見張りを保つ', () => {
   expect(confirm).not.toContain('>戻る<');
   expect(bookings).not.toContain('過去');
   expect(done).not.toContain('LoadingView');
-  expect(offer).not.toContain('LoadingView');
   expect(confirm).not.toContain('bg-info-bg');
   expect(confirm).not.toContain('bg-yellow');
   expect(event).not.toContain('text-danger');

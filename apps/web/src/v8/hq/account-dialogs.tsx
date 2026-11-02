@@ -65,19 +65,27 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
   const [nameError, setNameError] = useState('')
   const initialFolder = (account as { folderId?: string | null }).folderId ?? ''
   const [folders, setFolders] = useState<Folder[]>([])
+  const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [folderAttempt, setFolderAttempt] = useState(0)
   const [folderId, setFolderId] = useState<string>(initialFolder)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
+    setFolderState('loading')
     void api.lineAccountFolders.list().then((res) => {
-      if (!cancelled && res.success && Array.isArray(res.data?.folders)) setFolders([...res.data.folders].sort((a, b) => a.displayOrder - b.displayOrder))
-    }).catch(() => {})
+      if (!res.success || !Array.isArray(res.data?.folders)) throw new Error('folder list unavailable')
+      if (!cancelled) {
+        setFolders([...res.data.folders].sort((a, b) => a.displayOrder - b.displayOrder))
+        setFolderState('ready')
+      }
+    }).catch(() => { if (!cancelled) setFolderState('error') })
     return () => { cancelled = true }
-  }, [])
+  }, [folderAttempt])
 
   const save = async () => {
+    if (folderState !== 'ready' || busy) return
 
     if (accountNameRequirement.check(name)) {
       setNameError('名前を入力してください。')
@@ -136,7 +144,7 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
 
           <>
             <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
-            <Button type="button" variant="primary" onClick={() => save()} disabled={busy} busy={busy} busyLabel="保存中…">保存</Button>
+            <Button type="button" variant="primary" onClick={() => save()} disabled={busy || folderState !== 'ready'} busy={busy} busyLabel="保存中…">保存</Button>
           </>
         </DialogActions>
       }
@@ -153,7 +161,7 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
             className={styles.full}
           /></SaveErrorField>
 {nameError ? <p id="hq-account-settings-name-error" className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
-        <div className={styles.field}><Field note={<>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</>} label="フォルダ" htmlFor="hq-account-folder"><SaveErrorField names={["folderId","folder_id"]}><FolderSelect
+        <div className={styles.field}><Field note={<>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</>} label="フォルダ" htmlFor="hq-account-folder">{folderState === 'loading' ? <p role="status">フォルダを読み込んでいます。</p> : folderState === 'error' ? <><p role="alert">フォルダを読み込めませんでした。</p><Button type="button" onClick={() => setFolderAttempt((n) => n + 1)}>もう一度読み込む</Button></> : <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
             id="hq-account-folder"
             aria-label="フォルダ"
             size="full"
@@ -167,7 +175,7 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
                 onFolderCreated?.()
               })
               : undefined}
-          /></SaveErrorField>
+          /></SaveErrorField>}
 </Field></div>
         {lineAccountConnectionState(account).tone === 'warn' ? (
           /* 要確認のときだけ：引っかかった確認ごとの理由（URL は折り返して全文）。 */

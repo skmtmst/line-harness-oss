@@ -244,7 +244,7 @@ export default function SoldOutBoard({
           </tbody></DataTable></Card>
 
           {canManage ? (
-            <BulkBar count={checkedCount} unit="品">
+            <BulkBar count={checkedCount} unit="品" onClear={() => onToggleAll(false)}>
               <Button variant="danger-outline" disabled={!canSubmit} busy={busy} busyLabel="送信中…" onClick={() => onSubmit(true)}>
                 <Ban size={16} aria-hidden="true" />選んだ商品を品切れにする
               </Button>

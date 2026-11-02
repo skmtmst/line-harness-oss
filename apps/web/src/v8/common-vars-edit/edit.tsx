@@ -40,6 +40,7 @@ import Select from '@/components/shared/select'
 import { StickyBarAction } from '@/components/shared/sticky-bar'
 import ChooseCommonVarTarget from './choose-target'
 import TargetMissing from '@/components/shared/target-missing'
+import TruncatedText from '@/components/shared/truncated-text'
 import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import { useAccount } from '@/contexts/account-context'
@@ -62,7 +63,7 @@ function EditCommonVarV8Inner() {
     { label: 'ホーム', href: '/' },
     { label: '共通情報', href: '/contents/vars' },
   ])
-  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountLoading, error: accountError } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
   const router = useRouter()
@@ -582,16 +583,20 @@ function EditCommonVarV8Inner() {
   const stopped = (item?.status ?? 'active') === 'stopped'
   const isDraft = (item?.status ?? 'active') === 'draft'
 
+  const previewAccountName = !accountLoading && !accountError && selectedAccountId && selectedAccount?.id === selectedAccountId && !loading && !loadFailure && item?.lineAccountId === selectedAccountId
+    ? selectedAccount.displayName?.trim() || selectedAccount.name.trim() || 'アカウント名未取得'
+    : 'アカウント名未取得'
+
   const previewTalk = (
     <LinePreview
       caption={schedules.length > 0 && schedules[0] ? `${scheduleStamp(schedules[0].effectiveFrom)} から` : undefined}
-      accountName="musubo"
+      accountName={previewAccountName}
       note="差し込んだときの見え方です。新しい中身を入れると、ここが変わります。"
     >
       <div className={styles.talkRow}>
         <span className={styles.talkIcon} aria-hidden="true"><MusuboMark /></span>
         <div className={styles.talkCol}>
-          <span className={styles.talkName}>musubo</span>
+          <TruncatedText value={previewAccountName} className={styles.talkName} />
           <div className={styles.talkBubbleRow}>
             <p className={styles.talkBubble}>
               {`いつもありがとうございます。\n${item?.name ?? '共通情報'}は ${value || emptyValue('unconfigured')} です。`}

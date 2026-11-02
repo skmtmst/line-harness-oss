@@ -23,7 +23,7 @@ const CODE = PAGE
 describe('お知らせの出す・止める確認窓の置き場所', () => {
   it('確認窓は編集画面の条件（expandedSetting）の外に置く', () => {
     const editorBlock = CODE.indexOf('expandedSetting ? <>')
-    const dialog = CODE.indexOf('open={pendingToggle !== null}')
+    const dialog = CODE.indexOf('open={pendingToggle !== null && pendingToggle.scope === testAccountScope.current}')
     const blockEnd = CODE.indexOf('</> : null}', editorBlock)
     expect(editorBlock).toBeGreaterThan(-1)
     expect(dialog).toBeGreaterThan(-1)

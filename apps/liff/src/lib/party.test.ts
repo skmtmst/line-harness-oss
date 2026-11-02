@@ -52,3 +52,9 @@ it('追加メニューと担当別料金・指名料・所要時間をそれぞ�
   party.members[0] = { ...party.members[0], addonIds: ['a1'], staff: { ...sasaki, price: 9000, nomination_fee: 600, duration_minutes: 90 }, designated: true };
   expect(totals(party, menu)).toMatchObject({ price: 10400, minutes: 105 });
 });
+it('仮の指名なしが同じIDでも同時として計算する', () => {
+  const party = resize(initialParty(), 2);
+  party.members = party.members.map(member => ({ ...member, staff:sasaki, designated:false }));
+  expect(sameStaffSequence(party)).toBe(false);
+  expect(totals(party, menu).minutes).toBe(105);
+});

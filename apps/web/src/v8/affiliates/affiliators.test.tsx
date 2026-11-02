@@ -108,7 +108,7 @@ describe('V8 アフィリエイター', () => {
     await render()
     const names = [...host.querySelectorAll('tbody tr')].map((row) => row.querySelector('a[data-row-link]')?.textContent)
     expect(names).toEqual(['多い人', '少ない人'])
-    expect(host.textContent).toContain('アフィリエイター登録')
+    expect(host.textContent).toContain('アフィリエイターを作る')
     expect(host.querySelector('[aria-label="アフィリエイターを作る"]')).not.toBeNull()
     expect(host.querySelector('[aria-label="多い人を選ぶ"]')).not.toBeNull()
     expect(host.textContent).not.toContain('閲覧のみで見ています')

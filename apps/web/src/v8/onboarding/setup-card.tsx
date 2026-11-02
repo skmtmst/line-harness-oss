@@ -49,8 +49,8 @@ export function SetupWarningBands({ data, configureAllowed = true, role }: { dat
       {warnings.map((warning) => {
         const button = tiles.find((tile) => tile.feature === warning.feature)?.label ?? featureName(warning.feature)
         return (
-          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button lockedReason={permissionLockReason(role, configureAllowed, 'manager')} onClick={() => { if (configureAllowed) preparing.open(FEATURES[warning.feature]!.preparing!) }}>決まりを入れる</Button> : <Button lockedReason={permissionLockReason(role, configureAllowed, 'manager')} href={featureHref(warning.feature, warning.href, data.state.style)}>決まりを入れる</Button>}>
-            {`リッチメニューに「${button}」のボタンがありますが、${featureName(warning.feature)}の決まりがまだです。お客さまには「${PREPARING_WORD}」と出ています。`}
+          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button lockedReason={permissionLockReason(role, configureAllowed, 'manager')} onClick={() => { if (configureAllowed) preparing.open(FEATURES[warning.feature]!.preparing!) }}>{`${featureName(warning.feature)}を設定する`}</Button> : <Button lockedReason={permissionLockReason(role, configureAllowed, 'manager')} href={featureHref(warning.feature, warning.href, data.state.style)}>{`${featureName(warning.feature)}を設定する`}</Button>}>
+            {`リッチメニューに「${button}」のボタンがありますが、${featureName(warning.feature)}がまだ設定されていません。お客さまには「${PREPARING_WORD}」と出ています。`}
           </Notice>
         )
       })}

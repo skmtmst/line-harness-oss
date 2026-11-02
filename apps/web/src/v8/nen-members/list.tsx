@@ -156,7 +156,7 @@ export default function MembersListV8({
             value={sort}
             onChange={(value) => { setSort(value as NenMemberSort); setPage(1) }}
             options={[
-              { value: 'annual_desc', label: '通年が多い順' },
+              { value: 'annual_desc', label: '年間の購入額が多い順' },
               { value: 'lifetime_desc', label: 'ライフタイムが多い順' },
               { value: 'balance_desc', label: 'マイル残高が多い順' },
               { value: 'recent', label: '最終購入が新しい順' },
@@ -192,7 +192,7 @@ export default function MembersListV8({
                 <GridHeadRow className={`${styles.mRow} ${styles.mHead}`}>
                   <span role="columnheader">会員</span>
                   <span role="columnheader">ランク</span>
-                  <span role="columnheader">通年</span>
+                  <span role="columnheader">年間の購入額</span>
                   <span role="columnheader">ライフタイム</span>
                   <span role="columnheader">マイル残高</span>
                   <span role="columnheader">ペット</span>

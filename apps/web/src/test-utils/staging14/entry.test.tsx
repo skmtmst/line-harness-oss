@@ -28,6 +28,7 @@ beforeEach(() => {
     if (path === '/api/forms/f/opened') return reply({ success: true })
     if (path === '/api/forms/f/submit') return failSubmit ? reply({ success: false, error: 'offline' }, 500) : reply({ success: true, data: { complete: true } })
     if (path === '/api/liff/booking/menus') return reply({ menus: [{ id: 'm', name: '予約メニュー', intake_question: '事前の質問', base_price: 1000 }] })
+    if (path === '/api/liff/booking/menus/m/addons') return reply({ success: true, data: [] })
     if (path === '/api/liff/booking/menus/m/staff') return reply({ staff: [{ id: 's', display_name: '担当者', price: 1000, duration_minutes: 30 }] })
     if (path === '/api/liff/booking/availability') return reply({ by_staff: [{ staff_id: 's', display_name: '担当者', slots: [{ date: url.searchParams.get('from'), start: '10:00', end: '10:30' }] }] })
     if (path === '/api/liff/booking/requests') return failSubmit ? reply({ error: 'slot_conflict' }, 409) : reply({ booking_id: 'b', status: 'requested' })

@@ -448,7 +448,7 @@ export default function AffiliatorsTab() {
   const createButton = (full: boolean) => (
     readonly ? null : (
       <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href="/affiliates/new" aria-label="アフィリエイターを作る" title="アフィリエイターを作る">
-        <Plus size={16} aria-hidden="true" /> アフィリエイター登録
+        {!full && <Plus size={16} aria-hidden="true" />} アフィリエイターを作る
       </Button>
     )
   )
@@ -457,7 +457,7 @@ export default function AffiliatorsTab() {
   const chooseFolder = (id: string) => resetPage(() => setFolderId(id))
   const folderPanel = (
     <ManagedFolderPanel kind="affiliate" accountId={accountId} folders={folders}
-      onChanged={async () => { await reloadFolders(); await loadList() }} canManage={!readonly} createAction={createButton(false)}
+      onChanged={async () => { await reloadFolders(); await loadList() }} canManage={!readonly} createAction={createButton(true)}
       itemLabel="アフィリエイター" activeId={folderId} onSelect={chooseFolder}
       allCount={ready ? rows.length : null} error={folderError}
       unfiledCount={ready ? rows.filter(row => !row.folderId).length : null}

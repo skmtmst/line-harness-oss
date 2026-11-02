@@ -26,11 +26,11 @@ export function MessageComposerPage({ active, children }: { active: boolean; chi
 export const COMPOSER_TYPES = [
   ['text', 'テキスト'], ['image', '画像'], ['video', '動画'], ['audio', '音声'], ['sticker', 'スタンプ'],
   ['carousel', 'カルーセル'], ['rich_message', 'リッチメッセージ'], ['rich_video', 'リッチビデオ'],
-  ['location', '位置情報'], ['research', '質問'], ['intro', '紹介'], ['coupon', 'その他'],
+  ['location', '位置情報'], ['research', 'リサーチ'], ['intro', '紹介'], ['coupon', 'クーポン'],
 ] as const
-export type ComposerKind = typeof COMPOSER_TYPES[number][0]
+export type ComposerKind = typeof COMPOSER_TYPES[number][0] | 'question'
 const KIND_ICONS: Record<string, typeof MessageSquare> = { text: MessageSquare, image: Image, video: Video, audio: Music, sticker: Smile, carousel: GalleryHorizontal, rich_message: Image, rich_video: Video, location: MapPin }
-export const composerLabel = (type: string) => COMPOSER_TYPES.find(([value]) => value === type)?.[1] ?? 'その他'
+export const composerLabel = (type: string) => COMPOSER_TYPES.find(([value]) => value === type)?.[1] ?? ({ flex: 'フレックスメッセージ', card_message: 'カードタイプメッセージ', question: '質問' } as Record<string, string>)[type] ?? '未対応の種類'
 export function composerSummary(bubble: BroadcastBubble): string {
   const c = bubble.content
   if (bubble.type === 'text') return String(c.text ?? '').trim().slice(0, 40) || 'まだ書いていません'
@@ -94,7 +94,8 @@ export default function MessageComposer(props: MessageComposerProps) {
       <div className={styles.actions}><Button size="composer" disabled={busy} onClick={() => onPickTemplate(0)}><FileText size={16} aria-hidden />テンプレートから選ぶ</Button><Button size="composer" disabled={busy} onClick={() => onSaveTemplate(0)}><Save size={16} aria-hidden />保存してテンプレートにする</Button></div>
     </div>}
     {bubbles.map((bubble, index) => {
-      const activeType = COMPOSER_TYPES.some(([type]) => type === bubble.type) ? bubble.type : 'coupon'
+      const tabs: ReadonlyArray<readonly [ComposerKind, string]> = unavailable.question ? [...COMPOSER_TYPES.slice(0, 10), ['question', '質問'], ...COMPOSER_TYPES.slice(10)] : COMPOSER_TYPES
+      const activeType = tabs.some(([type]) => type === bubble.type) ? bubble.type : null
       const composed = ['carousel', 'rich_message', 'rich_video'].includes(bubble.type)
       const name = String(bubble.content.templateName ?? bubble.content.assetName ?? '')
       const reason = unavailable[bubble.type as ComposerKind]
@@ -113,9 +114,10 @@ export default function MessageComposer(props: MessageComposerProps) {
           const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 1) + tabs.length) % tabs.length
           event.preventDefault(); tabs[next]?.focus()
         }}>
-          {COMPOSER_TYPES.map(([type, label]) => <button key={type} type="button" role="tab" tabIndex={activeType === type ? 0 : -1} aria-selected={activeType === type} aria-disabled={Boolean(unavailable[type]) || busy} title={unavailable[type]}  onClick={() => { if (type !== bubble.type && !busy && !unavailable[type] && type !== 'intro') onChange(index, { id: bubble.id, type: type as BroadcastBubbleType, content: ['audio', 'sticker', 'location'].includes(type) ? { state: emptyMessageKindState() } : {} }) }}>{label}</button>)}
+          {tabs.map(([type, label], tabIndex) => <button key={type} type="button" role="tab" tabIndex={activeType === type || (activeType === null && tabIndex === 0) ? 0 : -1} aria-selected={activeType === type} aria-disabled={Boolean(unavailable[type]) || busy} aria-description={unavailable[type]} title={unavailable[type]}  onClick={() => { if (type !== bubble.type && !busy && !unavailable[type] && type !== 'intro' && type !== 'question') onChange(index, { id: bubble.id, type: type as BroadcastBubbleType, content: ['audio', 'sticker', 'location'].includes(type) ? { state: emptyMessageKindState() } : {} }) }}>{label}</button>)}
         </div>
         <div className={styles.content} {...props.bubbleFieldProps?.(index)} data-invalid={props.bubbleErrors?.[index] ? '' : undefined} aria-describedby={props.bubbleErrors?.[index] ? `composer-bubble-${bubble.id}-error` : undefined}>
+          {activeType === null ? <p role="note">この種類は形式のタブから選べません。内容を確認してください。</p> : null}
           {reason ? <p role="note">{reason}</p> : bubble.type === 'text' ? <ComposerText tokenNames={tokenNames} bubble={bubble} index={index} onChange={(next) => onChange(index, next)} inserts={props.inserts} extraTokens={props.extraTokens} />
             : ['image', 'video', 'audio'].includes(bubble.type) ? <ComposerMedia key={`${bubble.id}-${bubble.type}-${accountId}`} bubble={bubble} accountId={accountId} disabled={busy} onBusyChange={props.onBusyChange} onChange={(content) => onChange(index, { ...bubble, content })} />
             : bubble.type === 'sticker' || bubble.type === 'location' ? <MessageKindFields kind={bubble.type as MessageKind} value={(bubble.content.state as MessageKindState) ?? emptyMessageKindState()} onChange={(state) => onChange(index, { ...bubble, content: { ...bubble.content, state } })} composer />

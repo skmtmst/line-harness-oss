@@ -1144,8 +1144,7 @@ export default function MediaLibraryListV8() {
             ) : null}
 
             <p>
-              使われている場所から外すと削除できます。別のメディアを選ぶと、使用先をまとめて差し替えられます。
-              <br />
+              {impact.verified !== false && impact.usageCount === 0 ? null : <>使われている場所から外すと削除できます。別のメディアを選ぶと、使用先をまとめて差し替えられます。<br /></>}
               {checkedAtText(impact.checkedAt)} 時点で、テンプレート・一斉配信・リッチメニュー・シナリオ・コラム・イベント・ウェビナーの7種類を確認しました。
             </p>
           </div>

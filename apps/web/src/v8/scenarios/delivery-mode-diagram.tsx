@@ -53,7 +53,7 @@ export default function DeliveryModeDiagram({ mode, selected }: { mode: Mode; se
         )) : null}
       </svg>
       <span className={styles.caption} aria-hidden="true">
-        {absolute ? '2人とも同じ時刻に届きます' : '始めた時刻に合わせてずれて届きます（夜中に届くことがあります）'}
+        {absolute ? 'この例では2人とも同じ時刻に届きます' : '始めた時刻に合わせてずれて届きます（夜中に届くことがあります）'}
       </span>
     </span>
   )
