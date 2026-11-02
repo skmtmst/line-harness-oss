@@ -5616,7 +5616,7 @@ CREATE TABLE nen_ec_member_snapshots (
   point_balance INTEGER NOT NULL DEFAULT 0,
   member_rank TEXT NOT NULL DEFAULT '会員',
   synced_at TEXT NOT NULL
-, annual_miles_yen INTEGER NOT NULL DEFAULT 0, lifetime_miles_yen INTEGER NOT NULL DEFAULT 0, member_rank_key TEXT, mile_rate_percent REAL, rank_valid_until TEXT, mile_balance INTEGER NOT NULL DEFAULT 0, miles_used_this_month INTEGER NOT NULL DEFAULT 0, last_purchased_at TEXT);
+, annual_miles_yen INTEGER NOT NULL DEFAULT 0, lifetime_miles_yen INTEGER NOT NULL DEFAULT 0, member_rank_key TEXT, mile_rate_percent REAL, rank_valid_until TEXT, mile_balance INTEGER NOT NULL DEFAULT 0, miles_used_this_month INTEGER NOT NULL DEFAULT 0, last_purchased_at TEXT, ec_member_rank_name TEXT);
 
 CREATE TABLE nen_feeding_products (
   id              TEXT PRIMARY KEY,

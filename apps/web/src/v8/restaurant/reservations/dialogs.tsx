@@ -4,7 +4,7 @@ import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { datetimeLocalJstToUtcIso, jstDateTimeLocal, jstCalendar } from '@/lib/jst-datetime'
 
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Download } from 'lucide-react'
 import { Field } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -20,9 +20,12 @@ import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { formatYen as polishFormatYen } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import EntitySelect from '@/components/shared/entity-select'
 import { withHonorific } from '@line-crm/shared'
+import type { ReservationEditSaveResult } from './edit-save-result'
 
 /*
  * ★V8 予約台帳の窓：予約の変更（取消・復活・押さえの解除もここ）・取消の確認・受信データの試し。
@@ -50,20 +53,26 @@ function ReadOnlyChoice({ label, value, options }: { label: string; value: strin
   return <SaveErrorField names={["shown"]}><TextField aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} /></SaveErrorField>
 }
 
-export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore }: {
+export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore, missing = false }: {
   reservation: RestaurantReservation | null
+  missing?: boolean
   tables: RestaurantTable[]
   courses: RestaurantMenuItem[]
   busy: boolean
   canWrite: boolean
   onClose: () => void
-  onSave: (patch: ReservationPatch) => void
+  onSave: (patch: ReservationPatch) => Promise<ReservationEditSaveResult> | void
   onCancelReservation: (id: string) => void
   onRestore: (id: string) => void
 }) {
+  const initialReservation = useRef<{ id: string; version: number } | null>(null)
+  if (reservation && initialReservation.current?.id !== reservation.id) {
+    initialReservation.current = { id: reservation.id, version: reservation.customer_version ?? 1 }
+  }
+  const changedElsewhere = missing || (!!reservation && !!initialReservation.current && (reservation.customer_version ?? 1) !== initialReservation.current.version)
   const [draft, setDraft] = useState({ customerName: '', customerPhone: '', guestCount: '2', allergyNote: '', startsAt: '', endsAt: '', tableId: '', courseId: '' })
   useEffect(() => {
-    if (!reservation) return
+    if (!reservation || (reservation.customer_version ?? 1) !== initialReservation.current?.version) return
     setDraft({
       customerName: reservation.customer_name,
       customerPhone: reservation.customer_phone || '',
@@ -74,8 +83,14 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       tableId: reservation.table_id || '',
       courseId: reservation.course_id || '',
     })
-  }, [reservation])
-  const fields = useFormErrors()
+  }, [reservation?.id])
+  const fields = useSaveFormErrors()
+  const [saveError, setSaveError] = useState<unknown>(null)
+  const saving = useRef(false)
+  const attempt = useRef(0)
+  const currentInput = useRef({ draft, canWrite, busy, changedElsewhere, onSave })
+  currentInput.current = { draft, canWrite, busy, changedElsewhere, onSave }
+  useEffect(() => () => { attempt.current += 1 }, [])
   fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。', { required: true })
   fields.define('phone', '電話番号', () => phoneProblem(draft.customerPhone) || null)
   fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
@@ -84,7 +99,9 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   if (!reservation) return null
   const hold = isHold(reservation)
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
-  const save = () => {
+  const save = async () => {
+    const { draft: input, canWrite: allowed, busy: working, changedElsewhere: stale, onSave: commit } = currentInput.current
+    if (saving.current || working || !allowed || stale) return
     if (fields.submit().length > 0) {
       requestAnimationFrame(() => {
         const target = document.querySelector<HTMLElement>('[role="dialog"] [aria-invalid="true"]')
@@ -92,16 +109,27 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       })
       return
     }
-    onSave({
-    customerName: draft.customerName,
-    customerPhone: normalizePhone(draft.customerPhone) || null,
-    guestCount: Number(draft.guestCount),
-    startsAt: datetimeLocalJstToUtcIso(draft.startsAt),
-    endsAt: datetimeLocalJstToUtcIso(draft.endsAt),
-    tableId: draft.tableId || null,
-    courseId: draft.courseId || null,
-    allergyNote: draft.allergyNote || null,
-    })
+    const ticket = ++attempt.current
+    saving.current = true
+    setSaveError(null)
+    try {
+      const result = await commit({
+        expectedVersion: initialReservation.current?.version ?? 1,
+        customerName: input.customerName,
+        customerPhone: normalizePhone(input.customerPhone) || null,
+        guestCount: Number(input.guestCount),
+        startsAt: datetimeLocalJstToUtcIso(input.startsAt),
+        endsAt: datetimeLocalJstToUtcIso(input.endsAt),
+        tableId: input.tableId || null,
+        courseId: input.courseId || null,
+        allergyNote: input.allergyNote || null,
+      })
+      if (ticket === attempt.current && result?.inputError !== undefined && !fields.capture(result.inputError)) setSaveError(result.inputError)
+    } catch (error) {
+      if (ticket === attempt.current && !fields.capture(error)) setSaveError(error)
+    } finally {
+      if (ticket === attempt.current) saving.current = false
+    }
   }
   const tableOptions = [
     { value: '', label: '未配席' },
@@ -112,7 +140,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     ...courses.filter((course) => course.status === 'active' || course.id === reservation.course_id).map((course) => ({ value: course.id, label: `${course.name} ${polishFormatYen(course.price)}` })),
   ]
   return (
-    <RsDialog
+    <SaveErrorScope errors={fields}><RsDialog
       noValidate
       open
       title={hold ? `押さえ（${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}）` : `${withHonorific(reservation.customer_name)}の予約${canWrite ? 'を変更' : ''}`}
@@ -125,18 +153,20 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
         <>
           {canWrite ? (
             hold ? (
-              <Button type="button" variant="danger" className={styles.dialogLeft} disabled={busy} onClick={() => onCancelReservation(reservation.id)}>押さえを解除</Button>
+              <Button type="button" variant="danger" className={styles.dialogLeft} disabled={busy || changedElsewhere} onClick={() => onCancelReservation(reservation.id)}>押さえを解除</Button>
             ) : inactive ? (
-              <Button type="button" className={styles.dialogLeft} disabled={busy} onClick={() => onRestore(reservation.id)}>予約を有効に戻す</Button>
+              <Button type="button" className={styles.dialogLeft} disabled={busy || changedElsewhere} onClick={() => onRestore(reservation.id)}>予約を有効に戻す</Button>
             ) : (
-              <Button type="button" className={styles.dialogLeft} variant="danger-outline" disabled={busy} onClick={() => onCancelReservation(reservation.id)}>予約を取り消す</Button>
+              <Button type="button" className={styles.dialogLeft} variant="danger-outline" disabled={busy || changedElsewhere} onClick={() => onCancelReservation(reservation.id)}>予約を取り消す</Button>
             )
           ) : null}
           <Button type="button" onClick={onClose} disabled={busy}>{canWrite && !hold ? 'キャンセル' : '閉じる'}</Button>
-          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy}><Check aria-hidden="true" />保存する</Button> : null}
+          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy || changedElsewhere}><Check aria-hidden="true" />保存する</Button> : null}
         </>
       )}
     >
+      {changedElsewhere ? <Notice tone="warn" role="alert" message={canWrite && !hold ? "別の操作で予約が変更されたか、一覧から移動しました。入力を控えてから閉じ、最新の予約を開き直してください。" : "別の操作で予約が変更されたか、一覧から移動しました。閉じて最新の予約を開き直してください。"} /> : null}
+      {!changedElsewhere && saveError !== null ? <Notice tone="danger" role="alert" message={describeApiFailure(saveError, '保存')} /> : null}
       {hold ? (
         <DialogNote>{`${reservation.note || '仮押さえ'}・解除の期限 ${reservation.hold_expires_at ? hm(reservation.hold_expires_at) : emptyValue('unknown')}。期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。`}</DialogNote>
       ) : (
@@ -177,7 +207,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
           </Field>
         </>
       )}
-    </RsDialog>
+    </RsDialog></SaveErrorScope>
   )
 }
 
