@@ -982,7 +982,7 @@ export default function HqBroadcastCreate() {
                 <div className={formStyles.excludeTag}><span className={formStyles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><SaveErrorField names={["excludeTag","exclude_tag"]}><EntityPickerField label="除くタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={excludeTag} onChange={setExcludeTag} clearable placeholder="（除外なし）" disabled={tagStatus !== 'ready' || chosen.length === 0} /></SaveErrorField></div>
                 <div className={formStyles.exclusion}>
                   <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
-                  <small>最近送った人を除く機能は、まだ使えません</small>
+                  <small>現在、最近送った人を除外できません</small>
                 </div>
                 <div className={formStyles.audienceCount} aria-live="polite"><span><Send size={16} aria-hidden /> この条件で送る人数</span><strong>{peopleLabel}</strong></div>
                 {audience !== 'all' && !totals ? <p className="text-xs text-ink-faint">絞った人数は、最終確認でアカウントごとに数えます</p> : null}

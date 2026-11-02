@@ -8,6 +8,7 @@ const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createMenu: vi.fn(), upda
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 
+import * as toast from '@/components/shared/toast'
 import MenuV8 from '@/v8/restaurant/menu/menu'
 import MenuEditV8 from '@/v8/restaurant/menu/edit'
 const nav = vi.hoisted(() => ({ params: new URLSearchParams('id=m1') }))
@@ -63,6 +64,16 @@ describe('MJoJR メニュー管理のV8', () => {
     render(<MenuV8 />)
     await screen.findByText('メニュー一覧')
     expect(screen.getAllByRole('button', { name: '再開' })).toHaveLength(1)
+  })
+
+  it('変更のない編集は保存せず理由を知らせる', async () => {
+    const notice = vi.spyOn(toast, 'notifyToast')
+    render(<MenuEditV8 />)
+    await screen.findByDisplayValue('秋の鹿肉コース')
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    expect(notice).toHaveBeenCalledWith('変更はありません。')
+    expect(fixture.updateMenu).not.toHaveBeenCalled()
+    notice.mockRestore()
   })
 
   it('編集ページ（mauOC）で変えた名前が今の口へ届く', async () => {

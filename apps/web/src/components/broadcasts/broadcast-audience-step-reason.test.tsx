@@ -71,6 +71,6 @@ describe('配信対象の除外（押せない理由の結び付け）', () => {
     const describedId = box!.getAttribute('aria-describedby')
     expect(describedId).toBeTruthy()
     const note = describedId ? host.querySelector(`#${CSS.escape(describedId)}`) : null
-    expect(note?.textContent ?? '').toContain('まだ使えません')
+    expect(note?.textContent ?? '').toContain('最近送った人を除外できません')
   })
 })

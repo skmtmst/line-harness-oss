@@ -80,7 +80,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
     fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
-    fireEvent.click(screen.getByRole('button', { name: /開ける時間と配分を保存/ }))
+    fireEvent.click(screen.getByRole('button', { name: /受付時間と配分を保存/ }))
     await waitFor(() => expect(fixture.saveOpeningHours).toHaveBeenCalled())
     expect(fixture.saveInventoryAllocation).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', otaCapacity: 7, slots: [{ id: 's17', expectedVersion: 3 }, { id: 's19', expectedVersion: 3 }] }))
     expect(fixture.saveOpeningHours).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', expectedVersion: 4 }))
@@ -90,7 +90,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     fixture.saveInventoryAllocation.mockRejectedValue(new ApiError(409, 'conflict'))
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    fireEvent.click(screen.getByRole('button', { name: /開ける時間と配分を保存/ }))
+    fireEvent.click(screen.getByRole('button', { name: /受付時間と配分を保存/ }))
     const band = await screen.findByRole('alert')
     expect(band.textContent).toContain('中川さんが 14:02 に予約枠・在庫を保存しました')
     expect(screen.getByRole('button', { name: /比べてから保存/ })).not.toBeNull()
@@ -156,7 +156,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     }
     const controls = [
       ...screen.getAllByRole('switch'),
-      screen.getByRole('button', { name: /開ける時間と配分を保存/ }),
+      screen.getByRole('button', { name: /受付時間と配分を保存/ }),
       screen.getAllByRole('button', { name: '＋ 時間帯を足す' })[0],
       screen.getByRole('button', { name: '火曜日の1つ目の時間帯を外す' }),
       screen.getByRole('button', { name: 'この時間帯だけ保存' }),
@@ -189,7 +189,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     role.value = verifiedStaffRole(null)
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    const save = screen.getByRole('button', { name: /開ける時間と配分を保存/ }) as HTMLButtonElement
+    const save = screen.getByRole('button', { name: /受付時間と配分を保存/ }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
     expect(save.hasAttribute('data-permission-locked')).toBe(false)
     for (const control of screen.getAllByRole('switch')) {
