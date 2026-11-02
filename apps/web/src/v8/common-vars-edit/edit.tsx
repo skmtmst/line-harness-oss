@@ -444,11 +444,17 @@ function EditCommonVarV8Inner() {
   }
 
   const [statusAction, setStatusAction] = useState<'stop' | 'resume' | 'publish' | null>(null)
+  const [statusScope, setStatusScope] = useState<{ accountId: string; itemId: string; window: object } | null>(null)
+  const statusWindow = useRef<object>({})
+  useEffect(() => { setStatusAction(null); setStatusBusy(false); return () => { statusWindow.current = {} } }, [selectedAccountId])
   const [statusReason, setStatusReason] = useState('')
   const [statusBusy, setStatusBusy] = useState(false)
   const [statusError, setStatusError] = useState('')
 
   const openStatusDialog = (action: 'stop' | 'resume' | 'publish') => {
+    if (!selectedAccountId || !item) return
+    statusWindow.current = {}
+    setStatusScope({ accountId: selectedAccountId, itemId: item.id, window: statusWindow.current })
     setStatusAction(action)
     setStatusReason('')
     setStatusError('')
@@ -456,13 +462,14 @@ function EditCommonVarV8Inner() {
 
   const closeStatusDialog = () => {
     if (statusBusy) return
+    statusWindow.current = {}
     setStatusAction(null)
     setStatusReason('')
     setStatusError('')
   }
 
   const applyStatus = async () => {
-    if (!item || !selectedAccountId || !statusAction) return
+    if (!item || !selectedAccountId || !statusAction || !statusScope || statusScope.accountId !== selectedAccountId || statusScope.itemId !== item.id || latestAccountRef.current !== statusScope.accountId || statusWindow.current !== statusScope.window) return
     const reason = statusReason.trim()
     if (!reason) {
       setStatusError('変える理由を入力してください')
@@ -476,14 +483,16 @@ function EditCommonVarV8Inner() {
         changeReason: reason,
         expectedVersion: item.version,
       })
+      if (latestAccountRef.current !== statusScope.accountId || statusWindow.current !== statusScope.window) return
       if (!res.success) {
         setStatusError(res.error)
         return
       }
-      setStatusAction(null)
+      setStatusBusy(false); statusWindow.current = {}; setStatusAction(null)
       setStatusReason('')
       await load()
     } catch (e) {
+      if (latestAccountRef.current !== statusScope.accountId || statusWindow.current !== statusScope.window) return
       const fieldFailure = saveErrors.capture(e)
 
       { if (!fieldFailure)
@@ -493,7 +502,7 @@ function EditCommonVarV8Inner() {
           : '状態を変えられませんでした。通信を確かめて、もう一度お試しください。',
       ) }
     } finally {
-      setStatusBusy(false)
+      if (latestAccountRef.current === statusScope.accountId && statusWindow.current === statusScope.window) setStatusBusy(false)
     }
   }
 
@@ -818,7 +827,7 @@ function EditCommonVarV8Inner() {
 
       {/* 状態の切替（止める・再開する・公開する）。理由は記録に残すので必須。 */}
       <Dialog
-        open={statusAction !== null}
+        open={statusAction !== null && statusScope?.accountId === selectedAccountId && statusScope.window === statusWindow.current}
         designNode="AYc6O-status"
         title={item && statusAction
           ? `「${item.name}」を${statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}`
@@ -849,6 +858,7 @@ function EditCommonVarV8Inner() {
           </DialogActions>
         }
       >
+        <OperationTargetSummary accounts={[{ id: statusScope?.accountId ?? '' }]} />
         <Field label={<><span className={styles.fieldLabelStrong}>
             {statusAction === 'stop' ? '止める理由（記録に残ります）'
               : statusAction === 'resume' ? '再開する理由（記録に残ります）'
