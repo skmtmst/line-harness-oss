@@ -70,3 +70,21 @@ it('予約後の支払いは既存部品に任せ、空きの案内を見出し�
   expect(screen.getAllByRole('heading')).toHaveLength(1);
   expect(screen.getByRole('heading', { name: '既存の支払い部品' })).toBeTruthy();
 });
+it('取り消し済みの席予約を確定済みと表示しない', async () => {
+  setup(true); mocks.acceptSeatWaitlist.mockResolvedValue({ reservation_id: 'r', status: 'cancelled' }); draw(true);
+  fireEvent.click(await screen.findByRole('button', { name: 'この枠で予約する' }));
+  await screen.findByText(/予約は取り消されています/);
+  expect(screen.queryByText('予約が確定しました。')).toBeNull();
+});
+it('期限切れなら次の日時を選ぶよう案内し、再送を止める', async () => {
+  setup(true); mocks.acceptSeatWaitlist.mockRejectedValue({ body: { error: 'offer_expired' } }); draw(true);
+  fireEvent.click(await screen.findByRole('button', { name: 'この枠で予約する' }));
+  await screen.findByText(/期限が切れました。別の日時/);
+  expect(screen.queryByRole('button', { name: 'この枠で予約する' })).toBeNull();
+});
+it('不明な席予約の状態は確定と断定せず確認先を案内する', async () => {
+  setup(true); mocks.acceptSeatWaitlist.mockResolvedValue({ reservation_id: 'r', status: 'pending' }); draw(true);
+  fireEvent.click(await screen.findByRole('button', { name: 'この枠で予約する' }));
+  await screen.findByText(/予約履歴を確認するか/);
+  expect(screen.queryByText('予約が確定しました。')).toBeNull();
+});
