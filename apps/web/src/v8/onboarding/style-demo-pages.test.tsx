@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { AccountStyle } from '@line-crm/shared'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 import StyleChoiceStep from './style-choice-step'
+import { STYLE_EXPERIENCE_SCRIPT } from './style-experience-player/script'
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/', useSearchParams: () => new URLSearchParams() }))
 beforeEach(() => { setTestReducedMotion(true) })
 afterEach(cleanup)
@@ -194,4 +195,17 @@ it('スタイルを変えると最初のページに戻り、標準ではお知�
   expect(screen.getByText('1 / 5')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'お知らせを作るに進む' }))
   expect(screen.getByRole('heading', { name: 'お知らせを作る' })).toBeTruthy()
+})
+
+it.each(['consult', 'lesson'] as const)('%s の体験台本もお礼の自動送信を断定しない', (style) => {
+  const script = STYLE_EXPERIENCE_SCRIPT.styles[style]
+  const thanks = script.scenes.find(scene => scene.step === 'thanks')
+  expect(thanks?.line).toBe('お礼の文と時刻の見本です（自動で送る機能の有無と条件は確認中です）')
+  expect(script.can[2].text).toContain('お礼を自動で送る機能の有無と条件は確認中です')
+  expect(JSON.stringify(script)).not.toMatch(/翌日にお礼を送れます|面談のお礼を送れます|参加のお礼を送れます/)
+})
+it('サロンの体験台本は翌日を時刻の見本として説明する', () => {
+  const thanks = STYLE_EXPERIENCE_SCRIPT.styles.salon.scenes.find(scene => scene.step === 'thanks')
+  expect(thanks?.line).toBe('来店のお礼の文と翌日の時刻の見本です（送信には設定と承認が必要です）')
+  expect(thanks?.line).not.toContain('翌日にお礼を送れます')
 })

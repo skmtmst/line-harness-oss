@@ -227,7 +227,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
           board: { kind: 'staff-board', data: salonBoard('active', true) },
         },
         {
-          step: 'thanks', ms: 4000, line: '設定すると、翌日にお礼を送れます（初期セットは停止中）',
+          step: 'thanks', ms: 4000, line: '来店のお礼の文と翌日の時刻の見本です（送信には設定と承認が必要です）',
           phone: { part: 'line-talk', data: { caption: '翌日 12:00', messages: [{ from: 'shop', starter: 'reminder-thanks', text: '昨日はありがとうございました。またのお越しをお待ちしています。', time: '12:00' }], richMenu: true } },
           dashboard: { kpis: salonKpis(7, 50, 2), rows: [salonRow({ label: '来店', tone: 'success' })] },
           board: { kind: 'staff-board', data: salonBoard('done', true) },
@@ -241,7 +241,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
       can: [
         { text: 'LINE から面談の予約を受け、オンラインか対面を選べます', basis: 'apps/liff/src/components/online-meeting-card・MeetingModeChoices' },
         { text: '担当ごとの予定と、結果待ちの数を見られます', basis: 'STYLE_DEFAULT_METRIC_IDS.consult.resultPending・StaffBoard' },
-        { text: '前日・当日の案内と面談のお礼を送れます（初期セットでは止めた状態で入ります）', basis: "standardStarter('consult').reminder-*" },
+        { text: '前日・当日の案内と面談のお礼の文を用意できます（お礼を自動で送る機能の有無と条件は確認中です）', basis: "standardStarter('consult').reminder-*" },
       ],
       steps: [{ key: 'reserve', label: '予約' }, { key: 'accept', label: '受付' }, { key: 'remind', label: 'リマインド' }, { key: 'visit', label: '実施' }, { key: 'thanks', label: 'お礼' }],
       scenes: [
@@ -270,7 +270,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
           board: { kind: 'staff-board', data: consultBoard('pending', true) },
         },
         {
-          step: 'thanks', ms: 4000, line: '設定すると、翌日にお礼を送れます（初期セットは停止中）',
+          step: 'thanks', ms: 4000, line: 'お礼の文と時刻の見本です（自動で送る機能の有無と条件は確認中です）',
           phone: { part: 'line-talk', data: { caption: '翌日 12:00', messages: [{ from: 'shop', starter: 'reminder-thanks', text: '昨日はご参加ありがとうございました。ご質問がありましたら、このトークでお知らせください。', time: '12:00' }], richMenu: true } },
           dashboard: { kpis: consultKpis(1, 6, 2), rows: [consultRow({ label: '実施済み', tone: 'success' })] },
           board: { kind: 'staff-board', data: consultBoard('done', true) },
@@ -284,7 +284,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
       can: [
         { text: 'LINE でクラスへのお問い合わせを受けられます', basis: 'apps/liff/src/pages/event・worker event-entitlements' },
         { text: 'クラスの埋まりと出欠待ちを数え、名簿で出席をつけられます', basis: 'STYLE_DEFAULT_METRIC_IDS.lesson.classroomOccupancy・attendancePending・LessonRoster' },
-        { text: 'クラスの前日の案内と参加のお礼を送れます（初期セットでは止めた状態で入ります）', basis: "standardStarter('lesson').reminder-*" },
+        { text: 'クラスの前日の案内と参加のお礼の文を用意できます（お礼を自動で送る機能の有無と条件は確認中です）', basis: "standardStarter('lesson').reminder-*" },
       ],
       steps: [{ key: 'reserve', label: '予約' }, { key: 'accept', label: '受付' }, { key: 'remind', label: 'リマインド' }, { key: 'visit', label: '出席' }, { key: 'thanks', label: 'お礼' }],
       scenes: [
@@ -292,7 +292,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
         { step: 'accept', ms: 3500, line: 'クラスについてのご案内を用意できます', phone: { part: 'line-talk', data: { richMenu: true, caption: '今日', messages: [{ from: 'shop', starter: 'welcome', text: 'こんにちは。レッスンへのお問い合わせありがとうございます。ご希望をお知らせください。', time: '10:00' }] } }, dashboard: { kpis: lessonKpis(2, 80, 2) } },
         { step: 'remind', ms: 3500, line: '設定すると、前日の案内を送れます（初期セットは停止中）', phone: { part: 'line-talk', data: { richMenu: true, caption: '前日 18:00', messages: [{ from: 'shop', starter: 'reminder-day-before', text: '明日のクラスについてご案内します。参加方法は申込内容をご確認ください。', time: '18:00' }] } }, dashboard: { kpis: lessonKpis(2, 80, 2) } },
         { step: 'visit', ms: 3500, line: '出席をつけます', phone: { part: 'line-talk', data: { richMenu: true, caption: '前日 18:00', messages: [{ from: 'shop', starter: 'reminder-day-before', text: '明日のクラスについてご案内します。参加方法は申込内容をご確認ください。', time: '18:00' }] } }, dashboard: { kpis: lessonKpis(1, 80, 2) } },
-        { step: 'thanks', ms: 4000, line: '設定すると、翌日にお礼を送れます（初期セットは停止中）', phone: { part: 'line-talk', data: { richMenu: true, caption: '翌日 12:00', messages: [{ from: 'shop', starter: 'reminder-thanks', text: '昨日はご参加ありがとうございました。ご質問がありましたら、このトークでお知らせください。', time: '12:00' }] } }, dashboard: { kpis: lessonKpis(0, 80, 2) } },
+        { step: 'thanks', ms: 4000, line: 'お礼の文と時刻の見本です（自動で送る機能の有無と条件は確認中です）', phone: { part: 'line-talk', data: { richMenu: true, caption: '翌日 12:00', messages: [{ from: 'shop', starter: 'reminder-thanks', text: '昨日はご参加ありがとうございました。ご質問がありましたら、このトークでお知らせください。', time: '12:00' }] } }, dashboard: { kpis: lessonKpis(0, 80, 2) } },
       ],
       richMenu: menuButtons('lesson'),
     },
