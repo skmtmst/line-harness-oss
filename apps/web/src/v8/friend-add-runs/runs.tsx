@@ -149,11 +149,11 @@ function FriendAddRunsInner() {
   const [csvBusy, setCsvBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [stopBusy, setStopBusy] = useState(false)
-  const [stopTarget, setStopTarget] = useState<{ accountId: string; ruleId: string; generation: number } | null>(null)
+  const [stopTarget, setStopTarget] = useState<{ accountId: string; ruleId: string; ruleName: string; generation: number } | null>(null)
   const [stopError, setStopError] = useState('')
   const [retrying, setRetrying] = useState<string | null>(null)
   const [menuId, setMenuId] = useState<string | null>(null)
-  const [ruleState, setRuleState] = useState<{ status: string; resendSuppressionHours: number | null } | null>(null)
+  const [ruleState, setRuleState] = useState<{ status: string; name: string; generation: number; resendSuppressionHours: number | null } | null>(null)
   const requestSequence = useRef(0)
 
   const load = useCallback(async () => {
@@ -269,22 +269,26 @@ function FriendAddRunsInner() {
   canManageRef.current = canManage
   const alive = useRef(false)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const renderScope = scope.current.generation
   const failedItems = items.filter((item) => item.status === 'failed' || item.status === 'partial_failed')
 
   const loadRuleState = useCallback(async () => {
+    if (renderScope !== scope.current.generation) return
     if (!selectedAccountId || !activeRuleId) {
       setRuleState(null)
       return
     }
     try {
       const detail = await api.friendAddRules.get(selectedAccountId, activeRuleId)
+      if (!alive.current || renderScope !== scope.current.generation) return
       setRuleState(detail.success
-        ? { status: detail.data.rule.status, resendSuppressionHours: detail.data.rule.definition.resendSuppressionHours ?? null }
+        && detail.data.rule.id === activeRuleId && detail.data.rule.accountId === selectedAccountId
+        ? { status: detail.data.rule.status, name: detail.data.rule.name?.trim() ?? '', generation: renderScope, resendSuppressionHours: detail.data.rule.definition.resendSuppressionHours ?? null }
         : null)
     } catch {
-      setRuleState(null)
+      if (alive.current && renderScope === scope.current.generation) setRuleState(null)
     }
-  }, [activeRuleId, selectedAccountId])
+  }, [activeRuleId, selectedAccountId, renderScope])
 
   useEffect(() => { void loadRuleState() }, [loadRuleState])
 
@@ -298,6 +302,11 @@ function FriendAddRunsInner() {
       const detail = await api.friendAddRules.get(target.accountId, target.ruleId)
       if (!current()) return
       if (!detail.success) throw new Error('rule detail missing')
+      if (detail.data.rule.id !== target.ruleId || detail.data.rule.accountId !== target.accountId || detail.data.rule.name?.trim() !== target.ruleName) {
+        setRuleState(null)
+        setStopError('ルールの名前または対象が変わりました。閉じて読み直してください。')
+        return
+      }
       const response = await api.friendAddRules.stop(target.accountId, target.ruleId, detail.data.rule.version)
       if (!current()) return
       if (!response.success) throw new Error('stop failed')
@@ -464,8 +473,8 @@ function FriendAddRunsInner() {
     <DetailPage
       {...head}
       actions={<div className={styles.headActions}>
-        <Button lockedReason={manageReason} onClick={() => { if (!canManage || !selectedAccountId || !activeRuleId) return; setStopError(''); setStopTarget({ accountId: selectedAccountId, ruleId: activeRuleId, generation: scope.current.generation }) }} disabled={!manageReason && (!canManage || !activeRuleId || stopBusy || ruleState?.status === 'paused')}
-            title={!activeRuleId ? '実行結果がまだありません' : undefined}>
+        <Button lockedReason={manageReason} onClick={() => { if (!canManage || !selectedAccountId || !activeRuleId || !ruleState?.name || ruleState.generation !== scope.current.generation) return; setStopError(''); setStopTarget({ accountId: selectedAccountId, ruleId: activeRuleId, ruleName: ruleState.name, generation: scope.current.generation }) }} disabled={!manageReason && (!canManage || !activeRuleId || !ruleState?.name || ruleState.generation !== scope.current.generation || stopBusy || ruleState.status === 'paused')}
+            title={!activeRuleId ? '実行結果がまだありません' : !ruleState?.name || ruleState.generation !== scope.current.generation ? '停止するルール名を確認できません。読み直してください。' : undefined}>
             <Pause size={16} aria-hidden="true" />一時停止する
           </Button>
         <Button href="/friend-add-settings">
@@ -612,9 +621,9 @@ function FriendAddRunsInner() {
         confirmLabel="止める"
         busy={stopBusy}
         error={stopError || undefined}
-        onCancel={() => { if (!stopBusy) setStopTarget(null) }}
+        onCancel={() => { if (!stopBusy) { setStopTarget(null); if (!ruleState) void loadRuleState() } }}
         onConfirm={() => stopDelivery()}
-      >{stopTarget ? <OperationTargetSummary accounts={[{ id: stopTarget.accountId }]} /> : null}</ConfirmDialog>
+      >{stopTarget ? <OperationTargetSummary accounts={[{ id: stopTarget.accountId }]} externalTarget={{ label: '止めるルール', name: stopTarget.ruleName }} /> : null}</ConfirmDialog>
     </DetailPage>
   )
 }

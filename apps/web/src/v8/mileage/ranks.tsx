@@ -85,6 +85,8 @@ export default function RanksTab() {
   const loadedScope = useRef(-1)
   const readonlyRef = useRef(readonly)
   readonlyRef.current = readonly
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const [operationAccount, setOperationAccount] = useState<{ id: string; generation: number } | null>(null)
   const accountName = (selectedAccount?.id === accountId ? selectedAccount.name : accounts?.find(account => account.id === accountId)?.name)?.trim() || "店名未取得"
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -103,10 +105,11 @@ export default function RanksTab() {
   const [sample, setSample] = useState<'up' | 'down'>('up')
   const [menuIndex, setMenuIndex] = useState<number | null>(null)
 
+  const renderScope = scope.current.generation
   const load = useCallback(async () => {
-    if (!accountId) return
+    if (!accountId || accountId !== scope.current.id || renderScope !== scope.current.generation) return
     const request=++loadEpoch.current
-    const requestScope = scope.current.generation
+    const requestScope = renderScope
     setStatus('loading');setProgramAccountId(null);setPreview(null)
     try {
       const response = await memberRanksApi.program(accountId)
@@ -116,15 +119,16 @@ export default function RanksTab() {
       setProgram(response.data);setProgramAccountId(accountId);loadedScope.current = requestScope
       setStatus('ready')
       const counts = await memberRanksApi.preview(accountId).catch(() => null)
-      if(request===loadEpoch.current)setPreview(counts && counts.success ? counts.data : null)
+      if(request===loadEpoch.current && requestScope===scope.current.generation)setPreview(counts && counts.success ? counts.data : null)
     } catch (reason) {
-      if(request!==loadEpoch.current)return
+      if(request!==loadEpoch.current || requestScope!==scope.current.generation)return
       setError(reason)
       setStatus('error')
     }
-  }, [accountId])
+  }, [accountId, renderScope])
 
   useEffect(() => { void load();return()=>{loadEpoch.current++} }, [load])
+  useEffect(() => { setDeleteId(null); setConfirm(null); setOperationAccount(null) }, [accountId])
 
   const tiers = useMemo(() => program?.tiers ?? [], [program])
   const editingIndex = edit?.id ? tiers.findIndex(tier => tier.id === edit.id) : -1
@@ -132,22 +136,25 @@ export default function RanksTab() {
 
   const run = async (doing: string, action: () => Promise<{ success: boolean }>, done: string) => {
     if (mutation.current || reviewRequired || readonly || status !== 'ready') return false
+    const operationScope = scope.current.generation
     mutation.current = true
     setBusy(true)
     setNotice('')
     try {
       const response = await action()
+      if (!alive.current || operationScope !== scope.current.generation) return false
       if (!response.success) throw new Error('failed')
       notifySaved(done)
       void load()
       return true
     } catch (reason) {
+      if (!alive.current || operationScope !== scope.current.generation) return false
       setNotice(failureText(reason, doing))
       const needsReview = !(reason instanceof ApiError) || reason.status === 409 || reason.status >= 500
       setReviewRequired(needsReview)
       return false
     } finally {
-      mutation.current = false; setBusy(false)
+      mutation.current = false; if (alive.current) setBusy(false)
     }
   }
 
