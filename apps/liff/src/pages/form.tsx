@@ -375,6 +375,7 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
    * 終わり画面に直し方と送り直しを出す（回答自体は保存済みと伝える）。
    */
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [courseRefresh, setCourseRefresh] = useState(0);
   const [bookingRetrying, setBookingRetrying] = useState(false);
   /** 確保できた予約 (終わりの画面の一文「次回のご予約（10月14日 13:00）は…」に使う)。 */
   const [booked, setBooked] = useState<Array<{ startsAt: string; status: string }>>([]);
@@ -451,6 +452,12 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
         trackedLinkId: search.get('ref') ?? undefined,
       }, current, testToken ?? undefined);
       if (!request.isCurrent(generation)) return;
+      if (attempt.status === 409 && attempt.body?.code === 'restaurant_course_unavailable') {
+        setIdemKey(crypto.randomUUID());
+        setCourseRefresh(n => n + 1);
+        setError('選んだメニューが見つかりません。メニューを選び直してください。');
+        return;
+      }
       const decision = decideFormSubmitStep(attempt);
       if (decision.action === 'done') {
         // 回答の保存後に予約を確保する。予約だけ失敗しても回答は残す。
@@ -662,6 +669,7 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
       choiceAvailability={block.kind === 'input' ? form.availability?.choices[block.name] : undefined}
       routed={routed}
       onRoutedEmpty={setRoutedEmpty}
+      courseRefresh={courseRefresh}
     />
   );
 
@@ -800,7 +808,7 @@ function toAddressDraft(value: unknown): AddressDraft {
  * 予約の受け口で確保する（枠の再確認と重なり防止はそちらが担う）。
  */
 export type RoutedState = { status: 'loading' } | { status: 'error'; retry: () => void } | { status: 'ready'; target: RoutedTarget };
-export function BookingSlotPicker(props: {block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void;/** 答えで行き先が決まるフォーム（B6）。 */ routed?:RoutedState;onRoutedEmpty?:(empty:boolean)=>void}) {
+export function BookingSlotPicker(props: {block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void;/** 答えで行き先が決まるフォーム（B6）。 */ routed?:RoutedState;onRoutedEmpty?:(empty:boolean)=>void;courseRefresh?:number}) {
   return props.block.booking?.kind==='seats' ? <SeatBookingBlock {...props} /> : <PeopleBookingSlotPicker {...props} />;
 }
 
@@ -1026,7 +1034,9 @@ function BlockView({
   choiceAvailability,
   routed,
   onRoutedEmpty,
+  courseRefresh,
 }: {
+  courseRefresh?: number;
   routed?: RoutedState;
   onRoutedEmpty?: (empty: boolean) => void;
   block: FormBlock;
@@ -1319,6 +1329,7 @@ function BlockView({
             value={value}
             routed={routed}
             onRoutedEmpty={onRoutedEmpty}
+            courseRefresh={courseRefresh}
             onChange={(next) => onChange(block.name, next)}
           />
         )}

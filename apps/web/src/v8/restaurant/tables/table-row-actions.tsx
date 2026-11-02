@@ -1,13 +1,14 @@
 import { RowActions } from '@/components/shared/row-actions'
 import type { RestaurantTable } from '@/lib/restaurant-test-api'
 
-export default function TableRowActions({ table, canEdit, busy, onEdit, onStop, onResume }: {
+export default function TableRowActions({ table, canEdit, busy, onEdit, onStop, onResume, onDelete }: {
   table: RestaurantTable
   canEdit: boolean
   busy: boolean
   onEdit: (table: RestaurantTable) => void
   onStop: (table: RestaurantTable) => void
   onResume: (table: RestaurantTable) => void
+  onDelete: (table: RestaurantTable) => void
 }) {
   if (!canEdit) return null
   return <RowActions subjectName={`${table.code}・${table.label}`}
@@ -19,5 +20,5 @@ export default function TableRowActions({ table, canEdit, busy, onEdit, onStop, 
       disabled: busy,
       disabledReason: busy ? 'ほかの変更を反映しています' : undefined,
       onSelect: () => table.is_active ? onStop(table) : onResume(table),
-    }]} />
+    }, { id: 'delete', label: '削除', tone: 'danger', disabled: busy, disabledReason: busy ? 'ほかの変更を反映しています' : undefined, onSelect: () => onDelete(table) }]} />
 }

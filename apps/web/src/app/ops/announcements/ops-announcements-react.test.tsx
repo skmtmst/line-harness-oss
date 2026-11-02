@@ -140,14 +140,11 @@ async function flush() {
 const button = (label: string) =>
   Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === label)
 
-/** 型の決まりで頭のメニューへ移る［下書きを保存する］を押す。 */
+/** 下の帯の［下書きを保存する］を押す。 */
 async function clickDraftSave() {
-  const trigger = document.querySelector<HTMLButtonElement>('button[aria-label="作成・編集のその他の操作"]')
-  expect(trigger).not.toBeNull()
-  await act(async () => { trigger!.click() })
-  const item = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((el) => el.textContent?.includes('下書きを保存する'))
+  const item = button('下書きを保存する')
   expect(item).toBeTruthy()
-  await act(async () => { (item!.querySelector('button') ?? item!).click() })
+  await act(async () => { item!.click() })
   await flush()
 }
 const setValue = (el: HTMLInputElement | HTMLTextAreaElement, value: string) => {
@@ -418,10 +415,7 @@ describe('作る画面', () => {
     await flush()
     expect(button('今すぐ送る')?.getAttribute('aria-disabled')).toBe('true')
     expect(document.querySelector<HTMLFieldSetElement>('fieldset[aria-label="お知らせの入力"]')!.disabled).toBe(true)
-    // 下書き保存は頭のメニューの中で押せない形＋理由。
-    const trigger = document.querySelector<HTMLButtonElement>('button[aria-label="作成・編集のその他の操作"]')
-    await act(async () => { trigger!.click() })
-    const item = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((el) => el.textContent?.includes('下書きを保存する'))
+    const item = button('下書きを保存する')
     expect(item?.getAttribute('aria-disabled')).toBe('true')
     expect(item?.hasAttribute('data-permission-locked')).toBe(true)
   })

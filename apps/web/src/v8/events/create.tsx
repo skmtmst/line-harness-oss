@@ -114,6 +114,7 @@ function EventsCreateV8Inner() {
   const [questions, setQuestions] = useState<QuestionDraft[]>([])
   const [adding, setAdding] = useState<QuestionDraft | null>(null)
   const [saving, setSaving] = useState(false)
+  const [savingPublished, setSavingPublished] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const focusTarget = useRef<string | null>(null)
@@ -184,6 +185,7 @@ function EventsCreateV8Inner() {
     if (!selectedAccountId || unknownCreateRef.current.has(selectedAccountId) || !validateInput()) return
     if (!feedback.begin('イベント')) return
     retryPublish.current = publish
+    setSavingPublished(publish)
     setSaving(true)
     setError(null)
     let saved = createdRef.current?.accountId === selectedAccountId ? createdRef.current.event : null
@@ -308,8 +310,8 @@ function EventsCreateV8Inner() {
       footerActions={(
         <>
           <Button href="/events">キャンセル</Button>
-          <Button disabled={saving || !selectedAccountId || createUnknown} busy={saving} onClick={() => void save(false)}>下書きを保存</Button>
-          <Button variant="primary" disabled={saving || !selectedAccountId || createUnknown} busy={saving} onClick={() => { if (validateInput()) setPublishOpen(true) }}><Globe size={16} aria-hidden="true" />公開する</Button>
+          <Button disabled={saving || !selectedAccountId || createUnknown} busy={saving && !savingPublished} onClick={() => void save(false)}>下書きを保存</Button>
+          <Button variant="primary" disabled={saving || !selectedAccountId || createUnknown} busy={saving && savingPublished} onClick={() => { if (validateInput()) setPublishOpen(true) }}><Globe size={16} aria-hidden="true" />公開する</Button>
         </>
       )} dirty={false}
     >

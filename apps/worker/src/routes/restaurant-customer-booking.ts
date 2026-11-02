@@ -186,7 +186,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
     Math.min(Date.now() + result.holdMinutes * 60000, Date.parse(startsAt)),
   ).toISOString();
   if(old){
-    const refreshed=await db.prepare(`UPDATE rt_reservations SET starts_at=?,ends_at=?,table_id=?,hold_expires_at=?,customer_version=customer_version+1,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status='pending' AND julianday(hold_expires_at)<=julianday('now') AND EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`).bind(startsAt,slot.endsAt,assignedTable.id,expires,old.id,old.customer_version,store.id,result.hoursVersion,body.courseId||null,body.courseId||null,store.id,course?.durationMinutes??null).run();
+    const refreshed=await db.prepare(`UPDATE rt_reservations SET starts_at=?,ends_at=?,table_id=?,hold_expires_at=?,customer_version=customer_version+1,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status='pending' AND julianday(hold_expires_at)<=julianday('now') AND EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?)) AND EXISTS(SELECT 1 FROM rt_tables WHERE id=? AND store_id=? AND is_active=1)`).bind(startsAt,slot.endsAt,assignedTable.id,expires,old.id,old.customer_version,store.id,result.hoursVersion,body.courseId||null,body.courseId||null,store.id,course?.durationMinutes??null,assignedTable.id,store.id).run();
     if(!refreshed.meta.changes)return liffBookingJson(c, {success:false,error:'version_conflict'},409);
     const row=await db.prepare('SELECT *,NULL seat_type FROM rt_reservations WHERE id=?').bind(old.id).first<CustomerReservationRow>();
     return liffBookingJson(c, {success:true,data:customerBooking(row!)});
@@ -194,7 +194,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
   // 営業時間を読んだ版と同じときだけ作る。席・本人・残枠はDBトリガーでも守る。
   await db
     .prepare(
-      `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone,course_id,allergy_note) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`,
+      `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone,course_id,allergy_note) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?)) AND EXISTS(SELECT 1 FROM rt_tables WHERE id=? AND store_id=? AND is_active=1)`,
     )
     .bind(
       id,
@@ -215,6 +215,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       store.id,
       result.hoursVersion,
       body.courseId || null, body.courseId || null, store.id, course?.durationMinutes ?? null,
+      assignedTable.id, store.id,
     )
     .run();
   const saved = await db

@@ -1,6 +1,8 @@
 'use client'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
+import { phoneReservationFailure } from './phone-error'
+import { useStaffRole } from '@/lib/staff-role'
 import { notifySaved } from '@/components/shared/toast'
 import { type ComponentProps, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
@@ -116,7 +118,9 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, readOnly, readOnlyNeed, children, renderPage }: {
+export default function RestaurantShell({ initialStoreId = '', boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, readOnly, readOnlyNeed, children, renderPage }: {
+  /** 指定店が存在しない場合は別の店へ切り替えない。 */
+  initialStoreId?: string
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
@@ -158,8 +162,9 @@ export default function RestaurantShell({ boardId, title, description, explanati
   usePageTitle(title)
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId } = useAccount()
+  const role = useStaffRole()
   const [snapshot, setSnapshot] = useState<RestaurantSnapshot | null>(null)
-  const [selectedStoreId, setSelectedStoreId] = useState('')
+  const [selectedStoreId, setSelectedStoreId] = useState(initialStoreId)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
@@ -184,7 +189,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
       setSavedButUnread(false)
       setSelectedStoreId((current) => (res.data.stores.some((item) => item.id === current)
         ? current
-        : res.data.stores[0]?.id || ''))
+        : initialStoreId ? current || initialStoreId : res.data.stores[0]?.id || ''))
       return true
     } catch (caught) {
       if (ticket !== latest.current) return false
@@ -193,7 +198,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
     } finally {
       if (ticket === latest.current) setLoading(false)
     }
-  }, [selectedAccountId, query, begin, accept])
+  }, [selectedAccountId, query, begin, accept, initialStoreId])
   useEffect(() => { void load() }, [load])
 
   const mutate = useCallback(async (action: () => Promise<unknown>, success: string, options?: { rethrow: (error: unknown) => boolean }) => {
@@ -209,19 +214,20 @@ export default function RestaurantShell({ boardId, title, description, explanati
       if (error instanceof QuietError) { setNotice(null); return false }
       setNotice({
         tone: 'error',
-        text: describeApiFailure(error, '保存'),
+        text: phoneReservationFailure(error, role) || describeApiFailure(error, '保存'),
       })
       return false
     } finally {
       setBusy(false)
     }
-  }, [load])
+  }, [load, role])
 
   const store = useMemo(
     () => (selectedStoreId ? snapshot?.stores.find((item) => item.id === selectedStoreId) || null : null),
     [snapshot, selectedStoreId],
   )
-  const ctx: RestaurantV8Context | null = snapshot?.organization
+  const missingRequestedStore = Boolean(snapshot && initialStoreId && selectedStoreId && !store)
+  const ctx: RestaurantV8Context | null = snapshot?.organization && !missingRequestedStore
     ? { tableDefinition, data: snapshot, store, selectedStoreId, busy, mutate, reload: async () => { await load() } }
     : null
 
@@ -229,6 +235,8 @@ export default function RestaurantShell({ boardId, title, description, explanati
     <div className={styles.panel}><div className={styles.stateBox}><ListState kind="loading" /></div></div>
   ) : loadError !== null && !snapshot?.organization ? (
     <ListState kind="error" error={loadError} onRetry={() => void load()} />
+  ) : missingRequestedStore ? (
+    <ListState kind="empty" title="指定された店舗を確認できません" description="アカウントと店舗を確かめて、もう一度開いてください。" />
   ) : !ctx ? (
     <EmptySetup />
   ) : (

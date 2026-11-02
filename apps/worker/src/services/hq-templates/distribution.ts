@@ -16,7 +16,7 @@ import { templateContentSummary } from './list-display.js';
 import { captureDistributionName, targetDistributionVersion } from './distribution-display.js';
 import { parseScenarioDefinition, scenarioSnapshot, inspectScenario, planScenario } from './scenario.js';
 import {
-  beginHqTemplateDistributionRun, getHqTemplate, listHqTemplateDisplaySources, HQ_TEMPLATE_TYPES,
+  beginHqTemplateDistributionRun, getHqTemplate, listHqTemplateDisplaySources, HQ_TEMPLATE_TYPES, validRestaurantCoursesSql,
   type HqTemplate, type HqTemplatePreflight, type HqTemplatePreflightResolution,
   type HqTemplateDistributionResult, type HqTemplateStatement, type HqTemplateType,
 } from '@line-crm/db';
@@ -103,11 +103,16 @@ export async function saveTemplate(db: D1Database, authority: HqTemplateAuthorit
   else statements.push(
     { sql: `INSERT INTO operation_request_receipts(action,actor_id,idempotency_key,request_hash,resource_id,created_at) VALUES ('hq_template.create',?,?,?,?,?)`, bindings: [`tenant:${authority.tenantId}`, requestId!, requestHash, templateId, createdAt] },
     { sql: `INSERT INTO hq_templates(id,tenant_id,template_type,extended_type,friend_attribute_type,delivery_type,catalog_type,name,description,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, bindings: [templateId, authority.tenantId, (type === 'scenario' || isDeliveryType(String(type)) || isCatalogType(String(type))) ? 'template' : type === 'friend_field' || type === 'mark' ? 'tag' : type as HqTemplateType, type === 'scenario' ? 'scenario' : null, type === 'friend_field' || type === 'mark' ? type : null, isDeliveryType(String(type))?String(type):null, isCatalogType(String(type))?String(type):null, name, description, authority.actorId, createdAt, createdAt] });
+  if (type === 'form') statements.push(guard(validRestaurantCoursesSql, [json, null]));
   statements.push({ sql: `INSERT INTO hq_template_versions(id,tenant_id,template_id,version,definition_json,content_hash,created_by,created_at) VALUES (?,?,?,(SELECT COALESCE(MAX(version),0)+1 FROM hq_template_versions WHERE tenant_id=? AND template_id=?),?,?,?,?)`, bindings: [versionId, authority.tenantId, templateId, authority.tenantId, templateId, json, await digest(json), authority.actorId, createdAt] });
   statements.push({ sql: `UPDATE hq_templates SET name=?,description=?,current_version_id=?,revision=revision+1,updated_at=? WHERE id=? AND tenant_id=?`, bindings: [name, description, versionId, createdAt, templateId, authority.tenantId] }, audit(authority, current ? 'edited' : 'created', templateId));
   statements.push({ sql: 'UPDATE hq_templates SET folder_id=? WHERE id=? AND tenant_id=?', bindings: [folderId as string | null, templateId, authority.tenantId] });
   try { await batch(db, statements); }
   catch {
+    if (type === 'form') {
+      const valid = await db.prepare(`SELECT ${validRestaurantCoursesSql} AS valid`).bind(json, null).first<{valid:number}>();
+      if (!valid?.valid) throw new HqTemplateError('restaurant_course_unavailable', 409);
+    }
     if (requestId) {
       const replay = await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description, body.folderId as string | null ?? null);
       if (replay) return replay;

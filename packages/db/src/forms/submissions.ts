@@ -1,6 +1,7 @@
 import type { FormSubmission, FormDestinationWriteStatus } from '../form-submission-types.js';
 import { type FormSubmissionPeriod, submissionPeriodSql } from '../form-submission-period.js';
 import { sqlIdSet } from '../id-queries.js';
+import { validRestaurantCoursesSql } from './course-guard.js';
 import { boundedListLimit, jstNow, MAX_LIST_LIMIT } from '../utils.js';
 import { type FormSubmissionPage, type FriendFormSubmission, type CreateFormSubmissionInput, type FormDestinationWriteResult } from './types.js';
 
@@ -180,9 +181,10 @@ export async function insertFormSubmissionRecord(
         SELECT ?, ?, ?, ?, ?, ?, 'pending', ?
         WHERE (SELECT COUNT(*) FROM form_submission_files f JOIN media_file_scans s ON s.id = f.scan_id
           WHERE f.id IN (${placeholders}) AND f.friend_id = ? AND f.form_id = ? AND f.submission_id IS NULL
-            AND f.deleted_at IS NULL AND (f.expires_at IS NULL OR julianday(f.expires_at) > julianday(?)) AND s.status = 'clean') = ?`)
+            AND f.deleted_at IS NULL AND (f.expires_at IS NULL OR julianday(f.expires_at) > julianday(?)) AND s.status = 'clean') = ?
+          AND ${validRestaurantCoursesSql}`)
         .bind(id, input.formId, input.friendId ?? null, input.formVersionId ?? null, input.isTest ? 1 : 0, input.data, now,
-          ...sqlIdSet(fileIds).binds, input.friendId ?? null, input.formId, now, fileIds.length),
+          ...sqlIdSet(fileIds).binds, input.friendId ?? null, input.formId, now, fileIds.length, input.data, null),
       db.prepare(`UPDATE form_submission_files SET submission_id = ? WHERE id IN (${placeholders}) AND submission_id IS NULL
         AND EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
         .bind(id, ...(fileIds.length ? sqlIdSet(fileIds).binds : []), id),
@@ -192,18 +194,24 @@ export async function insertFormSubmissionRecord(
         AND NOT EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
         .bind(input.formId, id, id),
     ]);
-    if (results[0].meta.changes !== 1 || results[1].meta.changes !== fileIds.length) throw new Error('document_attachment_conflict');
+    if (results[0].meta.changes !== 1) {
+      const valid = await db.prepare(`SELECT ${validRestaurantCoursesSql} AS valid`).bind(input.data,null).first<{valid:number}>();
+      if (!valid?.valid) throw new Error('restaurant_course_unavailable');
+      throw new Error('document_attachment_conflict');
+    }
+    if (results[1].meta.changes !== fileIds.length) throw new Error('document_attachment_conflict');
     return (await db.prepare('SELECT * FROM form_submissions WHERE id = ?').bind(id).first<FormSubmission>())!;
   }
 
-  await db
+  const inserted = await db
     .prepare(
       `INSERT INTO form_submissions
          (id, form_id, friend_id, form_version_id, is_test, data, destination_write_status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, 'pending', ? WHERE ${validRestaurantCoursesSql}`,
     )
-    .bind(id, input.formId, input.friendId ?? null, input.formVersionId ?? null, input.isTest ? 1 : 0, input.data, now)
+    .bind(id, input.formId, input.friendId ?? null, input.formVersionId ?? null, input.isTest ? 1 : 0, input.data, now, input.data, null)
     .run();
+  if (!inserted.meta.changes) throw new Error('restaurant_course_unavailable');
 
   return (await db
     .prepare(`SELECT * FROM form_submissions WHERE id = ?`)

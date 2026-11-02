@@ -46,6 +46,6 @@ export function normalizeProgressActionArrows(node: ReactNode): ReactNode {
 export function splitFormActions(children: ReactNode) {
   const nodes = headingActionNodes(children)
   const secondary = nodes.filter((node): node is ReactElement<ButtonProps> => isValidElement<ButtonProps>(node) && node.type === Button
-    && node.props.variant !== 'primary' && !/danger/.test(node.props.variant ?? '') && /複製|下書き.*保存|続けて作る/.test(actionLabel(node.props.children)))
+    && node.props.variant !== 'primary' && !/danger/.test(node.props.variant ?? '') && /複製|続けて作る/.test(actionLabel(node.props.children)))
   return { secondary, main: nodes.filter(node => !secondary.includes(node as ReactElement<ButtonProps>)) }
 }

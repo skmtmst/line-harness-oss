@@ -1,3 +1,4 @@
+import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { RESERVATION_FILTER_STATUSES } from './restaurant-reservation-filter.js';
@@ -109,6 +110,10 @@ export const post__api_restaurant_test_reservations_manual_3 = async (c: Context
   if (!storeId || !await storeBelongsTo(c, organization.id, storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
   const checked = validateInboundReservation({ ...body, externalId: `manual-${crypto.randomUUID()}` });
   if (!checked.ok) return inputError(c, { success: false, error: checked.error, field: checked.field }, 400, []);
+  if (body.source === 'phone') {
+    const failure = await phoneIntakeFailure(dbFor(c.env, storeId), storeId, checked.value.startsAt);
+    if (failure) return c.json({ success: false, code: failure, error: failure }, 409);
+  }
   await expireRestaurantHolds(dbFor(c.env, storeId), undefined, storeId);
   const lockKey = `reservation:${storeId}`;
   const lockOwner = crypto.randomUUID();

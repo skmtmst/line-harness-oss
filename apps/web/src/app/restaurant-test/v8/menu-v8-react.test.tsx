@@ -52,9 +52,9 @@ describe('MJoJR メニュー管理のV8', () => {
       expect(board.textContent).toContain(label)
     }
     expect(board.textContent).not.toContain('要承認')
-    expect(board.textContent).not.toContain('「…」の中身')
+    expect(board.textContent).not.toContain('参照中のメニューは削除できません')
     fireEvent.click(screen.getByRole('button', { name: 'メニュー一覧の説明' }))
-    expect(await screen.findByText(/「…」の中身/)).toBeTruthy()
+    expect(await screen.findByText(/参照中のメニューは削除できません/)).toBeTruthy()
     expect(board.textContent).toContain('秋の鹿肉コース')
     expect(board.textContent).toContain('ランチ・ディナー')
   })

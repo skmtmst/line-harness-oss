@@ -5,6 +5,7 @@ import { getFormById, attachFormAccounts } from './reads.js';
 import { publishFormVersion } from './versions.js';
 import { formMediaUsageStatements } from './media-references.js';
 
+import { validRestaurantCoursesSql } from './course-guard.js';
 
 /**
  * 削除・保管の直前に読む影響。回答と利用先を**同じ時点の版**に結びつける。
@@ -172,7 +173,7 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
           save_to_metadata, is_active, submit_count,
           og_title, og_description, og_image_url,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ? WHERE ${validRestaurantCoursesSql}`,
       )
       .bind(
         id,
@@ -193,8 +194,10 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
         input.ogImageUrl ?? null,
         now,
         now,
+        input.fields,
+        input.layout ?? null,
       );
-    await insert.run();
+    if (!(await insert.run()).meta.changes) throw new Error('restaurant_course_unavailable');
 
     await attachFormAccounts(db, id, input.lineAccountIds ?? []);
     if (input.isActive !== false) {
@@ -249,7 +252,7 @@ export async function updateForm(
            updated_at = ?,
            revision = revision + 1,
            content_revision = content_revision + 1
-       WHERE id = ? AND content_revision = ?`,
+       WHERE id = ? AND content_revision = ? AND ${validRestaurantCoursesSql}`,
     )
     .bind(
       'folderId' in input ? 1 : 0,
@@ -289,6 +292,8 @@ export async function updateForm(
       now,
       id,
       expectedContentRevision,
+      input.fields ?? existing.fields,
+      'layout' in input ? (input.layout ?? null) : existing.layout,
     );
 
   const result=actorId?(await db.batch([update,db.prepare(`INSERT INTO audit_events(id,source_kind,source_id,tenant_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json,created_at)
@@ -296,6 +301,9 @@ export async function updateForm(
     .bind(crypto.randomUUID(),JSON.stringify([id,expectedContentRevision+1]),id,expectedContentRevision+1,now,actorId), ...formMediaUsageStatements(db, id)]))[0]:(await db.batch([update, ...formMediaUsageStatements(db, id)]))[0];
 
   if ((result.meta?.changes ?? 0) !== 1) {
+    const valid = await db.prepare(`SELECT ${validRestaurantCoursesSql} AS valid`)
+      .bind(input.fields ?? existing.fields, 'layout' in input ? (input.layout ?? null) : existing.layout).first<{valid:number}>();
+    if (!valid?.valid) return {kind:'restaurant_course_unavailable'};
     const latest = await getFormById(db, id);
     // 版が合わなかったのか、そのあいだに消えたのかを分ける。
     return latest ? { kind: 'conflict', form: latest } : { kind: 'not_found' };
