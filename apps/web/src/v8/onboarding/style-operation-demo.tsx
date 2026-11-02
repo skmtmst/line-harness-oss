@@ -246,6 +246,39 @@ export function LessonAfterDemo() {
   </section>
 }
 
+/**
+ * 標準の問い合わせ後の見本の値。返事の送信は行わず、下書きの見本だけを示す。
+ * 実データの読み書き・送信はしない。
+ */
+const STANDARD_AFTER_SAMPLE = {
+  inbox: { unreplied: 2, latest: { name: '見本 さくら', topic: '見学のご相談' } },
+  reply: { text: 'お問い合わせありがとうございます。担当者からご返事します。' },
+}
+
+/** 標準4ページ目「問い合わせのあとも、つながりが続く」の静止見本。保存・送信はしない。 */
+export function StandardAfterDemo() {
+  return <section aria-label="問い合わせのあとの見本">
+    <p className={styles.note}>画面と操作の見本です。実際の設定は変わりません。</p>
+    <Card layout="vertical" padding="default" gap="normal" aria-label="問い合わせのあと">
+      <strong>問い合わせのあと（見本）</strong>
+      <section aria-label="受信箱の見本">
+        <p className={styles.description}>受信箱・未返信 {STANDARD_AFTER_SAMPLE.inbox.unreplied}件</p>
+        <ul className={styles.can}>
+          <li>
+            <StatusBadge tone="caution">未返信</StatusBadge>
+            <span>{STANDARD_AFTER_SAMPLE.inbox.latest.name} さま・{STANDARD_AFTER_SAMPLE.inbox.latest.topic}</span>
+          </li>
+        </ul>
+      </section>
+      <section aria-label="返事の下書きの見本">
+        <p className={styles.description}>返事の下書き（送信しません）</p>
+        <p className={styles.description}>{STANDARD_AFTER_SAMPLE.reply.text}</p>
+      </section>
+      <p className={styles.note}>名前・数は架空です。見本のため実際の設定は変わらず、何も送信しません。</p>
+    </Card>
+  </section>
+}
+
 /** EC3ページ目「商品の案内を用意する」の静止見本。保存・送信はしない。 */
 export function EcOperationDemo() {
   return <section aria-label="商品の案内の見本">
