@@ -454,10 +454,10 @@ const { syncResumeUrl, bindAccountDraft, captureFormSnapshot, resumeBase } = use
 
   useEffect(() => { setInputError(null) }, [eventType, triggerConfig])
 
-  const validate = (): string | null => {
+  const validate = (forPublish = true): string | null => {
     setError('')
     setInputError(null)
-    const problem = validateAutomationInput({ name, eventType, triggerConfig, conditionUnreadable, actions })
+    const problem = validateAutomationInput({ name, eventType, triggerConfig, conditionUnreadable, actions, forPublish })
     if (!problem) return null
     if (problem.actionKey !== undefined) setEditingActionKey(problem.actionKey)
     setInputError({ target: problem.target, message: problem.message })

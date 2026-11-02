@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const createDraft = vi.hoisted(() => vi.fn())
+const updateDraft = vi.hoisted(() => vi.fn())
 const resources = vi.hoisted(() => vi.fn())
 const getDraft = vi.hoisted(() => vi.fn())
 const summaries = vi.hoisted(() => vi.fn())
@@ -25,6 +26,7 @@ vi.mock('@/lib/api', async importOriginal => {
   return { ...actual, api: { ...actual.api, automations: {
     ...actual.api.automations,
     createDraftFromTemplate: createDraft,
+    updateDraft,
     list: listExisting,
     draftResources: resources,
     getDraft,
@@ -55,7 +57,7 @@ it('名前の誤りは欄だけに出し、処理の誤りは設定を開いて�
   expect(createDraft).not.toHaveBeenCalled()
 
   fireEvent.change(name, { target: { value: '予約のお礼' } })
-  fireEvent.click(getPageAction({ name: '下書きを保存' }))
+  fireEvent.click(screen.getByRole('button', { name: 'つくって動かす', exact: true }))
   const tag = await screen.findByRole('button', { name: '自動化で付けるタグ：選ぶ' })
   await waitFor(() => expect(document.activeElement).toBe(tag))
   expect(tag.getAttribute('aria-invalid')).toBe('true')
@@ -223,4 +225,16 @@ it('題は機能名を入れた「オートメーションを作る」（自動�
   render(<NewAutomationV8 />)
   expect(screen.getByRole('heading', { name: 'オートメーションを作る', level: 1 })).toBeTruthy()
   expect(screen.queryByRole('heading', { name: 'ルールを作る', level: 1 })).toBeNull()
+})
+
+
+it('タグ未選択の途中でも下書きだけ保存できる', async () => {
+  createDraft.mockResolvedValueOnce({ success: true, data: { id: 'draft-partial', draftVersionId: 'v1' } })
+  updateDraft.mockResolvedValueOnce({ success: true, data: { draftVersionId: 'v2' } })
+  getDraft.mockImplementationOnce(() => new Promise(() => {}))
+  render(<NewAutomationV8 />)
+  fireEvent.change(screen.getByRole('textbox', { name: '名前', exact: true }), { target: { value: '途中の下書き' } })
+  fireEvent.click(getPageAction({ name: '下書きを保存' }))
+  await waitFor(() => expect(updateDraft).toHaveBeenCalledWith('draft-partial', 'account', expect.objectContaining({ actions: [expect.objectContaining({ type: 'add_tag', params: expect.objectContaining({ tagId: '' }) })] })))
+  expect(screen.queryByRole('dialog', { name: 'この内容で動かし始めますか' })).toBeNull()
 })
