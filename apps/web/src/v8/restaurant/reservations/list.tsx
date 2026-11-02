@@ -94,7 +94,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
   const cancelledGuests = rows.filter((item) => INACTIVE_STATUSES.includes(item.status)).reduce((sum, item) => sum + item.guest_count, 0)
   const lineCount = live.filter((item) => item.source === 'line').length
   const mediaCount = live.filter((item) => sourceKind(item.source) === 'media' || item.source === 'restaurant_board').length
-  const unseated = live.filter((item) => !item.table_id).length
+  const unseated = live.filter((item) => !item.departed_at && seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.length === 0).length
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const tableById = new Map(tables.map((table) => [table.id, table]))
 

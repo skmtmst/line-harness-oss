@@ -532,9 +532,9 @@ export const get__api_folders_10 = async (c: Context<Env, "/api/folders">) => {
 
     const countScope = {
       allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
-      // account_id 指定（一覧画面が選んだ1件）は、その1件に閉じた母集団で
-      // 数える。未割当の NULL 行は単一アカウントの一覧に一切出ないため含めない。
-      canSeeUnassigned: requestedAccountId ? false : scope.canSeeUnassigned,
+      // 成果地点の一覧は選択アカウントに加え、権限があれば共通の地点も表示する。
+      // ほかの単一アカウント一覧は共通分を表示しない。
+      canSeeUnassigned: requestedAccountId && kind !== 'conversion' ? false : scope.canSeeUnassigned,
     };
     const itemCounts = section !== undefined && isTemplateSection(section)
       ? await getTemplateSectionFolderCounts(c.env.DB, section, { accountIds: countScope.allowedAccountIds, includeUnassigned: countScope.canSeeUnassigned })
