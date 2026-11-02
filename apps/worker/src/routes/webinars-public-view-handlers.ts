@@ -1,3 +1,4 @@
+import { recordKeyedWebinarComment } from '../services/webinar-comment-idempotency.js';
 import { logger } from '@line-crm/shared/server';
 import { isWebinarMissedInWindow, getWebinarWatchedSeconds } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
@@ -397,14 +398,16 @@ export const post__api_liff_webinars_slug_comments_4 = async (c: Context<Env, "/
   const loaded = { webinar: auth.webinar };
 
   const body = await c.req.json<{
-    sessionStartAt?: unknown; atSeconds?: unknown; body?: unknown;
+    sessionStartAt?: unknown; atSeconds?: unknown; body?: unknown; requestId?: unknown;
   }>();
   const sessionStartAt = Number(body.sessionStartAt);
   const atSeconds = Math.floor(Number(body.atSeconds));
   const text = typeof body.body === 'string' ? body.body.trim() : '';
+  const requestId = body.requestId;
   if (
     !Number.isFinite(sessionStartAt) || !Number.isFinite(atSeconds) ||
-    atSeconds < COMMENT_MIN_AT_SECONDS || text.length === 0 || text.length > COMMENT_MAX
+    atSeconds < COMMENT_MIN_AT_SECONDS || text.length === 0 || text.length > COMMENT_MAX ||
+    (requestId !== undefined && (typeof requestId !== 'string' || !/^u-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)))
   ) {
     return inputError(c, { error: 'invalid_body' }, 422, ["sessionStartAt","atSeconds","body"]);
   }
@@ -432,6 +435,14 @@ export const post__api_liff_webinars_slug_comments_4 = async (c: Context<Env, "/
     if (!inWaitingRoom || sessionStartAt !== next) {
       return c.json({ error: 'not_live' }, 409);
     }
+  }
+  if (typeof requestId === 'string') {
+    const result = await recordKeyedWebinarComment(c.env.DB, {
+      webinarId: loaded.webinar.id, friendId: auth.friendId, sessionStartAt, atSeconds, body: text,
+    }, requestId, SESSION_COMMENT_LIMIT);
+    if (result === 'limit') return c.json({ error: 'too_many_comments' }, 429);
+    if (result === 'conflict') return c.json({ error: 'comment_request_conflict' }, 409);
+    return c.json({ ok: true });
   }
   const count = await countSessionUserComments(
     c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt,

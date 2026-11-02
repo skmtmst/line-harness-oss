@@ -113,8 +113,8 @@ export async function receiveEntryRouteCoupon(db: D1Database, route: EntryRoute,
   friend: Pick<Friend, 'id' | 'line_account_id'>, now = new Date()) {
   const claim = await claimReceipt(db, route, friend, 'liff', now);
   if (!claim || !['received', 'sent'].includes(claim.receipt.status)) return null;
-  const used = await db.prepare('SELECT COUNT(*) AS n FROM coupon_redemptions WHERE entry_route_coupon_receipt_id = ?')
-    .bind(claim.receipt.id).first<{ n: number }>();
+  const used = await db.prepare('SELECT COUNT(*) AS n FROM coupon_redemptions WHERE asset_id = ? AND friend_id = ? AND line_account_id = ?')
+    .bind(claim.receipt.asset_id, friend.id, claim.receipt.line_account_id).first<{ n: number }>();
   return {
     receiptId: claim.receipt.id, assetId: claim.receipt.asset_id, name: claim.receipt.asset_name,
     payload: JSON.parse(claim.receipt.payload_snapshot) as Record<string, unknown>,
