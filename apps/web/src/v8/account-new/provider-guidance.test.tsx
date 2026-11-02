@@ -118,3 +118,14 @@ it.each([1, 4])('段%sの認証が失敗した画面でも手動確認を示し�
   expect(register === null || register.disabled).toBe(true)
   expect(calls.connect).not.toHaveBeenCalled()
 })
+
+it('接続確認の通信失敗を操作内容より先に表示し、再確認できる', async () => {
+  calls.check.mockRejectedValueOnce(new Error('offline'))
+  confirmation()
+  fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
+  const notice = await screen.findByText(/接続の確認結果を確認できませんでした/)
+  const card = screen.getByRole('region', { name: '接続確認' })
+  expect(notice.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'もう一度確かめる' })).toBeTruthy()
+  expect(calls.connect).not.toHaveBeenCalled()
+})

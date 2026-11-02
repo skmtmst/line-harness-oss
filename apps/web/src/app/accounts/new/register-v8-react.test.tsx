@@ -418,7 +418,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
     // 行の文字は止まった時点で出るが、案内は5行の演出が終わってから出る。
     expect(await screen.findByText('「Webhookの利用」をONにしてください', {}, { timeout: 5000 })).toBeTruthy()
-    const failedRow = screen.getByText('URLは登録できましたが、「Webhookの利用」がOFFのままです。上の案内のとおりONにしてください。').closest('li')
+    const failedRow = screen.getByText('URLは登録できましたが、「Webhookの利用」がOFFのままです。下の案内のとおりONにしてください。').closest('li')
     expect(failedRow?.getAttribute('data-phase')).toBe('error')
     expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
     expect(calls.connect).not.toHaveBeenCalled()

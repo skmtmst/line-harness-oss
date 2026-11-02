@@ -657,6 +657,16 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       />
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
         <StepContent elementRef={stepPanelRef} step={currentStep * 10 + sub}>
+          {recoveredAccountId ? (
+            <Notice
+              tone="warn"
+              message={error || '保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。'}
+              action={<Button href={`/accounts/detail?id=${encodeURIComponent(recoveredAccountId)}`}>登録したアカウントを見る</Button>}
+              onClose={() => { setError(''); setRecoveredAccountId('') }}
+            />
+          ) : error ? (
+            <Notice tone="danger" message={error} onClose={() => setError('')} />
+          ) : null}
           {currentStep === 1 && (
             <Step1Precheck
               badge={badge}
@@ -803,16 +813,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
             <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} restaurant={templateKey === 'restaurant'} onRefresh={() => void refreshImport()} refreshing={importRefreshing} />
           )}
 
-          {recoveredAccountId ? (
-            <Notice
-              tone="warn"
-              message={error || '保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。'}
-              action={<Button href={`/accounts/detail?id=${encodeURIComponent(recoveredAccountId)}`}>登録したアカウントを見る</Button>}
-              onClose={() => { setError(''); setRecoveredAccountId('') }}
-            />
-          ) : error ? (
-            <Notice tone="danger" message={error} onClose={() => setError('')} />
-          ) : null}
+
         </StepContent>
         <StickyBar presentation="account-registration" actions={currentStep === 5 ? <>
             {importAttention ? <Button type="button" variant="primary" busy={importRefreshing} busyLabel="確認中…" onClick={() => void refreshImport()}>状態を再確認</Button> : null}
