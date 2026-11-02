@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { FolderCreateError } from '@/components/shared/folder-select'
@@ -8,6 +8,9 @@ import { FileText, Plus } from 'lucide-react'
 import BroadcastAssetManager, { type BroadcastAssetListLayout } from '@/components/broadcasts/broadcast-asset-manager'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import EmptyList from '@/components/shared/empty-list'
 import SegmentedControl from '@/components/shared/segmented'
 import FolderPanel, { FOLDER_RAIL_WIDTH, type FolderPanelRow } from '@/components/shared/folder-panel'
@@ -55,6 +58,21 @@ function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items
   const [folderName, setFolderName] = useState('')
   const [folderBusy, setFolderBusy] = useState(false)
   const [createError, setCreateError] = useState('')
+  const depth = useContext(OverlayDepthContext)
+  const closeFolder = () => { setFolderOpen(false); setFolderName(''); setCreateError(''); saveErrors.reset() }
+  const guard = useUnsavedGuard({ dirty: folderOpen && (folderName.trim() !== '' || folderBusy), busy: folderOpen && folderBusy, onDiscard: closeFolder })
+  useEffect(() => { if (!folderOpen) guard.cancelLeave() }, [folderOpen, guard.cancelLeave])
+  useEffect(() => { guard.cancelLeave() }, [accountId, kind, guard.cancelLeave])
+  const current = useRef({ folderOpen, folderBusy, accountId, kind, target: guard.leaveTarget })
+  current.current = { folderOpen, folderBusy, accountId, kind, target: guard.leaveTarget }
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const discardAndLeave = () => {
+    const target = guard.leaveTarget
+    if (!alive.current || !current.current.folderOpen || current.current.folderBusy || current.current.accountId !== accountId || current.current.kind !== kind || !target || current.current.target !== target) return
+    current.current.target = null
+    guard.disarm(); guard.confirmLeave()
+  }
   const meta = KIND_CARDS.find(card => card.key === kind)!
   useEffect(() => {
     let current = true
@@ -121,12 +139,12 @@ function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items
       range={{ total: filtered.length, first: (page - 1) * 20 + 1, last: Math.min(page * 20, filtered.length) }}
       onPageChange={setPage} /> : undefined}
     overlays={<>{deleteDialog}<Dialog open={folderOpen} title="フォルダを追加する"
-      onCancel={() => { if (!folderBusy) setFolderOpen(false) }} onConfirm={() => void addFolder()}
+      onCancel={() => { if (!folderBusy) closeFolder() }} onConfirm={() => void addFolder()}
       confirmLabel="追加する" confirmDisabled={!folderName.trim() || !canMutate}
       busy={folderBusy} error={createError}>
       <Field label="フォルダ名"><SaveErrorField names={['name', 'folderName']}><TextField value={folderName}
         onChange={event => setFolderName(event.target.value)} /></SaveErrorField></Field>
-    </Dialog></>}>
+    </Dialog><OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={folderOpen && guard.leaveTarget !== null} subject="フォルダ名" onConfirm={discardAndLeave} onCancel={guard.cancelLeave} busy={folderBusy} /></OverlayDepthContext.Provider></>}>
     {editor}
     {loadState !== 'ready' ? <ListState kind={loadState === 'error' ? 'error' : 'loading'}
       title={loadState === 'error' ? `${meta.title}を読み込めませんでした` : undefined}

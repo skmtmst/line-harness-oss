@@ -48,7 +48,7 @@ export async function refreshInboxSla(db:D1Database,account:string) {
 export async function processInboxSla(db:D1Database,now=new Date()) {
  const accounts=(await db.prepare(`SELECT s.account_id FROM inbox_routing_settings s JOIN line_accounts a ON a.id=s.account_id WHERE s.sla_enabled=1 AND a.is_active=1`).all<{account_id:string}>()).results;
  for(const {account_id:account} of accounts){await refreshInboxSla(db,account);
- const rows=(await db.prepare(`SELECT c.id,c.friend_id,c.operator_id,c.pending_since,c.sla_due_at,c.sla_notified_stage,s.escalate_team_id
+ const rows=(await db.prepare(`SELECT c.id,c.friend_id,c.assignee_staff_id AS operator_id,c.pending_since,c.sla_due_at,c.sla_notified_stage,s.escalate_team_id
    FROM chats c JOIN friends f ON f.id=c.friend_id JOIN inbox_routing_settings s ON s.account_id=f.line_account_id
    WHERE f.line_account_id=? AND c.first_response_at IS NULL AND c.status!='resolved' AND c.sla_due_at IS NOT NULL
     AND julianday(c.sla_due_at)<=julianday(?)+15.0/1440 LIMIT 500`).bind(account,now.toISOString())

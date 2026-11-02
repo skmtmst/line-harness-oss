@@ -614,7 +614,7 @@ export default function SavedSearchEditV8() {
       api.scenarios.list({ accountId: selectedAccountId }).catch(() => null),
       api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }).catch(() => null),
       api.forms.list(selectedAccountId).catch(() => null),
-      api.operators.list().catch(() => null),
+      api.operators.list(selectedAccountId).catch(() => null),
     ]).then(([detail, searches, tagResult, markResult, scenarioResult, fieldResult, formResult, operatorResult]) => {
       // R518: 切替後に届いた古い応答は捨てる。今の対象の再試行だけを描く。
       if (cancelled || generation !== loadGenerationRef.current) return

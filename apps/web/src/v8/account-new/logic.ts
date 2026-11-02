@@ -42,6 +42,7 @@ export interface DraftState {
   precheckAt: PrecheckAt
   name: string; channelId: string; providerId: string; loginChannelId: string; lineId: string
   tagIds: string[]; parentId: string; staffIds: string[]; liffId: string; importFriends: boolean
+  importFriendsExplicit?: boolean
 }
 
 /** 指定した保存キーの下書きを読む。秘密値は復元しない。 */
@@ -63,6 +64,8 @@ export function readDraft(storage: Pick<Storage, 'getItem'>, key = DRAFT_KEY): D
       name: text(parsed.name), channelId: text(parsed.channelId), providerId: text(parsed.providerId), loginChannelId: text(parsed.loginChannelId), lineId: text(parsed.lineId),
       tagIds: ids(parsed.tagIds), parentId: text(parsed.parentId), staffIds: ids(parsed.staffIds), liffId: text(parsed.liffId),
       importFriends: parsed.importFriends !== false,
+      importFriendsExplicit: parsed.importFriendsExplicit === true
+        || (parsed.importFriendsExplicit === undefined && parsed.step >= 3 && typeof parsed.importFriends === 'boolean'),
     }
     // 手順1のまま何も入れていない下書きは戻さない（画面を開き直しただけで「下書きから続けます」を出さない）。
     const empty = draft.step === 1 && draft.precheckAt === 'q1' && Object.keys(draft.precheck).length === 0

@@ -56,7 +56,7 @@ export function HeadOperatorMenu({
       valuePrefix="担当："
       value={value}
       onChange={onChange}
-      options={rows.map((row) => ({ ...entityOptionMetadata(row), value: row.id, label: row.name }))}
+      options={rows.map((row) => ({ ...entityOptionMetadata(row), value: row.id, label: row.name, disabled: row.disabled }))}
     /></SaveErrorField>
   )
 }

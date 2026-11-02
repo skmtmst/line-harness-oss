@@ -47,18 +47,44 @@ ECサイトのお問い合わせフォームから送信しています。`);
 
 describe('support inbox assignee contract', () => {
   it.each([
+    ['staff', false, [], 'all', 403],
+    ['owner', true, [], 'all', 403],
+    ['owner', false, [], 'accounts', 404],
+  ] as const)('操作者の権限と共有受信箱の範囲を確かめる', async (role, readOnly, permissionKeys, accountScope, status) => {
+    const db = createTestD1();
+    try {
+      db.raw.prepare("INSERT INTO staff_members (id, name, api_key, role, account_scope) VALUES ('caller', '担当', 'caller-key', ?, ?)").run(role, accountScope);
+      const app = new Hono<Env>();
+      app.use('*', async (c, next) => { c.set('staff', { id: 'caller', name: '担当', role, readOnly, permissionKeys: [...permissionKeys] }); await next(); });
+      app.route('/', supportInbox);
+      const response = await app.request('/api/support/email/threads/thread/assignee', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ staffId: null }) }, { DB: db.db } as Env['Bindings']);
+      expect(response.status).toBe(status);
+    } finally { db.raw.close(); }
+  });
+
+  it.each([
     ['active-staff', 200, 'active-staff', 2],
     ['inactive-staff', 400, null, 1],
+    ['foreign-staff', 400, null, 1],
+    ['no-permission', 400, null, 1],
+    ['readonly-staff', 400, null, 1],
     ['customer-only', 400, null, 1],
     ['unknown', 400, null, 1],
   ] as const)('担当を%sへ変更したとき、有効な担当者だけを保存する', async (staffId, status, assigned, revision) => {
     const db = createTestD1();
     try {
       db.raw.exec(`
+        INSERT INTO tenants (id, name) VALUES ('outside', '別会社');
         INSERT INTO staff_members (id, name, api_key, role, is_active) VALUES
           ('owner', '管理者', 'fixture-owner', 'owner', 1),
           ('active-staff', '有効な担当者', 'fixture-active', 'staff', 1),
-          ('inactive-staff', '無効な担当者', 'fixture-inactive', 'staff', 0);
+          ('inactive-staff', '無効な担当者', 'fixture-inactive', 'staff', 0),
+          ('foreign-staff', '別会社', 'fixture-foreign', 'owner', 1),
+          ('no-permission', '権限なし', 'fixture-no-permission', 'staff', 1),
+          ('readonly-staff', '閲覧のみ', 'fixture-readonly', 'staff', 1);
+        UPDATE staff_members SET permission_keys='["/chats"]' WHERE id IN ('active-staff', 'readonly-staff');
+        UPDATE staff_members SET tenant_id='outside' WHERE id='foreign-staff';
+        UPDATE staff_members SET access_level='read_only' WHERE id='readonly-staff';
         INSERT INTO users (id, display_name) VALUES ('customer-only', '顧客');
         INSERT INTO support_email_threads
           (id, customer_email, subject, normalized_subject, status, revision, last_message_at, last_incoming_at, created_at, updated_at)

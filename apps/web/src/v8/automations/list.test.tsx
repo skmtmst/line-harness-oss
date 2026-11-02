@@ -29,6 +29,8 @@ const account = vi.hoisted(() => ({ id: 'account-a' }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: account.id, accounts: [{ id: account.id, name: '本店' }], loading: false }),
 }))
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }] })) }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
@@ -160,6 +162,9 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     await chooseRowAction('保管する')
     const dialog = document.querySelector('[role="alertdialog"]')!
     expect(dialog.textContent).toContain('通常の一覧から外します。動いた記録と設定は残り、「保管したもの」の絞り込みから戻せます。')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    await waitFor(() => dialog.textContent?.includes('本店') ?? false, '操作対象のアカウント')
+    expect(dialog.textContent).toContain('検証環境')
     await act(async () => { within(dialog as HTMLElement).getByRole('button', { name: 'キャンセル' }).click() })
     expect(document.querySelector('[role="alertdialog"]')).toBeNull()
   })

@@ -128,7 +128,7 @@ export default function SingleFriendActions({
           <p className="text-ink-faint mb-2 text-xs">
             {friendName} に「{LABELS[open]}」
           </p>
-          {open === 'operator' && <OperatorPanel friendId={friendId} busy={busy} run={run} />}
+          {open === 'operator' && <OperatorPanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
           {open === 'status' && <StatusPanel friendId={friendId} busy={busy} run={run} />}
           {open === 'template' && <TemplatePanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
           {open === 'scenario' && <ScenarioPanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
@@ -433,19 +433,22 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
   )
 }
 
-function OperatorPanel({ friendId, busy, run }: { friendId: string; busy: boolean; run: Run }) {
+function OperatorPanel({ friendId, accountId, busy, run }: { friendId: string; accountId: string | null; busy: boolean; run: Run }) {
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   const [id, setId] = useState('')
   const [failed, setFailed] = useState(false)
   useEffect(() => {
     let active = true
-    void api.operators.list().then((res) => {
+    setOperators([])
+    setId('')
+    if (!accountId) return () => { active = false }
+    void api.operators.list(accountId).then((res) => {
       if (!active) return
       if (res.success) setOperators(res.data)
       else setFailed(true)
     }).catch(() => { if (active) setFailed(true) })
     return () => { active = false }
-  }, [])
+  }, [accountId])
   return <Row>
     <SaveErrorField names={["id","operatorId"]}><EntitySelect aria-label="担当者" value={id} onChange={setId} options={[{ value: '', label: '未割り当て' }, ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name }))]} /></SaveErrorField>
     <Go busy={busy || failed} onClick={() => void run(() => api.chats.update(friendId, { operatorId: id || null }), '担当者を変えました')} />

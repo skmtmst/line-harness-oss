@@ -171,6 +171,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
   it('5つの段は絵の正本ノードを描く', async () => {
     enterCheckStep()
     expect(shownNode()).toBe('Lwxyh')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -190,6 +191,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
       .querySelector('[aria-current="step"]')?.textContent
     enterCheckStep()
     expect(current()).toContain('接続確認')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -201,6 +203,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
 
   it('④のポップアップを閉じても、登録画面の「あとで設定する」で保留を保存して⑤へ進める', async () => {
     enterCheckStep()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -227,6 +230,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     nextStep()
     nextStep()
     nextStep()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -236,6 +240,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
   it('友だち人数があっても今回の受信が未確認なら次へ進めない', async () => {
     calls.registrationReceipt.mockResolvedValue({ success: true, data: { status: 'waiting', receivedAt: null } })
     enterCheckStep()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -250,6 +255,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
       .mockResolvedValueOnce({ success: true, data: { status: 'confirmed', receivedAt: '2026-10-20T10:00:02.000+09:00' } })
       .mockResolvedValue({ success: true, data: { status: 'waiting', receivedAt: null } })
     enterCheckStep()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
@@ -374,6 +380,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     enterCheckStep()
     expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
     expect(calls.connect).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     expect(document.querySelectorAll('[data-phase="ok"]').length).toBe(5)
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
@@ -386,6 +393,8 @@ describe('V8 登録ウィザードの gated 進行', () => {
     /* 読むだけ（followerImportState）では次の自動処理まで進まないので、画面は step を呼ぶ。 */
     calls.stepFollowerImport.mockResolvedValue({ success: true, data: { state: { capability: 'available', phase: 'completed', received: 10, imported: 10 }, busy: false, profilesFetched: 10 } })
     enterCheckStep()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'いまの友だちの引き継ぎ' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -415,6 +424,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
       },
     })
     enterCheckStep()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
     // 行の文字は止まった時点で出るが、案内は5行の演出が終わってから出る。
     expect(await screen.findByText('「Webhookの利用」をONにしてください', {}, { timeout: 5000 })).toBeTruthy()

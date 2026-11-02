@@ -85,6 +85,7 @@ export type ChatLike = {
   id: string;
   friend_id: string;
   operator_id: string | null;
+  assignee_staff_id: string | null;
   status: string;
   notes: string | null;
   last_message_at: string | null;

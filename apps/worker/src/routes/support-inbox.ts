@@ -5,13 +5,14 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import PostalMime from 'postal-mime';
 import type { Env } from '../worker-env.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { denyReadOnly, requirePermission, requireRole } from '../middleware/role-guard.js';
 import { computeUnansweredInbox, countUnanswered } from '../services/unanswered-inbox.js';
 import { sendSupportEmailReply, storeSupportEmail } from '../services/support-email.js';
 import { SUPPORT_EMAIL_RAW_MAX_CHARACTERS, verifySupportRelay } from '../services/support-relay.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { markInboxConversationRead } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAssignChatTo } from '../services/chat-assignees.js';
 import {
   inboxEventStatement,
   inboxNoteStatement,
@@ -223,7 +224,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
         if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
         else {
           searchSql += ' AND t.assigned_staff_id = ?';
-          bindings.push(assignee);
+          bindings.push(assignee.startsWith('staff:') ? assignee.slice(6) : assignee);
         }
       }
       if (unreadOnly) {
@@ -558,6 +559,7 @@ supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner',
 supportInbox.patch(
   '/api/support/email/threads/:id/assignee',
   requireRole('owner', 'admin', 'staff'),
+  denyReadOnly(), requirePermission('/chats'),
   inputJsonBoundary(), async (c) => {
     const id = c.req.param('id');
     const body: { staffId?: string | null; revision?: number; reason?: string } = await c.req
@@ -565,12 +567,10 @@ supportInbox.patch(
       .catch(() => ({}));
     const staffId = body.staffId ? String(body.staffId) : null;
 
-    // 知らないIDを入れると、誰も見ていない担当になる。実在を確かめる。
-    if (staffId) {
-      const exists = await c.env.DB.prepare(`SELECT 1 FROM staff_members WHERE id = ? AND is_active = 1`)
-        .bind(staffId)
-        .first();
-      if (!exists) return inputError(c, { success: false, error: '担当者が見つかりません' }, 400, ["staffId"]);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.canSeeUnassigned) return fail(c, 404, 'THREAD_NOT_FOUND');
+    if (staffId && !await canAssignChatTo(c.env.DB, staffId, null, true)) {
+      return inputError(c, { success: false, error: '担当者が見つかりません' }, 400, ["staffId"]);
     }
 
     const current = await c.env.DB.prepare(

@@ -239,7 +239,7 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
       if (v === '') throw new Error('operator_id rule requires a non-empty value')
       bindings.push(v)
       return {
-        sql: `EXISTS (SELECT 1 FROM chats c WHERE c.friend_id = f.id AND c.operator_id = ?)`,
+        sql: `EXISTS (SELECT 1 FROM chats c WHERE c.friend_id = f.id AND COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) = ?)`,
         bindings,
       }
     }

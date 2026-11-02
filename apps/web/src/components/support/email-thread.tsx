@@ -174,7 +174,7 @@ export default function EmailThread({
   useEffect(() => {
     let cancelled = false
     void fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
-      '/api/operators',
+      '/api/operators?channel=email',
     )
       .then(res => {
         // 担当を選べないだけ。返信そのものは続けられる。
@@ -383,7 +383,7 @@ export default function EmailThread({
     try {
       const res = await fetchApi<{ success: boolean; error?: string }>(
         `/api/support/email/threads/${encodeURIComponent(myThread)}/assignee`,
-        { method: 'PATCH', body: JSON.stringify({ staffId, revision: detail?.thread.revision }) },
+        { method: 'PATCH', body: JSON.stringify({ staffId: staffId?.startsWith('staff:') ? staffId.slice(6) : staffId, revision: detail?.thread.revision }) },
       )
       if (latestThreadRef.current !== myThread) return
       if (!res.success) {
@@ -598,7 +598,7 @@ export default function EmailThread({
           subTitle={`${detail.thread.customer_email}・メール・${detail.thread.subject}`}
           onBack={onBack}
           operator={{
-            value: detail.thread.assigned_staff_id ?? 'unassigned',
+            value: detail.thread.assigned_staff_id ? `staff:${detail.thread.assigned_staff_id}` : 'unassigned',
             operators,
             onChange: (next) => { void updateAssignee(next === 'unassigned' ? null : next) },
           }}

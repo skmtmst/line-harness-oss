@@ -1,8 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useContext,useEffect,useRef,useState } from 'react'
 import { RESTAURANT_RESERVATION_REQUIRED_FIELDS,parseRestaurantReservationForm,type RestaurantReservationForm } from '@line-crm/shared'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Dialog from '@/components/shared/dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { Field } from '@/components/shared/form-controls'
 import { TextField,TextArea } from '@/components/shared/text-field'
 import { ToggleField } from '@/components/shared/toggle'
@@ -22,10 +25,22 @@ export function ReservationFormSample({definition,storeName,compact=false}:{defi
   </div>
  </LiffPhoneFrame>
 }
-export function ReservationFormEditor({definition,storeName,onCancel,onConfirm}:{definition:RestaurantReservationForm;storeName:string;onCancel:()=>void;onConfirm:(next:RestaurantReservationForm)=>void}){
+export function ReservationFormEditor({definition,storeName,pageDirty,pageBusy,onDiscardPage,onCancel,onConfirm}:{definition:RestaurantReservationForm;storeName:string;pageDirty:boolean;pageBusy:boolean;onDiscardPage:()=>void;onCancel:()=>void;onConfirm:(next:RestaurantReservationForm)=>void}){
  const [draft,setDraft]=useState(()=>structuredClone(definition)),[expanded,setExpanded]=useState(false),[error,setError]=useState('')
+ const depth=useContext(OverlayDepthContext)
+ const localDirty=JSON.stringify(draft)!==JSON.stringify(definition)
+ const pageGuard=useUnsavedGuard({dirty:pageDirty||localDirty,busy:pageBusy,onDiscard:onDiscardPage})
+ const alive=useRef(true),current=useRef({busy:pageBusy,target:pageGuard.leaveTarget})
+ current.current={busy:pageBusy,target:pageGuard.leaveTarget}
+ useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
+ function discardAndLeave(){
+  const target=pageGuard.leaveTarget
+  if(!alive.current||current.current.busy||!target||current.current.target!==target)return
+  current.current.target=null
+  pageGuard.disarm();pageGuard.confirmLeave()
+ }
  const change=(id:string,update:Partial<RestaurantReservationForm['fields'][number]>)=>setDraft(prev=>({...prev,fields:prev.fields.map(field=>field.id===id?{...field,...update}:field)}))
- return <Dialog open size="wide" title="予約の回答フォームを変える" dirty={JSON.stringify(draft)!==JSON.stringify(definition)} onCancel={onCancel} confirmLabel="この内容にする" error={error} onConfirm={()=>{const parsed=parseRestaurantReservationForm(draft);if(!parsed.ok){setError(parsed.error);return}onConfirm(parsed.value)}}>
+ return <><Dialog open size="wide" title="予約の回答フォームを変える" dirty={localDirty} onCancel={onCancel} confirmLabel="この内容にする" error={error} onConfirm={()=>{const parsed=parseRestaurantReservationForm(draft);if(!parsed.ok){setError(parsed.error);return}onConfirm(parsed.value)}}>
   <DetailColumns asideLabel="予約フォームの見え方" expanded={expanded} onExpandedChange={setExpanded} aside={<ReservationFormSample definition={draft} storeName={storeName}/>}>
    <div className={styles.stack}>
     <Field label="題名" required><SaveErrorField names={["definition","title","definition.title"]}><TextField value={draft.title} maxLength={80} onChange={e=>setDraft({...draft,title:e.target.value})}/></SaveErrorField></Field>
@@ -39,5 +54,5 @@ export function ReservationFormEditor({definition,storeName,onCancel,onConfirm}:
     <Field label="完了後の文" required><SaveErrorField names={["completionMessage","definition.completionMessage"]}><TextArea value={draft.completionMessage} maxLength={500} onChange={e=>setDraft({...draft,completionMessage:e.target.value})}/></SaveErrorField></Field>
    </div>
   </DetailColumns>
- </Dialog>
+ </Dialog><OverlayDepthContext.Provider value={depth+1}><UnsavedLeaveDialog open={pageGuard.leaveTarget !== null} subject="LINE来店フォローの変更" onConfirm={discardAndLeave} onCancel={pageGuard.cancelLeave} busy={pageBusy}/></OverlayDepthContext.Provider></>
 }
