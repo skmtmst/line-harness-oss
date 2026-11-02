@@ -53,6 +53,7 @@ const GUARDED = [
   'app/booking/staff/new/page.tsx',
   'v8/common-vars-edit/new.tsx',
   'v8/conversions/create.tsx',
+  'v8/contents/media-upload-dialog.tsx',
   'v8/settings/ec-commerce/connector.tsx',
   'v8/form-edit/edit.tsx',
   // 2026-10-07：入口は src/v8 の画面を出すだけ。番兵は画面（operator-edit）が持つ。
