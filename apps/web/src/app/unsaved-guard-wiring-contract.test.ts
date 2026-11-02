@@ -57,6 +57,7 @@ const GUARDED = [
   'app/booking/staff/new/page.tsx',
   'v8/common-vars-edit/new.tsx',
   'v8/conversions/create.tsx',
+  'v8/contents/media-upload-dialog.tsx',
   'v8/settings/ec-commerce/connector.tsx',
   'v8/form-edit/edit.tsx',
   'v8/templates/asset-list.tsx',
