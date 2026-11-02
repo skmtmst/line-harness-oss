@@ -139,6 +139,20 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     setEditor(table.id)
   }
 
+  const changeCapacity = (field: 'minCapacity' | 'maxCapacity', value: string) => {
+    if (!draft) return
+    const next = { ...draft, [field]: value }
+    setDraft(next)
+    setFieldErrors((current) => {
+      const errors = { ...current }
+      const min = Number(next.minCapacity), max = Number(next.maxCapacity)
+      // 保存時に表示済みの人数の理由だけを現在値で見直す。
+      if (current.minCapacity && Number.isInteger(min) && min >= 1) delete errors.minCapacity
+      if (current.maxCapacity && Number.isInteger(max) && max >= min && max >= 1) delete errors.maxCapacity
+      return errors
+    })
+  }
+
   const save = async () => {
     if (!draft) return
     setEditorError('')
@@ -335,10 +349,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
             </DialogField>
             <div className={styles.pair}>
               <Field label="最小人数" htmlFor="rs-table-min" error={fieldErrors.minCapacity} requirement={b244Requirements.draft_min_capacity}>
-                <SaveErrorField names={["minCapacity","draft.minCapacity","min_capacity","draft.min_capacity"]}><NumberInput id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => setDraft({ ...draft, minCapacity: event.target.value })} /></SaveErrorField>
+                <SaveErrorField names={["minCapacity","draft.minCapacity","min_capacity","draft.min_capacity"]}><NumberInput id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => changeCapacity('minCapacity', event.target.value)} /></SaveErrorField>
               </Field>
               <Field label="最大人数" htmlFor="rs-table-max" error={fieldErrors.maxCapacity} requirement={b244Requirements.draft_max_capacity}>
-                <SaveErrorField names={["maxCapacity","draft.maxCapacity","max_capacity","draft.max_capacity"]}><NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => setDraft({ ...draft, maxCapacity: event.target.value })} /></SaveErrorField>
+                <SaveErrorField names={["maxCapacity","draft.maxCapacity","max_capacity","draft.max_capacity"]}><NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => changeCapacity('maxCapacity', event.target.value)} /></SaveErrorField>
               </Field>
             </div>
             <Button presentation="restaurant" type="button" aria-expanded={showPlacement} onClick={() => setShowPlacement((open) => !open)}>

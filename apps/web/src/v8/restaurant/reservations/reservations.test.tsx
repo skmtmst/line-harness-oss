@@ -370,6 +370,18 @@ describe('予約台帳の初期状態', () => {
     expect(await screen.findByText('予約はまだありません')).toBeTruthy()
     expect(screen.getByRole('group',{name:'1階の座席表'})).toBeTruthy()
   })
+  it('月の見出しと曜日を表示し、前後の月を選ぶとその月を読み込む', async () => {
+    render(<ReservationsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '月', exact: true }))
+    expect(await screen.findByText('2026年10月')).toBeTruthy()
+    for (const weekday of ['日', '月', '火', '水', '木', '金', '土']) expect(within(screen.getByLabelText('曜日')).getByText(weekday, { exact: true })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '前の月' }))
+    expect(await screen.findByText('2026年9月')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '次の月' }))
+    expect(await screen.findByText('2026年10月')).toBeTruthy()
+    await waitFor(() => expect(fixture.snapshot.mock.calls.some((call) => JSON.stringify(call).includes('2026-09'))).toBe(true))
+  })
+
   it('月の予約0件は案内から電話予約へ進める', async () => {
     emptyStore(false)
     render(<ReservationsPage />)

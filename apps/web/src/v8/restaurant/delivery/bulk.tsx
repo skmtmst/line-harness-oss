@@ -264,7 +264,11 @@ export default function SoldOutBoard({
       ) : null}
 
       {!loading && !error && items.length === 0 ? (
-        <ListState kind="empty" title="あてはまる商品がありません" />
+        total === 0 ? (
+          <ListState kind="empty" title="商品がまだありません" description="メニュー管理で商品を作ると表示されます。" action={<Button href="/restaurant-test/menu">メニュー管理を開く</Button>} />
+        ) : (
+          <ListState kind="empty" title="あてはまる商品がありません" description="条件を変えて、もう一度お試しください。" />
+        )
       ) : null}
     </>
   )
