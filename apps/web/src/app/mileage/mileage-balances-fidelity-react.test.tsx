@@ -190,6 +190,13 @@ describe('残高の絵合わせ（板 `CJlf4`）', () => {
     expect(body).toContain('申請した人とは別のオーナー')
   })
 
+  it('R4-1-5-02：残高合計の1人あたりに単位マイルを付ける', async () => {
+    await waitForRows()
+    const body = container.textContent ?? ''
+    // 286400 ÷ 1284 → 223。TM-Q07「N マイル」にそろえる。
+    expect(body).toContain('1人あたり 223 マイル')
+  })
+
   it('頭の CSV と脚注は空けて書く', async () => {
     await waitForRows()
     expect(container.textContent ?? '').toContain('この頁の残高を CSV')
