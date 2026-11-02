@@ -272,7 +272,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       creationScope.current = scope
       if (attempt) {
         createAttempt.current = attempt; setCreateUncertain(true); setDetail(null)
-        setName(attempt.input.name); setDescription(attempt.input.description ?? ''); setDefinition(attempt.input.definition); setStage('edit')
+        setName(attempt.input.name); setDescription(attempt.input.description ?? ''); setDefinition(attempt.input.definition); setFolderId(attempt.input.folderId ?? null); setStage('edit')
       }
       setTemplates(rows); setAccounts(stores); setReady(true)
     }).catch((e) => { if (current) setError(errorText(e)) }).finally(() => { if (current) setBusy(false) })

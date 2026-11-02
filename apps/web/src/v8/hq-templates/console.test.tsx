@@ -666,6 +666,19 @@ it('作る画面のURLは一覧の種別（?type=）を引き継ぐ（PR#2042中
   await waitFor(() => expect(new URLSearchParams(window.location.search).get('mode')).toBe('create'))
   expect(new URLSearchParams(window.location.search).get('type')).toBe('scenario')
 })
+it('結果不明の復旧時は指定したフォルダを表示する（PR#2042再指摘）', async () => {
+  const { persistCreationAttempt } = await import('@/lib/hq-template-create-attempt')
+  persistCreationAttempt(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'template', {
+    requestId: 'req-recovery-folder',
+    distribute: false,
+    input: { type: 'template', name: '人工テスト', description: '', definition: message, folderId: 'f-1' },
+  })
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  expect(await screen.findByDisplayValue('人工テスト')).toBeTruthy()
+  await waitFor(() => expect(document.body.textContent ?? '').toContain('予約'))
+  expect(document.body.textContent ?? '').not.toContain('フォルダ：未分類')
+})
 it('未配布ありの1件を消すと数の帯を取り直す（B25）', async () => {
   calls.listStats
     .mockResolvedValueOnce({ thisMonthSentCount: 0, outdatedTemplateCount: 1 })
