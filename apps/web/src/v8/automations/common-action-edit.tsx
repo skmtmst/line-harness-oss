@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import {
   api,
   ApiError,
@@ -38,6 +39,8 @@ function EditCommonActionInner() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [actions, setActions] = useState<CommonActionStep[]>([])
+  const [baseline, setBaseline] = useState<string | null>(null)
+  const dirty = baseline !== null && JSON.stringify({ name, description, actions }) !== baseline
   const [draftVersionId, setDraftVersionId] = useState('')
   /* 監査 R473: 読み取り時の改訂番号。保存時に照合し、先行保存があれば409で止まる。 */
   const [draftRevision, setDraftRevision] = useState(1)
@@ -87,6 +90,7 @@ function EditCommonActionInner() {
       setName(detail.name)
       setDescription(detail.description ?? '')
       setActions(draft.actions)
+      setBaseline(JSON.stringify({ name: detail.name, description: detail.description ?? '', actions: draft.actions }))
       setDraftVersionId(draft.id)
       setDraftRevision(draft.draftRevision ?? 1)
       setSaveConflict(false)
@@ -231,7 +235,7 @@ function EditCommonActionInner() {
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage title="下書きの中身を編集"
+    <SaveErrorScope errors={saveErrors}><CreatePage title="下書きの中身を編集" dirty={dirty || saving} contentDisabled={saving}
         help="公開済みの版は変えず、新しい下書きだけを編集します。"
       busy={saving}
       status={saving ? '下書きを保存しています' : '公開済みの版には影響しません'}
@@ -277,7 +281,7 @@ function EditCommonActionInner() {
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {saveConflict ? (
         <div className="mt-4">
-          <Button onClick={() => { setSaveConflict(false); setReloadKey((key) => key + 1) }}>最新の内容を読み込み直す</Button>
+          <Button onClick={() => requestUnsavedAction(() => { setSaveConflict(false); setReloadKey((key) => key + 1) })}>最新の内容を読み込み直す</Button>
         </div>
       ) : null}
     </CreatePage></SaveErrorScope>

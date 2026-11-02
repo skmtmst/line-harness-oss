@@ -17,6 +17,7 @@ const net = vi.hoisted(() => ({
   getCount: 0,
   resourcesCount: 0,
   duplicate: vi.fn(),
+  updateDraft: vi.fn(),
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -54,6 +55,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       commonActions: {
         ...actual.api.commonActions,
         duplicate: net.duplicate,
+        updateDraft: net.updateDraft,
         list: async () => ({ success: true, data: [{ id: 'ca-1', name: '来店の案内', description: null, status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 0, oldVersionBindingCount: 0, executionCountThisMonth: 0, failureCountThisMonth: 0, lastRunAt: null, updatedAt: '2026-10-20T00:00:00Z' }] }),
         get: async () => {
           net.getCount += 1
@@ -134,6 +136,7 @@ beforeEach(() => {
   net.resourcesMode = 'ok-empty'
   net.getCount = 0
   net.resourcesCount = 0
+  net.updateDraft.mockReset()
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -286,4 +289,84 @@ it('CSVの可否が未取得の間は書き出す操作を出さず、確認後�
   net.exportAllowed = true
   await act(async () => { root.render(<ListPage />) })
   expect(screen.getByText('CSVで書き出す')).toBeTruthy()
+})
+
+describe('共通アクションの未保存', () => {
+  it('条件を追加したら移動前に確認し、続けると条件を保つ', async () => {
+    await act(async () => { root.render(<EditPage />) })
+    await flush()
+    await act(async () => { buttonNamed('条件で分ける')!.click() })
+    await flush()
+    const link = document.createElement('a')
+    link.href = '/templates'
+    document.body.appendChild(link)
+    await act(async () => { link.click() })
+    await waitFor(() => expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy())
+    await act(async () => { screen.getByRole('button', { name: '編集を続ける' }).click() })
+    expect(buttonNamed('分岐を削除する')).toBeTruthy()
+    link.remove()
+  })
+
+  it('追加した条件を元に戻すと離脱確認は出ない', async () => {
+    await act(async () => { root.render(<EditPage />) })
+    await flush()
+    await act(async () => { buttonNamed('条件で分ける')!.click() })
+    await act(async () => { buttonNamed('分岐を削除する')!.click() })
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it('条件を追加した後の戻るを止める', async () => {
+    await act(async () => { root.render(<EditPage />) })
+    await flush()
+    await act(async () => { buttonNamed('条件で分ける')!.click() })
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(go).toHaveBeenCalledWith(1)
+  })
+
+
+  it('保存競合後の読み直しは確認し、編集を続けると条件を保つ', async () => {
+    const { ApiError } = await import('@/lib/api')
+    net.updateDraft.mockRejectedValue(new ApiError(409, '競合'))
+    await act(async () => { root.render(<EditPage />) })
+    await flush()
+    await act(async () => { buttonNamed('条件で分ける')!.click() })
+    await act(async () => { buttonNamed('下書きを保存する')!.click() })
+    await flush()
+    expect(buttonNamed('最新の内容を読み込み直す')).toBeTruthy()
+    await act(async () => { buttonNamed('最新の内容を読み込み直す')!.click() })
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    await act(async () => { screen.getByRole('button', { name: '編集を続ける' }).click() })
+    expect(buttonNamed('分岐を削除する')).toBeTruthy()
+    expect(net.getCount).toBe(1)
+  })
+
+
+  it('保存中は入力を固定し、戻るを止める', async () => {
+    net.updateDraft.mockReturnValue(new Promise(() => {}))
+    await act(async () => { root.render(<EditPage />) })
+    await flush()
+    await act(async () => { buttonNamed('条件で分ける')!.click() })
+    await act(async () => { buttonNamed('下書きを保存する')!.click() })
+    expect(screen.getByRole('group', { name: '入力内容' }).hasAttribute('disabled')).toBe(true)
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+    expect(go).toHaveBeenCalledWith(1)
+    expect(net.updateDraft).toHaveBeenCalledTimes(1)
+  })
+
+
+  it('変更前の内容を保存中でも戻るを止める', async () => {
+    net.updateDraft.mockReturnValue(new Promise(() => {}))
+    await act(async () => { root.render(<EditPage />) })
+    await flush()
+    await act(async () => { buttonNamed('下書きを保存する')!.click() })
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+    expect(go).toHaveBeenCalledWith(1)
+  })
+
 })
