@@ -10,6 +10,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
@@ -216,10 +217,20 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   }
 
   // 停止は再開できる。保管は終端で、一覧と再集計から外れて戻せない。
-  const [statusTarget, setStatusTarget] = useState<{ funnel: { id: string; name: string; status: FunnelStatus }; to: FunnelStatus } | null>(null)
+  const [statusTarget, setStatusTarget] = useState<{ funnel: { id: string; name: string; status: FunnelStatus }; to: FunnelStatus; accountId: string } | null>(null)
+  const statusWindow = useRef<object>({})
+  const renderedStatusWindow = statusWindow.current
+  const currentAccount = useRef(accountId)
+  currentAccount.current = accountId
+  const statusMounted = useRef(false)
+  useEffect(() => { statusMounted.current = true; return () => { statusMounted.current = false } }, [])
+  const openStatus = (funnel: { id: string; name: string; status: FunnelStatus }, to: FunnelStatus) => {
+    statusWindow.current = {}
+    setStatusTarget({ funnel, to, accountId })
+  }
   const [statusBusy, setStatusBusy] = useState(false)
   const applyStatusChange = async () => {
-    if (!statusTarget || statusBusy) return
+    if (!statusTarget || statusBusy || !statusMounted.current || currentAccount.current !== statusTarget.accountId || statusWindow.current !== renderedStatusWindow) return
     setStatusBusy(true); setRunError('')
     try {
       const res = await api.analytics.v6Funnels.setStatus(accountId, statusTarget.funnel.id, { status: statusTarget.to, expectedStatus: statusTarget.funnel.status })
@@ -395,12 +406,12 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
             {canManage && selectedFunnel ? <div className={styles.rowActions} data-gap="wide">
               {selectedFunnel.status === 'active' ? <>
                 <Button onClick={() => void startEdit()} disabled={editLoading || !selectedFunnel.currentVersion} variant="secondary" busy={editLoading} busyLabel="定義を読み込み中">定義を編集</Button>
-                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'stopped' })} variant="secondary">停止</Button>
-                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })} variant="secondary">削除する</Button>
+                <Button onClick={() => openStatus(selectedFunnel, 'stopped')} variant="secondary">停止</Button>
+                <Button onClick={() => openStatus(selectedFunnel, 'archived')} variant="secondary">削除する</Button>
               </> : null}
               {selectedFunnel.status === 'stopped' ? <>
-                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'active' })} variant="secondary">再開</Button>
-                <Button onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })} variant="secondary">削除する</Button>
+                <Button onClick={() => openStatus(selectedFunnel, 'active')} variant="secondary">再開</Button>
+                <Button onClick={() => openStatus(selectedFunnel, 'archived')} variant="secondary">削除する</Button>
               </> : null}
             </div> : null}
           </Disclosure>
@@ -422,8 +433,8 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
               <StatePill tone={funnel.status === 'stopped' ? 'warn' : 'neutral'}>{funnel.status === 'stopped' ? '停止中' : 'アーカイブ'}</StatePill>
               <button type="button" className={styles.linkButton} onClick={() => setSelected(funnel.id)}>結果を見る</button>
               {canManage && funnel.status === 'stopped' ? <>
-                <Button onClick={() => setStatusTarget({ funnel, to: 'active' })} variant="secondary">再開</Button>
-                <Button onClick={() => setStatusTarget({ funnel, to: 'archived' })} variant="secondary">削除する</Button>
+                <Button onClick={() => openStatus(funnel, 'active')} variant="secondary">再開</Button>
+                <Button onClick={() => openStatus(funnel, 'archived')} variant="secondary">削除する</Button>
               </> : null}
               {funnel.status === 'archived' ? <span className={styles.caption}>戻せません</span> : null}
             </div>)}
@@ -431,7 +442,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
         </>}
     </div>
     <ConfirmDialog
-      open={statusTarget !== null}
+      open={statusTarget !== null && statusTarget.accountId === accountId}
       title={statusTarget?.to === 'stopped' ? 'ファネルを停止しますか' : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除しますか？` : 'ファネルを再開しますか'}
       description={statusTarget?.to === 'stopped' ? `「${statusTarget.funnel.name}」の再集計と対象者づくりを止めます。過去の結果は残り、あとから再開できます。`
         : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除すると、選ぶ一覧から外れ、再集計と対象者づくりはできません。あとから戻せません。過去の結果は残ります。`
@@ -441,7 +452,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       busy={statusBusy}
       error={runError}
       onConfirm={() => applyStatusChange()}
-      onCancel={() => { if (!statusBusy) setStatusTarget(null) }}
-    />
+      onCancel={() => { if (!statusBusy) { statusWindow.current = {}; setStatusTarget(null) } }}
+    ><OperationTargetSummary accounts={[{ id: statusTarget?.accountId ?? '' }]} /></ConfirmDialog>
   </></SaveErrorScope>
 }

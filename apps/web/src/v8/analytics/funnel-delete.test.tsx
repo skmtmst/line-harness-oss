@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ list: vi.fn(), latestRun: vi.fn(), setStatus: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'a', name: '本店' }] })) }))
 vi.mock('@/lib/api', () => ({ api: { analytics: { v6Funnels: net } } }))
 vi.mock('./parts', () => ({ RANGES: [{days:30,label:'過去30日'}], downloadCsv: vi.fn(), formatAnalyticsDate: vi.fn(), formatAnalyticsDateTime: vi.fn(), rangeFor: vi.fn(), useRegisterExport: vi.fn() }))
 import FunnelV8 from './funnel'
@@ -22,6 +23,8 @@ it('削除は確認後に保管し、過去の結果を残して選ぶ一覧か�
   fireEvent.click(screen.getByRole('button', { name: '削除する', exact: true }))
   expect(net.setStatus).not.toHaveBeenCalled()
   const dialog = screen.getByRole('alertdialog')
+  expect(await within(dialog).findByText('本店')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
   expect(dialog.textContent).toContain('過去の結果は残ります')
   net.list.mockResolvedValue({ success: true, data: [{ ...funnel, status: 'archived' }] })
   fireEvent.click(within(dialog).getByRole('button', { name: '削除する', exact: true }))
@@ -45,4 +48,16 @@ it('閲覧のみには削除の操作を出さない', async () => {
   render(<FunnelV8 accountId="a" canManage={false} />)
   fireEvent.click(await screen.findByText('定義の操作と集計の詳細', { exact: true }))
   expect(screen.queryByRole('button', { name: '削除する' })).toBeNull()
+})
+
+it('アカウントを切り替えた後の古い削除確定は送らない', async () => {
+  const view = render(<FunnelV8 accountId="a" canManage />)
+  fireEvent.click(await screen.findByText('定義の操作と集計の詳細', { exact: true }))
+  fireEvent.click(screen.getByRole('button', { name: '削除する', exact: true }))
+  const button = within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する', exact: true })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+  view.rerender(<FunnelV8 accountId="b" canManage />)
+  await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button })
+  expect(net.setStatus).not.toHaveBeenCalled()
 })
