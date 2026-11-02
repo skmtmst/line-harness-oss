@@ -6,6 +6,7 @@
  */
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { MediaQuota } from '@/lib/api'

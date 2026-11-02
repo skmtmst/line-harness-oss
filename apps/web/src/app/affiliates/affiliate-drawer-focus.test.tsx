@@ -36,6 +36,7 @@ const { default: AffiliateDrawerV8 } = await import('@/v8/affiliates/drawer')
 
 afterEach(() => {
   cleanup()
+  window.history.replaceState(null, '', '/affiliates')
 })
 
 const row = {
@@ -104,4 +105,106 @@ describe('成果引き出しは共通の窓の動きをする', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(document.activeElement).toBe(trigger)
   })
+})
+
+describe('支払い条件の未保存', () => {
+  test('入力後のページ移動を止め、編集を続けると入力を保つ', async () => {
+    render(<AffiliateDrawerV8 affiliate={{ ...row, commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={() => {}} onChanged={() => {}} onStopRequest={() => {}} />)
+    const email = await screen.findByLabelText('連絡先') as HTMLInputElement
+    fireEvent.change(email, { target: { value: 'draft@example.invalid' } })
+    const link = document.createElement('a')
+    link.href = '/templates'
+    document.body.appendChild(link)
+    fireEvent.click(link)
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect(email.value).toBe('draft@example.invalid')
+    link.remove()
+  })
+
+  test('入力後の詳細タブ切替も確認する', async () => {
+    render(<AffiliateDrawerV8 affiliate={{ ...row, commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={() => {}} onChanged={() => {}} onStopRequest={() => {}} />)
+    const email = await screen.findByLabelText('連絡先') as HTMLInputElement
+    fireEvent.change(email, { target: { value: 'draft@example.invalid' } })
+    fireEvent.click(screen.getByRole('tab', { name: '概要' }))
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  })
+
+  test('タブ切替を破棄しても引き出しは閉じず、確認を繰り返さない', async () => {
+    const close = vi.fn()
+    render(<AffiliateDrawerV8 affiliate={{ ...row, commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={close} onChanged={() => {}} onStopRequest={() => {}} />)
+    const email = await screen.findByLabelText('連絡先')
+    fireEvent.change(email, { target: { value: 'draft@example.invalid' } })
+    fireEvent.click(screen.getByRole('tab', { name: '概要' }))
+    fireEvent.click(await screen.findByRole('button', { name: '保存せずに移る' }))
+    expect(close).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+  })
+
+  test('引き出しを閉じる確認は一回で編集へ戻れる', async () => {
+    const close = vi.fn()
+    render(<AffiliateDrawerV8 affiliate={{ ...row, commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={close} onChanged={() => {}} onStopRequest={() => {}} />)
+    const email = await screen.findByLabelText('連絡先') as HTMLInputElement
+    fireEvent.change(email, { target: { value: 'draft@example.invalid' } })
+    fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+    expect(await screen.findByRole('dialog', { name: '入力を破棄しますか？' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect(email.value).toBe('draft@example.invalid')
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  test('入力を戻せばページ移動を止めない', async () => {
+    render(<AffiliateDrawerV8 affiliate={{ ...row, commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={() => {}} onChanged={() => {}} onStopRequest={() => {}} />)
+    const email = await screen.findByLabelText('連絡先') as HTMLInputElement
+    fireEvent.change(email, { target: { value: 'draft@example.invalid' } })
+    fireEvent.change(email, { target: { value: '' } })
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+
+  test('ページ移動で破棄を選ぶと引き出しを閉じる', async () => {
+    const close = vi.fn()
+    render(<AffiliateDrawerV8 affiliate={{ ...row, commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={close} onChanged={() => {}} onStopRequest={() => {}} />)
+    const email = await screen.findByLabelText('連絡先')
+    fireEvent.change(email, { target: { value: 'draft@example.invalid' } })
+    const link = document.createElement('a')
+    link.href = '/templates'
+    document.body.appendChild(link)
+    fireEvent.click(link)
+    fireEvent.click(await screen.findByRole('button', { name: '保存せずに移る' }))
+    expect(close).toHaveBeenCalledTimes(1)
+    link.remove()
+  })
+
+  test('保存中は入力とブラウザの戻るを止める', async () => {
+    update.mockImplementationOnce(() => new Promise(() => {}))
+    render(<AffiliateDrawerV8 affiliate={{ ...row, commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={() => {}} onChanged={() => {}} onStopRequest={() => {}} />)
+    const email = await screen.findByLabelText('連絡先')
+    fireEvent.change(email, { target: { value: 'draft@example.invalid' } })
+    fireEvent.click(screen.getByRole('button', { name: '取り決めを保存する' }))
+    expect(email.closest('form')?.hasAttribute('inert')).toBe(true)
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    fireEvent.popState(window)
+    expect(go).toHaveBeenCalledWith(1)
+    go.mockRestore()
+  })
+
+
+  test('戻るでタブが先に変わっても入力を保持して確認する', async () => {
+    render(<AffiliateDrawerV8 affiliate={{ ...row, commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={() => {}} onChanged={() => {}} onStopRequest={() => {}} />)
+    const email = await screen.findByLabelText('連絡先') as HTMLInputElement
+    fireEvent.change(email, { target: { value: 'draft@example.invalid' } })
+    window.history.replaceState(null, '', '/affiliates?tab=affiliates/summary')
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    fireEvent.popState(window)
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(go).toHaveBeenCalledWith(1)
+    expect(email.isConnected).toBe(true)
+    expect(email.value).toBe('draft@example.invalid')
+    go.mockRestore()
+  })
+
 })

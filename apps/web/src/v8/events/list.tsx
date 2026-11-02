@@ -674,7 +674,7 @@ export default function EventsListV8() {
           setDeleteTarget(null)
         }}
       >
-        {deleteTarget ? <OperationTargetSummary allAccounts accounts={eventOperationAccounts(deleteTarget.event, deleteTarget.accountId)} /> : null}
+        {deleteTarget ? <OperationTargetSummary showAccountCount accounts={eventOperationAccounts(deleteTarget.event, deleteTarget.accountId)} /> : null}
       </ConfirmDialog>
     </>
   )

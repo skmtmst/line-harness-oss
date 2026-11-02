@@ -26,12 +26,19 @@ export async function countInboxSavedViewMatches(
     bindings.push(...conditions.statuses);
   }
   if (conditions.assignees.length > 0) {
-    const named = conditions.assignees.filter((id) => id !== 'unassigned');
     const clauses: string[] = [];
-    if (conditions.assignees.includes('unassigned')) clauses.push('c.operator_id IS NULL');
-    if (named.length > 0) {
-      clauses.push(`c.operator_id IN (${sqlIdSet(named).sql})`);
-      bindings.push(...(named.length ? sqlIdSet(named).binds : []));
+    const staffIds = conditions.assignees.filter(id => id.startsWith('staff:')).map(id => id.slice(6));
+    const legacyIds = conditions.assignees.filter(id => id !== 'unassigned' && !id.startsWith('staff:'));
+    if (conditions.assignees.includes('unassigned')) clauses.push('(c.assignee_staff_id IS NULL AND c.operator_id IS NULL)');
+    if (staffIds.length) {
+      const set = sqlIdSet(staffIds);
+      clauses.push(`c.assignee_staff_id IN (${set.sql})`);
+      bindings.push(...set.binds);
+    }
+    if (legacyIds.length) {
+      const set = sqlIdSet(legacyIds);
+      clauses.push(`(c.assignee_staff_id IS NULL AND c.operator_id IN (${set.sql}))`);
+      bindings.push(...set.binds);
     }
     where.push(`(${clauses.join(' OR ')})`);
   }
@@ -114,7 +121,7 @@ export async function countInboxSavedViewMatches(
     emailBindings.push(...conditions.statuses);
   }
   if (conditions.assignees.length > 0) {
-    const named = conditions.assignees.filter((id) => id !== 'unassigned');
+    const named = conditions.assignees.filter((id) => id !== 'unassigned').map(id => id.startsWith('staff:') ? id.slice(6) : id);
     const clauses: string[] = [];
     if (conditions.assignees.includes('unassigned')) clauses.push('t.assigned_staff_id IS NULL');
     if (named.length > 0) {

@@ -35,3 +35,7 @@ describe('受信箱の担当者候補', () => {
   })
 
 })
+
+it('現在の担当が候補にないとき、名前不明と示して選び直せない', () => {
+  expect(buildOperatorRows([], false, 'old-id')).toContainEqual({ id: 'old-id', name: '担当者不明', disabled: true })
+})

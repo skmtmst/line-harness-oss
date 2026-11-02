@@ -7,6 +7,12 @@ import { useFeatureSettings } from './use-feature-settings'
 const m = vi.hoisted(() => ({ account: 'A', load: vi.fn(), usage: vi.fn(), fetch: vi.fn(), get: vi.fn() }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: m.account }) }))
+vi.mock('@/hooks/use-account-style', () => ({
+  useAccountStyle: () => ({
+    data: { style: 'standard', styleSelected: true, styleMode: 'configured', version: 1, answers: {}, settings: {}, cards: [], metricIds: [], visibleTabs: [], questions: [] },
+    error: null, reload: vi.fn(), stale: false, status: 'ready',
+  } satisfies ReturnType<typeof import('@/hooks/use-account-style').useAccountStyle>),
+}))
 vi.mock('@/lib/feature-settings-cache', () => ({ loadFeatureSettings: m.load, clearFeatureSettingsCache: vi.fn() }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()

@@ -28,7 +28,7 @@ inboxSla.put('/api/inbox/routing-settings',async c=>{
 
 inboxSla.post('/api/inbox/routing/apply-unassigned',async c=>{
  gapWrite(c,{admin:true,impersonation:true});const a=await gapAccount(c);
- const rows=(await c.env.DB.prepare("SELECT c.friend_id FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.operator_id IS NULL AND c.status!='resolved' ORDER BY c.last_customer_message_at LIMIT 500").bind(a).all<{friend_id:string}>()).results;
+ const rows=(await c.env.DB.prepare("SELECT c.friend_id FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.operator_id IS NULL AND c.assignee_staff_id IS NULL AND c.status!='resolved' ORDER BY c.last_customer_message_at LIMIT 500").bind(a).all<{friend_id:string}>()).results;
  let assigned=0;for(const r of rows)if(await assignInbox(c.env.DB,a,r.friend_id))assigned++;
  return c.json({success:true,data:{assigned,skipped:rows.length-assigned}});
 });

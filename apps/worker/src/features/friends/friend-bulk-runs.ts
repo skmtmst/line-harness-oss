@@ -1,3 +1,4 @@
+import { canAssignChatTo, chatAssigneeId, staffIdFromChatAssignee } from '../../services/chat-assignees.js';
 import {accountClause} from './friend-bulk-scope.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
@@ -380,11 +381,6 @@ async function prepareOperation(db: D1Database, operation: FriendBulkOperation):
     case 'stop_scenario':
       return { operation, resourceAccountId: await requireAccountResource(db, 'scenarios', operation.scenarioId, 'シナリオ'), reversible: true };
     case 'assign_operator':
-      if (operation.operatorId) {
-        const operator = await db.prepare(`SELECT id FROM operators WHERE id = ? AND is_active = 1`)
-          .bind(operation.operatorId).first<{ id: string }>();
-        if (!operator) throw new FriendBulkRunError('operator_not_found', '担当者が見つかりません', 404);
-      }
       return { operation, resourceAccountId: undefined, reversible: true };
     case 'set_support': {
       let accountId: string | undefined;
@@ -674,13 +670,14 @@ async function executeOperation(
     }
     case 'assign_operator': {
       const existing = await getChatByFriendId(db, friend.id);
-      const before = { chatId: existing?.id ?? null, operatorId: existing?.operator_id ?? null };
+      const before = { chatId: existing?.id ?? null, operatorId: existing ? chatAssigneeId(existing) : null };
+      if (operation.operatorId && !await canAssignChatTo(db, staffIdFromChatAssignee(operation.operatorId) ?? '', friend.line_account_id)) throw new ItemExecutionError('operator_not_found', '担当者が見つかりません', false);
       if (before.operatorId === operation.operatorId) return { status: 'skipped', before, after: before };
       const chat = existing ?? await createChat(db, { friendId: friend.id });
       if (friend.line_account_id) {
         await db.prepare(`UPDATE chats SET line_account_id = ? WHERE id = ?`).bind(friend.line_account_id, chat.id).run();
       }
-      await updateChat(db, chat.id, { operatorId: operation.operatorId });
+      await updateChat(db, chat.id, { assigneeStaffId: operation.operatorId ? staffIdFromChatAssignee(operation.operatorId) : null, ...(operation.operatorId === null ? { operatorId: null } : {}) });
       return { status: 'success', before, after: { chatId: chat.id, operatorId: operation.operatorId } };
     }
     case 'set_support': {
@@ -910,8 +907,8 @@ async function executeUndo(
     }
     case 'assign_operator': {
       const chat = await getChatByFriendId(db, item.friend_id);
-      if ((chat?.operator_id ?? null) !== (after?.operatorId ?? null)) conflict();
-      if (chat) await updateChat(db, chat.id, { operatorId: before?.operatorId as string | null });
+      if ((chat ? chatAssigneeId(chat) : null) !== (after?.operatorId ?? null)) conflict();
+      if (chat) { const previous = before?.operatorId as string | null; if (previous?.startsWith('staff:') && !await canAssignChatTo(db, previous.slice(6), item.line_account_id)) conflict(); await updateChat(db, chat.id, previous?.startsWith('staff:') ? { assigneeStaffId: previous.slice(6) } : { operatorId: previous, assigneeStaffId: null }); }
       break;
     }
     case 'set_support': {

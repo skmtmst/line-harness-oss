@@ -2,6 +2,7 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { UNSAVED_ACTION_EVENT } from '@/lib/unsaved-action'
 
 const net = vi.hoisted(() => ({ audience: vi.fn(), push: vi.fn(), save: vi.fn(), run: vi.fn(), fields: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: net.push }) }))
@@ -52,6 +53,37 @@ it('集計完了後も結果のIDを残し、保存と対象者づくりに同�
   fireEvent.click(screen.getByRole('button', { name: '対象者を開く' }))
   await waitFor(() => expect(net.audience).toHaveBeenCalledWith('account-1', 'result-1', { sourceKind: 'cross', rowKey: 'route-1', columnKey: 'tag-1' }))
   expect(net.push).toHaveBeenCalledWith('/friends?audienceId=audience-1')
+})
+
+it('対象者を作る前に未保存の画面内操作を確かめる', async () => {
+  render(<CrossV8 accountId="account-1" canManage />)
+  const run = await screen.findByRole('button', { name: '集計する' })
+  await waitFor(() => expect(run.hasAttribute('disabled')).toBe(false))
+  fireEvent.click(run)
+  const open = await screen.findByRole('button', { name: '対象者を開く' })
+  const listener = vi.fn((event: Event) => event.preventDefault())
+  window.addEventListener(UNSAVED_ACTION_EVENT, listener)
+  try {
+    fireEvent.click(open)
+    expect(listener).toHaveBeenCalledOnce()
+    expect(net.audience).not.toHaveBeenCalled()
+    expect(net.push).not.toHaveBeenCalled()
+  } finally { window.removeEventListener(UNSAVED_ACTION_EVENT, listener) }
+})
+
+it('再集計の前に未保存の画面内操作を確かめる', async () => {
+  render(<CrossV8 accountId="account-1" canManage />)
+  const run = await screen.findByRole('button', { name: '集計する' })
+  await waitFor(() => expect(run.hasAttribute('disabled')).toBe(false))
+  fireEvent.click(run)
+  const rerun = await screen.findByRole('button', { name: '集計し直す' })
+  const listener = vi.fn((event: Event) => event.preventDefault())
+  window.addEventListener(UNSAVED_ACTION_EVENT, listener)
+  try {
+    fireEvent.click(rerun)
+    expect(listener).toHaveBeenCalledOnce()
+    expect(net.run).toHaveBeenCalledTimes(1)
+  } finally { window.removeEventListener(UNSAVED_ACTION_EVENT, listener) }
 })
 
 it('共通ツールバーでも指定した2日付と軸を集計へ渡し、結果を同じIDで保存する', async () => {

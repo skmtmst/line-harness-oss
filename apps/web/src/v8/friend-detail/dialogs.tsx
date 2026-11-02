@@ -41,7 +41,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
   const [operatorId, setOperatorId] = useState('')
   const [notes, setNotes] = useState('')
   const [revision, setRevision] = useState(0)
-  const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
+  const [operators, setOperators] = useState<Array<{ id: string; name: string; disabled?: boolean }>>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -68,7 +68,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
     setError('')
     setBusy(true)
     try {
-      const [chatRes, operatorRes] = await Promise.all([api.chats.get(owner), loadOperators()])
+      const [chatRes, operatorRes] = await Promise.all([api.chats.get(owner), accountId ? loadOperators(accountId) : Promise.resolve({ success: true as const, data: [] })])
       if (gen !== genRef.current) return
       if (chatRes.success) {
         setStatus(chatRes.data.status)
@@ -76,7 +76,10 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
         setNotes(chatRes.data.notes ?? '')
         setRevision(chatRes.data.revision)
       }
-      if (operatorRes.success) setOperators(operatorRes.data)
+      if (operatorRes.success) {
+        const current = chatRes.success ? chatRes.data : null
+        setOperators(current?.operatorId && current.operatorName && !operatorRes.data.some(o => o.id === current.operatorId) ? [{ id: current.operatorId, name: current.operatorName, disabled: true }, ...operatorRes.data] : operatorRes.data)
+      }
       else setError('担当者の選択肢を読み込めませんでした')
     } catch {
       if (gen !== genRef.current) return
@@ -173,7 +176,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
             disabled={busy}
             onChange={(value) => setOperatorId(value)}
             aria-label="担当者を変える"
-            options={[{ value: '', label: '未割り当て' }, ...operators.map((o) => ({ ...entityOptionMetadata(o), value: o.id, label: o.name }))]}
+            options={[{ value: '', label: '未割り当て' }, ...(operatorId && !operators.some(o => o.id === operatorId) ? [{ value: operatorId, label: '以前の担当者（確認できません）', disabled: true }] : []), ...operators.map((o) => ({ ...entityOptionMetadata(o), value: o.id, label: o.name, disabled: o.disabled }))]}
           /></SaveErrorField></Field>
       </div>
     </Dialog></SaveErrorScope>

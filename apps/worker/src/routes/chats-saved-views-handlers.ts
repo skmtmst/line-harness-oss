@@ -1,9 +1,10 @@
+import { canAssignChatTo, chatAssigneeId, staffIdFromChatAssignee } from '../services/chat-assignees.js';
 import { logger } from '@line-crm/shared/server';
 import { countInboxSavedViewMatches } from './inbox-saved-view-matches.js';
 import { serializeInboxSavedView } from '../services/inbox-saved-view-response.js';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
-import { getOperatorById, getChatById, createChat, getFriendById, getSavedSearches, getSavedSearchById, createSavedSearch, updateSavedSearch, deleteSavedSearch, validateInboxSavedViewConditions, jstNow } from '@line-crm/db';
+import { getChatById, createChat, getFriendById, getSavedSearches, getSavedSearchById, createSavedSearch, updateSavedSearch, deleteSavedSearch, validateInboxSavedViewConditions, jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -136,7 +137,11 @@ export const post__api_chats_5 = async (c: Context<Env, "/api/chats">) => {
         || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
-    const item = await createChat(c.env.DB, body);
+    const friend = await getFriendById(c.env.DB, body.friendId);
+    const accountId = friend?.line_account_id ?? null;
+    if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId]) || (body.lineAccountId && body.lineAccountId !== accountId)) return c.json({ success: false, error: 'Not found' }, 404);
+    if (body.operatorId && !await canAssignChatTo(c.env.DB, staffIdFromChatAssignee(body.operatorId) ?? '', accountId)) return inputError(c, { success: false, error: '担当者が見つかりません' }, 400, ['operatorId']);
+    const item = await createChat(c.env.DB, { friendId: body.friendId, assigneeStaffId: body.operatorId ? staffIdFromChatAssignee(body.operatorId) ?? undefined : undefined });
 
     if (body.lineAccountId) {
       await c.env.DB.prepare(`UPDATE chats SET line_account_id = ? WHERE id = ?`)
@@ -166,9 +171,11 @@ export const put__api_chats_id_6 = async (c: Context<Env, "/api/chats/:id">) => 
     if (body.notes !== undefined && body.notes.length > 10_000) {
       return inputError(c, { success: false, error: '内部メモは10,000文字以内で入力してください' }, 400, ["notes"]);
     }
-    if (body.operatorId) {
-      const operator = await getOperatorById(c.env.DB, body.operatorId);
-      if (!operator || !operator.is_active) {
+    if (body.operatorId === '') return inputError(c, { success: false, error: '担当者が正しくありません' }, 400, ['operatorId']);
+    const currentOperatorId = chatAssigneeId(resolved);
+    if (body.operatorId && body.operatorId !== currentOperatorId) {
+      const friend = await getFriendById(c.env.DB, resolved.friend_id);
+      if (!await canAssignChatTo(c.env.DB, staffIdFromChatAssignee(body.operatorId) ?? '', friend?.line_account_id ?? null)) {
         return inputError(c, { success: false, error: '担当者が見つかりません' }, 400, ["operatorId"]);
       }
     }
@@ -194,12 +201,13 @@ export const put__api_chats_id_6 = async (c: Context<Env, "/api/chats/:id">) => 
       revision: expectedRevision + 1,
       updatedAt: now,
     };
-    if (body.operatorId !== undefined && body.operatorId !== resolved.operator_id) {
-      sets.push('operator_id = ?');
-      bindings.push(body.operatorId);
+    if (body.operatorId !== undefined && body.operatorId !== currentOperatorId) {
+      sets.push('assignee_staff_id = ?');
+      bindings.push(body.operatorId ? staffIdFromChatAssignee(body.operatorId) : null);
+      if (body.operatorId === null) sets.push('operator_id = NULL');
       events.push(inboxEventStatement(c.env.DB, {
         channel: 'line', conversationId: resolved.friend_id, eventType: 'assignment',
-        before: { operatorId: resolved.operator_id }, after: { operatorId: body.operatorId },
+        before: { operatorId: currentOperatorId }, after: { operatorId: body.operatorId },
         actorStaffId: c.get('staff').id, reason: body.reason, correlationId, createdAt: now,
         guard: eventGuard,
       }));
@@ -249,14 +257,14 @@ export const put__api_chats_id_6 = async (c: Context<Env, "/api/chats/:id">) => 
       }
       if (body.operatorId !== undefined
         && body.operatorId !== null
-        && body.operatorId !== resolved.operator_id) {
+        && body.operatorId !== currentOperatorId) {
         const assignedFriend = await getFriendById(c.env.DB, resolved.friend_id);
         await fireEvent(c.env.DB, 'staff_assigned', {
           sourceEventId: correlationId,
           sourceKind: 'inbox_assignment',
           occurredAt: now,
           friendId: resolved.friend_id,
-          eventData: { staffId: body.operatorId },
+          eventData: { staffId: staffIdFromChatAssignee(body.operatorId) },
         }, undefined, assignedFriend?.line_account_id).catch((error) => {
           logger.error("chats.chats_id_put_failed");
         });
@@ -270,7 +278,7 @@ export const put__api_chats_id_6 = async (c: Context<Env, "/api/chats/:id">) => 
       data: {
         id: updated.friend_id,
         friendId: updated.friend_id,
-        operatorId: updated.operator_id,
+        operatorId: chatAssigneeId(updated),
         status: updated.status,
         notes: updated.notes,
         revision: updated.revision,

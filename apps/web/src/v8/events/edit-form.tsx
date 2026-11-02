@@ -372,7 +372,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         </Button>
       </>} /> : null}
  <ConfirmDialog open={deleteOpen} title={`「${draft.name || 'このイベント'}」を削除しますか？`} description="削除すると元に戻せません。申込中・確定済みの予約やキャンセル待ちがあるときは削除できません。"
-      confirmLabel="削除する" destructive busy={deleteBusy} error={deleteError || undefined} onCancel={() => { if (!deleteBusy) setDeleteOpen(false) }} onConfirm={() => void removeEvent()}><OperationTargetSummary allAccounts accounts={eventOperationAccounts(savedDraft, accountId)} /></ConfirmDialog>
+      confirmLabel="削除する" destructive busy={deleteBusy} error={deleteError || undefined} onCancel={() => { if (!deleteBusy) setDeleteOpen(false) }} onConfirm={() => void removeEvent()}><OperationTargetSummary showAccountCount accounts={eventOperationAccounts(savedDraft, accountId)} /></ConfirmDialog>
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="イベントへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </></SaveErrorScope>
 }
@@ -814,7 +814,7 @@ export function SlotsTab({
           setDeleteSlotError('')
           setDeleteSlotTarget(null)
         }}
-      ><OperationTargetSummary allAccounts accounts={operationAccounts ?? [{ id: '' }]} /></ConfirmDialog>
+      ><OperationTargetSummary showAccountCount accounts={operationAccounts ?? [{ id: '' }]} /></ConfirmDialog>
 
       <ConfirmDialog
         open={bulkPreview !== null}
@@ -837,7 +837,7 @@ export function SlotsTab({
           setBulkDone(0)
           setBulkPreview(null)
         }}
-      ><OperationTargetSummary allAccounts accounts={operationAccounts ?? [{ id: '' }]} /></ConfirmDialog>
+      ><OperationTargetSummary showAccountCount accounts={operationAccounts ?? [{ id: '' }]} /></ConfirmDialog>
     </FormSection></SaveErrorScope>
   )
 }

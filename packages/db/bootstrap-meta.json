@@ -662,7 +662,8 @@
     "747_restaurant_followup_preferences.sql",
     "748_form_public_media_usages.sql",
     "749_booking_monthly_ledger.sql",
+    "750_chat_assignee_staff.sql",
     "751_nen_ec_member_rank_name.sql"
   ],
-  "migrationCount": 663
+  "migrationCount": 664
 }
