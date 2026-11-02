@@ -315,7 +315,7 @@ export default function BalancesTab() {
         value={ready ? summary.available : null}
         unit=""
         detail={ready
-          ? `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round(summary.available / summary.totalMembers) : 0)}`
+          ? `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round(summary.available / summary.totalMembers) : 0)} マイル`
           : emptyValue('unknown')}
       />
       <KpiCard
