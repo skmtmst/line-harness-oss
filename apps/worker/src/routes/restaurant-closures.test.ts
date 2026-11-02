@@ -183,7 +183,13 @@ beforeEach(() => {
 });
 
 
-afterEach(()=>{testDb.raw.close();vi.unstubAllGlobals();});
+afterEach(()=>{testDb.raw.close();vi.unstubAllGlobals();vi.useRealTimers();});
+function configurePhoneIntake() {
+ vi.useFakeTimers({toFake:['Date']});
+ vi.setSystemTime(new Date('2026-11-01T00:00:00Z'));
+ const hours=Array.from({length:7},(_,weekday)=>({weekday,periods:[{opensAt:'17:00',closesAt:'23:00'}]}));
+ testDb.raw.prepare("INSERT INTO rt_opening_hours_settings(store_id,hours_json,updated_by) VALUES('store-s',?,'test')").run(JSON.stringify(hours));
+}
 const closureInput={storeId:'store-s',startDate:'2026-11-10',endDate:'2026-11-10',allDay:false,startTime:'18:00',endTime:'20:00',kind:'temporary_closed'};
 const closurePath='/api/restaurant-test/closures';
 async function create(input:unknown=closureInput){const res=await post(closurePath,input);return {status:res.status,body:await res.json() as any};}
@@ -227,11 +233,12 @@ describe('日付で席予約を閉じる',()=>{
   expect((await changed.json() as any).data.closure.version).toBe(2);
  });
  test('一部貸切なら残りの卓に予約・仮押さえが入り、閉じた卓は理由付き409。終了の瞬間は空く',async()=>{
+  configurePhoneIntake();
   expect((await create({...closureInput,kind:'private_event',tableIds:['table-1']})).status).toBe(201);
   const {openSeatTables}=await import('../services/restaurant-closures.js');
   expect((await openSeatTables(testDb.db,'store-s',SLOT,SLOT_END,2)).map(t=>t.id)).toEqual(['table-2']);
   const denied=await post('/api/restaurant-test/reservations/manual',reservationInput());expect(denied.status).toBe(409);expect((await denied.json() as any).code).toBe('closure_conflict');
-  const hold=await post('/api/restaurant-test/reservations/holds',{...reservationInput(),holdMinutes:30});expect(hold.status).toBe(409);
+  const hold=await post('/api/restaurant-test/reservations/holds',{...reservationInput(),holdMinutes:30});expect(hold.status).toBe(409);expect((await hold.json() as any).code).toBe('closure_conflict');
   const remaining=await post('/api/restaurant-test/reservations/manual',{...reservationInput(),tableId:undefined});expect(remaining.status).toBe(201);expect((await remaining.json() as any).data.tableId).toBe('table-2');
   const boundary=await post('/api/restaurant-test/reservations/holds',{...reservationInput('table-1',SLOT_END,'2026-11-10T12:00:00Z'),holdMinutes:30});expect(boundary.status).toBe(201);
  });
@@ -303,6 +310,7 @@ test('日別在庫の空き席は閉じた卓を差し引き、既存予約と�
  const all=await get('/api/restaurant-test/inventory/day?storeId=store-s&date=2026-11-10');expect((await all.json() as any).data[0].freeSeats).toBe(0);
 });
 test('既存の仮押さえを休業保存後に確定予約へ変えられない',async()=>{
+ configurePhoneIntake();
  const held=await post('/api/restaurant-test/reservations/holds',{...reservationInput(),holdMinutes:30});expect(held.status).toBe(201);
  const id=(await held.json() as any).data.id;await create();
  expect(()=>testDb.raw.prepare("UPDATE rt_reservations SET status='confirmed' WHERE id=?").run(id)).toThrow('closure_conflict');
