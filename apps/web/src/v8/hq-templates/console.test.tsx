@@ -711,6 +711,26 @@ it('一時下書きは取消で捨てられ別種別・別所属には混ざら�
   expect(screen.queryByDisplayValue('別所属の下書き')).toBeNull()
   expect(screen.queryByDisplayValue('捨てる入力')).toBeNull()
 })
+it('カルーセルの通常入力は再読込後も一時下書きから復元する（H-18原文）', async () => {
+  const { unmount } = render(<HqTemplatesV8 type="template" />)
+  fireEvent.click(await screen.findByRole('tab', { name: /カルーセル/ }))
+  fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+  expect(await screen.findByRole('heading', { name: 'カルーセルを作る' })).toBeTruthy()
+  fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '未保存カルーセル' } })
+  const body = document.getElementById('cr-text') as HTMLInputElement
+  fireEvent.change(body, { target: { value: '未保存のカード本文' } })
+  await waitFor(() => expect(window.sessionStorage.getItem('lh_hq_create_draft_v1:tenant-a:owner:template:carousel') ?? '').toContain('未保存のカード本文'), { timeout: 5000 })
+  const { loadEditorDraft: loadTmp } = await import('@/lib/hq-template-create-attempt')
+  const loadedTmp = loadTmp(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'template', 'carousel')
+  expect(loadedTmp?.kind).toBe('carousel')
+  unmount()
+  cleanup()
+  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  render(<HqTemplatesV8 type="template" />)
+  await waitFor(() => expect(document.body.textContent ?? '').toContain('カルーセルを作る'))
+  expect(await screen.findByDisplayValue('未保存カルーセル')).toBeTruthy()
+  expect((document.getElementById('cr-text') as HTMLInputElement).value).toContain('未保存のカード本文')
+})
 it('未配布ありの1件を消すと数の帯を取り直す（B25）', async () => {
   calls.listStats
     .mockResolvedValueOnce({ thisMonthSentCount: 0, outdatedTemplateCount: 1 })

@@ -49,7 +49,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { FormEditV8 } from '@/v8/form-edit/public/edit/index'
 import type { FormEditHost } from '@/v8/form-edit/public/host/index'
 import { TemplateAssetEditor } from '@/v8/template-edit/public/asset/index'
-import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
+import type { TemplateEditHost,TemplateHostContent } from '@/v8/template-edit/public/host/index'
 import { TemplateMessageEditor } from '@/v8/template-edit/public/message/index'
 import { TemplateRichEditor } from '@/v8/template-edit/public/rich/index'
 import { TemplateRichVideoEditor } from '@/v8/template-edit/public/rich-video/index'
@@ -99,6 +99,8 @@ const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る
 
 type Stage = 'saved' | 'list' | 'detail' | 'edit' | 'accounts' | 'duplicates' | 'result'
 const errorText = (error: unknown) => describeApiFailure(error, '読み込み', { scope: 'hq' })
+/* H-18原文の一時下書きを復元できるタブ（message先行、他は実装順に追加）。 */
+const DRAFT_RESTORE_KINDS = ['message', 'carousel', 'question', 'rich_message'] as const
 
 export default function HqTemplatesV8(props: ConsoleProps) {
   const attribute = useAttributeTab('/hq/friend-attributes')
@@ -404,11 +406,17 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       entryHandled.current = 'create'
       /* 結果不明の復旧依頼がある再読込では startCreate で依頼・入力を消さない（PR#2042高）。 */
       if (createAttempt.current) return
-      /* H-18原文：子画面の通常入力の一時下書きがあれば initial として戻す（message先行、他は未完）。kind は一覧タブの値（新規では editKind と同値）。 */
+      /* H-18原文：子画面の通常入力の一時下書きがあれば initial として戻す。別タブの下書きはタブごと戻す。 */
       const creation = creationScope.current
-      const editorDraft = creation ? loadEditorDraft(window.sessionStorage, creation, type, kind) : null
-      if (editorDraft && editorDraft.kind === 'message') {
-        setRestoreDraft(editorDraft); setDetail(null); setFolderId(null); setName(''); setDescription(''); setStage('edit'); setError(''); setConflict(false)
+      let restored: { kind: TemplateKind; draft: EditorDraftContent } | null = null
+      if (creation) {
+        for (const draftKind of DRAFT_RESTORE_KINDS) {
+          const loaded = loadEditorDraft(window.sessionStorage, creation, type, draftKind)
+          if (loaded && loaded.kind === draftKind) { restored = { kind: draftKind, draft: loaded }; break }
+        }
+      }
+      if (restored) {
+        setKind(restored.kind); setRestoreDraft(restored.draft); setDetail(null); setFolderId(null); setName(''); setDescription(''); setStage('edit'); setError(''); setConflict(false)
         return
       }
       startCreate()
@@ -927,6 +935,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       onCancel: toList,
       onDraftChange: (content) => {
         const scope = creationScope.current
+        if (process.env.TMP_CAR_LOG) process.stdout.write('TMP-CONSOLE-DRAFT scope=' + Boolean(scope) + ' detail=' + Boolean(detail) + ' uncertain=' + String(createUncertain) + ' kind=' + kind + ' name=' + content.name.slice(0, 20) + '\n')
         if (!scope || detail !== null || createUncertain) return
         const body = 'messageContent' in content && typeof content.messageContent === 'string' ? content.messageContent : JSON.stringify(content)
         if (!content.name.trim() && !body.trim()) clearEditorDraft(window.sessionStorage, scope, type, kind)
@@ -937,8 +946,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         : restoreDraft?.kind === 'message'
           ? { name: String(restoreDraft.name ?? ''), messageType: String(restoreDraft.messageType ?? 'text'), messageContent: String(restoreDraft.messageContent ?? '') }
           : undefined,
-      /* 編集：カルーセル・質問・クーポン・リサーチ・リッチメッセージも店の作る画面で直す。 */
-      initialContent: editContent,
+      /* 編集：カルーセル・質問・クーポン・リサーチ・リッチメッセージも店の作る画面で直す。新規の一時下書きは保存と同じ形で戻す。 */
+      initialContent: editContent ?? (restoreDraft && restoreDraft.kind !== 'message' ? restoreDraft as unknown as TemplateHostContent : undefined),
       readOnly: !canEdit,
       uploadCarouselImage: async (file) => {
         setUploadBusy(true)
