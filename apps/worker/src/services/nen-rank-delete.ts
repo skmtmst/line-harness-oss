@@ -5,12 +5,8 @@ export class NenRankDeleteError extends Error {
   constructor(message: string, readonly status: 400 | 404 | 409) { super(message); }
 }
 
-// 会員一覧と同じ優先順位：ECのキー、通年、通年が0なら累計。
-const effectiveRank = `COALESCE(
-  (SELECT rank_key FROM nen_rank_settings WHERE line_account_id = f.line_account_id AND rank_key = s.member_rank_key),
-  (SELECT rank_key FROM nen_rank_settings WHERE line_account_id = f.line_account_id
-    AND annual_threshold_yen <= CASE WHEN s.annual_miles_yen <> 0 THEN s.annual_miles_yen ELSE s.lifetime_miles_yen END
-    ORDER BY annual_threshold_yen DESC LIMIT 1))`;
+// ECから届いたランクキーだけを移し替えの対象にする。
+const effectiveRank = 's.member_rank_key';
 
 export async function countRankMembers(db: D1Database, accountId: string, rankKey: string): Promise<number> {
   const row = await db.prepare(`SELECT COUNT(*) AS n FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id
@@ -60,7 +56,7 @@ export async function deleteNenRank(
       FROM nen_ec_member_snapshots s WHERE s.friend_id IN (${members}) AND ${gate}`)
       .bind(operation, operation, accountId, target.rank_key, actor, 'ランク削除による移し替え', now, now,
         accountId, source.rank_key, accountId, operation));
-    statements.push(db.prepare(`UPDATE nen_ec_member_snapshots SET member_rank_key = ?, member_rank = ?, mile_rate_percent = ?
+    statements.push(db.prepare(`UPDATE nen_ec_member_snapshots SET member_rank_key = ?, member_rank = ?, ec_member_rank_name = NULL, mile_rate_percent = ?
       WHERE friend_id IN (${members}) AND ${gate}`).bind(target.rank_key, target.name, target.mile_rate_percent, accountId, source.rank_key, accountId, operation));
   }
   statements.push(db.prepare(`DELETE FROM nen_rank_settings WHERE id = ? AND line_account_id = ? AND ${gate}`).bind(source.id, accountId, accountId, operation));

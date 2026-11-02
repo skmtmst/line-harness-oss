@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { daysUntil } from './nen-date-window.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import * as dbPackage from '@line-crm/db';
@@ -147,7 +148,7 @@ const DELIVERY_ELIGIBILITY_TAGS = [
   NEN_TAG.deliveryBirthday,
 ];
 const EC_STATE_TAGS = [
-  NEN_TAG.member, NEN_TAG.lineLinked, NEN_TAG.ecLinked, ...RANK_TAGS,
+  NEN_TAG.member, NEN_TAG.lineLinked, NEN_TAG.ecLinked,
   ...PURCHASE_STATE_TAGS, ...PURCHASE_RECENCY_TAGS,
   NEN_TAG.purchase20k, NEN_TAG.purchase50k, NEN_TAG.purchase100k,
   NEN_TAG.paymentAmazon, NEN_TAG.paymentCard, NEN_TAG.paymentBank,
@@ -159,6 +160,7 @@ const EC_STATE_TAGS = [
 const SCHEDULED_REFRESH_BATCH_SIZE = 20;
 const ALL_REFRESH_TAGS = [...new Set([
   ...EC_STATE_TAGS,
+  ...RANK_TAGS,
   ...PET_STATE_TAGS,
   ...HEALTH_STATE_TAGS,
   ...PHOTO_STATE_TAGS,
@@ -307,13 +309,12 @@ export function derivePetTagIds(pets: Pet[], now = new Date()): Set<string> {
 type RankTagLookup = Pick<NenRankSetting, 'rank_key' | 'name' | 'annual_threshold_yen' | 'mile_rate_percent' | 'tag_id'>;
 
 async function loadRankSettings(db: D1Database, lineAccountId: string): Promise<RankTagLookup[]> {
-  try {
-    // 丸ごと mock された @line-crm/db は、無い名前を読むだけで投げる。読み出しごと try に入れる。
+  {
     const loader = (dbPackage as { getNenRankSettings?: (db: D1Database, id: string) => Promise<NenRankSetting[]> }).getNenRankSettings;
     if (typeof loader !== 'function') return [];
-    return await loader(db, lineAccountId);
-  } catch {
-    return [];
+    const ranks = await loader(db, lineAccountId);
+    if (!ranks.length) logger.warn('nen_tag_refresh.rank_unconfigured');
+    return ranks;
   }
 }
 
@@ -391,7 +392,7 @@ export async function syncNenEcTags(db: D1Database, friendId: string, now = new 
   const resolver = new RankTagResolver(db);
   const rankTag = await resolver.desiredTagId(friend?.line_account_id ?? null, snapshot);
   if (rankTag) desired.add(rankTag);
-  const managed = [...EC_STATE_TAGS, ...(rankTag ? await resolver.managedTagIds(friend?.line_account_id ?? null) : [])];
+  const managed = [...EC_STATE_TAGS, ...((await resolver.ranksFor(friend?.line_account_id ?? null)).length ? await resolver.managedTagIds(friend?.line_account_id ?? null) : [])];
   return syncManagedTags(db, friendId, managed, desired, undefined, historySourceId);
 }
 
@@ -575,7 +576,11 @@ async function refreshScheduledNenTags(
   const rankResolver = new RankTagResolver(db);
   const extraRankTags = new Set<string>();
   for (const accountId of new Set(friends.map((friend) => friend.line_account_id))) {
-    for (const tagId of await rankResolver.managedTagIds(accountId)) extraRankTags.add(tagId);
+    try {
+      for (const tagId of await rankResolver.managedTagIds(accountId)) extraRankTags.add(tagId);
+    } catch {
+      logger.error('nen_tag_refresh.rank_lookup_failed');
+    }
   }
   const refreshTags = [...new Set([...ALL_REFRESH_TAGS, ...extraRankTags])];
   const currentTagQueries = [];
@@ -633,33 +638,38 @@ async function refreshScheduledNenTags(
   const gate = createFeatureJobGate();
 
   for (const friend of friends) {
-    // 機能オフ中は付け替えしない。再オンで再開する。
-    if (!await gate.canRun(db, friend.line_account_id, 'photo_review', 'NEN tag refresh')) {
-      continue;
-    }
-    const current = new Set((tagsByFriend.get(friend.id) ?? []).map((row) => row.tag_id));
-    const snapshot = snapshotByFriend.get(friend.id) ?? null;
-    const ecDesired = deriveEcTagIds(snapshot, now);
-    if (friend.user_id) ecDesired.add(NEN_TAG.ecLinked);
-    const rankTag = await rankResolver.desiredTagId(friend.line_account_id, snapshot);
-    if (rankTag) ecDesired.add(rankTag);
-    const rankManaged = rankTag ? await rankResolver.managedTagIds(friend.line_account_id) : [];
-    const desiredGroups: Array<[readonly string[], Set<string>]> = [
-      [[...EC_STATE_TAGS, ...rankManaged], ecDesired],
-      [PET_STATE_TAGS, derivePetTagIds(petsByFriend.get(friend.id) ?? [], now)],
-      [HEALTH_STATE_TAGS, deriveHealthTagIds(
-        healthByFriend.get(friend.id) ?? [],
-        flagsByFriend.get(friend.id) ?? [],
-        now,
-      )],
-      [PHOTO_STATE_TAGS, derivePhotoTagIds(photoByFriend.get(friend.id))],
-      [DELIVERY_ELIGIBILITY_TAGS,
-        new Set(current.has(NEN_TAG.deliveryOptout) ? [] : DELIVERY_ELIGIBILITY_TAGS)],
-    ];
-    for (const [managed, desired] of desiredGroups) {
-      const changed = await syncManagedTags(db, friend.id, managed, desired, current);
-      added += changed.added;
-      removed += changed.removed;
+    try {
+      // 機能オフ中は付け替えしない。再オンで再開する。
+      if (!await gate.canRun(db, friend.line_account_id, 'photo_review', 'NEN tag refresh')) {
+        continue;
+      }
+      const current = new Set((tagsByFriend.get(friend.id) ?? []).map((row) => row.tag_id));
+      const snapshot = snapshotByFriend.get(friend.id) ?? null;
+      const ecDesired = deriveEcTagIds(snapshot, now);
+      if (friend.user_id) ecDesired.add(NEN_TAG.ecLinked);
+      const rankTag = await rankResolver.desiredTagId(friend.line_account_id, snapshot);
+      if (rankTag) ecDesired.add(rankTag);
+      const rankManaged = (await rankResolver.ranksFor(friend.line_account_id)).length ? await rankResolver.managedTagIds(friend.line_account_id) : [];
+      const desiredGroups: Array<[readonly string[], Set<string>]> = [
+        [[...EC_STATE_TAGS, ...rankManaged], ecDesired],
+        [PET_STATE_TAGS, derivePetTagIds(petsByFriend.get(friend.id) ?? [], now)],
+        [HEALTH_STATE_TAGS, deriveHealthTagIds(
+          healthByFriend.get(friend.id) ?? [],
+          flagsByFriend.get(friend.id) ?? [],
+          now,
+        )],
+        [PHOTO_STATE_TAGS, derivePhotoTagIds(photoByFriend.get(friend.id))],
+        [DELIVERY_ELIGIBILITY_TAGS,
+          new Set(current.has(NEN_TAG.deliveryOptout) ? [] : DELIVERY_ELIGIBILITY_TAGS)],
+      ];
+      for (const [managed, desired] of desiredGroups) {
+        const changed = await syncManagedTags(db, friend.id, managed, desired, current);
+        added += changed.added;
+        removed += changed.removed;
+      }
+    } catch {
+      // 失敗した友だちは次の全件巡回で再試行し、残りの友だちを妨げない。
+      logger.error('nen_tag_refresh.friend_failed');
     }
   }
 

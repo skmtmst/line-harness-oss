@@ -26,6 +26,7 @@ vi.mock('../features/friends/friend-tag-attach.js', () => ({
 }));
 
 const { nenRanks } = await import('./nen-ranks.js');
+const { syncNenEcTags } = await import('../services/nen-tag-sync.js');
 
 const ACCOUNT = 'account-nen';
 let sql: Database.Database;
@@ -173,7 +174,7 @@ describe('PUT /api/nen/rank-settings', () => {
     expect(attachedFor('friend-a')).toContain(tagOf('プラチナ'));
     expect(attachedFor('friend-a')).not.toContain(tagOf('ゴールド'));
     // EC のキーがないときは金額からタグを推測しない。
-    expect(attachedFor('friend-b')).not.toContain(tagOf('ゴールド'));
+    expect(attachedFor('friend-b').filter((tag) => body.data.ranks.some((rank: any) => rank.tagId === tag))).toEqual([]);
     expect(attachedFor('friend-c')).toEqual([]);
   });
 
@@ -227,9 +228,10 @@ describe('DELETE /api/nen/rank-settings/:id', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('ECのキーがまだ無い会員も表示中のランクから移し、ブロック中の会員も取り残さない', async () => {
+  it('キーが一致するブロック中の会員も取り残さない', async () => {
     const data = await initial();
     sql.prepare('UPDATE friends SET is_following = 0 WHERE id = ?').run('friend-b');
+    sql.prepare("UPDATE nen_ec_member_snapshots SET member_rank_key = 'gold' WHERE friend_id = 'friend-b'").run();
     const source = data.ranks.find((r: any) => r.key === 'gold');
     const target = data.ranks.find((r: any) => r.key === 'regular');
     const result = await deletion(source.id, { accountId: ACCOUNT, replacementRankId: target.id, expectedVersion: 1 });
@@ -547,7 +549,7 @@ describe('GET /api/nen/members', () => {
     expect(body.data.total).toBe(2);
     expect(body.data.items.map((i: any) => [i.name, i.rankName, i.mileRatePercent, i.annualMilesYen])).toEqual([
       ['山田 太郎', 'プラチナ', 3, 138600],
-      ['鈴木 一郎', 'ゴールド', null, 72400],
+      ['鈴木 一郎', '未設定', null, 72400],
     ]);
     expect(body.data.kpis.byRank).toEqual({ platinum: 1, '': 1 });
     expect(body.data.ranks).toHaveLength(4);
@@ -572,6 +574,47 @@ describe('空のランク設定', () => {
     const initialized = await json(app, 'POST', '/api/nen/rank-settings/initialize', { accountId });
     expect(initialized.status).toBe(200);
     expect(initialized.body.data.ranks).toHaveLength(4);
+  });
+  it('タグがない環境で初期作成すると全ランクに実在するタグを用意する', async () => {
+    sql.exec('DELETE FROM tags');
+    sql.pragma('foreign_keys = ON');
+    const result = await json(harness('owner'), 'POST', '/api/nen/rank-settings/initialize', { accountId });
+    expect(result.status).toBe(200);
+    expect(result.body.data.ranks.every((r: any) => r.tagId && r.tagName)).toBe(true);
+  });
+  it('キーのない会員を金額から推測して削除対象にしない', async () => {
+    const app = harness('owner');
+    const data = (await json(app, 'GET', `/api/nen/rank-settings?accountId=${ACCOUNT}`)).body.data;
+    const gold = data.ranks.find((r: any) => r.key === 'gold');
+    expect(gold.memberCount).toBe(0);
+    const result = await json(app, 'DELETE', `/api/nen/rank-settings/${gold.id}`, { accountId: ACCOUNT, expectedVersion: 1 });
+    expect(result.status).toBe(200);
+    expect(sql.prepare("SELECT member_rank_key FROM nen_ec_member_snapshots WHERE friend_id = 'friend-b'").get()).toEqual({ member_rank_key: null });
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_member_rank_sync').get()).toEqual({ n: 0 });
+  });
+  it('設定のある店は不明キーの古いランクタグを外し、空の店は保持する', async () => {
+    sql.prepare("INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-b', 'nen-tag-member-rank-gold')").run();
+    await syncNenEcTags(db, 'friend-b');
+    expect(tagSide.detach).toHaveBeenCalledWith(expect.anything(), 'friend-b', 'nen-tag-member-rank-gold');
+    tagSide.detach.mockClear();
+    sql.prepare("UPDATE friends SET line_account_id = 'account-empty' WHERE id = 'friend-b'").run();
+    await syncNenEcTags(db, 'friend-b');
+    expect(tagSide.detach).not.toHaveBeenCalledWith(expect.anything(), 'friend-b', 'nen-tag-member-rank-gold');
+  });
+  it('タグ作成で途中失敗しても再試行で不足分を作れる', async () => {
+    sql.exec("DELETE FROM tags; CREATE TRIGGER fail_tag BEFORE INSERT ON tags BEGIN SELECT RAISE(ABORT, 'tag failure'); END");
+    const app = harness('owner');
+    expect((await json(app, 'POST', '/api/nen/rank-settings/initialize', { accountId })).status).toBe(500);
+    sql.exec('DROP TRIGGER fail_tag');
+    const retry = await json(app, 'POST', '/api/nen/rank-settings/initialize', { accountId });
+    expect(retry.status).toBe(200);
+    expect(retry.body.data.ranks.every((r: any) => r.tagId && r.tagName)).toBe(true);
+  });
+  it('ランクがありルールだけ無い店は保存する案内を返す', async () => {
+    sql.prepare('DELETE FROM nen_rank_rules WHERE line_account_id = ?').run(ACCOUNT);
+    const result = await json(harness('owner'), 'POST', '/api/nen/rank-settings/resync', { accountId: ACCOUNT });
+    expect(result.status).toBe(409);
+    expect(result.body.error).toContain('保存');
   });
   it('作成途中のエラーは全体を取り消し、再試行できる', async () => {
     sql.exec("CREATE TRIGGER fail_init BEFORE INSERT ON nen_lifetime_milestones WHEN NEW.threshold_yen = 600000 BEGIN SELECT RAISE(ABORT, 'injected failure'); END");

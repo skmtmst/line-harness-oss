@@ -112,7 +112,8 @@ async function syncToEc(c: Context<Env>, accountId: string): Promise<{ status: '
     getNenRankRules(db, accountId),
     getNenLifetimeMilestones(db, accountId),
   ]);
-  if (!ranks.length || !rules) return { status: 'failed', error: 'ランクが未設定です。初期ランクを作成してください' };
+  if (!ranks.length) return { status: 'failed', error: 'ランクが未設定です。初期ランクを作成してください' };
+  if (!rules) return { status: 'failed', error: 'ランクの設定を保存してから再同期してください' };
   const baseUrl = c.env.NEN_EC_BASE_URL;
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!baseUrl || !secret) {
@@ -180,6 +181,7 @@ nenRanks.post('/api/nen/rank-settings/initialize', requireRole('owner', 'admin')
   const denied = await requireAccount(c, accountId);
   if (denied) return denied;
   await ensureNenRankDefaults(c.env.DB, accountId);
+  await ensureRankTags(c.env.DB, await getNenRankSettings(c.env.DB, accountId), jstNow());
   return c.json({ success: true, data: await settingsResponse(c, accountId) });
 });
 
@@ -305,8 +307,11 @@ nenRanks.post('/api/nen/rank-settings/resync', requireRole('owner', 'admin'), in
   const accountId = accountIdFrom(c, body);
   const denied = await requireAccount(c, accountId);
   if (denied) return denied;
-  if (!(await getNenRankSettings(c.env.DB, accountId)).length || !(await getNenRankRules(c.env.DB, accountId))) {
+  if (!(await getNenRankSettings(c.env.DB, accountId)).length) {
     return c.json({ success: false, error: 'ランクが未設定です。初期ランクを作成してください' }, 409);
+  }
+  if (!(await getNenRankRules(c.env.DB, accountId))) {
+    return c.json({ success: false, error: 'ランクの設定を保存してから再同期してください' }, 409);
   }
   const sync = await syncToEc(c, accountId);
   return c.json({ success: true, data: { ...(await settingsResponse(c, accountId)), sync } });
@@ -397,7 +402,7 @@ nenRanks.get('/api/nen/members', async (c) => {
   ]);
   const data = items.map((row) => {
     const ecRankKey = row.member_rank_key?.trim() ? row.member_rank_key : null;
-    const ecRankName = row.member_rank?.trim() ? row.member_rank : null;
+    const ecRankName = row.ec_member_rank_name?.trim() ? row.ec_member_rank_name : null;
     const matchingRank = ecRankKey ? ranks.find((item) => item.rank_key === ecRankKey) : null;
     return {
       friendId: row.friend_id,
@@ -405,7 +410,7 @@ nenRanks.get('/api/nen/members', async (c) => {
       pictureUrl: row.picture_url,
       customerId: row.customer_id,
       rankKey: ecRankKey ?? matchingRank?.rank_key ?? null,
-      rankName: ecRankName ?? matchingRank?.name ?? '未設定',
+      rankName: matchingRank?.name ?? (ecRankKey ? ecRankName : null) ?? '未設定',
       mileRatePercent: row.mile_rate_percent ?? matchingRank?.mile_rate_percent ?? null,
       annualMilesYen: row.annual_miles_yen,
       lifetimeMilesYen: row.lifetime_miles_yen,

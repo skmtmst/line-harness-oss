@@ -295,21 +295,18 @@ describe('NEN bulk refresh scope', () => {
     }
   });
 
-  it('タグ更新に失敗したときは友だちカーソルを進めない', async () => {
-    const { db, getState } = loadTestDb(2, 0);
+  it('一人の失敗後も続行し、カーソルを進め、次の巡回で再試行する', async () => {
+    const { db, getState } = loadTestDb(22, 0);
     tagMocks.attach.mockRejectedValueOnce(new Error('tag write failed'));
-
-    await expect(refreshAllNenTags(
-      db,
-      { allTenants: true },
-      500,
-      new Date('2026-09-04T00:00:00.000Z'),
-    )).rejects.toThrow('tag write failed');
-
-    expect(getState()).toEqual({
-      lastFriendId: '',
-      cycleStartedAt: '2026-09-04T00:00:00.000Z',
-    });
+    const now = new Date('2026-09-04T00:00:00.000Z');
+    const first = await refreshAllNenTags(db, { allTenants: true }, 500, now);
+    expect(first.hasMore).toBe(true);
+    expect(getState().lastFriendId).toBe('friend-0019');
+    expect(tagMocks.tags.has('friend-0001')).toBe(true);
+    await refreshAllNenTags(db, { allTenants: true }, 500, now);
+    expect(getState().lastFriendId).toBe('');
+    await refreshAllNenTags(db, { allTenants: true }, 500, now);
+    expect(tagMocks.tags.has('friend-0000')).toBe(true);
   });
 
   it('keeps account filtering when an explicit account list is requested', async () => {
