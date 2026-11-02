@@ -53,9 +53,9 @@ function ReadOnlyChoice({ label, value, options }: { label: string; value: strin
   return <SaveErrorField names={["shown"]}><TextField aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} /></SaveErrorField>
 }
 
-export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore, resetRevision = 0 }: {
+export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore, missing = false }: {
   reservation: RestaurantReservation | null
-  resetRevision?: number
+  missing?: boolean
   tables: RestaurantTable[]
   courses: RestaurantMenuItem[]
   busy: boolean
@@ -69,7 +69,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   if (reservation && initialReservation.current?.id !== reservation.id) {
     initialReservation.current = { id: reservation.id, version: reservation.customer_version ?? 1 }
   }
-  const changedElsewhere = !!reservation && !!initialReservation.current && (reservation.customer_version ?? 1) !== initialReservation.current.version
+  const changedElsewhere = missing || (!!reservation && !!initialReservation.current && (reservation.customer_version ?? 1) !== initialReservation.current.version)
   const [draft, setDraft] = useState({ customerName: '', customerPhone: '', guestCount: '2', allergyNote: '', startsAt: '', endsAt: '', tableId: '', courseId: '' })
   useEffect(() => {
     if (!reservation || (reservation.customer_version ?? 1) !== initialReservation.current?.version) return
@@ -83,7 +83,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       tableId: reservation.table_id || '',
       courseId: reservation.course_id || '',
     })
-  }, [reservation?.id, resetRevision])
+  }, [reservation?.id])
   const fields = useSaveFormErrors()
   const [saveError, setSaveError] = useState<unknown>(null)
   const saving = useRef(false)
@@ -125,6 +125,8 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
         allergyNote: input.allergyNote || null,
       })
       if (ticket === attempt.current && result?.inputError !== undefined && !fields.capture(result.inputError)) setSaveError(result.inputError)
+    } catch (error) {
+      if (ticket === attempt.current && !fields.capture(error)) setSaveError(error)
     } finally {
       if (ticket === attempt.current) saving.current = false
     }
@@ -151,11 +153,11 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
         <>
           {canWrite ? (
             hold ? (
-              <Button type="button" variant="danger" className={styles.dialogLeft} disabled={busy} onClick={() => onCancelReservation(reservation.id)}>押さえを解除</Button>
+              <Button type="button" variant="danger" className={styles.dialogLeft} disabled={busy || changedElsewhere} onClick={() => onCancelReservation(reservation.id)}>押さえを解除</Button>
             ) : inactive ? (
-              <Button type="button" className={styles.dialogLeft} disabled={busy} onClick={() => onRestore(reservation.id)}>予約を有効に戻す</Button>
+              <Button type="button" className={styles.dialogLeft} disabled={busy || changedElsewhere} onClick={() => onRestore(reservation.id)}>予約を有効に戻す</Button>
             ) : (
-              <Button type="button" className={styles.dialogLeft} variant="danger-outline" disabled={busy} onClick={() => onCancelReservation(reservation.id)}>予約を取り消す</Button>
+              <Button type="button" className={styles.dialogLeft} variant="danger-outline" disabled={busy || changedElsewhere} onClick={() => onCancelReservation(reservation.id)}>予約を取り消す</Button>
             )
           ) : null}
           <Button type="button" onClick={onClose} disabled={busy}>{canWrite && !hold ? 'キャンセル' : '閉じる'}</Button>
@@ -163,7 +165,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
         </>
       )}
     >
-      {changedElsewhere ? <Notice tone="warn" role="alert" message="他の担当者が予約を変更しました。入力を控えてから閉じ、最新の予約を開き直してください。" /> : null}
+      {changedElsewhere ? <Notice tone="warn" role="alert" message={canWrite && !hold ? "別の操作で予約が変更されたか、一覧から移動しました。入力を控えてから閉じ、最新の予約を開き直してください。" : "別の操作で予約が変更されたか、一覧から移動しました。閉じて最新の予約を開き直してください。"} /> : null}
       {!changedElsewhere && saveError !== null ? <Notice tone="danger" role="alert" message={describeApiFailure(saveError, '保存')} /> : null}
       {hold ? (
         <DialogNote>{`${reservation.note || '仮押さえ'}・解除の期限 ${reservation.hold_expires_at ? hm(reservation.hold_expires_at) : emptyValue('unknown')}。期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。`}</DialogNote>

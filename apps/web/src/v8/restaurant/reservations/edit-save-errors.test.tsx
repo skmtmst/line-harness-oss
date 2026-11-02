@@ -110,7 +110,7 @@ it.each([
 ] as const)('対象外の失敗%s/%sは従来どおり知らせて読み直す', async (status, code, message) => {
   const { dialog, input, readsBefore } = await rejectEdit(new ApiError(status, message, code))
   await waitFor(() => expect(fixture.snapshot).toHaveBeenCalledTimes(readsBefore + 1))
-  await waitFor(() => expect(input.value).toBe('2'))
+  await waitFor(() => expect(input.value).toBe('9'))
   expect(within(dialog).queryByRole('alert')).toBeNull()
   const notices = [...document.querySelectorAll('[data-design-part="notice"]')]
   expect(notices.some(node => !dialog.contains(node))).toBe(true)
@@ -163,10 +163,11 @@ it.each(['同じ版', '別の版'] as const)('今日の自動更新が%sでも�
     fireEvent.change(input, { target: { value: '9' } })
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '保存する' })); await Promise.resolve() })
     await waitFor(() => expect(within(dialog).getByText(reason, { exact: false })).toBeTruthy())
-    const poll = interval.mock.calls.find(([, ms]) => ms === 30_000)?.[0]
+    const poll = interval.mock.calls.filter(([, ms]) => ms === 30_000).at(-1)?.[0]
     expect(typeof poll).toBe('function')
-    fixture.reservationsDay.mockResolvedValueOnce({ data: { date: '', reservations: today.map(row => ({ ...row, ...(row.id === 'r1' && version === '別の版' ? { customer_version: 2, guest_count: 3 } : {}) })) } })
+    fixture.reservationsDay.mockResolvedValueOnce({ data: { date: '', reservations: today.map(row => ({ ...row, ...(row.id === 'r1' ? { customer_name: '佐藤 更新', ...(version === '別の版' ? { customer_version: 2, guest_count: 3 } : {}) } : {}) })) } })
     await act(async () => { (poll as () => void)(); await Promise.resolve() })
+    await waitFor(() => expect(dialog.textContent).toContain('佐藤 更新'))
     expect(input.value).toBe('9')
     const button = within(dialog).getByRole('button', { name: '保存する' }) as HTMLButtonElement
     if (version === '同じ版') {
@@ -175,10 +176,88 @@ it.each(['同じ版', '別の版'] as const)('今日の自動更新が%sでも�
       await act(async () => { fireEvent.click(button); await Promise.resolve() })
       expect(fixture.updateReservation.mock.calls[1][2]).toEqual(expect.objectContaining({ guestCount: 9, expectedVersion: 1 }))
     } else {
-      expect(within(dialog).getByText(/他の担当者が予約を変更しました/)).toBeTruthy()
+      expect(within(dialog).getByText(/別の操作で予約が変更されたか/)).toBeTruthy()
       expect(button.disabled).toBe(true)
       fireEvent.click(button)
       expect(fixture.updateReservation).toHaveBeenCalledTimes(1)
     }
   } finally { interval.mockRestore() }
+})
+
+it('保存後の再読込も失敗したら入力を残す', async () => {
+  const { dialog, input } = await openEdit()
+  fixture.snapshot.mockRejectedValue(new TypeError('Failed to fetch'))
+  fixture.updateReservation.mockRejectedValueOnce(new ApiError(500, '内部の失敗'))
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '保存する' })); await Promise.resolve() })
+  await waitFor(() => expect(screen.getByText('最新の表示を読み込めませんでした')).toBeTruthy())
+  expect(input.value).toBe('9')
+})
+
+it('競合後の再読込で版が変わったら入力を残し保存を止める', async () => {
+  const { dialog, input } = await openEdit()
+  fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today.map(row => row.id === 'r1' ? { ...row, customer_version: 2, guest_count: 3 } : row), reservationTotal: 3 }) })
+  fixture.updateReservation.mockRejectedValueOnce(new ApiError(409, '最新の予約を確認してください', 'version_conflict'))
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '保存する' })); await Promise.resolve() })
+  await waitFor(() => expect(within(dialog).getByText(/別の操作で予約が変更されたか/)).toBeTruthy())
+  expect(input.value).toBe('9')
+  expect((within(dialog).getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(true)
+})
+
+it('今日の一覧から予約が消えても編集内容を保ち保存を止める', async () => {
+  const interval = vi.spyOn(globalThis, 'setInterval')
+  try {
+    render(<TestPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+    fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
+    const dialog = screen.getByRole('dialog')
+    const input = within(dialog).getByLabelText('人数') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '9' } })
+    const poll = interval.mock.calls.filter(([, ms]) => ms === 30_000).at(-1)?.[0]
+    expect(typeof poll).toBe('function')
+    fixture.reservationsDay.mockResolvedValue({ data: { date: '', reservations: today.filter(row => row.id !== 'r1') } })
+    await act(async () => { (poll as () => void)(); await Promise.resolve() })
+    await waitFor(() => expect(within(dialog).getByText(/別の操作で予約が変更されたか/)).toBeTruthy())
+    expect(input.value).toBe('9')
+    expect((within(dialog).getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(true)
+  } finally { interval.mockRestore() }
+})
+
+it('今日の見方で版競合後に日別と全体が更新されても入力を残す', async () => {
+  render(<TestPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
+  const dialog = screen.getByRole('dialog')
+  const input = within(dialog).getByLabelText('人数') as HTMLInputElement
+  fireEvent.change(input, { target: { value: '9' } })
+  const updated = today.map(row => row.id === 'r1' ? { ...row, customer_version: 2, guest_count: 3 } : row)
+  fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: updated, reservationTotal: 3 }) })
+  fixture.reservationsDay.mockResolvedValue({ data: { date: '', reservations: updated } })
+  fixture.updateReservation.mockRejectedValueOnce(new ApiError(409, '最新の予約を確認してください', 'version_conflict'))
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '保存する' })); await Promise.resolve() })
+  await waitFor(() => expect(within(dialog).getByText(/別の操作で予約が変更されたか/)).toBeTruthy())
+  expect(input.value).toBe('9')
+  expect((within(dialog).getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(true)
+})
+
+it('一覧の再読込で対象が消えても入力を残し保存を止める', async () => {
+  const { dialog, input } = await openEdit()
+  fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today.filter(row => row.id !== 'r1'), reservationTotal: 2 }) })
+  fixture.updateReservation.mockRejectedValueOnce(new ApiError(409, '最新の予約を確認してください', 'version_conflict'))
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '保存する' })); await Promise.resolve() })
+  await waitFor(() => expect(within(dialog).getByText(/別の操作で予約が変更されたか/)).toBeTruthy())
+  expect(input.value).toBe('9')
+  expect((within(dialog).getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(true)
+})
+
+it('今日以外の予約を詳細リンクから開いても編集できる', async () => {
+  const tomorrow = reservation('r4', { customer_name: '明日の予約', starts_at: at(1, 18), ends_at: at(1, 20), table_id: 't1' })
+  fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: [...today, tomorrow], reservationTotal: 4 }) })
+  window.history.replaceState({}, '', '?id=r4')
+  try {
+    render(<TestPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
+    const dialog = screen.getByRole('dialog')
+    expect((within(dialog).getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(within(dialog).queryByText(/別の操作で予約が変更されたか/)).toBeNull()
+  } finally { window.history.replaceState({}, '', '/') }
 })

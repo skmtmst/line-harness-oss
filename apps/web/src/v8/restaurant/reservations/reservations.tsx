@@ -103,7 +103,6 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   /* その日（今日の見方は選んだ日・ほかの見方は今日）の臨時休業・貸切。日の読み出しの口に入っている。 */
   const [dayClosures, setDayClosures] = useState<{ day: string; closures: RestaurantClosure[] } | null>(null)
   const [editTarget, setEditTarget] = useState<{ id: string; accountId: string; storeId: string; sequence: number } | null>(null)
-  const [editResetRevision, setEditResetRevision] = useState(0)
   const editSequence = useRef(0)
   const editContext = useRef({ target: editTarget, accountId, storeId })
   editContext.current = { target: editTarget, accountId, storeId }
@@ -178,7 +177,21 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     const target=rows.find(r=>r.id===id)??data.reservations.find(r=>r.id===id);
     return restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:target?.customer_version??1});
   }
-  const opened = rows.find((r) => r.id === openId) ?? data.reservations.find((r) => r.id === openId) ?? null
+  const dayOpened = rows.find((r) => r.id === openId)
+  const snapshotOpened = data.reservations.find((r) => r.id === openId)
+  const currentOpened = dayOpened && snapshotOpened
+    ? (dayOpened.customer_version ?? 1) >= (snapshotOpened.customer_version ?? 1) ? dayOpened : snapshotOpened
+    : dayOpened ?? snapshotOpened ?? null
+  const lastOpened = useRef<{ sequence: number; reservation: RestaurantReservation; seenInDay: boolean } | null>(null)
+  if (currentOpened && editTarget && openId) {
+    const seenInDay = (lastOpened.current?.sequence === editTarget.sequence && lastOpened.current.seenInDay) || (view === 'today' && !!todayRows?.some((r) => r.id === openId))
+    lastOpened.current = { sequence: editTarget.sequence, reservation: currentOpened, seenInDay }
+  }
+  const previousOpened = openId && editTarget && lastOpened.current?.sequence === editTarget.sequence ? lastOpened.current : null
+  const opened = currentOpened ?? previousOpened?.reservation ?? null
+  const missing = !!previousOpened && (view === 'today'
+    ? todayRows !== null && previousOpened.seenInDay && !todayRows.some((r) => r.id === openId)
+    : !currentOpened)
   const detailed = rows.find((r) => r.id === detailId) ?? data.reservations.find((r) => r.id === detailId) ?? null
   const cancelling = rows.find((r) => r.id === cancelId) ?? data.reservations.find((r) => r.id === cancelId) ?? null
 
@@ -274,7 +287,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
       <EditReservationDialog
         key={editTarget?.sequence ?? 0}
         reservation={opened}
-        resetRevision={editResetRevision}
+        missing={missing}
         tables={tables}
         courses={menuItems}
         busy={busy}
@@ -284,25 +297,15 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           const target = editTarget
           const current = () => editContext.current.target === target && editContext.current.accountId === accountId && editContext.current.storeId === storeId
           if (!opened || !target || !current()) return { saved: false }
-          let inputError: unknown
           const saved = await mutate(async () => {
-            try {
-              const result = await restaurantTestApi.updateReservation(accountId, opened.id, { ...patch })
-              if (!current()) throw new QuietError()
-              return result
-            } catch (error) {
-              if (!current()) throw new QuietError()
-              if (isReservationInputError(error)) {
-                inputError = error
-                throw new QuietError()
-              }
-              throw error
-            }
-          }, '予約を変更しました。')
+            const result = await restaurantTestApi.updateReservation(accountId, opened.id, patch)
+            if (!current()) throw new QuietError()
+            return result
+          }, '予約を変更しました。', { rethrow: (error) => !current() || isReservationInputError(error) })
           if (!current()) return { saved: false }
           if (saved) setOpenId('')
-          else if (inputError === undefined) void reload().then(() => { if (current()) setEditResetRevision((revision) => revision + 1) })
-          return { saved, inputError }
+          else void reload()
+          return { saved }
         }}
         onCancelReservation={(id) => { setOpenId(''); setCancelId(id) }}
         onRestore={(id) => {

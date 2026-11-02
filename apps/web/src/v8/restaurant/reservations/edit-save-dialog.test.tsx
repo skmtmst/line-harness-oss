@@ -66,7 +66,7 @@ it('別の版を受け取った後は古い確定口でも上書きしない', a
   fireEvent.change(screen.getByLabelText('人数'), { target: { value: '7' } })
   view.rerender(<EditReservationDialog {...props(save)} reservation={{ ...row, customer_version: 2, guest_count: 3 }} />)
   expect((screen.getByLabelText('人数') as HTMLInputElement).value).toBe('7')
-  expect(screen.getByText(/他の担当者が予約を変更しました/)).toBeTruthy()
+  expect(screen.getByText(/別の操作で予約が変更されたか/)).toBeTruthy()
   await act(async () => { await old() })
   expect(save).not.toHaveBeenCalled()
 })
