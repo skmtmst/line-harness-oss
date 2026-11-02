@@ -90,12 +90,12 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog, heading, notice }: {
   )
 }
 
-/** 「然-NEN 本店 ・ 1つの時間帯の総数 26席（有効の卓 8）」。 */
+/** 「然-NEN 本店 ・ 1つの時間帯の総数 26席（有効な卓 8 卓）」。 */
 function closuresDescription(ctx: RestaurantV8Context | null): string {
   if (!ctx?.store) return '日付を選んで、席の予約を閉じます。'
   const active = ctx.data.tables.filter((t) => t.store_id === ctx.selectedStoreId && t.is_active)
   const seats = active.reduce((sum, t) => sum + t.max_capacity, 0)
-  return `${ctx.store.name}・1つの時間帯の総数 ${seats}席（有効の卓 ${active.length}）`
+  return `${ctx.store.name}・1つの時間帯の総数 ${seats}席（有効な卓 ${active.length} 卓）`
 }
 
 export default function InventoryPage() {
