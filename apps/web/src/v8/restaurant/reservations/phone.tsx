@@ -119,9 +119,13 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
   const choosePerson = (next: Person | null) => { setPerson(next); setNotifyTarget(null) }
   useEffect(() => { setNotifyTarget(null) }, [selectedAccountId, storeId])
   const [error, setError] = useState<string | null>(null)
-  const [dayRows, setDayRows] = useState<RestaurantReservation[]>([])
-  const [dayReady, setDayReady] = useState(false)
-  const [hours, setHours] = useState<RestaurantOpeningDay[] | null>(null)
+  const scopeKey = JSON.stringify([selectedAccountId, storeId])
+  const dayKey = JSON.stringify([selectedAccountId, storeId, date])
+  const [dayData, setDayData] = useState<{ key: string; rows: RestaurantReservation[] } | null>(null)
+  const dayReady = Boolean(selectedAccountId && storeId && dayData?.key === dayKey)
+  const dayRows = dayReady ? dayData!.rows : []
+  const [hoursData, setHoursData] = useState<{ key: string; hours: RestaurantOpeningDay[] | null } | null>(null)
+  const hours = selectedAccountId && storeId && hoursData?.key === scopeKey ? hoursData.hours : null
   const [history, setHistory] = useState<RestaurantCustomerHistory | null>(null)
   const [historyError, setHistoryError] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
@@ -147,20 +151,21 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
 
   useEffect(() => {
     let current = true
-    setDayReady(false)
+    setDayData(null)
     if (!selectedAccountId || !storeId) return
     void restaurantTestApi.reservationsDay(selectedAccountId, storeId, date).then((res) => {
-      if (current) { setDayRows(Array.isArray(res.data?.reservations) ? res.data.reservations : []); setDayReady(true); setError(null) }
+      if (current) { setDayData({ key: dayKey, rows: Array.isArray(res.data?.reservations) ? res.data.reservations : [] }); setError(null) }
     }).catch(() => { if (current) setError('この日の予約を読み込めませんでした。日付を選び直してください。') })
     return () => { current = false }
-  }, [selectedAccountId, storeId, date])
+  }, [selectedAccountId, storeId, date, dayKey])
 
   useEffect(() => {
     let current = true
+    setHoursData(null)
     if (!selectedAccountId || !storeId) return
-    void restaurantTestApi.openingHours(selectedAccountId, storeId).then((res) => { if (current) setHours(res.data.hours) }).catch(() => { if (current) setHours(null) })
+    void restaurantTestApi.openingHours(selectedAccountId, storeId).then((res) => { if (current) setHoursData({ key: scopeKey, hours: res.data.hours ?? null }) }).catch(() => { if (current) setHoursData(null) })
     return () => { current = false }
-  }, [selectedAccountId, storeId])
+  }, [selectedAccountId, storeId, scopeKey])
 
   useEffect(() => {
     let current = true
@@ -233,6 +238,7 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
       })
       return
     }
+    if (!dayReady || !hours) { setError('営業時間と予約を確認できていません。'); return }
     const startsAt = new Date(`${date}T${time.padStart(5, '0')}:00+09:00`).toISOString()
     const endsAtIso = new Date(new Date(startsAt).getTime() + STAY_MINUTES * 60_000).toISOString()
     void onSave({
@@ -303,7 +309,7 @@ export default function PhoneReservation({ tableDefinition, storeId, storeName, 
         footerActions={(
           <>
             <Button onClick={onBack} disabled={busy}>キャンセル</Button>
-            <Button variant="primary" disabled={busy || !storeId || !dayReady || Boolean(inputReason)} disabledReason={inputReason} onClick={() => formRef.current?.requestSubmit()}>
+            <Button variant="primary" disabled={busy || !storeId || !dayReady || !hours || Boolean(inputReason)} disabledReason={inputReason || (!dayReady || !hours ? '営業時間と予約を確認できていません。' : undefined)} onClick={() => formRef.current?.requestSubmit()}>
               {kind === 'hold' ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}{kind === 'hold' ? '枠を押さえる' : '台帳に入れる'}
             </Button>
           </>

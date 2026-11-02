@@ -81,8 +81,10 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
   const notify = Boolean(friend?.lineUid) && notifyTarget === notifyKey
   const setNotify = (next: boolean) => setNotifyTarget(next ? notifyKey : null)
   useEffect(() => { setNotifyTarget(null) }, [accountId, storeId])
-  const [hours, setHours] = useState<RestaurantOpeningDay[] | null>(null)
-  const [dayRows, setDayRows] = useState<RestaurantReservation[]>([])
+  const scopeKey = JSON.stringify([accountId, storeId])
+  const [hoursData, setHoursData] = useState<{ key: string; hours: RestaurantOpeningDay[] | null } | null>(null)
+  const hours = open && accountId && storeId && hoursData?.key === scopeKey ? hoursData.hours : null
+  const [dayData, setDayData] = useState<{ key: string; rows: RestaurantReservation[] } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -98,22 +100,27 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
 
   useEffect(() => {
     let current = true
+    setHoursData(null)
     if (!open || !accountId || !storeId) return
     void restaurantTestApi.openingHours(accountId, storeId)
-      .then((res) => { if (current) setHours(res.data.hours ?? null) })
-      .catch(() => { if (current) setHours(null) })
+      .then((res) => { if (current) setHoursData({ key: scopeKey, hours: res.data.hours ?? null }) })
+      .catch(() => { if (current) setHoursData(null) })
     return () => { current = false }
-  }, [open, accountId, storeId])
+  }, [open, accountId, storeId, scopeKey])
+
+  const dayKey = JSON.stringify([accountId, storeId, date])
+  const dayReady = Boolean(open && accountId && storeId && date && dayData?.key === dayKey)
+  const dayRows = dayReady ? dayData!.rows : []
 
   useEffect(() => {
     let current = true
-    setDayRows([])
+    setDayData(null)
     if (!open || !accountId || !storeId || !date) return
     void restaurantTestApi.reservationsDay(accountId, storeId, date)
-      .then((res) => { if (current) setDayRows(Array.isArray(res.data?.reservations) ? res.data.reservations : []) })
+      .then((res) => { if (current) setDayData({ key: dayKey, rows: Array.isArray(res.data?.reservations) ? res.data.reservations : [] }) })
       .catch(() => { if (current) setError('この日の予約を読み込めませんでした。日付を選び直してください。') })
     return () => { current = false }
-  }, [open, accountId, storeId, date])
+  }, [open, accountId, storeId, date, dayKey])
 
   /* 電話番号で LINE の友だちを探す（4桁から・打つのが止まってから）。 */
   useEffect(() => {
@@ -132,7 +139,7 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
     return () => { current = false; clearTimeout(timer) }
   }, [open, accountId, storeId, phone])
 
-  const times = useMemo(() => (date ? openTimes(date, hours, now) : []), [date, hours, now])
+  const times = useMemo(() => (date ? openTimes(date, hours ?? [], now) : []), [date, hours, now])
   const freeAt = (label: string) => freeTables(tables, guests, startOf(date, label), dayRows).length > 0
   const candidates = useMemo(
     () => (time && date ? freeTables(tables, guests, startOf(date, time), dayRows) : []),
@@ -167,7 +174,7 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
   const save = async () => {
     setError('')
     if (fields.submit().length > 0) return
-    if (!date || !time || !chosenTable) return
+    if (!dayReady || !hours || !date || !time || !openTimes(date, hours, new Date()).includes(time) || !chosenTable) return
     const startsAt = new Date(startOf(date, time))
     setBusy(true)
     try {
@@ -197,10 +204,12 @@ export default function PhoneReservationDrawer({ tableDefinition, open, accountI
     }
   }
 
+  const validTime = Boolean(date && time && hours && openTimes(date, hours, new Date()).includes(time))
+  const timeReason = time && !validTime ? '営業時間内の時刻を選んでください。' : undefined
   const footer = (
     <DialogActions align="center" padding="none">
       <Button onClick={onClose} disabled={busy}>キャンセル</Button>
-      <Button variant="primary" onClick={() => void save()} disabled={busy || Boolean(inputReason)} disabledReason={inputReason} busy={Boolean(busy)} busyLabel="処理中…">
+      <Button variant="primary" onClick={() => void save()} disabled={busy || !dayReady || !hours || !validTime || Boolean(inputReason)} disabledReason={inputReason || (!dayReady || !hours ? '営業時間と予約を確認できていません。' : timeReason)} busy={Boolean(busy)} busyLabel="処理中…">
         <Check size={16} aria-hidden="true" />予約を入れる
       </Button>
     </DialogActions>
