@@ -209,8 +209,8 @@ export const templatesMethods = {
         `/api/templates/${id}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/templates/${id}`, { method: 'DELETE' }),
+    delete: (id: string, expectedDraftRevision?: number) =>
+      fetchApi<ApiResponse<null>>(`/api/templates/${id}${expectedDraftRevision === undefined ? '' : `?expectedDraftRevision=${expectedDraftRevision}`}`, { method: 'DELETE' }),
     usages: (id: string) =>
       fetchApi<ApiResponse<{
         autoReplies: Array<{ id: string; keyword: string; lineAccountId: string | null; templateVersion: number | null }>;

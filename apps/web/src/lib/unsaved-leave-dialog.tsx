@@ -7,6 +7,7 @@ import Dialog, { DialogActions } from '@/components/shared/dialog'
 
 interface UnsavedLeaveDialogProps {
   open: boolean
+  title?: string
   /**
    * 文の真ん中の名詞。「入力した共通情報」「カルーセルの変更」のように渡す。
    * 省いたときは「入力した内容」になる。
@@ -63,6 +64,7 @@ interface UnsavedLeaveDialogProps {
  */
 export function UnsavedLeaveDialog({
   open,
+  title = '保存していない変更があります',
   subject = '入力した内容',
   description,
   cancelLabel = '編集を続ける',
@@ -107,7 +109,7 @@ export function UnsavedLeaveDialog({
     return (
       <Dialog
         open={open}
-        title="保存していない変更があります"
+        title={title}
         description={body}
         error={error}
         busy={busy || savingLeave}
@@ -132,7 +134,7 @@ export function UnsavedLeaveDialog({
     <ConfirmDialog
       primaryAction="cancel"
       open={open}
-      title="保存していない変更があります"
+      title={title}
       description={body}
       error={error}
       confirmLabel={discardLabel}

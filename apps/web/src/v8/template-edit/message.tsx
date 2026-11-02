@@ -85,6 +85,10 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const [referenceState, setReferenceState] = useState<TemplateReferenceState>('idle')
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
+  const [discardError, setDiscardError] = useState('')
+  const [discardUnknown, setDiscardUnknown] = useState(false)
+  const discardLock = useRef(false)
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState<Conflict | null>(null)
   const [compareOpen, setCompareOpen] = useState(false)
@@ -140,12 +144,14 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const dirty = !loading && snapshot(editor.draft) !== clean
   const title = id || host?.initialMessage ? 'メッセージを編集' : 'メッセージを作る'
   usePageTitle(host ? 'テンプレート' : title)
-  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty: dirty || Boolean(!id && !host && autoCreated), busy: saving || publishing || discarding })
   /* 自動保存と手の保存が同時に新規作成へ流れて2件できないよう、送っている途中の保存を待ってから送る。 */
   const editVersion = useRef<{ expectedVersion: number; expectedDraftRevision: number } | null>(null)
   const inFlightRef = useRef<Promise<unknown> | null>(null)
   const autoCreatedRef = useRef(autoCreated)
   autoCreatedRef.current = autoCreated
+  const selectedAccountRef = useRef(selectedAccountId)
+  selectedAccountRef.current = selectedAccountId
 
   useEffect(() => {
     setFolders([])
@@ -331,6 +337,36 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     paused: leaveTarget !== null || saving || publishing,
     save: async () => (await saveNow({ silent: true })) !== null,
   })
+
+  const discardCreatedDraft = async () => {
+    if (discardLock.current) return
+    discardLock.current = true
+    setDiscarding(true)
+    setDiscardError('')
+    try {
+      while (inFlightRef.current) await inFlightRef.current.catch(() => undefined)
+      const created = autoCreatedRef.current
+      const version = editVersion.current
+      if (!created || !version || created.accountId !== selectedAccountRef.current || version.expectedVersion !== 0 || !Number.isSafeInteger(version.expectedDraftRevision)) {
+        setDiscardError('下書きの状態を確認できません。編集を続けて最新の状態を確かめてください。')
+        return
+      }
+      const response = await api.templates.delete(created.id, version.expectedDraftRevision)
+      if (created.accountId !== selectedAccountRef.current) return
+      if (!response.success) throw new Error(response.error)
+      confirmLeave()
+    } catch (cause) {
+      setDiscardUnknown(!(cause instanceof ApiError && (cause.code === 'IN_USE' || cause.status === 409)))
+      setDiscardError(cause instanceof ApiError && cause.code === 'IN_USE'
+        ? '使われているため消せません。利用先を確認してください。'
+        : cause instanceof ApiError && cause.status === 409
+        ? '下書きの状態が変わったため消せません。編集を続けて最新の状態を確かめてください。'
+        : '下書きの削除結果を確認できません。一覧で下書きが残っているか確認してください。移動すると未保存の変更は失われます。')
+    } finally {
+      discardLock.current = false
+      setDiscarding(false)
+    }
+  }
 
   const leave = (savedId: string) => {
     if (!id) { disarm(); router.push(createPageReturnHref('/templates', savedId)) }
@@ -680,7 +716,18 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         </ul>
       </ConfirmDialog>
 
-      <UnsavedLeaveDialog open={leaveTarget !== null} subject="テンプレートの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="テンプレートの変更"
+        busy={saving || discarding}
+        title={discardUnknown ? '下書きの確認' : autoCreated ? '下書きをどうしますか？' : undefined}
+        description={discardUnknown ? discardError : autoCreated ? '自動で作られた下書きがあります。残すか、消して移るか選んでください。' : undefined}
+        saveLabel={discardUnknown ? '一覧で確認する' : autoCreated ? '下書きを残して移る' : undefined}
+        discardLabel={autoCreated ? '下書きを消して移る' : undefined}
+        discardDisabled={discardUnknown}
+        error={discardUnknown ? undefined : discardError}
+        onSave={discardUnknown ? async () => true : autoCreated ? async () => { while (inFlightRef.current) await inFlightRef.current.catch(() => undefined); return !dirty || (await saveNow()) !== null } : undefined}
+        onSavedLeave={discardUnknown ? () => { disarm(); router.push('/templates') } : confirmLeave}
+        onConfirm={autoCreated ? () => void discardCreatedDraft() : confirmLeave}
+        onCancel={() => { setDiscardError(''); setDiscardUnknown(false); cancelLeave() }} />
     </></SaveErrorScope>
   )
 }

@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getRichMenuDeleteImpact } from '../src/rich-menus/index.js';
+import { deleteRichMenuGroup, getRichMenuDeleteImpact } from '../src/rich-menus/index.js';
 
 function asD1(sqlite: Database.Database): D1Database {
   return {
@@ -93,6 +93,17 @@ describe('getRichMenuDeleteImpact', () => {
     sqlite.pragma('foreign_keys = ON');
     sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'bootstrap.sql'), 'utf8'));
     insertAccount(sqlite);
+  });
+
+  test('作成中の削除は版と公開処理の状態を同時に確かめる', async () => {
+    insertGroup(sqlite, { id: 'target' });
+    db = asD1(sqlite);
+    const row = sqlite.prepare("SELECT version FROM rich_menu_groups WHERE id='target'").get() as {version:number};
+    expect(await deleteRichMenuGroup(db, 'target', row.version + 1)).toBe(false);
+    sqlite.prepare("UPDATE rich_menu_groups SET publishing_at='2026' WHERE id='target'").run();
+    expect(await deleteRichMenuGroup(db, 'target', row.version)).toBe(false);
+    sqlite.prepare("UPDATE rich_menu_groups SET publishing_at=NULL WHERE id='target'").run();
+    expect(await deleteRichMenuGroup(db, 'target', row.version)).toBe(true);
   });
 
   test('下書きでLINE実体も参照も無いときだけ削除できる', async () => {

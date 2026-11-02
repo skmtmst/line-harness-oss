@@ -36,19 +36,16 @@ it('属性付きの包みの非表示・操作・読み上げを保つ', () => {
   expect(click).toHaveBeenCalledOnce()
 })
 
-it('メニューへ移した非同期保存の二重実行を防ぎ、失敗を表示して再試行できる', async () => {
+it('帯の非同期保存は二重実行を防ぎ、失敗を表示して再試行できる', async () => {
   let fail!: (reason: Error) => void
   const save = vi.fn(() => new Promise<void>((_, reject) => { fail = reject }))
   render(<CreatePage title="作る" dirty={false} footerActions={<><Button>キャンセル</Button><Button onClick={save}>下書きを保存</Button><Button variant="primary">保存する</Button></>}>本文</CreatePage>)
-  fireEvent.click(screen.getByRole('button', { name: '作成・編集のその他の操作' }))
-  const item = await screen.findByRole('menuitem', { name: '下書きを保存' })
+  const item = screen.getByRole('button', { name: '下書きを保存' })
   fireEvent.click(item); fireEvent.click(item)
   expect(save).toHaveBeenCalledOnce()
-  expect(screen.getByRole('menu')).toBeTruthy()
   await act(async () => { fail(new Error('保存に失敗')) })
   expect(await screen.findByRole('alert')).toBeTruthy()
-  expect(screen.getByRole('menuitem', { name: '下書きを保存' })).toBeTruthy()
-  fireEvent.click(screen.getByRole('menuitem', { name: '下書きを保存' }))
+  fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
   expect(save).toHaveBeenCalledTimes(2)
   await act(async () => { fail(new Error('保存に失敗')) })
 })
@@ -80,14 +77,13 @@ it('非表示の主操作を数えず、非同期成功後は自分のメニュ�
   expect(document.activeElement).toBe(trigger)
 })
 
-it('作成の保存帯は取消と保存を保ち、下書き操作と無効条件を題のメニューへ渡す', async () => {
+it('作成の保存帯は取消と下書きと保存を保ち、無効条件も守る', async () => {
   const draft = vi.fn(), save = vi.fn(), cancel = vi.fn()
   const { container } = render(<CreatePage title="作る" footerActions={<>
     <Button onClick={cancel}>キャンセル</Button><Button onClick={draft} disabled>下書きを保存</Button><Button variant="primary" onClick={save}>保存する</Button>
   </>}><label>名前<input /></label></CreatePage>)
-  expect(container.querySelector('[data-sticky-actions]')?.textContent).toBe('キャンセル保存する')
-  fireEvent.click(screen.getByRole('button', { name: '作成・編集のその他の操作' }))
-  const item = await screen.findByRole('menuitem', { name: '下書きを保存' })
+  expect(container.querySelector('[data-sticky-actions]')?.textContent).toBe('キャンセル下書きを保存保存する')
+  const item = screen.getByRole('button', { name: '下書きを保存' })
   expect((item as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(item)
   expect(draft).not.toHaveBeenCalled()
@@ -108,19 +104,16 @@ it('移した入力不足の操作は名前・説明・titleを保ち、解除�
     </>}><label>名前<input value={name} onChange={event => setName(event.target.value)} /></label></CreatePage>
   }
   render(<Fixture />)
-  fireEvent.click(screen.getByRole('button', { name: '作成・編集のその他の操作' }))
-  const item = await screen.findByRole('menuitem', { name: '下書きを保存', exact: true }) as HTMLButtonElement
+  const item = screen.getByRole('button', { name: '下書きを保存', exact: true }) as HTMLButtonElement
   expect(item.disabled).toBe(true)
   expect(item.title).toBe('名前が必要です')
   expect(item.getAttribute('aria-description')).toBe('名前を入れてください')
-  const reason = document.getElementById(item.getAttribute('aria-describedby')!)!
-  expect(reason.textContent).toBe('名前を入れてください')
-  expect(reason.hidden).toBe(false)
+  expect(screen.getByRole('status').textContent).toContain('名前を入れてください')
   expect(item.hasAttribute('data-permission-locked')).toBe(false)
   fireEvent.click(item)
   expect(save).not.toHaveBeenCalled()
   fireEvent.change(screen.getByRole('textbox', { name: '名前' }), { target: { value: '会員' } })
-  const enabled = screen.getByRole('menuitem', { name: '下書きを保存' }) as HTMLButtonElement
+  const enabled = screen.getByRole('button', { name: '下書きを保存' }) as HTMLButtonElement
   expect(enabled.disabled).toBe(false)
   expect(enabled.title).toBe('')
   expect(enabled.hasAttribute('aria-description')).toBe(false)
@@ -135,8 +128,7 @@ it('移した権限の操作は焦点と説明を保ち、hrefと内部操作を
     <Button href="/tags/new" lockedReason="管理者に頼んでください" aria-label="別の下書きを保存" onClick={select}>下書きを保存</Button>
     <Button variant="primary">保存する</Button>
   </>}>本文</CreatePage>)
-  fireEvent.click(screen.getByRole('button', { name: '作成・編集のその他の操作' }))
-  const item = await screen.findByRole('menuitem', { name: '別の下書きを保存' }) as HTMLButtonElement
+  const item = screen.getByRole('button', { name: '別の下書きを保存' }) as HTMLButtonElement
   expect(item.disabled).toBe(false)
   expect(item.getAttribute('aria-disabled')).toBe('true')
   expect(item.hasAttribute('href')).toBe(false)
@@ -150,5 +142,4 @@ it('移した権限の操作は焦点と説明を保ち、hrefと内部操作を
   for (const key of ['Enter', ' ']) expect(fireEvent.keyDown(item, { key })).toBe(false)
   fireEvent.click(item)
   expect(select).not.toHaveBeenCalled()
-  expect(screen.getByRole('menu')).toBeTruthy()
 })
