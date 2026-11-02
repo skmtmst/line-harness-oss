@@ -128,6 +128,7 @@ describe('在庫を直すための案内', () => {
     ctx.mutate = vi.fn(async action => { try { await action(); return true } catch { return false } })
     render(draw(ctx))
     await screen.findByText('19:00 の卓')
+    fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
     fireEvent.click(screen.getByRole('button', { name: /受付時間と配分を保存/ }))
     await screen.findByText(/予約枠・在庫を保存しました/)
     fireEvent.click(screen.getByRole('button', { name: '最新を読み込んで続ける' }))
