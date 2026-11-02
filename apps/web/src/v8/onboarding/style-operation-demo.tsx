@@ -119,7 +119,7 @@ const EC_BOARD_SAMPLE: EcEntry[] = [
  * 保存しただけでは始まらない。実データの読み書き・送信はしない。
  */
 const RESTAURANT_AFTER_SAMPLE = {
-  visit: { time: '11:30–12:30', name: '見本 みお', menu: 'カット', staff: '見本 あおい' },
+  visit: { time: '18:00–20:00', name: '見本 たろう', detail: '2名・テーブル席' },
   thanks: { when: '翌日 12:00', text: '昨日はありがとうございました。またのお越しをお待ちしています。' },
 }
 
@@ -134,7 +134,7 @@ export function RestaurantAfterDemo() {
         <ul className={styles.can}>
           <li>
             <StatusBadge tone="success">来店済み</StatusBadge>
-            <span>{RESTAURANT_AFTER_SAMPLE.visit.time} {RESTAURANT_AFTER_SAMPLE.visit.name} さま・{RESTAURANT_AFTER_SAMPLE.visit.menu}・担当 {RESTAURANT_AFTER_SAMPLE.visit.staff}</span>
+            <span>{RESTAURANT_AFTER_SAMPLE.visit.time} {RESTAURANT_AFTER_SAMPLE.visit.name} さま・{RESTAURANT_AFTER_SAMPLE.visit.detail}</span>
           </li>
         </ul>
       </section>
