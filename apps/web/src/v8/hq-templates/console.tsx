@@ -40,6 +40,7 @@ import { fetchHqDistributionTargets } from '@/lib/api/helpers/hq-distribution-ta
 import { hqMediaApi } from '@/lib/api/helpers/hq-media'
 import { formatNumber } from '@/lib/format'
 import { HqRichMenuCompatibilityError,hqRichMenuDefinitionFromSeed,hqRichMenuSeedFromDefinition } from '@/lib/hq-rich-menu-create'
+import { readFormEditorDraft } from '@/lib/hq-form-editor-draft'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import { clearCreationAttempt,clearEditorDraft,loadCreationAttempt,loadEditorDraft,persistCreationAttempt,persistEditorDraft,sameCreationScope,type CreationAttempt,type CreationScope,type EditorDraftContent } from '@/lib/hq-template-create-attempt'
 import { hqTemplatesApi,type DistributionMode,type DistributionResult,type FormDefinition,type HqAccount,type HqTemplate,type HqTemplateListItem,type MessageTemplateDefinition,type Preflight,type RichMenuDefinition,type TagDefinition,type TemplateDefinition,type TemplateDetail,type TemplateInput,type TemplateType } from '@/lib/hq-templates-api'
@@ -99,7 +100,7 @@ const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る
 
 type Stage = 'saved' | 'list' | 'detail' | 'edit' | 'accounts' | 'duplicates' | 'result'
 const errorText = (error: unknown) => describeApiFailure(error, '読み込み', { scope: 'hq' })
-/* H-18原文の一時下書きを復元できるタブ（message先行、他は実装順に追加）。 */
+/* メッセージ系の復元タブ。タグ・回答フォームは固有の初期値を下で復元する。 */
 const DRAFT_RESTORE_KINDS = ['message', 'carousel', 'question', 'rich_message', 'rich_video', 'coupon', 'research'] as const
 
 export default function HqTemplatesV8(props: ConsoleProps) {
@@ -150,6 +151,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [stage, setStage] = useState<Stage>('list')
   const [folders, setFolders] = useState<HqTemplateFolder[]>([])
   const [folderLoadFailed, setFolderLoadFailed] = useState(false)
+  const [foldersReady, setFoldersReady] = useState(false)
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folderFilter, setFolderFilter] = useListUrlValue<string>('folderFilter', 'all')
   const [textOverrides, setTextOverrides] = useState<Record<string, string>>({})
@@ -264,7 +266,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }, [])
   useEffect(() => {
     let current = true
-    void hqTemplatesApi.folders.list().then((rows) => { if (current) setFolders(rows) }).catch(() => { if (current) setFolderLoadFailed(true) })
+    void hqTemplatesApi.folders.list().then((rows) => { if (current) { setFolders(rows); setFoldersReady(true) } }).catch(() => { if (current) setFolderLoadFailed(true) })
     return () => { current = false }
   }, [])
   useEffect(() => {
@@ -316,6 +318,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     return () => clearInterval(timer)
   }, [stage])
 
+  const freshFormBaseline = useRef(freshDefinition('form') as FormDefinition)
   const tagDraft = useRef<TemplateDefinition | null>(null)
   /* H-18原文の再読込対策：タグの作る画面の通常入力の一時下書き。結果不明の送信依頼とは別キーで所属・種別を区別し、保存・取消・作り直しで消す。 */
   const TAG_DRAFT_KIND = 'tag'
@@ -331,6 +334,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       }
       persistEditorDraft(window.sessionStorage, scope, 'tag', TAG_DRAFT_KIND, { kind: TAG_DRAFT_KIND, name: draftName, definition: next })
     } catch { /* 下書きの保存失敗は本機能を止めない */ }
+  }
+  const clearFormCreateDraft = () => {
+    if (type === 'form' && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, 'form', 'form')
   }
   const clearTagCreateDraft = () => {
     if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, 'tag', TAG_DRAFT_KIND)
@@ -381,7 +387,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : [])
     createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false); setRestoreDraft(null)
     /* 下書きは新規作成の分だけ消す。editKind は一覧の描画では未初期化のため kind を使う（新規では同値）。 */
-    if (!detail && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft()
+    if (!detail && creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); if (!detail) clearFormCreateDraft()
     flushListUrlState()
     entryHandled.current = ''
     window.history.replaceState(window.history.state, '', listHrefKeepingType(returnHref))
@@ -437,6 +443,13 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         setKind(restored.kind); setRestoreDraft(restored.draft); setDetail(null); setFolderId(null); setName(''); setDescription(''); setStage('edit'); setError(''); setConflict(false)
         return
       }
+      if (type === 'form' && creation) {
+        const loaded = loadEditorDraft(window.sessionStorage, creation, 'form', 'form')
+        if (readFormEditorDraft(loaded)) {
+          setRestoreDraft(loaded); setDetail(null); setFolderId(typeof loaded?.folderId === 'string' ? loaded.folderId : null); setName(''); setDescription(''); setDefinition(freshFormBaseline.current); setStage('edit'); setError(''); setConflict(false)
+          return
+        }
+      }
       /* H-18原文：タグの作る画面の一時下書きがあれば戻す（編集・結果不明の復旧は対象外）。 */
       if (type === 'tag' && creation) {
         const loaded = loadEditorDraft(window.sessionStorage, creation, 'tag', TAG_DRAFT_KIND)
@@ -462,8 +475,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }, [ready, busy, location, canEdit])
   const startCreate = () => {
     createAttempt.current = null; sessionUploads.current = []; setMenuTargets([]); setRestoreDraft(null)
-    if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft()
+    if (creationScope.current) clearEditorDraft(window.sessionStorage, creationScope.current, type, kind); clearTagCreateDraft(); clearFormCreateDraft()
     const fresh = freshDefinition(type), nextFolder = folderFilter !== 'all' && folderFilter !== 'none' ? folderFilter : null
+    if (type === 'form') freshFormBaseline.current = fresh as FormDefinition
     editBaseline.current = JSON.stringify({ name: '', description: '', definition: fresh, folderId: nextFolder })
     setDetail(null); setFolderId(nextFolder); setName(''); setDescription(''); setDefinition(fresh); setStage('edit'); setError(''); setConflict(false)
     showCreateUrl()
@@ -501,7 +515,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       }
       if (createSettlement.current?.kind === 'rejected') {
         clearReceipt()
-        createSettlement.current = null; createAttempt.current = null; setCreateUncertain(false)
+        createSettlement.current = null; createAttempt.current = null; setCreateUncertain(false); setRestoreDraft(null)
         setMessage('前回の保存は受け付けられていません。内容を確認して保存し直してください。')
         return
       }
@@ -526,6 +540,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         createSettlement.current = { kind: 'saved', detail: saved }
       }
       clearReceipt()
+      if (type === 'form') { clearFormCreateDraft(); setRestoreDraft(null) }
       createSettlement.current = null
     }
     if (!alive.current) return
@@ -1107,7 +1122,16 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     const listRow = detail ? templates.find((item) => item.id === detail.template.id) as HqTemplateListItem | undefined : undefined
     const host: FormEditHost = {
       backHref: '/hq/form-submissions',
-      initial: { name: value.name, description: value.description, layout: value.layout, onSubmitTagId: value.onSubmitTagId },
+      initial: (!detail && readFormEditorDraft(restoreDraft)) || { name: value.name, description: value.description, layout: value.layout, onSubmitTagId: value.onSubmitTagId },
+      baseline: !detail ? hqFormDefinitionToEditor(freshFormBaseline.current) : undefined,
+      onDraftChange: (content) => {
+        const scope = creationScope.current
+        if (!scope || detail || createUncertain || !canEdit) return
+        // 初回描画の空入力は保存しない。名前が空でも設問・見た目の変更は残す。
+        const baseline = hqFormDefinitionToEditor(freshFormBaseline.current)
+        if (JSON.stringify(content, (key, value) => key === 'id' ? undefined : value) === JSON.stringify({ name: baseline.name, description: baseline.description, layout: baseline.layout, onSubmitTagId: baseline.onSubmitTagId }, (key, value) => key === 'id' ? undefined : value)) { clearFormCreateDraft(); return }
+        persistEditorDraft(window.sessionStorage, scope, 'form', 'form', { kind: 'form', ...content, folderId })
+      },
       // 配った先で直せる参照先だけ（統括のタグのひな形）。友だち情報・テンプレート・リマインダは店ごとの ID なので選ばせない。
       refs: { tags: referenceOptions('tag'), friendFields: [], scenarios: [], reminders: [], templates: [] },
       accountName: '公式アカウント',
@@ -1129,7 +1153,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         }
         setDefinition(next); setName(next.form.name); setDescription(next.form.description ?? '')
         let saved = false
-        await save(distribute, next, next.form.name, next.form.description ?? '', false, { onSaved: () => { saved = true } })
+        await save(distribute, next, next.form.name, next.form.description ?? '', false, { folderId: !detail && foldersReady && !folderLoadFailed && !folders.some(folder => folder.id === folderId) ? null : folderId, onSaved: () => { saved = true } })
         return saved
       },
       onCancel: toList,
