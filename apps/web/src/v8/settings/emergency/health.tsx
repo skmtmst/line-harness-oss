@@ -62,7 +62,7 @@ const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'title' | 'sub' | 't
   { id: 'line', title: 'LINE のアカウントとつながっているか', sub: 'アカウント', threshold: 'LINE の確認で問題が出ると「注意」・重いと「エラー」', href: '/accounts' },
   { id: 'monitoring', title: '5分ごとの確認が動いているか', sub: '自動確認', threshold: '10分（2回分）止まると「エラー」', href: '/emergency?tab=health' },
   { id: 'api', title: 'API・外部連携', sub: 'EC連携・外部連携', threshold: '取り込みの失敗が続くと「注意」', href: '/ec-commerce' },
-  { id: 'quota', title: '送れる数の上限', sub: 'LINE と musubo の両方', threshold: '80%で「注意」・95%・予定分の超過で「エラー」', href: '/broadcasts' },
+  { id: 'quota', title: '送れる数の上限', sub: 'LINE と musubo', threshold: '80%で「注意」・95%・予定分の超過で「エラー」', href: '/broadcasts' },
   { id: 'friends', title: '友だちの急な減り', sub: 'この1日', threshold: '1日で5%以上・10人以上減ると「注意」', href: '/friends' },
   { id: 'webhook', title: 'Webhook が届いているか', sub: 'LINE からの受け取り', threshold: '受け取りの失敗が続くと「注意」', href: '/webhooks' },
   { id: 'delivery', title: '配信が送れているか', sub: '予約・自動の配信', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
