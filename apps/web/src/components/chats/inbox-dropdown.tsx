@@ -91,7 +91,7 @@ const rowClass = 'flex w-full items-center gap-2 px-3 py-2 text-left text-xs'
 // 担当者
 // ─────────────────────────────────────────────────────────────
 
-export type OperatorOption = { id: string; name: string }
+export type OperatorOption = { id: string; name: string; disabled?: boolean }
 
 export function buildOperatorRows(
   operators: OperatorOption[],
@@ -114,6 +114,7 @@ export function buildOperatorRows(
     探し直さずに確認できる。
   */
   if (currentValue && currentValue !== 'unassigned') {
+    if (!ordered.some(item => item.id === currentValue)) ordered.unshift({ id: currentValue, name: '担当者不明', disabled: true })
     ordered.sort((a, b) => Number(b.id === currentValue) - Number(a.id === currentValue))
   }
   return [...ordered, { id: 'unassigned', name: '未割り当て' }]
@@ -238,6 +239,7 @@ export function OperatorDropdown({
                 type="button"
                 role="option"
                 aria-selected={selected}
+                disabled={row.disabled}
                 onClick={() => { onChange(row.id); setOpen(false); setQuery('') }}
                 className={`${rowClass} ${selected ? 'bg-accent-soft text-accent-deep font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
               >

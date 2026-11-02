@@ -30,7 +30,7 @@ export default function BulkOperationEditor({ kind, accountId, tags, input, onCh
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [reload, setReload] = useState(0)
   const local = kind === 'add_tag' || kind === 'remove_tag' || kind === 'send_message'
-  const needsAccount = !local && kind !== 'assign_operator'
+  const needsAccount = !local
   useEffect(() => {
     let current = true
     setChoices([])
@@ -40,7 +40,7 @@ export default function BulkOperationEditor({ kind, accountId, tags, input, onCh
       try {
         let items: Choice[]
         if (kind === 'assign_operator') {
-          const res = await api.operators.list()
+          const res = await api.operators.list(accountId)
           if (!res.success) throw new Error('failed')
           items = [{ id: '__none', name: '未割り当てにする' }, ...res.data]
         } else if (kind === 'start_scenario' || kind === 'stop_scenario') {

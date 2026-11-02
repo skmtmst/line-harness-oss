@@ -50,8 +50,9 @@ test('SLA-11 SLA-24 SLA-29: 3段の通知は各1回、見回りが遅れたら�
 });
 test('SLA-15 SLA-14: DBで期限順に並べてからページ分割、超過の件数も同じ条件',async()=>{
  await gapCall(a(),'/api/inbox/routing-settings?account_id=a','PUT',body);await upsertChatOnMessage(d.db,'f');vi.advanceTimersByTime(5*60000);await upsertChatOnMessage(d.db,'f2');await refreshInboxSla(d.db,'a');
+ d.raw.exec("UPDATE chats SET assignee_staff_id='s' WHERE friend_id='f'");
  const r=new Hono<Env>();r.get('/api/chats',c=>slaChatList(c));const app=gapApp(d,[r]);
- const res=await (await gapCall(app,'/api/chats?sort=sla_due&lineAccountId=a&limit=1')).json() as any;expect(res.data.map((r:any)=>r.friendId)).toEqual(['f']);expect(res.total).toBe(2);
+ const res=await (await gapCall(app,'/api/chats?sort=sla_due&lineAccountId=a&limit=1')).json() as any;expect(res.data.map((r:any)=>r.friendId)).toEqual(['f']);expect(res.total).toBe(2);expect(res.data[0].operatorName).toBe('担当');
  vi.advanceTimersByTime(26*60000);const over=await (await gapCall(app,'/api/chats?slaState=overdue&lineAccountId=a')).json() as any;expect(over.total).toBe(1);expect(over.data.map((r:any)=>r.friendId)).toEqual(['f']);
 });
 test('SLA-17 SLA-18: スタッフ・閲覧のみの設定変更と他店の読取を拒否、代理書込モードは許可',async()=>{

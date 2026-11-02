@@ -39,21 +39,22 @@ export async function getInboxStats(
   const mine = operatorId
     ? await count(
         db,
-        `SELECT COUNT(*) AS n FROM chats c JOIN friends f ON f.id = c.friend_id WHERE c.status = 'in_progress' AND c.operator_id = ? AND ${friendScope.sql}`,
+        `SELECT COUNT(*) AS n FROM chats c JOIN friends f ON f.id = c.friend_id WHERE c.status = 'in_progress' AND c.assignee_staff_id = ? AND ${friendScope.sql}`,
         operatorId, ...friendScope.binds,
       )
     : await count(db, `SELECT COUNT(*) AS n FROM chats c JOIN friends f ON f.id = c.friend_id WHERE c.status = 'in_progress' AND ${friendScope.sql}`, ...friendScope.binds);
 
   const assigneeUnreadRows = await db
     .prepare(
-      `SELECT c.operator_id, o.name AS operator_name, COUNT(*) AS unread
+      `SELECT COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) AS operator_id, CASE WHEN c.assignee_staff_id IS NOT NULL THEN COALESCE(sm.name, '担当者不明') WHEN c.operator_id IS NOT NULL THEN COALESCE(o.name, '担当者不明') ELSE NULL END AS operator_name, COUNT(*) AS unread
          FROM chats c
          JOIN friends f ON f.id = c.friend_id
          LEFT JOIN operators o ON o.id = c.operator_id
+         LEFT JOIN staff_members sm ON sm.id = c.assignee_staff_id
         WHERE c.status = 'unread' AND ${friendScope.sql}
-        GROUP BY c.operator_id, o.name
-        ORDER BY CASE WHEN c.operator_id IS NULL THEN 0 ELSE 1 END,
-                 o.name ASC, c.operator_id ASC`,
+        GROUP BY COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id), operator_name
+        ORDER BY CASE WHEN COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) IS NULL THEN 0 ELSE 1 END,
+                 operator_name ASC, operator_id ASC`,
     )
     .bind(...friendScope.binds)
     .all<{ operator_id: string | null; operator_name: string | null; unread: number }>();

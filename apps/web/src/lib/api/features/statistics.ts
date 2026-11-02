@@ -4,7 +4,7 @@ import type { InboxStats, ListStats, BroadcastStats, FriendStats } from '../type
 
 export const statisticsMethods = {
   chatStats: {
-    get: () => fetchApi<ApiResponse<InboxStats>>('/api/chats/stats'),
+    get: (accountId?: string | null) => fetchApi<ApiResponse<InboxStats>>(`/api/chats/stats${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`),
   },
   listStats: {
     get: (accountId?: string) => fetchApi<ApiResponse<ListStats>>(
@@ -21,7 +21,7 @@ export const statisticsMethods = {
       ),
   },
   operators: {
-    list: () =>
-      fetchApi<ApiResponse<Array<{ id: string; name: string }>>>('/api/operators'),
+    list: (accountId?: string | null) =>
+      fetchApi<ApiResponse<Array<{ id: string; name: string }>>>(`/api/operators${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`),
   },
 }
