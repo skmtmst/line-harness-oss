@@ -51,6 +51,7 @@ function testApp(handler = vi.fn((c) => c.json({ success: true }))) {
   app.post('/api/restaurant-test/google/connect/start', handler);
   app.get('/api/restaurant-test/google/reviews', handler);
   app.get('/api/not-in-manifest', handler);
+  app.post('/api/nen/rank-settings/initialize', handler);
   return { app, handler };
 }
 
@@ -105,6 +106,17 @@ describe('featureEnforcementMiddleware', () => {
     const response = await app.request(`${path}?lineAccountId=account-1`, {}, env);
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ code: 'FEATURE_DISABLED', featureId });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  test('EC機能オフの店では初期ランクを作れない', async () => {
+    mocks.getAccountSetting.mockResolvedValue(JSON.stringify({ enabled: false }));
+    const { app, handler } = testApp();
+    const response = await app.request('/api/nen/rank-settings/initialize', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountId: 'account-1' }),
+    }, env);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'FEATURE_DISABLED', featureId: 'ec_commerce' });
     expect(handler).not.toHaveBeenCalled();
   });
 

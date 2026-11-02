@@ -33,7 +33,7 @@ test('E3: 人数枠の登録前照会が失敗したら、空き扱いせずや�
 test.each([false, true])('E3: %sの案内から既存の確定と見送りAPIに接続する', async seat => {
   (seat ? vi.mocked(api.seatWaitlists) : vi.mocked(api.bookingWaitlists)).mockResolvedValue({ waitlist: [offered(seat)] } as never);
   vi.mocked(api.acceptWaitlist).mockResolvedValue({ booking_id: 'b', status: 'confirmed' } as never);
-  vi.mocked(api.acceptSeatWaitlist).mockResolvedValue({} as never);
+  vi.mocked(api.acceptSeatWaitlist).mockResolvedValue({ reservation_id: 'r', status: 'confirmed' } as never);
   const { unmount } = render(<WaitlistOfferSheet id="w" seat={seat} onClose={() => {}} />);
   fireEvent.click(await screen.findByRole('button', { name: 'この枠で予約する' }));
   await screen.findByText('予約が確定しました。');

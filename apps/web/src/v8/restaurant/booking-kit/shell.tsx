@@ -41,7 +41,7 @@ export interface RestaurantV8Context {
   selectedStoreId: string
   busy: boolean
   /** 書き込み操作の共通処理。成功したら取り直して帯を出す。 */
-  mutate: (action: () => Promise<unknown>, success: string) => Promise<boolean>
+  mutate: (action: () => Promise<unknown>, success: string, options?: { rethrow: (error: unknown) => boolean }) => Promise<boolean>
   reload: () => Promise<void>
 }
 
@@ -196,7 +196,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
   }, [selectedAccountId, query, begin, accept])
   useEffect(() => { void load() }, [load])
 
-  const mutate = useCallback(async (action: () => Promise<unknown>, success: string) => {
+  const mutate = useCallback(async (action: () => Promise<unknown>, success: string, options?: { rethrow: (error: unknown) => boolean }) => {
     setBusy(true)
     try {
       await action()
@@ -205,6 +205,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
       else setSavedButUnread(true)
       return true
     } catch (error) {
+      if (options?.rethrow(error)) { setNotice(null); throw error }
       if (error instanceof QuietError) { setNotice(null); return false }
       setNotice({
         tone: 'error',
