@@ -151,6 +151,8 @@ it('保存した分析：一覧CSVは有効のまま、履歴CSVだけ取得中�
   await waitFor(() => enabled(headerCsv())); blocked(csvs()[1], '結果の履歴を読み込んでいます。')
   await act(async () => pending.reject(new Error('履歴の模擬失敗')))
   await waitFor(() => expect(csvs()[1].getAttribute('aria-description')).not.toBe('結果の履歴を読み込んでいます。'))
+  blocked(csvs()[1], '結果の履歴を読み込めないため書き出せません。')
+  expect(document.body.textContent).not.toContain('履歴の模擬失敗')
   enabled(headerCsv())
   m.snapshots.mockResolvedValue({ success: true, data: [] })
   fireEvent.click(screen.getByRole('button', { name: 'もう一度', exact: true }))

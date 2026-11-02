@@ -69,7 +69,9 @@ it('「…」の確定するも同じ保存口を呼ぶ', async () => {
 
 it('D-07: 名前と日本時間の日時がセルに見える', () => {
   setup(base)
-  const cell = screen.getByText('田中').closest('td')!
-  expect(cell.textContent).toContain('10/01 09:00')
-  expect(cell.querySelector('time')?.getAttribute('datetime')).toBe(base.occurredAt)
+  const row = screen.getByText('田中').closest('tr')!
+  const time = row.querySelector('time')!
+  expect(time.textContent).toContain('10/01 09:00')
+  expect(time.getAttribute('datetime')).toBe(base.occurredAt)
+  expect(time.closest('td')).not.toBe(screen.getByText('田中').closest('td'))
 })

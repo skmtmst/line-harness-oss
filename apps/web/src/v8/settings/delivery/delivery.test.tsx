@@ -154,7 +154,7 @@ describe('設定 › デリバリー連携', () => {
     for (const name of ['出前館', 'ロケットナウ']) {
       const region = card(name)
       expect(region.queryByRole('button', { name: '連携を申し込む' })).toBeNull()
-      expect(region.getByText('今は申し込めません。Uber Eats の連携をご利用いただけます。')).toBeTruthy()
+      expect(region.getByText('今は申し込めません。Uber Eats の連携状況をご確認ください。')).toBeTruthy()
       expect(region.getByText('未接続')).toBeTruthy()
       expect(region.queryByText('申し込んだ日')).toBeNull()
     }
@@ -167,6 +167,15 @@ describe('設定 › デリバリー連携', () => {
     expect(screen.getByText(/出前館とロケットナウは今は申し込めません。/)).toBeTruthy()
     expect(screen.queryByText(/出前館とロケットナウは「連携を申し込む」を押すだけです。/)).toBeNull()
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+  })
+
+  it('Uber の接続を利用できない環境でも利用可能と言い切らず、状態の確認を案内する', () => {
+    render(<DeliverySettingsPage services={[uber({ ready: false }), ...SERVICES.filter(service => service.id !== 'uber')]} />)
+    expect(button('Uber Eats にログインしてつなぐ').disabled).toBe(true)
+    for (const name of ['出前館', 'ロケットナウ']) {
+      expect(card(name).getByText('今は申し込めません。Uber Eats の連携状況をご確認ください。')).toBeTruthy()
+      expect(card(name).queryByText(/ご利用いただけます/)).toBeNull()
+    }
   })
 
   it('つなぐを押すと、サーバが返した Uber のログイン画面へ移る', async () => {
@@ -377,7 +386,7 @@ describe('設定 › デリバリー連携', () => {
     for (const name of ['出前館', 'ロケットナウ']) {
       const region = card(name)
       expect(region.queryByRole('button', { name: '連携を申し込む' })).toBeNull()
-      expect(region.getByText('今は申し込めません。Uber Eats の連携をご利用いただけます。')).toBeTruthy()
+      expect(region.getByText('今は申し込めません。Uber Eats の連携状況をご確認ください。')).toBeTruthy()
     }
     expect(screen.queryByRole('dialog')).toBeNull()
   })
