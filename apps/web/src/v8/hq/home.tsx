@@ -568,6 +568,9 @@ export default function HqHomeV8() {
             const state = statusOf(account)
             const warned = state.tone === 'warn'
             const name = account.displayName || account.name
+            const nameCharacters = Array.from(name)
+            const namePrefix = nameCharacters.slice(0, -6).join('')
+            const nameSuffix = nameCharacters.slice(-6).join('')
             return (
               <Card key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
                 <div className={styles.cardHead}>
@@ -575,7 +578,7 @@ export default function HqHomeV8() {
                   <div className={styles.cardName}>
                     {/* 絵 `JKjsE`：名前の前に左の列（フォルダ）の色の丸。未分類は色の無い輪。 */}
                     <p className={styles.name} title={name}>
-                      <FolderDotName folder={folderDotOf(account)}>{name}</FolderDotName>
+                      <FolderDotName folder={folderDotOf(account)}><span className={styles.middleName} title={name} aria-label={name}><span aria-hidden="true" className={styles.middleNamePrefix}>{namePrefix}</span><span aria-hidden="true" data-hq-name-suffix="">{nameSuffix}</span></span></FolderDotName>
                     </p>
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
                     <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />

@@ -60,6 +60,10 @@
 .cardHead .meta { padding-left: var(--tpl-folder-dot-indent); }
 /* 丸＋名前の行（inline-flex）が行の高さを 2px 押し上げないよう、名前の段を flex にする。 */
 .cardHead .name { display: flex; min-width: 0; }
+/* 長い名前は中央を省き、店を区別する末尾を残す。 */
+.middleName { display: flex; min-width: 0; max-width: 100%; }
+.middleNamePrefix { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 
 .cardName {
   display: flex;
