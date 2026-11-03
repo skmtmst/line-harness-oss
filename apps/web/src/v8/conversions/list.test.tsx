@@ -535,6 +535,52 @@ describe('V8 コンバージョンの一覧：読み込みの扱い', () => {
 })
 
 describe('V8 コンバージョンの一覧：止める・差し替える・削除する', () => {
+  it('確認した成果地点のアカウントと環境を示し、アカウント変更後の古い確認では止めない', async () => {
+    await mount()
+    await openStopDialog()
+    expect(stopDialog().textContent).toContain('本店')
+    expect(stopDialog().textContent).toContain('環境')
+    fireEvent.change(screen.getByLabelText('止める理由'), { target: { value: '変更のため' } })
+    await act(async () => { root.render(<ConversionListV8 accountId="account-b" />) })
+    await flush()
+    expect(screen.queryByRole('dialog', { name: '「商品を買った」を止めますか？' })).toBeNull()
+    expect(calls.some((call) => call.startsWith('POST ') && call.endsWith('/stop'))).toBe(false)
+  })
+
+  it('アカウントを変えた古い成果地点の確認では停止しない', async () => {
+    await mount()
+    await openStopDialog()
+    fireEvent.change(screen.getByLabelText('止める理由'), { target: { value: '変更のため' } })
+    await act(async () => { root.render(<ConversionListV8 accountId="account-b" />) })
+    await flush()
+    const stale = screen.queryByRole('dialog', { name: '「商品を買った」を止めますか？' })
+    if (stale) fireEvent.click(confirmButton())
+    await flush()
+    expect(calls.some((call) => call.startsWith('POST ') && call.endsWith('/stop'))).toBe(false)
+  })
+
+  it('アカウントを戻しても古い確認を復活させない', async () => {
+    await mount()
+    await openStopDialog()
+    await act(async () => { root.render(<ConversionListV8 accountId="account-b" />) })
+    await act(async () => { root.render(<ConversionListV8 accountId="account-a" />) })
+    await flush()
+    expect(screen.queryByRole('dialog', { name: '「商品を買った」を止めますか？' })).toBeNull()
+  })
+
+  it('確認を開いた後に成果地点の版が変わっていたら止めない', async () => {
+    overrideFetch((url) => url.pathname.endsWith('/delete-impact')
+      ? json({ success: true, data: { definition: { ...items[0], version: 4 }, usages: [], eventCount: 0, canDelete: true, stopImpact: { affectedUsageCount: 0 }, replacementCandidates: [] } })
+      : null)
+    await mount()
+    await openStopDialog()
+    fireEvent.change(screen.getByLabelText('止める理由'), { target: { value: '変更のため' } })
+    fireEvent.click(confirmButton())
+    await flush()
+    expect(calls.some((call) => call.startsWith('POST ') && call.endsWith('/stop'))).toBe(false)
+    expect(stopDialog().textContent).toContain('読み込めませんでした')
+  })
+
   it('影響の読み込み中は確定できず、読めなかったら理由を出して送らない', async () => {
     let release: (response: Response) => void = () => {}
     overrideFetch((url) => (url.pathname.endsWith('/delete-impact')

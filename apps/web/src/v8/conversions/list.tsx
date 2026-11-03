@@ -40,6 +40,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Disclosure from '@/components/shared/disclosure'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
@@ -237,7 +238,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const narrow = useNarrowViewport()
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, accounts } = useAccount()
   /* 作る画面は `?highlight=<作った行のID>` で戻ってくる。 */
   const highlightId = useSearchParams().get('highlight')
 
@@ -267,6 +268,8 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   const [panelId, setPanelId] = useDetailPanelUrl('point')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [stopTarget, setStopTarget] = useState<ConversionDefinitionListItem | null>(null)
+  const [stopEpoch, setStopEpoch] = useState(-1)
+  const stopRequest = useRef(0)
   const [stopImpact, setStopImpact] = useState<ConversionDefinitionDeleteImpact | null>(null)
   const [stopImpactLoading, setStopImpactLoading] = useState(false)
   const [stopAction, setStopAction] = useState<ConversionStopAction>('stop')
@@ -301,6 +304,8 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   const role = useStaffRole()
   const canEdit = canEditFeature('/conversions', role) && canEditFeature('conversion.definition.edit', role)
   const canExport = canEditFeature('/conversions', role) && canEditFeature('conversion.report.export', role)
+  const stopScope = useRef({ accountId, canEdit, epoch: 0 })
+  if (stopScope.current.accountId !== accountId || stopScope.current.canEdit !== canEdit) stopScope.current = { accountId, canEdit, epoch: stopScope.current.epoch + 1 }
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [actionNotice, setActionNotice] = useState('')
@@ -615,6 +620,9 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
 
   const openStop = async (target: ConversionDefinitionListItem, action: ConversionStopAction = 'stop') => {
     if (!canEdit) return
+    const epoch = stopScope.current.epoch
+    const request = ++stopRequest.current
+    setStopEpoch(epoch)
     setStopReason('')
     setDetailTarget(null)
     setStopTarget(target)
@@ -625,21 +633,24 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
     setStopImpactLoading(true)
     try {
       const response = await api.conversions.definitionDeleteImpact(target.id)
+      if (stopRequest.current !== request || stopScope.current.epoch !== epoch) return
       if (!response.success) throw new Error(response.error)
+      if (response.data.definition.id !== target.id || response.data.definition.version !== target.version) throw new Error('stale')
       setStopImpact(response.data)
     } catch (saveFailure) {
+      if (stopRequest.current !== request || stopScope.current.epoch !== epoch) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setStopError('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。') }
     } finally {
-      setStopImpactLoading(false)
+      if (stopRequest.current === request && stopScope.current.epoch === epoch) setStopImpactLoading(false)
     }
   }
 
   /* 止める・差し替える・削除する。影響が読めていないまま確定しない。理由は必須。 */
   const runStop = async () => {
-    if (!stopTarget || stopping || !canEdit || stopImpactLoading) return
+    if (!stopTarget || stopping || !canEdit || stopImpactLoading || stopEpoch !== stopScope.current.epoch) return
     if (!stopImpact) {
       setStopError('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
       return
@@ -926,7 +937,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
 </DetailPanel>
   ) : null
 
-  const stopCard = stopTarget ? (
+  const stopCard = stopTarget && stopEpoch === stopScope.current.epoch ? (
     <Dialog open contentLayout="form" description={stopImpactLoading
           ? '利用先と影響を読み込んでいます。'
           : stopImpact
@@ -945,6 +956,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
         </Button>
       </DialogActions>}>
 
+      <OperationTargetSummary accounts={[{ id: stopTarget.lineAccountId ?? '', name: accounts.find(account => account.id === stopTarget.lineAccountId)?.name }]} />
       <SaveErrorField names={["conversion-v8-stop-action","stopAction"]}><RadioCardGroup legend="どうしますか？">
         <RadioCard
           variant="row"
