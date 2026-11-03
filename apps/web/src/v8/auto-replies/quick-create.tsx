@@ -105,6 +105,11 @@ export default function QuickCreateV8({
   useEffect(() => { acknowledgedRef.current = [] }, [accountId])
 
   const saving = phase === 'saving'
+  const keywordMissing = validateKeywords(keywords) !== null && draft.trim() === ''
+  const replyMissing = validateReply(reply) !== null
+  const requiredReason = keywordMissing && replyMissing ? '反応する言葉と返す文を入れてください。'
+    : keywordMissing ? '反応する言葉を1つ以上入れてください。'
+      : replyMissing ? '返す文を入れてください。' : undefined
   const guard = useUnsavedGuard({ dirty: keywords.length > 0 || draft !== '' || reply !== '', busy: saving, onDiscard: onClose })
 
   const addKeyword = (value: string) => {
@@ -280,7 +285,8 @@ export default function QuickCreateV8({
           <Button
             type="button"
             variant="primary"
-            disabled={saving || inputsDisabled}
+            disabled={saving || inputsDisabled || Boolean(requiredReason)}
+            disabledReason={!saving && !inputsDisabled ? requiredReason : undefined}
             lockedReason={lockedReason}
             busy={saving}
             busyLabel={phase === 'confirming' ? '有効にしています…' : '保存しています…'}
