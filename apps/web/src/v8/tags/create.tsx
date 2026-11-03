@@ -221,12 +221,12 @@ function TagCreate() {
         previewLabel="設定内容を見る"
         previewTitle="タグの設定"
         preview={(
-          <div className={styles.aside}>
+          <Card variant="aside" gap="normal">
             <h2 className={styles.asideTitle}>できあがるタグ</h2>
             <TagPill name={name || 'タグ名'} color={(() => { const group = groups.find((group) => group.id === groupId); return group ? folderDisplayColor(group) : null })()} />
             <h2 className={styles.asideTitle}>このあと</h2>
             <p className={styles.asideText}>作ると、すぐに友だちへ付けられます。タグ連動（付いたときの動き）は作ったあとの編集で足します。</p>
-          </div>
+          </Card>
         )}
         footerActions={<>
           <Button type="button" onClick={() => guard.guarded(() => router.push('/tags'))} disabled={saving} disabledReason={saving ? 'タグを作っています。終わるまでお待ちください。' : undefined}>キャンセル</Button>

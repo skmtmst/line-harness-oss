@@ -78,3 +78,12 @@ for (const role of [null, 'viewer', 'staff']) test(`権限${role}の人には入
   expect(screen.getByRole('button', { name: '一覧へ戻る' })).toBeTruthy()
   expect(net.create).not.toHaveBeenCalled()
 })
+
+test('設定の見本は共通カードで囲み、利用できる付け方だけリンクにする', () => {
+  render(<TagCreate />)
+  const preview = document.querySelector('[data-template-region="preview"]')!
+  expect(preview.querySelector('[data-card-variant="aside"]')).toBeTruthy()
+  expect(screen.getByRole('link', { name: /回答フォーム/ }).getAttribute('href')).toBe('/form-submissions')
+  expect(screen.getByRole('link', { name: /オートメーション/ }).getAttribute('href')).toBe('/automations')
+  expect(screen.queryByRole('link', { name: /タグ連動/ })).toBeNull()
+})

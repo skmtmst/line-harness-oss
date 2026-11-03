@@ -143,7 +143,7 @@
   resize: none;
   outline: none;
 }
-.textarea::placeholder { color: var(--color-ink-faint); }
+.textarea::placeholder { color: var(--color-placeholder); }
 .countRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-inbox-composer-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
 .bottomRow { margin-top: 0; gap: var(--tpl-inbox-composer-gap); }
 .bottomRow > span:first-of-type span { font-size: var(--text-micro); }
