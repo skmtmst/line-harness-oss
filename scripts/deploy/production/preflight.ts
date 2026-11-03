@@ -24,8 +24,15 @@ export function assertStagingRun(run: any, jobs: any, sha: string, repository: s
   if (run?.repository?.full_name !== repository || run?.head_repository?.full_name !== repository || run?.path !== '.github/workflows/deploy-cloudflare-staging.yml' || run?.head_sha !== sha || run?.status !== 'completed' || run?.conclusion !== 'success' || run?.event !== 'workflow_dispatch') throw new Error('staging_run');
   if (!jobs?.jobs?.some((job: any) => job.conclusion === 'success' && job.steps?.some((step: any) => step.name === 'Verify public source revisions' && step.conclusion === 'success'))) throw new Error('staging_public_verification');
 }
-export function assertProductionApproval(environment: any): void {
-  if (!environment?.protection_rules?.some((rule: any) => rule.type === 'required_reviewers' && rule.reviewers?.length > 0)) throw new Error('production_reviewers');
+/** GitHub Free cannot protect a private environment with required reviewers.
+ * The owner must start (and, for a rerun, restart) this exact release workflow. */
+export function assertProductionApproval(run: any, context: NodeJS.ProcessEnv, repository: string): void {
+  if (context.GITHUB_ACTOR !== 'skmtmst' || context.GITHUB_TRIGGERING_ACTOR !== 'skmtmst' ||
+      run?.actor?.login !== 'skmtmst' || run?.triggering_actor?.login !== 'skmtmst' ||
+      String(run?.id) !== context.GITHUB_RUN_ID || run?.repository?.full_name !== repository ||
+      run?.head_repository?.full_name !== repository || run?.head_sha !== context.GITHUB_SHA ||
+      run?.head_branch !== 'main' || run?.event !== 'workflow_dispatch' ||
+      run?.path !== '.github/workflows/deploy-cloudflare-production.yml') throw new Error('production_owner_dispatch');
 }
 export async function preflight(sha: string, runId: string, fetcher: typeof fetch = fetch): Promise<void> {
   if (process.env.OPERATIONS_PAUSED !== 'true') throw new Error('operations_pause_confirmation');
@@ -41,7 +48,9 @@ export async function preflight(sha: string, runId: string, fetcher: typeof fetc
     if (!response.ok) throw new Error('github_metadata');
     return response.json();
   };
-  assertProductionApproval(await get('environments/production'));
+  const ownRunId = requireValue(process.env.GITHUB_RUN_ID);
+  if (!/^\d+$/.test(ownRunId)) throw new Error('production_run_id');
+  assertProductionApproval(await get(`actions/runs/${ownRunId}`), process.env, repository);
   assertStagingRun(await get(`actions/runs/${runId}`), await get(`actions/runs/${runId}/jobs?filter=latest&per_page=100`), sha, repository);
   // A successful dry-run or config replay cannot substitute for this exact public revision.
   await verifyPublicBuild('https://stg-api.musubo.jp', sha, 'https://stg-admin.musubo.jp', sha, fetcher);

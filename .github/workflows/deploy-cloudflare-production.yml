@@ -35,7 +35,9 @@ jobs:
   authorize:
     if: >-
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
-      github.repository != 'Shudesu/line-harness-oss' && vars.LINE_HARNESS_CLOUDFLARE_DEPLOY == 'true'
+      github.repository == 'skmtmst/line-harness-oss' &&
+      github.actor == 'skmtmst' && github.triggering_actor == 'skmtmst' &&
+      vars.LINE_HARNESS_CLOUDFLARE_DEPLOY == 'true'
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -70,7 +72,7 @@ jobs:
           node-version: '22.23.4'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Verify approved main, production reviewers, and staging source revision
+      - name: Verify owner dispatch, approved main, and staging source revision
         env:
           GH_TOKEN: ${{ github.token }}
         run: pnpm exec tsx scripts/deploy/production/run.ts preflight
