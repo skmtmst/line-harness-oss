@@ -799,16 +799,18 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
           )}
 
           {currentStep === 3 && sub === 2 && connection && (
-            <CreateStepColumns data-design-node="Lwxyh" previewTitle="ためしに友だち追加" previewLabel="友だち追加の方法を見る" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ためしに友だち追加">
-                <h2 className={styles.asideH2}>ためしに友だち追加</h2>
-                <p className={styles.asideP}>まだ友だちでなければ、スマホの LINE で QR を読み取って追加してください。</p>
-                <p className={styles.asideP}>すでに友だちなら、この公式アカウントとのトークに「接続テスト」と送ってください。受信が確認できると次へ進めます。</p>
+            <CreateStepColumns data-design-node="Lwxyh" previewTitle={receipt.status === 'confirmed' && !receiptRequestFailed ? '接続の確認' : 'ためしに友だち追加'} previewLabel={receipt.status === 'confirmed' && !receiptRequestFailed ? '確認結果を見る' : '友だち追加の方法を見る'} preview={(
+                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label={receipt.status === 'confirmed' && !receiptRequestFailed ? '接続の確認' : 'ためしに友だち追加'}>
+                <h2 className={styles.asideH2}>{receipt.status === 'confirmed' && !receiptRequestFailed ? '接続の確認' : 'ためしに友だち追加'}</h2>
+                {receipt.status === 'confirmed' && !receiptRequestFailed ? <p className={styles.asideP}>接続を確認できました。「次へ」を押してください。</p> : <>
+                  <p className={styles.asideP}>まだ友だちでなければ、スマホの LINE で QR を読み取って追加してください。</p>
+                  <p className={styles.asideP}>すでに友だちなら、この公式アカウントとのトークに「接続テスト」と送ってください。受信が確認できると次へ進めます。</p>
+                </>}
               </Card>
               )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ためしに友だち追加">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label={receipt.status === 'confirmed' && !receiptRequestFailed ? '接続確認が完了しました' : 'ためしに友だち追加'}>
                 <p className={styles.subBadge}>{badge}</p>
-                <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>友だち追加できるか確かめます</h2>
+                <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>{receipt.status === 'confirmed' && !receiptRequestFailed ? '接続確認が完了しました' : '友だち追加できるか確かめます'}</h2>
                 <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p></Notice>
                 <div className={styles.qrBlock}>
                   <div className={styles.qrFrame}>
@@ -839,12 +841,13 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
                       <span className={styles.receiptAccountIcon} aria-hidden="true">{(connection.displayName ?? form.name).slice(0, 1) || 'L'}</span>
                       <span><strong>{connection.displayName ?? form.name}</strong><br />{basicId || String(emptyValue('unknown'))}</span>
                     </div>
-                    <div className={styles.receiptInstructions}>
+                    {(receipt.status !== 'confirmed' || receiptRequestFailed) && <><div className={styles.receiptInstructions}>
                       <strong>すでに友だち追加している場合</strong>
                       <p>このアカウントの LINE トークから「接続テスト」と送ってください。QR を開き直すだけでは確認できません。</p>
                     </div>
                     <p className={styles.receiptHelp}>変わらない場合は LINE Developers で Webhook の利用がオンか確認してください。</p>
                     <p className={styles.receiptHelp}><TextLink href="/hq/support" inline>変わらない場合はサポートに問い合わせ</TextLink></p>
+                    </>}
                   </div>
                 </div>
               </Card>
