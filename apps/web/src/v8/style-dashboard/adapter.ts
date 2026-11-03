@@ -235,7 +235,7 @@ function weekOf(sch: StyleSchedule, now: Date): StyleWeek {
 function monthOf(sch: StyleSchedule, selected: string, now: Date, rows: StyleRow[]): StyleMonth {
   const tz = sch.timeZone
   const today = parts(now.toISOString(), tz).date
-  const start = new Date(`${sch.from.slice(0, 10)}T00:00:00Z`)
+  const start = new Date(`${parts(sch.from, tz).date}T00:00:00Z`)
   const month = start.getUTCMonth()
   const lead = (start.getUTCDay() + 6) % 7
   const cells: StyleMonthDay[] = []
