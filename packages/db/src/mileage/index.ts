@@ -1,4 +1,5 @@
 // Public entry point. Implementation is organized by responsibility.
+export { resolveMileageSource, selectMileageAccountBatch } from './source.js';
 export {
   DEFAULT_MILEAGE_PROGRAM_ID,
   ensureDefaultMileageProgram,

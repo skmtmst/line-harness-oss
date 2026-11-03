@@ -1315,4 +1315,4 @@ export {
 export { prepareMonthlyContract, getMonthlyContractRow, findMonthlyContractReplay, setMonthlyServiceState, listMonthlyContracts, monthlyEntitlementAccess, prepareMonthlyEventApplication, recordMonthlyEventApplication, MonthlyLedgerError } from './booking-monthly/index.js';
 export type { MonthlyScope, MonthlyContractSnapshot, MonthlyContractRow, MonthlyEventApplication } from './booking-monthly/index.js';
 
-export { validRestaurantCoursesSql } from './forms/course-guard.js';
+export { validRestaurantCoursesSql } from './forms/index.js';
