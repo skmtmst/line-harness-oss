@@ -22,6 +22,7 @@ vi.hoisted(() => {
 
 const state = vi.hoisted(() => ({
   tab: 'health',
+  from: '',
   accountCalls: 0,
   accounts: [] as Array<() => Promise<unknown>>,
   health: null as OperationHealthSnapshot | null,
@@ -34,7 +35,7 @@ vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof impo
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/emergency',
-  useSearchParams: () => new URLSearchParams(`tab=${state.tab}`),
+  useSearchParams: () => new URLSearchParams(`tab=${state.tab}&from=${state.from}`),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [], selectedAccountId: 'account-1', selectedAccount: null, loading: false }),
@@ -70,6 +71,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 afterEach(() => {
   cleanup()
   state.tab = 'health'
+  state.from = ''
   state.accountCalls = 0
   state.accounts = []
   state.health = null
@@ -89,6 +91,15 @@ async function openHelp() {
 }
 
 describe('運用状態の外側', () => {
+  it('統括からの移動ではタブと更新履歴に戻り先を保持する', async () => {
+    state.tab = 'history'
+    state.from = 'hq'
+    render(<EmergencyScreen />)
+    expect(screen.getByRole('tab', { name: '緊急コントロール' }).getAttribute('href')).toBe('/emergency?tab=control&from=hq')
+    expect(screen.getByRole('tab', { name: '健全性チェック' }).getAttribute('href')).toBe('/emergency?from=hq')
+    expect(screen.getByRole('link', { name: 'アップデート履歴を見る' }).getAttribute('href')).toBe('/updates?from=hq')
+  })
+
   it('実入口から取得済みの健全性の行を設定型の本文へ描く', async () => {
     const now = new Date().toISOString()
     const keys = ['line_connection', 'monitoring_heartbeat', 'external_integrations', 'message_quota', 'friend_change', 'webhook', 'dispatch_jobs', 'infra_canary', 'credential_expiry'] as const

@@ -145,6 +145,7 @@ async function pickDateByLabel(label: string, date: Date) {
   )!
   if (!day) throw new Error(`日付 ${dayLabelOf(date)} が見つかりません: ${document.querySelector('[role="grid"]')?.outerHTML}`)
   fireEvent.click(day)
+  fireEvent.click(screen.getByRole('button', { name: '確定' }))
 }
 
 /** 現役V8の時刻欄でHH:mmを入力する。 */

@@ -22,7 +22,8 @@ import { TextField } from '@/components/shared/text-field'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import ApplicationPreview from './application-preview'
-import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso, todayJst } from './shared'
+import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso } from './shared'
+import { jstDateOffset } from '@/lib/jst-datetime'
 import styles from './create.module.css'
 import { Field, OptionalBadge, RequiredBadge } from '@/components/shared/form-controls'
 import { permissionDeniedMessage, describeApiFailure } from '@/components/shared/api-error-message'
@@ -77,6 +78,11 @@ function timeMinutes(value: string) {
   return hour * 60 + minute
 }
 
+function isPastStart(date: string, time: string): boolean {
+  if (!date || !time) return false
+  try { return Date.parse(jstToUtcIso(date, time)) <= Date.now() } catch { return false }
+}
+
 type QuestionDraft = { label: string; required: boolean }
 
 /* useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。 */
@@ -109,7 +115,7 @@ function EventsCreateV8Inner() {
   }, [continuingId, router])
 
   const [draft, setDraft] = useState<EventDetail>(EVENT_DEFAULT_DRAFT)
-  const [date, setDate] = useState(todayJst)
+  const [date, setDate] = useState(() => jstDateOffset(1))
   const [startTime, setStartTime] = useState('14:00')
   const [endTime, setEndTime] = useState('15:30')
   const [capacity, setCapacity] = useState('')
@@ -141,10 +147,11 @@ function EventsCreateV8Inner() {
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
   const [publishTarget, setPublishTarget] = useState<{ accountIds: string[]; generation: number } | null>(null)
+  const [pastConfirmation, setPastConfirmation] = useState<{ publish: boolean; snapshot: string; accountId: string } | null>(null)
   const targetIds = selectedAccountId ? resolveEventMultiAccountIds(draft, selectedAccountId) ?? [selectedAccountId] : []
   const targetIdsRef = useRef(targetIds)
   targetIdsRef.current = targetIds
-  useEffect(() => { setPublishTarget(null) }, [selectedAccountId])
+  useEffect(() => { setPublishTarget(null); setPastConfirmation(null) }, [selectedAccountId])
   const [unknownCreateAccounts, setUnknownCreateAccounts] = useState<Set<string>>(new Set())
   const unknownCreateRef = useRef(new Set<string>())
   const createUnknown = Boolean(selectedAccountId && unknownCreateAccounts.has(selectedAccountId))
@@ -191,8 +198,13 @@ function EventsCreateV8Inner() {
     return !focusTarget.current
   }
 
-  async function save(publish: boolean) {
+  async function save(publish: boolean, acceptedPastSnapshot?: string) {
     if (!selectedAccountId || unknownCreateRef.current.has(selectedAccountId) || !validateInput()) return
+    if (isPastStart(date, startTime) && acceptedPastSnapshot !== snapshot) {
+      setPublishTarget(null)
+      setPastConfirmation({ publish, snapshot, accountId: selectedAccountId })
+      return false
+    }
     if (!feedback.begin('イベント')) return
     retryPublish.current = publish
     setSavingPublished(publish)
@@ -406,6 +418,7 @@ function EventsCreateV8Inner() {
 
       <Card variant="form" gap="normal" aria-labelledby="ev-new-slot">
         <CardHeader size="stacked" titleId="ev-new-slot" title="最初の予約枠" meta="あとから回を足せます（中身を見る → 回を足す）" />
+        {isPastStart(date, startTime) && !fieldErrors['ev-new-date'] ? <Notice tone="warn">開始日時が過去です。日時を確認してください。</Notice> : null}
         <SettingsFormRow layout="columns">
           <div className={styles.field}><Field requirement={eventRequirements.date} label="日付" htmlFor="ev-new-date"><SaveErrorField names={["date"]}><DateField id="ev-new-date" value={date} invalid={Boolean(fieldErrors['ev-new-date'])} aria-describedby={fieldErrors['ev-new-date'] ? 'ev-new-date-error' : undefined} onChange={(value) => { setDate(value); clearFieldError('ev-new-date') }} /></SaveErrorField>
 {fieldErrors['ev-new-date'] ? <p id="ev-new-date-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-date']}</p> : null}</Field></div>
@@ -552,6 +565,10 @@ function EventsCreateV8Inner() {
       </Card>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したイベント" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog open={pastConfirmation !== null && pastConfirmation.accountId === selectedAccountId} title="過去の日時で保存しますか？" description="開始日時が過去です。日時を確認してください。" warning confirmLabel="この日時で保存する" busy={saving} error={error || undefined} onCancel={() => setPastConfirmation(null)} onSuccess={() => setPastConfirmation(null)} onConfirm={() => {
+        if (!pastConfirmation || pastConfirmation.accountId !== selectedAccountId || pastConfirmation.snapshot !== snapshot) return false
+        return save(pastConfirmation.publish, pastConfirmation.snapshot)
+      }} />
       <ConfirmDialog open={publishTarget !== null && publishTarget.generation === accountScope.current.generation} title="イベントを公開する" description="イベントを公開し、お客さまが申し込めるようにします。内容を確かめてください。" confirmLabel="公開する" busy={saving} confirmDisabled={createUnknown} confirmDisabledReason="閉じて一覧で作成結果を確認してください。" error={error || undefined} onSuccess={() => setPublishTarget(null)} onConfirm={() => {
         if (!publishTarget || publishTarget.generation !== accountScope.current.generation || !canEditRef.current || JSON.stringify(publishTarget.accountIds) !== JSON.stringify(targetIdsRef.current)) return
         return save(true)

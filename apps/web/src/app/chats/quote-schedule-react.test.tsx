@@ -292,6 +292,7 @@ describe('N-025 引用返信と送信予約', () => {
     await act(async () => {
       Array.from(document.querySelectorAll('button')).find((b) => (b.getAttribute('aria-label') ?? '').startsWith('2027年9月17日（金）'))!.click()
     })
+    await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click() })
     await setTimeControl(dialog().querySelector('input[role="combobox"]'), '09:00')
 
     const scheduleButton = Array.from(document.querySelectorAll('button'))

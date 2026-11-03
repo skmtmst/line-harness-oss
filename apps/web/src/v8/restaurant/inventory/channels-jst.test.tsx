@@ -64,3 +64,12 @@ it('予約経路は状態の色で示し、受け取り方を省略せず示す'
  expect(within(row('経路A')).getByText('届いている').closest('[data-tone]')?.getAttribute('data-tone')).toBe('success')
  expect(within(row('経路B')).getByText('7日届いていない').closest('[data-tone]')?.getAttribute('data-tone')).toBe('warning')
 })
+
+it('準備中の直接接続は転送手順でなく準備中の説明を出す', async () => {
+ calls.fetch.mockImplementation(async(url:string)=>url.includes('inbound-emails')?{data:[],total:0}:{data:[{id:'direct',code:'direct',name:'直接媒体',todayCount:null,lastReceivedAt:null,unreadableCount:null,receiveMethod:'direct',status:'preparing',daysWithoutReceipt:null}]})
+ render(<ChannelsBoard accountId="a" storeId="s" date="2026-10-20" canEdit />)
+ fireEvent.click(await screen.findByRole('button',{name:/直接媒体.*操作/}))
+ fireEvent.click(await screen.findByRole('menuitem',{name:'直接接続の案内を見る'}))
+ expect(screen.getByRole('dialog',{name:'直接接続はまだつなげません'})).toBeTruthy()
+ expect(screen.queryByRole('dialog',{name:'転送の設定のしかた'})).toBeNull()
+})

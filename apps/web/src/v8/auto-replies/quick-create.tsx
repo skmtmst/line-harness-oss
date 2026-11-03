@@ -35,7 +35,7 @@ import { canEditAutoReplyNow } from './write-access'
 
 /* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
 function validateKeywords(keywords: string[]): string | null {
-  return keywords.length > 0 ? null : '反応する言葉を1つ以上入れてください'
+  return keywords.length > 0 ? null : '反応する言葉を1つ以上入れてください。'
 }
 
 const replyRequirement = requiredText('返す文を入れてください。')
@@ -105,11 +105,10 @@ export default function QuickCreateV8({
   useEffect(() => { acknowledgedRef.current = [] }, [accountId])
 
   const saving = phase === 'saving'
-  const keywordMissing = validateKeywords(keywords) !== null && draft.trim() === ''
-  const replyMissing = validateReply(reply) !== null
-  const requiredReason = keywordMissing && replyMissing ? '反応する言葉と返す文を入れてください。'
-    : keywordMissing ? '反応する言葉を1つ以上入れてください。'
-      : replyMissing ? '返す文を入れてください。' : undefined
+  const keywordProblem = validateKeywords(keywords.length || !draft.trim() ? keywords : [draft.trim()])
+  const replyProblem = validateReply(reply)
+  const missingReason = !accountId ? '上のバーでLINE公式アカウントを選んでください'
+    : keywordProblem && replyProblem ? '反応する言葉と返す文を入れてください。' : keywordProblem ?? replyProblem
   const guard = useUnsavedGuard({ dirty: keywords.length > 0 || draft !== '' || reply !== '', busy: saving, onDiscard: onClose })
 
   const addKeyword = (value: string) => {
@@ -188,11 +187,14 @@ export default function QuickCreateV8({
 
   const save = async () => {
     if (!canEditNow() || saveLock.current) return
-    const keywordMessage = validateKeywords(keywords)
+    const word = draft.trim()
+    const words = word && !keywords.includes(word) ? [...keywords, word] : keywords
+    const keywordMessage = validateKeywords(words)
     const replyMessage = validateReply(reply)
     setKeywordError(keywordMessage ?? '')
     setReplyError(replyMessage ?? '')
     if (keywordMessage || replyMessage) return
+    if (word) { setKeywords(words); setDraft('') }
     if (!accountId) {
       setSaveError('上のバーでLINE公式アカウントを選んでください')
       return
@@ -209,7 +211,7 @@ export default function QuickCreateV8({
     setSaveError('')
     let completed = false
     try {
-      const input = buildInput(keywords, reply)
+      const input = buildInput(words, reply)
       const snapshot = JSON.stringify(input)
       let id = draftIdRef.current
       const changed = snapshot !== savedInputRef.current
@@ -274,7 +276,6 @@ export default function QuickCreateV8({
       error={saveError || undefined}
       onCancel={onClose}
       footer={(<div className={styles.actionFooter}>
-        <div className={styles.actionReason} role="status">{!saving && !inputsDisabled ? requiredReason : undefined}</div>
         <DialogActions align="center" leadingAction={<Button {...(!inputsDisabled ? { href: '/auto-replies/edit' } : { type: 'button', disabled: true })} variant="text" lockedReason={lockedReason}>
             <ListOrdered size={16} aria-hidden="true" />
             詳しく作るへ
@@ -287,8 +288,8 @@ export default function QuickCreateV8({
           <Button
             type="button"
             variant="primary"
-            disabled={saving || inputsDisabled || Boolean(requiredReason)}
-            aria-description={!saving && !inputsDisabled ? requiredReason : undefined}
+            disabled={saving || inputsDisabled || Boolean(missingReason)}
+            aria-description={!saving && !inputsDisabled ? missingReason ?? undefined : undefined}
             lockedReason={lockedReason}
             busy={saving}
             busyLabel={phase === 'confirming' ? '有効にしています…' : '保存しています…'}
@@ -300,7 +301,9 @@ export default function QuickCreateV8({
 
           {/* 左の「詳しく作るへ」と釣り合いを取り、キャンセル・保存を窓の真ん中に置く。 */}
 
-        </DialogActions></div>)}
+        </DialogActions>
+        <div className={styles.actionReason} role="status">{!saving && !inputsDisabled ? missingReason : undefined}</div>
+      </div>)}
     >
       <div className={styles.body}>
         {lockedReason ? <ReadOnlyNotice need="feature" /> : null}

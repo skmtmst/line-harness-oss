@@ -75,6 +75,15 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('V8 通知', () => {
+  test('統括からの通知は更新履歴と運用状態に戻り先を引き継ぐ', async () => {
+    fx.query = 'from=hq'
+    render(<NotificationsV8 />)
+    const update = await screen.findByText('既読の新しい版')
+    expect(update.closest('a')?.getAttribute('href')).toBe('/updates?from=hq')
+    expect(screen.getByText('Webhook の遅れ').closest('a')?.getAttribute('href')).toBe('/emergency?from=hq')
+    expect(screen.getByText('EC連携の取り込みが失敗').closest('a')?.getAttribute('href')).toBe('/ec-commerce')
+  })
+
   test('未読が先・新しい順。右の言葉は行き先どおり', async () => {
     render(<NotificationsV8 />)
     await screen.findByText('Webhook の遅れ')
