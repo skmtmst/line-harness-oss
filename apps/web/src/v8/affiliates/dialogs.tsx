@@ -1,6 +1,6 @@
 'use client'
 import { formatYen as yen } from '@line-crm/shared';
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Landmark, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -194,6 +194,10 @@ export function AffiliatePaymentConfirmDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
+  const confirmLock = useRef(false)
+  const targetId = target?.id
+  const session = useRef<{ targetId: string; accountId: string; invalid: boolean } | null>(null)
+  if (session.current && targetId && (session.current.targetId !== targetId || session.current.accountId !== accountId)) session.current.invalid = true
   const [issueStatement, setIssueStatement] = useState(false)
   const [statementKey, setStatementKey] = useState('')
   // 確定の実行中は×と同じくEscapeでも閉じない。共通の約束（初期フォーカス・
@@ -207,17 +211,20 @@ export function AffiliatePaymentConfirmDialog({
   const [contact, setContact] = useState<{ friendId: string | null; email: string | null } | null>(null)
 
   const load = useCallback(async () => {
-    if (!target) return
+    const opened = session.current
+    if (!targetId || !opened || opened.invalid || opened.targetId !== targetId || opened.accountId !== accountId) return
     setPhase('loading')
     setPreview(null)
     setContact(null)
     setError('')
     try {
-      const response = await api.affiliates.paymentPreview(target.id, accountId)
+      const response = await api.affiliates.paymentPreview(targetId, accountId)
+      if (session.current !== opened || opened.invalid) return
       if (!response.success) throw new Error(response.error)
       setPreview(response.data)
       setPhase(response.data.conversionCount === 0 ? 'empty' : 'ready')
     } catch (saveFailure) {
+      if (session.current !== opened || opened.invalid) return
       saveErrors.capture(saveFailure)
       setPhase('error');
 
@@ -225,29 +232,42 @@ export function AffiliatePaymentConfirmDialog({
     }
     // 依頼先の連絡手段は別口。ここが落ちても確定の画面自体は止めない。
     try {
-      const detail = await api.affiliates.get(target.id);
+      const detail = await api.affiliates.get(targetId);
+
+      if (session.current !== opened || opened.invalid) return
 
       const row = detail.success && detail.data
         ? (detail.data as typeof detail.data & { friendId?: string | null })
         : null
       setContact(row ? { friendId: row.friendId ?? null, email: row.email ?? null } : null)
     } catch (saveFailure) {
+      if (session.current !== opened || opened.invalid) return
       saveErrors.capture(saveFailure)
       setContact(null)
     }
-  }, [accountId, target, saveErrors])
+  }, [accountId, targetId, saveErrors])
 
   useEffect(() => {
-    if (!target)
- return
+    if (!targetId) {
+      session.current = null
+      return
+    }
+    if (session.current?.invalid) {
+      setPhase('error')
+      setError('対象が変わりました。窓を閉じて、もう一度選び直してください。')
+      return
+    }
+    if (session.current) return
+    session.current = { targetId, accountId, invalid: false }
     setIdempotencyKey(crypto.randomUUID())
     setStatementKey(crypto.randomUUID())
     setIssueStatement(true)
     void load()
-  }, [load, target])
+  }, [load, targetId])
 
   const confirmPayment = async () => {
-    if (!target || !preview || phase !== 'ready') return
+    if (!target || !preview || phase !== 'ready' || !idempotencyKey || confirmLock.current || !session.current || session.current.invalid || session.current.targetId !== target.id || session.current.accountId !== accountId) return
+    confirmLock.current = true
     setBusy(true)
     setError('')
     try {
@@ -287,6 +307,7 @@ export function AffiliatePaymentConfirmDialog({
 
       setError('支払いを確定できませんでした。内容を読み直してください。') }
     } finally {
+      confirmLock.current = false
       setBusy(false)
     }
   }
