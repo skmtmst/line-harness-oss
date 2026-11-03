@@ -10,7 +10,7 @@ import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-er
 import { swapHqFolderOrder,HqFolderError } from '@line-crm/db';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { hqBroadcastApprovalState, hqBroadcastApprovalCandidates, updateHqApproval } from '../features/hq-broadcasts/hq-broadcast-approval/index.js';
-import { hqBroadcastRecipients, hqBroadcastActivity, testHqBroadcast } from '../features/hq-broadcasts/hq-broadcast-details/index.js';
+import { hqBroadcastRecipients, hqBroadcastActivity, testHqBroadcast, hqTestRecipientPreview, HqTestRecipientConflict } from '../features/hq-broadcasts/hq-broadcast-details/index.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { isFolderSelectColor } from '@line-crm/shared';
@@ -23,6 +23,7 @@ import { hqBroadcastAuthority, prepareHqBroadcast, getHqBroadcastRun, readHqBroa
 export const hqBroadcasts=new Hono<Env>();
 const mediaRuntime = (c: import('hono').Context<Env>) => ({bucket:c.env.IMAGES,publicBaseUrl:c.env.WORKER_URL || new URL(c.req.url).origin});
 hqBroadcasts.onError((e, c) => {
+  if (e instanceof HqTestRecipientConflict) return c.json({success:false,code:'HQ_TEST_RECIPIENT_CHANGED',error:e.message,data:e.current},409);
   if (!(e instanceof StampError)) throw new UnexpectedRouteError(c, { success: false, error: '統括配信を確認できません' });
   return inputError(c, { success: false, ...((e.status === 400 || e.status === 422) ? { fields: e.fields } : {}), error: e.message }, e.status);
 });
@@ -31,6 +32,11 @@ hqBroadcasts.get('/api/hq/broadcasts',async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method));
   const result=await listHqBroadcasts(db,a.tenantId,{from:c.req.query('from'),to:c.req.query('to'),q:c.req.query('q'),status:c.req.query('status'),folderId:c.req.query('folderId'),limit:c.req.query('limit'),cursor:c.req.query('cursor'),sort:c.req.query('sort')});
   return c.json(buildOffsetListResponse({ success:true,...result, items: result.data, total: result.pagination.total, paging: { limit: result.pagination.limit }, sort: [{field:'at',direction:c.req.query('sort') === 'oldest' ? 'asc' : 'desc'},{field:'id',direction:c.req.query('sort') === 'oldest' ? 'asc' : 'desc'}] }));
+});
+hqBroadcasts.get('/api/hq/broadcasts/test-recipients',async c=>{
+ const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'));const accountId=c.req.query('accountId');
+ if(!accountId)throw new StampError('対象店を確認してください',400);
+ return c.json({success:true,data:await hqTestRecipientPreview(db,a.tenantId,accountId)});
 });
 hqBroadcasts.get('/api/hq/broadcasts/quota',async c=>{const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);return c.json({success:true,data:await hqBroadcastQuota(db,a.tenantId)})});
 hqBroadcasts.get('/api/hq/broadcasts/saved-views',async c=>{
@@ -159,9 +165,10 @@ for(const [suffix,action] of [['approval-request','request'],['approve','approve
    if(!await sensitiveStepUpSatisfied(c,'broadcast.approval'))return stepUpRequiredResponse(c,'配信の承認には本人確認が必要です');}
  return c.json({success:true,data:await updateHqApproval(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),a.actorId,action,await c.req.json())});
 });
-hqBroadcasts.post('/api/hq/broadcasts/:id/test-send',inputJsonBoundary({"accountId":["string"]}), async c=>{
- const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{accountId:string}>();
- return c.json({success:true,data:await testHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),a.actorId,b.accountId,mediaRuntime(c))});
+hqBroadcasts.post('/api/hq/broadcasts/:id/test-send',inputJsonBoundary({"accountId":["string"],"expectedRecipientToken":["string"]}), async c=>{
+ const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{accountId:string;expectedRecipientToken?:string}>();
+ if(b.expectedRecipientToken!==undefined&&!/^[a-f0-9]{64}$/.test(b.expectedRecipientToken))throw new StampError('テスト宛先の確認が正しくありません',400);
+ return c.json({success:true,data:await testHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),a.actorId,b.accountId,mediaRuntime(c),b.expectedRecipientToken)});
 });
 hqBroadcasts.get('/api/hq/broadcasts/:id/targets/:accountId/recipients',async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true),p=pagination(c);

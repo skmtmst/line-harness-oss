@@ -272,3 +272,42 @@ it('UNS-19: send-previewは外へ照会せず、統括の合計と店ごとの�
  const data=(await response.json() as any).data;
  expect(data.recipients).toBe(1);expect(data.perAccount.reduce((n:number,p:any)=>n+p.recipients,0)).toBe(data.recipients);expect(data.needsApproval).toBe(false);expect(fetch).not.toHaveBeenCalled();
 });
+
+it('統括テスト送信は確認後に宛先のLINE連携先が変われば409で誰にも送らない',async()=>{
+ f.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','test_recipients','["friend"]')`);
+ const run=await made({messageBubbles:[{id:'one',type:'text',content:{text:'本文'}}]});
+ const preview=await call('/api/hq/broadcasts/test-recipients?accountId=shop');expect(preview.status).toBe(200);
+ const before=(await preview.json() as any).data;expect(before.count).toBe(1);expect(before.token).toEqual(expect.any(String));
+ f.raw.exec("UPDATE friends SET line_user_id='U-changed' WHERE id='friend'");vi.mocked(fetch).mockClear();
+ const response=await call(`/api/hq/broadcasts/${run.id}/test-send`,'POST',{accountId:'shop',expectedRecipientToken:before.token});
+ expect(response.status).toBe(409);expect(await response.json()).toMatchObject({code:'HQ_TEST_RECIPIENT_CHANGED',data:{count:1}});
+ expect(vi.mocked(fetch).mock.calls.filter(([u])=>String(u).endsWith('/message/push'))).toHaveLength(0);
+ expect((f.raw.prepare("SELECT COUNT(*) n FROM messages_log WHERE delivery_type='test'").get() as any).n).toBe(0);
+});
+
+it('テスト送信直前に宛先が変わっても新旧どちらにも送らない',async()=>{
+ f.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','test_recipients','["friend"]')`);
+ const run=await made({messageBubbles:[{id:'one',type:'text',content:{text:'本文'}}]});
+ const before=(await (await call('/api/hq/broadcasts/test-recipients?accountId=shop')).json() as any).data;
+ const prepare=f.db.prepare.bind(f.db);let reads=0;
+ const spy=vi.spyOn(f.db,'prepare').mockImplementation(sql=>{
+  if(sql.includes("key='test_recipients'")&&++reads===2)f.raw.exec("UPDATE friends SET line_user_id='U-changed' WHERE id='friend'");
+  return prepare(sql);
+ });
+ try{
+  vi.mocked(fetch).mockClear();const response=await call(`/api/hq/broadcasts/${run.id}/test-send`,'POST',{accountId:'shop',expectedRecipientToken:before.token});
+  expect(reads).toBe(2);expect(response.status).toBe(409);
+  expect(vi.mocked(fetch).mock.calls.filter(([u])=>String(u).endsWith('/message/push'))).toHaveLength(0);
+ }finally{spy.mockRestore();}
+});
+
+it('同じテスト宛先なら確認情報つきでも1回送り、旧呼び出しも受け付ける',async()=>{
+ f.raw.exec(`INSERT INTO account_settings(line_account_id,key,value) VALUES('shop','test_recipients','["friend"]')`);
+ const run=await made({messageBubbles:[{id:'one',type:'text',content:{text:'本文'}}]});
+ const before=(await (await call('/api/hq/broadcasts/test-recipients?accountId=shop')).json() as any).data;
+ vi.mocked(fetch).mockClear();expect((await call(`/api/hq/broadcasts/${run.id}/test-send`,'POST',{accountId:'shop',expectedRecipientToken:before.token})).status).toBe(200);
+ expect(vi.mocked(fetch).mock.calls.filter(([u])=>String(u).endsWith('/message/push'))).toHaveLength(1);
+ f.raw.exec("DELETE FROM hq_broadcast_audit WHERE action='test_send'");vi.mocked(fetch).mockClear();
+ expect((await call(`/api/hq/broadcasts/${run.id}/test-send`,'POST',{accountId:'shop'})).status).toBe(200);
+ expect(vi.mocked(fetch).mock.calls.filter(([u])=>String(u).endsWith('/message/push'))).toHaveLength(1);
+});
