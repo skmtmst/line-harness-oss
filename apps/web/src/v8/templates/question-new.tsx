@@ -71,7 +71,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const params = useSearchParams()
   /* 統括の入口（host）では店のテンプレートを読まない（新しく作るだけ）。 */
   const id = host ? null : params.get('id')
-  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const scopeKey = JSON.stringify([id, selectedAccountId])
   const scope = useRef({ key: scopeKey, generation: 0 })
   if (scope.current.key !== scopeKey) scope.current = { key: scopeKey, generation: scope.current.generation + 1 }
@@ -270,8 +270,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   ])
   const publishReason = inputReason || (!host && id && templateAccountId && templateAccountId !== selectedAccountId ? 'この質問のLINEアカウントを選んでから公開してください。' : undefined)
   const busy = saving || publishing || Boolean(host?.busy)
+  const previewAccountName = host ? host.accountName : accounts.find((account) => account.id === (id ? templateAccountId : selectedAccountId))?.name
   const phone = (
-    <LinePreview title={null} note="質問の見え方（山田 太郎さんの場合）" caption="配信日 10:00">
+    <LinePreview title={null} note="質問の見え方（山田 太郎さんの場合）" accountName={previewAccountName ?? undefined}>
       <div className={styles.bubble}>
         {question.intro?.trim() ? <p className={styles.bubbleIntro}>{displayText(question.intro)}</p> : null}
         <p className={styles.bubbleText}>{displayText(question.text) || '質問文を入力すると、ここに出ます。'}</p>
@@ -339,8 +340,8 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
 
         <Card variant="form" gap="normal" aria-labelledby="q-question">
           <CardHeader size="stacked" title="質問" titleId="q-question" />
-          <Field label="前文（空なら送らない）"><SaveErrorField names={["intro","question.intro"]}><TextField value={question.intro ?? ''} maxLength={4500} placeholder="いつもありがとうございます。" onChange={(event) => setQuestion((current) => ({ ...current, intro: event.target.value }))} /></SaveErrorField></Field>
-          <Field label="質問文（160文字まで）" requirement={fields.requirement('text')}><SaveErrorField names={["text","question.text"]}><TextField {...fields.bind('text')} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} /></SaveErrorField></Field>
+          <Field label="前文（空なら送らない）"><SaveErrorField names={["intro","question.intro"]}><TextField value={question.intro ?? ''} maxLength={4500} placeholder="例：いつもありがとうございます。" onChange={(event) => setQuestion((current) => ({ ...current, intro: event.target.value }))} /></SaveErrorField></Field>
+          <Field label="質問文（160文字まで）" requirement={fields.requirement('text')}><SaveErrorField names={["text","question.text"]}><TextField {...fields.bind('text')} value={question.text} maxLength={160} placeholder="例：来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} /></SaveErrorField></Field>
           <FieldError id="q-text-error">{fields.error('text')}</FieldError>
           <Field label="答え方" optional={false}><SegmentedControl fit="content" aria-label="答え方" value={question.tapMode} options={[{ value: 'single', label: '1つだけ選ぶ' }, { value: 'multiple', label: 'いくつでも選ぶ' }]} onChange={tapMode => setQuestion(current => ({ ...current, tapMode }))} /></Field>
         </Card>

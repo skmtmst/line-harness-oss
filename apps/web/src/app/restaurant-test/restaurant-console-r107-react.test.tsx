@@ -90,9 +90,9 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
   it('昼・夜の両方を提供する既存メニューは、編集しても両方を残す', async () => {
     fixture.snapshot.mockResolvedValue({ data: { ...data, menuItems: [{ ...data.menuItems[0], service_periods_json: '["lunch","dinner"]' }] } })
     render(<RestaurantScreen view="menu-edit" />)
-    await screen.findByDisplayValue('ランチ')
+    fireEvent.change(await screen.findByDisplayValue('ランチ'), { target: { value: 'ランチコース' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', expect.objectContaining({ servicePeriods: ['lunch', 'dinner'] })))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'menu-1', expect.objectContaining({ name: 'ランチコース', servicePeriods: ['lunch', 'dinner'] })))
   })
 
   it('所属ユーザーを編集し、停止の確認を経て変更APIへ渡す', async () => {

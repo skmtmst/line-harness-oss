@@ -297,7 +297,7 @@ export async function styleSchedule(
   }
   await seatSchedule(liveDb,account,query,style,from,to,asOf,timeZone,days,closures,availability);
   if (entries.some((e) => e.columnIds.includes('unassigned')))
-    columns.push({ id: 'unassigned', kind: 'unassigned', name: '担当未定' });
+    columns.push({ id: 'unassigned', kind: 'unassigned', name: style === 'restaurant' && query.axis === 'table' ? '卓未割り当て' : '担当未定' });
   entries.sort((a, b) =>
     query.sort === 'name'
       ? a.title.localeCompare(b.title, 'ja') ||

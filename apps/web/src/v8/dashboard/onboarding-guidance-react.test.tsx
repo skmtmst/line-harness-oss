@@ -117,7 +117,7 @@ it('カードの進みは基本6段の1つだけにし、選んだ機能の設�
   expect(within(guide()).queryByRole('progressbar', { name: '使い方の設定の進み' })).toBeNull()
   expect(guide().textContent).not.toMatch(/質問 \d|済み \d+件/)
   expect(within(guide()).getByText('リッチメニューなどの見た目を決める')).toBeTruthy()
-  expect(within(guide()).getByRole('button', { name: '済んだ物を見る' })).toBeTruthy()
+  expect(within(guide()).getByRole('button', { name: '設定を確認する' })).toBeTruthy()
 })
 
 it('基本GETだけ失敗しても取得済みの設定入口と独立した再試行を残す', async () => {

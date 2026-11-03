@@ -109,6 +109,34 @@ describe('頭の3つの印と保存した検索', () => {
     vi.unstubAllGlobals()
   })
 
+  it('保存した検索は Escape と外側クリックで閉じ、再び開ける', async () => {
+    await act(async () => root.render(<ChatsPage />))
+    const button = host.querySelector('button[aria-label="保存した検索"]') as HTMLButtonElement
+    await act(async () => button.click())
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => button.click())
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    await act(async () => document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })))
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('保存した検索内の操作メニューは親を閉じずに操作できる', async () => {
+    await act(async () => root.render(<ChatsPage />))
+    const button = host.querySelector('button[aria-label="保存した検索"]') as HTMLButtonElement
+    await act(async () => button.click())
+    await eventually(() => expect(host.textContent).toContain('未対応だけ'))
+    const menuButton = host.querySelector('button[aria-label="未対応だけの操作"]') as HTMLButtonElement
+    await act(async () => menuButton.click())
+    await eventually(() => expect(document.querySelector('[data-menu-portal]')).not.toBeNull())
+    const portal = document.querySelector('[data-menu-portal]')!
+    await act(async () => portal.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })))
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+  })
+
   it('3つの印は字なしのアイコンだけで吹き出しが付く（F12・オーナー指摘）', async () => {
     await act(async () => root.render(<ChatsPage />))
     for (const label of ['絞り込み', '保存した検索', '対応ルール']) {

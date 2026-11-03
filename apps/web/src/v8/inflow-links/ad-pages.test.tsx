@@ -55,8 +55,8 @@ const log = (id: string, status: string, adPlatformId: string, eventName: string
 })
 const LOGS = [log('l-1', 'pending', 'ad-google', '初回購入'), log('l-2', 'failed', 'ad-meta', '定期便の申し込み')]
 const PLATFORMS = [
-  { id: 'ad-google', name: 'google', displayName: null, config: {}, isActive: true, createdAt: '', updatedAt: '' },
-  { id: 'ad-meta', name: 'meta', displayName: null, config: {}, isActive: true, createdAt: '', updatedAt: '' },
+  { id: 'ad-google', name: 'google', displayName: null, config: {}, isActive: true, verifiedAt: '2026-10-01T00:00:00Z', createdAt: '', updatedAt: '' },
+  { id: 'ad-meta', name: 'meta', displayName: null, config: {}, isActive: true, verifiedAt: '2026-10-01T00:00:00Z', createdAt: '', updatedAt: '' },
 ]
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
@@ -103,6 +103,18 @@ async function render(node: React.ReactElement, until: string) {
 const buttons = (text: string) => [...host.querySelectorAll('button, a')].filter((element) => (element.textContent ?? '').trim() === text) as HTMLElement[]
 
 describe('広告とのつなぎ（FDBsG）', () => {
+  it('広告を接続していない場合は自動の候補があっても返していると表示しない', async () => {
+    const previousFetch = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (new URL(String(input)).pathname === '/api/ad-platforms') return json({ success: true, data: [] })
+      return previousFetch(input, init)
+    })
+    await render(<AdConnectionsV8 />, '初回購入')
+    const row = [...host.querySelectorAll('tr, [role="row"]')].find(item => item.textContent?.includes('初回購入'))
+    expect(row?.textContent).toContain('返していない')
+    expect(row?.textContent).not.toContain('返している')
+  })
+
   it('対応表を成果地点ごとに1行で出し、返している／返していないを札にする', async () => {
     await render(<AdConnectionsV8 />, '来店予約')
     expect(host.querySelector('[data-design-node="FDBsG"]')).not.toBeNull()

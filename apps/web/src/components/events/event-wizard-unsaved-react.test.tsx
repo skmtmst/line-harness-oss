@@ -33,7 +33,7 @@ afterEach(() => {
 describe('R161: イベントの書きかけがある間の離脱確認', () => {
   it('名前を入れてパンくずで一覧へ戻ると確認が出て、編集継続で入力が残る', async () => {
     render(<EventsCreate />)
-    const nameBox = await screen.findByPlaceholderText('秋のしつけ教室（第1回）')
+    const nameBox = await screen.findByPlaceholderText('例：秋のしつけ教室（第1回）')
     fireEvent.change(nameBox, { target: { value: '夏の試食会' } })
 
     fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
@@ -42,12 +42,12 @@ describe('R161: イベントの書きかけがある間の離脱確認', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
     await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
-    expect((screen.getByPlaceholderText('秋のしつけ教室（第1回）') as HTMLInputElement).value).toBe('夏の試食会')
+    expect((screen.getByPlaceholderText('例：秋のしつけ教室（第1回）') as HTMLInputElement).value).toBe('夏の試食会')
   })
 
   it('破棄を選んだときだけ一覧へ進む', async () => {
     render(<EventsCreate />)
-    const nameBox = await screen.findByPlaceholderText('秋のしつけ教室（第1回）')
+    const nameBox = await screen.findByPlaceholderText('例：秋のしつけ教室（第1回）')
     fireEvent.change(nameBox, { target: { value: '夏の試食会' } })
 
     fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
@@ -59,7 +59,7 @@ describe('R161: イベントの書きかけがある間の離脱確認', () => {
 
   it('何も入れていなければ確認を出さない', async () => {
     render(<EventsCreate />)
-    await screen.findByPlaceholderText('秋のしつけ教室（第1回）')
+    await screen.findByPlaceholderText('例：秋のしつけ教室（第1回）')
     const event = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(false)

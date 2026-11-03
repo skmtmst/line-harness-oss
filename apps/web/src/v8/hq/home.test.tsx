@@ -111,6 +111,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   flushListUrlState()
+  window.history.replaceState(null, '', '/hq')
   container.remove()
   verifiedStaffRole(null)
 })
@@ -185,6 +186,32 @@ describe('統括のアカウント', () => {
       .filter((band) => !band.closest('article'))
     expect(bands).toHaveLength(1)
     expect(bands[0].textContent).toContain('期限が切れたトークン 1 件・期限が近い 1 件')
+  })
+
+  it('期限の案内は検索結果とアーカイブの一覧に合わせる', async () => {
+    accounts.mockResolvedValue({ success: true, data: [
+      { ...warnedAccount, tokenExpiry: { status: 'expired', label: '期限切れ' } },
+      { ...warnedAccount, id: 'acc-2', name: '二号店', displayName: '二号店', tokenExpiry: { status: 'expiring', label: '期限が近い' } },
+      { ...warnedAccount, id: 'acc-3', archivedAt: '2026-10-01', tokenExpiry: { status: 'expired', label: '期限切れ' } },
+    ] })
+    await render()
+    const search = container.querySelector<HTMLInputElement>('input[placeholder="名前・LINE ID・フォルダで探す"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, '二号店')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise(resolve => setTimeout(resolve, 350))
+    })
+    expect(container.textContent).toContain('期限が近い 1 件')
+    expect(container.textContent).not.toContain('期限が切れたトークン')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, '')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise(resolve => setTimeout(resolve, 350))
+    })
+    const archive = [...container.querySelectorAll('button')].find(el => el.textContent?.startsWith('アーカイブ'))!
+    await act(async () => { archive.click() })
+    expect(container.textContent).not.toContain('期限が切れたトークン')
+    expect(container.textContent).not.toContain('期限が近い 1 件')
   })
 
   it('表の LINE 接続は状態の札に期限の札を添え、素の期限の文字を出さない', async () => {

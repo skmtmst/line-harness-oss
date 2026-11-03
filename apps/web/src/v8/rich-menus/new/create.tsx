@@ -10,7 +10,7 @@ import { renderAudienceStep,renderHqAudienceStep } from './create-audience-step'
 import { renderButtonsStep } from './create-buttons-step'
 import { hydrateMenuDraft } from './create-hydration'
 import { getSlotImage,renderSingleImageSlot,renderTabSlot } from './create-image-slots'
-import { groupFromSeed } from './create-model'
+import { firstUnconfiguredArea, groupFromSeed, publishConfirmNoteFor, publishEffectNoteFor } from './create-model'
 import { renderMenuLinePreview,renderPreviewRail } from './create-preview-rail'
 import { renderHqPublishStep,renderPublishStep } from './create-publish-step'
 import { createMenuDraft,persistMenuDraft,saveMenuDraft } from './create-save-actions'
@@ -603,6 +603,13 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   async function goNext() {
     const idx = STEP_KEYS.indexOf(step)
     if (idx >= STEP_KEYS.length - 1) return
+    const missing = step === 'buttons' ? firstUnconfiguredArea(pages) : null
+    if (missing) {
+      setActivePageId(missing.pageId)
+      setSelectedAreaId(missing.areaId)
+      setError(missing.reason)
+      return
+    }
     const ok = await saveDraft()
     if (!ok) return
     const next = STEP_KEYS[idx + 1]
@@ -1110,20 +1117,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       : conditionEmpty
         ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください'
         : '保存するとLINEに登録され、条件に当てはまる人の画面に出来事のタイミングで順次出ます'
-  const publishEffectNote = audience === 'all'
-    ? '個別に指定した人を除く、すべての友だちのトーク画面に出ます。既定のメニューが入れ替わります。'
-    : audience === 'none'
-      ? 'LINEへの登録だけでは、友だちのトーク画面は変わりません。「表示先」で出す相手を決めてください。'
-      : conditionEmpty
-        ? '公開しても今は誰の画面にも出ません（0人）。条件を1つ以上足してください。'
-        : '条件に当てはまる人の画面は、その人に関係する出来事のタイミングで順次切り替わります。すぐ全員に出るわけではありません。'
-  const publishConfirmNote = audience === 'all'
-    ? '個別に指定した人を除く、すべての友だちの既定メニューになります。'
-    : audience === 'none'
-      ? 'この操作だけでは、友だちのトーク画面には出ません。出すには登録後に一覧の「表示先」から操作してください。'
-      : conditionEmpty
-        ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください。'
-        : '条件に当てはまる人の画面に、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。'
+  const publishEffectNote = publishEffectNoteFor(audience, conditionEmpty)
+  const publishConfirmNote = publishConfirmNoteFor(audience, conditionEmpty)
   /*
    * 面の数：作成前は選んだ面の分けかたの数、作成後は全ページの面の合計。
    * 作成前の面はまだ動きが未設定（0設定済み）なので、分けかたの枚数だけ数える。

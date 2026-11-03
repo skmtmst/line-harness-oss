@@ -209,7 +209,7 @@ describe('V8 リッチメニュー一覧', () => {
     fireEvent.click(await view.findByText('取り下げ・削除する'))
     const dialog = await view.findByRole('alertdialog')
     expect(dialog.textContent).toContain('「通常メニュー」はまだ消せません')
-    expect(dialog.textContent).toContain('消すと、リッチメニューが出なくなる友だちがいます（1,204 人）。先に下の順に外してください。')
+    expect(dialog.textContent).toContain('このメニューを消すと、リッチメニューが出なくなる友だちがいます。先に下の順に外してください。')
     await waitFor(() => expect(dialog.querySelectorAll('li').length).toBe(3))
     const rows = [...dialog.querySelectorAll('li')].map((li) => li.textContent)
     expect(rows).toEqual([

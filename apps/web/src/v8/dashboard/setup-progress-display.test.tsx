@@ -24,7 +24,7 @@ it.each(['restaurant', 'salon', 'consult', 'lesson', 'standard', 'ec'] as const)
   expect(card.textContent).not.toMatch(/質問 \d|済み \d+件/)
   expect(within(card).getByText('入ったお知らせを動かす')).toBeTruthy()
   expect(within(card).getByRole('button', { name: '中身を見る' })).toBeTruthy()
-  expect(within(card).getByRole('button', { name: '済んだ物を見る' })).toBeTruthy()
+  expect(within(card).getByRole('button', { name: '設定を確認する' })).toBeTruthy()
   const rows = card.querySelectorAll('#first-steps-list > li')
   expect(rows).toHaveLength(summary.total)
   summary.steps.forEach((step, index) => {

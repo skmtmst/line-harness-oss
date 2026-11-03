@@ -183,6 +183,15 @@ describe('リッチメニューを作る：面の動きの欄', () => {
     expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
   })
 
+  it('表示先を決めない公開確認では、友だちの画面に出ないと示す', async () => {
+    groupBody = { ...GROUP, isDefaultForAll: false, targetingEnabled: false }
+    await open('?id=rmg-x&step=publish')
+    await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) })
+    const dialog = await screen.findByRole('dialog', { name: '公開の確認' })
+    expect(dialog.textContent).toContain('この操作だけでは、友だちのトーク画面には出ません')
+    expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
   it('確認中にアカウントを切り替えて戻した後、古い公開を送らない', async () => {
     await open('?id=rmg-x&step=publish')
     await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) }); await settle()
@@ -218,6 +227,30 @@ describe('リッチメニューを作る：面の動きの欄', () => {
     await settle()
     expect(screen.queryByRole('alertdialog', { name: '公開の確認' }) ?? screen.queryByRole('dialog', { name: '公開の確認' })).not.toBeNull()
     expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
+  it.each(['not-a-url', ''])('不正なURLまたは未設定の面があると次の手順へ進まない: %s', async (uri) => {
+    groupBody = { ...GROUP, pages: [{ ...GROUP.pages[0], areas: [area('a-1', '予約する', 0), { ...area('a-2', '会員証', 833), actionData: { uri } }] }] }
+    await open('?id=rmg-x&step=buttons')
+    await act(async () => { fireEvent.click(getPageAction({ name: '次へ：誰に出すか', exact: true })) })
+    await settle()
+    expect(currentStep()).toContain('ボタンの動き')
+    expect(screen.getByText(/面.*設定/)).toBeTruthy()
+  })
+
+  it('面が一つもないタブが残っていると次の手順へ進まない', async () => {
+    groupBody = { ...GROUP, pages: [...GROUP.pages, { ...GROUP.pages[0], id: 'empty-page', name: '次のページ', areas: [] }] }
+    await open('?id=rmg-x&step=buttons')
+    await act(async () => { fireEvent.click(getPageAction({ name: '次へ：誰に出すか', exact: true })) })
+    await settle()
+    expect(currentStep()).toContain('ボタンの動き')
+    expect(screen.getByText(/面.*設定/)).toBeTruthy()
+  })
+
+  it('テキストが入った面には未設定ではなくテキストを送ると表示する', async () => {
+    groupBody = { ...GROUP, pages: [{ ...GROUP.pages[0], areas: [{ ...area('a-1', '予約する', 0), intent: 'text', actionType: 'message', actionData: { text: '架空メッセージ' } }] }] }
+    await open('?id=rmg-x&step=buttons')
+    expect(screen.getAllByText('テキストを送る').length).toBeGreaterThan(0)
   })
 
   it('選んだ面だけの動きの欄を開き、面の名前を出す。別の面を選ぶと欄が入れ替わる', async () => {

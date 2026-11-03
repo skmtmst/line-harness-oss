@@ -17,7 +17,7 @@ vi.mock('next/navigation', async () => {
   return navigation
 })
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: 'account-1', accounts: [{ id: 'account-1', name: '店舗' }], loading: false }),
 }))
 vi.mock('@/lib/api', () => ({
   api: {
@@ -48,7 +48,7 @@ describe('R136: 質問の書きかけがある間の離脱確認', () => {
     </>)
     const nameBox = await screen.findByPlaceholderText('例：継続の意思をうかがう')
     fireEvent.change(nameBox, { target: { value: '継続の意思' } })
-    fireEvent.change(screen.getByPlaceholderText('来月も定期便を続けますか？'), { target: { value: '続けますか？' } })
+    fireEvent.change(screen.getByPlaceholderText('例：来月も定期便を続けますか？'), { target: { value: '続けますか？' } })
 
     fireEvent.click(screen.getByRole('link', { name: 'シナリオで使う' }))
     await screen.findByText('保存していない変更があります')
@@ -56,7 +56,7 @@ describe('R136: 質問の書きかけがある間の離脱確認', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
     await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
-    expect((screen.getByPlaceholderText('来月も定期便を続けますか？') as HTMLInputElement).value).toBe('続けますか？')
+    expect((screen.getByPlaceholderText('例：来月も定期便を続けますか？') as HTMLInputElement).value).toBe('続けますか？')
   })
 
   it('破棄を選んだときだけシナリオへ進む', async () => {

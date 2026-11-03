@@ -667,7 +667,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   <div key={url} className={styles.urlRow}>
                     <Link2 size={16} aria-hidden="true" className={styles.urlIcon} />
                     <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
-                    <span className={styles.urlNote}>短縮して、押された数を数える</span>
+                    <span className={styles.urlNote}>短縮して数える（いつもオン・変更できません）</span>
                     <Toggle checked locked label={`${url}を短縮して数える（いつもオン）`} />
                   </div>
                 ))}
