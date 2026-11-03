@@ -317,3 +317,24 @@ it('フォルダの数は表示ページの20件ではなく取得した26件全
   expect(host.querySelectorAll('[data-row-id]')).toHaveLength(6)
   expect(counts()).toEqual(expect.arrayContaining(['すべて26', '問合せ13', '未分類13']))
 })
+
+it('確認できる自動応答の有効状態を一覧の上に示す', async () => {
+  act(() => { root.render(<AutoRepliesListV8 />) })
+  await flush()
+  expect(host.textContent).toContain('確認できる自動応答に、有効なルールがあります。')
+})
+
+it('確認できる有効なルールがない時はその範囲を明示する', async () => {
+  listReplies.mockResolvedValue({ success: true, data: [ruleB] })
+  act(() => { root.render(<AutoRepliesListV8 />) })
+  await flush()
+  expect(host.textContent).toContain('確認できる自動応答に、有効なルールはありません。')
+})
+
+it('自動応答を取得できない時は状態を断定しない', async () => {
+  listReplies.mockRejectedValue(new Error('offline'))
+  act(() => { root.render(<AutoRepliesListV8 />) })
+  await flush()
+  expect(host.textContent).not.toContain('確認できる自動応答のうち、有効なルールが')
+  expect(host.textContent).not.toContain('確認できる自動応答に、有効なルールはありません。')
+})

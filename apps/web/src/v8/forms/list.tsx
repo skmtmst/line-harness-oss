@@ -5,7 +5,7 @@ import { VIEWER_NOTE } from './list-helpers'
 import { loadFormsPage } from './list-load'
 
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
 import ListToolbar,{ ListToolbarFrame,ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListScrollMemory,useListUrlValue } from '@/components/shared/list-url-state'
 import { pageSizeOptions } from '@/components/shared/page-size-options'
@@ -167,7 +167,8 @@ export default function FormsListV8() {
   /** 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 右から出る詳細パネル。管理者確認は読み取り専用なので開かない。 */
-  const [activeId, setActiveId] = useDetailPanelUrl('form')
+  const detailGuard = useInlineDetailGuard('form')
+  const { id: activeId, setId: setActiveId } = detailGuard
   /* 右クリックされた行（「…」と同じ項目を出す）。 */
   const [contextId, setContextId] = useState<string | null>(null)
   const formRequest = useRef(0)
@@ -309,13 +310,19 @@ export default function FormsListV8() {
   }
 
   const activeIndex = reviewMode ? -1 : visibleForms.findIndex((form) => form.id === activeId)
-  const active = activeIndex >= 0 ? visibleForms[activeIndex] : null
+  const currentActive = activeIndex >= 0 ? visibleForms[activeIndex] : null
+  const heldActive = useRef<Form | null>(null)
+  const heldAccount = useRef(selectedAccountId)
+  if (heldAccount.current !== selectedAccountId) { heldAccount.current = selectedAccountId; heldActive.current = null }
+  if (currentActive) heldActive.current = currentActive
+  else if (!detailGuard.holding || heldActive.current?.id !== activeId) heldActive.current = null
+  const active = currentActive ?? heldActive.current
   const openDetail = useCallback((id: string) => {
     withViewTransition(() => setActiveId(activeId === id ? null : id))
   }, [activeId, setActiveId])
   const closeDetail = useCallback(() => {
     withViewTransition(() => setActiveId(null))
-  }, [])
+  }, [setActiveId])
   const goDetail = (direction: -1 | 1) => {
     const next = visibleForms[activeIndex + direction]
     if (!next) return
@@ -802,7 +809,7 @@ export default function FormsListV8() {
     } finally { setRestoringId(null) }
   }
 
-  const rowMenuItems = (form: Form): ActionMenuItem[] => !canEditForms ? [{
+  const rowMenuItemsRaw = (form: Form): ActionMenuItem[] => !canEditForms ? [{
     id: 'responses', label: '集まった回答', external: true,
     href: `/form-submissions/responses?id=${encodeURIComponent(form.id)}`, onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
   }] : form.status === 'archived' ? [
@@ -829,6 +836,7 @@ export default function FormsListV8() {
     { id: 'archive', label: 'アーカイブ', dividerBefore: true, onSelect: () => void openDelete(form) },
     { id: 'delete', label: '削除', tone: 'danger' as const, onSelect: () => void requestDelete(form) },
   ]
+  const rowMenuItems = (form: Form): ActionMenuItem[] => rowMenuItemsRaw(form).map(item => item.onSelect ? { ...item, onSelect: () => detailGuard.protect(() => { void item.onSelect?.() }) } : item)
 
   /* ===== フォルダの列 ===== */
   const folderRows: FolderPanelRow[] = [
@@ -839,10 +847,10 @@ export default function FormsListV8() {
       label: folder.name,
       count: folder.itemCount ?? null,
       color: folder.color,
-      onEdit: canManageFolders ? () => { closeDetail(); setEditingFolder(folder) } : undefined,
-      onMoveUp: canManageFolders && index > 0 ? () => void moveFolder(index, -1) : undefined,
-      onMoveDown: canManageFolders && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
-      onDelete: canManageFolders ? () => void openFolderDelete(folder) : undefined,
+      onEdit: canManageFolders ? () => detailGuard.protect(() => { closeDetail(); setEditingFolder(folder) }) : undefined,
+      onMoveUp: canManageFolders && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
+      onMoveDown: canManageFolders && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
+      onDelete: canManageFolders ? () => detailGuard.protect(() => { void openFolderDelete(folder) }) : undefined,
       deleteNote: '削除しても、中のフォームは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNFILED_VALUE, label: '未分類', count: loading || loadError ? null : unfiledCount },
@@ -863,7 +871,7 @@ export default function FormsListV8() {
       type="button"
       variant="primary"
       className={full ? 'v8-folder-create w-full' : undefined}
-      onClick={createDraft}
+      onClick={() => detailGuard.protect(createDraft)}
     >
       <Plus size={16} aria-hidden="true" />フォームを作る
     </Button>
@@ -875,7 +883,7 @@ export default function FormsListV8() {
       reserveCreateSpace={false}
       activeId={activeFolderId}
       onSelect={selectFolder}
-      onAddFolder={canManageFolders ? () => { closeDetail(); setFolderDialogOpen(true) } : undefined}
+      onAddFolder={canManageFolders ? () => detailGuard.protect(() => { closeDetail(); setFolderDialogOpen(true) }) : undefined}
       addFolderLabel="フォルダを追加"
       rows={folderRows}
     >
@@ -1004,7 +1012,7 @@ export default function FormsListV8() {
   )
 
   let listBody: ReactNode
-  if (accountLoading || (loading && selectedAccountId)) {
+  if ((accountLoading || (loading && selectedAccountId)) && !detailGuard.holding) {
     listBody = skeleton
   } else if (!selectedAccountId) {
     listBody = stateCard(
@@ -1186,7 +1194,7 @@ export default function FormsListV8() {
     <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null
 
-  const overlays = renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms })
+  const overlays = <>{renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms, detailGuard })}{detailGuard.dialog}</>
 
   return (
     /* 一覧の状態（読込中・失敗・空・表）を外から待てるように出す。箱は作らない（display: contents）。 */
@@ -1203,7 +1211,7 @@ export default function FormsListV8() {
         help="LINEの中で開くアンケート・申し込みフォームです。答えは友だち情報に保存できます。"
         /* 絵に無い機能（管理者確認）は見出しの右に小さく残す。 */
         actions={canManageFolders ? (
-          <Button variant="secondary" onClick={() => { setReviewMode(!reviewMode); setPage(1) }}>
+          <Button variant="secondary" onClick={() => detailGuard.protect(() => { setReviewMode(!reviewMode); setPage(1) })}>
             {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
           </Button>
         ) : undefined}

@@ -124,3 +124,45 @@ test('版が同じ応答でもエラーを消し、入力理由を保持する',
   expect(screen.queryByText(/取り消せませんでした。入力は残っています/)).toBeNull()
   expect((screen.getByRole('textbox', { name: '取り消す理由' }) as HTMLInputElement).value).toBe('予定の変更')
 })
+
+test('版が変わると最新の対象を示し、理由を保って再確認まで送らない', async () => {
+  cancelGroup.mockResolvedValue({ success: true, data: { cancelled: 2, version: 4 } })
+  const { rerender } = render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" />)
+  fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
+  rerender(<PartySection party={{ ...party, version: 3, members: [{ ...party.members[0], menuName: '新しいメニュー' }, party.members[1]] }} canOperate accountId="account-1" currentBookingId="b1" />)
+  const dialog = screen.getByRole('alertdialog')
+  expect(dialog.textContent).toContain('新しいメニュー')
+  expect(dialog.textContent).toContain('Kenta')
+  expect(dialog.textContent).not.toContain('チョコ・爪切り')
+  expect((screen.getByRole('textbox', { name: '取り消す理由' }) as HTMLInputElement).value).toBe('予定の変更')
+  const confirm = screen.getByRole('button', { name: 'まとめて取り消す' }) as HTMLButtonElement
+  expect(confirm.disabled).toBe(true)
+  fireEvent.click(confirm)
+  expect(cancelGroup).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '最新の内容を確認しました' }))
+  fireEvent.click(confirm)
+  await waitFor(() => expect(cancelGroup).toHaveBeenCalledWith('account-1', 'g1', '予定の変更', 3))
+})
+
+
+test('版変更で取消可能な予約がなくなったら再確認を求めず送らない', () => {
+  const { rerender } = render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" />)
+  fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
+  rerender(<PartySection party={{ ...party, version: 3, members: party.members.map(member => ({ ...member, status: 'cancelled' })) }} canOperate accountId="account-1" currentBookingId="b1" />)
+  expect(screen.getByText(/取り消せる予約がなくなりました/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '最新の内容を確認しました' })).toBeNull()
+  expect((screen.getByRole('button', { name: 'まとめて取り消す' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(cancelGroup).not.toHaveBeenCalled()
+})
+
+test('版変更と権限喪失が重なれば再確認も取消もできない', () => {
+  const { rerender } = render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" />)
+  fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
+  rerender(<PartySection party={{ ...party, version: 3 }} canOperate={false} accountId="account-1" currentBookingId="b1" />)
+  expect(screen.queryByRole('button', { name: '最新の内容を確認しました' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
+  expect(cancelGroup).not.toHaveBeenCalled()
+})

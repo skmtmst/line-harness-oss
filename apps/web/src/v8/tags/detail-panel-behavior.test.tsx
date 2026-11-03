@@ -128,6 +128,20 @@ describe.each(cases)('$title の一覧', (testCase) => {
 
   if (testCase.inline) {
     const inline = testCase.inline
+    it('名前を編集中の行送りは確認し、編集を続ければ入力を保つ', async () => {
+      const { container } = render(testCase.view())
+      await screen.findAllByText(testCase.names[1])
+      openRow(container, testCase.names[0])
+      const panel = await screen.findByRole('dialog', { name: testCase.names[0] })
+      fireEvent.click(panel.querySelector(`button[aria-label="${inline.label}を変更する"]`)!)
+      const input = panel.querySelector(`input[aria-label="${inline.label}"]`) as HTMLInputElement
+      fireEvent.change(input, { target: { value: '編集中の名前' } }); fireEvent.blur(input)
+      fireEvent.click(screen.getByRole('button', { name: '次の行' }))
+      expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+      expect((screen.getByRole('textbox', { name: inline.label }) as HTMLInputElement).value).toBe('編集中の名前')
+      expect(param(testCase.key)).toBe(testCase.ids[0])
+    })
     it('名前の欄は詳細パネルの中でその場で書き換えられ、その項目の更新口へ送る', async () => {
       const { container } = render(testCase.view())
       await screen.findAllByText(testCase.names[1])

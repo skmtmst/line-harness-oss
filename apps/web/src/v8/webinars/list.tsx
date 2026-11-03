@@ -1,6 +1,7 @@
 'use client'
 import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import DetailPanel from '@/components/shared/detail-panel';
+import { useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { RowNameLink } from '@/components/shared/table';
@@ -363,7 +364,8 @@ function WebinarList() {
   const [highlightedId, setHighlightedId] = useState<string | null>(useSearchParams().get('highlight'))
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [duplicateError, setDuplicateError] = useState('')
-  const [activeId, setActiveId] = useDetailPanelUrl('webinar')
+  const detailGuard = useInlineDetailGuard('webinar')
+  const { id: activeId, setId: setActiveId } = detailGuard
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
   const [archiving, setArchiving] = useState(false)
@@ -607,7 +609,7 @@ function WebinarList() {
   const activeIndex = visibleItems.findIndex((w) => w.id === activeId)
   const active = activeIndex >= 0 ? visibleItems[activeIndex] : null
   const openDetail = useCallback((id: string) => { withViewTransition(() => setActiveId(current => current === id ? null : id)) }, [setActiveId])
-  const closeDetail = useCallback(() => { withViewTransition(() => setActiveId(null)) }, [])
+  const closeDetail = useCallback(() => { withViewTransition(() => setActiveId(null)) }, [setActiveId])
   const goDetail = (direction: -1 | 1) => {
     const next = visibleItems[activeIndex + direction]
     if (next) withViewTransition(() => setActiveId(next.id))
@@ -715,7 +717,7 @@ function WebinarList() {
     }
   }
 
-  const go = (href: string) => router.push(href)
+  const go = (href: string) => detailGuard.protect(() => router.push(href))
 
   /* ===== フォルダ ===== */
   /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。 */
@@ -740,10 +742,10 @@ function WebinarList() {
         label: folder.name,
         count: folder.count,
         color: folder.color,
-        onEdit: manageable ? () => { setFolderError(''); closeDetail(); setEditingFolder(folder) } : undefined,
-        onMoveUp: manageable && index > 0 ? () => moveFolder(index, -1) : undefined,
-        onMoveDown: manageable && index < folders.length - 1 ? () => moveFolder(index, 1) : undefined,
-        onDelete: manageable ? () => { setFolderError(''); setDeletingFolderAccountId(selectedAccountId); setDeletingFolder(folder) } : undefined,
+        onEdit: manageable ? () => detailGuard.protect(() => { setFolderError(''); closeDetail(); setEditingFolder(folder) }) : undefined,
+        onMoveUp: manageable && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
+        onMoveDown: manageable && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
+        onDelete: manageable ? () => detailGuard.protect(() => { setFolderError(''); setDeletingFolderAccountId(selectedAccountId); setDeletingFolder(folder) }) : undefined,
         deleteNote: '削除しても、中のウェビナーは未分類に残ります。',
       }
     }),
@@ -861,7 +863,7 @@ function WebinarList() {
             <TableHead />
             <tbody>
               {visibleItems.map((w) => {
-                const menuItems = [...(canEdit ? [{ id: 'edit', label: '編集する', onSelect: () => go(`/webinars/edit?id=${w.id}`) }] : []), ...rowMenuItems(w, canEdit, go, openArchive, (item) => void duplicateWebinar(item), duplicatingId !== null)]
+                const menuItems = [...(canEdit ? [{ id: 'edit', label: '編集する', onSelect: () => go(`/webinars/edit?id=${w.id}`) }] : []), ...rowMenuItems(w, canEdit, go, item => detailGuard.protect(() => openArchive(item)), item => detailGuard.protect(() => { void duplicateWebinar(item) }), duplicatingId !== null)]
                 const counts = showsCounts(w)
                 const period = periodSummary(w)
                 const menuLabel = `ウェビナー「${w.title}」の操作`
@@ -990,7 +992,7 @@ function WebinarList() {
           createAction={createButton}
           activeId={selectedFolder}
           onSelect={(id) => { setSelectedFolder(id); setPage(1) }}
-          onAddFolder={canEdit ? () => { setFolderError(''); closeDetail(); setFolderFormOpen(true) } : undefined}
+          onAddFolder={canEdit ? () => detailGuard.protect(() => { setFolderError(''); closeDetail(); setFolderFormOpen(true) }) : undefined}
           addFolderLabel="フォルダを追加"
           addFolderDisabled={!selectedAccountId}
           rows={folderRows}
@@ -1002,6 +1004,7 @@ function WebinarList() {
       toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{wideToolbar}</>}
       pagination={pager}
       overlays={<>
+        {detailGuard.dialog}
         {archiveTarget ? (
           <ArchiveConfirm
             target={archiveTarget}
@@ -1018,6 +1021,7 @@ function WebinarList() {
         ) : null}
         <DetailPanel
           open={active !== null}
+          busy={detailGuard.busy}
           title={active?.title ?? ''}
           description={active ? periodSummary(active) : undefined}
           onClose={closeDetail}
@@ -1027,12 +1031,12 @@ function WebinarList() {
           onNext={activeIndex >= 0 && activeIndex < visibleItems.length - 1 ? () => goDetail(1) : undefined}
           actions={{ primary: (active ? <Button variant="primary" href={`/webinars/edit?id=${active.id}`}>編集する</Button> : null),
     menuItems: [...(active ? [{ id: 'body-1', label: "分析を見る", onSelect: () => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=analytics`) }] : []),
-        ...(active ? [{ id: 'body-2', label: "コメント演出を開く", onSelect: () => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=comments`) }] : []), ...(active ? [{ allowed: canEdit, id: 'detail-0', label: (active.status === 'archived' ? '下書きに戻す' : 'アーカイブする'), onSelect: () => { closeDetail(); openArchive(active); } }] : [])], secondary: (active ? <Button variant="secondary" onClick={() => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=participants`)}>参加者を見る</Button> : null), primaryAllowed: canEdit }}
+        ...(active ? [{ id: 'body-2', label: "コメント演出を開く", onSelect: () => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=comments`) }] : []), ...(active ? [{ allowed: canEdit, id: 'detail-0', label: (active.status === 'archived' ? '下書きに戻す' : 'アーカイブする'), onSelect: () => detailGuard.protect(() => { closeDetail(); openArchive(active) }) }] : [])], secondary: (active ? <Button variant="secondary" onClick={() => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=participants`)}>参加者を見る</Button> : null), primaryAllowed: canEdit }}
          status={active ? <StatusPill webinar={active} /> : null}>
 <DetailContent>
           {active ? (
             <div className={styles.detail}>
-              <DetailField label="ウェビナー名"> <DetailInlineEdit allowed={canEdit} value={active.title} label="ウェビナー名" onSave={(next) => renameWebinar(active, next)} /> </DetailField>
+              <DetailField label="ウェビナー名"> <DetailInlineEdit {...detailGuard.editor} allowed={canEdit} value={active.title} label="ウェビナー名" onSave={(next) => renameWebinar(active, next)} /> </DetailField>
 
               <DetailField label="申込・視聴">
                 申込 {showsCounts(active) ? peopleText(active.registrationCount) : emptyValue('unknown')}　視聴開始 {showsCounts(active) ? peopleText(active.viewerCount) : emptyValue('unknown')}

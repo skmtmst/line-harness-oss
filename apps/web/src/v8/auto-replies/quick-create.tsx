@@ -39,7 +39,7 @@ function validateKeywords(keywords: string[]): string | null {
   return keywords.length > 0 ? null : '反応する言葉を1つ以上入れてください'
 }
 
-const replyRequirement = requiredText('返す内容を入力してください')
+const replyRequirement = requiredText('返す文を入れてください。')
 const validateReply = replyRequirement.check
 
 function overlapNames(conflicts: AutoReplyConflict[]): string {
@@ -106,6 +106,11 @@ export default function QuickCreateV8({
   useEffect(() => { acknowledgedRef.current = [] }, [accountId])
 
   const saving = phase === 'saving'
+  const keywordMissing = validateKeywords(keywords) !== null && draft.trim() === ''
+  const replyMissing = validateReply(reply) !== null
+  const requiredReason = keywordMissing && replyMissing ? '反応する言葉と返す文を入れてください。'
+    : keywordMissing ? '反応する言葉を1つ以上入れてください。'
+      : replyMissing ? '返す文を入れてください。' : undefined
   const guard = useUnsavedGuard({ dirty: keywords.length > 0 || draft !== '' || reply !== '', busy: saving, onDiscard: onClose })
 
   const addKeyword = (value: string) => {
@@ -269,7 +274,9 @@ export default function QuickCreateV8({
       busy={saving}
       error={saveError || undefined}
       onCancel={onClose}
-      footer={(<DialogActions align="center" leadingAction={<Button {...(!inputsDisabled ? { href: '/auto-replies/edit' } : { type: 'button', disabled: true })} variant="text" lockedReason={lockedReason}>
+      footer={(<div className={styles.actionFooter}>
+        <div className={styles.actionReason} role="status">{!saving && !inputsDisabled ? requiredReason : undefined}</div>
+        <DialogActions align="center" leadingAction={<Button {...(!inputsDisabled ? { href: '/auto-replies/edit' } : { type: 'button', disabled: true })} variant="text" lockedReason={lockedReason}>
             <ListOrdered size={16} aria-hidden="true" />
             詳しく作るへ
           </Button>}>
@@ -281,7 +288,8 @@ export default function QuickCreateV8({
           <Button
             type="button"
             variant="primary"
-            disabled={saving || inputsDisabled}
+            disabled={saving || inputsDisabled || Boolean(requiredReason)}
+            aria-description={!saving && !inputsDisabled ? requiredReason : undefined}
             lockedReason={lockedReason}
             busy={saving}
             busyLabel={phase === 'confirming' ? '有効にしています…' : '保存しています…'}
@@ -293,7 +301,7 @@ export default function QuickCreateV8({
 
           {/* 左の「詳しく作るへ」と釣り合いを取り、キャンセル・保存を窓の真ん中に置く。 */}
 
-        </DialogActions>)}
+        </DialogActions></div>)}
     >
       <div className={styles.body}>
         <OperationTargetSummary accounts={[{ id: initialAccountId.current ?? '' }]} />
