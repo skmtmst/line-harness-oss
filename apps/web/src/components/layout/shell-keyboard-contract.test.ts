@@ -26,7 +26,7 @@ describe('スマホのメニュー', () => {
   })
 
   it('Esc で閉じ、閉じたら焦点をハンバーガーへ戻す', () => {
-    expect(sidebar).toMatch(/event\.key === 'Escape'\) setIsOpen\(false\)/)
+    expect(sidebar).toMatch(/event\.key === 'Escape'.*setIsOpen\(false\)/)
     expect(sidebar).toContain('menuButtonRef.current?.focus()')
   })
 })

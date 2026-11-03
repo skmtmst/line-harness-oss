@@ -53,14 +53,18 @@ describe('ROOT-18 精算の一連の見本', () => {
   })
 
   it('ROOT-18 確認した額と件数が確定・振込で変わらない', async () => {
-    const preview = (await (await fetch(`${baseUrl}/api/affiliate-settlements/preview`)).json()).data
-    const closed = (await (await fetch(`${baseUrl}/api/affiliate-settlements`, {
+    const preview = ((await (await fetch(`${baseUrl}/api/affiliate-settlements/preview`)).json()) as {
+      data: { lineAccountId: string; periodFrom: string; periodTo: string; previewVersion: string; totalAmount: number; conversionCount: number }
+    }).data
+    const closed = ((await (await fetch(`${baseUrl}/api/affiliate-settlements`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lineAccountId: preview.lineAccountId, periodFrom: preview.periodFrom, periodTo: preview.periodTo, expectedPreviewVersion: preview.previewVersion })
-    })).json()).data
+    })).json()) as { data: { settlementId: string; version: string; totalAmount: number; conversionCount: number } }).data
     expect(closed.totalAmount).toBe(preview.totalAmount)
     expect(closed.conversionCount).toBe(preview.conversionCount)
-    const batch = (await (await fetch(`${baseUrl}/api/affiliate-payout-batches`, { method: 'POST', body: JSON.stringify({ settlementId: closed.settlementId, expectedVersion: closed.version }) })).json()).data
+    const batch = ((await (await fetch(`${baseUrl}/api/affiliate-payout-batches`, { method: 'POST', body: JSON.stringify({ settlementId: closed.settlementId, expectedVersion: closed.version }) })).json()) as {
+      data: { totalAmount: number; lineCount: number; settlementId: string }
+    }).data
     expect(batch.totalAmount).toBe(closed.totalAmount)
     expect(batch.lineCount).toBe(closed.conversionCount)
     expect(batch.settlementId).toBe(closed.settlementId)

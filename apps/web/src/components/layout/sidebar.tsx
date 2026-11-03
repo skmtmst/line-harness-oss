@@ -564,7 +564,8 @@ export default function Sidebar({
       wasOpen.current = true
       drawerRef.current?.querySelector<HTMLElement>('a[href], button')?.focus()
       const onKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') setIsOpen(false)
+        // 内側の本人メニューが開いている間は、その Esc をドロワーまで伝えない。
+        if (event.key === 'Escape' && !event.defaultPrevented && !document.querySelector('[role="menu"][aria-label="自分のメニュー"]')) setIsOpen(false)
       }
       document.addEventListener('keydown', onKeyDown)
       return () => document.removeEventListener('keydown', onKeyDown)

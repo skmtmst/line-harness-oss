@@ -334,7 +334,7 @@ export function checkMigration(sql: string, fileName?: string): CheckResult {
  *
  * これを超えると `LIKE or GLOB pattern too complex: SQLITE_ERROR` で落ち、
  * ファイル全体が中止される。本番で 382 が、未適用のまま 440 も同じ形で
- * 引っかかっていた（2026-09-29）。50文字までは通り、51文字から落ちることを
+ * 引っかかった。50文字までは通り、51文字から落ちることを
  * 本番D1で実測した。
  *
  * エラー文からは「どの条件が不成立か」が分からないので、アサーションを書く側が

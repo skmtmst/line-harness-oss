@@ -90,15 +90,13 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
     expect(page).toContain('文書のページはまだ公開されていません')
   })
 
-  it('ログイン前の画面にお問い合わせの導線を置かない（2026-09-29 決定）', () => {
-    // ログイン前の窓口は作らない。問い合わせはログイン後の /hq/support だけ。
+  it('ログイン前の問い合わせ先は公開サイトに向け、ログイン必須の統括窓口へ送らない', () => {
     const card = read('components/auth/auth-card.tsx')
-    expect(card).not.toContain('お問い合わせ')
-    expect(card).not.toContain('CONTACT_URL')
+    expect(card).toContain('href={CONTACT_URL}')
     expect(card).not.toContain('href="/hq/support"')
     const page = read('app/register/page.tsx')
-    expect(page).not.toContain('お問い合わせ')
-    expect(page).not.toContain('CONTACT_URL')
+    expect(page).toContain('!LEGAL_LINKS.terms || !LEGAL_LINKS.privacy')
+    expect(page).toContain('href={CONTACT_URL}')
     // フッターに残すのは法務の3つだけ。
     expect(card).toContain('利用規約')
     expect(card).toContain('プライバシーポリシー')

@@ -24,7 +24,13 @@ async function call(method = 'GET', body?: unknown, staff: AuthenticatedStaff | 
 const persisted = () => sql.raw.prepare('SELECT legal_company_name,company_postal_code,company_address,company_building,company_phone,contact_name,contact_email,invoice_addressee,company_settings_version FROM tenants WHERE id=?').get(DEFAULT_TENANT_ID);
 const audits = () => sql.raw.prepare("SELECT count(*) AS n FROM audit_events WHERE action='tenant_company_contact.updated'").get();
 
-beforeEach(() => { sql = createTestD1(); sql.raw.exec("INSERT INTO tenants(id,name) VALUES('other','他の統括')"); });
+beforeEach(() => {
+  sql = createTestD1();
+  sql.raw.exec("INSERT INTO tenants(id,name) VALUES('other','他の統括')");
+  // 統括全体の所属を持つ実在メンバーとして認可を通す。
+  sql.raw.prepare("INSERT INTO staff_members(id,name,role,api_key,tenant_id,account_scope) VALUES(?,?,?,?,?,'all')")
+    .run('owner', '管理者', 'owner', 'owner-key', DEFAULT_TENANT_ID);
+});
 afterEach(() => sql.raw.close());
 
 describe('統括の会社と連絡先（実SQL）', () => {

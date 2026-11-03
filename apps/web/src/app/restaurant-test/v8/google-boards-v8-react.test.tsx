@@ -73,7 +73,6 @@ describe('Googleビジネス子板の印', () => {
     ['posts', null, 'Cfed0'],
     ['posts', 'new', 'T1j2Sw'],
     ['posts', 'confirm', 'T1j2Sw'],
-    ['settings', null, 'CuHXG'],
     ['reviews', 'draft', 'x9HIR'],
   ])('tab=%s view=%s → %s', async (tab, view, node) => {
     search.tab = tab
@@ -83,13 +82,19 @@ describe('Googleビジネス子板の印', () => {
     expect(document.querySelector(`[data-design-node="${node}"]`)).not.toBeNull()
   })
 
-  it('未接続は設定の印 CuHXG', async () => {
+  it('旧設定タブは現在のSNS連携設定へ案内する', async () => {
+    search.tab = 'settings'
+    render(<GoogleV8 />)
+    await waitFor(() => expect(fixture.router.replace).toHaveBeenCalledWith('/settings/sns'))
+  })
+
+  it('未接続はSNS連携への案内を表示する', async () => {
     search.tab = null
     search.view = null
     fixture.connection.mockResolvedValue({ ...connectionData, connection: { ...connectionData.connection, status: 'new' } })
     render(<GoogleV8 />)
-    await screen.findByText('現役の子画面')
-    expect(document.querySelector('[data-design-node="CuHXG"]')).not.toBeNull()
+    await screen.findByText('Googleビジネスは未接続です')
+    expect(screen.getByRole('link', { name: 'SNS連携を開く' }).getAttribute('href')).toBe('/settings/sns')
   })
 
   it('編集の子画面が書きかけを持つとき、タブ移動は共有の確認を通してから実行する', async () => {

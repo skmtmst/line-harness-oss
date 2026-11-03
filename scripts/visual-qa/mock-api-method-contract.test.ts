@@ -56,7 +56,7 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
   it('撮影用の機能設定は全キーと版を返し、見本用の機能だけ有効にする', async () => {
     const response = await fetch(`${baseUrl}/api/settings/features`)
     expect(response.status).toBe(200)
-    const body = await response.json()
+    const body = (await response.json()) as { success: boolean; data: { version: number; features: Record<string, boolean> } }
     expect(body.success).toBe(true)
     expect(body.data.version).toBe(1)
     expect(Object.keys(body.data.features).sort()).toEqual(FEATURE_CATALOG.map(entry => entry.featureId).sort())
@@ -69,7 +69,7 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
     const key = async (account: string) => {
       const response = await fetch(`${baseUrl}/api/site/tracking-key?account_id=${account}`, { signal: AbortSignal.timeout(2000) })
       expect(response.status).toBe(200)
-      const body = await response.json()
+      const body = (await response.json()) as { success: boolean; data: { accountId: string; trackingKey: string } }
       expect(body).toMatchObject({ success: true, data: { accountId: account } })
       expect(body.data.trackingKey).toMatch(/^hk_[a-f0-9]{32}$/)
       return body.data.trackingKey as string
@@ -123,7 +123,7 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
       for (const qaEmpty of [false, true]) {
         const selected = await save(qaEmpty)
         expect(selected.status).toBe(200)
-        const schedule = await fetch(`${root}/schedule?style=salon&range=today`).then(response => response.json())
+        const schedule = await fetch(`${root}/schedule?style=salon&range=today`).then(response => response.json() as Promise<{ data: { style: string; entries: unknown[] } }>)
         expect(schedule.data.style).toBe('salon')
         expect(schedule.data.entries.length > 0).toBe(!qaEmpty)
       }

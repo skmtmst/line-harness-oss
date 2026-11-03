@@ -26,7 +26,10 @@ const testLocalStorage = {
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: testLocalStorage })
 Object.defineProperty(window, 'localStorage', { configurable: true, value: testLocalStorage })
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/hq/members' }))
+vi.mock('next/navigation', async () => ({
+  ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  usePathname: () => '/hq/members',
+}))
 vi.mock('next/link', async () => {
   const React = await import('react')
   return {
@@ -82,7 +85,7 @@ describe('脇メニューの中のアカウントメニューと Esc', () => {
     expect(trigger).not.toBeNull()
     await act(async () => { trigger!.click() })
     await waitFor(() => {
-      expect(document.querySelector('[role="menu"][aria-label="アカウントメニュー"]')).not.toBeNull()
+      expect(document.querySelector('[role="menu"][aria-label="自分のメニュー"]')).not.toBeNull()
     })
 
     trigger!.focus()
@@ -90,7 +93,7 @@ describe('脇メニューの中のアカウントメニューと Esc', () => {
 
     // アカウントメニューだけが閉じる。
     await waitFor(() => {
-      expect(document.querySelector('[role="menu"][aria-label="アカウントメニュー"]')).toBeNull()
+      expect(document.querySelector('[role="menu"][aria-label="自分のメニュー"]')).toBeNull()
     })
     // 脇メニューは開いたまま。焦点は上のハンバーガーへ移らない。
     expect(drawer!.hasAttribute('inert')).toBe(false)

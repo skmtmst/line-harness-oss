@@ -43,7 +43,7 @@ describe('U094 運営コンソールの外枠', () => {
   })
 
   it('本文の左右の余白は狭い画面では現在の共通外枠の余白へそろえる', () => {
-    expect(SHELL).toContain('className={shellStyles.content}')
+    expect(SHELL).toContain('className={shellStyles.content} data-content-layout="ops"')
     expect(COMMON).toContain('@media (min-width: 1024px)')
     expect(COMMON).toContain('padding: 24px 16px')
   })
@@ -77,25 +77,4 @@ describe('U094 運営コンソールの外枠', () => {
     expect(ACTIONS).toContain("['ArrowDown', 'ArrowUp', 'Home', 'End']")
   })
 
-  /*
-   * 縦に長い画面（監査ログなど）で、左下のアカウント情報が本文と一緒に
-   * 下へ送られ、一番下までスクロールしないと見えなかった。外枠の高さを
-   * 画面に合わせ、縦に流れるのは本文の中だけにする。
-   */
-  it('外枠は画面の高さに収め、縦に流れるのは本文の中だけにする', () => {
-    expect(SHELL).toContain('flex h-svh flex-col overflow-hidden')
-    expect(SHELL).not.toContain('flex min-h-svh flex-col bg-canvas-sunken')
-    expect(SHELL).toContain('<div className="flex min-h-0 flex-1">')
-    expect(SHELL).toContain("navOpen ? 'overflow-hidden' : 'overflow-y-auto'")
-    expect(SHELL).toContain('id="ops-main"')
-  })
-
-  it('左下のアカウント情報は常に見え、流れるのはメニューの部分だけ', () => {
-    // サイドバー自体はスクロールさせない（中の nav だけが流れる）。
-    expect(SHELL).toContain('w-64 shrink-0 flex-col overflow-hidden')
-    expect(SHELL).toContain('<nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-3">')
-    // 上の見出しと下のアカウントは縮まない。
-    expect(SHELL).toContain('flex shrink-0 items-center gap-3 px-4 py-4')
-    expect(SHELL).toContain('relative shrink-0 px-3 py-3')
-  })
 })

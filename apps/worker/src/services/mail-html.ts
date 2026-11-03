@@ -7,7 +7,7 @@
  * 止められた状態で意味が通らなくなる作りにしない。
  *
  * 文字だけの本文（sendPlainMail の body）はこの部品では作らない。
- * 同じ内容を2通りに書くと片方だけ直す事故が起きるので、呼ぶ側が
+ * 同じ内容を2通りに書くと片方だけの修正になり得るため、呼ぶ側が
  * 文字の本文を正本として持ち、ここへ同じ材料を渡す。
  */
 
@@ -46,7 +46,7 @@ function paragraph(text: string, color: string, size: string): string {
 }
 
 export type MailHtmlInput = {
-  /** 見出し。件名の【musubo】を外したものを入れることが多い。 */
+  /** 見出し。件名の【musubo】を除いたものを入れることが多い。 */
   heading: string;
   /** 宛名など、見出しのすぐ下に出す1行。 */
   lead?: string;

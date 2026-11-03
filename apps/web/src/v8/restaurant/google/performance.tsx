@@ -122,7 +122,7 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
 
   return (
     <>
-      <ListToolbar filters={<PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} choices={PERIOD_CHOICES} />} actions={<Button onClick={() => void sync()} disabled={syncing}>{syncing ? '取り込み中…' : 'いま取り込む'}</Button>} />
+      <ListToolbar filters={<PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} choices={PERIOD_CHOICES} />} actions={<Button onClick={() => void sync()} busy={syncing} busyLabel="取り込み中…">いま取り込む</Button>} />
       {syncError ? <Notice tone="danger">{syncError}</Notice> : null}
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="パフォーマンスを読み込んでいます" /></div> : null}
       {loadError ? <ListState kind="error" title="パフォーマンスを表示できませんでした" description={loadError} onRetry={() => void load()} /> : null}

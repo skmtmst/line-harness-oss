@@ -241,7 +241,7 @@ describe('招待期限7日 (N-432)', () => {
   function inviteBody(email: string) {
     return {
       name: '新しい担当者', email, role: 'staff',
-      assignedLineAccountId: 'account-1', accountScope: 'all', scopedLineAccountIds: [],
+      assignedLineAccountId: 'account-1', accountScope: 'accounts', scopedLineAccountIds: ['account-1'],
     };
   }
 

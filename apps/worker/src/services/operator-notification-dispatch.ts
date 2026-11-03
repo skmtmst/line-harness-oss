@@ -471,7 +471,7 @@ async function sendEmailDelivery(
       to: input.to,
       subject: input.subject,
       body: input.text,
-      // 見出しは件名から【musubo】を外したもの。本文の正本は text のまま。
+      // 見出しは件名から【musubo】を除いたもの。本文の正本は text のまま。
       html: renderMailHtml({
         heading: input.subject.replace(/^【[^】]*】/, '').trim() || input.subject,
         paragraphs: [input.text],
