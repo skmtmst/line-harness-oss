@@ -17,6 +17,14 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 const scope = vi.hoisted(() => ({ account: 'acc-1' }))
+const held = vi.hoisted(() => ({ confirm: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.onConfirm) held.confirm = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 const { list, create, update, upload, remove } = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
@@ -205,4 +213,18 @@ it('削除確認には素材のアカウントを示し、切替後の古い確�
   scope.account = 'acc-1'; renderKind('card_message'); await flush()
   await act(async () => oldConfirm({ preventDefault() {}, stopPropagation() {} }))
   expect(remove).not.toHaveBeenCalled()
+})
+
+it('閉じた削除確認の確定は、同じ素材を再度開いても使えない', async () => {
+  renderKind('card_message'); await flush(); clickText('削除する')
+  const oldConfirm = held.confirm!
+  const dialog = document.querySelector('[role="alertdialog"]')!
+  const cancel = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === 'キャンセル')!
+  act(() => cancel.click()); clickText('削除する')
+  await act(async () => { await oldConfirm() })
+  expect(remove).not.toHaveBeenCalled()
+  const current = document.querySelector('[role="alertdialog"]')!
+  const confirm = [...current.querySelectorAll('button')].find(button => button.textContent?.trim() === '削除する')!
+  await act(async () => { confirm.click() })
+  expect(remove).toHaveBeenCalledExactlyOnceWith('asset-card-1')
 })
