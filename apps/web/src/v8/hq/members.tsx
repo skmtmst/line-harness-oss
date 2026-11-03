@@ -289,6 +289,7 @@ function MembersInner() {
       <MemberDialogV8
         /* 確認を出す間は閉じる。確認をやめたら入れた中身のまま戻る。 */
         open={dialog.open && !confirmChange}
+        active={dialog.open}
         session={dialogSession}
         member={dialog.member}
         isSelf={dialog.member?.id === me?.id}
@@ -300,6 +301,7 @@ function MembersInner() {
         }}
         onCancel={() => {
           if (dialogBusy) return
+          setConfirmChange(null)
           setDialog({ open: false, member: null })
         }}
       />

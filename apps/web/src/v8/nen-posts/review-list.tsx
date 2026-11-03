@@ -11,6 +11,7 @@ import HelpTip from '@/components/shared/help-tip'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import Radio from '@/components/shared/radio'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -294,6 +295,7 @@ export function PhotoCardV8({ photo, status, ...props }: { photo: Record<string,
  * 見送ってもマイルは減らない。
  */
 export function RejectDialogV8({
+  accountId,
   photo,
   reasonCode,
   reasonNote,
@@ -309,6 +311,7 @@ export function RejectDialogV8({
   onClose,
   onConfirm,
 }: {
+  accountId: string
   photo: Record<string, unknown> | null
   reasonCode: ReviewReasonCode
   reasonNote: string
@@ -341,6 +344,7 @@ export function RejectDialogV8({
     : ''
   return (
     <Dialog open designNode="ujcar" designWidth={620} designTop={90} title="この写真を見送りますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。見送っても、この方のマイルは減りません。" confirmation tone="destructive" busy={busy} error={reasonError} onCancel={onClose} onConfirm={onConfirm} confirmLabel="見送る">
+      <OperationTargetSummary accounts={[{ id: accountId }]} />
       <div className={styles.dialogStack}>
         {photo ? (
           <div className={styles.dialogPhoto}>

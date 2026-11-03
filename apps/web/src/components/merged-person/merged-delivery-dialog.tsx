@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useContext, useEffect, useLayoutEffect, useState } from 'react'
 import type { MergedPersonDeliveryPriority } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -12,6 +12,9 @@ import {
 } from './merged-person-view'
 import styles from './merged-delivery-dialog.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 /**
  * 配信元の優先順を変える窓（設計 「優先順位を変更」）。
@@ -31,6 +34,7 @@ export default function MergedDeliveryDialog({
   error,
   onCancel,
   onSave,
+  onDirtyChange,
 }: {
   open: boolean
   priorities: MergedPersonDeliveryPriority[]
@@ -40,9 +44,16 @@ export default function MergedDeliveryDialog({
   error?: string
   onCancel: () => void
   onSave: (rows: MergedPersonDeliveryPriority[]) => void
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const [rows, setRows] = useState<MergedPersonDeliveryPriority[]>(priorities)
   const [confirmedClearAll, setConfirmedClearAll] = useState(false)
+  const dirty = JSON.stringify(rows) !== JSON.stringify(priorities)
+  const depth = useContext(OverlayDepthContext)
+  useLayoutEffect(() => { if (!open) return; onDirtyChange?.(dirty || busy); return () => onDirtyChange?.(false) }, [open, dirty, busy, onDirtyChange])
+  const guard = useUnsavedGuard({ dirty: open && (dirty || busy), busy: open && busy, onDiscard: () => { onDirtyChange?.(false); onCancel() } })
+  const close = () => guard.guarded(() => { if (!dirty) onCancel() })
+  useEffect(() => { if (!open) guard.cancelLeave() }, [open, guard.cancelLeave])
 
   // 別の人を開いたら、前の人の編集を持ち越さない。
   useEffect(() => {
@@ -80,18 +91,19 @@ export default function MergedDeliveryDialog({
       )
     })
 
-  return (
+  return (<>
     <Dialog
       open={open}
       title="配信元の優先順を変える"
       description="同じ人へ2通目以降を送らないよう、用途ごとに上から1件だけ選びます。"
       busy={busy}
       error={error}
-      onCancel={onCancel}
+      dirty={false}
+      onCancel={close}
       designNode="Hn9eE"
       footer={
         <DialogActions>
-          <Button type="button" onClick={onCancel} disabled={busy}>
+          <Button type="button" onClick={close} disabled={busy}>
             キャンセル
           </Button>
           <Button type="button" variant="primary" onClick={() => onSave(rows)} disabled={!ready} busy={busy} busyLabel="処理中…">保存する
@@ -149,5 +161,6 @@ export default function MergedDeliveryDialog({
         ) : null}
       </div>
     </Dialog>
-  )
+    <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={open && guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></OverlayDepthContext.Provider>
+  </>)
 }

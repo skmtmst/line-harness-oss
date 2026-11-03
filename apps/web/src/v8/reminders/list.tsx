@@ -209,6 +209,8 @@ export default function RemindersListV8() {
   useEffect(() => { setBulkPauseIds(null) }, [selectedAccountId])
   const [pauseTarget, setPauseTarget] = useState<ReminderRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
+  const [deleteAccountId, setDeleteAccountId] = useState(selectedAccountId)
+  useEffect(() => { setDeleteTarget(null) }, [selectedAccountId])
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
@@ -389,6 +391,7 @@ export default function RemindersListV8() {
   // 下書きも公開済みも、削除は必ず確認する（・決まり2）。
   const requestDelete = (row: ReminderRow) => {
     setDeleteError('')
+    setDeleteAccountId(selectedAccountId)
     setDeleteTarget(row)
   }
 
@@ -396,7 +399,7 @@ export default function RemindersListV8() {
     deleteTarget !== null && reminders.some((row) => row.id === deleteTarget.id)
 
   const runDelete = async () => {
-    if (!deleteTarget || deleting || !deleteStillListed) return
+    if (!deleteTarget || deleting || !deleteStillListed || deleteAccountId !== selectedAccountId) return
     setDeleting(true)
     setDeleteError('')
     try {
@@ -1194,7 +1197,7 @@ export default function RemindersListV8() {
 
       {/* 削除の窓（★V8 `VsSyu`）。 */}
       <SheetDialog
-        open={deleteTarget !== null}
+        open={deleteTarget !== null && deleteAccountId === selectedAccountId}
         designNode="VsSyu" designWidth={480}
         title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
         description="通知の予定と登録者がすべて消えます。すでに送ったメッセージは友だちのトークに残ります。"
@@ -1236,7 +1239,7 @@ export default function RemindersListV8() {
             ) : null}
           </>
         )}
-      />
+      ><OperationTargetSummary accounts={[{ id: deleteAccountId ?? '' }]} /></SheetDialog>
 
       {/* 複製の窓。下書きとして写し、確認してから有効にする。 */}
       <></>

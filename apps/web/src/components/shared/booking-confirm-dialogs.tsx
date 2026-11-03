@@ -5,7 +5,7 @@ import { ArrowRight } from 'lucide-react'
 import { Steps } from '@/components/templates/steps'
 import Checkbox from './checkbox'
 import Dialog from './dialog'
-import { Field, TextInput, TextArea } from './form-controls'
+import { Field, TextInput } from './form-controls'
 import Radio from './radio'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
 import TestModeNote from './test-mode-note'
@@ -193,16 +193,10 @@ export function CancelClassDialog({ open, subtitle, facts, counts, testMode, bus
 }
 
 export type OverlapRow = { time: string; name: string; sub: string; pay?: { label: string; tone: StatusBadgeTone } | null }
-export type OverlapInput = { mode: 'ask' | 'cancel'; message: string }
-
-/** 休みを入れる窓の 2 段目（s8BwT8）。重なる予約がある時だけ出す。予約は消さず、LINE で聞くのがおすすめ。 */
-export function ClosureOverlapStep({ rows, message, mediaNote, mode, onMode, onMessage }: {
+/** 休みを入れる前に、重なる予約と連絡の扱いを確認する。 */
+export function ClosureOverlapStep({ rows, mediaNote }: {
   rows: OverlapRow[]
-  message: string
   mediaNote?: string | null
-  mode: OverlapInput['mode']
-  onMode: (mode: OverlapInput['mode']) => void
-  onMessage: (text: string) => void
 }) {
   return (
     <div className={styles.body}>
@@ -215,13 +209,8 @@ export function ClosureOverlapStep({ rows, message, mediaNote, mode, onMode, onM
           </div>
         ))}
       </div>
-      <Field label="予約の扱い" optional={false}>
-        <div className={styles.choices} role="radiogroup" aria-label="予約の扱い">
-          <Radio name="overlap-mode" checked={mode === 'ask'} onChange={() => onMode('ask')}>予約はそのまま。LINE で日を変えるか取り消すかを聞く（おすすめ）</Radio>
-          <Radio name="overlap-mode" checked={mode === 'cancel'} onChange={() => onMode('cancel')}>予約を取り消して返金する（次で確かめる）</Radio>
-        </div>
-      </Field>
-      <Field label={`${formatNumber(rows.length)}人に送る LINE`} optional={false}><TextArea value={message} onChange={(e) => onMessage(e.target.value)} rows={3} /></Field>
+      <p>重なる予約は取り消しません。</p>
+      <p>重なる予約への連絡は自動では送られません。</p>
       {mediaNote ? <Notice tone="info">
         {mediaNote}
       </Notice> : null}

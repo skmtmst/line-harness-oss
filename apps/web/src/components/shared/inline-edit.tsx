@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import styles from './inline-edit.module.css'
 import { usePermissionLockTip } from './permission-lock-tip'
 import { isImeComposing } from './ime'
@@ -19,6 +19,10 @@ export type InlineEditProps = {
   lockedReason?: string
   /** 保持した操作も、実行直前の本人・対象・権限で確かめる。 */
   canSaveNow?: () => boolean
+  preserveDirtyOnBlur?: boolean
+  onDirtyChange?: (dirty: boolean) => void
+  onSavingChange?: (saving: boolean) => void
+  resetToken?: number
 }
 
 /**
@@ -26,7 +30,7 @@ export type InlineEditProps = {
  * Enter で保存・Esc でやめる。保存中は押せなくなり、失敗したら
  * 下書きを残して理由を出す。V8 のときだけ開閉の感じが付く。
  */
-export default function InlineEdit({ value, label, onSave, placeholder, maxLength, disabled = false, lockedReason, canSaveNow }: InlineEditProps) {
+export default function InlineEdit({ value, label, onSave, placeholder, maxLength, disabled = false, lockedReason, canSaveNow, preserveDirtyOnBlur = false, onDirtyChange, onSavingChange, resetToken }: InlineEditProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const [saving, setSaving] = useState(false)
@@ -40,6 +44,17 @@ export default function InlineEdit({ value, label, onSave, placeholder, maxLengt
   const canUseNow = () => !permission.current.disabled && !permission.current.lockedReason
     && (!permission.current.canSaveNow || permission.current.canSaveNow())
   const tip = usePermissionLockTip<HTMLElement>(lockedReason)
+
+  useLayoutEffect(() => { onDirtyChange?.(editing && draft !== value) }, [draft, editing, value, onDirtyChange])
+  useLayoutEffect(() => { onSavingChange?.(saving) }, [saving, onSavingChange])
+  const previousReset = useRef(resetToken)
+  useEffect(() => {
+    if (previousReset.current === resetToken) return
+    previousReset.current = resetToken
+    setDraft(value)
+    setError('')
+    setEditing(false)
+  }, [resetToken, value])
 
   useEffect(() => {
     if (editing) inputRef.current?.select()
@@ -119,7 +134,7 @@ export default function InlineEdit({ value, label, onSave, placeholder, maxLengt
         onBlur={() => {
           // ぶれたらやめる（勝手に保存しない）。
           tip.handlers?.onBlur()
-          if (!saving && !error && (!hasPermission() || canUseNow())) cancel()
+          if (!saving && !error && !(preserveDirtyOnBlur && draft !== value) && (!hasPermission() || canUseNow())) cancel()
         }}
         className={styles.input}
       />

@@ -1,5 +1,6 @@
 'use client'
-import { ClosureOverlapStep,type OverlapInput,type OverlapRow } from '@/components/shared/booking-confirm-dialogs'
+import { ClosureOverlapStep,type OverlapRow } from '@/components/shared/booking-confirm-dialogs'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
@@ -15,8 +16,8 @@ import Select from '@/components/shared/select'
 import TimeFieldV8 from '@/components/shared/time-field-v8'
 import Toggle from '@/components/shared/toggle'
 import { Steps } from '@/components/templates/steps'
-import { ArrowDown,ArrowUp,CalendarX2,Info,Lock,RotateCcw,Scissors,Send,Shapes } from 'lucide-react'
-import { useEffect,useState } from 'react'
+import { ArrowDown,ArrowUp,CalendarX2,Info,Lock,RotateCcw,Scissors,Shapes } from 'lucide-react'
+import { useEffect,useRef,useState } from 'react'
 import type { StyleClosureInput,StyleLayout,StyleLayoutItem,StyleKpi,IndustryStyle } from './model'
 import styles from './style-dashboard.module.css'
 import { metricOptions } from './metric-selection'
@@ -116,7 +117,7 @@ export function ViewDrawer({ open, layout, industry, defaultMetrics = [], busy, 
  * 日付・時間帯（終日／時間を決める）・対象（店全体／担当者／卓）・理由（お客さまには出さない）。
  * 既存の予約は取り消さず、連絡は次の画面で選ぶ。
  */
-export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affectedNote, onClose, onSave, preview, overlapMessage, mediaNote }: {
+export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affectedNote, onClose, onSave, preview, mediaNote, accountId, store }: {
   open: boolean
   date: string
   targets: { staff: { id: string; name: string }[]; seats: { id: string; name: string }[] }
@@ -125,17 +126,17 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
   error?: string
   affectedNote?: string | null
   onClose: () => void
-  onSave: (input: StyleClosureInput, overlap?: OverlapInput) => void
+  onSave: (input: StyleClosureInput) => void
   /** 重なる予約を読む（飲食は既存の口の preview、ほかは画面の予約から）。重なりがあれば 2 段目（s8BwT8）。 */
   preview?: (input: StyleClosureInput) => Promise<OverlapRow[]>
-  overlapMessage?: (input: StyleClosureInput) => string
   mediaNote?: string | null
+  accountId?: string | null
+  store?: { id: string; name?: string | null }
 }) {
   const [step, setStep] = useState<1 | 2>(1)
   const [overlap, setOverlap] = useState<OverlapRow[]>([])
-  const [mode, setMode] = useState<OverlapInput['mode']>('ask')
-  const [message, setMessage] = useState('')
   const [checking, setChecking] = useState(false)
+  const previewGeneration = useRef(0)
   const [day, setDay] = useState(date)
   const [allDay, setAllDay] = useState<'all' | 'time'>('time')
   const [from, setFrom] = useState('19:00')
@@ -143,28 +144,31 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
   const [target, setTarget] = useState<StyleClosureInput['target']>(seatNoun === '卓' ? 'seat' : 'staff')
   const [ids, setIds] = useState<string[]>([])
   const [reason, setReason] = useState('貸切')
-  useEffect(() => { if (open) { setDay(date); setStep(1); setOverlap([]); setMode('ask') } }, [open, date])
+  useEffect(() => { previewGeneration.current += 1; if (open) { setDay(date); setStep(1); setOverlap([]) }; return () => { previewGeneration.current += 1 } }, [open, date])
   const choices = target === 'seat' ? targets.seats : target === 'staff' ? targets.staff : []
   const current = (): StyleClosureInput => ({ date: day, allDay: allDay === 'all', from: allDay === 'time' ? from : undefined, to: allDay === 'time' ? to : undefined, target, ids: target === 'store' ? [] : ids, reason })
   const confirmClosure = async () => {
     const input = current()
-    if (step === 2) { onSave(input, { mode, message }); return }
+    if (step === 2) { onSave(input); return }
     if (!preview) { onSave(input); return }
+    const generation = ++previewGeneration.current
     setChecking(true)
     // 重なる予約を読むだけ。読めなかったときは、重なりなしとして保存へ進む（保存の失敗は呼び出し側が欄へ返す）。
     let rows: OverlapRow[] = []
-    try { rows = await preview(input) } catch { /* 読めなければ重なりなしとして保存へ進む */ } finally { setChecking(false) }
-    if (rows.length) { setOverlap(rows); setMessage(overlapMessage?.(input) ?? ''); setStep(2) } else onSave(input)
+    try { rows = await preview(input) } catch { /* 読めなければ重なりなしとして保存へ進む */ } finally { if (generation === previewGeneration.current) setChecking(false) }
+    if (generation !== previewGeneration.current) return
+    if (rows.length) { setOverlap(rows); setStep(2) } else onSave(input)
   }
   useEffect(() => { if (open) setIds(choices[0] ? [choices[0].id] : []) }, [open, target]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <Dialog open={open} designWidth={step === 2 ? 540 : 480} titleHelp={<HelpTip label="休みを入れるの説明">臨時休業・貸切・急な休みを入れます。入れた時間は予約を受け付けません。</HelpTip>} busy={busy || checking} error={error} confirmLabel={step === 2 ? `休みを入れて LINE を送る` : '休みを入れる'} confirmIcon={step === 2 ? <Send size={16} aria-hidden="true" /> : <CalendarX2 size={16} aria-hidden="true" />} busyLabel="入れています" onCancel={() => (step === 2 ? setStep(1) : onClose())} cancelLabel={step === 2 ? '戻る' : 'キャンセル'} footerAlign="center"
+    <Dialog open={open} designWidth={step === 2 ? 540 : 480} titleHelp={<HelpTip label="休みを入れるの説明">臨時休業・貸切・急な休みを入れます。入れた時間は予約を受け付けません。</HelpTip>} busy={busy || checking} error={error} confirmLabel="休みを入れる" confirmIcon={<CalendarX2 size={16} aria-hidden="true" />} busyLabel="入れています" onCancel={() => (step === 2 ? setStep(1) : onClose())} cancelLabel={step === 2 ? '戻る' : 'キャンセル'} footerAlign="center"
       title={step === 2 ? `重なる予約が ${formatNumber(overlap.length)}件あります` : '休みを入れる'} description={step === 2 ? `${day} を休みにします` : undefined}
       confirmDisabled={target !== 'store' && ids.length === 0} confirmDisabledReason="対象を選んでください" dirty={false}
       onConfirm={() => void confirmClosure()}
       steps={overlap.length ? <Steps label="休みを入れる手順" currentKey={String(step)} steps={[{ key: '1', label: '日と時間', state: step > 1 ? 'done' : 'todo' }, { key: '2', label: '重なる予約', state: 'todo' }]} /> : undefined} stepKey={step}
       footerLead={overlap.length ? <span className={styles.cellMuted}>手順 {step} / 2</span> : undefined}>
-      {step === 2 ? <ClosureOverlapStep rows={overlap} message={message} mediaNote={mediaNote} mode={mode} onMode={setMode} onMessage={setMessage} /> : <div className={styles.dialogBody}>
+      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} store={store} />
+      {step === 2 ? <ClosureOverlapStep rows={overlap} mediaNote={mediaNote} /> : <div className={styles.dialogBody}>
         <Field label="日付" optional={false}><DateField value={day} onChange={setDay} displayFormat="full" /></Field>
         <Field label="時間帯" optional={false}>
           <div className={styles.dialogInline}>

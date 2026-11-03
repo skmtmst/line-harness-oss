@@ -1,14 +1,41 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import {render,screen,fireEvent,cleanup,waitFor,within} from '@testing-library/react'
-import {it,expect,vi,afterEach} from 'vitest'
-const calls=vi.hoisted(()=>({fetch:vi.fn()}))
+import {it,expect,vi,afterEach,beforeEach} from 'vitest'
+const calls=vi.hoisted(()=>({fetch:vi.fn(), addresses: vi.fn(), issue: vi.fn()}))
 vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn(),replace:vi.fn()}),useSearchParams:()=>new URLSearchParams()}))
 vi.mock('@/lib/api',async(o)=>({...await o<typeof import('@/lib/api')>(),fetchApi:calls.fetch}))
-vi.mock('@/lib/restaurant-test-api',()=>({restaurantTestApi:{listIntakeAddresses:async()=>({data:[]})}}))
+vi.mock('@/lib/restaurant-test-api',()=>({restaurantTestApi:{listIntakeAddresses:calls.addresses,issueIntakeAddress:calls.issue}}))
+vi.mock('@/lib/staff-role',()=>({useStaffRole:()=> 'owner'}))
+vi.mock('@/components/shared/use-permission-lock-reason',()=>({usePermissionLockReason:()=>undefined}))
 vi.mock('@/components/shared/date-time-field',async(o)=>({...await o<typeof import('@/components/shared/date-time-field')>(),default:({onChange,...props}:React.ComponentProps<typeof import('@/components/shared/date-time-field').default>)=><input {...props} onChange={e=>onChange(e.target.value)}/>}))
 import ChannelsBoard from './channels'
+beforeEach(()=>{calls.addresses.mockReset().mockResolvedValue({data:[]});calls.issue.mockReset()})
 afterEach(cleanup)
+it('アドレス再発行は対象店と環境を示し、店の切替後に古い確認を使えない',async()=>{
+ calls.addresses.mockResolvedValue({data:[{address:'example@example.test'}]})
+ calls.fetch.mockImplementation(async(url:string)=>url.includes('inbound-emails')?{data:[],total:0}:{data:[]})
+ const view=render(<ChannelsBoard accountId="a" storeId="s" storeName="本店" date="2026-10-20" canEdit />)
+ fireEvent.click(await screen.findByRole('button',{name:/発行し直す（旧は/}))
+ const dialog=screen.getByRole('dialog',{name:'取り込みアドレスを発行し直しますか？'})
+ expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+ expect(within(dialog).getByText('本店')).toBeTruthy()
+ expect(within(dialog).getByText('環境')).toBeTruthy()
+ view.rerender(<ChannelsBoard accountId="b" storeId="t" storeName="支店" date="2026-10-20" canEdit />)
+ expect(screen.queryByRole('dialog',{name:'取り込みアドレスを発行し直しますか？'})).toBeNull()
+ expect(calls.issue).not.toHaveBeenCalled()
+})
+it('アドレスの再発行確認は店を切り替えると閉じる',async()=>{
+ calls.addresses.mockResolvedValue({data:[{address:'example@example.test'}]})
+ calls.fetch.mockImplementation(async(url:string)=>url.includes('inbound-emails')?{data:[],total:0}:{data:[]})
+ const view=render(<ChannelsBoard accountId="a" storeId="s" date="2026-10-20" canEdit />)
+ fireEvent.click(await screen.findByRole('button',{name:/発行し直す（旧は/}))
+ expect(screen.getByRole('dialog',{name:'取り込みアドレスを発行し直しますか？'})).toBeTruthy()
+ view.rerender(<ChannelsBoard accountId="b" storeId="t" date="2026-10-20" canEdit />)
+ await screen.findByRole('button',{name:/発行し直す（旧は/})
+ expect(screen.queryByRole('dialog',{name:'取り込みアドレスを発行し直しますか？'})).toBeNull()
+ expect(calls.issue).not.toHaveBeenCalled()
+})
 it('OP-R05 manual intake stores Japan local time regardless of device timezone',async()=>{
  calls.fetch.mockImplementation(async(url:string,options?:{method?:string})=>options?.method==='POST'?{success:true}:url.includes('inbound-emails')?{data:[{id:'e',receivedAt:'2026-10-20T01:00:00Z',status:'quarantined'}],total:1}:{data:[]})
  render(<ChannelsBoard accountId="a" storeId="s" date="2026-10-20" canEdit />)

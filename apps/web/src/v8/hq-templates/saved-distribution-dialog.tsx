@@ -6,6 +6,7 @@ import type { HqTemplateReceivedVersion } from '@line-crm/shared'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { type useDistributionFolders } from './distribution-accounts'
 import DistributionAccountPicker from './distribution-account-picker'
 import styles from './saved-distribution-dialog.module.css'
@@ -24,6 +25,7 @@ export default function SavedDistributionDialog({ accounts, folders, selected, o
   busy: boolean; error?: string
   onLater: () => void; onDistribute: () => void
 }) {
+  const accountNames = new Map(accounts.map(account => [account.id, account.name]))
   return <Dialog open title={title ?? "保存しました。アカウントに配りますか？"} designNode="d8CL4g" designWidth={720}
     designHeaderPadding="20px 24px 8px" designContentPadding="0" busy={busy} error={error} onCancel={onLater}
     titleHelp={<HelpTip label="アカウントに配るの説明">{help ?? <>配ると、選んだアカウントのテンプレートに新しい版として届きます。あとで一覧の「…」からも配れます。</>}</HelpTip>}
@@ -39,6 +41,7 @@ export default function SavedDistributionDialog({ accounts, folders, selected, o
       </>
     </DialogActions>}
   >
+    <OperationTargetSummary accounts={selected.map(id => ({ id, name: accountNames.get(id) }))} showAccountCount />
     <DistributionAccountPicker showCount={false} {...{ accounts, folders, selected, onChange, filter, onFilter, search, onSearch, received, receivedFailed, busy, accountState }} />
   </Dialog>
 }

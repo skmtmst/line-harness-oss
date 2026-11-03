@@ -25,6 +25,7 @@ export default function BlockedDeleteDialog({
   error,
   footer,
   onClose,
+  children,
 }: {
   title: string
   description: string
@@ -33,9 +34,11 @@ export default function BlockedDeleteDialog({
   error: string | null
   footer: ReactNode
   onClose: () => void
+  children?: ReactNode
 }) {
   return <Dialog open title={title} description={description} onCancel={onClose} busy={busy} error={error ?? undefined}
     tone="destructive" confirmation designLayout="stacked" designWidth={480} designNode="yOyCg" footer={footer ? <DialogActions>{footer}</DialogActions> : undefined}>
+    {children}
     <ol className={styles.rows}>{rows.map((row, index) => <li key={row.key} className={styles.row}>
       <span className={styles.rowText}>{`${index + 1} ${row.text}`}</span><span className={styles.spacer} aria-hidden="true" />
       {row.action ? <button type="button" className={styles.rowAction} onClick={row.action.onSelect} disabled={busy}>{row.action.label}</button> : null}

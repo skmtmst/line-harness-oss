@@ -1,12 +1,13 @@
 'use client'
 
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import { Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import HelpTip from '@/components/shared/help-tip'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -48,6 +49,9 @@ export function periodLabel(periods: string[]): string {
 function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const { data, store, busy, mutate } = ctx
   const { selectedAccountId } = useAccount()
+  const loadedAccount = useRef({ data, id: selectedAccountId })
+  if (loadedAccount.current.data !== data) loadedAccount.current = { data, id: selectedAccountId }
+  const dataIsCurrent = loadedAccount.current.id === selectedAccountId
   const role = useStaffRole()
   /* 閲覧のみの人には、追加・変更・停止・再開のボタンを置かない（2026-10-06 オーナー）。 */
   const canEdit = canManageRole(role)
@@ -57,15 +61,20 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const [stopId, setStopId] = useState('')
   const [deleteId, setDeleteId] = useState('')
   const [deleteError, setDeleteError] = useState('')
-  const stopping = rows.find((row) => row.id === stopId)
-  const deleting = rows.find((row) => row.id === deleteId)
+  const [confirmationScope, setConfirmationScope] = useState('')
+  const scopeKey = JSON.stringify([selectedAccountId, store?.id ?? null])
+  const scopeVersion = useRef({ key: scopeKey, generation: 0 })
+  if (scopeVersion.current.key !== scopeKey) scopeVersion.current = { key: scopeKey, generation: scopeVersion.current.generation + 1 }
+  const currentScope = JSON.stringify([scopeKey, scopeVersion.current.generation])
+  const stopping = dataIsCurrent && confirmationScope === currentScope ? rows.find((row) => row.id === stopId) : undefined
+  const deleting = dataIsCurrent && confirmationScope === currentScope ? rows.find((row) => row.id === deleteId) : undefined
   /* 追加・変更は 1 枚の編集ページ（mauOC）。前の窓は消した。 */
   const router = useRouter()
   const openNew = () => router.push(`/restaurant-test/menu/edit${store ? `?store=${encodeURIComponent(store.id)}` : ''}`)
   const openEdit = (item: RestaurantMenuItem) => router.push(`/restaurant-test/menu/edit?id=${encodeURIComponent(item.id)}`)
 
   const stop = (item: RestaurantMenuItem) => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || !dataIsCurrent || confirmationScope !== JSON.stringify([scopeVersion.current.key, scopeVersion.current.generation])) return
     void mutate(
       () => restaurantTestApi.updateMenu(selectedAccountId, item.id, { status: 'archived' }),
       'メニューを保管しました。予約履歴の参照は残ります。',
@@ -74,7 +83,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
 
   /* 参照の有無は削除時にサーバで判定する。 */
   const remove = (item: RestaurantMenuItem) => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || !dataIsCurrent || confirmationScope !== JSON.stringify([scopeVersion.current.key, scopeVersion.current.generation])) return
     void mutate(
       async () => {
         try { await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(item.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE' }) }
@@ -157,8 +166,8 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                             { id: 'edit', label: '変更', onSelect: () => openEdit(item) },
                             ...(archived
                               ? [{ id: 'resume', label: '再開', onSelect: () => resume(item) }]
-                              : draftItem ? [] : [{ id: 'stop', label: '停止', onSelect: () => setStopId(item.id) }]),
-                            { id: 'delete', label: '削除', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setDeleteError(''); setDeleteId(item.id) } },
+                              : draftItem ? [] : [{ id: 'stop', label: '停止', onSelect: () => { if (dataIsCurrent) { setConfirmationScope(currentScope); setStopId(item.id) } } }]),
+                            { id: 'delete', label: '削除', tone: 'danger' as const, dividerBefore: true, onSelect: () => { if (dataIsCurrent) { setConfirmationScope(currentScope); setDeleteError(''); setDeleteId(item.id) } } },
                           ]}
                         />
                       </span>
@@ -186,6 +195,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         )}
       >
         <p className={styles.stopName}>{stopping?.name}</p>
+        <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} store={{ id: stopping?.store_id ?? '', name: data.stores.find((entry) => entry.id === stopping?.store_id)?.name }} />
         <DialogNote>メニューは保管され、予約履歴の参照は残ります。後で再開できます。</DialogNote>
       </RsDialog>
       <RsDialog
@@ -203,6 +213,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         )}
       >
         <p className={styles.stopName}>{deleting?.name}</p>
+        <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} store={{ id: deleting?.store_id ?? '', name: data.stores.find((entry) => entry.id === deleting?.store_id)?.name }} />
         <DialogNote>予約や設定で使われていないメニューだけ削除できます。元に戻せません。</DialogNote>
         {deleteError ? <Notice tone="danger">{deleteError}</Notice> : null}
       </RsDialog>

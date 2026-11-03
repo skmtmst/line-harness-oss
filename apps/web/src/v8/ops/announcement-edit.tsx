@@ -12,6 +12,7 @@ import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/share
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { CreatePage } from '@/components/templates'
 import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
@@ -446,6 +447,7 @@ export default function OpsAnnouncementEditV8() {
         onCancel={() => { if (!busy) setConfirmSend(false) }}
       >
         <div className={parts.dialogBody}>
+          <OperationTargetSummary accounts={[]} />
           <dl className={styles.facts}>
             <div className={styles.fact}><dt>宛先</dt><dd>{confirmAudience(form, preview)}</dd></div>
             <div className={styles.fact}><dt>届く方法</dt><dd>{confirmChannels(form, preview)}</dd></div>

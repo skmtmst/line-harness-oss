@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { CreateProjectDialogV8 } from './dialogs'
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 afterEach(cleanup)
 
 test('作成窓は入力を本文幅へ渡し、名前必須・説明・Enterの保存を保つ', () => {

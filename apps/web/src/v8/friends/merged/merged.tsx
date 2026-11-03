@@ -1,6 +1,7 @@
 'use client'
 
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import { requestUnsavedAction } from '@/lib/unsaved-action';
 import { useListItemHref } from '@/components/shared/list-navigation';
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -63,7 +64,8 @@ function deliveryAccount(row: UserRowData): string {
 }
 
 export default function MergedUsersV8() {
-  const [openedPersonId, setOpenedPersonId] = useDetailPanelUrl('person')
+  const editingRef = useRef(false)
+  const [openedPersonId, setOpenedPersonId] = useDetailPanelUrl('person', () => editingRef.current)
   const close = () => setOpenedPersonId(null)
   /*
    * 人の詳細は一覧と同じ URL のまま開くことがあるので、上の帯のパンくずの「統合ユーザー」で
@@ -72,11 +74,11 @@ export default function MergedUsersV8() {
   const closeRef = useRef(close)
   closeRef.current = close
   usePageCrumbs(openedPersonId
-    ? [{ label: '友だち', href: '/friends' }, { label: '統合ユーザー', href: '/friends?tab=merged', onSelect: () => closeRef.current() }]
+    ? [{ label: '友だち', href: '/friends' }, { label: '統合ユーザー', href: '/friends?tab=merged', onSelect: () => requestUnsavedAction(() => closeRef.current()) }]
     : null)
 
   if (openedPersonId) {
-    return <MergedPersonV8 personId={openedPersonId} onClose={close} />
+    return <MergedPersonV8 personId={openedPersonId} onClose={close} onDirtyChange={(dirty) => { editingRef.current = dirty }} />
   }
   return <MergedUsersList onOpen={setOpenedPersonId} />
 }

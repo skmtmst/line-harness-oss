@@ -4,7 +4,7 @@ import { requiredText } from '@/lib/form-requirement'
 const projectNameRequirement = requiredText('プロジェクト名を入力してください')
 
 import { Archive, Plus, Upload } from 'lucide-react'
-import { useEffect, useId, useState } from 'react'
+import { useContext, useEffect, useId, useLayoutEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import MediaSlot from '@/components/shared/media-slot'
 import Select from '@/components/shared/select'
@@ -17,6 +17,9 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 
 /*
  * ★V8 バナー生成の小さな窓。共通の窓（Dialog）に絵の幅・上からの位置を渡し、中身だけを絵どおりに組む。
@@ -37,7 +40,7 @@ export function uploadRefusal(file: File): string | null {
   return null
 }
 
-export function CreateProjectDialogV8({ open, project = null, busy, error, onSubmit, onCancel }: {
+export function CreateProjectDialogV8({ open, project = null, busy, error, onSubmit, onCancel, onDraftChange, onRequestClose }: {
   open: boolean
   /** 名前と説明を変えるとき。作るときは渡さない。 */
   project?: BannerProject | null
@@ -45,11 +48,20 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
   error?: string
   onSubmit: (input: { name: string; description: string }) => void
   onCancel: () => void
+  onDraftChange?: (dirty: boolean) => void
+  onRequestClose?: () => void
 }) {
   const uid = useId()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [localError, setLocalError] = useState('')
+  const depth = useContext(OverlayDepthContext)
+  const dirty = name !== (project?.name ?? '') || description !== (project?.description ?? '')
+  const guard = useUnsavedGuard({ dirty: !onDraftChange && open && (dirty || Boolean(busy)), busy: open && busy, onDiscard: onCancel })
+  const close = () => onRequestClose ? onRequestClose() : guard.guarded(() => { if (!dirty) onCancel() })
+  useLayoutEffect(() => { onDraftChange?.(open && dirty) }, [open, dirty, onDraftChange])
+
+  useEffect(() => { if (!open) guard.cancelLeave() }, [open, guard.cancelLeave])
 
   useEffect(() => {
     if (!open) return
@@ -66,7 +78,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
     onSubmit({ name: trimmed, description: description.trim() })
   }
 
-  return (
+  return (<>
     <BannerDialogFrame
       open={open}
       kind="create" contentLayout="form"
@@ -74,11 +86,11 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
       description={project ? undefined : '案件やキャンペーンごとに作ります。画像はプロジェクトの中で生成・取り込みします。'}
       busy={busy}
       error={localError || error}
-      onClose={onCancel}
+      onClose={close}
       designNode="W7Z57"
       actions={(
           <>
-            <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
+            <Button onClick={close} disabled={busy}>キャンセル</Button>
             {/* W7Z57: 名前が空のまま作らせない。 */}
             <Button widthReserve="idle" variant="primary" onClick={submit} disabled={busy || Boolean(projectNameRequirement.check(name))} title={projectNameRequirement.check(name) ?? undefined} busy={busy} busyLabel="保存しています…">
               {project ? '変更を保存' : <><Plus aria-hidden="true" className={styles.icon} />作って開く</>}
@@ -111,7 +123,8 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
           </div>
         </form>
     </BannerDialogFrame>
-  )
+    <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={open && guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></OverlayDepthContext.Provider>
+  </>)
 }
 
 /**
@@ -133,6 +146,11 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
   // 選んだファイル。選んでから「取り込む」を押すまで送らない。
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const dirty = file !== null
+  const guard = useUnsavedGuard({ dirty: open && (dirty || uploading), busy: open && uploading, onDiscard: onClose })
+  const close = () => guard.guarded(() => { if (!dirty) onClose() })
+  useEffect(() => { if (!open) guard.cancelLeave() }, [open, guard.cancelLeave])
   // 選んだ画像の見本（取り込む前に枠いっぱいに見せる）。閉じる・選び直すと手放す。
   const [filePreview, setFilePreview] = useState<string | null>(null)
   useEffect(() => {
@@ -186,20 +204,20 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
   }
 
   const noProject = projects.length === 0 && !loading
-  return (
+  return (<>
     <BannerDialogFrame
       open={open}
       kind="upload"
       contentLayout="form"
       title="画像を取り込む"
       description="手持ちの画像をプロジェクトへ入れます。PNG・JPEG・WebP、10MB まで。取り込んだ画像も生成した画像と同じようにアカウントへ渡せます。"
-      onClose={onClose}
+      onClose={close}
       busy={uploading}
       error={error || undefined}
       designNode="AnwtH"
       actions={(
           <>
-            <Button onClick={onClose} disabled={uploading}>キャンセル</Button>
+            <Button onClick={close} disabled={uploading}>キャンセル</Button>
             <Button variant="primary" onClick={() => void takeIn()} disabled={!file || Boolean(uploadProjectRequirement.check(projectId)) || loading || uploading} title={loading ? 'プロジェクトを読み込んでいます。' : uploadProjectRequirement.check(projectId) ?? (!file ? '取り込む画像を選んでください。' : undefined)} busy={uploading} busyLabel="取り込み中…">
               <Upload aria-hidden="true" className={styles.icon} />取り込む
             </Button>
@@ -237,7 +255,8 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
           </>
         )}
     </BannerDialogFrame>
-  )
+    <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={open && guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={uploading} /></OverlayDepthContext.Provider>
+  </>)
 }
 
 /**

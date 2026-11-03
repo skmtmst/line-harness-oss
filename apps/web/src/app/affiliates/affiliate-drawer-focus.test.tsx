@@ -108,6 +108,30 @@ describe('成果引き出しは共通の窓の動きをする', () => {
 })
 
 describe('支払い条件の未保存', () => {
+  test('名前の編集はフォーカスが外れても消えず、ページ移動を確かめる', async () => {
+    render(<AffiliateDrawerV8 affiliate={row} accountId="acc-1" readonly={false} startInEdit={false} linkBaseUrl="https://example.invalid" onClose={() => {}} onChanged={() => {}} onStopRequest={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: '紹介者の名前を直すを変更する' }))
+    const input = screen.getByRole('textbox', { name: '紹介者の名前を直す' }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: '新しい名前' } })
+    fireEvent.blur(input)
+    const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+    fireEvent.click(link)
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect((screen.getByRole('textbox', { name: '紹介者の名前を直す' }) as HTMLInputElement).value).toBe('新しい名前')
+    link.remove()
+  })
+  test('名前と支払いを両方編集してタブを移ると、確認一回で両方の変更を破棄する', async () => {
+    render(<AffiliateDrawerV8 affiliate={{ ...row, commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={() => {}} onChanged={() => {}} onStopRequest={() => {}} />)
+    const email = await screen.findByLabelText('連絡先')
+    fireEvent.change(email, { target: { value: 'draft@example.invalid' } })
+    fireEvent.click(screen.getByRole('button', { name: '紹介者の名前を直すを変更する' }))
+    fireEvent.change(screen.getByRole('textbox', { name: '紹介者の名前を直す' }), { target: { value: '新しい名前' } })
+    fireEvent.click(screen.getByRole('tab', { name: '概要' }))
+    fireEvent.click(await screen.findByRole('button', { name: '保存せずに移る' }))
+    expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+    expect(screen.getByRole('button', { name: '紹介者の名前を直すを変更する' })).toBeTruthy()
+  })
   test('入力後のページ移動を止め、編集を続けると入力を保つ', async () => {
     render(<AffiliateDrawerV8 affiliate={{ ...row, commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={() => {}} onChanged={() => {}} onStopRequest={() => {}} />)
     const email = await screen.findByLabelText('連絡先') as HTMLInputElement

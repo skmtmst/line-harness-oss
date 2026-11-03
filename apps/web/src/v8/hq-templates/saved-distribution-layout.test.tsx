@@ -21,6 +21,16 @@ const props = {
 }
 
 describe('保存後に配る窓の配るもの（タグの札）', () => {
+  it('配布するアカウントと環境を確認できる', () => {
+    const view = render(<SavedDistributionDialog {...props} />)
+    expect(screen.getByText('環境')).toBeTruthy()
+    expect(screen.getByText('対象アカウント数')).toBeTruthy()
+    expect(screen.getByText('1件')).toBeTruthy()
+    expect(screen.getByTitle('然 -NEN- 本店（a）')).toBeTruthy()
+    view.rerender(<SavedDistributionDialog {...props} selected={['b']} />)
+    expect(screen.getByTitle('然 -NEN- 渋谷店（b）')).toBeTruthy()
+    expect(screen.queryByTitle('然 -NEN- 本店（a）')).toBeNull()
+  })
   for (const width of [1152, 1440]) {
     it(`${width}：配るものは下の帯の選んだ数の横にあり、一覧の中には無い`, async () => {
       window.innerWidth = width

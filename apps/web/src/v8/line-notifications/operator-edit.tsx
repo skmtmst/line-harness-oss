@@ -9,6 +9,7 @@ import { LinePreviewMessage } from '@/components/shared/line-preview'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { Check, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -64,6 +65,8 @@ function OperatorEditInner() {
   ])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  const currentAccountRef = useRef(selectedAccountId)
+  currentAccountRef.current = selectedAccountId
 
   /*
    * お知らせの口はすべて owner・admin だけ。staff には閲覧のみの帯を出し、
@@ -166,6 +169,8 @@ function OperatorEditInner() {
   const sawLoadingRef = useRef(false)
   /* 公開前の確認の窓（板 ）。 */
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmAccountId, setConfirmAccountId] = useState<string | null>(null)
+  useEffect(() => { setConfirmOpen(false); setConfirmAccountId(null) }, [selectedAccountId])
   const [publishing, setPublishing] = useState(false)
   /* 確認の窓の「役割」の列。宛先の口は役割を返さないので、ログインユーザーの一覧から引く。読めなければ空のまま。 */
   const [staffRoles, setStaffRoles] = useState<Record<string, string>>({})
@@ -386,11 +391,13 @@ function OperatorEditInner() {
   /* 公開の前に  の確認の窓を出す。保存後に直した分も出すので、古い内容のまま出さない。 */
   const openPublishConfirm = async () => {
     if (!selectedAccountId || saving || ruleLoading || publishing) return
+    const accountId = selectedAccountId
     /* 押した「公開」のボタンに手応え（押せない形＋輪）を出す。先に下書きを保存している間も。 */
     setPreparingPublish(true)
     try {
       const ruleId = await saveDraft(true)
-      if (!ruleId) return
+      if (!ruleId || currentAccountRef.current !== accountId) return
+      setConfirmAccountId(accountId)
       setConfirmOpen(true)
     } finally {
       setPreparingPublish(false)
@@ -398,7 +405,7 @@ function OperatorEditInner() {
   }
 
   const publish = async () => {
-    if (!selectedAccountId || publishing) return
+    if (!selectedAccountId || selectedAccountId !== confirmAccountId || publishing) return
     const ruleId = savedRuleId
     if (!ruleId) return
     setPublishing(true)
@@ -666,7 +673,7 @@ function OperatorEditInner() {
 
       {/* 公開前の確認（板 `sDXNy`）。選んだスタッフと LINE の届く人数を確かめる。 */}
       <Dialog
-        open={confirmOpen}
+        open={confirmOpen && confirmAccountId === selectedAccountId}
         busy={publishing}
         designNode="sDXNy"
         // 絵 ：窓の余白24・題の行36・本文までの間14
@@ -677,6 +684,7 @@ function OperatorEditInner() {
         title="このお知らせを公開しますか？"
         onCancel={() => { if (!publishing) setConfirmOpen(false) }}
       >
+        <OperationTargetSummary accounts={[{ id: confirmAccountId ?? '' }]} />
         <div className={styles.confirmBody}>
           <div className={styles.confirmSummary}>
             <p className={styles.confirmLine}>
