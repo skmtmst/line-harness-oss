@@ -979,10 +979,13 @@ it.each(['staff', null] as const)('停止の窓を開いた後に役割が%sな�
   await act(async () => at('/restaurant-test/delivery?tab=all'))
   await act(async () => confirm())
   expect(fixture.stopIntake).not.toHaveBeenCalled()
-  expect(screen.queryByRole('alertdialog')).not.toBeNull()
-  const dialog = within(screen.getByRole('alertdialog'))
-  expect(within(screen.getByRole('alertdialog').querySelector('[data-window-actions]') as HTMLElement).getByText(role === null ? '担当者の確認が終わるまでお待ちください。' : '店舗や権限が変わったため、受付の操作を中止しました。窓を開き直してください。')).toBeTruthy()
-  expect((dialog.getByRole('button', { name: '止める', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+  if (role === null) {
+    const dialog = within(screen.getByRole('alertdialog'))
+    expect(within(screen.getByRole('alertdialog').querySelector('[data-window-actions]') as HTMLElement).getByText('担当者の確認が終わるまでお待ちください。')).toBeTruthy()
+    expect((dialog.getByRole('button', { name: '止める', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+  } else {
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+  }
 })
 
 it('未取得の別の店では、前の店のサービスを使って停止を開かない', async () => {

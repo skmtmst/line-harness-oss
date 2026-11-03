@@ -205,14 +205,14 @@ function DeliveryInner() {
   const [stopScope, setStopScope] = useState<object | null>(null)
   const openedStopScope = useRef<typeof intakeScope | null>(null)
   useEffect(() => {
-    if (!openedStopScope.current || openedStopScope.current.selectedAccountId === selectedAccountId) return
+    if (!openedStopScope.current || (openedStopScope.current.selectedAccountId === selectedAccountId && (role === null || canManage))) return
     openedStopScope.current = null
     setStopScope(null)
     setStopOpen(false)
     setStopSelected([])
     setStopPreset('')
     setStopError(null)
-  }, [selectedAccountId])
+  }, [selectedAccountId, role, canManage])
   const intakeDisabledReason = intakeReady ? undefined : '注文の状態を読み直してから操作してください。'
   const stoppable = (data?.services ?? []).filter(state => !intakeActionReason(state, 'stop'))
   const bulkStopReason = intakeDisabledReason ?? (stoppable.length ? undefined : '接続済みで受付中のサービスがありません。')

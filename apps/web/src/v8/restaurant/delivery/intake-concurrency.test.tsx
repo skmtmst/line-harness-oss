@@ -397,3 +397,20 @@ it('受付停止の窓で担当者の確認に失敗したら理由を示し送�
   expect((dialog.getByRole('button', { name: '止める', exact: true }) as HTMLButtonElement).disabled).toBe(true)
   expect(fixture.stopIntake).not.toHaveBeenCalled()
 })
+
+it('閲覧のみへ変わると受付停止の窓と入力を閉じ、古い確定は使えない', async () => {
+  const view = render(<DeliveryPage />)
+  await screen.findByRole('region', { name: '出前館' })
+  fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
+  const oldSubmit = fixture.stopSubmit
+  fixture.role.value = verifiedStaffRole('viewer')
+  view.rerender(<DeliveryPage />)
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  fixture.role.value = verifiedStaffRole('owner')
+  view.rerender(<DeliveryPage />)
+  await act(async () => { oldSubmit?.() })
+  expect(fixture.stopIntake).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  expect((within(screen.getByRole('alertdialog')).getByRole('button', { name: '止める', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+})
