@@ -400,7 +400,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const [calendarFormError, setCalendarFormError] = useState<string | null>(null)
   const [savingCalendar, setSavingCalendar] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
-  const [confirmDisconnect, setConfirmDisconnect] = useState(false)
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false); const [disconnectContext, setDisconnectContext] = useState('')
   const [dayAddOpen, setDayAddOpen] = useState(false)
   const [dayAddKind, setDayAddKind] = useState<DayAddKind>('shift')
   const [dayAddDate, setDayAddDate] = useState('')
@@ -1399,7 +1399,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               ) : null}
               {canEdit ? (
                 <div className={styles.calActions}>
-                  {calendarId ? <Button onClick={() => { setCalendarFormError(''); setConfirmDisconnect(true) }} disabled={disconnecting}>外す</Button> : null}
+                  {calendarId ? <Button onClick={() => { setCalendarFormError(''); setDisconnectContext(conflictContext); setConfirmDisconnect(true) }} disabled={disconnecting}>外す</Button> : null}
                   <Button variant={calendarId ? 'secondary' : 'primary'} onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured} busy={savingCalendar} busyLabel="確認中…" widthReserve="idle">
                     {calendarId ? '保存する' : 'つなげる'}
                   </Button>
@@ -1426,15 +1426,15 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         error={shiftError || undefined} confirmDisabled={removeTarget?.kind === 'break' && Boolean(dateSaveConflict.conflict)} confirmDisabledReason="閉じて最新の内容と比べてください。" onSuccess={() => setRemoveTarget(null)} onConfirm={() => removeDayEntry()}
       ><OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} /></ConfirmDialog>
       <ConfirmDialog
-        open={confirmDisconnect}
+        open={confirmDisconnect && disconnectContext === conflictContext}
         title="外の予定とのつながりを切りますか？"
         description="切ると、カレンダーの予定があっても枠が閉じなくなります。つなぎ直すといつでも戻せます。"
         confirmLabel="つながりを切る"
         destructive
         busy={disconnecting}
         onCancel={() => setConfirmDisconnect(false)}
-        error={calendarFormError || undefined} onSuccess={() => setConfirmDisconnect(false)} onConfirm={() => disconnectCalendar()}
-      />
+        error={calendarFormError || undefined} onSuccess={() => setConfirmDisconnect(false)} onConfirm={() => disconnectContext === conflictContext ? disconnectCalendar() : undefined}
+      ><OperationTargetSummary accounts={[{ id: selectedAccountId ?? '', name: selectedAccount?.id === selectedAccountId ? selectedAccount.name : undefined }]} externalTarget={{ label: '担当者', name: staff?.name }} /></ConfirmDialog>
     </SaveErrorScope>
   )
 }
