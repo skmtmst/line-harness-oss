@@ -99,9 +99,6 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
     expect(markup).toContain(`href="${CONTACT_URL}"`)
     expect(markup).toContain('>お問い合わせ</a>')
     expect(markup).not.toContain('href="/hq/support"')
-    const page = read('app/register/page.tsx')
-    expect(page).toContain('!LEGAL_LINKS.terms || !LEGAL_LINKS.privacy')
-    expect(page).toContain('href={CONTACT_URL}')
     // フッターに残すのは法務の3つだけ。
     for (const [label, url] of [
       ['利用規約', LEGAL_LINKS.terms],

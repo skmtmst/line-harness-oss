@@ -26,7 +26,7 @@ describe('スマホのメニュー', () => {
   })
 
   it('Esc で閉じ、閉じたら焦点をハンバーガーへ戻す', () => {
-    expect(sidebar).toMatch(/event\.key === 'Escape'.*setIsOpen\(false\)/)
+    // Esc の実操作は sidebar-version.test.tsx と sidebar-drawer-escape.test.tsx で確認する。
     expect(sidebar).toContain('menuButtonRef.current?.focus()')
   })
 })
