@@ -14,7 +14,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 const noop = () => {}
-const dialogState = vi.hoisted(() => ({ refund: false, lesson: false, closeRefund: vi.fn(), closeLesson: vi.fn(), preparing: vi.fn() }))
+const dialogState = vi.hoisted(() => ({ refund: false, lesson: false, cancel: false, confirmCancel: vi.fn(), closeRefund: vi.fn(), closeLesson: vi.fn(), preparing: vi.fn() }))
 
 vi.mock('./use-style-dashboard', () => ({
   useStyleDashboard: () => ({
@@ -40,9 +40,9 @@ vi.mock('./use-style-dashboard', () => ({
     roster: null, rosterRow: null, today: null,
     preparing: { dialog: null, open: dialogState.preparing }, openPayment: dialogState.preparing, reload: noop,
     subtitle: '', openRow: noop, markVisit: noop, markNoShow: noop, approve: noop,
-    undoVisit: noop, cancelRow: null, setCancelRow: noop, refundRow: dialogState.refund ? { id: 'r1', name: '山田', time: '10:00' } : null, setRefundRow: dialogState.closeRefund,
+    undoVisit: noop, cancelRow: dialogState.cancel ? { id: 'r1', name: '山田', time: '10:00', booking: { price: 1000, partySize: 1 } } : null, setCancelRow: noop, refundRow: dialogState.refund ? { id: 'r1', name: '山田', time: '10:00' } : null, setRefundRow: dialogState.closeRefund,
     resultRow: null, setResultRow: noop, classRow: dialogState.lesson ? { id: 'c1', name: '朝のクラス', time: '10:00' } : null, setClassRow: dialogState.closeLesson,
-    menuFor: () => [], confirmCancel: noop, saveResult: noop, testMode: false,
+    menuFor: () => [], confirmCancel: dialogState.confirmCancel, saveResult: noop, testMode: false,
     alertAction: noop, attend: noop, KIND: {}, saveClosure: noop, addNew: noop,
   }),
 }))
@@ -50,7 +50,7 @@ vi.mock('./use-style-dashboard', () => ({
 import StyleDashboard from './style-dashboard'
 
 beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ data: [] }), { status: 200 }))) })
-afterEach(() => { cleanup(); dialogState.refund = false; dialogState.lesson = false; vi.clearAllMocks(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); dialogState.refund = false; dialogState.lesson = false; dialogState.cancel = false; vi.clearAllMocks(); vi.unstubAllGlobals() })
 
 it.each([
   ['refund', 'この画面から返金はできません。'],
@@ -79,4 +79,26 @@ it('担当の欄は4字の名前が切れない幅（143px以上）で、日付�
   const width = Number.parseInt(field.style.width, 10)
   expect(width).toBeGreaterThanOrEqual(143)
   expect(width).toBeLessThanOrEqual(160)
+})
+
+it('ダッシュボードの予約取消は理由だけを受け取り、連絡と返金は自動で行わない', () => {
+  dialogState.cancel = true
+  render(<StyleDashboard style="salon" />)
+  const dialog = screen.getByRole('alertdialog')
+  expect(within(dialog).getByText('自動の連絡・返金は行われません。')).toBeTruthy()
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+  expect(within(dialog).queryByRole('checkbox')).toBeNull()
+  expect(within(dialog).queryByRole('radio')).toBeNull()
+  fireEvent.change(within(dialog).getByLabelText(/取り消す理由/), { target: { value: '都合により' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: '予約を取り消す' }))
+  expect(dialogState.confirmCancel).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }), { reason: '都合により', refund: 'none', notify: false })
+})
+
+it('飲食店の予約取消は店舗を特定できない場合にその旨を示す', () => {
+  dialogState.cancel = true
+  render(<StyleDashboard style="restaurant" />)
+  const dialog = screen.getByRole('alertdialog')
+  expect(within(dialog).getByText('店舗')).toBeTruthy()
+  expect(within(dialog).getAllByText('名前を確認できません').length).toBeGreaterThan(0)
 })

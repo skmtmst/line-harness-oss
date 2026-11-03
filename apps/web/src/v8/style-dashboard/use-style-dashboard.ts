@@ -247,7 +247,12 @@ export function useStyleDashboard(style: IndustryStyle) {
     if (style !== 'restaurant' || !row.reservationId) return
     return run(row, () => restaurantTestApi.deleteSeatVisitMark(accountId, row.reservationId!, version(row), crypto.randomUUID()), '来店の印を取り消しました。', '取り消せませんでした。')
   }
-  const [cancelRow, setCancelRow] = useState<StyleRow | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<{ row: StyleRow; generation: number } | null>(null)
+  const cancelScope = useRef({ accountId, generation: 0 })
+  if (cancelScope.current.accountId !== accountId) cancelScope.current = { accountId, generation: cancelScope.current.generation + 1 }
+  const cancelRow = cancelTarget?.generation === cancelScope.current.generation ? cancelTarget.row : null
+  const setCancelRow = (row: StyleRow | null) => setCancelTarget(row ? { row, generation: cancelScope.current.generation } : null)
+  useEffect(() => { setBusy(value => value === 'cancel' ? '' : value) }, [accountId])
   const [refundRow, setRefundRow] = useState<StyleRow | null>(null)
   const [resultRow, setResultRow] = useState<StyleRow | null>(null)
   const [classRow, setClassRow] = useState<StyleRow | null>(null)
@@ -269,17 +274,21 @@ export function useStyleDashboard(style: IndustryStyle) {
   })
   /** 取り消す（h2lHCH）。理由は口の cancellationReason へ。返金は決済の口（組3）の一部返金・理由つきが要る。 */
   const confirmCancel = async (row: StyleRow, input: CancelReservationInput) => {
+    if (!cancelTarget || cancelTarget.row !== row || cancelTarget.generation !== cancelScope.current.generation || !accountId) return
+    const generation = cancelTarget.generation
     setBusy('cancel')
     try {
       if (style === 'restaurant' && row.reservationId) await restaurantTestApi.updateReservation(accountId, row.reservationId, { status: 'cancelled', expectedVersion: version(row), cancellationReason: input.reason })
       else {
         if (row.booking?.version != null) await styleApi.saveBooking(accountId, bookingId(row), { expectedVersion: row.booking.version, cancellationReason: input.reason })
+        if (cancelScope.current.generation !== generation) return
         await bookingApi.decideRequest(accountId, bookingId(row), 'cancel')
       }
+      if (cancelScope.current.generation !== generation) return
       setCancelRow(null)
       notifyToast('予約を取り消しました。')
       if (input.refund !== 'none' || input.notify) openPayment()
-    } catch (caught) { notifyToast(japaneseDetailOf(caught) || '取り消せませんでした。', { tone: 'error' }) } finally { setBusy(''); void reload() }
+    } catch (caught) { if (cancelScope.current.generation === generation) notifyToast(japaneseDetailOf(caught) || '取り消せませんでした。', { tone: 'error' }) } finally { if (cancelScope.current.generation === generation) { setBusy(''); void reload() } }
   }
   /** 面談の結果（検討中・成約・見送り）。予約ごとに持つ（ 追記 4 ⑤）。 */
   const saveResult = async (row: StyleRow, outcome: 'considering' | 'won' | 'lost') => {

@@ -105,6 +105,10 @@ function DeliveryInner() {
   const requestedTab = searchParams.get('tab') as DeliveryOrderTab | null
   const tab: DeliveryOrderTab = requestedTab && TABS.includes(requestedTab) ? requestedTab : 'new'
   const orderId = searchParams.get('id')
+  const cancelKey = JSON.stringify([selectedAccountId, orderId])
+  const cancelScope = useRef({ key: cancelKey })
+  if (cancelScope.current.key !== cancelKey) cancelScope.current = { key: cancelKey }
+  const openedCancelScope = useRef<typeof cancelScope.current | null>(null)
 
   const meta = PAGE_META[view]
   usePageTitle(meta.title)
@@ -140,6 +144,7 @@ function DeliveryInner() {
   const [cancelReason, setCancelReason] = useState<DeliveryCancelReasonCode>('out_of_stock')
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
+  useEffect(() => { setCancelOpen(false); setCancelBusy(false); setCancelError(null) }, [cancelKey])
 
   /* ── 注文履歴・売上（OzHLO） ─────────────────────────────── */
   const [history, setHistory] = useState<DeliveryHistoryData | null>(null)
@@ -481,21 +486,25 @@ function DeliveryInner() {
     if (
       !canManage
       || !selectedAccountId
+      || openedCancelScope.current !== cancelScope.current
       || !order
       || (order.service === 'ubereats' && !uberOrderActionsEnabled)
     ) return
+    const requestScope = cancelScope.current
     setCancelBusy(true)
     setCancelError(null)
     try {
       await restaurantDeliveryApi.cancel(selectedAccountId, order.id, cancelReason)
+      if (requestScope !== cancelScope.current) return
       setCancelOpen(false)
       setNotice({ tone: 'success', text: '注文をキャンセルしました。' })
       await loadOrders(true)
       closeDetail()
     } catch (err) {
+      if (requestScope !== cancelScope.current) return
       setCancelError(errorMessage(err, 'キャンセルできませんでした。'))
     } finally {
-      setCancelBusy(false)
+      if (requestScope === cancelScope.current) setCancelBusy(false)
     }
   }, [canManage, selectedAccountId, currentDetail, cancelReason, uberOrderActionsEnabled, loadOrders, closeDetail])
 
@@ -867,6 +876,7 @@ function DeliveryInner() {
         onReady={() => { if (detailOrder) readyOrder(detailOrder) }}
         onHandOver={() => { if (detailOrder) handOverOrder(detailOrder) }}
         onCancelOrder={() => {
+          openedCancelScope.current = cancelScope.current
           setCancelReason('out_of_stock')
           setCancelError(null)
           setCancelOpen(true)
@@ -874,7 +884,9 @@ function DeliveryInner() {
       />
 
       <CancelOrderDialog
-        open={cancelOpen}
+        open={cancelOpen && openedCancelScope.current === cancelScope.current}
+        accountId={detailAccountId}
+        store={dataAccountId === selectedAccountId && data?.orders.some(order => order.id === detailOrder?.id) ? data.store : undefined}
         orderNumber={detailOrder?.orderNumber ?? ''}
         serviceLabel={detailOrder
           ? detailOrder.serviceLabel || DELIVERY_SERVICE_LABELS[detailOrder.service]

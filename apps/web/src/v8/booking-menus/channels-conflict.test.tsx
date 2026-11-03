@@ -34,8 +34,18 @@ it('2件の名前・メニュー・受付経路と日本時間を返事どおり
   expect(screen.getByText(/② 外部取り込み・鈴木さん・シャンプー・13:00〜13:45/)).toBeTruthy()
   expect(screen.getByText(conflict.guidance!)).toBeTruthy()
   expect(screen.getByText('①の予約を移す先のスタッフ')).toBeTruthy()
+  expect(screen.getByText('LINEアカウント')).toBeTruthy()
+  expect(screen.getByText('環境')).toBeTruthy()
   expect(document.body.textContent).not.toContain('Hot Pepper Beauty')
   expect(document.body.textContent).not.toContain('13:00に空いている')
+})
+
+it('アカウントが切り替わったら古い確認から移動しない', () => {
+  const view = render(<ConflictDialog accountId="a" conflict={conflict} staff={staff} onClose={() => {}} onDone={() => {}} />)
+  const confirm = screen.getByRole('button', { name: '移して知らせる' })
+  view.rerender(<ConflictDialog accountId="b" conflict={conflict} staff={staff} onClose={() => {}} onDone={() => {}} />)
+  fireEvent.click(confirm)
+  expect(net.reassign).not.toHaveBeenCalled()
 })
 
 it('連携済みなら未連携の案内を出さず、失敗した移動は同じ窓からやり直せる', async () => {
