@@ -83,6 +83,7 @@ const dbMocks = {
   getWebinarEditorSettings: vi.fn(),
   saveWebinarEditorSettings: vi.fn(),
   publishWebinarEditorVersion: vi.fn(),
+  publishWebinarAndActivate: vi.fn(),
   getWebinarViewSegmentCoverage: vi.fn(),
   getWebinarParticipantOperations: vi.fn(),
   classifyWebinarParticipant: realDb.classifyWebinarParticipant,
@@ -1705,6 +1706,24 @@ describe('admin CRUD', () => {
       expect.objectContaining({ key: 'notification_test', status: 'passed' }),
       expect.objectContaining({ key: 'notification_duplicates', status: 'passed' }),
     ]));
+  });
+
+  test('公開時の版競合は現在の版を返し、無条件の状態更新をしない', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    dbMocks.getWebinarEditorSettings.mockResolvedValue({
+      webinar_id:'w1', version:4, delivery_kind:'scheduled', viewing_condition_json:'{}', public_description:'', registration_form_id:'form-1',
+      notification_messages_json:'{}', notification_test_json:'{"status":"passed"}', action_template_body:'', missing_result_policy:'escalate',
+      public_page_test_json:'{"status":"passed"}', published_version:null, published_at:null, created_at:'x', updated_at:'x',
+    });
+    dbMocks.getFormById.mockResolvedValue({id:'form-1', name:'申込フォーム', is_active:1, fields:'[]'});
+    dbMocks.getWebinarCtas.mockResolvedValue([{at_seconds:300, kind:'url', url:'https://example.com'}]);
+    dbMocks.getWebinarActions.mockResolvedValue([{id:'action-1'}]);
+    dbMocks.publishWebinarAndActivate.mockResolvedValue(false);
+    const res=await adminReq('/api/webinars/w1/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedVersion:4})});
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({error:'version_conflict',currentVersion:4});
+    expect(dbMocks.publishWebinarAndActivate).toHaveBeenCalledWith(expect.anything(),'w1',4);
+    expect(dbMocks.updateWebinar).not.toHaveBeenCalled();
   });
 
   test('GET participants — 実行エラーと担当者連携状態をカーソル付きで返す', async () => {
