@@ -69,7 +69,8 @@ export function useFileScan() {
   const [stopExternal, setStopExternal] = useState(false)
   const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
   const stopTicket = useRef<object | null>(null)
-  const stopLock = useRef(false)
+  const stopLock = useRef<object | null>(null)
+  const configLock = useRef<object | null>(null)
   const [stopError, setStopError] = useState('')
   const configFields = useFormErrors()
   const hasExternalInput = Boolean(provider.trim() || endpoint.trim() || secretRef.trim())
@@ -151,8 +152,9 @@ export function useFileScan() {
 
   useEffect(() => {
     releaseTicket.current = null; deleteTicket.current = null; stopTicket.current = null
+    stopLock.current = null; configLock.current = null
     setReleaseTarget(null); setDeleteTarget(null); setStopExternal(false)
-    setReleaseBusy(false); setDeleteBusy(false)
+    setReleaseBusy(false); setDeleteBusy(false); setConfigBusy(false)
   }, [renderedScope])
 
   useEffect(() => {
@@ -223,16 +225,18 @@ export function useFileScan() {
 
   async function saveConfig() {
     if (!canEdit) return
-    if (!selectedAccountId || configBusy || !configDirty) return
+    if (!selectedAccountId || configBusy || configLock.current || !configDirty) return
     setActionError('')
     if (configFields.submit().length > 0) return
-    setConfigBusy(true)
+    const lock = {}; configLock.current = lock; setConfigBusy(true)
+    const current = () => mounted.current && renderedScope === scope.current && configLock.current === lock
     try {
       const res = await api.fileScan.saveConfig(selectedAccountId, {
         externalProvider: provider.trim() || null,
         externalEndpointUrl: endpoint.trim() || null,
         externalSecretRef: secretRef.trim() || null,
       })
+      if (!current()) return
       if (!res.success) {
         setActionError('設定を保存できませんでした。時間をおいて、もう一度お試しください。')
         return
@@ -241,6 +245,7 @@ export function useFileScan() {
       notifySaved('外の検査の設定を保存しました。')
       await load()
     } catch (caught) {
+      if (!current()) return
       const errors = readSaveFieldErrors(caught)
       const count = Object.keys(errors).length
       if (count && configFields.setServerErrors(errors) === count) return
@@ -248,7 +253,7 @@ export function useFileScan() {
         ? describeApiFailure(caught, '設定の保存')
         : '設定を保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
-      setConfigBusy(false)
+      if (current()) { configLock.current = null; setConfigBusy(false) }
     }
   }
 
@@ -257,9 +262,9 @@ export function useFileScan() {
    * 実際に消す。空に保存すると送信は止まる（部分だけの空はAPIが弾く）。
    */
   async function stopExternalConfig() {
-    if (!canEditRef.current || !selectedAccountId || !stopScope || stopScope.scope !== scope.current || stopScope.ticket !== stopTicket.current || loadedScope.current !== stopScope.scope || !mounted.current || stopLock.current) return
+    if (!canEditRef.current || !selectedAccountId || !stopScope || stopScope.scope !== scope.current || stopScope.ticket !== stopTicket.current || loadedScope.current !== stopScope.scope || !mounted.current || stopLock.current || configLock.current) return
     const current = () => mounted.current && canEditRef.current && stopScope.scope === scope.current && stopScope.ticket === stopTicket.current
-    stopLock.current = true; setConfigBusy(true)
+    const lock = {}; stopLock.current = lock; configLock.current = lock; setConfigBusy(true)
     setStopError('')
     try {
       const res = await api.fileScan.saveConfig(selectedAccountId, {
@@ -282,8 +287,8 @@ export function useFileScan() {
       if (!current()) return
       setStopError('設定を消せませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
-      stopLock.current = false
-      if (mounted.current && stopScope.scope === scope.current) setConfigBusy(false)
+      if (stopLock.current === lock) stopLock.current = null
+      if (configLock.current === lock) { configLock.current = null; if (mounted.current && stopScope.scope === scope.current) setConfigBusy(false) }
     }
   }
 

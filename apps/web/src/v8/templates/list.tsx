@@ -48,7 +48,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import type { Folder } from '@line-crm/shared'
 import { Bookmark,Braces,Copy,FileText,Folder as FolderIcon,Link2,Mail,Plus,Send,Unlink } from 'lucide-react'
-import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
+import { Fragment,useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { loadTemplateExamples,type TemplateExample } from './examples'
 import styles from './list.module.css'
 import { useTemplatePanelDetail } from './panel-detail'
@@ -153,7 +153,7 @@ export default function TemplatesListV8() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleteScope, setDeleteScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
   const deleteTicket = useRef<object | null>(null)
-  const deleteLock = useRef(false)
+  const deleteLock = useRef<object | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   /** 使っている所があるので削除できない窓（）。中身は usage 口で取る。 */
@@ -183,7 +183,7 @@ export default function TemplatesListV8() {
   const [pendingBulkDelete, setPendingBulkDelete] = useState<Template[] | null>(null)
   const [bulkScope, setBulkScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
   const bulkTicket = useRef<object | null>(null)
-  const bulkLock = useRef(false)
+  const bulkLock = useRef<object | null>(null)
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [bulkDeleteError, setBulkDeleteError] = useState('')
 
@@ -194,6 +194,8 @@ export default function TemplatesListV8() {
   useEffect(() => {
     activeAccountRef.current = selectedAccountId
     deleteTicket.current = null; bulkTicket.current = null
+    deleteLock.current = null; bulkLock.current = null
+    setDeleting(false); setBulkDeleting(false)
     // フォルダはアカウント単位。切り替えたら前のアカウントの帯も選択も残さない。
     setFolders([])
     setUnfiledCount(null)
@@ -533,7 +535,7 @@ export default function TemplatesListV8() {
     }
     const target = pendingDelete.item
     const current = () => mounted.current && canMutateRef.current && deleteScope.scope === accountScope.current && deleteScope.ticket === deleteTicket.current
-    deleteLock.current = true; setDeleting(true)
+    const lock = {}; deleteLock.current = lock; setDeleting(true)
     setDeleteError('')
     try {
       const res = await api.templates.delete(target.id)
@@ -550,7 +552,7 @@ export default function TemplatesListV8() {
       { if (!fieldFailure)
       setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      deleteLock.current = false
+      if (deleteLock.current === lock) deleteLock.current = null
       if (mounted.current && deleteScope.scope === accountScope.current) setDeleting(false)
     }
   }
@@ -654,7 +656,7 @@ export default function TemplatesListV8() {
   const runBulkDelete = async () => {
     if (!pendingBulkDelete || !bulkScope || bulkScope.scope !== accountScope.current || bulkScope.ticket !== bulkTicket.current || loadedScope.current !== bulkScope.scope || !mounted.current || !canMutateRef.current || bulkLock.current) return
     const current = () => mounted.current && canMutateRef.current && bulkScope.scope === accountScope.current && bulkScope.ticket === bulkTicket.current
-    bulkLock.current = true; setBulkDeleting(true)
+    const lock = {}; bulkLock.current = lock; setBulkDeleting(true)
     setBulkDeleteError('')
     try {
       let failed = 0
@@ -685,7 +687,7 @@ export default function TemplatesListV8() {
           : '削除できませんでした。状態を読み直してからお試しください。',
       ) }
     } finally {
-      bulkLock.current = false
+      if (bulkLock.current === lock) bulkLock.current = null
       if (mounted.current && bulkScope.scope === accountScope.current) setBulkDeleting(false)
     }
   }
@@ -984,7 +986,7 @@ export default function TemplatesListV8() {
   const blockedRows = blockedUsage ? usageRows(blockedUsage) : []
   const blockedTotal = blockedDelete ? Math.max(blockedDelete.item.usageCount, blockedRows.length) : 0
 
-  const overlays = renderTemplateDialogs({ deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates })
+  const overlays = <Fragment key={renderedScope.generation}>{renderTemplateDialogs({ deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates })}</Fragment>
 
   const heading = {
     title: 'テンプレート',

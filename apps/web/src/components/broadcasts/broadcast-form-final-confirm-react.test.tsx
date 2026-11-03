@@ -246,6 +246,23 @@ describe('画面内の最終確認（IDEA-06）', () => {
 })
 
 describe('条件が変わったら古い確認を使わない', () => {
+  it('アカウント切替先で確認窓を開き直すと切替先の下書きを確認する', async () => {
+    mocks.create.mockImplementation(async () => ({ success: true, data: { id: `draft-${mocks.account}`, version: 1 } }))
+    mocks.update.mockImplementation(async (id: string) => ({ success: true, data: { id, version: 2 } }))
+    await render()
+    await click('今すぐ送る', container); await settle(200)
+    expect(mocks.preview).toHaveBeenCalledWith('draft-acc-1')
+    mocks.account = 'acc-2'
+    await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign currentStep="confirm" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
+    await settle()
+    await click('今すぐ送る', container); await settle(200)
+    expect(mocks.preview).toHaveBeenLastCalledWith('draft-acc-2')
+    const opened = dialog()!
+    const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))!
+    await act(async () => { fireEvent.click(acknowledgement) }); await flush()
+    await click('37 人に送る', opened)
+    expect(mocks.confirm).toHaveBeenCalledWith('draft-acc-2', expect.anything())
+  })
   async function addExcludeTag() {
     await act(async () => { fireEvent.click(container.querySelector('button[aria-label="除くタグ"]')!) }); await flush()
     await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('input[type="radio"]')).find((item) => item.getAttribute('aria-label')?.includes('配信不要'))!) }); await flush()

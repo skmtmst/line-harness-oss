@@ -379,6 +379,29 @@ describe('ファイルの安全確認の設定画面', () => {
     })
   })
 
+  test('外部検査の停止中に切り替えても切替先の設定を操作できる', async () => {
+    ready()
+    mocks.getConfig.mockResolvedValue({ success: true, data: { config: externalConfig } })
+    mocks.list.mockResolvedValue({ success: true, data: { items: [], total: 0, limit: 50, offset: 0 } })
+    let finishOld!: (value: unknown) => void
+    mocks.saveConfig.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve })).mockImplementation(() => new Promise(() => {}))
+    const view = render(<FileScanSettingsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '外の検査を止める' }))
+    fireEvent.click(screen.getAllByRole('button', { name: '外の検査を止める' }).at(-1)!)
+    await waitFor(() => expect(mocks.saveConfig).toHaveBeenCalledTimes(1))
+    mocks.accountId = 'acc-2'
+    view.rerender(<FileScanSettingsPage />)
+    await waitFor(() => expect(mocks.getConfig).toHaveBeenCalledWith('acc-2'))
+    const stop = await screen.findByRole('button', { name: '外の検査を止める' })
+    await waitFor(() => expect((stop as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(stop)
+    fireEvent.click(screen.getAllByRole('button', { name: '外の検査を止める' }).at(-1)!)
+    await waitFor(() => expect(mocks.saveConfig).toHaveBeenCalledTimes(2))
+    finishOld({ success: true, data: {} })
+    await waitFor(() => expect((screen.getAllByRole('button', { name: /外の検査を止める|処理中/ })[0] as HTMLButtonElement).disabled).toBe(true))
+    expect(mocks.saveConfig).toHaveBeenCalledTimes(2)
+  })
+
   /*
    * 監査 D017: 確認窓の中で起きた失敗は、窓の中に理由を出す。
    * ページ最上部の帯は暗転の後ろに隠れて読めないため、窓の中の

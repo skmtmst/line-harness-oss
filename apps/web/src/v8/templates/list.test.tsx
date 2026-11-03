@@ -218,6 +218,30 @@ describe('V8 テンプレートの一覧', () => {
     expect(removeTemplate).not.toHaveBeenCalled()
   })
 
+  it.each(['単体', 'まとめて'])('%s削除の通信中に切り替えても新しいアカウントで削除できる', async (mode) => {
+    let finishOld!: (value: unknown) => void
+    removeTemplate.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve })).mockImplementation(() => new Promise(() => {}))
+    const view = render(<TemplatesListV8 />)
+    await act(async () => { await Promise.resolve() })
+    const open = () => {
+      if (mode === '単体') openMenuAndDelete('秋の新商品（画像）')
+      else { fireEvent.click(screen.getByRole('checkbox', { name: '「秋の新商品（画像）」を選択' })); fireEvent.click(screen.getByRole('button', { name: 'まとめて削除' })) }
+    }
+    open()
+    await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })) })
+    expect(removeTemplate).toHaveBeenCalledTimes(1)
+    account.id = 'account-2'
+    await act(async () => { view.rerender(<TemplatesListV8 />); await Promise.resolve() })
+    open()
+    const dialog = screen.getByRole('alertdialog')
+    expect((within(dialog).getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+    expect(removeTemplate).toHaveBeenCalledTimes(2)
+    await act(async () => { finishOld({ success: true }); await Promise.resolve() })
+    expect((within(dialog).getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(removeTemplate).toHaveBeenCalledTimes(2)
+  })
+
   it('まとめて削除の窓を再表示すると古い確定は受け付けない', async () => {
     await renderList()
     fireEvent.click(screen.getByRole('checkbox', { name: '「秋の新商品（画像）」を選択' }))

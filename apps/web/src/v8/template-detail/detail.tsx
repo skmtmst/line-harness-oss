@@ -90,10 +90,14 @@ export default function TemplateDetailV8() {
   const [deleteScope, setDeleteScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
   const deleteOpen = requestedDeleteOpen && deleteScope?.scope === scope.current
   const deleteTicket = useRef<object | null>(null)
-  const deleteLock = useRef(false)
+  const deleteLock = useRef<object | null>(null)
   const [blockedOpen, setBlockedOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  useEffect(() => {
+    deleteTicket.current = null; deleteLock.current = null
+    setDeleteOpen(false); setDeleting(false); setDeleteError('')
+  }, [renderedScope])
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
   const usageRef = useRef<HTMLDivElement>(null)
@@ -250,7 +254,7 @@ export default function TemplateDetailV8() {
     if (deleting || usageCount > 0 || !template) return
     if (deleteLock.current || !deleteScope || !mounted.current || !canMutateRef.current || deleteScope.scope !== scope.current || deleteScope.ticket !== deleteTicket.current || loadedScope.current !== deleteScope.scope || template.id !== id) return
     const current = () => mounted.current && canMutateRef.current && deleteScope.scope === scope.current && deleteScope.ticket === deleteTicket.current
-    deleteLock.current = true; setDeleting(true)
+    const lock = {}; deleteLock.current = lock; setDeleting(true)
     setDeleteError('')
     try {
       const res = await api.templates.delete(id)
@@ -266,7 +270,7 @@ export default function TemplateDetailV8() {
       { if (!fieldFailure)
       setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      deleteLock.current = false
+      if (deleteLock.current === lock) deleteLock.current = null
       if (mounted.current && deleteScope.scope === scope.current) setDeleting(false)
     }
   }, [deleting, usageCount, template, id, router, saveErrors, deleteScope])

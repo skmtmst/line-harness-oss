@@ -1219,7 +1219,6 @@ export default function BroadcastForm({
   const approvalCountMatched = needsApprovalSingle
     && approvalCountInput.trim() !== ''
     && Number(approvalCountInput) === audienceCount
-
   /*
    * 共通の「送る前の確かめ」の中身は、保存した配信に対するサーバーの数え直し（GET send-preview）。
    * 窓を開くたびに下書きを保存して数え直し、確定は「見た人数・版」を添えて送る（人数・版が変わっていたら 409）。
@@ -1228,6 +1227,7 @@ export default function BroadcastForm({
   const broadcastRole = useStaffRole()
   const [sendPreview, setSendPreview] = useState<{ state: 'loading' | 'error' | 'ready'; data: SendConfirmationPreview | null; broadcast: ApiBroadcast | null }>({ state: 'loading', data: null, broadcast: null })
   const [previewSeq, setPreviewSeq] = useState(0)
+  useEffect(() => { setConfirmOpen(false); setSendPreview({ state: 'loading', data: null, broadcast: null }) }, [selectedAccountId])
   useEffect(() => {
     if (!confirmOpen || needsApprovalSingle || !currentStep) return
     let alive = true
