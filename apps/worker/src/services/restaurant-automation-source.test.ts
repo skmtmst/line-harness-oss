@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { futureSlot } from '../test-utils/waitlist-fixture.js';
 import { readRestaurantAutomationSource } from './restaurant-automation-source.js';
 import type { RestaurantEvent } from './restaurant-event-types.js';
 
@@ -54,9 +55,11 @@ it('飲食以外の出来事には予約の条件を付けない',async()=>{
   expect(await readRestaurantAutomationSource(t.db,{...input(),eventType:'friend_add',eventId:'ordinary'})).toEqual({restaurant:false,allowed:true});
 });
 it('キャンセル待ちは同じ招待・本人・有効期限だけを通す',async()=>{
-  t.raw.exec(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,ends_at,guest_count,customer_name,line_uid,identity_key,status)
-    VALUES('w','store','2026-11-03T09:00:00Z','2026-11-03T10:00:00Z',2,'友だち','UID','uid','waiting');
-    UPDATE rt_seat_waitlist SET status='invited',invited_at='2026-11-02T23:00:00Z',hold_expires_at='2026-11-03T00:10:00Z',notification_retry_key='invite' WHERE id='w';`);
+  const startsAt=futureSlot();
+  const endsAt=new Date(Date.parse(startsAt)+60*60*1000).toISOString();
+  t.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,ends_at,guest_count,customer_name,line_uid,identity_key,status)
+    VALUES('w','store',?,?,2,'友だち','UID','uid','waiting')`).run(startsAt,endsAt);
+  t.raw.exec(`UPDATE rt_seat_waitlist SET status='invited',invited_at='2026-11-02T23:00:00Z',hold_expires_at='2026-11-03T00:10:00Z',notification_retry_key='invite' WHERE id='w'`);
   const e=t.raw.prepare("SELECT * FROM rt_reservation_events WHERE event_type='restaurant.waitlist.invited'").get() as RestaurantEvent;
   const value={...input(),eventId:e.id,eventType:e.event_type};
   expect(await readRestaurantAutomationSource(t.db,value)).toMatchObject({restaurant:true,allowed:true,waitlistId:'w'});

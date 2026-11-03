@@ -33,6 +33,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -98,6 +99,8 @@ function FriendDetailInner() {
   const friendId = searchParams.get('id') ?? ''
   const openAdjustment = searchParams.get('adjust') === '1'
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
   const requestRef = useRef(0)
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [mileage, setMileage] = useState<MileageDetail | null>(null)
@@ -114,7 +117,8 @@ function FriendDetailInner() {
   const canConfigureAdjustmentPolicy = isOwnerRole(useStaffRole())
   const [adjustmentOpen, setAdjustmentOpen] = useState(false)
   const [adjustMode, setAdjustMode] = useState<'increase' | 'decrease'>('increase')
-  const [pendingAction, setPendingAction] = useState<{ entryId: string; kind: 'confirm' | 'void'; label: string } | null>(null)
+  const [pendingAction, setPendingAction] = useState<{ entryId: string; kind: 'confirm' | 'void'; label: string; amount: number; accountId: string; generation: number } | null>(null)
+  const pendingActionRef = useRef<typeof pendingAction>(null)
   const [pendingReason, setPendingReason] = useState('')
   const [pendingBusy, setPendingBusy] = useState(false)
   const [pendingError, setPendingError] = useState('')
@@ -227,7 +231,7 @@ function FriendDetailInner() {
   }
 
   const runPendingAction = async () => {
-    if (!pendingAction || !selectedAccountId) return
+    if (!pendingAction?.accountId || pendingActionRef.current !== pendingAction || pendingAction.generation !== accountScope.current.generation || selectedAccountId !== accountScope.current.id) return
     const reason = pendingReason.trim()
     if (!reason) {
       setPendingError('理由を入力してください')
@@ -237,9 +241,10 @@ function FriendDetailInner() {
     setPendingError('')
     try {
       const response = pendingAction.kind === 'confirm'
-        ? await api.mileage.confirmMileageEntry(pendingAction.entryId, { accountId: selectedAccountId, reason })
-        : await api.mileage.voidMileageEntry(pendingAction.entryId, { accountId: selectedAccountId, reason })
+        ? await api.mileage.confirmMileageEntry(pendingAction.entryId, { accountId: pendingAction.accountId, reason })
+        : await api.mileage.voidMileageEntry(pendingAction.entryId, { accountId: pendingAction.accountId, reason })
       if (!response.success) throw new ApiError(500, response.error || '処理できませんでした。もう一度お試しください。')
+      pendingActionRef.current = null
       setPendingAction(null)
       setPendingReason('')
       await load()
@@ -356,16 +361,23 @@ function FriendDetailInner() {
 
   const rowMenuOf = (item: MileageDetailHistoryItem): ActionMenuItem[] => {
     const items: ActionMenuItem[] = []
+    const openPendingAction = (kind: 'confirm' | 'void') => {
+      const action = { entryId: item.id, kind, label: item.reason ?? '', amount: item.amount, accountId: item.lineAccountId ?? '', generation: accountScope.current.generation }
+      pendingActionRef.current = action
+      setPendingAction(action)
+      setPendingReason('')
+      setPendingError('')
+    }
     if (canAdjust && item.status === 'pending' && !item.restricted) {
       items.push({
         id: 'confirm',
         label: '確定する',
-        onSelect: () => { setPendingAction({ entryId: item.id, kind: 'confirm', label: item.reason ?? '' }); setPendingReason(''); setPendingError('') },
+        onSelect: () => openPendingAction('confirm'),
       })
       items.push({
         id: 'void',
         label: '取消す',
-        onSelect: () => { setPendingAction({ entryId: item.id, kind: 'void', label: item.reason ?? '' }); setPendingReason(''); setPendingError('') },
+        onSelect: () => openPendingAction('void'),
       })
     }
     if (canAdjust && item.entryType === 'adjustment' && item.notificationStatus === 'failed' && !item.restricted) {
@@ -604,14 +616,18 @@ function FriendDetailInner() {
         error={pendingError}
         confirmLabel={pendingAction?.kind === 'void' ? 'この理由で取消す' : 'この理由で確定する'}
         cancelLabel="キャンセル"
+        confirmDisabled={!pendingAction?.accountId || pendingAction.generation !== accountScope.current.generation}
+        confirmDisabledReason="対象を確認できないか、表示後に切り替わりました。閉じて確認し直してください。"
         onConfirm={() => runPendingAction()}
-        onCancel={() => { if (!pendingBusy) { setPendingAction(null); setPendingReason(''); setPendingError('') } }}
+        onCancel={() => { if (!pendingBusy) { pendingActionRef.current = null; setPendingAction(null); setPendingReason(''); setPendingError('') } }}
       >
-        <div className={styles.dlgBody}>
+        <div className={`${styles.dlgBody} ${styles.dlgTargetBody}`}>
+          <OperationTargetSummary accounts={[{ id: pendingAction?.accountId ?? '' }]} externalTarget={{ label: '対象件数', name: pendingAction ? '1件' : null }} />
           <div className={styles.dlgPerson}>
             <div className={styles.dlgPersonText}>
               <span className={styles.dlgPersonSub}>対象の記録</span>
               <span className={styles.dlgPersonName}>{pendingAction?.label}</span>
+              <span className={styles.dlgPersonName}>{`${formatMileageNumber(pendingAction?.amount)} マイル`}</span>
             </div>
           </div>
           <Field label="理由" htmlFor="mileage-pending-reason" required>

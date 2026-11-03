@@ -1,6 +1,8 @@
 'use client'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+import { DetailContent, DetailFields, DetailSection } from '@/components/shared/detail-content'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpDown, ChevronDown, ChevronRight, GitCompare, Lock, RotateCcw, Save, Star } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -274,6 +276,12 @@ export default function FeatureSettingsScreen() {
     setSavedFavorites,
     currentOrder,
   } = settings
+  const accountScope = useRef({ id: selectedAccountId })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId }
+  const impactScope = useRef<{ scope: typeof accountScope.current; id: string | null } | null>(null)
+  if (!impactOpen) impactScope.current = null
+  else if (!impactScope.current) impactScope.current = { scope: accountScope.current, id: selectedAccountId }
+  const renderedImpactScope = impactScope.current
   const accountStyle = useAccountStyle(selectedAccountId)
   const showEcCommerce = accountStyle.status === 'ready' && accountStyle.data?.style === 'ec' && accountStyle.data.styleSelected === true
   const styleGroups = useMemo(() => groups.map((group) => ({
@@ -579,28 +587,29 @@ export default function FeatureSettingsScreen() {
       />
 
       <ConfirmDialog
-        open={impactOpen}
+        open={impactOpen && renderedImpactScope?.scope === accountScope.current}
         title="オフにする前に確認"
         description="止まる仕事があります。オフにしてもデータは削除されず、再度オンにすると再開できます。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。"
         confirmLabel="確認して保存する"
         destructive
+        confirmIcon={false}
         busy={impactBusy || saving}
         error={impactError || undefined}
         onCancel={() => {
-          if (impactBusy || saving) return
+          if (impactBusy || saving || renderedImpactScope?.scope !== accountScope.current || renderedImpactScope !== impactScope.current) return
+          impactScope.current = null
           setImpactOpen(false)
           setImpactError('')
         }}
-        onConfirm={() => { if (canManage) return confirmImpactSave() }}
+        onConfirm={() => { if (canManage && renderedImpactScope?.scope === accountScope.current && renderedImpactScope === impactScope.current) return confirmImpactSave() }}
       >
-        <div>
-          {impactGroups.map((group) => (
-            <div key={group.feature} className={styles.impactGroup}>
-              <p className={styles.impactName}>{featureLabelByKey.get(group.feature) ?? group.feature}</p>
-              <p className={styles.impactText}>{impactSummary(group)}</p>
-            </div>
-          ))}
-        </div>
+        <OperationTargetSummary accounts={[{ id: renderedImpactScope?.id ?? '' }]} />
+        <DetailContent><DetailSection><DetailFields><div>
+          <dt>止まるもの</dt>
+          <dd>{impactGroups.map((group) => (
+            <div key={group.feature}>{featureLabelByKey.get(group.feature) ?? group.feature} {impactSummary(group)}</div>
+          ))}</dd>
+        </div></DetailFields></DetailSection></DetailContent>
       </ConfirmDialog>
     </SbSettingsScreen>
   )

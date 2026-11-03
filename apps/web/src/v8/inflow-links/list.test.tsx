@@ -22,8 +22,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
 }))
 
+const account = vi.hoisted(() => ({ id: null as string | null }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: null, accounts: [], loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, accounts: [], loading: false }),
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
@@ -69,6 +70,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  account.id = null
   flushListUrlState()
   window.history.replaceState(null, '', '/inflow-links')
   window.dispatchEvent(new PopStateEvent('popstate'))
@@ -110,6 +112,47 @@ const buttonByLabel = (label: string) =>
 const rowOf = (refCode: string) => host.querySelector(`[data-row-id="${ROUTES.find(row => row.refCode === refCode)?.id ?? refCode}"]`)
 
 describe('V8 流入と計測の一覧', () => {
+  it('アカウントを切り替えて戻しても古い停止確認は実行しない', async () => {
+    const originalFetch = globalThis.fetch
+    const updates: string[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PATCH') updates.push(String(input))
+      return originalFetch(input, init)
+    })
+    account.id = 'account-a'
+    await render()
+    await act(async () => buttonByLabel('「夏のInstagram投稿」の操作')!.click())
+    await act(async () => (([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('受付を止める')) ?? querySupplementaryPageAction('受付を止める')) as HTMLElement).click())
+    const button = [...document.querySelectorAll('[role="alertdialog"] button')].find(el => el.textContent === '受付を停止する') as HTMLButtonElement
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    account.id = 'account-b'; await act(async () => root.render(<InflowListV8 />))
+    account.id = 'account-a'; await act(async () => root.render(<InflowListV8 />))
+    await act(async () => old())
+    expect(updates).toEqual([])
+  })
+  it('アカウントを切り替えて戻しても古い削除確認は実行しない', async () => {
+    const originalFetch = globalThis.fetch
+    const deletes: string[] = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'DELETE') deletes.push(String(input))
+      return originalFetch(input, init)
+    })
+    account.id = 'account-a'
+    await render()
+    await act(async () => buttonByLabel('「夏のInstagram投稿」の操作')!.click())
+    await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('削除する')) as HTMLElement).click())
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    const input = dialog.querySelector('input')!
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '夏のInstagram投稿'); input.dispatchEvent(new Event('input', { bubbles: true })) })
+    const button = [...dialog.querySelectorAll('button')].find(el => el.textContent?.includes('削除する')) as HTMLButtonElement
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    account.id = 'account-b'; await act(async () => root.render(<InflowListV8 />))
+    account.id = 'account-a'; await act(async () => root.render(<InflowListV8 />))
+    await act(async () => old())
+    expect(deletes).toEqual([])
+  })
   it('未分類が0件でもフォルダから選んで空の一覧を見られる', async () => {
     const originalFetch = globalThis.fetch
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -367,4 +410,25 @@ it('D-18: 閲覧者には一覧の削除操作を出さない', async () => {
   await render()
   await act(async () => buttonByLabel('「夏のInstagram投稿」の操作')!.click())
   expect([...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent?.includes('削除する'))).toBe(false)
+})
+
+it('経路の取得中はフォルダ件数を0件と見せず、取得後に本当の件数を出す', async () => {
+  const originalFetch = globalThis.fetch
+  let complete!: (response: Response) => void
+  vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+    if (new URL(String(input)).pathname === '/api/entry-routes') {
+      return new Promise<Response>((resolve) => { complete = resolve })
+    }
+    if (new URL(String(input)).pathname === '/api/analytics/ref-summary') return Promise.resolve(json({ success: true, data: { ...SUMMARY, routes: [] } }))
+    return originalFetch(input, init)
+  })
+  await act(async () => { root.render(<InflowListV8 />) })
+  for (let i = 0; i < 4; i += 1) await act(async () => {})
+  const countFor = (name: string) => host.querySelector<HTMLButtonElement>(`[data-folder-select][title="${name}"]`)?.textContent?.trim()
+  expect(countFor('すべて')).toBe('すべて')
+  expect(countFor('未分類')).toBe('未分類')
+  await act(async () => { complete(json({ success: true, data: ROUTES })) })
+  for (let i = 0; i < 4; i += 1) await act(async () => {})
+  expect(countFor('すべて')).toBe('すべて3')
+  expect(countFor('未分類')).toBe('未分類1')
 })

@@ -74,6 +74,13 @@ it('書きかけでアカウントを切り替えると確認まで止まる', a
   fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
   expect(change).not.toHaveBeenCalled()
 })
+it('アカウントを切り替えても作成中の対象は元のアカウントを示す', () => {
+  const view = render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={created} />)
+  view.rerender(<QuickCreate accountId="account-2" onClose={vi.fn()} onCreated={created} />)
+  const dialog = screen.getByRole('dialog')
+  expect(dialog.querySelector('[title="account-1"]')).toBeTruthy()
+  expect(dialog.querySelector('[title="account-2"]')).toBeNull()
+})
 it('日本語の変換を確定する Enter では言葉を札にしない（変換が終わった Enter で札にする）', () => {
   render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={created} />)
   const input = screen.getByLabelText('追加する言葉') as HTMLInputElement
@@ -104,4 +111,18 @@ it('保存ボタンを続けて押しても下書き作成は1回で、失敗後
   await save()
   expect(apiMock.createDraft).toHaveBeenCalledTimes(2)
   expect(apiMock.publishDraft).not.toHaveBeenCalled()
+})
+
+it('必須の言葉と返す文が不足すると理由を示して保存を止める', () => {
+  render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={created} />)
+  const button = screen.getByRole('button', { name: '有効にして保存' }) as HTMLButtonElement
+  expect(button.disabled).toBe(true)
+  expect(screen.getByText('反応する言葉と返す文を入れてください。')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('追加する言葉'), { target: { value: '営業時間' } })
+  fireEvent.keyDown(screen.getByLabelText('追加する言葉'), { key: 'Enter' })
+  expect(button.disabled).toBe(true)
+  expect(screen.getByText('返す文を入れてください。')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('返す文'), { target: { value: '10時からです' } })
+  expect(button.disabled).toBe(false)
+  expect(apiMock.createDraft).not.toHaveBeenCalled()
 })

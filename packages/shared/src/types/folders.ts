@@ -3,6 +3,8 @@ export interface Folder {
   revision?: number;
   id: string;
   kind: string;
+  /** null は共通フォルダ、未指定は所有先を確認できないことを示す。 */
+  accountId?: string | null;
   name: string;
   parentId: string | null;
   displayOrder: number;

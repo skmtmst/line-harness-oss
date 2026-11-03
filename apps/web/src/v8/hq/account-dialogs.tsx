@@ -4,7 +4,11 @@ import { lineAccountConnectionState } from '@/lib/line-account-state'
 import { requiredText } from '@/lib/form-requirement'
 const accountNameRequirement = requiredText('名前を入力してください。')
 
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { Pencil, RotateCcw, Users } from 'lucide-react'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
@@ -71,6 +75,9 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
   const [folderId, setFolderId] = useState<string>(initialFolder)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const savedName = useRef(account.name)
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: name !== savedName.current || folderId !== initialFolder || busy, busy, subject: 'アカウント設定の変更', onDiscard: onClose })
 
   useEffect(() => {
     let cancelled = false
@@ -100,12 +107,14 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
     setBusy(true)
     setError('')
     try {
-      if (name.trim() !== account.name) {
+      if (name.trim() !== savedName.current) {
         const res = await api.lineAccounts.update(account.id, { name: name.trim() })
         if (!res.success) {
           setError(res.error)
           return
         }
+        savedName.current = name.trim()
+        setName(savedName.current)
       }
       if (folderId !== initialFolder) {
         const res = await api.lineAccountFolders.move(account.id, folderId || null)
@@ -114,6 +123,7 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
           return
         }
       }
+      guard.disarm()
       onSaved()
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
@@ -137,14 +147,14 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
       designTop={SETTINGS_TOP}
       busy={busy}
       error={error || undefined}
-      onCancel={onClose}
+      onCancel={() => requestUnsavedAction(onClose)}
       footer={
-        <DialogActions align="center" leadingAction={<Button type="button" variant="secondary" onClick={onArchive}>
+        <DialogActions align="center" leadingAction={<Button type="button" variant="secondary" disabled={busy} onClick={() => requestUnsavedAction(onArchive)}>
             {archived ? '戻す' : 'アーカイブ'}
           </Button>}>
 
           <>
-            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
+            <Button type="button" variant="secondary" onClick={() => requestUnsavedAction(onClose)} disabled={busy}>キャンセル</Button>
             <Button type="button" variant="primary" onClick={() => save()} disabled={busy || folderState !== 'ready'} busy={busy} busyLabel="保存中…">保存</Button>
           </>
         </DialogActions>
@@ -191,7 +201,7 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
         <div className={styles.field}>
           <p className={styles.label}>ほかの設定</p>
           <div className={styles.buttonRow}>
-            <Button type="button" onClick={onEditRegistration}>
+            <Button type="button" disabled={busy} onClick={() => requestUnsavedAction(onEditRegistration)}>
               <Pencil aria-hidden="true" className={styles.icon} />LINE の登録内容を編集
             </Button>
             <Button href="/hq/members">
@@ -200,7 +210,7 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
           </div>
         </div>
       </div>
-    </Dialog></SaveErrorScope>
+    </Dialog><OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></SaveErrorScope>
   )
 }
 
@@ -214,6 +224,8 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
   const [typedCode, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: Boolean(reason) || busy, busy, onDiscard: onClose })
   /* 6桁目が入った瞬間にも送る（entered）。送っている間は二重に送らない。 */
   const archive = async (entered?: string) => {
     const code = entered ?? typedCode
@@ -231,6 +243,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
         setError(res.error)
         return
       }
+      guard.disarm()
       onDone()
     } catch (caught) {
       setError(otpFailureMessage(describeApiFailure(caught, 'アーカイブ')))
@@ -239,7 +252,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
     }
   }
   return (
-    <Dialog
+    <><Dialog
       open
       title={`「${account.name}」をアーカイブしますか？`}
       designNode="D6ljr"
@@ -272,7 +285,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
           <SaveErrorField names={["typedCode","code"]}><OtpInput visualLabel="認証コード（6桁）" label="認証コード" value={typedCode} onChange={(next) => { setCode(next); if (next && error) setError('') }} onComplete={(entered) => void archive(entered)} invalid={Boolean(error)} busy={busy} /></SaveErrorField>
         </div>
       </div>
-    </Dialog>
+    </Dialog><OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></>
   )
 }
 

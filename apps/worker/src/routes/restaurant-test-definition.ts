@@ -419,6 +419,7 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
   const kind = body.kind === undefined ? current.kind : body.kind;
   const name = body.name === undefined ? current.name : body.name;
   const price = body.price === undefined ? current.price : body.price;
+  if (body.price !== undefined && price !== current.price && price > 1_000_000) return inputError(c, { success: false, error: '値段は1,000,000円以下で入れてください。' }, 400, ['price']);
   const status = body.status === undefined ? current.status : body.status;
   if (!['course', 'a_la_carte'].includes(kind) || typeof name !== 'string' || !name.trim()
     || !Number.isInteger(price) || price < 0 || !['draft', 'active', 'archived'].includes(status)

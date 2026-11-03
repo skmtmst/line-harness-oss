@@ -34,6 +34,15 @@ describe('一覧の型：板が狭いときに畳む左の列（folderNav）', (
     expect(onSelect).toHaveBeenCalledWith('f1')
   })
 
+  it('選んだフォルダの削除なども畳んだ欄から実行できる', () => {
+    const onDelete = vi.fn()
+    const folders = [rows[0], { ...rows[1], onDelete }]
+    render(<ListPage title="一覧" folders={<nav>列</nav>} folderNav={{ rows: folders, activeId: 'f1', onSelect: () => {} }}>本文</ListPage>)
+    fireEvent.click(screen.getByRole('button', { name: 'フォルダ「春の案内」の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '消す' }))
+    expect(onDelete).toHaveBeenCalledOnce()
+  })
+
   it('呼び名を渡すとその名で出す（統括のアカウントは「タグ：すべて」）。作るボタンを渡さない（閲覧のみ）ときは作るを出さない', () => {
     const { container } = render(
       <ListPage title="一覧" folders={<nav>列</nav>} folderNav={{ rows, activeId: 'f1', onSelect: () => {}, label: 'タグ' }}>本文</ListPage>,

@@ -6,7 +6,7 @@ const FIELD_REQUIREMENTS = {
 }
 
 
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import { api, describeSaveFailure } from '@/lib/api'
@@ -31,6 +31,9 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict, isConflictResponse } from '@/components/shared/save-conflict'
 import EditorSurface from '@/components/shared/editor-surface'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 /*
  * ★V8 の一覧（src/v8/inflow-links/list.tsx）用の写し。元は
@@ -136,6 +139,7 @@ export default function EditRouteModal({
     isActive: source?.isActive ?? true,
   })
   const [form, setForm] = useState<CreateEntryRouteInput>(() => formValues(route))
+  const originalForm = useRef(JSON.stringify(form))
   const [baseline, setBaseline] = useState(route?.updatedAt)
   const conflict = useSaveConflict({
     contextKey: route?.id,
@@ -150,7 +154,9 @@ export default function EditRouteModal({
         const res = await api.entryRoutes.get(route.id)
         if (!res.success) throw new Error('reload_failed')
         const latest = res.data
-        setForm(formValues(latest))
+        const latestValues = formValues(latest)
+        originalForm.current = JSON.stringify(latestValues)
+        setForm(latestValues)
         setBaseline(latest.updatedAt)
         conflict.clear()
         setError('')
@@ -160,6 +166,12 @@ export default function EditRouteModal({
     },
   })
   const [submitting, setSubmitting] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({
+    dirty: surface !== 'page' && (JSON.stringify(form) !== originalForm.current || submitting),
+    busy: surface !== 'page' && submitting,
+    onDiscard: onClose,
+  })
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -200,7 +212,7 @@ export default function EditRouteModal({
       const res = isNew
         ? await api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })
         : await api.entryRoutes.update(route!.id, { ...form, expectedUpdatedAt: baseline })
-      if (res.success) onSaved(res.data, isNew)
+      if (res.success) { guard.disarm(); onSaved(res.data, isNew) }
       else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
       // 新規の識別子重複と、更新時の版の競合は別の409。新規は入力を直して再試行できるままにする。
@@ -394,7 +406,10 @@ export default function EditRouteModal({
       <CouponSettings accountId={route?.lineAccountId ?? accountId} disabled={submitting}
         value={{ couponEnabled: form.couponEnabled ?? false, couponAssetId: form.couponAssetId ?? null, couponAudience: form.couponAudience ?? 'new_friends' }}
         onChange={(next) => { setForm((current) => ({ ...current, ...next })); setFieldErrors((current) => ({ ...current, 'route-coupon': '' })) }} />
-    </EditorSurface></SaveErrorScope>
+    </EditorSurface>
+    <OverlayDepthContext.Provider value={depth + 2}>
+      <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={submitting} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+    </OverlayDepthContext.Provider></SaveErrorScope>
   )
 }
 

@@ -40,10 +40,12 @@ const NO_ACCOUNTS: NotificationAccount[] = []
 export default function BellNotifications({
   popover,
   target,
+  hqOrigin = false,
   accounts = NO_ACCOUNTS,
   onAccountChange,
   onUnreadChange,
 }: {
+  hqOrigin?: boolean
   popover: TopBarNotificationsPopover
   /** 統括全店・個別店・店未選択を区別し、未選択から全店へ広げない。 */
   target: NotificationScope
@@ -185,7 +187,7 @@ export default function BellNotifications({
     if (!item) return
     markRead(item)
     onClose()
-    const nextContext = { accountId: item.sourceAccountId, canManage: destinationContext.canManage }
+    const nextContext = { accountId: item.sourceAccountId, canManage: destinationContext.canManage, hqOrigin }
     const destination = notificationDestination(item, nextContext)
     if (item.sourceAccountId !== accountId) {
       onAccountChange(item.sourceAccountId, () => {
@@ -214,7 +216,7 @@ export default function BellNotifications({
       markAllReadDisabled={role === null || Boolean(markAllReadLockedReason) || !data || data.unreadCount === null || data.unreadCount === 0}
       markAllReadDisabledReason={markAllReadDisabledReason}
       markAllReadLockedReason={markAllReadLockedReason}
-      onViewAll={() => { onClose(); router.push('/notifications') }}
+      onViewAll={() => { onClose(); router.push(hqOrigin ? '/notifications?from=hq' : '/notifications') }}
     />
   )
 }

@@ -5,7 +5,7 @@ import { simulationContext } from '../features/broadcasts/broadcast-simulation/i
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { parseJsonArray, sameJsonMeaning } from './broadcast-json.js';
-import { inputError } from '../lib/input-errors.js';
+import { inputError, validatedInputBody } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
 import { getBroadcastById, updateBroadcast, requestBroadcastStop, resumeBroadcastSending, beginBroadcastRetryAttempt, closeClaimsForStop, reopenFailedClaims, getRetryableRecipientIds } from '@line-crm/db';
 import type { BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
@@ -368,18 +368,31 @@ export const post__api_broadcasts_id_cancel_2 = async (c: Context<Env, "/api/bro
     return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
+  const body = validatedInputBody(c) ?? {};
+  const version = body.expectedVersion;
+  if (version !== undefined && (!Number.isSafeInteger(version) || (version as number) < 1)) {
+    return inputError(c, { success: false, error: 'expectedVersion must be a positive integer' }, 400, ['expectedVersion']);
+  }
+  const conflict = async () => {
+    const latest = await getBroadcastById(c.env.DB, id);
+    if (!latest || !await canAccessBroadcast(c.env.DB, c.get('staff'), latest)) return fail(c, 404, 'BROADCAST_NOT_FOUND');
+    return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が予約を変えました。読み直してから、もう一度選んでください', data: serializeBroadcast(latest) }, 409);
+  };
+  if (version !== undefined && version !== (existing.lock_version ?? 1)) return conflict();
   if (existing.status !== 'scheduled' || !existing.scheduled_at) {
-    return c.json({ success: false, error: 'Only scheduled broadcasts can be cancelled' }, 409);
+    return version === undefined ? c.json({ success: false, error: 'Only scheduled broadcasts can be cancelled' }, 409) : conflict();
   }
 
   const result = await c.env.DB.prepare(
     `UPDATE broadcasts
        SET status = 'draft', scheduled_at = NULL, batch_lock_at = NULL,
-           common_var_snapshot = NULL, common_var_snapshot_at = NULL
-       WHERE id = ? AND status = 'scheduled' AND scheduled_at IS NOT NULL`,
-  ).bind(id).run();
+           common_var_snapshot = NULL, common_var_snapshot_at = NULL,
+           lock_version = COALESCE(lock_version, 1) + 1
+       WHERE id = ? AND status = 'scheduled' AND scheduled_at IS NOT NULL
+         AND (? IS NULL OR COALESCE(lock_version, 1) = ?)`,
+  ).bind(id, version ?? null, version ?? null).run();
   if ((result.meta.changes ?? 0) !== 1) {
-    return c.json({ success: false, error: 'Broadcast is no longer scheduled' }, 409);
+    return version === undefined ? c.json({ success: false, error: 'Broadcast is no longer scheduled' }, 409) : conflict();
   }
 
   const updated = await getBroadcastById(c.env.DB, id);

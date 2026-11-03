@@ -129,7 +129,7 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'ã
     {rows.length > 1 ? <span className={styles.collapsedSelect} style={width ? { minWidth: width } : undefined}>
       <Select size="content" aria-label={label} value={activeId} onChange={onSelect} options={rows.map((row) => ({ value: row.id, label: `${label}ï¼š${row.label}` }))} />
     </span> : null}
-    {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
+    {selected && (selected.leadingActions?.length || selected.onEdit || selected.onMoveUp || selected.onMoveDown || selected.onDelete) ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }
 export function ListPage({ readOnly, readOnlyNeed, readOnlyBand, boardId, layout, heightMode, standalone, createPlacement, tabs, title, help, explanation, explanationKey, titleAccessory, explanationToggle, identity, actions, crumbs, subtitle, steps, headingSize, bottomSpacing, ...body }: ListPageProps) {

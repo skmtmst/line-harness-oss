@@ -8,7 +8,10 @@ import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/sh
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import Link from 'next/link';
 import { Folder as FolderIcon, Inbox, LayoutGrid, List, LogIn, Pencil, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { ListPage, ListPageCards } from '@/components/templates';
 import Card from '@/components/shared/card';
@@ -21,6 +24,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
 import EmptyList from '@/components/shared/empty-list';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
+import OperationTargetSummary from '@/components/shared/operation-target-summary';
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel';
 import ListState from '@/components/shared/list-state';
 import Notice from '@/components/shared/notice';
@@ -115,9 +119,18 @@ export default function HqHomeV8() {
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState<string | null>(null)
   const [deleteFolder, setDeleteFolder] = useState<(Folder & { itemCount?: number }) | null>(null)
+  const folderDeleteTicket = useRef<object | null>(null)
+  const renderedFolderDeleteTicket = folderDeleteTicket.current
+  const folderDeleteLock = useRef(false)
   const [folderError, setFolderError] = useState('')
   const [folderNameError, setFolderNameError] = useState('')
   const [folderSaving, setFolderSaving] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const folderGuard = useUnsavedGuard({
+    dirty: folderDialog !== null && (folderName !== (folderDialog.editing?.name ?? '') || folderColor !== (folderDialog.editing ? folderDisplayColor(folderDialog.editing) : DEFAULT_TAG_FOLDER_COLOR) || folderSaving),
+    busy: folderDialog !== null && folderSaving,
+    onDiscard: () => setFolderDialog(null),
+  })
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -154,13 +167,10 @@ export default function HqHomeV8() {
     void import('@/lib/api/helpers/styles').then(({ hqStyleApi }) => hqStyleApi.attention(attentionKey || reloadKey ? { cache: 'reload' } : undefined)).then((result) => {
       if (cancelled || epoch !== attentionEpoch.current) return
       if (!result.success) { setAttentionError(new Error('attention failed')); return }
-      const kinds = ['unhandledChats', 'pendingBookings', 'unpaid', 'connections', 'stoppedDeliveries'] as const
       const counts: Record<string, number> = {}
       for (const item of result.data.items) {
-        const values = kinds.map(kind => item.counts[kind])
-        if (values.every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0)) {
-          counts[item.accountId] = values.reduce((sum, value) => sum + value, 0)
-        }
+        const value = item.counts.connections
+        if (typeof value === 'number' && Number.isFinite(value) && value >= 0) counts[item.accountId] = value
       }
       setAttentionCounts(counts)
     }).catch((error: unknown) => { if (!cancelled && epoch === attentionEpoch.current) setAttentionError(error ?? new Error('attention failed')) })
@@ -305,6 +315,17 @@ export default function HqHomeV8() {
     unconfirmed: sum.unconfirmed + (statusOf(account).label === '未確認' ? 1 : 0),
   }), { friends: 0, messages: 0, warnings: 0, unconfirmed: 0 }), [currentAccounts])
 
+  const connectionUnconfirmed = attentionCounts ? currentAccounts.filter(account => {
+    const state = statusOf(account).label
+    return state !== '停止中' && (state === '未確認' || attentionCounts[account.id] === undefined)
+  }).length : 0
+  const knownConnectionTotal = attentionCounts
+    ? currentAccounts.reduce((sum, account) => sum + (attentionCounts[account.id] ?? 0), 0) : null
+  const connectionTotal = knownConnectionTotal === 0 && connectionUnconfirmed > 0 ? null : knownConnectionTotal
+  const connectionDetail = loadError || attentionError ? '読み込めませんでした'
+    : connectionUnconfirmed ? `${knownConnectionTotal ? 'ほかに' : ''}未確認 ${formatNumber(connectionUnconfirmed)} 件`
+      : connectionTotal === null ? '接続の問題を確認できません' : null
+
   /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
   const folderCounts = useMemo(() => {
@@ -421,12 +442,15 @@ export default function HqHomeV8() {
 
   /* 消す：中のアカウントは消えず未分類へ（API-17 の DELETE）。 */
   const removeFolder = async (target: Folder) => {
-
+    if (!renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current || folderDeleteLock.current) return
+    folderDeleteLock.current = true
     setFolderSaving(true)
     setFolderError('')
     try {
       const response = await api.lineAccountFolders.remove(target.id)
       if (!response.success) throw new Error(response.error)
+      if (renderedFolderDeleteTicket !== folderDeleteTicket.current) return
+      folderDeleteTicket.current = null
       setDeleteFolder(null)
       if (folder === target.id) setFolder(ALL)
       await loadFolders()
@@ -439,6 +463,7 @@ export default function HqHomeV8() {
         if (!fieldFailure) setFolderError(describeApiFailure(caught, '保存', { scope: 'hq' }))
       }
     } finally {
+      folderDeleteLock.current = false
       setFolderSaving(false)
     }
   }
@@ -455,7 +480,7 @@ export default function HqHomeV8() {
       onEdit: canManage ? () => openFolderDialog(f) : undefined,
       onMoveUp: canManage && index > 0 ? () => void moveFolder(index, -1) : undefined,
       onMoveDown: canManage && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
-      onDelete: canManage ? () => { setFolderError(''); setDeleteFolder(f) } : undefined,
+      onDelete: canManage ? () => { folderDeleteTicket.current = {}; setFolderError(''); setDeleteFolder(f) } : undefined,
     })),
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: accountsReadable ? localUnfiled : null },
   ]
@@ -531,7 +556,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
+        <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={connectionDetail} valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">
@@ -595,7 +620,7 @@ export default function HqHomeV8() {
   ) : (
     <>
       {view === 'table' && attentionError ? <Notice tone="danger" message={`対応件数：${loadFailureNotice(attentionError, '対応件数', 'hq')}`} action={classifyApiFailure(attentionError) === 'forbidden' ? undefined : <Button type="button" disabled={attentionRefreshing} onClick={() => setAttentionKey(key => key + 1)}>もう一度読み込む</Button>} /> : null}
-      {view === 'table' ? <p className={styles.progress}>対応件数は対応が要るものの合計です。LINE接続の状態とは判定が異なり、停止・アーカイブの未処理分も含みます。</p> : null}
+      {view === 'table' ? <p className={styles.progress}>対応件数は接続の問題の数です。</p> : null}
       {connectionProgress ? <p className={styles.progress} role="status">{connectionProgress}</p> : null}
       {connectionResult ? <Notice tone={connectionResult.tone} message={connectionResult.message}
         action={connectionResult.needsReload ? <Button type="button" onClick={() => void reloadConnections()} disabled={checkingConnections}>もう一度読み込む</Button> : undefined}
@@ -670,7 +695,7 @@ export default function HqHomeV8() {
             <Th>アカウント</Th>
             <Th>LINE接続</Th>
             <Th>お支払い</Th>
-            <Th>対応が要る</Th>
+            <Th>接続の問題</Th>
             <Th>友だち</Th>
             <Th>今月の配信</Th>
             <Th className="sr-only">操作</Th>
@@ -789,6 +814,8 @@ export default function HqHomeV8() {
         onConfirm={() => saveFolder()}
       >{folderUnchanged ? <Notice tone="info" compact>名前か色を変えると保存できます。</Notice> : null}</FolderEditorDialog>
 
+      <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={folderGuard.leaveTarget !== null} busy={folderSaving} onConfirm={folderGuard.confirmLeave} onCancel={folderGuard.cancelLeave} /></OverlayDepthContext.Provider>
+
       {deleteFolder ? (
         <ConfirmDialog
           open
@@ -800,8 +827,8 @@ export default function HqHomeV8() {
           busy={folderSaving}
           error={folderError || undefined}
           onConfirm={() => removeFolder(deleteFolder)}
-          onCancel={() => { if (!folderSaving) setDeleteFolder(null) }}
-        />
+          onCancel={() => { if (!folderSaving && !folderDeleteLock.current) { folderDeleteTicket.current = null; setDeleteFolder(null) } }}
+        ><OperationTargetSummary accounts={[]} externalTarget={{ label: '対象アカウント', name: '未分類へ移るアカウントの名前を確認できません' }} /></ConfirmDialog>
       ) : null}
     </ListPage></SaveErrorScope>
     </KpiValueMotionProvider>

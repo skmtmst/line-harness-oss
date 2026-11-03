@@ -140,6 +140,7 @@ async function pickTargetDate(label: string, iso: string) {
     await Promise.resolve()
     await Promise.resolve()
   })
+  await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click() })
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
     const timeInput = reopened.querySelector('input') as HTMLInputElement

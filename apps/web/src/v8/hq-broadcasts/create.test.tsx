@@ -6,10 +6,18 @@ import { getPageAction } from '@/test-utils/page-action'
  * 詳細は失敗した店へのやり直し。閲覧のみ（担当者）には作る画面を出さない。
  */
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const previewWindow = vi.hoisted(() => ({ hidden: false }))
+const retryConfirmation = vi.hoisted(() => ({ current: undefined as undefined | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const { default: ConfirmDialog } = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { default: (props: React.ComponentProps<typeof ConfirmDialog>) => {
+    if (props.title === '失敗した店にやり直します') retryConfirmation.current = props.onConfirm
+    return <ConfirmDialog {...props} />
+  } }
+})
 vi.mock('@/components/shared/dialog', async original => {
   const { default: Dialog } = await original<typeof import('@/components/shared/dialog')>()
   return { default: (props: React.ComponentProps<typeof Dialog>) => previewWindow.hidden && props.title === 'LINEの見え方' ? null : <Dialog {...props} /> }
@@ -792,6 +800,134 @@ it.each(['競合', '結果不明'])('送信が%sなら窓に理由を残し、�
   fireEvent.click(within(dialog).getByRole('button', { name: '戻る' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(screen.getByRole('button', { name: '送る前に確かめる' })).toBeTruthy()
+})
+
+it('一括配信の再送確認は実際にやり直す店と環境を示す', async () => {
+ hq.retry.mockReset().mockResolvedValue({ data: {} })
+ params.value = new URLSearchParams('id=run-retry-targets')
+ const target = (id: string, name: string, status: string, version: number) => ({ ...check(id, name, 10), status, totalCount: 10, successCount: status === 'sent' && id === 'a1' ? 10 : 0, version, retryableCount: id === 'a1' ? 0 : 10, stopped: false, broadcastId: 'b-' + id })
+ hq.get.mockResolvedValue({ data: { id: 'run-retry-targets', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target('a1', '銀座店', 'sent', 3), target('a3', '名古屋店', 'sent', 5)] } })
+ render(<HqBroadcastDetail />)
+ fireEvent.click(await screen.findByRole('button', { name: /失敗した店にやり直す/ }))
+ const dialog = await screen.findByRole('dialog', { name: '失敗した店にやり直します' })
+ expect(within(dialog).getByText('名古屋店')).toBeTruthy()
+ expect(within(dialog).queryByText('銀座店')).toBeNull()
+ expect(within(dialog).getByText('環境')).toBeTruthy()
+ expect(within(dialog).getByText('1店・約10人に送ります')).toBeTruthy()
+ expect(hq.retry).not.toHaveBeenCalled()
+})
+
+it('店別の再送確認は選んだ店と環境を示す', async () => {
+ hq.retry.mockReset().mockResolvedValue({ data: {} })
+ params.value = new URLSearchParams('id=run-retry-one')
+ const target = { ...check('a3', '名古屋店', 10), status: 'sent', totalCount: 10, successCount: 0, version: 5, retryableCount: 10, stopped: false, broadcastId: 'b-a3' }
+ hq.get.mockResolvedValue({ data: { id: 'run-retry-one', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target] } })
+ render(<HqBroadcastDetail />)
+ fireEvent.click(await screen.findByRole('button', { name: '名古屋店のその他操作' }))
+ fireEvent.click(await screen.findByRole('menuitem', { name: 'この店にやり直す' }))
+ const dialog = await screen.findByRole('dialog', { name: 'この店にやり直します' })
+ expect(within(dialog).getByText('名古屋店')).toBeTruthy()
+ expect(within(dialog).getByText('環境')).toBeTruthy()
+ expect(within(dialog).getByText('約10人に送ります')).toBeTruthy()
+ expect(hq.retry).not.toHaveBeenCalled()
+})
+
+it.each([true, false])('送信前に止まった店は理由の有無が%sでも人数がまだ決まらないと示す', async hasReason => {
+ params.value = new URLSearchParams('id=run-retry-unknown')
+ const target = { ...check('a3', '名古屋店', 10), status: 'failed', totalCount: 0, successCount: 0, version: 5, retryableCount: 5, stopped: false, broadcastId: 'b-a3', failureReasons: hasReason ? [{ code: 'before_send_failed', label: '送信前に止まりました', count: 0, retryable: true }] : [] }
+ hq.get.mockResolvedValue({ data: { id: 'run-retry-unknown', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target] } })
+ render(<HqBroadcastDetail />)
+ fireEvent.click(await screen.findByRole('button', { name: /失敗した店にやり直す/ }))
+ const dialog = await screen.findByRole('dialog', { name: '失敗した店にやり直します' })
+ expect(within(dialog).getByText('1店・人数は送る時に決まります')).toBeTruthy()
+ expect(hq.retry).not.toHaveBeenCalled()
+})
+
+it.each([['既知', 7, '2店・約17人に送ります'], ['未確定', 0, '2店・人数は送る時に決まります']] as const)('一括再送で人数が%sの店を含むときは全店の人数を示す', async (_label, secondCount, expected) => {
+ params.value = new URLSearchParams('id=run-retry-multiple')
+ const target = (id: string, name: string, count: number) => ({ ...check(id, name, 10), status: count > 0 ? 'sent' : 'failed', totalCount: 10, successCount: 0, version: 5, retryableCount: count, stopped: false, broadcastId: 'b-' + id })
+ hq.get.mockResolvedValue({ data: { id: 'run-retry-multiple', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target('a1', '銀座店', 10), target('a3', '名古屋店', secondCount)] } })
+ render(<HqBroadcastDetail />)
+ fireEvent.click(await screen.findByRole('button', { name: /失敗した店にやり直す/ }))
+ const dialog = await screen.findByRole('dialog', { name: '失敗した店にやり直します' })
+ expect(within(dialog).getByText(expected)).toBeTruthy()
+})
+
+it('停止していない配信中の店は再送の候補にしない', async () => {
+ params.value = new URLSearchParams('id=run-retry-running')
+ const target = { ...check('a3', '名古屋店', 10), status: 'sending', totalCount: 10, successCount: 0, version: 5, retryableCount: 5, stopped: false, broadcastId: 'b-a3' }
+ hq.get.mockResolvedValue({ data: { id: 'run-retry-running', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target] } })
+ render(<HqBroadcastDetail />)
+ await screen.findAllByText('名古屋店')
+ expect(screen.queryByRole('button', { name: /失敗した店にやり直す/ })).toBeNull()
+ expect(screen.queryByRole('button', { name: '名古屋店のその他操作' })).toBeNull()
+})
+
+it('停止した配信の再送人数は確定前として表示する', async () => {
+ params.value = new URLSearchParams('id=run-retry-stopped')
+ const target = { ...check('a3', '名古屋店', 10), status: 'sending', totalCount: 10, successCount: 0, version: 5, retryableCount: 5, stopped: true, broadcastId: 'b-a3' }
+ hq.get.mockResolvedValue({ data: { id: 'run-retry-stopped', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target] } })
+ render(<HqBroadcastDetail />)
+ fireEvent.click(await screen.findByRole('button', { name: /失敗した店にやり直す/ }))
+ const dialog = await screen.findByRole('dialog', { name: '失敗した店にやり直します' })
+ expect(within(dialog).getByText('1店・人数は送る時に決まります')).toBeTruthy()
+})
+
+it('送信済みの一時失敗は再送人数を表示する', async () => {
+ params.value = new URLSearchParams('id=run-retry-sent')
+ const target = { ...check('a3', '名古屋店', 10), status: 'sent', totalCount: 10, successCount: 5, version: 5, retryableCount: 5, stopped: false, broadcastId: 'b-a3' }
+ hq.get.mockResolvedValue({ data: { id: 'run-retry-sent', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target] } })
+ render(<HqBroadcastDetail />)
+ fireEvent.click(await screen.findByRole('button', { name: /失敗した店にやり直す/ }))
+ const dialog = await screen.findByRole('dialog', { name: '失敗した店にやり直します' })
+ expect(within(dialog).getByText('1店・約5人に送ります')).toBeTruthy()
+})
+
+it('再送確認中に人数が変わったら同じ版でも送信しない', async () => {
+ hq.retry.mockReset().mockResolvedValue({ data: {} })
+ params.value = new URLSearchParams('id=run-retry-count-change')
+ const target = { ...check('a3', '名古屋店', 10), status: 'sent', totalCount: 10, successCount: 5, version: 5, retryableCount: 5, stopped: false, broadcastId: 'b-a3' }
+ const run = { id: 'run-retry-count-change', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target] }
+ hq.get.mockResolvedValue({ data: run })
+ render(<HqBroadcastDetail />)
+ fireEvent.click(await screen.findByRole('button', { name: /失敗した店にやり直す/ }))
+ const dialog = await screen.findByRole('dialog', { name: '失敗した店にやり直します' })
+ run.targets = [{ ...target, retryableCount: 6 }]
+ fireEvent.click(within(dialog).getByRole('button', { name: 'やり直す' }))
+ expect(await within(dialog).findByRole('alert')).toBeTruthy()
+ expect(hq.retry).not.toHaveBeenCalled()
+})
+
+it('再送の確認中に対象が変わったら送信せず読み直しを促す', async () => {
+ hq.retry.mockReset().mockResolvedValue({ data: {} })
+ params.value = new URLSearchParams('id=run-retry-change')
+ const target = (id: string, name: string, version: number) => ({ ...check(id, name, 10), status: 'failed', totalCount: 10, successCount: 0, version, retryableCount: 10, stopped: false, broadcastId: 'b-' + id })
+ const run = { id: 'run-retry-change', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target('a1', '銀座店', 3)] }
+ hq.get.mockResolvedValue({ data: run })
+ render(<HqBroadcastDetail />)
+ fireEvent.click(await screen.findByRole('button', { name: /失敗した店にやり直す/ }))
+ const dialog = await screen.findByRole('dialog', { name: '失敗した店にやり直します' })
+ run.targets.push(target('a3', '名古屋店', 5))
+ fireEvent.click(within(dialog).getByRole('button', { name: 'やり直す' }))
+ expect(await within(dialog).findByRole('alert')).toBeTruthy()
+ expect(hq.retry).not.toHaveBeenCalled()
+})
+
+it('閉じた再送確認の確定口は送信しない', async () => {
+ hq.retry.mockReset().mockResolvedValue({ data: {} })
+ retryConfirmation.current = undefined
+ params.value = new URLSearchParams('id=run-retry-closed')
+ const target = { ...check('a1', '銀座店', 10), status: 'failed', totalCount: 10, successCount: 0, version: 3, retryableCount: 10, stopped: false, broadcastId: 'b-a1' }
+ hq.get.mockResolvedValue({ data: { id: 'run-retry-closed', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target] } })
+ render(<HqBroadcastDetail />)
+ fireEvent.click(await screen.findByRole('button', { name: /失敗した店にやり直す/ }))
+ const dialog = await screen.findByRole('dialog', { name: '失敗した店にやり直します' })
+ const oldConfirm = retryConfirmation.current!
+ expect(oldConfirm).toBeTypeOf('function')
+ fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+ await waitFor(() => expect(screen.queryByRole('dialog', { name: '失敗した店にやり直します' })).toBeNull())
+ await act(async () => { await oldConfirm() })
+ expect(hq.retry).not.toHaveBeenCalled()
 })
 
 it.each(['通信断', '500', '409'])('一括配信の店別やり直しの%sは窓内で止め、閉じた後の読直しで未完了の最新の版だけ送る', async kind => {

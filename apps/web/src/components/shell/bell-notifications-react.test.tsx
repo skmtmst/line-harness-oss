@@ -76,7 +76,7 @@ function centerData(items: NotificationCenterItem[]) {
   }
 }
 
-function Harness({ accountId = 'account-1', accounts = [], withPopover = true }: { accountId?: string | null; accounts?: Array<{ id: string; label: string }>; withPopover?: boolean }) {
+function Harness({ accountId = 'account-1', accounts = [], withPopover = true, hqOrigin = false }: { accountId?: string | null; accounts?: Array<{ id: string; label: string }>; withPopover?: boolean; hqOrigin?: boolean }) {
   const [unread, setUnread] = useState<number | null>(3)
   return (
     <TopBar
@@ -89,7 +89,7 @@ function Harness({ accountId = 'account-1', accounts = [], withPopover = true }:
       onLogout={() => {}}
       notificationUnreadCount={unread}
       renderNotifications={withPopover ? (popover) => (
-        <BellNotifications popover={popover} target={accountId ? { kind: 'store', accountId } : accounts.length ? { kind: 'all' } : { kind: 'none' }} accounts={accounts} onAccountChange={fixture.changeAccount} onUnreadChange={setUnread} />
+        <BellNotifications hqOrigin={hqOrigin} popover={popover} target={accountId ? { kind: 'store', accountId } : accounts.length ? { kind: 'all' } : { kind: 'none' }} accounts={accounts} onAccountChange={fixture.changeAccount} onUnreadChange={setUnread} />
       ) : undefined}
       v8Chrome
       chromeVariant="shell"
@@ -125,6 +125,14 @@ describe('★V8 ベルの小窓', () => {
       item('r4', { isRead: true }),
       item('u3', { eventType: 'ec.sync_failed', title: 'EC連携が止まった' }),
     ]))
+  })
+
+  it('統括のベルから通知一覧にも戻り先を引き継ぐ', async () => {
+    render(<Harness hqOrigin />)
+    const panel = await openPopover()
+    await within(panel).findByText('未読のエラー')
+    fireEvent.click(within(panel).getByRole('button', { name: /すべて見る/ }))
+    expect(fixture.push).toHaveBeenLastCalledWith('/notifications?from=hq')
   })
 
   it.each(['viewer', null])('権限が %s の間は規定どおり無効化し、通知の移動はできる', async (role) => {

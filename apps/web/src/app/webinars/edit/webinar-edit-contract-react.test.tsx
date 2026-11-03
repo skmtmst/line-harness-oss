@@ -221,3 +221,16 @@ it.each([
     if (other !== reason) expect(host.textContent).not.toContain(other)
   }
 })
+
+it('ウェビナー複製は変更と作りかけのフォルダを両方確認する', async () => {
+  state.search = 'id=webinar-1&pane=basic'
+  await render()
+  await act(async () => { fireEvent.change(screen.getByLabelText('名前'), { target: { value: '変更中の名前' } }) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ', exact: true })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' })) })
+  await act(async () => { fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成途中' } }); fireEvent.pointerDown(document.body) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'ウェビナーの操作' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '複製する' })) })
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('作りかけのフォルダ')
+  expect(requests.some(request => request.method === 'POST' && request.path.includes('duplicate'))).toBe(false)
+})
