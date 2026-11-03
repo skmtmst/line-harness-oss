@@ -167,6 +167,14 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   const [copyError, setCopyError] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleteContext, setDeleteContext] = useState<{ ticket: object; poolId: string; updatedAt: string; accounts: string[] | null } | null>(null)
+  const [accountsLoading, setAccountsLoading] = useState(false)
+  const deleteTicket = useRef<object | null>(null)
+  const deleteLock = useRef(false)
+  const alive = useRef(false)
+  const canManageRef = useRef(canManage); canManageRef.current = canManage
+  const poolRef = useRef(pool); poolRef.current = pool
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
@@ -203,20 +211,57 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   }
 
 
+  const openDelete = async () => {
+    if (isMain || !alive.current || !canManageRef.current || poolRef.current.id !== pool.id) return
+    const ticket = {}; deleteTicket.current = ticket
+    const current = () => alive.current && canManageRef.current && poolRef.current.id === pool.id && poolRef.current.updatedAt === pool.updatedAt && deleteTicket.current === ticket
+    setDeleteError(''); setConfirmOpen(true); setAccountsLoading(true)
+    setDeleteContext({ ticket, poolId: pool.id, updatedAt: pool.updatedAt, accounts: null })
+    try {
+      const result = await api.pools.accounts.list(pool.id)
+      if (!current()) return
+      if (!result.success || result.data.some(member => typeof member.lineAccountId !== 'string' || !member.lineAccountId.trim())) throw new Error('accounts_unavailable')
+      setDeleteContext({ ticket, poolId: pool.id, updatedAt: pool.updatedAt, accounts: [...new Set(result.data.map(member => member.lineAccountId))].sort() })
+    } catch {
+      if (current()) setDeleteError('所属アカウントを確認できませんでした。閉じてから、もう一度お試しください。')
+    } finally {
+      if (alive.current && deleteTicket.current === ticket) setAccountsLoading(false)
+    }
+  }
+
+  const deleteStale = !!deleteContext && (deleteContext.poolId !== pool.id || deleteContext.updatedAt !== pool.updatedAt)
+
   const onDelete = async () => {
     // 押している間は受け付けない（二度押しの2回目は404になり、消えているのに失敗と出る）。
-    if (isMain || deleting) return
-    setDeleting(true)
+    if (isMain || deleting || deleteLock.current || !deleteContext || !deleteContext.accounts || !alive.current || !canManageRef.current || deleteContext.ticket !== deleteTicket.current || deleteContext.poolId !== poolRef.current.id || deleteContext.updatedAt !== poolRef.current.updatedAt) return
+    const current = () => alive.current && canManageRef.current && deleteContext.ticket === deleteTicket.current && deleteContext.poolId === poolRef.current.id && deleteContext.updatedAt === poolRef.current.updatedAt
+    deleteLock.current = true; setDeleting(true)
     setDeleteError('')
     try {
+      const members = await api.pools.accounts.list(deleteContext.poolId).catch(() => null)
+      if (!current()) return
+      if (!members?.success || members.data.some(member => typeof member.lineAccountId !== 'string' || !member.lineAccountId.trim())) {
+        setDeleteError('所属アカウントを確認できませんでした。閉じてから、もう一度お試しください。')
+        setDeleteContext({ ...deleteContext, accounts: null })
+        return
+      }
+      const currentAccounts = [...new Set(members.data.map(member => member.lineAccountId))].sort()
+      if (JSON.stringify(currentAccounts) !== JSON.stringify(deleteContext.accounts)) {
+        setDeleteError('所属アカウントが変わりました。閉じて確認し直してください。')
+        setDeleteContext({ ...deleteContext, accounts: null })
+        return
+      }
       const res = await api.pools.delete(pool.id)
+      if (!current()) return
       if (!res.success) throw new Error(res.error)
+      deleteTicket.current = null
       setConfirmOpen(false)
       onChange()
     } catch {
-      setDeleteError('このプールを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      if (current()) setDeleteError('このプールを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setDeleting(false)
+      deleteLock.current = false
+      if (alive.current && deleteContext.poolId === poolRef.current.id) setDeleting(false)
     }
   }
 
@@ -230,7 +275,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
               menuLabel="操作"
               open={menuOpen}
               onOpenChange={setMenuOpen}
-              items={[{ id: 'edit', label: '編集する', onSelect: () => { setMenuOpen(false); setEditName(pool.name); setSavedName(pool.name); setEditVersion(pool.updatedAt); conflict.clear(); setEditError(''); setNameError(''); setEditing(true) } }, ...(!isMain ? [{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } } as const] : [])]}
+              items={[{ id: 'edit', label: '編集する', onSelect: () => { setMenuOpen(false); setEditName(pool.name); setSavedName(pool.name); setEditVersion(pool.updatedAt); conflict.clear(); setEditError(''); setNameError(''); setEditing(true) } }, ...(!isMain ? [{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); void openDelete() } } as const] : [])]}
             />
           </div>
         ) : null} />
@@ -255,14 +300,20 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         confirmLabel="削除する"
         destructive
         busy={deleting}
+        confirmDisabled={accountsLoading || !deleteContext?.accounts || deleteStale}
+        confirmDisabledReason={deleteStale ? 'プールが更新されました。閉じて確認し直してください。' : '所属アカウントを確認してから操作してください。'}
+        confirmLockedReason={canManage ? undefined : 'プールを変更する権限がありません。'}
         error={deleteError}
         onConfirm={() => onDelete()}
         onCancel={() => {
-          if (deleting) return
+          if (deleting || !deleteContext || deleteContext.ticket !== deleteTicket.current) return
+          deleteTicket.current = null
           setConfirmOpen(false)
           setDeleteError('')
         }}
-      />
+      >
+        {deleteContext?.accounts ? <OperationTargetSummary accounts={deleteContext.accounts.map(id => ({ id, name: accounts.find(account => account.id === id)?.name }))} showAccountCount /> : <p>{accountsLoading ? '所属アカウントを確認しています。' : '所属アカウントを確認できません。'}</p>}
+      </ConfirmDialog>
     </Card>
   )
 }
