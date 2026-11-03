@@ -1,4 +1,5 @@
 'use client'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 /*
  * ★V8 タグの一覧（Pencil：タグ ・1152 ・閲覧のみ ）。
@@ -11,7 +12,8 @@
  * 行の詳細は `?tag=<id>`。
  */
 import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { InlineDetailHoldingContext } from '@/components/shared/use-inline-detail-guard'
 import { useSearchParams } from 'next/navigation'
 import { Plus, Search, Upload } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
@@ -64,7 +66,11 @@ export default function TagsList({
   const rawTab = params.get('tab')
   const routeTab: TagsTabKey = TABS.some(([key]) => key === rawTab) ? (rawTab as TagsTabKey) : 'tags'
   const [fixtureTab, setFixtureTab] = useState<TagsTabKey>('tags')
-  const tab = fixture ? fixtureTab : routeTab
+  const requestedTab = fixture ? fixtureTab : routeTab
+  const [tabHolding, setTabHolding] = useState(false)
+  const heldTab = useRef(requestedTab)
+  if (!tabHolding) heldTab.current = requestedTab
+  const tab = tabHolding ? heldTab.current : requestedTab
   const [csvOpen, setCsvOpen] = useState(false)
 
   /*
@@ -126,7 +132,7 @@ export default function TagsList({
           items={TABS.filter(([key]) => tabEnabled(key)).map(([key, label]) => ({
             label,
             current: tab === key,
-            onClick: () => (fixture ? setFixtureTab(key) : samePageUrl.replace(key === 'tags' ? '/tags' : `/tags?tab=${key}`)),
+            onClick: () => requestUnsavedAction(() => { if (fixture) setFixtureTab(key); else samePageUrl.replace(key === 'tags' ? '/tags' : `/tags?tab=${key}`) }),
           }))}
         />
       </div>
@@ -153,5 +159,6 @@ export default function TagsList({
       )}
     </PageFrame>
   )
-  return (tab === 'searches' || tab === 'fields' || tab === 'marks') && !currentTabBlocked ? <PageExplanationProvider pageKey={`tags:${tab}`}>{page}</PageExplanationProvider> : page
+  const content = (tab === 'searches' || tab === 'fields' || tab === 'marks') && !currentTabBlocked ? <PageExplanationProvider pageKey={`tags:${tab}`}>{page}</PageExplanationProvider> : page
+  return <InlineDetailHoldingContext.Provider value={setTabHolding}>{content}</InlineDetailHoldingContext.Provider>
 }

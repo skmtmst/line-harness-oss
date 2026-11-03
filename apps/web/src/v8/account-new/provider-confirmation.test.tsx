@@ -29,6 +29,7 @@ vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-util
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => null }))
 vi.mock('./resume-style', () => ({ default: () => null }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn() } }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/qr-image', () => ({ qrToDataURL: vi.fn(async () => '') }))
 vi.mock('@/components/shared/button', async original => {
   const actual = await original<typeof import('@/components/shared/button')>()

@@ -400,6 +400,16 @@ describe('右詳細の情報と操作', () => {
     return screen.findByRole('dialog', { name: '新規登録7日間フォロー', exact: true })
   }
 
+  test('名前の編集中に詳細を閉じると破棄の確認が出る', async () => {
+    const detail = await panel()
+    fireEvent.click(within(detail).getByRole('button', { name: 'シナリオ名を変更する' }))
+    const input = within(detail).getByRole('textbox', { name: 'シナリオ名', exact: true })
+    fireEvent.change(input, { target: { value: '未保存の名前' } })
+    fireEvent.blur(input)
+    fireEvent.click(within(detail).getByRole('button', { name: '閉じる' }))
+    expect(await screen.findByText('保存していない変更があります')).toBeTruthy()
+  })
+
   test('人数は配信の状態として示し、複製と削除はメニューへ置く', async () => {
     const detail = await panel()
     const scoped = within(detail)

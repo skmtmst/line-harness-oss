@@ -12,6 +12,7 @@ const REGISTRATION_STYLE_KEY = registrationStorageKey(STYLE_KEY, { id: 'style-ow
 const net = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn(),starterSet:vi.fn() }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: net }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [{ id: 'created-account', name: '登録した教室' }] }) }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 beforeEach(() => {
   verifiedStaffRole('owner')
   rememberStaffIdentity({ ...readStaffIdentity()!, id: 'style-owner', tenantId: 'style-tenant' })
@@ -21,6 +22,40 @@ beforeEach(() => {
   net.save.mockReset().mockResolvedValue({ success: true, data: { version: 1 } })
 })
 afterEach(() => { cleanup(); forgetStaffIdentity() })
+
+it('登録再開中のスタイル選択はページ移動を確認し、編集に戻れば選択を保つ', async () => {
+  render(<ResumeRegistrationStyle accountId="created-account" />)
+  const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  fireEvent.click(within(dialog).getByRole('button', { name: '面談・相談' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
+  const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+  fireEvent.click(link)
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+  expect(screen.getByRole('button', { name: '面談・相談（選んでいます）' })).toBeTruthy()
+  link.remove()
+})
+
+it('読み込んだ保存済みスタイルだけでは未保存の確認を出さない', async () => {
+  net.get.mockResolvedValueOnce({ success: true, data: { style: 'lesson', styleSelected: true, version: 4 } })
+  render(<ResumeRegistrationStyle accountId="created-account" />)
+  await screen.findByRole('button', { name: '教室・レッスン（選んでいます）' })
+  const event = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(event)
+  expect(event.defaultPrevented).toBe(false)
+})
+
+it('選択窓を閉じても下書きを保ち、ページ移動を確認する', async () => {
+  render(<ResumeRegistrationStyle accountId="created-account" />)
+  const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  fireEvent.click(within(dialog).getByRole('button', { name: '面談・相談' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+  fireEvent.click(link)
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  link.remove()
+})
 
 it('登録を再開したアカウントの店名を見本へ渡す', async () => {
   render(<ResumeRegistrationStyle accountId="created-account" />)

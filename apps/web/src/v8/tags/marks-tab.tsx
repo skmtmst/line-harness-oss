@@ -15,7 +15,8 @@ import { createResponseGate } from '@/lib/latest-request';
 import { ListPageBody } from '@/components/templates';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import DetailPanel from '@/components/shared/detail-panel';
+import { useHeldDetail, useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
 import { withViewTransition } from '@/components/shared/view-transition';
@@ -89,7 +90,8 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?mark=<id> を残す。 */
-  const [activeMarkId, setActiveMarkId] = useDetailPanelUrl('mark')
+  const detailGuard = useInlineDetailGuard('mark')
+  const { id: activeMarkId, setId: setActiveMarkId } = detailGuard
   const openMarkDetail = (id: string) => host ? (canEdit ? host.onEdit(id) : undefined) : withViewTransition(() => setActiveMarkId(current => current === id ? null : id))
 
   /* アカウント切替のあとに届いた古い応答で一覧を上書きしない（ATTR-01）。 */
@@ -180,7 +182,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   const liveOrder = useLiveReorder(pageItems, (mark) => mark.id, dragId)
   const bodyRef = useRef<HTMLTableSectionElement>(null)
   useFlipRows(bodyRef, liveOrder.shown.map((mark) => mark.id).join(','), JSON.stringify([accountId, query, usage, onlyArchived, page, pageSize]))
-  const activeMark = items.find((mark) => mark.id === activeMarkId) ?? null
+  const activeMark = useHeldDetail(items.find((mark) => mark.id === activeMarkId) ?? null, activeMarkId, detailGuard.holding, accountId)
   const activeMarkIndex = pageItems.findIndex((mark) => mark.id === activeMarkId)
   useEffect(() => setPage(1), [query, usage, pageSize, onlyArchived])
 
@@ -313,7 +315,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   }
 
   /* 行の「…」と右クリックは同じ操作。押せない理由もそのまま渡す。閲覧のみは押せない項目を出さない。 */
-  const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => {
+  const rowMenuItemsRaw = (mark: MarkRow): ActionMenuItem[] => {
     if (host) return canEdit ? [
       { id: 'edit', label: '編集', onSelect: () => host.onEdit(mark.id) },
       { id: 'distribute', label: '配る', icon: <Send size={16} aria-hidden="true" />, disabled: host.busy, onSelect: () => host.onDistribute(mark.id) },
@@ -339,6 +341,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       },
     ]
   }
+  const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => rowMenuItemsRaw(mark).map(item => item.onSelect ? { ...item, onSelect: () => detailGuard.protect(() => { void item.onSelect?.() }) } : item)
   const markContextItems = (mark: MarkRow): ContextMenuItem[] =>
     rowMenuItems(mark).map((item) => ({
       id: item.id,
@@ -558,8 +561,10 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       </ListPageBody>
 
       {/* 行の詳細パネル。名前はその場で直せる。 */}
+      {detailGuard.dialog}
       <DetailPanel
         open={!host && activeMark !== null}
+        busy={detailGuard.busy}
         title={activeMark?.name ?? ''}
         description={activeMark ? `${formatNumber(activeMark.friendCount)} 人・${autoRuleLabel(activeMark)}` : undefined}
         onClose={() => setActiveMarkId(null)}
@@ -576,7 +581,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
             <div>
               <dt>マーク名</dt>
               <dd>
-                <DetailInlineEdit allowed={canEdit}
+                <DetailInlineEdit {...detailGuard.editor} allowed={canEdit}
                     label="マーク名"
                     value={activeMark.name}
                     maxLength={30}

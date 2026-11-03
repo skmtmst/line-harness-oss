@@ -128,6 +128,7 @@ afterEach(() => {
   act(() => root.unmount())
   host.remove()
   document.body.innerHTML = ''
+  window.history.replaceState(null, '', '/contents/vars')
   delete document.documentElement.dataset.theme
 })
 
@@ -151,6 +152,63 @@ function buttonByText(text: string): HTMLElement {
 }
 
 describe('V8 共通情報の一覧（src/v8）の動き', () => {
+  it.each(['止める', '削除する'])('%sの理由を入力したら画面移動を確認する', async (action) => {
+    act(() => { root.render(<CommonVarsListV8 />) }); await flush()
+    act(() => { buttonByLabel('共通情報「会社名」の操作').click() }); await flush()
+    act(() => { buttonByText(action).click() }); await flush()
+    const placeholder = action === '止める' ? 'キャンペーンが終わったため' : '店舗情報の変更のため'
+    const input = document.querySelector<HTMLInputElement>(`input[placeholder="${placeholder}"]`)!
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => { setter.call(input, '変更のため'); input.dispatchEvent(new Event('input', { bubbles: true })) })
+    const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+    act(() => { link.click() }); await flush()
+    expect(document.body.textContent).toContain('保存していない変更があります')
+    link.remove()
+  })
+  it('詳細の名前を編集して移動するときは入力を保って確認する', async () => {
+    window.history.replaceState(null, '', '/contents/vars?row=v-company')
+    act(() => { root.render(<CommonVarsListV8 />) }); await flush()
+    act(() => { buttonByLabel('共通情報の名前を変更する').click() })
+    const input = document.querySelector<HTMLInputElement>('input[aria-label="共通情報の名前"]')!
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => { setter.call(input, '編集途中の名前'); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })) })
+    const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+    act(() => { link.click() }); await flush()
+    expect(document.body.textContent).toContain('保存していない変更があります')
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="共通情報の名前"]')?.value).toBe('編集途中の名前')
+    link.remove()
+  })
+  it('詳細の名前を編集中に次の行へ移るときは一度確かめる', async () => {
+    window.history.replaceState(null, '', '/contents/vars?row=v-company')
+    act(() => { root.render(<CommonVarsListV8 />) }); await flush()
+    act(() => { buttonByLabel('共通情報の名前を変更する').click() })
+    const input = document.querySelector<HTMLInputElement>('input[aria-label="共通情報の名前"]')!
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => { setter.call(input, '編集途中の名前'); input.dispatchEvent(new Event('input', { bubbles: true })) })
+    act(() => { buttonByLabel('次の行').click() }); await flush()
+    expect(document.body.textContent).toContain('保存していない変更があります')
+    act(() => { buttonByText('編集を続ける').click() }); await flush()
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="共通情報の名前"]')?.value).toBe('編集途中の名前')
+    act(() => { buttonByLabel('次の行').click() }); await flush()
+    act(() => { buttonByText('保存せずに移る').click() }); await flush()
+    expect(document.body.textContent).not.toContain('保存していない変更があります')
+    expect(new URL(window.location.href).searchParams.get('row')).toBe('v-contact')
+  })
+  it('名前の編集中に履歴で別の行へ戻っても入力を失わず確認する', async () => {
+    window.history.replaceState(null, '', '/contents/vars?row=v-company')
+    act(() => { root.render(<CommonVarsListV8 />) }); await flush()
+    act(() => { buttonByLabel('共通情報の名前を変更する').click() })
+    const input = document.querySelector<HTMLInputElement>('input[aria-label="共通情報の名前"]')!
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    act(() => { setter.call(input, '編集途中の名前'); input.dispatchEvent(new Event('input', { bubbles: true })) })
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    window.history.replaceState(null, '', '/contents/vars?row=v-contact')
+    act(() => { window.dispatchEvent(new PopStateEvent('popstate')) }); await flush()
+    expect(document.body.textContent).toContain('保存していない変更があります')
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="共通情報の名前"]')?.value).toBe('編集途中の名前')
+    expect(go).toHaveBeenCalledWith(1)
+    go.mockRestore()
+  })
   it('未入力と取得できない数を分け、実値の0を残す', async () => {
     // 使用先の列が出る1440相当。狭い板ではこの列を詳細へ畳む。
     const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
