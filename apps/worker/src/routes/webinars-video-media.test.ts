@@ -1,6 +1,6 @@
 /** 動画指定は自由な R2 prefix を受け付けず、同じアカウントの kind=video の登録メディアからキーを解決する。実 route・認証・SQLite で検証し、R2 自体へは触れない。 */
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -109,6 +109,31 @@ beforeEach(async () => {
   sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ webinarRoutes } = await import('./webinars.js'));
+});
+
+describe('ウェビナー停止時の版競合', () => {
+  test('版確認後に設定が変わったら停止しない', async () => {
+    expect((await put(WEBINAR_A, KEY_OWNER, { title: '確認前' })).status).toBe(200);
+    sqlite.raw.prepare("UPDATE webinars SET status='active' WHERE id=?").run(WEBINAR_A);
+    const expected = (sqlite.raw.prepare('SELECT version FROM webinar_editor_settings WHERE webinar_id=?').get(WEBINAR_A) as {version:number}).version;
+    const prepare = sqlite.db.prepare.bind(sqlite.db);
+    let intercepted = false;
+    vi.spyOn(sqlite.db, 'prepare').mockImplementation(sql => {
+      if (!intercepted && sql.includes('UPDATE webinars SET account_id')) {
+        intercepted = true;
+        sqlite.raw.prepare('UPDATE webinar_editor_settings SET version=version+1 WHERE webinar_id=?').run(WEBINAR_A);
+      }
+      return prepare(sql);
+    });
+    const response = await app().request(`/api/webinars/${WEBINAR_A}/pause`, {
+      method: 'POST', headers: { Authorization: `Bearer ${KEY_OWNER}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedVersion: expected }),
+    }, env());
+    expect(intercepted).toBe(true);
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ currentVersion: expected + 1, currentStatus: 'active' });
+    expect((sqlite.raw.prepare('SELECT status FROM webinars WHERE id=?').get(WEBINAR_A) as {status:string}).status).toBe('active');
+  });
 });
 
 describe('ウェビナー動画のメディア選択 (N-115)', () => {
