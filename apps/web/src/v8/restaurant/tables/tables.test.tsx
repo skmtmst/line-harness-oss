@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
@@ -14,11 +14,12 @@ const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const floorApi = vi.hoisted(() => ({ floors: vi.fn() }))
 const assignmentApi = vi.hoisted(() => ({ getTables: vi.fn(), saveTables: vi.fn() }))
 const location = vi.hoisted(() => ({ query: '' }))
+const account = vi.hoisted(() => ({ selectedAccountId: 'account-1' }))
 
 vi.mock('next/navigation',()=>({useRouter:()=>({push(){},replace(){},back(){}}),usePathname:()=>'/restaurant-test/tables',useSearchParams:()=>new URLSearchParams(location.query)}))
 vi.mock('@/lib/api/helpers/booking-assignment', () => ({ bookingAssignmentApi: assignmentApi }))
 vi.mock('@/lib/api/helpers/reservation-board',()=>({reservationBoardApi:floorApi}))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.selectedAccountId, accounts: [{ id: 'account-1', name: '本店LINE' }, { id: 'account-2', name: '別店LINE' }] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 
@@ -40,6 +41,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = 'owner'
+  account.selectedAccountId = 'account-1'
   location.query = ''
   const assignment = { method: 'balanced', balancePeriod: 'day', resources: [], version: 4, storageReady: true, effectiveMethod: 'balanced' }
   assignmentApi.getTables.mockResolvedValue({ success: true, data: assignment })
@@ -143,6 +145,91 @@ describe('BERxg 座席・卓管理', () => {
     await waitFor(() => expect(fixture.deleteTable).toHaveBeenCalledWith('account-1', 't3'))
   })
 
+  it('卓を削除・停止する前に対象アカウントと店舗を確認できる', async () => {
+    render(<TablesPage />)
+    const row = (await screen.findByText('T3 · 窓側4人卓')).closest('li')!
+    fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    let dialog = screen.getByRole('dialog')
+    expect(dialog.textContent).toContain('本店LINE')
+    expect(dialog.textContent).toContain('渋谷店')
+    expect(dialog.textContent).toContain('環境')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
+    dialog = screen.getByRole('dialog')
+    expect(dialog.textContent).toContain('本店LINE')
+    expect(dialog.textContent).toContain('渋谷店')
+    expect(dialog.textContent).toContain('環境')
+  })
+
+  it.each(['削除', '停止'])('アカウントを切り替えて戻した後は卓の%sを確定できない', async (mode) => {
+    const view = render(<TablesPage />)
+    const row = (await screen.findByText('T3 · 窓側4人卓')).closest('li')!
+    fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: mode }))
+    const dialog = screen.getByRole('dialog')
+    const button = within(dialog).getByRole('button', { name: mode === '削除' ? '削除する' : '予約を移して止める' })
+    const key = Object.keys(button).find(name => name.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    account.selectedAccountId = 'account-2'
+    await act(async () => { view.rerender(<TablesPage />) })
+    account.selectedAccountId = 'account-1'
+    await act(async () => { view.rerender(<TablesPage />) })
+    await act(async () => { oldClick() })
+    expect(fixture.deleteTable).not.toHaveBeenCalled()
+    expect(fixture.updateTable).not.toHaveBeenCalled()
+    expect(fixture.updateReservation).not.toHaveBeenCalled()
+  })
+
+  it('アカウント切替後の読み込み中は前の一覧から卓を削除できない', async () => {
+    const view = render(<TablesPage />)
+    const row = (await screen.findByText('T3 · 窓側4人卓')).closest('li')!
+    fixture.snapshot.mockImplementationOnce(() => new Promise(() => {}))
+    account.selectedAccountId = 'account-2'
+    await act(async () => { view.rerender(<TablesPage />) })
+    const menu = within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }) as HTMLButtonElement
+    fireEvent.click(menu)
+    const remove = screen.getByRole('menuitem', { name: '削除' })
+    expect(remove.getAttribute('aria-disabled')).toBe('true')
+    expect(document.getElementById(remove.getAttribute('aria-describedby')!)?.textContent).toContain('選んだアカウント')
+    fireEvent.click(remove)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(fixture.deleteTable).not.toHaveBeenCalled()
+  })
+
+  it.each(['削除', '停止'])('卓の%sの窓の再表示では別の確定口を受け付けない', async (mode) => {
+    render(<TablesPage />)
+    const row = (await screen.findByText('T3 · 窓側4人卓')).closest('li')!
+    const open = () => { fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' })); fireEvent.click(screen.getByRole('menuitem', { name: mode })) }
+    open()
+    const dialog = screen.getByRole('dialog')
+    const button = within(dialog).getByRole('button', { name: mode === '削除' ? '削除する' : '予約を移して止める' })
+    const key = Object.keys(button).find(name => name.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    open()
+    await act(async () => { oldClick() })
+    expect(fixture.deleteTable).not.toHaveBeenCalled()
+    expect(fixture.updateTable).not.toHaveBeenCalled()
+    expect(fixture.updateReservation).not.toHaveBeenCalled()
+  })
+
+  it.each(['削除', '停止'])('画面終了後は卓の%sを確定できない', async (mode) => {
+    const view = render(<TablesPage />)
+    const row = (await screen.findByText('T3 · 窓側4人卓')).closest('li')!
+    fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: mode }))
+    const button = within(screen.getByRole('dialog')).getByRole('button', { name: mode === '削除' ? '削除する' : '予約を移して止める' })
+    const key = Object.keys(button).find(name => name.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    view.unmount()
+    await act(async () => { oldClick() })
+    expect(fixture.deleteTable).not.toHaveBeenCalled()
+    expect(fixture.updateTable).not.toHaveBeenCalled()
+    expect(fixture.updateReservation).not.toHaveBeenCalled()
+  })
+
   it('参照中の卓は確認窓に理由を出して残す', async () => {
     fixture.deleteTable.mockRejectedValueOnce(new ApiError(409, '予約で使われている卓は削除できません。停止してください', 'resource_in_use'))
     render(<TablesPage />)
@@ -165,6 +252,22 @@ describe('BERxg 座席・卓管理', () => {
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't3', { isActive: false }))
     expect(fixture.updateReservation).toHaveBeenNthCalledWith(1, 'account-1', 'r1', { tableId: 't4', expectedVersion: 1 })
     expect(fixture.updateReservation).toHaveBeenNthCalledWith(2, 'account-1', 'r2', { tableId: null, expectedVersion: 1 })
+  })
+
+  it('予約の移動中にアカウントが切り替わったら次の変更を送らない', async () => {
+    let finish!: (value: unknown) => void
+    fixture.updateReservation.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const view = render(<TablesPage />)
+    await screen.findByText('卓の詳細')
+    fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '予約を移して止める' }))
+    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledTimes(1))
+    account.selectedAccountId = 'account-2'
+    await act(async () => { view.rerender(<TablesPage />) })
+    await act(async () => { finish({ success: true }); await Promise.resolve() })
+    expect(fixture.updateReservation).toHaveBeenCalledTimes(1)
+    expect(fixture.updateTable).not.toHaveBeenCalled()
   })
 
   it('卓を作るは窓（gBrCz）から createTable へ送る', async () => {
