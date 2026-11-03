@@ -6,7 +6,7 @@ import type { BroadcastAssetKind } from '@/lib/api/types/broadcasts'
 
 export class AssetPublishError extends Error {
   constructor(cause: unknown) {
-    super(cause instanceof Error ? cause.message : '公開を確認できませんでした', { cause })
+    super('公開を確認できませんでした。', { cause })
   }
 }
 
