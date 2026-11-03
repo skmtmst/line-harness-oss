@@ -286,7 +286,7 @@ export default function QuickCreateV8({
             type="button"
             variant="primary"
             disabled={saving || inputsDisabled || Boolean(missingReason)}
-            aria-description={!saving && !inputsDisabled ? missingReason : undefined}
+            aria-description={!saving && !inputsDisabled ? missingReason ?? undefined : undefined}
             lockedReason={lockedReason}
             busy={saving}
             busyLabel={phase === 'confirming' ? '有効にしています…' : '保存しています…'}
