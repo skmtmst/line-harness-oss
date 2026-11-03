@@ -34,6 +34,6 @@ export function tokenExpirySummary(accounts: readonly TokenAccount[]): string | 
   const live = accounts.filter(account => !account.archivedAt)
   const expired = live.filter(account => account.tokenExpiry?.status === 'expired').length
   const expiring = live.filter(account => account.tokenExpiry?.status === 'expiring').length
-  const parts = [expired > 0 ? `期限が切れたトークン ${expired} 件` : null, expiring > 0 ? `期限が近い ${expiring} 件` : null].filter(Boolean)
+  const parts = [expired > 0 ? `期限切れ ${expired} 件` : null, expiring > 0 ? `期限が近い ${expiring} 件` : null].filter(Boolean)
   return parts.length > 0 ? parts.join('・') : null
 }

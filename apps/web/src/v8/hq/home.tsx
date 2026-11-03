@@ -517,7 +517,7 @@ export default function HqHomeV8() {
           /></SaveErrorField>
           </ListToolbarEnd>
         </ListToolbarRow>
-        {tokenExpirySummary(filtered) ? <ListToolbarRow><Notice tone="warn" compact message={`表示中のトークン（接続に問題とは別の数え方）：${tokenExpirySummary(filtered)}`} /></ListToolbarRow> : null}
+        {tokenExpirySummary(filtered) ? <ListToolbarRow><Notice tone="warn" compact message={`表示中のLINE接続の期限（接続に問題とは別の数え方）：${tokenExpirySummary(filtered)}`} /></ListToolbarRow> : null}
       </ListToolbarFrame> : null}
   </>
 
