@@ -21,6 +21,7 @@ import EmptyList from '@/components/shared/empty-list'
 import { Field } from '@/components/shared/form-controls'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { RowMenu } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
@@ -197,7 +198,7 @@ export default function McpConnectionsSection() {
         error={dialogError || undefined}
         onConfirm={() => void stop()}
         onCancel={() => { if (!busy) setStopTarget(null) }}
-      />
+      ><OperationTargetSummary accounts={stopTarget?.accounts?.length ? stopTarget.accounts : [{ id: '' }]} showAccountCount={(stopTarget?.accounts?.length ?? 0) > 1} /></ConfirmDialog>
       <ConfirmDialog
         open={rotateTarget !== null}
         title={`「${rotateTarget?.name ?? ''}」の鍵を作り直しますか？`}
@@ -209,7 +210,7 @@ export default function McpConnectionsSection() {
         error={dialogError || undefined}
         onConfirm={() => void rotate()}
         onCancel={() => { if (!busy) setRotateTarget(null) }}
-      />
+      ><OperationTargetSummary accounts={rotateTarget?.accounts?.length ? rotateTarget.accounts : [{ id: '' }]} showAccountCount={(rotateTarget?.accounts?.length ?? 0) > 1} /></ConfirmDialog>
       {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
     </Card>
   )

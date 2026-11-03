@@ -11,8 +11,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
  * 鍵は 1 回だけで、閉じる前に「鍵はもう見られません」の確かめ。
  */
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
-const apiMock = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), stop: vi.fn(), rotate: vi.fn() }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
+const apiMock = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), stop: vi.fn(), rotate: vi.fn(), logs: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/mcp-connect/log', useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: { id: 'acc-1', name: '渋谷店' }, accounts: [{ id: 'acc-1', name: '渋谷店' }] }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => null, useStaffRole: () => role.value }))
@@ -21,13 +22,16 @@ vi.mock('./api', async (importOriginal) => {
   return { ...actual, mcpApi: { ...actual.mcpApi, ...apiMock } }
 })
 import McpConnectionsSection from './section'
+import McpLogV8 from './log'
 
 const CONNECTION = { id: 'mcp-1', name: 'Claude（Kenta）', level: 'draft', accounts: [{ id: 'acc-1', name: '渋谷店' }], keyPrefix: 'mcp_', expiresAt: '2027-01-15T00:00:00.000Z', lastUsedAt: null, status: 'active', previousKeyExpiresAt: null, version: 1 }
+const MANY_ACCOUNTS = [{ id: 'acc-1', name: '渋谷店' }, { id: 'acc-2', name: '新宿店' }, { id: 'acc-3', name: '池袋店' }, { id: 'acc-4', name: '品川店' }]
 
 beforeEach(() => {
   vi.clearAllMocks()
   role.value = verifiedStaffRole('owner')
   apiMock.list.mockResolvedValue({ success: true, data: [CONNECTION] })
+  apiMock.logs.mockResolvedValue({ success: true, data: { items: [], total: 0, connection: { ...CONNECTION, accounts: MANY_ACCOUNTS } } })
   apiMock.create.mockResolvedValue({ success: true, data: { connection: { ...CONNECTION, id: 'mcp-2', level: 'read' }, url: 'https://api.example.test/mcp/acc', key: 'mcp_live_abcdef1234567890' } })
 })
 afterEach(cleanup)
@@ -36,6 +40,37 @@ async function open() {
   render(<McpConnectionsSection />)
   await act(async () => {})
 }
+
+it.each(['止める', '鍵を作り直す'])('接続一覧で%s前に全アカウントと環境を示す', async action => {
+  apiMock.list.mockResolvedValueOnce({ success: true, data: [{ ...CONNECTION, accounts: MANY_ACCOUNTS }] })
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '「Claude（Kenta）」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: action }))
+  const dialog = screen.getByRole(action === '止める' ? 'alertdialog' : 'dialog')
+  for (const account of MANY_ACCOUNTS) expect(within(dialog).getByText(account.name)).toBeTruthy()
+  expect(within(dialog).getByText('4件')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+})
+
+it('操作記録から止める前に全アカウントと環境を示す', async () => {
+  render(<McpLogV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: 'その他の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'この接続を止める' }))
+  const dialog = screen.getByRole('alertdialog')
+  for (const account of MANY_ACCOUNTS) expect(within(dialog).getByText(account.name)).toBeTruthy()
+  expect(within(dialog).getByText('4件')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+})
+
+it('対象アカウントが分からない時は選択中のアカウントで補わない', async () => {
+  apiMock.list.mockResolvedValueOnce({ success: true, data: [{ ...CONNECTION, accounts: [] }] })
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '「Claude（Kenta）」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '止める' }))
+  const dialog = screen.getByRole('alertdialog')
+  expect(within(dialog).getByText('名前を確認できません')).toBeTruthy()
+  expect(within(dialog).queryByText('渋谷店')).toBeNull()
+})
 
 it('オーナーは接続を作れ、鍵は 1 回だけ出て、閉じる前に確かめる', async () => {
   await open()
