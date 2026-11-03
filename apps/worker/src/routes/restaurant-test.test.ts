@@ -1209,7 +1209,7 @@ describe('R2-18 飲食メニューの説明と登録画像', () => {
 });
 describe('V8-B メニューの価格確定', () => {
   const menuPath = '/api/restaurant-test/menus/menu-ginza?account_id=account-1';
-  it('価格の上限は作成と更新の両方で守る', () => checkRestaurantMenuPrice({ seedRestaurantFixture, request, requestWithMethod }));
+  it('価格の上限は作成と更新の両方で守る', () => checkRestaurantMenuPrice({ testDb, seedRestaurantFixture, request, requestWithMethod }));
   it('権限者の保存で価格を即時確定し、二重承認を受け付けない', async () => {
     seedRestaurantFixture();
     const response = await requestWithMethod(menuPath, 'PATCH', { price: 9900 });

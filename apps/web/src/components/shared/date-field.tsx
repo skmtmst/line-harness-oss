@@ -92,6 +92,11 @@ export default function DateField({
   const minDate = parseDate(min ?? '')
   const maxDate = parseDate(max ?? '')
   const isDisabled = (day: Date) => Boolean((minDate && day < minDate) || (maxDate && day > maxDate))
+  const draftDate = parseDate(draftValue)
+  const draftInvalid = Boolean(draftValue && (!draftDate || isDisabled(draftDate)))
+  const stale = value !== openedValue.current
+  const confirmDisabled = disabled || stale || draftInvalid
+  const confirmReason = stale ? 'ほかで日付が変わりました。開き直してください。' : draftInvalid ? '選んだ日付を確認してください。' : disabled ? '日付を変更できません。' : undefined
 
   // 外側を押したときの扱いは MenuPortal に任せる（箱の中の日付押しで閉じない）。
 
@@ -294,7 +299,7 @@ export default function DateField({
             </div>
             <div className={styles.footerGroup}>
               <Button type="button" size="compact" variant="secondary" onClick={close}>キャンセル</Button>
-              <Button type="button" size="compact" variant="primary" disabled={disabled || value !== openedValue.current || Boolean(draftValue && (!parseDate(draftValue) || isDisabled(parseDate(draftValue)!)))} onClick={() => { if (disabled || value !== openedValue.current) return; const day = parseDate(draftValue); if (draftValue && (!day || isDisabled(day))) return; onChange(draftValue); close() }}>確定</Button>
+              <Button type="button" size="compact" variant="primary" disabled={confirmDisabled} disabledReason={confirmReason} onClick={() => { if (confirmDisabled) return; onChange(draftValue); close() }}>確定</Button>
             </div>
           </div>
         </div>

@@ -129,6 +129,7 @@ it('編集中に外から値が変われば古い仮選択を確定できない'
   fireEvent.click(screen.getByRole('button', { name: '2026年9月24日（木）' }))
   view.rerender(<DateField value="2026-09-25" onChange={onChange} aria-label="配信日" />)
   expect((screen.getByRole('button', { name: '確定' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.getByRole('status').textContent).toContain('ほかで日付が変わりました。開き直してください')
   fireEvent.click(screen.getByRole('button', { name: '確定' })); expect(onChange).not.toHaveBeenCalled()
 })
 
