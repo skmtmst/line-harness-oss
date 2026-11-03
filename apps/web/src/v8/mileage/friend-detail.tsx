@@ -208,7 +208,11 @@ function FriendDetailInner() {
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
-  const retryNotification = async (entryId: string, entryAccountId: string) => {
+  const retryNotification = async (entryId: string, entryAccountId: string | null | undefined) => {
+    if (!entryAccountId?.trim()) {
+      setNotificationRetryError('通知の所属アカウントを確認できないため、再送できません。')
+      return
+    }
     setNotificationRetryId(entryId)
     setNotificationRetryError('')
     try {
@@ -371,7 +375,7 @@ function FriendDetailInner() {
         label: '通知を再送',
         disabled: retrying,
         disabledReason: '通知を送り直しています',
-        onSelect: () => void retryNotification(item.id, item.lineAccountId ?? selectedAccountId ?? ''),
+        onSelect: () => void retryNotification(item.id, item.lineAccountId),
       })
     }
     return items
