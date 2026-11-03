@@ -161,6 +161,45 @@ export function markersOf(migrationSql: string, final: Schema): Marker[] {
   return markers;
 }
 
+function markerKey(marker: Marker): string {
+  return `${marker.kind}:${marker.name}:${marker.column ?? ''}`;
+}
+
+/**
+ * 目印の持ち主を、その名前を最初に作ったファイルへ寄せる。
+ *
+ * 索引は貼り直しになることがある（DEPLOY-GATE.md の「索引は貼り直しになるので、
+ * 名前を毎回変えてください」）。後のファイルが同じ名前を作り直していると、その
+ * ファイルが1文も当たっていなくても「古いほうが作った索引が在る」せいで一部だけ
+ * 在るように見え、`partial` に化ける。本番の 324・354・382・409 がこれで止まった。
+ * 表・列でも同じことが起きる。
+ *
+ * 名前ごとに最初に作ったファイルだけを持ち主にすれば、後のファイルの判定はその
+ * ファイルが新しく足す物だけで決まる。
+ *
+ * ただし新しく足す物が1つも無いファイル（既存の索引を貼り直すだけ等）は、寄せると
+ * 目印が空になって `unknown` へ落ちる。`unknown` は未記録なら適用対象に入るので、
+ * これまで `applied` と分かっていたものを当て直す側へ動かしてしまう。そこは従来
+ * どおり全部の目印で見る。
+ *
+ * `entries` はマイグレーションの適用順（ファイル名順）で渡すこと。
+ */
+export function attributeMarkers(
+  entries: Array<{ file: string; markers: Marker[] }>,
+): Array<{ file: string; markers: Marker[] }> {
+  const owner = new Map<string, string>();
+  for (const entry of entries) {
+    for (const marker of entry.markers) {
+      const key = markerKey(marker);
+      if (!owner.has(key)) owner.set(key, entry.file);
+    }
+  }
+  return entries.map((entry) => {
+    const own = entry.markers.filter((marker) => owner.get(markerKey(marker)) === entry.file);
+    return { file: entry.file, markers: own.length > 0 ? own : entry.markers };
+  });
+}
+
 function present(marker: Marker, live: Schema): boolean {
   if (marker.kind === 'table') return live.tables.has(marker.name);
   if (marker.kind === 'index') return live.indexes.has(marker.name);

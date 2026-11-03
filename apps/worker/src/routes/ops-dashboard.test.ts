@@ -155,6 +155,8 @@ describe('集計', () => {
   });
 
   it('使用量は今月の配信通数・バナー生成・メディア容量をプランの上限と比べる', async () => {
+    // 使用量は「今月」で数えるため、日数で前後させず今月の月初に合わせる。
+    const inThisMonth = resolvePeriod('month').from;
     testDb.raw.prepare(`INSERT INTO friends (id, line_user_id, display_name, line_account_id) VALUES ('f1', 'Uf1', '友だち', 'la-1')`).run();
     for (let i = 0; i < 4; i += 1) {
       testDb.raw.prepare(`INSERT INTO messages_log (id, friend_id, line_account_id, direction, message_type, content, created_at) VALUES (?, 'f1', 'la-1', 'outgoing', 'text', 'hi', ?)`).run(`m${i}`, isoInMonth('month'));

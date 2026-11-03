@@ -33,9 +33,21 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "PR差分がない手動実行のため、司令塔の所有パス検査を飛ばします。"
+            exit 0
+          fi
+
+          # 本番へ昇格するPR（base が main）は、開発版で既に司令塔の経路を通った
+          # 変更をまとめて運ぶだけで、ここで所有パスを新しく書き換えるわけではない。
+          # この検査は lane のPR（機能開発 → 開発版）が所有パスへ勝手に手を入れるのを
+          # 止めるためのものなので、本番昇格には効かせない。
+          # 効かせると、開発版の文書変更を必ず含む本番昇格が常に落ちて、
+          # 本番へ出す手段そのものが無くなる（#1016 で実際に詰まった）。
+          if [ "$BASE_REF" = "main" ]; then
+            echo "本番へ昇格するPRのため、所有パスの変更を許可します。"
             exit 0
           fi
 

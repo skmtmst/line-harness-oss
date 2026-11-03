@@ -104,6 +104,7 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
     })
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.stopPropagation()
         setOpen(false)
         triggerRef.current?.focus()
       }

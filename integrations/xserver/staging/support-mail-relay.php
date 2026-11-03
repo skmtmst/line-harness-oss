@@ -41,19 +41,35 @@ if (!filter_var($to, FILTER_VALIDATE_EMAIL) || !is_string($subject) || !is_strin
     echo json_encode(['success' => false, 'error' => 'Invalid message']);
     exit;
 }
+/*
+ * html は飾り付きの本文。本番と同じ扱いで、無ければ文字だけの1通にする。
+ * 飾り付きは文字より長いので、上限は本文と別に持つ。
+ */
+$html = is_array($input) && is_string($input['html'] ?? null) ? $input['html'] : '';
+if (strlen($html) > 200000) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid message']);
+    exit;
+}
 $requestedFromName = is_array($input) && is_string($input['fromName'] ?? null) ? $input['fromName'] : '';
 $fromName = FROM_NAME_ALLOWED[$requestedFromName] ?? FROM_NAME_DEFAULT;
 $messageId = '<'.bin2hex(random_bytes(16)).'@stg.nen-petfood.com>';
 $cleanHeader = static fn (mixed $value): string => preg_replace('/[\r\n]+/', ' ', is_string($value) ? $value : '');
+// 区切り線。毎回引き直すので、本文の中に同じ並びが出ることはない。
+$boundary = 'nen-'.bin2hex(random_bytes(16));
 $headers = [
     'From: =?UTF-8?B?'.base64_encode($fromName).'?= <'.FROM_EMAIL.'>',
     'Reply-To: <'.FROM_EMAIL.'>',
     'Message-ID: '.$messageId,
     'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    // 本番と同じ。本文を丸ごと base64 にすると迷惑メール判定の材料になる。
-    'Content-Transfer-Encoding: quoted-printable',
 ];
+if ($html !== '') {
+    $headers[] = 'Content-Type: multipart/alternative; boundary="'.$boundary.'"';
+} else {
+    $headers[] = 'Content-Type: text/plain; charset=UTF-8';
+    // 本番と同じ。本文を丸ごと base64 にすると迷惑メール判定の材料になる。
+    $headers[] = 'Content-Transfer-Encoding: quoted-printable';
+}
 if (!empty($input['inReplyTo'])) {
     $headers[] = 'In-Reply-To: '.$cleanHeader($input['inReplyTo']);
 }
@@ -62,7 +78,24 @@ if (!empty($input['references'])) {
 }
 $encodedSubject = '=?UTF-8?B?'.base64_encode($cleanHeader($subject)).'?=';
 // 改行を CRLF に揃えてから符号化する。混ざると受信側で行が崩れる。
-$encodedBody = quoted_printable_encode(preg_replace("/\r\n|\r|\n/", "\r\n", $text));
+$encodeQp = static fn (string $value): string => quoted_printable_encode(preg_replace("/\r\n|\r|\n/", "\r\n", $value));
+// 並び順は決まりで、後ろにあるものが優先される。飾り付きを後ろに置く。
+$encodedBody = $html === '' ? $encodeQp($text) : implode("\r\n", [
+    'This is a multi-part message in MIME format.',
+    '',
+    '--'.$boundary,
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: quoted-printable',
+    '',
+    $encodeQp($text),
+    '--'.$boundary,
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: quoted-printable',
+    '',
+    $encodeQp($html),
+    '--'.$boundary.'--',
+    '',
+]);
 $sent = mail($to, $encodedSubject, $encodedBody, implode("\r\n", $headers), '-f'.FROM_EMAIL);
 if (!$sent) {
     http_response_code(502);

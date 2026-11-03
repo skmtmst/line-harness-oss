@@ -9,7 +9,7 @@
     "dev:worker": "pnpm --filter worker dev",
     "dev:web": "pnpm --filter web dev",
     "build": "pnpm -r build",
-    "deploy:worker": "pnpm --filter worker deploy",
+    "deploy:worker": "pnpm --filter worker run deploy",
     "deploy:web": "pnpm --filter web build",
     "db:migrate-line-credentials": "tsx scripts/db/migrate-line-account-credentials.ts",
     "db:dry-run-v6-automations": "tsx scripts/db/dry-run-automations.ts",

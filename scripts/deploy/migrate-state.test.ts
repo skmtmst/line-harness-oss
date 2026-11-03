@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  attributeMarkers,
   columnsOf,
   stripSqlComments,
   judge,
@@ -211,5 +212,84 @@ describe('実物で確かめた8件（2026-08-16 の nen-line-stg）', () => {
     ['mileage_rules', false],
   ])('表 %s は %s', (table, expected) => {
     expect(live.tables.has(table)).toBe(expected);
+  });
+});
+
+describe('目印の持ち主寄せ', () => {
+  it('同じ名前は最初に作ったファイルの目印にする', () => {
+    const attributed = attributeMarkers([
+      { file: '098_a.sql', markers: [{ kind: 'index', name: 'idx_x' }] },
+      {
+        file: '324_b.sql',
+        markers: [{ kind: 'index', name: 'idx_x' }, { kind: 'table', name: 'jobs' }],
+      },
+    ]);
+    expect(attributed[0].markers).toEqual([{ kind: 'index', name: 'idx_x' }]);
+    expect(attributed[1].markers).toEqual([{ kind: 'table', name: 'jobs' }]);
+  });
+
+  it('新しく足す物が無いファイルは全部の目印で見たままにする', () => {
+    // 寄せると目印が空になって判定不能へ落ちる。未記録なら当て直す側へ動くので、
+    // 分かっているものを分からない扱いにしない。
+    const attributed = attributeMarkers([
+      { file: '112_a.sql', markers: [{ kind: 'index', name: 'idx_y' }] },
+      { file: '500_rebuild.sql', markers: [{ kind: 'index', name: 'idx_y' }] },
+    ]);
+    expect(attributed[1].markers).toEqual([{ kind: 'index', name: 'idx_y' }]);
+  });
+
+  it('本番で partial に化けた形を未適用と判定する（324・354・382・409）', () => {
+    // 2026-09-29 の本番D1。古いファイルが作った索引だけが在り、後のファイルが
+    // 足す物は1つも無い。寄せる前は一部だけ在るように見えて partial になった。
+    const live = schemaFromSqliteMaster([
+      { type: 'table', name: 'event_waitlist', sql: 'CREATE TABLE event_waitlist (id TEXT, slot_id TEXT)' },
+      { type: 'table', name: 'event_slots', sql: 'CREATE TABLE event_slots (id TEXT)' },
+      { type: 'index', name: 'idx_event_waitlist_slot_identity', sql: null },
+      { type: 'index', name: 'idx_tags_group', sql: null },
+      { type: 'table', name: 'tags', sql: 'CREATE TABLE tags (id TEXT, name TEXT)' },
+    ]);
+    const attributed = attributeMarkers([
+      { file: '098_event_waitlist.sql', markers: [{ kind: 'index', name: 'idx_event_waitlist_slot_identity' }] },
+      { file: '088_tags.sql', markers: [{ kind: 'index', name: 'idx_tags_group' }] },
+      {
+        file: '324_event_waitlist_applicant_contract.sql',
+        markers: [
+          { kind: 'index', name: 'idx_event_waitlist_slot_identity' },
+          { kind: 'table', name: 'event_waitlist_promotion_jobs' },
+          { kind: 'column', name: 'event_slots', column: 'version' },
+        ],
+      },
+      {
+        file: '382_tags_account_name_scope.sql',
+        markers: [
+          { kind: 'index', name: 'idx_tags_group' },
+          { kind: 'index', name: 'idx_tags_account_normalized_name' },
+        ],
+      },
+    ]);
+    const stateOf = (file: string) =>
+      judge(attributed.find((entry) => entry.file === file)!.markers, live).state;
+
+    expect(stateOf('324_event_waitlist_applicant_contract.sql')).toBe('missing');
+    expect(stateOf('382_tags_account_name_scope.sql')).toBe('missing');
+    // 先に作ったほうは、これまでどおり適用済みのまま。
+    expect(stateOf('098_event_waitlist.sql')).toBe('applied');
+    expect(stateOf('088_tags.sql')).toBe('applied');
+  });
+
+  it('本当に一部だけ当たっているものは引き続き部分適用にする', () => {
+    const live = schemaFromSqliteMaster([
+      { type: 'table', name: 'a', sql: 'CREATE TABLE a (id TEXT, added TEXT)' },
+    ]);
+    const attributed = attributeMarkers([
+      {
+        file: '113_two_alters.sql',
+        markers: [
+          { kind: 'column', name: 'a', column: 'added' },
+          { kind: 'column', name: 'a', column: 'not_yet' },
+        ],
+      },
+    ]);
+    expect(judge(attributed[0].markers, live).state).toBe('partial');
   });
 });

@@ -11,13 +11,14 @@ import { mailFromName } from './mail-from-name.js';
  */
 export async function sendPlainMail(
   env: Env['Bindings'],
-  input: { to: string; subject: string; body: string; fromName?: string },
+  input: { to: string; subject: string; body: string; html?: string; fromName?: string },
 ): Promise<void> {
   const from = env.CONTACT_EMAIL || 'contact-shed@nen-petfood.com';
   const message = {
     to: input.to,
     subject: input.subject,
     body: input.body,
+    html: input.html,
     fromName: input.fromName || mailFromName(input.subject),
   };
   if (env.XSERVER_RELAY_URL && env.XSERVER_RELAY_SECRET) {

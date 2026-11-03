@@ -24,6 +24,7 @@ import {
   columnsOf,
   describeMarker,
   judge,
+  attributeMarkers,
   markersOf,
   schemaFromSqliteMaster,
   type Marker,
@@ -145,14 +146,18 @@ function inspect(target: Target): Row[] {
   } catch {
     // _migrations がまだ無い。seed がその状態を想定している。
   }
-  return migrationFiles().map((file) => {
+  const entries = migrationFiles().map((file) => {
     const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf8');
+    return { file, sql, markers: markersOf(sql, final) };
+  });
+  const attributed = attributeMarkers(entries);
+  return entries.map(({ file, sql }, index) => {
     // CHECK 制約だけを直す再建は列・索引だけでは判定できない。
     // D1 がファイル単位で原子的に適用し、その後 _migrations に記録する。
     const ledgerOnly = /^-- migration-state: ledger-only\s*$/m.test(sql);
     const verdict = ledgerOnly
       ? { state: recorded.has(file) ? 'applied' : 'missing', missing: [] as Marker[] }
-      : judge(markersOf(sql, final), live);
+      : judge(attributed[index].markers, live);
     return {
       file,
       state: verdict.state,
