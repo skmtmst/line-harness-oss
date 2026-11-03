@@ -379,7 +379,7 @@ export default function FeatureSettingsScreen() {
       notice={conflictBand || (staffRole !== null && !canManage) ? <>{conflictBand}{!canManage && <ReadOnlyNotice role="status" need="manager" />}</> : undefined}
       title={TITLE}
       help={DESCRIPTION}
-      explanation={`公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。${accountStyle.data?.style === 'restaurant' ? '星を選ぶと左メニューのお気に入りに表示します。' : ''}`}
+      explanation={canManage ? `公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。${accountStyle.data?.style === 'restaurant' ? '星を選ぶと左メニューのお気に入りに表示します。' : ''}` : '機能ごとの設定を確認できます。'}
       saveActions={ready && (dirty || saving) ? (
         <>
           <Button
