@@ -60,13 +60,13 @@ export const post__api_rich_menu_groups_groupId_apply_to_tag_1 = async (c: Conte
       await c.env.DB.batch([
         c.env.DB
           .prepare(
-            `UPDATE rich_menu_groups SET is_default_for_all = 0, updated_at = ?
-              WHERE account_id = ? AND id != ?`,
+            `UPDATE rich_menu_groups SET is_default_for_all = 0, version = version + 1, updated_at = ?
+              WHERE account_id = ? AND id != ? AND is_default_for_all <> 0`,
           )
           .bind(now, group.account_id, groupId),
         c.env.DB
           .prepare(
-            `UPDATE rich_menu_groups SET is_default_for_all = 1, updated_at = ? WHERE id = ?`,
+            `UPDATE rich_menu_groups SET is_default_for_all = 1, version = version + 1, updated_at = ? WHERE id = ? AND is_default_for_all <> 1`,
           )
           .bind(now, groupId),
       ]);
