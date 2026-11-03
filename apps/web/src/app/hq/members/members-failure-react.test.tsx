@@ -11,6 +11,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+vi.mock('@/v8/settings/staff', () => ({ SelfSecurity: () => null }))
+
 const mocks = vi.hoisted(() => ({
   me: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), resend: vi.fn(), accounts: vi.fn(),
   tenant: vi.fn(), updateName: vi.fn(), contact: vi.fn(),
@@ -65,7 +67,7 @@ describe('M026 権限者の失敗表示', () => {
   it('招待の保存が通信で落ちたら、窓の中に再試行の言葉つきの案内を出す', async () => {
     mocks.create.mockRejectedValueOnce(network())
     render(<HqMembersV8 />)
-    fireEvent.click(await screen.findByRole('button', { name: '権限者を招待' }))
+    fireEvent.click(await screen.findByRole('button', { name: '招待する' }))
     const dialog = await screen.findByRole('dialog', { name: '権限者を招待' })
     fireEvent.change(within(dialog).getByRole('textbox', { name: '名前' }), { target: { value: '山田 太郎' } })
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'メールアドレス' }), { target: { value: 'yamada@example.com' } })
@@ -80,7 +82,7 @@ describe('M026 権限者の失敗表示', () => {
     const forbidden = new ApiError(403, 'API error: 403')
     mocks.create.mockRejectedValueOnce(forbidden)
     render(<HqMembersV8 />)
-    fireEvent.click(await screen.findByRole('button', { name: '権限者を招待' }))
+    fireEvent.click(await screen.findByRole('button', { name: '招待する' }))
     const dialog = await screen.findByRole('dialog', { name: '権限者を招待' })
     fireEvent.change(within(dialog).getByRole('textbox', { name: '名前' }), { target: { value: '山田 太郎' } })
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'メールアドレス' }), { target: { value: 'yamada@example.com' } })

@@ -192,6 +192,7 @@ async function pickExpiresDate(iso: string) {
     )!.click()
     await settle()
   })
+  await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click(); await settle() })
 }
 
 /** 利用期限の日付の選択を空にする。 */
@@ -205,6 +206,7 @@ async function clearExpiresDate() {
     [...picker.querySelectorAll('button')].find((b) => b.textContent?.trim() === '消す')!.click()
     await settle()
   })
+  await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click(); await settle() })
 }
 
 beforeEach(() => {

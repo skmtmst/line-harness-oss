@@ -14,7 +14,6 @@ const key = ({ file, selector }: Candidate) => `${file} ${selector}`
 // 新しい箱はここを足さず、共通の Card / content-card の形を使う。
 const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/combobox.module.css", ".popup", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
-  ["components/shared/date-field.module.css", ".popover", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/date-time-field.module.css", ".popover", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/multi-select.module.css", ".popup", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
   ["app/mileage/earning-rules/new/v8-create-form.module.css", ".choice", "獲得方法を選ぶ入力。選択枠で区別する。"],

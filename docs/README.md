@@ -462,6 +462,9 @@
 
 ## 反映履歴
 
+- [統括・運営メンバー画面の本人パスキー設定と一覧配置](release-log/unreleased/2026-11-03-masato-hq-ops-passkeys-ui.md)
+- [統括メンバーの本人パスキー設定](release-log/unreleased/2026-11-03-masato-hq-passkeys.md)
+- [統括から引き継いだユーザーの一覧表示](release-log/unreleased/2069-masato-hq-inherited-users.md)
 - [配信枠の確認の修正](release-log/unreleased/2053-kenta-operations-quota.md)
 - [履歴と数の単位の表示修正](release-log/unreleased/2056-kenta-review-wording.md)
 - [使い方デモと管理画面の操作の修正](release-log/unreleased/2057-kenta-demo-operations.md)
@@ -1145,3 +1148,5 @@
 - [EC 管理マイルと操作確認の改善](release-log/unreleased/2064-kenta-ec-mileage-operations.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [未保存の保護と操作対象の確認](release-log/unreleased/2065-kenta-unsaved-operation-confirm.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [操作対象の確認と画面案内の改善](release-log/unreleased/2066-kenta-operation-safety.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [編集内容の保護と操作確認の改善](release-log/unreleased/2067-kenta-edit-confirmation.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [保存と操作確認の改善](release-log/unreleased/2068-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。

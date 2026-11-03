@@ -8,6 +8,7 @@ import { FriendAddLink } from '@/v8/dashboard/public/friend-add/index'
 import CalendarPeriod from '@/components/shared/calendar-period'
 import { formatYen } from '@line-crm/shared';
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { restaurantWalkIn } from '@/lib/terms'
 import { CancelReservationDialog } from '@/components/shared/booking-confirm-dialogs'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
@@ -121,7 +122,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const reservationLock = cfg.walkIn ? storeLock ?? (!today ? failed ? '予約情報を確認できません。読み直してからお試しください。' : '予約情報を読み込んでいます。確認が終わるまでお待ちください。' : undefined) : undefined
   const headActions = (
     <>
-      {cfg.walkIn ? <Button disabled={role === null} lockedReason={writeLock || storeLock} onClick={() => { if (canWrite && restaurantStoreReady) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
+      {cfg.walkIn ? <Button disabled={role === null} lockedReason={writeLock || storeLock} onClick={() => { if (canWrite && restaurantStoreReady) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />{restaurantWalkIn}</Button> : null}
       <Button lockedReason={writeLock} {...(canWrite ? { href: '/broadcasts' } : { disabled: role === null })}><MessageCircle size={16} aria-hidden="true" />LINE を送る</Button>
       <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setClosureOpen(true) }}><CalendarX2 size={16} aria-hidden="true" />休みを入れる</Button>
       <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setViewOpen(true) }}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>

@@ -129,3 +129,22 @@ it('狭い幅で見本を開いた時も記録し、本文を変えた後は未�
   fireEvent.click(screen.getByRole('button', { name: '本文を直す' }))
   expect(check.checked).toBe(false)
 })
+
+it('今すぐの見本には時刻を出さず、予約の見本には予約時刻を出す', () => {
+  type Props = ComponentProps<typeof BroadcastPreviewRail>
+  const props = {
+    ab: { hasB: false } as Props['ab'], afterActionVersionId: '', audienceDisplayCount: null,
+    bubbles: [{ id: 'a', type: 'text', content: { text: '本文' } }] as Props['bubbles'],
+    confirmAudienceLabel: '全員', currentStep: 'confirm' as const, excludeTagId: '', messageButtons: [],
+    openTestDialog: vi.fn(async () => {}), preflight: null, preflightStatus: 'idle' as const,
+    previewCloseRef: createRef<HTMLButtonElement>(), reviewKey: 'initial', previewConfirmed: false,
+    previewDevice: 'phone' as const, previewOpen: true, previewToggleRef: createRef<HTMLButtonElement>(),
+    publishedActions: [], saving: false, scheduledLabel: null, selectedAccount: null,
+    sendWhenLabel: '今すぐ（確認してから送信）', setPreviewConfirmed: vi.fn(),
+    setPreviewDevice: vi.fn(), setPreviewOpen: vi.fn(), tags: [], testBlockReason: '',
+  }
+  const view = render(<BroadcastPreviewRail {...props} />)
+  expect(view.queryByText('10:00')).toBeNull()
+  view.rerender(<BroadcastPreviewRail {...props} scheduledLabel="2026/11/04 14:30" />)
+  expect(view.getByText('14:30')).toBeTruthy()
+})

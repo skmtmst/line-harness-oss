@@ -373,3 +373,24 @@ it('経路の数は含む範囲を説明する', async () => {
   await render()
   expect(host.textContent).toContain('停止中を含むすべての経路')
 })
+
+it('経路の取得中はフォルダ件数を0件と見せず、取得後に本当の件数を出す', async () => {
+  const originalFetch = globalThis.fetch
+  let complete!: (response: Response) => void
+  vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+    if (new URL(String(input)).pathname === '/api/entry-routes') {
+      return new Promise<Response>((resolve) => { complete = resolve })
+    }
+    if (new URL(String(input)).pathname === '/api/analytics/ref-summary') return Promise.resolve(json({ success: true, data: { ...SUMMARY, routes: [] } }))
+    return originalFetch(input, init)
+  })
+  await act(async () => { root.render(<InflowListV8 />) })
+  for (let i = 0; i < 4; i += 1) await act(async () => {})
+  const countFor = (name: string) => host.querySelector<HTMLButtonElement>(`[data-folder-select][title="${name}"]`)?.textContent?.trim()
+  expect(countFor('すべて')).toBe('すべて')
+  expect(countFor('未分類')).toBe('未分類')
+  await act(async () => { complete(json({ success: true, data: ROUTES })) })
+  for (let i = 0; i < 4; i += 1) await act(async () => {})
+  expect(countFor('すべて')).toBe('すべて3')
+  expect(countFor('未分類')).toBe('未分類1')
+})

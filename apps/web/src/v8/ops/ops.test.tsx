@@ -128,7 +128,7 @@ describe('閲覧のみには隠さず押せない形＋理由で出す', () => {
   it('メンバー管理：書ける人には招待と停止、閲覧のみは押せない形＋理由で押しても口を呼ばない', async () => {
     await act(async () => { root.render(<OpsMembersV8 />) })
     await settle()
-    expect(buttons('招待メールを送る')).toHaveLength(1)
+    expect(buttons('招待する')).toHaveLength(1)
     const menu = document.querySelector<HTMLButtonElement>('button[aria-label="見本 次郎のその他操作"]')!
     expect(menu).not.toBeNull()
     act(() => menu.click())
@@ -148,9 +148,9 @@ describe('閲覧のみには隠さず押せない形＋理由で出す', () => {
     await settle()
     expect(text()).toContain('見本 次郎')
     // 招待は押せない形＋理由で出し、押しても口を呼ばない。
-    expect(buttons('招待メールを送る')).toHaveLength(1)
+    expect(buttons('招待する')).toHaveLength(1)
     expect(text()).toContain(OPS_READONLY_LOCK_REASON)
-    act(() => buttons('招待メールを送る')[0].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    act(() => buttons('招待する')[0].dispatchEvent(new MouseEvent('click', { bubbles: true })))
     await settle()
     expect(calls.filter(call => call.method !== 'GET')).toHaveLength(0)
     // 行の「…」も押せない形＋理由で出し、選んでも口を呼ばない。

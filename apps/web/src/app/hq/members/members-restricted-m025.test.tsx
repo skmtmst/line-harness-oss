@@ -7,6 +7,8 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 
+vi.mock('@/v8/settings/staff', () => ({ SelfSecurity: () => null }))
+
 const mocks = vi.hoisted(() => ({
   me: vi.fn(),
   list: vi.fn(),

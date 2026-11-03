@@ -117,7 +117,8 @@ export default function AutomationTemplatesV8() {
   }, [accountLoading, load])
   useEffect(() => { setTrigger('') }, [selectedAccountId])
 
-  const tabCounts = useAutomationTabCounts(rules ? rules.length : null)
+  const currentRules = rules?.filter((rule) => rule.status !== 'archived') ?? null
+  const tabCounts = useAutomationTabCounts(currentRules ? currentRules.length : null)
   const chips = useMemo(() => templateTriggerChips(items), [items])
   const [chipsOpen, setChipsOpen] = useState(false)
   const hiddenChipCount = chipsOpen ? 0 : Math.max(0, chips.length - INLINE_TRIGGER_CHIPS)

@@ -160,3 +160,14 @@ it('見本にはルールの実行数ではなく見本の一覧を表示する'
   expect(host.querySelector('[aria-label="ルールの数の帯"]')).toBeNull()
   expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(8)
 })
+
+it('見本のルール数は保管したルールを除き、ルールの数の帯は出さない', async () => {
+  const originalFetch = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (new URL(String(input)).pathname === '/api/automations') return json({ success: true, data: [{ id: 'active', status: 'active', isActive: true }, { id: 'archived', status: 'archived', isActive: false }], summary: { active: 1, stopped: 1, executionCount30d: 0, failureCount30d: 0 } })
+    return originalFetch(input, init)
+  })
+  await render()
+  expect(host.querySelector('[aria-label="ルールの数の帯"]')).toBeNull()
+  expect(host.querySelector('[role="tab"][aria-selected="false"]')?.textContent).toMatch(/ルール\s*1/)
+})

@@ -25,7 +25,7 @@ export default function SelfPasskeys({ enabled }: { enabled: boolean | null }) {
   const load = useCallback(async () => {
     try {
       const res = await fetchApi<ApiResponse<Passkey[]>>('/api/auth/passkeys/self', { cache: 'no-store' })
-      if (!res.success) throw new Error(res.error)
+      if (!res.success || !Array.isArray(res.data)) throw new Error(res.success ? 'パスキー一覧を読み込めませんでした' : res.error)
       setKeys(res.data)
     } catch (caught) { setError(describeSaveFailure(caught)) }
     finally { setLoaded(true) }

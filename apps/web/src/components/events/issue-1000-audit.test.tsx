@@ -127,6 +127,7 @@ async function pickDate(id: string, iso: string) {
     (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
   )!
   await act(async () => { fireEvent.click(day) })
+  await act(async () => { fireEvent.click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!) })
 }
 
 /** 時刻の選択（★管理画面）で HH:mm を選ぶ。 */
@@ -155,6 +156,7 @@ async function clearDate(id: string) {
   const dialog = document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!
   const clear = ([...dialog.querySelectorAll('button')].find((b) => b.textContent?.trim() === '消す') ?? querySupplementaryPageAction('消す'))!
   await act(async () => { fireEvent.click(clear) })
+  await act(async () => { fireEvent.click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!) })
 }
 async function click(text: string) {
   const b = (Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === text) ?? querySupplementaryPageAction(text))!

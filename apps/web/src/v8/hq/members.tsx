@@ -1,22 +1,19 @@
 'use client'
 
 import { loadStaffIdentity, useTenantWideAccess } from '@/lib/staff-role'
-import { PageContent } from '@/components/templates/page-frame'
-import { Plus, Users, UserPlus, Eye, Building2 } from 'lucide-react'
+import { PageFrame } from '@/components/templates/page-frame'
+import { UserPlus } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
-import { ListPage } from '@/components/templates'
 import StepUpPrompt from '@/components/step-up-prompt'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api, ApiError } from '@/lib/api'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersByRole, type MemberStatus } from '@/lib/hq-members'
-import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
+import StatusBadge from '@/components/shared/status-badge'
+import { canResendInvite, lastLoginShort, memberStatus, sortMembersByRole } from '@/lib/hq-members'
+import HqSettingsNavV8 from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -26,6 +23,11 @@ import Notice from '@/components/shared/notice'
 import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
 import TruncatedText from '@/components/shared/truncated-text'
 import { RowActions } from '@/components/shared/row-actions'
+import { SelfSecurity } from '@/v8/settings/staff'
+import SegmentedControl from '@/components/shared/segmented'
+import Pagination from '@/components/shared/pagination'
+import SearchField from '@/components/shared/search-field'
+import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 
 /*
  * ★V8 統括のメンバー（Pencil 。招待の窓 ・権限を変える窓 ・
@@ -46,22 +48,6 @@ const ROLE_WORDS: Record<StaffMember['role'], string> = {
   viewer: '閲覧のみ',
 }
 
-/** 絵の言葉（状態）。止めた人は「停止中」。 */
-const STATUS_WORDS: Record<MemberStatus, string> = {
-  active: '有効',
-  invited: '招待中',
-  expired: '期限切れ',
-  inactive: '停止中',
-}
-
-/** 状態の札の色（「状態の札」：有効＝緑・招待中＝青・停止中＝灰）。 */
-const STATUS_TONES: Record<MemberStatus, StatusBadgeTone> = {
-  active: 'success',
-  invited: 'info',
-  expired: 'danger',
-  inactive: 'neutral',
-}
-
 const VIEWER_NOTE = '閲覧のみで見ています。権限者の招待・変更は統括の管理者に頼んでください。'
 
 export default function HqMembersV8() {
@@ -77,7 +63,6 @@ function MembersInner() {
   // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」。
   usePageTitle('メンバー')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
-  const settingsNav = useHqSettingsFolderNav('members')
 
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [members, setMembers] = useState<StaffMember[]>([])
@@ -134,7 +119,18 @@ function MembersInner() {
   const accountNames = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts])
   /* 絵  の並び：状態→役割（オーナー→管理者→担当者→閲覧のみ）→名前。 */
   const rows = sortMembersByRole(members)
-  const kpis = useMemo(() => memberKpis(members), [members])
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<'active' | 'suspended' | 'all'>('active')
+  const [page, setPage] = useState(1)
+  const activeCount = members.filter(member => memberStatus(member) !== 'inactive').length
+  const suspendedCount = members.length - activeCount
+  const filteredRows = rows.filter(member => {
+    const matchesQuery = `${member.name} ${member.email ?? ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
+    return matchesQuery && (filter === 'all' || (filter === 'active' ? memberStatus(member) !== 'inactive' : memberStatus(member) === 'inactive'))
+  })
+  const pageCount = Math.max(1, Math.ceil(filteredRows.length / 6))
+  const visibleRows = filteredRows.slice((Math.min(page, pageCount) - 1) * 6, Math.min(page, pageCount) * 6)
+  const missingMfa = members.filter(member => memberStatus(member) === 'active' && !member.twoFactorEnabled).length
   const canManage = useTenantWideAccess()
   const restricted = me?.accountScope === 'accounts'
 
@@ -216,19 +212,10 @@ function MembersInner() {
   const ready = status === 'ready' && !restricted
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage
-      boardId="r4ARpV"
-      title="メンバー"
-      help="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。役割は、オーナー（請求・メンバーまで全部）、管理者、担当者（担当範囲のアカウントだけ）、閲覧のみ（見るだけ）です。"
-      actions={ready && canManage ? (
-        <Button variant="primary" onClick={openInvite}>
-          <Plus aria-hidden="true" className={styles.buttonIcon} />
-          権限者を招待
-        </Button>
-      ) : undefined}
-      folders={<HqSettingsNavV8 active="members" />} folderNav={settingsNav}
-    >
-      <PageContent>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId="r4ARpV">
+      <div className={styles.layout}>
+        <aside className={styles.settingsNav}><HqSettingsNavV8 active="members" /></aside>
+        <div className={styles.main}>
         {ready && !canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div> : null}
         {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
         {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
@@ -243,36 +230,26 @@ function MembersInner() {
           <ListState permissionScope="hq" kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" permissionReason="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
         ) : (
           <>
-            <KpiBand aria-label="権限者の数">
-              <KpiCard icon={<Users />} title="権限者" value={kpis.total} unit="人" detail={`有効 ${kpis.active}人`} />
-              <KpiCard icon={<UserPlus />} title="招待中" value={kpis.invited} unit="人" detail="まだ承諾していない招待" />
-              <KpiCard icon={<Eye />} title="閲覧のみ" value={kpis.viewers} unit="人" detail="編集できない権限者" />
-              <KpiCard icon={<Building2 />} title="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" detail={`全アカウントを担当 ${kpis.allScope}人`} />
-            </KpiBand>
-
-            <GridTable label="権限者の一覧" columnSizing="content" design={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-hq-col-role) minmax(0, 1fr) var(--tpl-hq-col-state) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
+            <ListToolbarFrame singleRow><ListToolbarRow>
+              <SearchField aria-label="名前・メールで探す" placeholder="名前・メールで探す" value={query} onChange={value => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
+              <SegmentedControl aria-label="利用状態で絞り込む" fit="content" value={filter} onChange={value => { setFilter(value); setPage(1) }} options={[{ value: 'active', label: '有効', count: activeCount }, { value: 'suspended', label: '止めた', count: suspendedCount }, { value: 'all', label: 'すべて' }]} />
+              <Button variant="primary" disabled={!canManage} onClick={openInvite}><UserPlus aria-hidden="true" className={styles.buttonIcon} />招待する</Button>
+            </ListToolbarRow></ListToolbarFrame>
+            <section className={styles.listCard}>
+              <h2 className={styles.listTitle}>メンバー</h2><p className={styles.listCount}>{members.length}人</p>
+            <GridTable label="権限者の一覧" columnSizing="content" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-hq-col-role) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
               <GridHeadRow>
-                <GridCell role="columnheader">名前</GridCell>
-                <GridCell role="columnheader">メールアドレス</GridCell>
-                <GridCell role="columnheader">役割</GridCell>
-                <GridCell role="columnheader">担当範囲</GridCell>
-                <GridCell role="columnheader">状態</GridCell>
+                <GridCell role="columnheader">ユーザー情報</GridCell>
+                <GridCell role="columnheader">権限</GridCell>
                 <GridCell role="columnheader">最終ログイン</GridCell>
                 <GridCell role="columnheader">操作</GridCell>
               </GridHeadRow>
-              {rows.map((member) => {
-                const state = memberStatus(member)
+              {visibleRows.map((member) => {
                 const isSelf = member.id === me?.id
-                const scope = member.accountScope !== 'accounts'
-                  ? 'すべて'
-                  : (member.scopedLineAccountIds ?? []).map((id) => accountNames.get(id) ?? '不明なアカウント').join('、') || 'アカウントなし'
                 return (
                   <GridRow key={member.id}>
-                    <GridNameCell folder={false} name={<TruncatedText value={`${member.name}${isSelf ? '（あなた）' : ''}`} />} />
-                    <GridCell><TruncatedText value={member.email ?? emptyValue('unknown')} /></GridCell>
-                    <GridCell>{ROLE_WORDS[member.role] ?? member.role}</GridCell>
-                    <GridCell><TruncatedText value={scope} /></GridCell>
-                    <GridCell><StatusBadge tone={STATUS_TONES[state]}>{STATUS_WORDS[state]}</StatusBadge></GridCell>
+                    <GridNameCell folder={false} name={<span className={styles.identity}><strong><TruncatedText value={`${member.name}${isSelf ? '（あなた）' : ''}`} /></strong><small><TruncatedText value={member.email ?? emptyValue('unknown')} /></small></span>} />
+                    <GridCell><StatusBadge tone={member.role === 'viewer' ? 'neutral' : member.role === 'staff' ? 'info' : 'success'}>{ROLE_WORDS[member.role] ?? member.role}</StatusBadge></GridCell>
                     <GridCell><span className={styles.shortText}>{lastLoginShort(lastLogins[member.id])}</span></GridCell>
                     <GridCell align="right">
                       {canManage ? <RowActions subjectName={member.name} edit={{ label: '権限を変更する', onClick: () => openChange(member) }} menuItems={canResendInvite(member) ? [{ id: 'resend', label: '招待を再送する', disabled: resendingId === member.id, disabledReason: resendingId === member.id ? '招待を送信しています' : undefined, onSelect: () => { void resend(member) } }] : []} /> : null}
@@ -280,11 +257,15 @@ function MembersInner() {
                   </GridRow>
                 )
               })}
-            </GridTable>
+            </GridTable></section>
+            {missingMfa > 0 ? <p className={styles.warning}>二段階認証が未設定の人が {missingMfa}人 います。高い権限の人から設定してください。</p> : null}
+            <div className={styles.listFoot}><span>メンバー {filteredRows.length}人中 {visibleRows.length}人を表示</span><Pagination page={Math.min(page, pageCount)} pageCount={pageCount} onPageChange={setPage} /></div>
 
           </>
         )}
-      </PageContent>
+        </div>
+        <aside className={styles.securityAside}><SelfSecurity /></aside>
+      </div>
 
       <MemberDialogV8
         /* 確認を出す間は閉じる。確認をやめたら入れた中身のまま戻る。 */
@@ -327,6 +308,6 @@ function MembersInner() {
           onClose={() => setStepUp(null)}
         />
       ) : null}
-    </ListPage></SaveErrorScope>
+    </PageFrame></SaveErrorScope>
   )
 }

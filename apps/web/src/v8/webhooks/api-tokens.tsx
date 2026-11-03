@@ -3,6 +3,7 @@
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ContextMenu from '@/components/shared/context-menu'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Dialog from '@/components/shared/dialog'
@@ -65,7 +66,7 @@ export function tokenUsedAt(value: string | null): string {
 
 export default function WebhooksApiTokensV8() {
   const management = useWebhookWriteAccess()
-  const { saveErrors, ownership, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke } = useApiTokens()
+  const { saveErrors, ownership, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, targetAccountId, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke } = useApiTokens()
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」から入れ替える・止める。止めても、すでに付けたタグは残ります。"}</>}
@@ -162,7 +163,7 @@ export default function WebhooksApiTokensV8() {
             setRotateTarget(null)
             setDialogError('')
           }}
-        />
+        ><OperationTargetSummary accounts={[{ id: targetAccountId ?? '' }]} /></ConfirmDialog>
         <ConfirmDialog
           open={revokeTarget !== null}
           title={`「${revokeTarget?.name ?? ''}」の鍵を止めますか？`}
@@ -179,7 +180,7 @@ export default function WebhooksApiTokensV8() {
             setRevokeTarget(null)
             setDialogError('')
           }}
-        />
+        ><OperationTargetSummary accounts={[{ id: targetAccountId ?? '' }]} /></ConfirmDialog>
         {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
       </>}
     >
