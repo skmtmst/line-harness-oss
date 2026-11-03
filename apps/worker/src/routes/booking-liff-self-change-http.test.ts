@@ -1226,6 +1226,8 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
   test('貸出中の取消は409で何も変えず、送信後に再試行で取消せる', async () => {
     mockSlots([D11]);
     const id = await adminCreate('menu-ok', T1, 'cx-lease-restore');
+    sqlite.prepare("INSERT INTO booking_groups(id,line_account_id,friend_id,version,created_at,idempotency_key,request_json) VALUES('liff-group','account-ny','friend-self',1,'now','liff-group','{}')").run();
+    sqlite.prepare("UPDATE bookings SET group_id='liff-group' WHERE id=?").run(id);
     const decidedBefore = bookingRow(id).decided_at;
     sqlite.exec(`
       INSERT INTO reminders
@@ -1251,6 +1253,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(bookingRow(id).status).toBe('confirmed');
     expect(bookingRow(id).decided_at).toBe(decidedBefore);
     expect(bookingRow(id).cancel_claim_id).toBeNull();
+    expect(sqlite.prepare("SELECT version FROM booking_groups WHERE id='liff-group'").get()).toEqual({ version: 2 });
     const active = sqlite.prepare(
       "SELECT status FROM friend_reminders WHERE id = 'FR-bk'",
     ).get() as { status: string };
