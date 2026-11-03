@@ -21,13 +21,14 @@ vi.hoisted(() => {
  * - きっかけの写しは正本（v8/line-notifications/operator-event-options.ts）と同じ
  */
 const search = { value: 'id=rule-9' }
+const selectedAccount = vi.hoisted(() => ({ id: 'account-a' }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/line-notifications/operator/new',
   useSearchParams: () => new URLSearchParams(search.value),
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
+  useAccount: () => ({ selectedAccountId: selectedAccount.id, selectedAccount: null, loading: false }),
 }))
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
@@ -52,6 +53,7 @@ let host: HTMLDivElement | null = null
 const store = new Map<string, string>()
 
 beforeEach(() => {
+  selectedAccount.id = 'account-a'
   Object.defineProperty(window, 'localStorage', {
     configurable: true,
     value: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v) }, removeItem: (k: string) => { store.delete(k) }, clear: () => store.clear() },
@@ -145,6 +147,16 @@ describe('欄で知らせて移る', () => {
 })
 
 describe('公開前の確認の窓（sDXNy）', () => {
+  test('アカウントを切り替えたら古い公開確認は使えない', async () => {
+    search.value = ''
+    await render()
+    const publish = [...host.querySelectorAll('button')].find(b => b.textContent?.includes('運用者へのお知らせを公開'))!
+    await act(async () => { publish.click(); for (let i = 0; i < 10; i++) await new Promise(r => setTimeout(r, 0)) })
+    expect(document.body.querySelector('[data-design-node="sDXNy"]')).not.toBeNull()
+    selectedAccount.id = 'account-b'
+    await act(async () => { root.render(<OperatorEditV8 />); await Promise.resolve() })
+    expect(document.body.querySelector('[data-design-node="sDXNy"]')).toBeNull()
+  })
   test('要約は題と値の2列、宛先の行は名前・役割・札。ボタンは届く人数を言う', async () => {
     search.value = ''
     await render()
@@ -155,6 +167,8 @@ describe('公開前の確認の窓（sDXNy）', () => {
     })
     const dialog = document.body.querySelector('[data-design-node="sDXNy"]')
     expect(dialog).not.toBeNull()
+    expect(dialog?.textContent).toContain('LINEアカウント')
+    expect(dialog?.textContent).toContain('環境')
     const lines = Array.from(dialog?.querySelectorAll('p[class*=confirmLine]') ?? []).map((p) => Array.from(p.children).map((c) => c.textContent))
     expect(lines).toEqual([
       ['お知らせ', '新しい予約が入りました'],

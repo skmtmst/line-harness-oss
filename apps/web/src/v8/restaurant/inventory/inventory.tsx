@@ -68,7 +68,7 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog, heading, notice }: {
   } else if (tab === 'rules') {
     body = <RulesBoard key={`${selectedAccountId}:${ctx.selectedStoreId}`} accountId={selectedAccountId} storeId={ctx.selectedStoreId} today={today} timezone={ctx.store?.timezone} canEdit={canEdit} />
   } else if (tab === 'channels') {
-    body = <ChannelsBoard accountId={selectedAccountId} storeId={ctx.selectedStoreId} date={today} canEdit={canEdit} timezone={ctx.store?.timezone} />
+    body = <ChannelsBoard accountId={selectedAccountId} storeId={ctx.selectedStoreId} storeName={ctx.store?.id === ctx.selectedStoreId ? ctx.store.name : null} date={today} canEdit={canEdit} timezone={ctx.store?.timezone} />
   } else {
     body = (
       <ClosuresBoard

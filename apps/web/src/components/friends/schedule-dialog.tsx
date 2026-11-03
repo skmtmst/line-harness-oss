@@ -20,6 +20,7 @@ import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { TextArea } from '@/components/shared/text-field'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot, { mediaLimitLabel } from '@/components/shared/media-slot'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import styles from './schedule-dialog.module.css'
 
 /* 日本時間の時計。サーバも端末も日本時間のつもりで扱う。 */
@@ -61,6 +62,8 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
   onClose: () => void
   onReserved: () => void
 }) {
+  const opened = useRef({ accountId, friendId })
+  const scopeChanged = opened.current.accountId !== accountId || opened.current.friendId !== friendId
   const [content, setContent] = useState('')
   const [templates, setTemplates] = useState<Template[]>([])
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false)
@@ -92,6 +95,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
   const disabledReason = scheduledMessageInputReason(content, Boolean(image), scheduledAt)
 
   useEffect(() => { setImage(null); setImagePickerOpen(false) }, [accountId, friendId])
+  useEffect(() => { if (scopeChanged) onClose() }, [scopeChanged, onClose])
 
   const reserve = async () => {
     if (lock.current) return
@@ -135,6 +139,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
     }
   }
 
+  if (scopeChanged) return null
   return (
     <Dialog
       open
@@ -146,6 +151,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
       designNode="MyJP7"
       onCancel={onClose}
     >
+      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
       <div className={styles.body}>
         <div className={styles.group}>
           <p className={styles.label}>送るもの</p>

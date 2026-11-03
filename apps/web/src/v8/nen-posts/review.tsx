@@ -39,6 +39,7 @@ import Chip from '@/components/shared/chip';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
 import Disclosure from '@/components/shared/disclosure';
 import Notice from '@/components/shared/notice';
+import OperationTargetSummary from '@/components/shared/operation-target-summary';
 import { RowActions } from '@/components/shared/row-actions';
 import StatusBadge from '@/components/shared/status-badge';
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
@@ -564,6 +565,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         <>
           {rejectingPhotoId ? (
             <RejectDialogV8
+              accountId={accountId ?? ''}
               photo={rejectingPhoto}
               reasonCode={reasonCode}
               reasonNote={reasonNote}
@@ -585,6 +587,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           ) : null}
 
           <Dialog open={bulkApproveOpen} title={`${formatNumber(selectedPendingPhotos.length)}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => bulkReview('approve')}>
+            <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
             <dl className={styles.bulkSummary}>
               <div><dt>写真</dt><dd>{formatNumber(selectedPendingPhotos.length)}枚</dd></div>
               <div><dt>付与するマイル</dt><dd>合計 {policyPoints == null ? emptyValue('unknown') : `${formatNumber(selectedPendingPhotos.length * policyPoints)} マイル`}</dd></div>
@@ -596,6 +599,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
             if (reasonCode === 'other' && !reasonNote.trim()) { setReasonFieldError('そのほかの理由を入力してください'); focusFormField('photo-reject-note'); return }
             return bulkReview('return', { reasonCode, reasonNote: reasonNote.trim() })
           }}>
+            <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
             <div role="radiogroup" aria-label="見送り理由" className={styles.pillGroup}>
               {REVIEW_REASONS.map((reason) => (
                 <SaveErrorField names={["photo-reject-reason","reasonCode","value","reason.value"]} key={reason.value}><Radio key={reason.value} name="photo-reject-reason" checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError(''); setReasonFieldError('') }}>{reason.label}</Radio></SaveErrorField>
@@ -608,7 +612,9 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           <Dialog open={Boolean(publicationCandidate)} title="公式サイトに掲載しますか？"
             description="公開の同意と採用状態を確認して、公開用画像を掲載します。追加報酬は初回掲載の版で写真ごとに一度だけ手続きします。"
             confirmLabel="公式サイトに掲載する" error={notice} busy={Boolean(reviewing)} onConfirm={() => confirmPublication()}
-            onCancel={() => { if (!reviewing) setPublicationCandidate(null) }} />
+            onCancel={() => { if (!reviewing) setPublicationCandidate(null) }}>
+            <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
+          </Dialog>
           <PhotoPolicyHistoryV8 canEdit={canEdit}
             open={historyOpen}
             onClose={() => setHistoryOpen(false)}
@@ -869,7 +875,9 @@ function PublicationsV8({
         description="すべての掲載先から外します。審査と公開同意の履歴、付与済みのマイルは残ります。"
         confirmLabel="掲載先から外す" busy={Boolean(busyId)} error={notice || undefined}
         onCancel={() => { if (!busyId) { setWithdrawTarget(null); setNotice('') } }}
-        onConfirm={() => { if (withdrawTarget) void withdraw(withdrawTarget) }} />
+        onConfirm={() => { if (withdrawTarget) void withdraw(withdrawTarget) }}>
+        <OperationTargetSummary accounts={[{ id: accountId }]} />
+      </ConfirmDialog>
       <Dialog open={orderItems !== null} title="掲載順を変える" description="上から順に公式サイトへ表示します。全件と確認した版をまとめて保存します。"
         confirmLabel="並び順を保存する" error={notice} busy={busyId === 'order'} onConfirm={() => saveOrder()}
         onCancel={() => { if (!busyId) { setOrderItems(null); void load() } }}>
@@ -949,6 +957,7 @@ function PublicationsV8({
         </DetailColumns>
       )}
       <Dialog open={Boolean(editing)} title="使う場所" description="同意のある写真の掲載先を選びます。原本は公開しません。" busy={Boolean(busyId)} error={notice} confirmLabel="保存する" onCancel={() => { if (!busyId) setEditing(null) }} onConfirm={() => savePlacements()}>
+        <OperationTargetSummary accounts={[{ id: accountId }]} />
         {placementChoices.map((choice, saveFieldIndex) => <SaveErrorField names={[`placementChoices.${saveFieldIndex}.type`,"type","choice.type","selectedPlacements","selected_placements"]} key={choice.type}><Checkbox key={choice.type} checked={selectedPlacements.includes(choice.type)} onCheckedChange={(checked) => setSelectedPlacements((current) => checked ? [...current, choice.type] : current.filter((type) => type !== choice.type))}>{choice.label}</Checkbox></SaveErrorField>)}
       </Dialog>
     </></SaveErrorScope>

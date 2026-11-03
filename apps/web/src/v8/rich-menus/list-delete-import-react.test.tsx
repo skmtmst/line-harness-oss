@@ -195,6 +195,8 @@ describe('削除の影響の読み込み', () => {
     const view = render(<RichMenusListV8 />)
     await openDelete(view, '秋の下書き')
     const dialog = await findDialog(/「秋の下書き」はまだ消せません/)
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
     expect(dialog.textContent).toContain('既定の印があり、LINE側の状態を確認できない')
     expect(dialog.textContent).toContain('削除せずに残しておいて問題ありません。')
     expect(dialog.textContent).not.toContain('出なくなる友だちがいます')
@@ -363,6 +365,8 @@ describe('消す・取り下げる', () => {
     await openDelete(view, '通常メニュー', '取り下げ・削除する')
     const dialog = await deleteDialog(view, '通常メニュー')
     const text = dialog.textContent ?? ''
+    expect(text).toContain('LINEアカウント')
+    expect(text).toContain('環境')
     expect(text).toContain('取り下げるもの：')
     expect(text).toContain('残るもの：管理画面の設定と、これまでのタップ記録')
     expect(text).toContain('取り下げたあと、管理画面から削除できます。')

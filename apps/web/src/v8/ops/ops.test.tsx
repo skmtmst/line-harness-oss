@@ -236,6 +236,7 @@ describe('送る・止める前に確かめる', () => {
     await act(async () => { send.click() })
     await settle()
     expect(text()).toContain('このお知らせを送りますか？')
+    expect(document.querySelector('[data-design-node="TJUUl"]')?.textContent).toContain('環境')
     expect(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/api/ops/announcements'))).toHaveLength(0)
   })
 
