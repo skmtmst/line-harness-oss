@@ -192,7 +192,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     if (view === 'calendar') {
       if (range === 'month' && today.month) {
         main = <MonthCalendar month={today.month} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, 'month', s))} onDay={(d) => setDate(d)} />
-        aside = <DayList month={today.month} href={cfg.links.bookings} />
+        aside = <DayList month={today.month} href={cfg.links.bookings} canWrite={canWrite} />
       } else if (today.week) {
         main = <WeekCalendar empty={emptyBookings} week={today.week} period={range === 'today' ? 'day' : 'week'} canWrite={canWrite} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, range === 'today' ? 'today' : 'week', s))} onSlot={(day, time) => addNew({ date: day, time })} onOpen={(id) => { const row = today.rows.find((item) => item.id === id); if (row) openRow(row) }} />
         aside = null

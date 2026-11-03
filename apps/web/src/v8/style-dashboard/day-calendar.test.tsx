@@ -8,7 +8,7 @@ import type { ButtonProps } from '@/components/shared/button'
 import { STYLE_CONFIG } from './config'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import { toToday } from './adapter'
-import { WeekCalendar } from './calendar'
+import { DayList, WeekCalendar } from './calendar'
 import { StaffBoard } from './staff-board'
 import StyleDashboard from './style-dashboard'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
@@ -465,4 +465,12 @@ it('教室の週は日ごとのクラスを判定し、休業日と日またぎ�
   expect(weekdays()).toEqual(['満', '満'])
   schedule.entries[0].endsAt = '2026-10-22T00:00:00+09:00'
   expect(weekdays()).toEqual(['満', 'クラスなし'])
+})
+
+
+it.each([true, false])('月表示の休み操作の案内は編集可否 %s に合う', canWrite => {
+  const month = { title: '11月', days: [], selected: { title: '11月1日', total: '0件', rows: [], moreLabel: '一覧へ' } }
+  render(<DayList month={month} href="/bookings" canWrite={canWrite} />)
+  expect(screen.getByText(/日を押すと、その日の予約がここに出ます/)).toBeTruthy()
+  expect(Boolean(screen.queryByText(/休みは［休みを入れる］から/))).toBe(canWrite)
 })
