@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { assertOwnerDispatch, assertReleaseSource, assertStagingRun } from './preflight.js';
+import { assertProductionApproval, assertReleaseSource, assertStagingRun } from './preflight.js';
 import { assertBootstrap, assertHeaderRules, headerRules } from './artifacts.js';
 import { assertApproved, assertUnchanged } from './database.js';
 import { assertBackupPolicy, decryptBackup, encryptBackup } from './backup.js';
 import { assertResponse } from './responses.js';
 
 const sha = 'a'.repeat(40), repository = 'owner/repository';
-const context = { GITHUB_REPOSITORY: repository, GITHUB_SHA: sha, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main` };
+const context = { GITHUB_REPOSITORY: repository, GITHUB_SHA: sha, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main`, GITHUB_RUN_ID: '456', GITHUB_ACTOR: 'skmtmst', GITHUB_TRIGGERING_ACTOR: 'skmtmst' };
 const run = { repository: { full_name: repository }, head_repository: { full_name: repository }, path: '.github/workflows/deploy-cloudflare-staging.yml', head_sha: sha, status: 'completed', conclusion: 'success', event: 'workflow_dispatch' };
 const jobs = { jobs: [{ conclusion: 'success', steps: [{ name: 'Verify public source revisions', conclusion: 'success' }] }] };
 
@@ -25,19 +25,17 @@ describe('approved production source and staging proof', () => {
     expect(() => assertStagingRun(run, { jobs: [{ conclusion: 'success', steps: [] }] }, sha, repository)).toThrow();
     expect(() => assertStagingRun(run, { jobs: [{ conclusion: 'success', steps: [{ ...jobs.jobs[0].steps[0], conclusion: 'skipped' }] }] }, sha, repository)).toThrow();
   });
-  it('requires the original and current owner to have dispatched this production run', () => {
-    const ownerContext = { ...context, GITHUB_RUN_ID: '123', GITHUB_ACTOR: 'skmtmst', GITHUB_TRIGGERING_ACTOR: 'skmtmst' };
-    const productionRun = { id: 123, actor: { login: 'skmtmst' }, triggering_actor: { login: 'skmtmst' }, repository: { full_name: 'skmtmst/line-harness-oss' }, head_repository: { full_name: 'skmtmst/line-harness-oss' }, event: 'workflow_dispatch', head_branch: 'main', head_sha: sha, path: '.github/workflows/deploy-cloudflare-production.yml' };
-    expect(() => assertOwnerDispatch(productionRun, ownerContext, 'skmtmst/line-harness-oss')).not.toThrow();
-    for (const [changedRun, changedContext, repo] of [
-      [{ ...productionRun, actor: { login: 'other' } }, ownerContext, 'skmtmst/line-harness-oss'],
-      [{ ...productionRun, triggering_actor: { login: 'other' } }, ownerContext, 'skmtmst/line-harness-oss'],
-      [productionRun, { ...ownerContext, GITHUB_TRIGGERING_ACTOR: 'other' }, 'skmtmst/line-harness-oss'],
-      [{ ...productionRun, id: 124 }, ownerContext, 'skmtmst/line-harness-oss'],
-      [{ ...productionRun, head_sha: 'b'.repeat(40) }, ownerContext, 'skmtmst/line-harness-oss'],
-      [{ ...productionRun, path: '.github/workflows/other.yml' }, ownerContext, 'skmtmst/line-harness-oss'],
-      [productionRun, ownerContext, 'other/repository'],
-    ] as const) expect(() => assertOwnerDispatch(changedRun, changedContext, repo)).toThrow();
+  it('requires GitHub to identify the owner as both initiator and rerun initiator', () => {
+    const ownerRun = { id: 456, repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: sha, head_branch: 'main', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-production.yml', actor: { login: 'skmtmst' }, triggering_actor: { login: 'skmtmst' } };
+    expect(() => assertProductionApproval(ownerRun, context, repository)).not.toThrow();
+    for (const mutation of [
+      { actor: { login: 'collaborator' } }, { triggering_actor: { login: 'collaborator' } },
+      { id: 789 }, { head_sha: 'b'.repeat(40) }, { head_branch: 'feature' },
+      { repository: { full_name: 'other/repository' } }, { head_repository: { full_name: 'other/repository' } },
+      { event: 'push' }, { path: '.github/workflows/other.yml' },
+    ]) expect(() => assertProductionApproval({ ...ownerRun, ...mutation }, context, repository)).toThrow();
+    for (const mutation of [{ GITHUB_ACTOR: 'collaborator' }, { GITHUB_TRIGGERING_ACTOR: 'collaborator' }, { GITHUB_RUN_ID: '789' }]) expect(() => assertProductionApproval(ownerRun, { ...context, ...mutation }, repository)).toThrow();
+    expect(() => assertProductionApproval({}, context, repository)).toThrow();
   });
 });
 describe('approved SQL and backup boundaries', () => {

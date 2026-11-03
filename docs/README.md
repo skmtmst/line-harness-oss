@@ -464,7 +464,10 @@
 
 ## 反映履歴
 
+- [無料プラン向け本番配備の本人確認ゲート](release-log/unreleased/2073-masato-production-owner-gate.md)
+- [統括・運営メンバー画面の本人パスキー設定と一覧配置](release-log/unreleased/2026-11-03-masato-hq-ops-passkeys-ui.md)
 - [統括メンバーの本人パスキー設定](release-log/unreleased/2026-11-03-masato-hq-passkeys.md)
+- [統括から引き継いだユーザーの一覧表示](release-log/unreleased/2069-masato-hq-inherited-users.md)
 - [配信枠の確認の修正](release-log/unreleased/2053-kenta-operations-quota.md)
 - [履歴と数の単位の表示修正](release-log/unreleased/2056-kenta-review-wording.md)
 - [使い方デモと管理画面の操作の修正](release-log/unreleased/2057-kenta-demo-operations.md)

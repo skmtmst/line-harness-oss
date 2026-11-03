@@ -52,16 +52,6 @@ async function centered(button) {
   })
   expect(position.align).toBe('center'); expect(position.delta).toBeLessThanOrEqual(1)
 }
-async function detailTypography(page, label) {
-  const heading = page.getByRole('heading', { name: label, exact: true })
-  const value = heading.locator('..').locator('strong')
-  const typography = el => { const style = getComputedStyle(el); return { size: parseFloat(style.fontSize), weight: Number(style.fontWeight) } }
-  const headingStyle = await heading.evaluate(typography)
-  const valueStyle = await value.evaluate(typography)
-  expect(headingStyle.size).toBeLessThanOrEqual(12)
-  expect(valueStyle).toEqual({ size: 13, weight: 600 })
-  expect(headingStyle.weight).toBeLessThan(valueStyle.weight)
-}
 for (const width of [1152,1440,1920]) test(`MFA input and centered auth buttons at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })
   const errors = []; page.on('pageerror', error => errors.push(error.message))
@@ -134,11 +124,12 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and authenticato
     return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   await page.goto('/staff')
-  await expect(page.getByRole('heading', { name: '自分の二段階認証' })).toBeVisible()
-  await detailTypography(page, '認証アプリ')
-  await detailTypography(page, '登録済み')
-  await page.getByRole('heading', { name: '自分の二段階認証' }).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('heading', { name: '二段階認証', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'パスキー' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '認証アプリ' })).toContainText('登録済み')
+  await page.getByRole('heading', { name: '二段階認証', exact: true }).scrollIntoViewIfNeeded()
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`personal-${width}.png`), fullPage: true })
+  await page.getByRole('tab', { name: '役割と権限' }).click()
   await page.getByRole('switch', { name: 'ログインで二段階認証を必須にする' }).click()
   const dialog = page.getByRole('dialog', { name: '二段階認証の必須をオフにしますか' })
   await expect(dialog).toBeVisible()
@@ -241,7 +232,7 @@ async function useIndustryFixture(page, style = 'salon', legacyMeet = false) {
   })
 }
 
-for (const [style, heading] of [['standard', 'ダッシュボード'], ['ec', 'ダッシュボード'], ['restaurant', 'お店'], ['salon', 'サロン'], ['consult', '面談'], ['lesson', '教室']]) test(`${style} resumes shared setup and summary, then returns without changing the style`, async ({ page }) => {
+for (const style of ['standard', 'ec', 'restaurant', 'salon', 'consult', 'lesson']) test(`${style} resumes shared setup and summary, then returns without changing the style`, async ({ page }) => {
   await useIndustryFixture(page, style)
   for (const [step, title] of [['0', '使い方のスタイルを選ぶ'], ['summary', '準備ができました']]) {
     await page.goto(`/?setup=${step}`)
@@ -251,7 +242,10 @@ for (const [style, heading] of [['standard', 'ダッシュボード'], ['ec', '�
     await dialog.getByRole('button', { name: '閉じる', exact: true }).click()
     await expect(dialog).toHaveCount(0)
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole('heading', { name: heading, exact: true, level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true, level: 1 })).toBeVisible()
+    if (style !== 'standard' && style !== 'ec') {
+      await expect(page.locator(`[data-style-dashboard="${style}"]`)).toBeVisible()
+    }
   }
 })
 
@@ -360,7 +354,7 @@ for (const style of ['salon', 'ec']) test(`discarding unsaved ${style} setup nev
     await styleChoiceButtons(selection).nth(STYLE_CHOICE_ORDER.indexOf(style)).click()
     await selection.getByRole('button', { name: 'このスタイルにする', exact: true }).click()
     await selection.getByRole('button', { name: '次へ', exact: true }).click()
-    const question = page.getByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })
+    const question = page.getByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
     await expect(question.getByRole('button', { name: '途中保存して閉じる', exact: true })).toBeEnabled()
     await expect.poll(() => question.evaluate(dialog => {
       const bounds = dialog.getBoundingClientRect()

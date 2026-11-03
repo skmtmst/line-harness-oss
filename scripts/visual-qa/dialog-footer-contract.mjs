@@ -98,7 +98,12 @@ export function inspectDialogFooters(source, file = 'screen.tsx') {
 
 export function scanDialogFooters(root) {
   const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', 'apps/web/src'], { cwd: root, encoding: 'utf8' }).split('\0')
-  return [...new Set(files)].filter(file => file.endsWith('.tsx') && !/\.(?:test|spec)\.tsx$/.test(file) && !file.includes('/visual-qa/')).flatMap(file => inspectDialogFooters(readFileSync(resolve(root, file), 'utf8'), file))
+  return [...new Set(files)].filter(file => file.endsWith('.tsx') && !/\.(?:test|spec)\.tsx$/.test(file) && !file.includes('/visual-qa/')).flatMap(file => {
+    const source = readFileSync(resolve(root, file), 'utf8')
+    // inspectDialogFooters only checks footer props on direct shared/dialog imports.
+    if (!source.includes('/shared/dialog') || !source.includes('footer')) return []
+    return inspectDialogFooters(source, file)
+  })
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

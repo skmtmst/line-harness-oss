@@ -198,6 +198,19 @@ staging のロックが242分残留してその間の配備が全部止まりま
 
 原則として masato 専任です。
 
+### musubo Cloudflare の Actions 承認（非公開リポジトリ・GitHub Free）
+
+GitHub Free の非公開リポジトリでは、Environment の required reviewers を本番ゲートに使えません。
+Cloudflare 本番 Workflow は `main` の `workflow_dispatch` を **skmtmst 本人が開始**した場合だけ動きます。
+再実行も本人に限ります。Workflow の入口と、DB 更新・Worker・管理画面の各公開直前に、
+GitHub が記録した `actor` / `triggering_actor`、run ID、リポジトリ、`main` の SHA を API で再照合します。
+入力欄の承認者名だけでは通しません。
+
+この技術的な制限は承認記録の代わりではありません。実行前に、対象 SHA、検証 run、
+マイグレーション一覧・ハッシュ、影響と切り戻しを Masato が確認し、明示的に承認します。
+代理実行や自動再実行はしません。`LINE_HARNESS_CLOUDFLARE_DEPLOY` は、
+本番反映の準備と承認が整うまで未設定のまま維持します。
+
 Cloudflare の本番アクセス権限があること自体は、本番変更の承認ではありません。
 kenta は調査・差分確認・dry-run・手順準備まで進められますが、
 本番への適用は masato の明示的な承認と担当指定がある場合だけ実施します。

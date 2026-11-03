@@ -328,6 +328,12 @@ jobs:
       # Dependencies were built above; standalone package hooks remain enabled locally.
       - name: Test the setup CLI
         run: pnpm --config.enable-pre-post-scripts=false --filter create-line-harness test
+      - name: Install ripgrep for repository audits
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ripgrep
+          fi
       - run: pnpm test:scripts
       - name: Ratchet code quality against the PR base
         env:
@@ -370,7 +376,10 @@ jobs:
           --filter @line-crm/line-sdk
           --filter @line-crm/db
           build
-      - run: pnpm --config.enable-pre-post-scripts=false --filter worker typecheck
+      - name: Typecheck Worker with sufficient Node heap
+        run: pnpm --config.enable-pre-post-scripts=false --filter worker typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
       - run: pnpm --config.enable-pre-post-scripts=false --filter worker test
 
   worker-build:

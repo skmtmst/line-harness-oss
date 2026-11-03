@@ -107,7 +107,7 @@ for (const width of [1152, 1440]) for (const delay of [0, 600]) {
     try {
       await direct('/templates')
       // 実際のSPAリンクを押す。リンクが無い場合は直接URLで代用しない。
-      for (const path of ['/settings']) {
+      for (const path of ['/settings/customer-look']) {
         const link = page.locator(`a[href="${path}"]:visible`).first()
         await link.waitFor()
         await observe(`画面間 ${path}`, () => link.click(), path)
@@ -172,7 +172,7 @@ for (const width of [1152, 1440]) for (const delay of [0, 600]) {
         }
         await tabs(`スタイル ${style}`)
         // EC専用の入口はECを選び済みのときだけ現れる。その条件で元の切り替えも見張る。
-        if (style === 'ec') for (const path of ['/templates', '/settings', '/ec-commerce']) {
+        if (style === 'ec') for (const path of ['/templates', '/settings/customer-look', '/ec-commerce']) {
           const link = page.locator(`a[href="${path}"]:visible`).first()
           await link.waitFor()
           await observe(`EC 画面間 ${path}`, () => link.click(), path)

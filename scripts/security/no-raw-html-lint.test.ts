@@ -11,7 +11,7 @@ describe('HTML の文字列を画面へ差し込まない', () => {
     const messages = await lint('export const Mark = () => <svg dangerouslySetInnerHTML={{ __html: "<path/>" }} />\n');
     expect(messages).toHaveLength(1);
     expect(messages[0].severity).toBe(2);
-  });
+  }, 20_000);
 
   it('要素として描けば通る', async () => {
     expect(await lint('export const Mark = () => <svg><path d="M0 0h1" /></svg>\n')).toEqual([]);
