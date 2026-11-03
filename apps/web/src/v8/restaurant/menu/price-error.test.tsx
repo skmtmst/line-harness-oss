@@ -124,3 +124,13 @@ it('閲覧のみは既存の読む表示を保ち、価格入力と入力の理�
   expect(fixture.createMenu).not.toHaveBeenCalled()
   expect(fixture.updateMenu).not.toHaveBeenCalled()
 })
+
+it('100万円を超えると理由を出して止め、上限ちょうどは保存できる', async () => {
+  const price = await openEditor('create', 'course')
+  changePrice(price, '1000001')
+  expect(screen.getByRole('alert').textContent).toBe('値段は1,000,000円以下で入れてください。')
+  expect(saveButton().disabled).toBe(true)
+  fireEvent.click(saveButton()); expect(fixture.createMenu).not.toHaveBeenCalled()
+  changePrice(price, '1000000')
+  expect(saveButton().disabled).toBe(false)
+})

@@ -158,6 +158,7 @@ async function setDateTime(label: string, iso: string) {
     )!.click()
     await settle()
   })
+  await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click() })
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await setTimeControl(reopened.querySelector('input[role="combobox"]'), `${hour}:${minute}`)
   await act(async () => {
