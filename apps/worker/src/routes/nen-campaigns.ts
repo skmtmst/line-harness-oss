@@ -1,3 +1,4 @@
+import { enqueueConfirmedNenColumn, NenColumnConfirmationConflict, nenColumnConfirmation } from '../services/nen-column-confirmation.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { verifyNenWebhook } from '../lib/hmac.js';
@@ -859,8 +860,24 @@ nenCampaigns.post('/api/nen-campaigns/deliveries/pending-now', requireDeliveryAc
   }
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"accountId":["string"],"scheduledAt":["string"]}), async (c) => {
-  const body = await c.req.json<{ accountId?: string; scheduledAt?: string }>().catch(() => null);
+nenCampaigns.get('/api/nen-campaigns/columns/:id/send-preview', requireDeliveryAccess('nenCampaigns'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  try {
+    const snapshot = await nenColumnConfirmation(c.env.DB, accountId, c.req.param('id'));
+    const col = snapshot.column;
+    if (snapshot.campaign.is_enabled !== 1) return c.json({ success: false, code: 'COLUMN_CONFIRMATION_CHANGED', error: 'コラム配信が停止しています。', data: { recipientCount: snapshot.recipientCount } }, 409);
+    return c.json({ success: true, data: {
+      recipientCount: snapshot.recipientCount, confirmationToken: snapshot.confirmationToken,
+      column: { id: col.id, title: col.title, excerpt: col.excerpt, introText: col.intro_text?.trim() ? col.intro_text : buildDefaultColumnIntro(col.title, col.excerpt), articleUrl: col.article_url, imageUrl: col.image_url, targetMode: col.target_mode, targetTagId: col.target_tag_id, updatedAt: col.updated_at },
+      campaign: { updatedAt: snapshot.campaign.updated_at, buttonLabel: snapshot.campaign.button_label },
+      messages: buildNenDeliveryMessages(snapshot.campaign, { article: col }),
+    } });
+  } catch (error) { return columnOperationError(c, error); }
+});
+
+nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"accountId":["string"],"scheduledAt":["string"],"recipientCount":["number"],"confirmationToken":["string"]}), async (c) => {
+  const body = await c.req.json<{ accountId?: string; scheduledAt?: string; recipientCount?: unknown; confirmationToken?: unknown }>().catch(() => null);
   if (!body?.accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -883,7 +900,18 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireDeliveryAcces
   } else {
     when = new Date().toISOString().slice(0, 19).replace('T', ' ');
   }
-  const queued = await queueColumnDelivery(c.env.DB, c.req.param('id'), body.accountId, when);
+  let queued: number;
+  const confirmed = body.recipientCount !== undefined || body.confirmationToken !== undefined;
+  if (confirmed && (!Number.isSafeInteger(body.recipientCount) || Number(body.recipientCount) < 0 || typeof body.confirmationToken !== 'string' || !/^[a-f0-9]{64}$/.test(body.confirmationToken))) return inputError(c, { success: false, error: '送る相手を確認し直してください' }, 400, ['recipientCount','confirmationToken']);
+  try {
+    queued = confirmed
+      ? await enqueueConfirmedNenColumn(c.env.DB, body.accountId, c.req.param('id'), when, { recipientCount: Number(body.recipientCount), confirmationToken: body.confirmationToken as string })
+      : await queueColumnDelivery(c.env.DB, c.req.param('id'), body.accountId, when);
+  } catch (error) {
+    if (error instanceof NenColumnConfirmationConflict) return c.json({ success: false, code: 'COLUMN_CONFIRMATION_CHANGED', error: error.message, data: { recipientCount: error.current?.recipientCount ?? null } }, 409);
+    if (error instanceof NenColumnOperationError) return columnOperationError(c, error);
+    throw error;
+  }
   auditLog(c, 'nen.column.schedule', {kind:'nen_column',id:c.req.param('id')}, {lineAccountId:body.accountId});
   return c.json({ success: true, data: { queued } });
 });
