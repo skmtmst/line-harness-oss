@@ -1283,6 +1283,7 @@ export default function MediaLibraryListV8() {
           notifyToast('登録できたメディアを一覧へ反映しました。')
           void load()
           void loadKpis()
+          void loadFolders()
         }}
       />
 
