@@ -29,6 +29,19 @@ const m = vi.hoisted(() => ({
   params: new URLSearchParams('id=sc-a'),
 }))
 
+const kindFlags = vi.hoisted(() => ({ introHasReason: true }))
+vi.mock('@/components/scenarios/message-type-tabs', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/scenarios/message-type-tabs')>()
+  return {
+    ...actual,
+    get STEP_MESSAGE_KINDS() {
+      return actual.STEP_MESSAGE_KINDS.map(item => item.value === 'intro' && !kindFlags.introHasReason
+        ? { ...item, disabledReason: undefined }
+        : item)
+    },
+  }
+})
+
 vi.mock('next/navigation', () => ({
   useSearchParams: () => m.params,
   useRouter: () => ({ push: m.push }),
@@ -142,6 +155,7 @@ async function click(name: string) {
 }
 
 beforeEach(() => {
+  kindFlags.introHasReason = true
   forgetSessionSnapshot(); verifiedStaffRole('owner')
   vi.clearAllMocks()
   m.params = new URLSearchParams('id=sc-a')
@@ -153,6 +167,70 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 })
 afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot() })
+
+describe('紹介が選べない理由', () => {
+  const reason = '紹介は未対応です。本文に友だち追加のURLを書いてください。'
+
+  it('理由を一つ見せ、紹介の拒否と他の種類の選択・元の本文の保存を保つ', async () => {
+    const messageContent = 'ご案内 https://example.test/follow?from=scenario&day=1'
+    m.get.mockResolvedValue(ok(scenario({ steps: [step({ messageContent })] })))
+    await mount(<FirstStep />)
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+    expect(screen.getByText(reason).closest('[role="note"]')).toBeTruthy()
+    expect(screen.getByRole('radiogroup', { name: '送るものの種類' }).nextElementSibling).toBe(screen.getByText(reason).closest('[role="note"]'))
+    const intro = screen.getByRole('radio', { name: '紹介', exact: true }) as HTMLButtonElement
+    expect(intro.disabled).toBe(true)
+    expect(intro.title).toContain('LINE側に該当するメッセージの種別がありません')
+    fireEvent.click(intro)
+    expect(intro.getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('radio', { name: 'テキスト', exact: true }).getAttribute('aria-checked')).toBe('true')
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: '画像', exact: true })) })
+    expect(screen.getByRole('radio', { name: '画像', exact: true }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: 'テキスト', exact: true })) })
+    expect(screen.getByRole('textbox', { name: '本文', exact: true }).textContent).toBe(messageContent)
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.updateStep).not.toHaveBeenCalled()
+    await click('作って編集へ')
+    expect(m.updateStep).toHaveBeenCalledExactlyOnceWith('sc-a', 's1', {
+      stepOrder: 1, messageType: 'text', messageContent, offsetDays: 0, offsetMinutes: 90,
+      targetCondition: null, question: null,
+    })
+    expect(m.addStep).not.toHaveBeenCalled()
+  })
+
+  it('テンプレートへ切り替えると理由を消し、この画面で作るへ戻ると一つ出す', async () => {
+    await mount(<FirstStep />)
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+    await click('テンプレートから選ぶ')
+    expect(screen.queryByText(reason)).toBeNull()
+    await click('この画面で作る')
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.updateStep).not.toHaveBeenCalled()
+  })
+
+  it('紹介に押せない理由が無い対照では、未対応の案内を出さない', async () => {
+    kindFlags.introHasReason = false
+    await mount(<FirstStep />)
+    expect(screen.queryByText(reason)).toBeNull()
+    expect((screen.getByRole('radio', { name: '紹介', exact: true }) as HTMLButtonElement).disabled).toBe(false)
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.updateStep).not.toHaveBeenCalled()
+  })
+
+  it('画像が空で保存できないときも、入力の誤りと理由をそれぞれ保つ', async () => {
+    await mount(<FirstStep />)
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: '画像', exact: true })) })
+    await click('作って編集へ')
+    expect(screen.getAllByText(reason)).toHaveLength(1)
+    expect(screen.getByText('内容を入力してください。あとで書く場合は「1通目はあとで書く」を押してください。')).toBeTruthy()
+    expect(screen.getByRole('radio', { name: '画像', exact: true }).getAttribute('aria-checked')).toBe('true')
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.updateStep).not.toHaveBeenCalled()
+    expect(screen.getByText(reason).closest('[role="note"]')).toBeTruthy()
+  })
+})
 
 describe('SCENARIO-01：分の端数を丸めない', () => {
   it('offsetMinutes=90 の既存1通目をそのまま保存すると90のまま', async () => {

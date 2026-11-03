@@ -246,6 +246,7 @@ function deleteImpactRows(
   impact: TagDependencies | null,
 ): Array<{ name: string; value: string; result: string }> {
   const refs = impact?.referenceCounts
+  const hasMileage = impact?.mileageImpact.configured ?? ((tag.mileageReward ?? 0) > 0 || (tag.referralMileageReward ?? 0) > 0 || tag.mileageMultiplierBps != null)
   const linked = [
     tag.mileageReward ? `本人+${tag.mileageReward}` : null,
     tag.referralMileageReward ? `紹介者+${tag.referralMileageReward}` : null,
@@ -271,7 +272,7 @@ function deleteImpactRows(
       数が無くても判断はできる。`—` のままにすると「まだ数えている」
       ように見え、いつまでも埋まらない欄になる。
     */
-    { name: '積んだマイル', value: 'そのまま残る', result: '取り消されません' },
+    ...(hasMileage ? [{ name: '積んだマイル', value: 'そのまま残る', result: '取り消されません' }] : []),
   ]
   if (impact?.linkedActions.length) {
     rows.push({ name: '使用中の版', value: impact.linkedActions.map((item) => `${item.state === 'published' ? '公開' : '下書き'} 第${item.version}版`).join('・'), result: impact.linkedActions.some((item) => item.state === 'published') ? '公開している版があるので消せません' : '公開版はありません' })
@@ -352,7 +353,7 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
     </DialogActions>}
   >
     <div data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。保管すると友だちから外れ、一覧には「保管済み」として残ります。元に戻せません。</p>
+      <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。保管すると友だちから外れ、一覧には「保管済み」として残ります。元に戻せません。保管しても、過去の履歴は残ります。</p>
         <dl className="mt-5 divide-y divide-hairline overflow-hidden rounded-control border border-hairline text-sm">
           {deleteImpactRows(tag, impact).map((row) => (
             <div key={row.name} className="flex items-baseline gap-3 px-4 py-3">
@@ -367,9 +368,9 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
         {impactStatus === 'ready' && impact && !impact.canDelete && (
           <Notice tone="danger" data-qa="tag-delete-blocked-warning">
             {impact.referenceCounts.affiliateOffers > 0 ? (
-              <><p className="font-bold">アフィリエイトのオファーで使用中のタグは保管できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。保管しても、過去のマイル履歴と配信ログは残ります。</p></>
+              <><p className="font-bold">アフィリエイトのオファーで使用中のタグは保管できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。</p></>
             ) : (
-              <><p className="font-bold">有効な参照があるタグは保管できません</p><p className="mt-1">参照中の設定を確認してから操作してください。過去のマイル履歴と配信ログは残ります。</p></>
+              <><p className="font-bold">有効な参照があるタグは保管できません</p><p className="mt-1">参照中の設定を確認してから操作してください。</p></>
             )}
           </Notice>
         )}

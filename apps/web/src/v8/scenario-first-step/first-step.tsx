@@ -786,6 +786,9 @@ export default function ScenarioFirstStepV8() {
                 </button>,
               ])}
             </div>
+            {STEP_MESSAGE_KINDS.find((item) => item.value === 'intro')?.disabledReason ? (
+              <Notice tone="info" message="紹介は未対応です。本文に友だち追加のURLを書いてください。" />
+            ) : null}
 
             {kind === 'text' ? (
               <MessageBody>
