@@ -47,6 +47,12 @@ export default function InlineEdit({ value, label, onSave, placeholder, maxLengt
 
   useLayoutEffect(() => { onDirtyChange?.(editing && draft !== value) }, [draft, editing, value, onDirtyChange])
   useLayoutEffect(() => { onSavingChange?.(saving) }, [saving, onSavingChange])
+  const statusCallbacks = useRef({ onDirtyChange, onSavingChange })
+  statusCallbacks.current = { onDirtyChange, onSavingChange }
+  useLayoutEffect(() => () => {
+    statusCallbacks.current.onDirtyChange?.(false)
+    statusCallbacks.current.onSavingChange?.(false)
+  }, [])
   const previousReset = useRef(resetToken)
   useEffect(() => {
     if (previousReset.current === resetToken) return

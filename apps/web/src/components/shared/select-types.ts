@@ -36,6 +36,8 @@ export interface SelectProps {
   'aria-label': string
   className?: string
   defaultOpen?: boolean
+  /** 作成欄を開く要求。値を増やすたび、可能なら作成欄を表示する。 */
+  openCreateSignal?: number
   /** 権限の理由。入力や状態のdisabledとは分ける。 */
   lockedReason?: string
   disabled?: boolean

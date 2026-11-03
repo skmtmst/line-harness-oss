@@ -192,6 +192,7 @@ export default function FieldEditor({
     )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
   const folderDraftGuard = useRef<FolderDraftGuard | null>(null)
+  const [folderCreating, setFolderCreating] = useState(false)
 
   /* 入力を変えたら次の作成は別の要求として新しいキーにする（R515）。 */
   const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
@@ -235,7 +236,7 @@ export default function FieldEditor({
   }
 
   const submit = () => {
-    if (saving) return
+    if (saving || folderCreating) return
     if (mode === 'create' && !siblingsReady) return
     if (nameRequirement.check(name)) return failField('name', nameRequirement.check(name)!)
     if (mode === 'create' && keyRequirement.check(fieldKey)) return failField('key', keyRequirement.check(fieldKey)!)
@@ -384,7 +385,8 @@ export default function FieldEditor({
           <Button
             type="button"
             variant="primary"
-            disabled={saving || locked || (mode === 'create' && !siblingsReady)}
+            disabled={saving || folderCreating || locked || (mode === 'create' && !siblingsReady)}
+            disabledReason={folderCreating ? 'フォルダを作成中です。完了するまでお待ちください。' : undefined}
             onClick={submit}
             busy={saving}
             busyLabel={mode === 'create' ? '作成中…' : '保存中…'}
@@ -445,6 +447,7 @@ export default function FieldEditor({
                 <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                   aria-label="友だち情報欄のフォルダ"
                   draftGuardRef={folderDraftGuard}
+                  onCreatingChange={setFolderCreating}
                   value={folderId}
                   onChange={setFolderId}
                   disabled={locked || saving}

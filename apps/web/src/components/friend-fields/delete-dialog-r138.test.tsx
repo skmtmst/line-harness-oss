@@ -25,6 +25,7 @@ function openDialog(props?: { initialConfirmation?: string; onCancel?: () => voi
   render(
     <DeleteDialog
       tag={tag}
+      accountId="account-a"
       dependencies={dependencies}
       dependenciesStatus="ready"
       onCancel={onCancel}
@@ -48,6 +49,12 @@ afterEach(() => {
 })
 
 describe('R138 タグ削除の確認窓', () => {
+  test('削除するアカウントと環境を表示する', async () => {
+    openDialog()
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
+  })
   test('見出しが確認窓の名前として取得できる', async () => {
     openDialog()
     const dialog = await screen.findByRole('alertdialog', { name: '「定期購入者」を削除しますか？' })

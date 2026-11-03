@@ -189,3 +189,17 @@ it('統括の一括配信のフォルダ名を編集中は移動前に確認す�
   fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
   expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
 })
+
+it('統括のフォルダ窓をキャンセルすると確認は1回だけで閉じる', async () => {
+  window.history.replaceState(null, '', '/hq/broadcasts')
+  hq.list.mockResolvedValue({ data: [run('r1', 'ある配信', [target('a', 'sent', 100, 50)])] })
+  render(<HqBroadcastList />)
+  await screen.findByText('ある配信')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '連絡' } })
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'フォルダを追加' })).getByRole('button', { name: 'やめる' }))
+  expect(screen.getAllByRole('dialog', { name: '入力を破棄しますか？' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
+  expect(screen.queryByRole('dialog', { name: '入力を破棄しますか？' })).toBeNull()
+  expect(screen.queryByRole('dialog', { name: 'フォルダを追加' })).toBeNull()
+})

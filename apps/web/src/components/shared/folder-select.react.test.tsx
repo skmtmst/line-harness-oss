@@ -399,13 +399,14 @@ it.each(['<script>', '番号 with space', 'a'.repeat(129), ''])('使えない追
 })
 
 it('フォルダ名の入力中に外へ焦点が移っても、開き直せば入力を保つ', async () => {
-  const button = await openMenu({ onCreate: vi.fn() })
+  await openMenu({ onCreate: vi.fn() })
   const input = await startCreate()
   await act(async () => { fireEvent.change(input, { target: { value: '確認中の分類' } }) })
   const outside = document.createElement('button'); outside.textContent = '外側'; document.body.append(outside)
   await act(async () => { fireEvent.blur(input, { relatedTarget: outside }) })
-  await act(async () => { fireEvent.click(button) })
-  const restored = await startCreate()
+  expect(screen.getByText('作りかけのフォルダ名があります。')).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダの入力を確認' })) })
+  const restored = screen.getByRole('textbox', { name: '新しいフォルダの名前' }) as HTMLInputElement
   expect(restored.value).toBe('確認中の分類')
   outside.remove()
 })

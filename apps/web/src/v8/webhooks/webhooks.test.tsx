@@ -582,3 +582,27 @@ it('受け取り口の名前を編集中は画面移動前に確認する', asyn
   expect(document.body.textContent).toContain('保存していない変更があります')
   link.remove()
 })
+
+it('編集途中の受け取り口が再読込で消えたら、残った画面の移動を妨げない', async () => {
+  window.history.replaceState(null, '', '/webhooks?tab=incoming')
+  await render(<WebhooksIncomingV8 />)
+  const edit = await vi.waitFor(() => within(host).getByRole('button', { name: '受け取り口の名前を変更する' }))
+  await act(async () => { edit.click() })
+  await act(async () => { fireEvent.change(within(host).getByRole('textbox', { name: '受け取り口の名前' }), { target: { value: '変更中' } }) })
+  const original = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (/\/api\/webhooks\/incoming\/in-1/.test(url) && init?.method === 'PATCH') return json({ success: true, data: INLET })
+    if (url.includes('/api/webhooks/incoming') && !url.includes('/in-1')) return json({ success: true, data: [] })
+    return original(input, init)
+  })
+  await act(async () => { fireEvent.click(within(host).getByRole('switch', { name: '申込フォームを動かす' })) })
+  await vi.waitFor(() => expect(within(host).queryByRole('textbox', { name: '受け取り口の名前' })).toBeNull())
+  const link = document.createElement('a'); link.href = '/events'; link.textContent = 'イベントへ'; document.body.append(link)
+  try {
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+    await act(async () => { link.dispatchEvent(click) })
+    expect(click.defaultPrevented).toBe(false)
+    expect(document.body.textContent).not.toContain('保存していない変更があります')
+  } finally { link.remove() }
+})

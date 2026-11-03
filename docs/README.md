@@ -1145,3 +1145,4 @@
 - [EC 管理マイルと操作確認の改善](release-log/unreleased/2064-kenta-ec-mileage-operations.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [未保存の保護と操作対象の確認](release-log/unreleased/2065-kenta-unsaved-operation-confirm.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [操作対象の確認と画面案内の改善](release-log/unreleased/2066-kenta-operation-safety.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [編集内容の保護と操作確認の改善](release-log/unreleased/2067-kenta-edit-confirmation.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
