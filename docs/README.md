@@ -371,6 +371,8 @@
 
 ## 運用と配備
 
+- [2026-11-03 本番全体更新の候補と停止条件](release-review/2026-11-03-full-production-candidate.md)
+
 - [開発ガイド](development.md)
 - [PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md)
 - [GitHub 設定の運用メモ](../.github/README.md)
