@@ -11,6 +11,16 @@ beforeEach(()=>{f=createTestD1();for(const id of ['shop1','shop2']){f.raw.prepar
 });
 afterEach(()=>{f.raw.close();vi.unstubAllGlobals();});
 describe('統括の一括配信',()=>{
+ it('停止直後の未送信台帳も再送可能人数に含め、送信途中の台帳は含めない',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('pending','U-pending','shop1'),('inflight','U-inflight','shop1')");
+  f.raw.prepare("UPDATE broadcasts SET status='sending',stopped_at=datetime('now') WHERE id=?").run(child);
+  const put=f.raw.prepare('INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code,dispatched_at) VALUES(?,?,?,?,?)');
+  put.run(child,'friend-shop1','failed','line_http_429',null);put.run(child,'pending','claimed',null,null);put.run(child,'inflight','claimed',null,'2026-01-01');
+  const {readHqBroadcastResult}=await import('./hq-broadcasts.js');
+  expect((await readHqBroadcastResult(f.db,await getHqBroadcastRun(f.db,tenant,r.id))).targets[0].retryableCount).toBe(2);
+ });
  it('人数・残枠を店ごとに返し、足りない店を外した後だけ送れる',async()=>{
   let run=await prepareHqBroadcast(f.db,tenant,'owner',input),check=await preflightHqBroadcast(f.db,run);
   expect(check.map(p=>p.remaining)).toEqual([100,0]);expect(check[1].blockedReasons).toContain('今月の送信枠が足りません');
