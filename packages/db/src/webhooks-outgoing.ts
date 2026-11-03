@@ -108,11 +108,12 @@ export async function deleteOutgoingWebhook(
   id: string,
   lineAccountId: string,
   deletedByStaffId?: string,
+  expectedVersion?: number,
 ): Promise<boolean> {
   const result = await db.prepare(`UPDATE outgoing_webhooks
     SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0, updated_at = ?
-    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
-    .bind(jstNow(), deletedByStaffId ?? null, jstNow(), id, lineAccountId).run();
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL AND (? IS NULL OR version = ?)`)
+    .bind(jstNow(), deletedByStaffId ?? null, jstNow(), id, lineAccountId, expectedVersion ?? null, expectedVersion ?? null).run();
   return (result.meta.changes ?? 0) > 0;
 }
 

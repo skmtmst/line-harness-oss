@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { webhooks } from './webhooks.js';
-import { updateOutgoingWebhook } from '@line-crm/db';
+import { updateIncomingWebhook, updateOutgoingWebhook } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 let db: SqliteD1;
 beforeEach(() => {
@@ -26,6 +26,46 @@ const put = (body: object) => app().request('/api/webhooks/outgoing/wh1?lineAcco
   method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 }, { DB: db.db });
 describe('送り先の版の競合', () => {
+
+  test('確認した送り先が変わったら試し送信しない', async () => {
+    await put({ expectedVersion: 1, name: '更新後' });
+    const external = vi.fn();
+    vi.stubGlobal('fetch', external);
+    try {
+      const res = await app().request('/api/webhooks/outgoing/wh1/test?lineAccountId=a1', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedVersion: 1 }),
+      }, { DB: db.db });
+      expect(res.status).toBe(409);
+      expect(external).not.toHaveBeenCalled();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+
+  test('受信口の鍵更新の版条件は書込み時に検査する', async () => {
+    db.raw.prepare(`INSERT INTO incoming_webhooks (id, name, source_type, line_account_id) VALUES ('in1', '受信', 'custom', 'a1')`).run();
+    await updateIncomingWebhook(db.db, 'in1', 'a1', { name: '新しい設定' });
+    const updated = await Reflect.apply(updateIncomingWebhook, null, [db.db, 'in1', 'a1', { name: '古い確認' }, undefined, 1]);
+    expect(updated).toBe(false);
+    expect(db.raw.prepare('SELECT name FROM incoming_webhooks WHERE id = ?').get('in1')).toEqual({ name: '新しい設定' });
+  });
+
+
+
+  test('受信口の設定変更後は古い確認で削除できない', async () => {
+    db.raw.prepare(`INSERT INTO incoming_webhooks (id, name, source_type, line_account_id) VALUES ('in1', '受信', 'custom', 'a1')`).run();
+    await app().request('/api/webhooks/incoming/in1?lineAccountId=a1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: '変更後' }) }, { DB: db.db });
+    const res = await app().request('/api/webhooks/incoming/in1?lineAccountId=a1&expectedVersion=1', { method: 'DELETE' }, { DB: db.db });
+    expect(res.status).toBe(409);
+    expect(db.raw.prepare('SELECT deleted_at FROM incoming_webhooks WHERE id = ?').get('in1')).toEqual({ deleted_at: null });
+  });
+
+  test('古い版の削除は409で止まり送り先を残す', async () => {
+    await put({ expectedVersion: 1, name: '更新後' });
+    const res = await app().request('/api/webhooks/outgoing/wh1?lineAccountId=a1&expectedVersion=1', { method: 'DELETE' }, { DB: db.db });
+    expect(res.status).toBe(409);
+    expect(db.raw.prepare('SELECT deleted_at FROM outgoing_webhooks WHERE id = ?').get('wh1')).toEqual({ deleted_at: null });
+  });
+
   test('一致する版で更新し、担当と日時を返す', async () => {
     const res = await put({ expectedVersion: 1, name: '更新後' });
     expect(res.status).toBe(200);
