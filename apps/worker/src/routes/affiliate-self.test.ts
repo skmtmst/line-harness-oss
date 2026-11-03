@@ -305,7 +305,6 @@ describe('GET /api/liff/mileage/me — generic wallet', () => {
   it('ECの店では顧客にもECの残高を返す', async () => {
     mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
     mileageSourceMocks.getEcMileageBalance.mockResolvedValueOnce(29);
-    mileageSourceMocks.hasHeldMileageRedemption.mockResolvedValueOnce(true);
     const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice');
     expect((await res.json() as any).mileage).toMatchObject({ available: 29, balanceSource: 'ec' });
   });
@@ -382,6 +381,7 @@ describe('LIFF mileage rewards — verified account and real limits', () => {
   it('EC管理の店には交換可能な使い道を返さない', async () => {
     mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
     mileageSourceMocks.getEcMileageBalance.mockResolvedValueOnce(29);
+    mileageSourceMocks.hasHeldMileageRedemption.mockResolvedValueOnce(true);
     const response = await call('/api/liff/mileage/rewards?lineAccessToken=tok-alice');
     expect(await response.json()).toMatchObject({ balanceSource: 'ec', availableMiles: 29, hasHeldRedemption: true, rewards: [] });
     expect(mileageSourceMocks.hasHeldMileageRedemption).toHaveBeenCalledWith(DB, 'account-main', expect.any(String));
