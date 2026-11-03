@@ -190,7 +190,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
           <Chevron className={styles.chevron} aria-hidden="true" />
         </button>
         <h2 className={styles.groupTitle}>{group.label}</h2>
-        {total === 0 && <span className={styles.groupMeta}>{groupSummary(group, features)}</span>}
+        {total === 0 && <span className={styles.groupMeta}>{canManage ? groupSummary(group, features) : '消せません'}</span>}
         <span className={styles.spacer} />
         {total > 0 && (
           <ToggleGroupActions total={total} enabled={enabled} label={group.label} disabled={busy || !canManage} lockedReason={lockedReason}

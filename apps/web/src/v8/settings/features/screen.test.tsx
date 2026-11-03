@@ -37,6 +37,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  fixture.role = 'owner'
   clearFeatureSettingsCache()
   fixture.identity = 'ready'
   fixture.account = 'account-a'
@@ -348,4 +349,13 @@ it.each(['owner', 'viewer'])('機能設定の操作説明は %s の権限に合�
     expect(document.body.textContent).not.toContain('並び順は「並びを変える」から入れ替えます。')
     expect(document.body.textContent).not.toContain('星を選ぶと左メニューのお気に入りに表示します。')
   }
+})
+
+it.each(['owner', 'viewer'])('変更できない機能の並替案内は %s の権限に合う', async role => {
+  fixture.role = role
+  await act(async () => { root.render(<FeatureSettingsScreen />) })
+  await flush()
+  const main = within(host).getByRole('region', { name: 'メイン' })
+  expect(main.textContent).toContain('消せません')
+  expect(main.textContent?.includes('並びだけ変えられる')).toBe(role === 'owner')
 })
