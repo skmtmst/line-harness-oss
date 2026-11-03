@@ -93,6 +93,17 @@ beforeEach(() => {
 });
 
 describe('Uber connection management', () => {
+
+  it('refuses an older confirmed connection before contacting Uber', async () => {
+    await addMerchantToken();
+    const api = provider();
+    const result = await disconnectUberConnection({ db: database.db, storeId: 'store-1', accountId: 'account-1',
+      client, encryptionKey: KEY, fetcher: api.fetcher, nowMs: NOW, ...{ expectedVersion: 0 } });
+    expect(result).toMatchObject({ ok: false, status: 409, code: 'connection_changed' });
+    expect(api.calls).toEqual([]);
+    expect(row()).toMatchObject({ status: 'connected', version: 1 });
+  });
+
   it('checks the exact provider ownership with an eats.store application token', async () => {
     database.raw.prepare(`UPDATE rt_delivery_uber_connections
       SET status = 'pending_store', provisioned_at = NULL WHERE store_id = 'store-1'`).run();

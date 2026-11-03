@@ -132,6 +132,7 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
         oauthConfigured: uberOAuthClient(c.env) !== null,
         connection: {
           status: row?.status ?? 'disconnected',
+          version: row?.version ?? null,
           storeName: row?.uber_store_name ?? null,
           connectedAt: isoFromMs(row?.connected_at),
           // POST /pos_data が通った時刻。ここが入って初めて Uber 側で連携が有効。
