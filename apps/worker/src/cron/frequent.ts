@@ -212,27 +212,29 @@ export async function runFrequentHeavyJobs(
     {
       name: 'mileage projection',
       run: async () => {
-        const result = await processPendingMileageEvents(env.DB, { limit: 100 });
-        if (result.claimed > 0) {
-          logger.log("src_index_log");
-        }
-        // m22o: 付与ルールの「通知する」で予約された分だけ、付与の後に届ける。
-        // OFF のルールは予約自体が無い。公開URLが無い環境では送らず残す。
-        if (env.WORKER_PUBLIC_URL) {
-          const { deliverDueMileageGrantNotifications } = await import(
-            '../features/mileage/mileage-grant-notification/index.js'
-          );
-          const { dispatchLineProxyLocally } = await import('../services/local-line-proxy.js');
-          const notified = await deliverDueMileageGrantNotifications(
-            {
-              db: env.DB,
-              workerPublicUrl: env.WORKER_PUBLIC_URL,
-              dispatch: (request) => dispatchLineProxyLocally(request, env),
-            },
-            { limit: 20 },
-          );
-          if (notified.delivered + notified.failed > 0) {
+        try {
+          const result = await processPendingMileageEvents(env.DB, { limit: 100 });
+          if (result.claimed > 0) {
             logger.log("src_index_log");
+          }
+        } finally {
+          // 付与に失敗しても、他店の予約済み通知は届ける。
+          if (env.WORKER_PUBLIC_URL) {
+            const { deliverDueMileageGrantNotifications } = await import(
+              '../features/mileage/mileage-grant-notification/index.js'
+            );
+            const { dispatchLineProxyLocally } = await import('../services/local-line-proxy.js');
+            const notified = await deliverDueMileageGrantNotifications(
+              {
+                db: env.DB,
+                workerPublicUrl: env.WORKER_PUBLIC_URL,
+                dispatch: (request) => dispatchLineProxyLocally(request, env),
+              },
+              { limit: 20 },
+            );
+            if (notified.delivered + notified.failed > 0) {
+              logger.log("src_index_log");
+            }
           }
         }
       },
