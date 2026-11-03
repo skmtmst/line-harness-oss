@@ -15,7 +15,7 @@ import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import FolderSelect from '@/components/shared/folder-select'
 import ListToolbar,{ ListToolbarOptional,ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
 import { useStaffRole } from '@/lib/staff-role'
-import { Ban,Bookmark,ChevronDown,CircleCheck,CircleHelp,Layers,MessageCircle,Pause,Plus,TriangleAlert,Zap } from 'lucide-react'
+import { Ban,Bookmark,ChevronDown,CircleCheck,CircleHelp,CirclePlay,Layers,MessageCircle,Pause,Plus,TriangleAlert,Zap } from 'lucide-react'
 import { SORT_OPTIONS,type SortKey } from './list-options'
 import { autoReplyMatchesQuery,isCurrentAutoReplyLoad,LOAD_STATE_WORDS,NO_WRITE_PERMISSION,visibleAutoReplyLoadState,type LoadState } from './words'
 
@@ -966,7 +966,7 @@ export default function AutoRepliesListV8() {
         designWidth={480}
         designTop={280}
         footerAlign="center"
-        titleIcon={false}
+        headerIcon={pendingToggle?.kind === 'resume' ? <CirclePlay /> : <Pause />}
         error={toggleError}
         onCancel={() => {
           setToggleError('')
