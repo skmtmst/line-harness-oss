@@ -9,6 +9,7 @@ import {
   getLineAccountById,
   isOperationCapabilityStopped,
   jstNow,
+  nextVersionToken,
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
@@ -612,12 +613,25 @@ export async function saveNenCampaignAccountSetting(
   lineAccountId: string,
   campaign: CampaignRow,
 ): Promise<void> {
-  await writeAccountSetting(
-    db,
-    lineAccountId,
-    campaignAccountSettingKey(campaign.campaign_key),
-    JSON.stringify({ ...campaign, updated_at: jstNow() }),
-  );
+  const key = campaignAccountSettingKey(campaign.campaign_key);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const previous = await readAccountSetting(db, lineAccountId, key);
+    let previousVersion = campaign.updated_at;
+    if (previous) {
+      try { previousVersion = (JSON.parse(previous) as { updated_at?: string }).updated_at ?? previousVersion; } catch { /* use the base token */ }
+    }
+    const version = nextVersionToken(previousVersion);
+    const value = JSON.stringify({ ...campaign, updated_at: version });
+    const result = previous === null
+      ? await db.prepare(`INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(line_account_id, key) DO NOTHING`)
+          .bind(crypto.randomUUID(), lineAccountId, key, value, version, version).run()
+      : await db.prepare(`UPDATE account_settings SET value = ?, updated_at = ?
+          WHERE line_account_id = ? AND key = ? AND value = ?`)
+          .bind(value, version, lineAccountId, key, previous).run();
+    if ((result.meta?.changes ?? 0) === 1) return;
+  }
+  throw new Error('campaign_setting_contention');
 }
 
 export async function getNenBirthdayCouponSetting(

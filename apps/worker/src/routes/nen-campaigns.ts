@@ -404,7 +404,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireDeli
   if (typeof accountId !== 'string') return accountId;
   const key = c.req.param('campaignKey');
   if (!CAMPAIGN_KEYS.has(key)) return inputError(c, { success: false, error: 'Invalid campaign' }, 400, []);
-  const body = await c.req.json<{ isEnabled?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ isEnabled?: unknown; expectedUpdatedAt?: unknown }>().catch(() => null);
   if (!body || typeof body.isEnabled !== 'boolean') {
     return inputError(c, { success: false, error: 'isEnabled is required' }, 400, ["isEnabled"]);
   }
@@ -423,13 +423,34 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireDeli
       }, 409);
     }
   }
-  await saveNenCampaignAccountSetting(c.env.DB, accountId, {
-    ...current,
-    is_enabled: body.isEnabled ? 1 : 0,
-    updated_at: jstNow(),
-  });
+  let writtenVersion: string | null = null;
+  if (body.expectedUpdatedAt !== undefined && (typeof body.expectedUpdatedAt !== 'string' || !body.expectedUpdatedAt)) {
+    return inputError(c, { success: false, error: 'Invalid expectedUpdatedAt' }, 400, ['expectedUpdatedAt']);
+  }
+  if (body.expectedUpdatedAt === undefined) {
+    await saveNenCampaignAccountSetting(c.env.DB, accountId, { ...current, is_enabled: body.isEnabled ? 1 : 0 });
+  } else {
+    const settingKey = `nen.campaign.${key}`;
+    const saved = await c.env.DB.prepare('SELECT value FROM account_settings WHERE line_account_id = ? AND key = ?')
+      .bind(accountId, settingKey).first<{ value: string }>();
+    const seen = readCampaignSettingUpdatedAt(saved?.value ?? null, current.updated_at ?? '');
+    const conflict = async () => {
+      const latest = await getNenCampaign(c.env.DB, key, accountId);
+      return c.json({ success: false, code: 'VERSION_CONFLICT', error: '設定が変わりました。最新の内容を確認してください。', data: { latest: latest ? toCampaignSettingPayload(latest) : null } }, 409);
+    };
+    if (seen !== body.expectedUpdatedAt || current.updated_at !== body.expectedUpdatedAt) return conflict();
+    const version = nextVersionToken(seen);
+    const value = JSON.stringify({ ...current, is_enabled: body.isEnabled ? 1 : 0, updated_at: version });
+    const result = saved
+      ? await c.env.DB.prepare('UPDATE account_settings SET value = ?, updated_at = ? WHERE line_account_id = ? AND key = ? AND value = ?')
+        .bind(value, version, accountId, settingKey, saved.value).run()
+      : await c.env.DB.prepare('INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(line_account_id, key) DO NOTHING')
+        .bind(crypto.randomUUID(), accountId, settingKey, value, version, version).run();
+    if ((result.meta?.changes ?? 0) !== 1) return conflict();
+    writtenVersion = version;
+  }
   auditLog(c, body.isEnabled ? 'nen.campaign.enable' : 'nen.campaign.stop', {kind:'nen_campaign', id:key}, {lineAccountId:accountId});
-  return c.json({ success: true });
+  return c.json({ success: true, data: { updatedAt: writtenVersion } });
 });
 
 type NenCampaignDraft = {
