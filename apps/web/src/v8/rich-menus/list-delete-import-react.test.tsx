@@ -83,6 +83,7 @@ const group = (id: string, name: string, extra: Record<string, unknown> = {}) =>
   defaultPageId: null,
   isDefaultForAll: false,
   status: 'draft',
+  version: 7,
   publishingAt: null,
   targetingCondition: null,
   targetingPriority: 0,
@@ -267,7 +268,7 @@ describe('削除の影響の読み込み', () => {
     expect(text).toContain('切替元：ありません')
     expect(text).toContain('使っている自動処理：ありません')
     fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
-    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith('g-draft'))
+    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith('g-draft', 7))
     expect(mocks.unpublish).not.toHaveBeenCalled()
   })
 
@@ -345,9 +346,34 @@ describe('消す・取り下げる', () => {
     const dialog = await deleteDialog(view, '秋の下書き')
     expect(mocks.remove).not.toHaveBeenCalled()
     fireEvent.click(await within(dialog).findByRole('button', { name: '削除する' }))
-    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith('g-draft'))
+    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith('g-draft', 7))
     expect(confirmSpy).not.toHaveBeenCalled()
     expect(alertSpy).not.toHaveBeenCalled()
+  })
+
+  test('別の削除窓を開いた後も古い窓の確定を受け付けない', async () => {
+    const view = render(<RichMenusListV8 />)
+    await openDelete(view, '秋の下書き')
+    const first = await deleteDialog(view, '秋の下書き')
+    const button = await within(first).findByRole('button', { name: '削除する' })
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+    fireEvent.click(within(first).getByRole('button', { name: 'キャンセル' }))
+    await openDelete(view, '冬の下書き')
+    const second = await deleteDialog(view, '冬の下書き')
+    await within(second).findByRole('button', { name: '削除する' })
+    await act(async () => { oldClick({ preventDefault() {}, stopPropagation() {} }) })
+    expect(mocks.remove).not.toHaveBeenCalled()
+  })
+
+  test('下書きの版が不明なら削除を送らない', async () => {
+    mocks.listPage.mockResolvedValue(listResult([{ ...DRAFT, version: undefined }]))
+    const view = render(<RichMenusListV8 />)
+    await openDelete(view, '秋の下書き')
+    const dialog = await deleteDialog(view, '秋の下書き')
+    fireEvent.click(await within(dialog).findByRole('button', { name: '削除する' }))
+    await waitFor(() => expect(dialog.textContent).toContain('版を確認できません'))
+    expect(mocks.remove).not.toHaveBeenCalled()
   })
 
   test('下書きは消えるもの・残るもの・元に戻せないことを読ませる', async () => {
