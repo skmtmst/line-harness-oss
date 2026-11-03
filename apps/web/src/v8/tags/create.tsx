@@ -80,6 +80,7 @@ function TagCreate() {
   const [groupId, setGroupId] = useState('')
   const [isStarred, setIsStarred] = useState(false)
   const folderDraftGuard = useRef<FolderDraftGuard | null>(null)
+  const [folderCreating, setFolderCreating] = useState(false)
   const dirty = Boolean(name.trim() || groupId || isStarred)
   const guard = useUnsavedGuard({ dirty, busy: saving })
 
@@ -238,9 +239,9 @@ function TagCreate() {
           </Card>
         )}
         footerActions={<>
-          <Button type="button" onClick={() => requestUnsavedAction(() => router.push('/tags'))} disabled={saving} disabledReason={saving ? 'タグを作っています。終わるまでお待ちください。' : undefined}>キャンセル</Button>
-          <Button type="button" onClick={() => requestSave(true)} disabled={saving} busy={Boolean(saving)} busyLabel="処理中…"><Plus size={16} aria-hidden="true" />保存して続けて作る</Button>
-          <Button type="button" variant="primary" onClick={() => requestSave(false)} busy={saving} busyLabel="作っています…"><Check size={16} aria-hidden="true" />タグを作る</Button>
+          <Button type="button" onClick={() => requestUnsavedAction(() => router.push('/tags'))} disabled={saving || folderCreating} disabledReason={folderCreating ? 'フォルダを作成中です。' : saving ? 'タグを作っています。終わるまでお待ちください。' : undefined}>キャンセル</Button>
+          <Button type="button" onClick={() => requestSave(true)} disabled={saving} busy={saving || folderCreating} busyLabel={folderCreating ? "フォルダ作成中" : "処理中…"}><Plus size={16} aria-hidden="true" />保存して続けて作る</Button>
+          <Button type="button" variant="primary" onClick={() => requestSave(false)} busy={saving || folderCreating} busyLabel={folderCreating ? "フォルダ作成中" : "作っています…"}><Check size={16} aria-hidden="true" />タグを作る</Button>
         </>} dirty={false}
       >
         {createdName ? <Notice tone="success" message={`「${createdName}」を作成しました。続けて新しいタグを作れます。`} /> : null}
@@ -263,7 +264,7 @@ function TagCreate() {
 <DuplicateNameNote duplicates={duplicates} kindLabel="タグ" /></Field>
           <Field label="所属フォルダ">
             <span className={styles.selectBox}>
-              <SaveErrorField names={["groupId","group_id"]}><FolderSelect draftGuardRef={folderDraftGuard} size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} /></SaveErrorField>
+              <SaveErrorField names={["groupId","group_id"]}><FolderSelect draftGuardRef={folderDraftGuard} onCreatingChange={setFolderCreating} size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} /></SaveErrorField>
             </span>
             {foldersFailed ? (
               <div className={styles.inlineRetry}>

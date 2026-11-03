@@ -1,15 +1,15 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { Tag } from '@line-crm/shared'
-const fx = vi.hoisted(() => ({ create: vi.fn(), push: vi.fn(), save: vi.fn() }))
+const fx = vi.hoisted(() => ({ create: vi.fn(), createFolder: vi.fn(), push: vi.fn(), save: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: fx.push, replace: vi.fn(), prefetch: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/tags/new' }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<object>(), useStaffRole: () => 'admin', canManageRole: () => true }))
-vi.mock('@/lib/api', async original => { const actual = await original<typeof import('@/lib/api')>(); return { ...actual, api: { ...actual.api, tags: { ...actual.api.tags, list: async () => ({ success: true, data: [] }), retroactivePreview: async () => ({ success: true, data: { selfTargets: 4, referralTargets: 1, selfMiles: 400, referralMiles: 0, selfExcluded: 1, referralExcluded: 0, previewToken: 'pt-1' } }), createDefinition: fx.create }, tagGroups: { ...actual.api.tagGroups, list: async () => ({ success: true, data: [] }) } } } })
+vi.mock('@/lib/api', async original => { const actual = await original<typeof import('@/lib/api')>(); return { ...actual, api: { ...actual.api, tags: { ...actual.api.tags, list: async () => ({ success: true, data: [] }), retroactivePreview: async () => ({ success: true, data: { selfTargets: 4, referralTargets: 1, selfMiles: 400, referralMiles: 0, selfExcluded: 1, referralExcluded: 0, previewToken: 'pt-1' } }), createDefinition: fx.create }, tagGroups: { ...actual.api.tagGroups, list: async () => ({ success: true, data: [] }), create: fx.createFolder } } } })
 import TagCreate from './create'
 import { TagEditForm } from '@/v8/tag-edit/edit-form'
 afterEach(() => { cleanup(); vi.clearAllMocks() })
@@ -20,7 +20,7 @@ function startFolder() {
   fireEvent.pointerDown(document.body)
 }
 function edit() {
-  render(<TagEditForm tag={{ id: 't1', name: '架空タグ', status: 'active' } as Tag} groups={[]} onCreateGroup={vi.fn()} dependencies={null} accountId="acc" readOnly={false} conflict={false} compareBusy={false} onCompare={vi.fn()} onReloadLatest={vi.fn()} retroactiveReference={false} initialActions={[]} saving={false} error="" onCancel={fx.push} onSave={fx.save} onDelete={vi.fn()} />)
+  render(<TagEditForm tag={{ id: 't1', name: '架空タグ', status: 'active' } as Tag} groups={[]} onCreateGroup={fx.createFolder} dependencies={null} accountId="acc" readOnly={false} conflict={false} compareBusy={false} onCompare={vi.fn()} onReloadLatest={vi.fn()} retroactiveReference={false} initialActions={[]} saving={false} error="" onCancel={fx.push} onSave={fx.save} onDelete={vi.fn()} />)
 }
 it.each(['タグを作る', '保存して続けて作る'])('新規 %s の前に作成途中のフォルダを確認する', async label => {
   render(<TagCreate />)
@@ -106,4 +106,45 @@ it('フォルダ破棄を確かめた後も遡及反映の確認を省かない'
   fireEvent.click(await screen.findByRole('button', { name: 'フォルダを破棄して保存' }))
   expect(await screen.findByText('5人にさかのぼってマイルを積みますか？')).toBeTruthy()
   expect(fx.save).not.toHaveBeenCalled()
+})
+
+
+it.each(['新規', '編集'])('%s：フォルダ作成の通信中は親の保存に処理中を表示する', async mode => {
+  fx.createFolder.mockImplementation(() => new Promise(() => {}))
+  if (mode === '新規') {
+    render(<TagCreate />)
+    fireEvent.change(await screen.findByLabelText('タグ名'), { target: { value: '架空タグ' } })
+  } else edit()
+  fireEvent.click(screen.getByRole('button', { name: '所属フォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '処理中' } })
+  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  const busy = await screen.findAllByRole('button', { name: 'フォルダ作成中' })
+  expect(busy).toHaveLength(1)
+  expect(busy.every(button => (button as HTMLButtonElement).disabled)).toBe(true)
+  if (mode === '新規') {
+    fireEvent.click(screen.getByRole('button', { name: '作成・編集のその他の操作' }))
+    expect(screen.getByRole('menuitem', { name: 'フォルダ作成中' }).getAttribute('disabled')).not.toBeNull()
+  }
+  expect(screen.getAllByText('フォルダを作成中です。')).toHaveLength(mode === '編集' ? 2 : 1)
+  expect((screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
+  if (mode === '編集') expect((screen.getByRole('button', { name: 'タグを削除する' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(fx.create).not.toHaveBeenCalled()
+  expect(fx.save).not.toHaveBeenCalled()
+})
+
+
+it.each(['成功', '失敗'])('フォルダ作成の%s後は親の保存の処理中表示を解除する', async outcome => {
+  let resolve!: (value: { value: string; label: string }) => void
+  let reject!: (reason: Error) => void
+  fx.createFolder.mockImplementation(() => new Promise((ok, fail) => { resolve = ok; reject = fail }))
+  edit()
+  fireEvent.click(screen.getByRole('button', { name: '所属フォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '新規分類' } })
+  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  expect(await screen.findByRole('button', { name: 'フォルダ作成中' })).toBeTruthy()
+  await act(async () => { if (outcome === '成功') resolve({ value: 'group-1', label: '新規分類' }); else reject(new Error('作成失敗')) })
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'フォルダ作成中' })).toBeNull())
+  expect((screen.getByRole('button', { name: 'タグを保存する' }) as HTMLButtonElement).disabled).toBe(false)
 })
