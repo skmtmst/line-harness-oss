@@ -23,9 +23,9 @@ import { join } from 'node:path';
 import {
   columnsOf,
   describeMarker,
-  judge,
   attributeMarkers,
   markersOf,
+  stateForMigration,
   schemaFromSqliteMaster,
   type Marker,
   type Schema,
@@ -152,12 +152,8 @@ function inspect(target: Target): Row[] {
   });
   const attributed = attributeMarkers(entries);
   return entries.map(({ file, sql }, index) => {
-    // CHECK 制約だけを直す再建は列・索引だけでは判定できない。
-    // D1 がファイル単位で原子的に適用し、その後 _migrations に記録する。
-    const ledgerOnly = /^-- migration-state: ledger-only\s*$/m.test(sql);
-    const verdict = ledgerOnly
-      ? { state: recorded.has(file) ? 'applied' : 'missing', missing: [] as Marker[] }
-      : judge(attributed[index].markers, live);
+    // 表の再構築も、既存の表名だけでは適用済みかどうか判定できない。
+    const verdict = stateForMigration(sql, recorded.has(file), attributed[index].markers, live);
     return {
       file,
       state: verdict.state,

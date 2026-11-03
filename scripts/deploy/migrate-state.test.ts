@@ -8,6 +8,7 @@ import {
   markersOf,
   schemaFromSqliteMaster,
   splitTopLevel,
+  stateForMigration,
   type Schema,
 } from './migrate-state';
 
@@ -158,6 +159,31 @@ describe('当たっているかの判定', () => {
   it('目印が無いものは判定不能', () => {
     // データだけを入れるマイグレーション。現物からは当否が分からない。
     expect(judge([], final).state).toBe('unknown');
+  });
+});
+
+describe('再構築の適用記録による判定', () => {
+  const live = schema({ existing: ['id'] }, ['old_index']);
+  const markers = [
+    { kind: 'table' as const, name: 'existing' },
+    { kind: 'index' as const, name: 'new_index' },
+  ];
+
+  it('未記録の表再構築は既存の表があっても未適用', () => {
+    expect(stateForMigration('-- migration-policy: table-rebuild\n', false, markers, live)).toEqual({ state: 'missing' });
+  });
+
+  it('記録済みの表再構築は現物の目印に依存しない', () => {
+    expect(stateForMigration('-- migration-policy: table-rebuild\n', true, markers, live)).toEqual({ state: 'applied' });
+  });
+
+  it('ledger-only は既存の動作を保つ', () => {
+    expect(stateForMigration('-- migration-state: ledger-only\n', false, markers, live)).toEqual({ state: 'missing' });
+    expect(stateForMigration('-- migration-state: ledger-only\n', true, markers, live)).toEqual({ state: 'applied' });
+  });
+
+  it('通常の一部適用は引き続き停止対象', () => {
+    expect(stateForMigration('CREATE INDEX new_index ON existing(id);', false, markers, live).state).toBe('partial');
   });
 });
 

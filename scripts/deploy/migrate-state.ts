@@ -215,6 +215,20 @@ export function judge(markers: Marker[], live: Schema): MigrationState {
   return { state: 'partial', missing };
 }
 
+/**
+ * A table rebuild changes existing table and index names in one D1 file transaction.
+ * Those names cannot prove that an unrecorded rebuild already ran. Use its ledger
+ * entry as the source of truth, so a pending rebuild is not skipped as "applied"
+ * or rejected as "partial" solely because older columns already exist.
+ */
+export function stateForMigration(sql: string, recorded: boolean, markers: Marker[], live: Schema): MigrationState {
+  if (/^-- migration-state: ledger-only\s*$/m.test(sql)
+    || /^-- migration-policy: table-rebuild\s*$/m.test(sql)) {
+    return { state: recorded ? 'applied' : 'missing' };
+  }
+  return judge(markers, live);
+}
+
 export function describeMarker(marker: Marker): string {
   if (marker.kind === 'column') return `列 ${marker.name}.${marker.column}`;
   if (marker.kind === 'index') return `索引 ${marker.name}`;
