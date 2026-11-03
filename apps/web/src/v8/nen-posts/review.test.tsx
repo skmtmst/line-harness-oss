@@ -430,3 +430,59 @@ it('一括採用の確認はアカウントを往復した後に使えず、新�
   await click(current)
   expect(writes).toHaveLength(1)
 })
+
+it.each(['公開', '掲載解除', '掲載先変更'] as const)('%sの窓を閉じた後は古い確定口を使えない', async kind => {
+  const item = { id: 'publication-a', version: 3, pet_name: 'こむぎ', hide_owner_name: 1, placements: [], view_count_30_days: null }
+  const original = globalThis.fetch
+  const writes: string[] = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), 'http://worker.test')
+    if (init?.method && init.method !== 'GET') writes.push(url.pathname)
+    if (url.pathname === '/api/nen-members/photos/publications') return json({ success: true, data: { summary: { publishedCount: 1 }, items: [item], pendingWithdrawals: [], withdrawnItems: [] } })
+    if (url.pathname === '/api/nen-members/photos/ph-4') return json({ success: true, data: { publication: { version: 2 } } })
+    return original(input, init)
+  })
+  await render()
+  if (kind === '公開') {
+    await click([...document.querySelectorAll('[role="tab"]')].find(tab => tab.textContent?.startsWith('採用')))
+    await click(buttons('公式サイトに出す')[0])
+  } else {
+    await click(buttons('公式サイト掲載')[0])
+    await click(buttons('その他操作')[0])
+    await click(buttons(kind === '掲載解除' ? '掲載先から外す' : '使う場所')[0])
+  }
+  const dialog = document.querySelector('[role="dialog"]')!
+  const label = kind === '公開' ? '公式サイトに掲載する' : kind === '掲載解除' ? '掲載先から外す' : '保存する'
+  const button = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === label)!
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+  await click([...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === 'キャンセル'))
+  await act(async () => { await oldClick({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
+  expect(writes).toEqual([])
+  if (kind === '公開') await click(buttons('公式サイトに出す')[0])
+  else {
+    await click(buttons('その他操作')[0])
+    await click(buttons(kind === '掲載解除' ? '掲載先から外す' : '使う場所')[0])
+  }
+  const fresh = document.querySelector('[role="dialog"]')!
+  await click([...fresh.querySelectorAll('button')].find(el => el.textContent?.trim() === label))
+  expect(writes).toHaveLength(1)
+})
+
+it('個別見送りの窓を閉じた後は古い確定口から通知しない', async () => {
+  const original = globalThis.fetch
+  const writes: string[] = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method && init.method !== 'GET') writes.push(String(input))
+    return original(input, init)
+  })
+  await render()
+  await click(buttons('そらちゃんの写真を見送る')[0])
+  const dialog = document.querySelector('[role="alertdialog"]')!
+  const button = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === '見送る')!
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+  await click([...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === 'キャンセル'))
+  await act(async () => { await oldClick({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
+  expect(writes).toEqual([])
+})
