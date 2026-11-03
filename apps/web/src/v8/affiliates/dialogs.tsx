@@ -37,15 +37,28 @@ function dateLabel(value: string | null): string {
 
 export function AffiliateArchiveDialog({
   target,
+  accountId,
   onClose,
   onChanged,
 }: {
   target: { id: string; name: string } | null
+  accountId?: string | null
   onClose: () => void
   onChanged: () => void
 }) {
+  const scopeRef = useRef<{ targetId: string; accountId: string | null | undefined; stale: boolean } | null>(null)
+  if (!target) {
+    if (scopeRef.current) scopeRef.current.stale = true
+    scopeRef.current = null
+  } else if (!scopeRef.current || scopeRef.current.targetId !== target.id) {
+    if (scopeRef.current) scopeRef.current.stale = true
+    scopeRef.current = { targetId: target.id, accountId, stale: false }
+  } else if (scopeRef.current.accountId !== accountId) scopeRef.current.stale = true
+  const scope = scopeRef.current
+  const loadedScopeRef = useRef<typeof scope>(null)
   const [phase, setPhase] = useState<LoadPhase>('loading')
   const [impact, setImpact] = useState<AffiliateArchiveImpact | null>(null)
+  const [targetAccountId, setTargetAccountId] = useState<string | null>(null)
   const [choice, setChoice] = useState<'pause' | 'pay_first' | 'archive'>('pause')
   const [confirmationName, setConfirmationName] = useState('')
   const [busy, setBusy] = useState(false)
@@ -53,18 +66,26 @@ export function AffiliateArchiveDialog({
 
   const load = useCallback(async () => {
     if (!target) return
+    loadedScopeRef.current = null
     setPhase('loading')
     setImpact(null)
+    setTargetAccountId(null)
     setError('')
     try {
-      const response = await api.affiliates.archiveImpact(target.id)
+      const [response, detail] = await Promise.all([
+        api.affiliates.archiveImpact(target.id),
+        api.affiliates.get(target.id).catch(() => null),
+      ])
+      if (scopeRef.current !== scope || scope?.stale) return
       if (!response.success) throw new Error(response.error)
+      loadedScopeRef.current = scope
+      setTargetAccountId(detail?.success ? detail.data.lineAccountId ?? null : null)
       setImpact(response.data)
       setPhase('ready')
     } catch {
       setPhase('error')
     }
-  }, [target])
+  }, [target, scope])
 
   useEffect(() => {
     if (!target) return
@@ -74,7 +95,7 @@ export function AffiliateArchiveDialog({
   }, [load, target])
 
   const apply = async () => {
-    if (!target || choice === 'pay_first') return
+    if (!target || !scope || scopeRef.current !== scope || loadedScopeRef.current !== scope || scope.stale || phase !== 'ready' || choice === 'pay_first') return
     setBusy(true)
     setError('')
     try {
@@ -113,12 +134,14 @@ export function AffiliateArchiveDialog({
             </Button>) : (<Button
               type="button"
               variant="primary"
-              disabled={busy || phase !== 'ready' || archiveDisabled}
+              disabled={busy || phase !== 'ready' || loadedScopeRef.current !== scope || archiveDisabled || scope?.stale}
               onClick={() => { void apply() }} busy={busy} busyLabel="処理中…">
               {choice === 'pause' ? '紹介を止める' : 'アーカイブする'}
             </Button>)}
         </DialogActions>)}
     >
+      <OperationTargetSummary accounts={[{ id: loadedScopeRef.current === scope ? targetAccountId ?? '' : '', name: loadedScopeRef.current === scope && targetAccountId ? undefined : '不明' }]} externalTarget={{ label: '対象件数', name: target ? '1件' : null }} />
+      {scope?.stale ? <Notice tone="warn" message="対象が変わりました。閉じて確認し直してください。" /> : null}
       {phase === 'loading' ? (
         <ListState kind="loading" title="使われている場所を確認しています" />
       ) : phase === 'error' ? (
