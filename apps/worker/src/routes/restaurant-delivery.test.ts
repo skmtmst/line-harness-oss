@@ -9,7 +9,6 @@ import {
   type DeliveryOrderCreatedOverrides,
 } from '../test-utils/delivery-webhook-fixtures.js';
 import { stubUberStoresApi, type UberStoresApiOptions } from '../test-utils/uber-stores-api.js';
-
 type MockStaff = {
   id: string;
   name: string;
@@ -20,7 +19,6 @@ type MockStaff = {
   can_access_descendant_accounts: number;
   tenant_id?: string | null;
 };
-
 /* 管理セッションは生のトークンではなくハッシュで引き当てるので、登録した順に照合して返す。 */
 const authMocks = vi.hoisted(() => {
   const sessions = new Map<string, unknown>();
@@ -40,7 +38,6 @@ const authMocks = vi.hoisted(() => {
     lineAccounts: [] as Array<Record<string, unknown>>,
   };
 });
-
 /** 管理画面にログインしたオーナー。既定のテスト利用者。 */
 const OWNER_SESSION: MockStaff = {
   id: 'owner-1',
@@ -51,7 +48,6 @@ const OWNER_SESSION: MockStaff = {
   assigned_line_account_id: null,
   can_access_descendant_accounts: 1,
 };
-
 vi.mock('@line-crm/db', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
   return {
@@ -62,14 +58,12 @@ vi.mock('@line-crm/db', async () => {
     getLineAccountScopeEntries: vi.fn(async () => authMocks.lineAccounts),
   };
 });
-
 const { authMiddleware, ADMIN_SESSION_BEARER_PREFIX } = await import('../middleware/auth.js');
 const { restaurantDelivery } = await import('./restaurant-delivery.js');
 const { signSupportRelay } = await import('../services/support-relay.js');
 const { UBER_PROBE_LAST_RUN_KEY } = await import('../services/ubereats-token-probe.js');
 const { MAX_WEBHOOK_BODY_BYTES } = await import('../services/delivery-webhook-payload.js');
 type Env = import('../index.js').Env;
-
 const TENANT = '00000000-0000-4000-8000-000000000001';
 const ENC_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 /** 2026-10-09（金）12:00 JST。 */
@@ -82,10 +76,8 @@ const DEMAECAN_WEBHOOK_SECRET = 'demaecan-webhook-secret-0123456789ab';
 const UBEREATS_CLIENT_SECRET = 'test-client-secret';
 const CANCEL_CONFIRM_TOKEN = 'delivery-order-cancel';
 const INTAKE_STOP_CONFIRM_TOKEN = 'delivery-intake-stop';
-
 /** サービスが返してくる自由文。台帳にも画面にも出てはいけない。 */
 const PROVIDER_FREE_TEXT = 'merchant token expired for partner store 99812';
-
 let testDb: SqliteD1;
 let env: Env['Bindings'];
 let deliveryCalls: Array<{ url: string; init?: RequestInit }>;
@@ -93,7 +85,6 @@ let deliveryCalls: Array<{ url: string; init?: RequestInit }>;
 let sendFailStatus: number | null;
 let logSpy: ReturnType<typeof vi.spyOn>;
 let errorSpy: ReturnType<typeof vi.spyOn>;
-
 function seedStore(): void {
   for (const [id, name] of [
     ['account-1', '統括'],
@@ -115,7 +106,6 @@ function seedStore(): void {
     )
     .run('store-shibuya', 'org-1', 'こもれび食堂 渋谷店', 'SHIBUYA', '東京', 20, 'account-2');
 }
-
 /** D-1の表に出る注文を1件置く。状態と版を指定して、版での絞り込みも確かめられるようにする。 */
 function seedOrder(
   overrides: {
@@ -150,14 +140,12 @@ function seedOrder(
     );
   return id;
 }
-
 function app() {
   const instance = new Hono<Env>();
   instance.use('*', authMiddleware);
   instance.route('/', restaurantDelivery);
   return instance;
 }
-
 /** 管理セッションで呼ぶ。token は useStaffRole / OWNER_SESSION で登録したセッショントークン。 */
 function call(
   path: string,
@@ -178,7 +166,6 @@ function call(
     env,
   );
 }
-
 function useStaffRole(role: 'admin' | 'staff'): void {
   testDb.raw
     .prepare(
@@ -196,9 +183,7 @@ function useStaffRole(role: 'admin' | 'staff'): void {
     can_access_descendant_accounts: 1,
   });
 }
-
 /* ------------------------------ 受信口の署名 ------------------------------ */
-
 /** HMAC-SHA256 の小文字16進。受信口が求める形をそのまま作る。 */
 async function hmacHex(secret: string, message: string) {
   const key = await crypto.subtle.importKey(
@@ -213,12 +198,10 @@ async function hmacHex(secret: string, message: string) {
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 }
-
 /** 自社方式（出前館・ロケットナウ）の署名。材料は本番と同じ `${timestamp}.${rawBody}`。 */
 async function signWebhook(timestamp: number, rawBody: string, secret = DEMAECAN_WEBHOOK_SECRET) {
   return hmacHex(secret, `${timestamp}.${rawBody}`);
 }
-
 /**
  * Uber Eats の方式。公式仕様どおり**本文だけ**の署名で、鍵は同じアプリの Secret。
  * Uber は時刻の見出しを送らないので、ここでも作らない。
@@ -226,13 +209,11 @@ async function signWebhook(timestamp: number, rawBody: string, secret = DEMAECAN
 async function signUberWebhook(rawBody: string, secret = UBEREATS_CLIENT_SECRET) {
   return hmacHex(secret, rawBody);
 }
-
 function orderCreatedPayload(
   overrides: DeliveryOrderCreatedOverrides = {},
 ) {
   return deliveryOrderCreatedPayload(NOW_SEC, overrides);
 }
-
 /** 署名付きで受信口を叩く。既定は正しい署名・正しい時刻。 */
 async function postWebhook(
   payload: unknown,
@@ -267,27 +248,22 @@ async function postWebhook(
     env,
   );
 }
-
 /* ------------------------------ 台帳の読み出し ------------------------------ */
-
 function dispatchRows(): Array<Record<string, unknown>> {
   return testDb.raw
     .prepare('SELECT * FROM rt_delivery_dispatches ORDER BY created_at, id')
     .all() as Array<Record<string, unknown>>;
 }
-
 function eventRows(): Array<Record<string, unknown>> {
   return testDb.raw.prepare('SELECT * FROM rt_delivery_events ORDER BY received_at, id').all() as Array<
     Record<string, unknown>
   >;
 }
-
 function orderRow(id = 'order-1'): Record<string, unknown> | undefined {
   return testDb.raw.prepare('SELECT * FROM rt_delivery_orders WHERE id = ?').get(id) as
     | Record<string, unknown>
     | undefined;
 }
-
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
@@ -303,7 +279,6 @@ beforeEach(() => {
   ];
   testDb = createTestD1({ loginPolicy: 'off' });
   testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`).run(TENANT);
-
   deliveryCalls = [];
   sendFailStatus = null;
   vi.stubGlobal(
@@ -324,7 +299,6 @@ beforeEach(() => {
       });
     }),
   );
-
   env = {
     DB: testDb.db,
     API_KEY: 'owner-key',
@@ -355,31 +329,62 @@ beforeEach(() => {
   } as unknown as Env['Bindings'];
   seedStore();
 });
-
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   logSpy.mockRestore();
   errorSpy.mockRestore();
 });
-
 /* ============================== 受入条件2 ============================== */
-
 describe('送信台帳（受入条件2）', () => {
+  it('外部操作の直前に注文が変わっても送らない', async () => {
+    seedOrder({ status: 'new', version: 1 });
+    const original = testDb.db.prepare.bind(testDb.db);
+    let changed = false;
+    const spy = vi.spyOn(testDb.db, 'prepare').mockImplementation((sql: string) => {
+      if (!changed && sql.startsWith('SELECT version FROM rt_delivery_orders')) {
+        changed = true;
+        testDb.raw.prepare("UPDATE rt_delivery_orders SET version = 2 WHERE id = 'order-1'").run();
+      }
+      return original(sql);
+    });
+    try {
+      const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', { body: { expectedVersion: 1 } });
+      expect(changed).toBe(true);
+      expect(response.status).toBe(409);
+      expect(deliveryCalls).toHaveLength(0);
+      expect(orderRow()).toMatchObject({ status: 'new', version: 2 });
+    } finally { spy.mockRestore(); }
+  });
+  it('確認した版が一致する注文取消は送れる', async () => {
+    seedOrder({ status: 'cooking', version: 1 });
+    const response = await call('/api/restaurant-test/delivery/orders/order-1/cancel', {
+      body: { reason_code: 'out_of_stock', expectedVersion: 1 }, confirm: CANCEL_CONFIRM_TOKEN,
+    });
+    expect(response.status).toBe(200);
+    expect(deliveryCalls).toHaveLength(1);
+    expect(orderRow()?.status).toBe('canceled');
+  });
+  it('確認後に注文版が変わったら外部操作を開始しない', async () => {
+    seedOrder({ status: 'new', version: 2 });
+    const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', { body: { expectedVersion: 1 } });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'STALE_ORDER', order: { id: 'order-1', status: 'new', version: 2 } });
+    expect(deliveryCalls).toHaveLength(0);
+    expect(dispatchRows()).toHaveLength(0);
+    expect(orderRow()).toMatchObject({ status: 'new', version: 2 });
+  });
   it('送信が成功したときだけD1の状態を進め、台帳に成功として残す', async () => {
     seedOrder({ status: 'new' });
-
     const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', { body: {} });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
       order: { id: 'order-1', status: 'cooking' },
     });
-
     // 外へ出たのは1回だけ。宛先は各サービスの店舗向け窓口（受注一元化サービスは経由しない）。
     expect(deliveryCalls).toHaveLength(1);
     expect(deliveryCalls[0]?.url).toBe('https://demaecan.example.test/orders/accept');
-
     const rows = dispatchRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -391,17 +396,14 @@ describe('送信台帳（受入条件2）', () => {
       error_code: null,
     });
     expect(rows[0]?.completed_at).toBe(NOW_SEC);
-
     const order = orderRow();
     expect(order?.status).toBe('cooking');
     expect(order?.accepted_at).toBe(NOW_SEC);
     expect(order?.version).toBe(2);
   });
-
   it('送信が一時的に失敗したら状態は進めず、台帳には分類済み符号だけを残す', async () => {
     seedOrder({ status: 'new' });
     sendFailStatus = 500;
-
     const response = await call('/api/restaurant-test/delivery/orders/order-1/accept', { body: {} });
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
@@ -409,13 +411,11 @@ describe('送信台帳（受入条件2）', () => {
       code: 'delivery_temporary_failure',
       retryable: true,
     });
-
     const rows = dispatchRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ status: 'retryable_failed', error_code: 'delivery_temporary_failure' });
     // サービスから返った自由文は台帳のどこにも入れない。
     expect(JSON.stringify(rows[0])).not.toContain(PROVIDER_FREE_TEXT);
-
     // D1の状態は動かさない。再送は台帳の next_attempt_at から行う。
     const order = orderRow();
     expect(order?.status).toBe('new');

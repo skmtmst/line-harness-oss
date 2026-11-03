@@ -289,6 +289,7 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
           });
           return {
             id: row.id,
+            version: row.version,
             service: row.service,
             serviceLabel: DELIVERY_SERVICE_LABELS[row.service],
             orderNumber: row.order_number,
@@ -335,6 +336,7 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
         success: true,
         order: {
           id: order.id,
+          version: order.version,
           service: order.service,
           serviceLabel: DELIVERY_SERVICE_LABELS[order.service],
           orderNumber: order.order_number,

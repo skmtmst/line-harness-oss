@@ -292,11 +292,21 @@ export async function sendWithLedger(
     targetKind: 'order' | 'menu_item' | 'service';
     targetId: string | null;
     externalId?: string | null;
+    expectedOrderVersion?: number;
     body?: Record<string, unknown>;
     now: number;
   },
 ): Promise<DeliveryDispatchResult> {
   const dispatchId = await openDispatch(c, store, input);
+  if (input.expectedOrderVersion !== undefined && input.targetKind === 'order') {
+    const current = await dbFor(c.env, store.id).prepare('SELECT version FROM rt_delivery_orders WHERE id = ? AND store_id = ?')
+      .bind(input.targetId, store.id).first<{ version: number }>();
+    if (current?.version !== input.expectedOrderVersion) {
+      const conflict: DeliveryDispatchResult = { ok: false, error: { code: 'delivery_order_conflict', message: '注文が変わりました。画面を開き直してください。', retryable: false }, nextAttemptAt: null };
+      await closeDispatch(c, store, dispatchId, conflict, input.now);
+      return conflict;
+    }
+  }
   const result = await dispatchToDeliveryService(
     c.env,
     {
