@@ -143,3 +143,11 @@ it('入力理由は操作ボタンの並びの外にあり、ボタンは同じ�
   changeReply('10時からです'); addWord()
   expect(screen.queryByText(BOTH)).toBeNull()
 })
+
+it('返す文の欄を離れたとき、欄のエラーと帯の理由が同じ文になる', () => {
+  render(<QuickCreate accountId="fixture-account" {...callbacks} />)
+  addWord()
+  fireEvent.blur(reply())
+  expect(screen.getByRole('alert').textContent).toBe(REPLY)
+  expect(screen.getByRole('status').textContent).toBe(REPLY)
+})

@@ -38,7 +38,7 @@ function validateKeywords(keywords: string[]): string | null {
   return keywords.length > 0 ? null : '反応する言葉を1つ以上入れてください'
 }
 
-const replyRequirement = requiredText('返す内容を入力してください')
+const replyRequirement = requiredText('返す文を入れてください。')
 const validateReply = replyRequirement.check
 
 function overlapNames(conflicts: AutoReplyConflict[]): string {
