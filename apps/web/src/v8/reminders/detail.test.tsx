@@ -14,6 +14,7 @@ vi.hoisted(() => {
 
 const state = vi.hoisted(() => ({
   accountId: 'account-a',
+  ownerId: 'account-a' as string | null,
   role: 'owner' as string,
   tab: '' as string,
   updates: [] as Array<Record<string, unknown>>,
@@ -72,7 +73,7 @@ vi.mock('@/lib/api', () => {
         runs: vi.fn(async (_id: string, params?: { status?: string }) => ({
           success: true,
           data: {
-            reminder: { id: 'reminder-1', name: '予約前日のご案内', isActive: true, lifecycleStatus: 'published', stopConditions: null, hasPublishedVersion: true },
+            reminder: { id: 'reminder-1', lineAccountId: state.ownerId, name: '予約前日のご案内', isActive: true, lifecycleStatus: 'published', stopConditions: null, hasPublishedVersion: true },
             summary: { sent: 3, scheduled: 2, stopped: 0, errors: 2, targetCount: 186, nextScheduledAt: soon(), sentThisMonth: 386, scheduledNext7Days: 124 },
             steps: [{ id: 'st1', stepNumber: 1, offsetMinutes: -1440, messageType: 'text', messageContent: '明日のご案内です。', sent: 212, openRate: null, errors: 1 }],
             items: params?.status === 'planned'
@@ -111,6 +112,7 @@ let host: HTMLDivElement
 
 beforeEach(() => {
   state.accountId = 'account-a'
+  state.ownerId = 'account-a'
   document.documentElement.dataset.theme = 'v8'
   state.role = 'owner'
   state.tab = ''
@@ -152,14 +154,14 @@ describe('V8 リマインダの詳細', () => {
     expect(document.querySelector('[role="alertdialog"]')).toBeNull()
   })
   it('削除確認は所属が取れない場合に不明と環境を示す', async () => {
-    state.accountId = 'unknown'
+    state.ownerId = null
     await render()
     const more = [...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label')?.includes('その他の操作')) as HTMLButtonElement
     await act(async () => { more.click() })
     const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('削除する')) as HTMLElement
     await act(async () => { remove.click() })
     const dialog = document.querySelector('[role="alertdialog"]')
-    expect(dialog?.textContent).toContain('名前を確認できません')
+    expect(dialog?.textContent).toContain('不明')
     expect(dialog?.textContent).toContain('環境')
   })
   it('削除確認に操作対象の店名を示す', async () => {
@@ -203,6 +205,28 @@ describe('V8 リマインダの詳細', () => {
     expect(state.updates).toEqual([{ isActive: false }])
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)) })
     expect(document.querySelector('[data-design-node="RwVo5"]')).toBeNull()
+  })
+
+  it('一時停止の対象は選択中の店ではなくリマインダの所属先を示す', async () => {
+    state.ownerId = 'account-b'
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    const dialog = document.querySelector('[data-design-node="RwVo5"]')
+    await waitFor(() => expect(dialog?.textContent).toContain('別店舗'))
+    expect(dialog?.textContent).not.toContain('本店')
+  })
+
+  it('停止確認を開いた後でアカウントを切り替えると古い確認では送れない', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    const dialog = document.querySelector('[data-design-node="RwVo5"]')!
+    const button = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === '一時停止する') as HTMLButtonElement
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    state.accountId = 'account-b'; await act(async () => { root.render(<ReminderDetailV8Page />) })
+    state.accountId = 'account-a'; await act(async () => { root.render(<ReminderDetailV8Page />) })
+    await act(async () => old())
+    expect(state.updates).toEqual([])
   })
 
   it('閲覧のみ：一時停止・編集・複製・削除を置かず、書き出しだけ残す', async () => {

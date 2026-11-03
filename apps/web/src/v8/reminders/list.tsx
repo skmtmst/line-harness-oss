@@ -106,6 +106,7 @@ const STATUS_CHIPS = ['有効', '下書き', '停止中', '失敗あり'] as con
 interface ReminderRow {
   followupManagement?:import('@line-crm/shared').RestaurantFollowupManagement
   id: string
+  lineAccountId?: string | null
   name: string
   description: string | null
   isActive: boolean
@@ -171,6 +172,8 @@ export default function RemindersListV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  const pauseContext = useRef({ accountId: selectedAccountId, generation: 0 })
+  if (pauseContext.current.accountId !== selectedAccountId) pauseContext.current = { accountId: selectedAccountId, generation: pauseContext.current.generation + 1 }
   const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const role = useStaffRole()
   const canEdit = useFeatureAccess('reminders')
@@ -205,9 +208,13 @@ export default function RemindersListV8() {
 
   /* 窓・まとめての帯の状態。 */
   const [bulkPauseIds, setBulkPauseIds] = useState<string[] | null>(null)
+  const [bulkPauseAccounts, setBulkPauseAccounts] = useState<Array<{ id: string; name?: string }>>([])
+  const [bulkPauseGeneration, setBulkPauseGeneration] = useState(0)
   const [bulkPauseAccountId, setBulkPauseAccountId] = useState(selectedAccountId)
   useEffect(() => { setBulkPauseIds(null) }, [selectedAccountId])
   const [pauseTarget, setPauseTarget] = useState<ReminderRow | null>(null)
+  const pauseRef = useRef<{ target: ReminderRow; generation: number } | null>(null)
+  const openedPause = pauseRef.current
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
   const [deleteAccountId, setDeleteAccountId] = useState(selectedAccountId)
   useEffect(() => { setDeleteTarget(null) }, [selectedAccountId])
@@ -382,7 +389,8 @@ export default function RemindersListV8() {
     } finally { stopLock.current = false; if (current()) setStopBusy(false) }
   }
 
-  const runPause = () => pauseTarget ? stopConfirmed([pauseTarget.id], pauseTarget) : undefined
+  const openPause = (target: ReminderRow) => { pauseRef.current = { target, generation: pauseContext.current.generation }; setPauseTarget(target) }
+  const runPause = () => pauseTarget && openedPause && pauseRef.current === openedPause && openedPause.target === pauseTarget && openedPause.generation === pauseContext.current.generation ? stopConfirmed([pauseTarget.id], pauseTarget) : false
 
   const runResume = (row: ReminderRow) => runToggle(row, true)
 
@@ -783,7 +791,7 @@ export default function RemindersListV8() {
             icon: <Pause size={16} aria-hidden="true" />,
             disabledReason: canEdit ? undefined : readonlyReason,
             onSelect: () => {
-                        setPauseTarget(row)
+                        openPause(row)
             },
           }
         : status === 'stopped'
@@ -1093,7 +1101,7 @@ export default function RemindersListV8() {
               variant="secondary"
               disabled={stoppableIds.length === 0}
               title={stoppableIds.length === 0 ? '有効なリマインダが選ばれていません' : undefined}
-              onClick={() => { setBulkPauseAccountId(selectedAccountId); setBulkPauseIds(stoppableIds) }}
+              onClick={() => { setBulkPauseAccountId(selectedAccountId); setBulkPauseGeneration(pauseContext.current.generation); setBulkPauseAccounts([...new Set(selectedRows.filter(row => stoppableIds.includes(row.id)).map(row => row.lineAccountId ?? ''))].map(id => ({ id, name: id ? undefined : '不明' }))); setBulkPauseIds(stoppableIds) }}
             >
               <Square size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               止める
@@ -1167,10 +1175,10 @@ export default function RemindersListV8() {
         confirmLabel="停止する"
         onCancel={() => setBulkPauseIds(null)}
         busy={stopBusy} error={stopError || undefined}
-        confirmDisabled={!canEdit} confirmLockedReason={moveLockedReason}
+        confirmDisabled={!canEdit || bulkPauseGeneration !== pauseContext.current.generation} confirmLockedReason={moveLockedReason}
         onSuccess={() => setBulkPauseIds(null)}
-        onConfirm={() => bulkPauseIds && bulkPauseAccountId === selectedAccountId ? stopConfirmed(bulkPauseIds, bulkPauseIds) : undefined}
-      ><OperationTargetSummary accounts={[{ id: bulkPauseAccountId ?? '' }]} /></ConfirmDialog>
+        onConfirm={() => bulkPauseIds && bulkPauseGeneration === pauseContext.current.generation && bulkPauseAccountId === selectedAccountId ? stopConfirmed(bulkPauseIds, bulkPauseIds) : undefined}
+      ><OperationTargetSummary accounts={bulkPauseAccounts} /></ConfirmDialog>
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
         open={pauseTarget !== null}
@@ -1179,13 +1187,14 @@ export default function RemindersListV8() {
         description="再開するまで、このリマインダの通知は送られません。"
         confirmLabel="一時停止する"
         busy={stopBusy} error={stopError || undefined}
-        confirmDisabled={!canEdit} confirmLockedReason={moveLockedReason}
-        onSuccess={() => setPauseTarget(null)}
+        confirmDisabled={!canEdit || !openedPause || openedPause.generation !== pauseContext.current.generation} confirmLockedReason={moveLockedReason}
+        onSuccess={() => { pauseRef.current = null; setPauseTarget(null) }}
         onConfirm={() => runPause()}
         onCancel={() => {
-          setPauseTarget(null)
+          pauseRef.current = null; setPauseTarget(null)
               }}
       >
+        <OperationTargetSummary accounts={[{ id: pauseTarget?.lineAccountId ?? '', name: pauseTarget?.lineAccountId ? undefined : '不明' }]} externalTarget={{ label: '対象件数', name: '1件' }} />
         {pauseTarget && (
           <Notice tone="warn" icon={<TriangleAlert size={16} aria-hidden="true" />}>
             {pauseTarget.plannedDeliveries != null && pauseTarget.plannedDeliveries > 0
@@ -1229,7 +1238,7 @@ export default function RemindersListV8() {
             {deleteTarget && statusKeyOf(deleteTarget) === 'active' ? (
               <Button
                 onClick={() => {
-                  setPauseTarget(deleteTarget)
+                  openPause(deleteTarget)
                   setDeleteTarget(null)
                 }}
                 disabled={deleting}
@@ -1239,7 +1248,7 @@ export default function RemindersListV8() {
             ) : null}
           </>
         )}
-      ><OperationTargetSummary accounts={[{ id: deleteAccountId ?? '' }]} /></SheetDialog>
+      ><OperationTargetSummary accounts={[{ id: deleteTarget?.lineAccountId ?? '', name: deleteTarget?.lineAccountId ? undefined : '不明' }]} /></SheetDialog>
 
       {/* 複製の窓。下書きとして写し、確認してから有効にする。 */}
       <></>

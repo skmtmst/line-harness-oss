@@ -82,12 +82,15 @@ describe('GET /api/ad-costs', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as {
       data: {
-        rows: Array<{ sourceLabel: string; source: string; totals: unknown[] }>;
+        rows: Array<{ sourceLabel: string; source: string; totals: unknown[]; lineAccountId: string }>;
+        manualEntries: Array<{ id: string; lineAccountId: string }>;
         platforms: Array<{ id: string; lastRunStatus: string | null }>;
       };
     };
     // 別アカウント b1 の費用・媒体は混ざらない
     expect(body.data.rows.map((row) => row.sourceLabel).sort()).toEqual(['Meta広告', 'チラシ']);
+    expect(body.data.rows.every(row => row.lineAccountId === 'a1')).toBe(true);
+    expect(body.data.manualEntries).toEqual([expect.objectContaining({ id: 'e2', lineAccountId: 'a1' })]);
     expect(body.data.platforms.map((p) => p.id)).toEqual(['p1']);
     expect(body.data.platforms[0].lastRunStatus).toBe('success');
   });

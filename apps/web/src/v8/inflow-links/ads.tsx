@@ -39,6 +39,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 /*
  * ★V8 広告連携（Pencil：画面 ・広告費を手で入れる ）。
@@ -73,6 +74,7 @@ type AdCostRow = {
 
 type ManualCostEntry = {
   id: string
+  lineAccountId?: string | null
   sourceLabel: string
   day: string
   amountMinor: number
@@ -137,7 +139,10 @@ export default function AdsV8() {
   const role = useStaffRole()
   const readonly = !canManageRole(role)
   const { selectedAccountId } = useAccount()
+  const cancelContext = useRef({ accountId: selectedAccountId, generation: 0 })
+  if (cancelContext.current.accountId !== selectedAccountId) cancelContext.current = { accountId: selectedAccountId, generation: cancelContext.current.generation + 1 }
   const loadGenerationRef = useRef(0)
+  const loadedCostContext = useRef<number | null>(null)
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
   const [platforms, setPlatforms] = useState<AdPlatform[]>([])
@@ -155,6 +160,8 @@ export default function AdsV8() {
   const [connectionTarget, setConnectionTarget] = useState<{ key: string; label: string } | null>(null)
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
   const [cancelTarget, setCancelTarget] = useState<ManualCostEntry | null>(null)
+  const cancelRef = useRef<{ target: ManualCostEntry; generation: number } | null>(null)
+  const openedCancel = cancelRef.current
   const [cancelReason, setCancelReason] = useState('')
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelError, setCancelError] = useState('')
@@ -196,6 +203,7 @@ export default function AdsV8() {
       setPlatforms(platformResponse.data)
       if (routeResponse.success) setEntryRoutes(routeResponse.data)
       if (costResponse.success) {
+        loadedCostContext.current = cancelContext.current.generation
         setCostRows((costResponse.data.rows ?? []) as AdCostRow[])
         setCostPlatforms((costResponse.data.platforms ?? []) as AdCostPlatformStatus[])
         setManualEntries((costResponse.data.manualEntries ?? []) as ManualCostEntry[])
@@ -278,6 +286,8 @@ export default function AdsV8() {
   }
 
   const openCancel = (entry: ManualCostEntry) => {
+    if (loadedCostContext.current !== cancelContext.current.generation) return
+    cancelRef.current = { target: entry, generation: cancelContext.current.generation }
     setCancelTarget(entry)
     setCancelReason('')
     setCancelError('')
@@ -285,7 +295,7 @@ export default function AdsV8() {
   }
 
   const submitCancel = async () => {
-    if (!cancelTarget || cancelBusy) return
+    if (!cancelTarget || !openedCancel || cancelRef.current !== openedCancel || openedCancel.target !== cancelTarget || openedCancel.generation !== cancelContext.current.generation || cancelBusy) return
     const reason = cancelReason.trim()
     if (!reason) {
       setCancelError('')
@@ -301,6 +311,7 @@ export default function AdsV8() {
         setCancelError(res.error ?? '取り消せませんでした')
         return
       }
+      cancelRef.current = null
       setCancelTarget(null)
       setSelectedEntryId(null)
       void load()
@@ -570,13 +581,16 @@ export default function AdsV8() {
         title="この費用を取り消す"
         description="取り消すと集計と「1人あたり」から外れます。記録そのものは残り、取り消した理由と日時が履歴に残ります。同じ流入元・同じ日に入れ直すと新しい記録として戻ります。"
         confirmLabel="取り消す"
+        confirmDisabled={!openedCancel || openedCancel.generation !== cancelContext.current.generation}
+        confirmDisabledReason="対象が変わりました。閉じてから確認し直してください。"
         busy={cancelBusy}
         error={cancelError || undefined}
         onConfirm={() => submitCancel()}
-        onCancel={() => { if (!cancelBusy) setCancelTarget(null) }}
+        onCancel={() => { if (!cancelBusy) { cancelRef.current = null; setCancelTarget(null) } }}
       >
         {cancelTarget ? (
           <div className={styles.dialogBody}>
+            <OperationTargetSummary accounts={[{ id: cancelTarget.lineAccountId ?? '', name: cancelTarget.lineAccountId ? undefined : '不明' }]} externalTarget={{ label: '対象件数', name: '1件' }} />
             <p className={styles.dialogLead}>{`対象: ${cancelTarget.day} ／ ${cancelTarget.sourceLabel} ／ ${formatMinor(cancelTarget.amountMinor, cancelTarget.currency)}`}</p>
             <Field label="取り消す理由" required><SaveErrorField names={["cancelReason","cancel_reason"]}><TextField id="ad-cancel-reason" aria-invalid={Boolean(cancelReasonError)} aria-describedby={cancelReasonError ? 'ad-cancel-reason-error' : undefined} value={cancelReason} onChange={(event) => { setCancelReason(event.target.value); setCancelReasonError('') }} placeholder="例：金額を間違えた" maxLength={200} /></SaveErrorField>
 {cancelReasonError ? <span id="ad-cancel-reason-error" className={styles.error} role="alert">{cancelReasonError}</span> : null}</Field>
