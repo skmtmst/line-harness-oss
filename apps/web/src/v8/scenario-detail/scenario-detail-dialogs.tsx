@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { type SegmentCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
@@ -386,6 +387,7 @@ export function ScenarioDetailDialogs({
         }}
       >
         <div className={styles.stopBody}>
+          <OperationTargetSummary accounts={scenario?.lineAccountId === null ? [] : [{ id: scenario?.lineAccountId ?? '' }]} allAccounts={scenario?.lineAccountId === null} />
           <p className={styles.stopDesc}>止めても、途中の人の記録は残ります。再開すると止めたところから続きを送ります。</p>
           <dl className={styles.stopRow}>
             <dt>いま途中の人</dt>
@@ -478,7 +480,7 @@ export function ScenarioDetailDialogs({
           setDeleteStepTarget(null)
           setDeleteStepError('')
         }}
-      />
+      ><OperationTargetSummary accounts={scenario?.lineAccountId === null ? [] : [{ id: scenario?.lineAccountId ?? '' }]} allAccounts={scenario?.lineAccountId === null} /></ConfirmDialog>
 
       <ConfirmDialog
         open={deleteScenarioOpen && scenario !== null}
@@ -504,6 +506,7 @@ export function ScenarioDetailDialogs({
           setDeleteScenarioError('')
         }}
       >
+        <OperationTargetSummary accounts={scenario?.lineAccountId === null ? [] : [{ id: scenario?.lineAccountId ?? '' }]} allAccounts={scenario?.lineAccountId === null} />
         {/* R250: 終了後の移動先にされていると、削除で参照元の設定が変わる。件数が取れたときだけ出す。 */}
         <div className="text-ink-secondary mt-3 space-y-2 text-sm">
           <MoveReferrersNotice scenarioId={id} />

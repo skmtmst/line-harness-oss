@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { describe, expect, it, afterEach } from 'vitest'
+import { describe, expect, it, afterEach, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 
 /*
@@ -12,6 +12,7 @@ import StepPreview from './step-preview'
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
 })
 
 const base = {
@@ -50,4 +51,14 @@ describe('R213: 編集プレビューは実際の通番号を出す', () => {
       screen.queryByText('2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。'),
     ).toBeNull()
   })
+})
+
+it('時刻を過ぎた当日のプレビューは翌日ではなくすぐ送ると示す', () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-01T03:00:00Z'))
+  render(<StepPreview {...base} deliveryMode="absolute_time" offsetDays={0} deliveryTime="10:00" stepOrder={2} />)
+  expect(screen.getByText('すぐに届きます（2通目）')).toBeTruthy()
+  expect(screen.getByText(/時刻を過ぎているため、すぐに送ります/)).toBeTruthy()
+  expect(screen.queryByText(/購読開始が.*より前なら/)).toBeNull()
+  expect(screen.queryByText(/翌日になります/)).toBeNull()
 })

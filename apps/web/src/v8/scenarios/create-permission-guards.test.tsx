@@ -58,6 +58,7 @@ vi.mock('@/lib/api', async original => {
     scenarioDrafts: { get: calls.draftGet, save: calls.draftSave, delete: calls.draftDelete },
   } }
 })
+import * as toast from '@/components/shared/toast'
 import ScenarioCreateV8 from './create'
 import { ApiError } from '@/lib/api'
 const base = { id: 'sc-1', name: '春のフォロー', folderId: null, lineAccountId: 'account-a', deliveryMode: 'elapsed' }
@@ -104,6 +105,19 @@ it.each(createRoles.flatMap(role => (['save', 'later'] as const).map(action => (
     deliveryMode: action === 'save' ? 'elapsed' : 'absolute_time',
   }))
   expect(calls.update).not.toHaveBeenCalled()
+})
+
+it('作成後に1通目の画面へ進むとき、下書き状態と重なる作成通知を出さない', async () => {
+  const notify = vi.spyOn(toast, 'notifyToast')
+  fixture.search = ''
+  render(<ScenarioCreateV8 />)
+  fireEvent.change(name(), { target: { value: '新しい案内' } })
+  fireEvent.click(screen.getByRole('radio', { name: /経過時間で指定/ }))
+  fireEvent.click(save())
+  await waitFor(() => expect(calls.push).toHaveBeenCalledWith('/scenarios/first-step?id=created-1'))
+  expect(calls.create).toHaveBeenCalledTimes(1)
+  expect(notify).not.toHaveBeenCalledWith('シナリオを作りました')
+  notify.mockRestore()
 })
 
 it.each([false, true])('既存シナリオの有効状態%sは、名前と方式を保存しても変えない', async isActive => {

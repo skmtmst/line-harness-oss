@@ -458,7 +458,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
 
     // Bの予約パネルにはBの分だけが出る。Aの「予約文面」も件数も混ざらない。
     await openSchedulePanel()
-    expect(scheduleToggleText()).toBe('予約(1)')
+    expect(scheduleToggleText()).toBe('送信予約(1)')
     expect(scheduledRowsText()).toContain('Bの予約文面')
     expect(scheduledRowsText()).not.toContain('Aの予約文面')
   })
@@ -478,7 +478,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     // 0件として黙るのではなく、読み込めなかったことと再読み込み口が出る。
     expect(document.body.textContent).toContain('予約の一覧を読み込めませんでした。')
     expect(document.querySelector('[data-inbox-v6="scheduled-retry"]')).not.toBeNull()
-    expect(scheduleToggleText()).toBe('予約')
+    expect(scheduleToggleText()).toBe('送信予約')
   })
 
   it('F03: Aの「前のメッセージ」応答が遅れてBへ切替後に届いても、Bの履歴に混ざらない', async () => {

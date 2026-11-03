@@ -517,7 +517,7 @@ export default function HqHomeV8() {
           /></SaveErrorField>
           </ListToolbarEnd>
         </ListToolbarRow>
-        {tokenExpirySummary(currentAccounts) ? <ListToolbarRow><Notice tone="warn" compact message={tokenExpirySummary(currentAccounts)!} /></ListToolbarRow> : null}
+        {tokenExpirySummary(filtered) ? <ListToolbarRow><Notice tone="warn" compact message={tokenExpirySummary(filtered)!} /></ListToolbarRow> : null}
       </ListToolbarFrame> : null}
   </>
 

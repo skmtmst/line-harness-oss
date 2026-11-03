@@ -406,11 +406,10 @@ export default function InflowListV8({
         .map((name) => ({ id: `legacy-${name}`, name, createdAt: '', updatedAt: '' })),
     ]
   }, [genres, routes])
-  const hasUncategorized = accountRows.some((row) => !row.genre)
   useEffect(() => {
-    const selectable = ['', ...availableGenres.map((genre) => genre.name), ...(hasUncategorized ? [UNCATEGORIZED] : [])]
+    const selectable = ['', ...availableGenres.map((genre) => genre.name), UNCATEGORIZED]
     setSelectedGenre((current) => (selectable.includes(current) ? current : ''))
-  }, [availableGenres, hasUncategorized])
+  }, [availableGenres])
 
   const selectedGenreLabel = selectedGenre === UNCATEGORIZED ? '未分類' : selectedGenre || 'すべて'
   const genreRows = selectedGenre === ''
@@ -518,9 +517,7 @@ export default function InflowListV8({
         ? { onEdit: () => setEditingGenre(genre) }
         : {}),
     })),
-    ...(hasUncategorized
-      ? [{ kind: 'unfiled' as const, id: UNCATEGORIZED, label: '未分類', count: accountRows.filter((row) => !row.genre).length }]
-      : []),
+    { kind: 'unfiled' as const, id: UNCATEGORIZED, label: '未分類', count: accountRows.filter((row) => !row.genre).length },
   ]
   const selectGenre = (id: string) => { setSelectedGenre(id); setPage(1) }
   const folderSelect = (
@@ -531,7 +528,7 @@ export default function InflowListV8({
       options={[
         { value: '', label: 'フォルダ：すべて' },
         ...availableGenres.map((genre) => ({ value: genre.name, label: `フォルダ：${genre.name}` })),
-        ...(hasUncategorized ? [{ value: UNCATEGORIZED, label: 'フォルダ：未分類' }] : []),
+        { value: UNCATEGORIZED, label: 'フォルダ：未分類' },
       ]}
     /></SaveErrorField>
   )

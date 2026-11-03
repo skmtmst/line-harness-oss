@@ -20,7 +20,7 @@ export default function ReservationMonth({ month, entries, onOpen, readableNames
 }) {
   const first = new Date(month + '-01T00:00:00Z')
   const count = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate()
-  return <ListFolderContext.Provider value={false}><div className={styles.month}>
+  return <ListFolderContext.Provider value={false}>{readableNames ? <div className={styles.weekdays} aria-label="曜日">{['日', '月', '火', '水', '木', '金', '土'].map(day => <span key={day}>{day}</span>)}</div> : null}<div className={styles.month}>
     {Array.from({ length: first.getUTCDay() }, (_, index) => <div key={'blank' + index} />)}
     {Array.from({ length: count }, (_, index) => {
       const date = `${month}-${String(index + 1).padStart(2, '0')}`

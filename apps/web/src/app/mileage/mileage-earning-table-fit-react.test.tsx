@@ -20,6 +20,8 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   usePathname: () => '/mileage',
 }))
 
+let ruleValidUntil: string | null = '2026-12-31T00:00:00.000Z'
+
 function ruleFixture() {
   return {
     id: 'rule-1',
@@ -41,7 +43,7 @@ function ruleFixture() {
       amount: 200,
       initialStatus: 'available',
       validFrom: null,
-      validUntil: '2026-12-31T00:00:00.000Z',
+      validUntil: ruleValidUntil,
       expiresAfterDays: 365,
       cancellationEventTypes: [],
       targetConditions: null,
@@ -182,6 +184,7 @@ beforeEach(() => {
   /* 管理画面と同じ V8 の器で描く。 */
   document.documentElement.dataset.theme = 'v8'
   createdRulePayloads.length = 0
+  ruleValidUntil = '2026-12-31T00:00:00.000Z'
   stubFetch()
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -237,12 +240,23 @@ async function waitForTabCount(calls: Array<{ key: string; text: string | null }
 }
 
 describe('有効期間の短さ（板 `E2Any`）', () => {
-  it('1年・12/31 と出す', async () => {
+  it('マイルの失効とルール終了日を区別して表示する', async () => {
     await act(async () => {
       root.render(<AccountProvider><MileagePage /></AccountProvider>)
     })
     await waitForTable()
-    expect(container.textContent ?? '').toContain('1年・12/31')
+    expect(container.textContent ?? '').toContain('マイル：1年')
+    expect(container.textContent ?? '').toContain('ルール：12/31')
+  })
+
+  it('ルールが無期限でもマイルは1年で失効すると分かる', async () => {
+    ruleValidUntil = null
+    await act(async () => {
+      root.render(<AccountProvider><MileagePage /></AccountProvider>)
+    })
+    await waitForTable()
+    expect(container.textContent ?? '').toContain('マイル：1年')
+    expect(container.textContent ?? '').toContain('ルール：期限なし')
   })
 })
 

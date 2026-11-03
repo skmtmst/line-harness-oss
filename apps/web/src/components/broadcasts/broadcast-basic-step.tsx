@@ -77,7 +77,7 @@ export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMeth
               </RadioCardGroup></SaveErrorField>
           <label className={styles.nameField}>
             <span className={styles.labelRow}><span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span><span className="text-xs text-ink-faint">{title.trim().length} / {TITLE_MAX}文字</span></span>
-            <SaveErrorField names={["title"]}><SharedTextField value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={styles.textInput} /></SaveErrorField>
+            <SaveErrorField names={["title"]}><SharedTextField maxLength={TITLE_MAX} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={styles.textInput} /></SaveErrorField>
             <small>友だちには表示されません。一覧で見分けるための名前です</small>
           </label>
           <div className={styles.basicFields}>

@@ -65,6 +65,16 @@ describe('MJoJR メニュー管理のV8', () => {
     expect(screen.getAllByRole('button', { name: '再開' })).toHaveLength(1)
   })
 
+  it('変更のない編集は保存せず理由を知らせる', async () => {
+    render(<MenuEditV8 />)
+    await screen.findByDisplayValue('秋の鹿肉コース')
+    const save = screen.getByRole('button', { name: '保存する' })
+    expect(save.hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText('変更していません')).toBeTruthy()
+    fireEvent.click(save)
+    expect(fixture.updateMenu).not.toHaveBeenCalled()
+  })
+
   it('編集ページ（mauOC）で変えた名前が今の口へ届く', async () => {
     render(<MenuEditV8 />)
     fireEvent.change(await screen.findByDisplayValue('秋の鹿肉コース'), { target: { value: '冬の鹿肉コース' } })

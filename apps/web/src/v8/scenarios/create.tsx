@@ -10,7 +10,6 @@ import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared';
 import { ApiError, api } from '@/lib/api';
 import { CreatePage } from '@/components/templates';
 import { Steps } from '@/components/templates/steps';
-import { notifyToast } from '@/components/shared/toast';
 import FolderSelect, { FolderCreateError, folderById, folderCreator } from '@/components/shared/folder-select';
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -267,7 +266,6 @@ export default function ScenarioCreateV8() {
       setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
       return null
     }
-    notifyToast('シナリオを作りました')
     return res.data.id
   }
 
@@ -442,9 +440,7 @@ export default function ScenarioCreateV8() {
         <Steps
           label="シナリオ作成の進み方"
           steps={[
-            // 既存の下書き（id あり）は1段目が済んでいる。新規は名前を入れたら済み。
-            { label: 'シナリオ情報', state: id || name.trim() ? 'done' : 'current', anchor: 'scenario-step-info' },
-            { label: '配信方式', state: 'current' },
+            { label: 'シナリオ情報・配信方式', state: 'current' },
             { label: '1通目を設定', state: 'todo' },
           ]}
         />

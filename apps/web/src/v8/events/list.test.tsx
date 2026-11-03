@@ -122,6 +122,19 @@ afterEach(async () => {
 const createLink = () => [...host.querySelectorAll('a')].find((a) => a.textContent?.includes('イベントを作る'))
 
 describe('V8 イベント予約の一覧', () => {
+  it('絞り込みと並び順を別に選び、同時に使える', async () => {
+    await render()
+    fireEvent.click(screen.getByLabelText('よく使う絞り込み'))
+    expect(screen.queryByRole('option', { name: 'イベント名の順に並べる' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '満席のイベントだけ' }))
+    await waitFor(() => expect(fetchApi.mock.calls.some(([path]) => new URL(String(path), 'http://worker.test').searchParams.get('filter') === 'full')).toBe(true))
+    fireEvent.click(screen.getByLabelText('並び順'))
+    fireEvent.click(screen.getByRole('button', { name: 'イベント名順' }))
+    await waitFor(() => expect(fetchApi.mock.calls.some(([path]) => {
+      const params = new URL(String(path), 'http://worker.test').searchParams
+      return params.get('filter') === 'full' && params.get('sort') === 'name'
+    })).toBe(true))
+  })
   it('統括には「イベントを作る」を置き、閲覧のみの帯は出さない', async () => {
     role.value = verifiedStaffRole('owner')
     await render()

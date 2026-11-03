@@ -41,7 +41,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { visitStampsApi } from '@/lib/visit-stamps-api';
-import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from './display';
+import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, settingsRangeIssues, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from './display';
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs';
 import { withHonorific } from '@line-crm/shared'
 import HistoryTable from './history-table'
@@ -161,8 +161,10 @@ function VisitStampsScreen() {
   const [saving, setSaving] = useState(false)
   const [imageBusy, setImageBusy] = useState(false)
   const [issue, setIssue] = useState<{ field: StampSettingField; message: string } | null>(null)
-  const fieldProps = (field: StampSettingField) => ({ id: `stamp-${field}`, invalid: issue?.field === field, 'aria-describedby': issue?.field === field ? `stamp-${field}-error` : undefined })
-  const fieldError = (field: StampSettingField) => <FieldError id={`stamp-${field}-error`}>{issue?.field === field ? issue.message : null}</FieldError>
+  const rangeIssues = settingsRangeIssues(settings)
+  const fieldMessage = (field: StampSettingField) => field === 'receiptBonus' || field === 'intervalHours' ? rangeIssues[field] ?? (issue?.field === field ? issue.message : undefined) : issue?.field === field ? issue.message : undefined
+  const fieldProps = (field: StampSettingField) => ({ id: `stamp-${field}`, invalid: Boolean(fieldMessage(field)), 'aria-describedby': fieldMessage(field) ? `stamp-${field}-error` : undefined })
+  const fieldError = (field: StampSettingField) => <FieldError id={`stamp-${field}-error`}>{fieldMessage(field) ?? null}</FieldError>
   useEffect(() => {
     if (!issue) return
     const input = document.getElementById(`stamp-${issue.field}`)

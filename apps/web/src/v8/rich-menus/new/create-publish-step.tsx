@@ -452,7 +452,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
                       ? `スマホの実機で確認済みです${checks.device.at ? `（${formatDateTime(checks.device.at)}）` : ''}。`
                       : '管理画面の見本だけでは公開できません。スマホで見た担当者が押します'}
                     {!host && group && (canManageRole(staffRole))
-                      ? <RichMenuTestApply key={`${accountId}:${group.id}`} groupId={group.id} /> : null}
+                      ? <RichMenuTestApply key={`${accountId}:${group.id}`} groupId={group.id} accountId={group.accountId ?? ''} /> : null}
                   </p>
                 </div>
                 <span className={styles.checkAction}>

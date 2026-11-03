@@ -20,6 +20,7 @@ function normalized(r: Row): StyleBooking {
     menuName: (r.menuName ?? null) as string | null,
     storeId: (r.storeId ?? null) as string | null,
     slotId: (r.slotId ?? null) as string | null,
+    departedAt: (r.departedAt ?? null) as string | null,
     partySize: Number(r.partySize ?? 1),
     price: Number(r.price ?? 0),
     visited: !!r.visited,
@@ -47,7 +48,7 @@ async function industryRows(
   let sql: string;
   if (style === 'restaurant')
     sql = `SELECT r.id,r.customer_version version,r.updated_at updatedAt,'restaurant' kind,f.id friendId,COALESCE(f.id,'phone:'||r.customer_phone,'reservation:'||r.id) personKey,
-    r.customer_name name,r.starts_at startsAt,r.ends_at endsAt,r.created_at requestedAt,r.status,r.staff_id staffId,r.course_id menuId,m.name menuName,r.store_id storeId,r.table_id slotId,
+    r.customer_name name,r.starts_at startsAt,r.ends_at endsAt,r.created_at requestedAt,r.status,r.staff_id staffId,r.course_id menuId,m.name menuName,r.store_id storeId,COALESCE(r.table_id,(SELECT l.table_id FROM rt_reservation_table_links l WHERE l.reservation_id=r.id LIMIT 1)) slotId,r.departed_at departedAt,
     r.guest_count partySize,0 price,r.status IN('visited','seated') visited,r.hold_expires_at IS NOT NULL held,r.source,NULL cancelledAt,
     (SELECT response FROM rt_reservation_confirmations WHERE reservation_id=r.id ORDER BY requested_at DESC LIMIT 1) confirmedResponse
     FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id LEFT JOIN rt_menu_items m ON m.id=r.course_id AND m.store_id=r.store_id LEFT JOIN friends f ON f.line_user_id=r.line_uid AND f.line_account_id=s.line_account_id

@@ -1022,7 +1022,7 @@ export default function BroadcastListV8() {
             <Th align="right" className={styles.colRate}>クリック</Th>
           </>
         )}
-        <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
+        <Th showActionLabel className={styles.colMenu}>操作</Th>
       </TableHeadRow>
     </thead>
   )

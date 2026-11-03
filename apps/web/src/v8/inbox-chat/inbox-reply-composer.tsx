@@ -1,4 +1,6 @@
 'use client'
+
+import { terms } from '@/lib/terms'
 import TemplatePicker from '@/components/chats/template-picker';
 import Button from '@/components/shared/button';
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason';
@@ -356,7 +358,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
             aria-expanded={showSchedulePanel}
             aria-haspopup={'dialog'}>
             {(<Clock3 aria-hidden="true" size={16} />)}
-            予約{scheduledSends.length > 0 ? `(${scheduledSends.length})` : ''}
+            {terms.A41}{scheduledSends.length > 0 ? `(${scheduledSends.length})` : ''}
           </InboxToolButton>
           <Button variant="primary"
             size="standard"

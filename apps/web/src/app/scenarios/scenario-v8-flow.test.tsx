@@ -250,7 +250,6 @@ describe('V8 シナリオの通し：作る→1通目→詳細', () => {
     // ★V8 作る①（src/v8/scenarios/create.tsx・）の主ボタンは絵どおり「この方式で保存する」。
     fireEvent.click(screen.getByRole('button', { name: 'この方式で保存する' }))
     await waitFor(() => expect(createScenario).toHaveBeenCalledTimes(1))
-    await screen.findByText('シナリオを作りました')
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/scenarios/first-step?id=sc-new'))
   })
 
