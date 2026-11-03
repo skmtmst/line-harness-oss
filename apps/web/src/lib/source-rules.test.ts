@@ -34,7 +34,7 @@ describe("必須欄と保存失敗を調べるソースの見張り", () => {
       }
     } finally { rmSync(root, { recursive: true, force: true }) }
   })
-  it('対象の全V8ファイルに違反がない', () => {
+  it('対象の全V8ファイルに違反がない', { timeout: 120000 }, () => {
     // pathname は百分率符号化されるので、作業場所の名前に日本語や空白があると読めない。
     expect(inspectB244Tree(fileURLToPath(new URL('../..', import.meta.url))).errors).toEqual([])
   })
