@@ -136,12 +136,85 @@ describe('R195 フォルダ件数の読み直し', () => {
     return screen.getByRole('button', { name: '移動する' })
   }
 
+  test('移動先を選んだ詳細から別の行に移る前に確認する', async () => {
+    fixture.templatesList.mockResolvedValue({ success: true, data: [TEMPLATE, { ...TEMPLATE, id: 'tpl-2', name: '別のテンプレート' }] })
+    await chooseFolder()
+    const other = within(screen.getByRole('table')).getByText('別のテンプレート').closest('tr')!
+    fireEvent.keyDown(other, { key: 'Enter' })
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
+    expect(fixture.templatesUpdate).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: '移動先のフォルダ' })).toBeNull()
+  })
+
+  test('選択バーからの移動も、詳細で選択中の移動先を破棄する前に確認する', async () => {
+    await chooseFolder()
+    fireEvent.click(screen.getByRole('checkbox', { name: '「来店お礼」を選択' }))
+    fireEvent.click(screen.getByRole('button', { name: 'フォルダへ移す', exact: true }))
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect(screen.getByRole('button', { name: '移動先のフォルダ' }).textContent).toContain('営業')
+  })
+
+  test('移動先を選ばず詳細を閉じても移動の窓を開かない', async () => {
+    await renderReady()
+    fireEvent.keyDown(within(screen.getByRole('table')).getByText('来店お礼').closest('tr')!, { key: 'Enter' })
+    fireEvent.click(await findDetailMenuItem('フォルダへ移す'))
+    fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true }))
+    expect(screen.queryByRole('dialog', { name: /フォルダを移す/ })).toBeNull()
+  })
+
+  test('移動先を選んだ後の画面移動は、送信前に確認する', async () => {
+    await chooseFolder()
+    const link = document.createElement('a')
+    link.href = '/events'
+    link.textContent = 'イベントへ'
+    document.body.append(link)
+    try {
+      fireEvent.click(link)
+      expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+      expect(fixture.templatesUpdate).not.toHaveBeenCalled()
+    } finally { link.remove() }
+  })
+
+  test('移動先を選んだ詳細パネルを閉じる前に確認する', async () => {
+    await chooseFolder()
+    fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true }))
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(fixture.templatesUpdate).not.toHaveBeenCalled()
+  })
+
+  test('履歴で戻ると移動先と詳細を残して確認する', async () => {
+    await chooseFolder()
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    try {
+      window.history.replaceState(null, '', '/templates')
+      fireEvent.popState(window)
+      expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: '移動先のフォルダ' }).textContent).toContain('営業')
+      expect(go).toHaveBeenCalledWith(1)
+    } finally { go.mockRestore() }
+  })
+
+  test('名前と移動先を両方変えた詳細を閉じるとき、確認は1枚で両方を保てる', async () => {
+    await chooseFolder()
+    fireEvent.click(screen.getByRole('button', { name: 'テンプレートの名前を変更する' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'テンプレートの名前' }), { target: { value: '編集中の名前' } })
+    fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true }))
+    expect(screen.getAllByRole('dialog', { name: '保存していない変更があります' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect((screen.getByRole('textbox', { name: 'テンプレートの名前' }) as HTMLInputElement).value).toBe('編集中の名前')
+    expect(screen.getByRole('button', { name: '移動先のフォルダ' }).textContent).toContain('営業')
+  })
+
   test('移動を続けて二度押しても同じ更新を二重に送らない', async () => {
     let finish!: (value: unknown) => void
     fixture.templatesUpdate.mockImplementation(() => new Promise(resolve => { finish = resolve }))
     const button = await chooseFolder()
     await act(async () => { fireEvent.click(button); fireEvent.click(button) })
     expect(fixture.templatesUpdate).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true }))
+    expect(screen.queryByRole('button', { name: '閉じる', exact: true })).toBeNull()
     await act(async () => { finish({ success: true, data: TEMPLATE }) })
   })
 

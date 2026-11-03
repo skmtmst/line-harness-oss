@@ -26,6 +26,7 @@ const GUARDED = [
   'components/shared/folder-select.tsx',
   'components/shared/use-inline-detail-guard.tsx',
   'v8/common-vars/list.tsx',
+  'v8/templates/list.tsx',
   'v8/account-new/registration-unsaved-guard.tsx',
   'v8/hq-banners/project.tsx',
   'v8/restaurant/organization/organization.tsx',
@@ -198,6 +199,7 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   // タブ枠は子の名前編集を保持し、確認は子の共通ガードが担当する。
   'v8/tags/list.tsx': 'components/shared/use-inline-detail-guard.tsx',
   'v8/common-vars/list-dialogs.tsx': 'v8/common-vars/list.tsx',
+  'v8/templates/list-dialogs.tsx': 'v8/templates/list.tsx',
   // 再開画面のスタイル・メニューは共通の登録状態が離脱を守る。
   'v8/account-new/resume-style.tsx': 'v8/account-new/registration-unsaved-guard.tsx',
   // 飲食店のフォームと選択中の値は組織画面の番兵へ伝える。
@@ -421,8 +423,6 @@ const EXEMPTIONS: Record<string, string> = {
     'app/restaurant-test/v8/tables.tsx と同じ画面の★V8版（BERxg）。卓の追加・変更は窓（gBrCz）の中で、閉じると戻る',
   'v8/scenario-first-step/first-step.tsx':
     'app/scenarios/first-step-v8.tsx と同じ画面の★V8版（V6xAo）。番兵の要否は元の画面（first-step/page.tsx・未判定）と一緒に決めるため同じ扱い',
-  'v8/templates/list.tsx':
-    '詳細のテンプレート名は use-inline-detail-guard.tsx が保護する。種類ごとの窓や移動中の選択は別途確認する。',
   'v8/nen-pets/editor.tsx':
     'app/nen/pets/pet-editor.tsx と同じ窓の★V8版（eLjeQ）。入力はすべて窓の中で、閉じると戻る。番兵の要否は元の窓（未判定）と一緒に決めるため同じ扱い',
 }
