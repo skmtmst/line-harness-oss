@@ -1,7 +1,7 @@
 import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
-import { fireEvent, render, screen, cleanup } from '@testing-library/react'
+import { fireEvent, render, screen, cleanup, within, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const createEvent = vi.hoisted(() => vi.fn())
@@ -61,9 +61,11 @@ describe('イベント作成の入力確認', () => {
   })
 })
 
-it('初期日時は未来で、過去の日付を選ぶと注意が出る', () => {
- vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T08:00:00Z'))
+it('初期日時は未来で、過去の日付を確認してから保存できる', async () => {
+ vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-03T08:00:00Z'))
  try {
+  createEvent.mockResolvedValue({id:'past-event',version:1,is_published:0})
+  createSlots.mockImplementation(async (_account, eventId, slots) => ({items:[{...slots[0],id:'past-slot',event_id:eventId,version:1}]}))
   render(<EventsCreate />)
   expect(screen.getByLabelText('日付').getAttribute('title')).toContain('2026年11月4日')
   fireEvent.click(screen.getByLabelText('日付'))
@@ -73,6 +75,11 @@ it('初期日時は未来で、過去の日付を選ぶと注意が出る', () =
   fireEvent.change(screen.getByLabelText('定員'), { target: { value: '20' } })
   fireEvent.click(getPageAction({ name: '下書きを保存' }))
   expect(createEvent).not.toHaveBeenCalled()
-  expect(screen.getByLabelText('日付').getAttribute('aria-invalid')).toBe('true')
+  const confirmation = screen.getByRole('dialog', { name: '過去の日時で保存しますか？' })
+  expect(within(confirmation).getByText(/開始日時が過去/)).toBeTruthy()
+  fireEvent.click(within(confirmation).getByRole('button', { name: 'この日時で保存する' }))
+  await waitFor(() => expect(push).toHaveBeenCalled())
+  expect(createEvent).toHaveBeenCalledTimes(1)
+  expect(createSlots.mock.calls[0][2][0].starts_at).toBe('2026-11-02T05:00:00.000Z')
  } finally { cleanup(); vi.useRealTimers() }
 })

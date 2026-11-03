@@ -146,10 +146,11 @@ function EventsCreateV8Inner() {
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
   const [publishTarget, setPublishTarget] = useState<{ accountIds: string[]; generation: number } | null>(null)
+  const [pastConfirmation, setPastConfirmation] = useState<{ publish: boolean; snapshot: string; accountId: string } | null>(null)
   const targetIds = selectedAccountId ? resolveEventMultiAccountIds(draft, selectedAccountId) ?? [selectedAccountId] : []
   const targetIdsRef = useRef(targetIds)
   targetIdsRef.current = targetIds
-  useEffect(() => { setPublishTarget(null) }, [selectedAccountId])
+  useEffect(() => { setPublishTarget(null); setPastConfirmation(null) }, [selectedAccountId])
   const [unknownCreateAccounts, setUnknownCreateAccounts] = useState<Set<string>>(new Set())
   const unknownCreateRef = useRef(new Set<string>())
   const createUnknown = Boolean(selectedAccountId && unknownCreateAccounts.has(selectedAccountId))
@@ -184,7 +185,6 @@ function EventsCreateV8Inner() {
     const startError = eventRequirements.start.check(startTime)
     const endError = eventRequirements.end.check(endTime)
     if (dateError) errors['ev-new-date'] = dateError
-    else if (isPastStart(date, startTime)) errors['ev-new-date'] = '開始日時が過去です。日時を確認してください。'
     if (startError) errors['ev-new-start'] = startError
     if (endError) errors['ev-new-end'] = endError
     else if (startTime && endTime <= startTime) errors['ev-new-end'] = '終了は開始より後にしてください'
@@ -197,8 +197,13 @@ function EventsCreateV8Inner() {
     return !focusTarget.current
   }
 
-  async function save(publish: boolean) {
+  async function save(publish: boolean, acceptedPastSnapshot?: string) {
     if (!selectedAccountId || unknownCreateRef.current.has(selectedAccountId) || !validateInput()) return
+    if (isPastStart(date, startTime) && acceptedPastSnapshot !== snapshot) {
+      setPublishTarget(null)
+      setPastConfirmation({ publish, snapshot, accountId: selectedAccountId })
+      return false
+    }
     if (!feedback.begin('イベント')) return
     retryPublish.current = publish
     setSavingPublished(publish)
@@ -558,6 +563,10 @@ function EventsCreateV8Inner() {
       </Card>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したイベント" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog open={pastConfirmation !== null && pastConfirmation.accountId === selectedAccountId} title="過去の日時で保存しますか？" description="開始日時が過去です。日時を確認してください。" warning confirmLabel="この日時で保存する" busy={saving} error={error || undefined} onCancel={() => setPastConfirmation(null)} onSuccess={() => setPastConfirmation(null)} onConfirm={() => {
+        if (!pastConfirmation || pastConfirmation.accountId !== selectedAccountId || pastConfirmation.snapshot !== snapshot) return false
+        return save(pastConfirmation.publish, pastConfirmation.snapshot)
+      }} />
       <ConfirmDialog open={publishTarget !== null && publishTarget.generation === accountScope.current.generation} title="イベントを公開する" description="イベントを公開し、お客さまが申し込めるようにします。内容を確かめてください。" confirmLabel="公開する" busy={saving} confirmDisabled={createUnknown} confirmDisabledReason="閉じて一覧で作成結果を確認してください。" error={error || undefined} onSuccess={() => setPublishTarget(null)} onConfirm={() => {
         if (!publishTarget || publishTarget.generation !== accountScope.current.generation || !canEditRef.current || JSON.stringify(publishTarget.accountIds) !== JSON.stringify(targetIdsRef.current)) return
         return save(true)
