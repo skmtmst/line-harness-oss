@@ -22,6 +22,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'components/shared/folder-add-dialog.tsx',
   'components/shared/use-inline-detail-guard.tsx',
   'v8/common-vars/list.tsx',
   'v8/account-new/registration-unsaved-guard.tsx',
@@ -173,6 +174,7 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  'components/shared/folder-row-actions.tsx': 'components/shared/folder-add-dialog.tsx',
   // タブ枠は子の名前編集を保持し、確認は子の共通ガードが担当する。
   'v8/tags/list.tsx': 'components/shared/use-inline-detail-guard.tsx',
   'v8/common-vars/list-dialogs.tsx': 'v8/common-vars/list.tsx',

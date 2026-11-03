@@ -20,6 +20,8 @@ const captures = vi.hoisted(() => {
     row: undefined as ReturnType<ReturnType<typeof useFolderRowActions>['rowActions']> | undefined,
   }
 })
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('./folder-add-dialog', async original => {
   const mod = await original<typeof import('./folder-add-dialog')>()
   return { ...mod, default: (props: ComponentProps<typeof mod.default>) => {

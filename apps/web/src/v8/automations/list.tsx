@@ -254,12 +254,13 @@ export default function AutomationListV8() {
     rowActionLockRef.current = null; pendingLockRef.current = null
   }, [selectedAccountId])
 
-  const tabCounts = useAutomationTabCounts(loadStatus === 'ready' ? items.length : null)
+  const currentRules = items.filter((item) => item.status !== 'archived')
+  const tabCounts = useAutomationTabCounts(loadStatus === 'ready' ? currentRules.length : null)
 
-  const activeCount = useMemo(() => items.filter((item) => item.isActive).length, [items])
+  const activeCount = useMemo(() => items.filter((item) => item.status !== 'archived' && item.isActive).length, [items])
   const stoppedCount = items.filter((item) => item.status !== 'archived' && !item.isActive).length
   /** 動かしているのに、この30日に一度も動いていないルール。 */
-  const neverRunCount = useMemo(() => items.filter((item) => item.isActive && item.executionCount30d === 0).length, [items])
+  const neverRunCount = useMemo(() => items.filter((item) => item.status !== 'archived' && item.isActive && item.executionCount30d === 0).length, [items])
 
   const visible = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('ja')
@@ -415,7 +416,7 @@ export default function AutomationListV8() {
   const ready = loadStatus === 'ready'
   const estimatedHoursSaved = summary ? Math.round(summary.executionCount30d / 120) : null
   const cells: BandCell[] = [
-    { key: 'rules', title: 'ルール', icon: <ListChecks size={16} aria-hidden="true" />, value: ready ? items.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
+    { key: 'rules', title: 'ルール', icon: <ListChecks size={16} aria-hidden="true" />, value: ready ? currentRules.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
     { key: 'runs', title: '今月動いた', icon: <Activity size={16} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
     { key: 'failed', title: '失敗', icon: <FileWarning size={16} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
     { key: 'skipped', title: '条件に外れた', icon: <Filter size={16} aria-hidden="true" />, value: skipped, unit: '回', detail: ready ? `稼働中で直近30日動いていないルール ${neverRunCount}` : emptyValue('unknown') },
