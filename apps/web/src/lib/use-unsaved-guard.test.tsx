@@ -19,8 +19,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => router,
 }))
 
-function Harness({ dirty, onDiscard, busy }: { dirty: boolean; onDiscard?: () => void; busy?: boolean }) {
-  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, onDiscard, busy })
+function Harness({ dirty, onDiscard, busy, disarmBeforeConfirm }: { dirty: boolean; onDiscard?: () => void; busy?: boolean; disarmBeforeConfirm?: boolean }) {
+  const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, onDiscard, busy })
   return (
     <div>
       <a href="/form-submissions">回答フォーム</a>
@@ -33,7 +33,7 @@ function Harness({ dirty, onDiscard, busy }: { dirty: boolean; onDiscard?: () =>
       {leaveTarget ? (
         <div role="dialog">
           <p>leave:{leaveTarget.kind}:{leaveTarget.kind === 'link' ? leaveTarget.href : ''}</p>
-          <button type="button" data-action="confirm" onClick={confirmLeave}>保存せずに移る</button>
+          <button type="button" data-action="confirm" onClick={() => { if (disarmBeforeConfirm) disarm(); confirmLeave() }}>保存せずに移る</button>
           <button type="button" data-action="cancel" onClick={cancelLeave}>編集を続ける</button>
         </div>
       ) : null}
@@ -96,6 +96,52 @@ describe('useUnsavedGuard', () => {
       expect(parentDiscard).toHaveBeenCalledTimes(1)
       expect(childDiscard).toHaveBeenCalledTimes(1)
       expect(back).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+  it('履歴確定の直前に解除しても、自分と他の未保存入力を両方破棄する', async () => {
+    const parentDiscard = vi.fn(), childDiscard = vi.fn()
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty onDiscard={parentDiscard} disarmBeforeConfirm /><Harness dirty onDiscard={childDiscard} /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await clickDialogButton('confirm')
+      expect(parentDiscard).toHaveBeenCalledTimes(1)
+      expect(childDiscard).toHaveBeenCalledTimes(1)
+      expect(back).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+  it('確認後に別の入力が保存中なら解除を戻して確認を維持する', async () => {
+    const firstDiscard = vi.fn(), otherDiscard = vi.fn()
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty onDiscard={firstDiscard} disarmBeforeConfirm /><Harness dirty onDiscard={otherDiscard} /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await render(<><Harness dirty onDiscard={firstDiscard} disarmBeforeConfirm /><Harness dirty busy onDiscard={otherDiscard} /></>)
+      await clickDialogButton('confirm')
+      expect(firstDiscard).not.toHaveBeenCalled()
+      expect(otherDiscard).not.toHaveBeenCalled()
+      expect(back).not.toHaveBeenCalled()
+      expect(host.querySelector('[role="dialog"]')).toBeTruthy()
+      await render(<><Harness dirty onDiscard={firstDiscard} disarmBeforeConfirm /><Harness dirty={false} onDiscard={otherDiscard} /></>)
+      const event = await click(anchor('回答フォーム'))
+      expect(event.defaultPrevented).toBe(true)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+  it('破棄後に再編集して戻る時も、もう一度確認する', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<Harness dirty onDiscard={discard} />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await clickDialogButton('confirm')
+      await render(<Harness dirty={false} onDiscard={discard} />)
+      await render(<Harness dirty onDiscard={discard} />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      expect(go).toHaveBeenCalledTimes(2)
+      expect(host.querySelector('[role="dialog"]')).toBeTruthy()
     } finally { go.mockRestore(); back.mockRestore() }
   })
   it('復元後の通知では他の未保存状態も再び止めない', async () => {
