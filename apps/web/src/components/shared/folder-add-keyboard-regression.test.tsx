@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const create = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', () => ({ api: { folders: { create } } }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 import FolderAddDialog from './folder-add-dialog'
 beforeEach(() => { vi.resetAllMocks(); document.documentElement.dataset.theme = 'v8' })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })

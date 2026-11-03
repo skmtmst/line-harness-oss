@@ -83,6 +83,65 @@ async function clickDialogButton(action: 'confirm' | 'cancel') {
 }
 
 describe('useUnsavedGuard', () => {
+  it('2つの未保存状態があっても履歴は1回戻し、1つの確認で両方を破棄する', async () => {
+    const parentDiscard = vi.fn(), childDiscard = vi.fn()
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty onDiscard={parentDiscard} /><Harness dirty onDiscard={childDiscard} /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      expect(go).toHaveBeenCalledTimes(1)
+      expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+      await clickDialogButton('confirm')
+      expect(parentDiscard).toHaveBeenCalledTimes(1)
+      expect(childDiscard).toHaveBeenCalledTimes(1)
+      expect(back).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+  it('復元後の通知では他の未保存状態も再び止めない', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty /><Harness dirty /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      expect(go).toHaveBeenCalledTimes(1)
+      expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+    } finally { go.mockRestore() }
+  })
+  it('復元前に入力がきれいになっても次の戻る操作を確認する', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    try {
+      await render(<Harness dirty />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await render(<Harness dirty={false} />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await render(<Harness dirty />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      expect(go).toHaveBeenCalledTimes(2)
+    } finally { go.mockRestore() }
+  })
+  it('一方が保存中なら別の入力からも履歴を進めない', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty /><Harness dirty busy /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      expect(go).toHaveBeenCalledTimes(1)
+      expect(host.querySelector('[role="dialog"]')).toBeNull()
+    } finally { go.mockRestore() }
+  })
+  it('2つの入力で編集を続けると、どちらも破棄しない', async () => {
+    const parentDiscard = vi.fn(), childDiscard = vi.fn()
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty onDiscard={parentDiscard} /><Harness dirty onDiscard={childDiscard} /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await clickDialogButton('cancel')
+      expect(parentDiscard).not.toHaveBeenCalled()
+      expect(childDiscard).not.toHaveBeenCalled()
+      expect(back).not.toHaveBeenCalled()
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
   it('保存中は未保存判定にかかわらず閉じる操作を止める', async () => {
     await render(<Harness dirty={false} busy />)
     await act(async () => host.querySelector<HTMLButtonElement>('[data-action="leave-button"]')!.click())

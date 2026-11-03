@@ -14,6 +14,23 @@ export type UnsavedLeaveTarget =
   | { kind: 'history-back' }
   | { kind: 'action'; run: () => void }
 
+type HistoryGuard = {
+  active: () => boolean
+  busy: () => boolean
+  handles: (destination: URL) => boolean
+  discard: () => void
+  disarm: () => void
+}
+// 同じ戻る操作を複数の番兵が受けても、復元と確認は1回にまとめる。
+const historyGuards = new Set<HistoryGuard>()
+const handledPopEvents = new WeakSet<Event>()
+let restoringHistory = false
+function onRestoredHistory(event: PopStateEvent) {
+  if (!restoringHistory) return
+  restoringHistory = false
+  handledPopEvents.add(event)
+}
+
 /**
  * 未保存の変更がある間、画面を離れる操作を止める。
  *
@@ -47,6 +64,8 @@ export function useUnsavedGuard(options: {
   const [leaveTarget, setLeaveTarget] = useState<UnsavedLeaveTarget | null>(null)
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
+  const busyRef = useRef(busy)
+  busyRef.current = busy
   const samePageRef = useRef(samePage)
   samePageRef.current = samePage
   const handlesLocalLinkRef = useRef(handlesLocalLink)
@@ -54,9 +73,29 @@ export function useUnsavedGuard(options: {
   const onDiscardRef = useRef(onDiscard)
   onDiscardRef.current = onDiscard
   const allowHistoryLeaveRef = useRef(false)
-  const skipRestoredPopRef = useRef(false)
+  const historyCohortRef = useRef<HistoryGuard[] | null>(null)
   /* 公開成功など「離れてよい」と決まった遷移の直前に立てる解除印。 */
   const disarmedRef = useRef(false)
+  const historyGuardRef = useRef<HistoryGuard | null>(null)
+  if (!historyGuardRef.current) historyGuardRef.current = {
+    active: () => (dirtyRef.current || busyRef.current) && !disarmedRef.current,
+    busy: () => busyRef.current,
+    handles: destination => !samePageRef.current?.(destination),
+    discard: () => onDiscardRef.current?.(),
+    disarm: () => { disarmedRef.current = true },
+  }
+  useEffect(() => {
+    const entry = historyGuardRef.current!
+    if (historyGuards.size === 0) window.addEventListener('popstate', onRestoredHistory)
+    historyGuards.add(entry)
+    return () => {
+      historyGuards.delete(entry)
+      if (historyGuards.size === 0) {
+        window.removeEventListener('popstate', onRestoredHistory)
+        restoringHistory = false
+      }
+    }
+  }, [])
 
   /*
    * ブラウザ再読込・タブ終了だけは画面内のDialogを出せないので、標準の確認を
@@ -110,29 +149,28 @@ export function useUnsavedGuard(options: {
    */
   useEffect(() => {
     if (!dirty) {
-      skipRestoredPopRef.current = false
       disarmedRef.current = false
       return
     }
-    const onPopState = () => {
+    const onPopState = (event: PopStateEvent) => {
+      if (handledPopEvents.has(event)) return
       if (disarmedRef.current) return
       if (allowHistoryLeaveRef.current) {
         allowHistoryLeaveRef.current = false
-        return
-      }
-      // history.go(1)で現在画面へ戻った直後のpopstateは、もう一度止めない。
-      if (skipRestoredPopRef.current) {
-        skipRestoredPopRef.current = false
         return
       }
       /*
        * paneの切替だけが変わる、同じ画面の中の戻る・進むは離脱ではない。
        * ここで止めると「同じ画面に居たまま」なのに離脱確認が出る。
        */
-      if (samePageRef.current?.(canonicalLocalUrl(new URL(window.location.href)))) return
-      skipRestoredPopRef.current = true
+      const destination = canonicalLocalUrl(new URL(window.location.href))
+      if (samePageRef.current?.(destination)) return
+      handledPopEvents.add(event)
+      const cohort = [...historyGuards].filter(entry => entry.active() && entry.handles(destination))
+      historyCohortRef.current = cohort
+      restoringHistory = true
       window.history.go(1)
-      if (!busy) setLeaveTarget({ kind: 'history-back' })
+      if (!cohort.some(entry => entry.busy())) setLeaveTarget({ kind: 'history-back' })
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -159,13 +197,21 @@ export function useUnsavedGuard(options: {
    */
   const confirmLeave = useCallback(() => {
     if (!leaveTarget || busy) return
+    if (leaveTarget.kind === 'history-back' && historyCohortRef.current?.some(entry => historyGuards.has(entry) && entry.active() && entry.busy())) return
     setLeaveTarget(null)
-    onDiscardRef.current?.()
     if (leaveTarget.kind === 'history-back') {
+      const own = historyGuardRef.current
+      for (const entry of historyCohortRef.current ?? []) {
+        if (!historyGuards.has(entry) || !entry.active()) continue
+        if (entry !== own) entry.disarm()
+        entry.discard()
+      }
+      historyCohortRef.current = null
       allowHistoryLeaveRef.current = true
       window.history.back()
       return
     }
+    onDiscardRef.current?.()
     if (leaveTarget.kind === 'action') {
       /*
        * 保留していた操作（一覧へ戻るボタン等の router.push）を再実行する。
@@ -178,7 +224,7 @@ export function useUnsavedGuard(options: {
     router.push(leaveTarget.href)
   }, [leaveTarget, busy, router])
 
-  const cancelLeave = useCallback(() => setLeaveTarget(null), [])
+  const cancelLeave = useCallback(() => { historyCohortRef.current = null; setLeaveTarget(null) }, [])
 
   /*
    * リンクではない離れる操作（`<button onClick>` からの router.push や、

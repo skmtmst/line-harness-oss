@@ -18,6 +18,7 @@ import { describeFolderFailure } from './folder-failure'
 import { notifyToast } from './toast'
 import type { FolderPanelRow } from './folder-panel'
 import { formatNumber } from '@/lib/format'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 export interface FolderRowActionsOptions {
   /** `folders.kind`（'rich_menu'・'scenario' など）。 */
@@ -143,8 +144,11 @@ export function useFolderRowActions({
     actionsDisabled: !actionEnabled,
     onEdit: () => {
       if (!canActNow()) return
-      if (usesLivePermission()) { dialogScope.current = scope.current; dialogEpoch.current = {}; setDeleting(null) }
-      setEditing(folder)
+      requestUnsavedAction(() => {
+        if (!canActNow()) return
+        if (usesLivePermission()) { dialogScope.current = scope.current; dialogEpoch.current = {}; setDeleting(null) }
+        setEditing(folder)
+      })
     },
     onMoveUp: index > 0 ? () => void move(index, -1) : undefined,
     onMoveDown: index < folders.length - 1 ? () => void move(index, 1) : undefined,
