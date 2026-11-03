@@ -130,7 +130,9 @@ function MenuEditBody() {
   const title = resolveResourceTitle({ name: editing?.name, loaded: state === 'ready', pendingTitle })
   usePageTitle(title)
   usePageCrumbs([{ label: 'メニュー管理', href: LIST_HREF }])
-  const valid = draft.name.trim() !== '' && draft.price !== '' && Number(draft.price) >= 0
+  const exceedsPriceLimit = (!editing || priceChanged) && Number(draft.price) > 1_000_000
+  const valid = draft.name.trim() !== '' && draft.price !== '' && Number.isInteger(Number(draft.price)) && Number(draft.price) >= 0 && !exceedsPriceLimit
+  const priceError = draft.price === '' ? undefined : Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : exceedsPriceLimit ? '値段は1,000,000円以下で入れてください。' : !Number.isInteger(Number(draft.price)) ? '値段は整数で入れてください。' : undefined
 
   const [confirmationScope, setConfirmationScope] = useState('')
   const confirmationVersion = useRef({ key: contextKey, generation: 0 })
@@ -240,7 +242,7 @@ function MenuEditBody() {
         destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setConfirmationScope(currentConfirmationScope); setError(null); setDeleting(true) }} disabled={busy}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { setConfirmationScope(currentConfirmationScope); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { setConfirmationScope(currentConfirmationScope); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
@@ -254,7 +256,7 @@ function MenuEditBody() {
               <Field label={course ? 'コースの名前' : 'メニューの名前'} htmlFor="rs-menu-name" required>
                 <SaveErrorField names={['name', 'draft.name']}><TextField id="rs-menu-name" aria-label="メニュー名" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></SaveErrorField>
               </Field>
-              <Field label={course ? '1名の値段' : '値段'} htmlFor="rs-menu-price" required error={draft.price !== '' && Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : undefined}>
+              <Field label={course ? '1名の値段' : '値段'} htmlFor="rs-menu-price" required error={priceError}>
                 <SaveErrorField names={['price', 'draft.price']}><NumberInput id="rs-menu-price" aria-label="価格（税込）" unit="円" type="number" min={0} required value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} /></SaveErrorField>
               </Field>
               <Field label="所要時間（変更不可）" htmlFor="rs-menu-duration" optional={false}>

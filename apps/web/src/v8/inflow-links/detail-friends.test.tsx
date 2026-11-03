@@ -32,7 +32,7 @@ import InflowDetailV8 from './detail'
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 const route = (id: string, refCode: string, name: string) => ({
   id, refCode, genre: null, name, tagId: configuredTag, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null,
-  runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, lineAccountId: null,
+  runAccountFriendAddScenarios: true, isActive: routeActive, stoppedAt: null, stoppedReason: null, lineAccountId: null,
   createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
 })
 const funnel = (adds: number) => ({ click_count: 100, friend_add_count: adds, cv_count: 0, blockedCount: 0, remainingCount: adds, valuePerFriend: null })
@@ -40,11 +40,13 @@ const funnel = (adds: number) => ({ click_count: 100, friend_add_count: adds, cv
 let root: Root
 let host: HTMLDivElement
 let configuredTag: string | null = null
+let routeActive = true
 let friendsFor: (ref: string) => Promise<Response>
 
 beforeEach(() => {
   nav.id = 'er-a'
   configuredTag = null
+  routeActive = true
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -137,4 +139,49 @@ describe('月の区切りは日本時間（WEB038）', () => {
     expect(monthKeyOf('2026-09-30T16:00:00.000Z')).toBe('2026-10')
     expect(monthKeyOf('2026-09-30T14:00:00.000Z')).toBe('2026-09')
   })
+})
+
+it('操作の案内はその後のメニューを指す', async () => {
+  await act(async () => { root.render(<InflowDetailV8 />) }); await settle()
+  expect(host.textContent).toContain('「その後」の「…」から')
+  expect(host.textContent).not.toContain('右上の「…」から')
+})
+
+it('停止中の経路はメニューに停止や再開を出さず、帯から再開できる', async () => {
+  routeActive = false
+  await act(async () => { root.render(<InflowDetailV8 />) }); await settle()
+  const menu = host.querySelector<HTMLButtonElement>('button[aria-label^="この経路の操作"]')!
+  await act(async () => { menu.click() })
+  const menuItems = [...document.querySelectorAll('[role="menuitem"]')].map(node => node.textContent)
+  expect(menuItems).not.toContain('受付を止める')
+  expect(menuItems).not.toContain('受付を再開する')
+  expect([...host.querySelectorAll('button')].some(button => button.textContent?.includes('受付を再開する'))).toBe(true)
+  const entries = [...document.querySelectorAll('[role="menuitem"]')]
+  expect(entries.find(node => node.textContent === '別リンクへ送る')?.querySelector('svg.lucide-arrow-right')).toBeTruthy()
+})
+
+it('読み込み中は停止も再開も対象にしない', async () => {
+  const { routeMenuState } = await import('./detail')
+  expect(routeMenuState(null)).toBeNull()
+  expect(routeMenuState({ isActive: true })).toBe('stop')
+  expect(routeMenuState({ isActive: false })).toBeNull()
+})
+
+it('経路の取得中は再開する操作や案内を出さない', async () => {
+  vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+    const url = new URL(String(input))
+    if (url.pathname === '/api/entry-routes/er-a') return new Promise<Response>(() => {})
+    return Promise.resolve(json({ success: true, data: [] }))
+  })
+  await act(async () => { root.render(<InflowDetailV8 />) }); await settle()
+  expect(host.textContent).not.toContain('受付を再開する')
+  expect(host.querySelector('button[aria-label^="この経路の操作"]')).toBeNull()
+})
+
+it('受付を止めると削除には共通メニューの印を付ける', async () => {
+  await act(async () => { root.render(<InflowDetailV8 />) }); await settle()
+  await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label^="この経路の操作"]')!.click() })
+  const entries = [...document.querySelectorAll('[role="menuitem"]')]
+  expect(entries.find(node => node.textContent === '受付を止める')?.querySelector('svg.lucide-pause')).toBeTruthy()
+  expect(entries.find(node => node.textContent === '削除する')?.querySelector('svg.lucide-trash-2')).toBeTruthy()
 })

@@ -562,9 +562,11 @@ it('配信日の共通入口から期間を指定し、選択表示と解除を�
   const prefix = `${month[1]}-${month[2].padStart(2,'0')}`
   const chooseDay = (day:string) => ([...document.querySelectorAll<HTMLButtonElement>('[role="grid"] button:not([data-outside])')].find(button=>button.textContent===day)!).click()
   act(() => { chooseDay('1') })
+  act(() => { ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="日付を選ぶ"] button')].find(button => button.textContent?.trim() === '確定')!).click() })
   act(() => { (document.querySelector('button[aria-label="配信日（終了）"]') as HTMLButtonElement).click() })
   await flush()
   act(() => { chooseDay('2') })
+  act(() => { ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="日付を選ぶ"] button')].find(button => button.textContent?.trim() === '確定')!).click() })
   await flush()
   expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({from:`${prefix}-01`,to:`${prefix}-02`}))
   expect(trigger.getAttribute('aria-pressed')).toBe('true')

@@ -185,7 +185,13 @@ export function OpenAlerts({
     <section className={styles.alerts} aria-label="開いている異常">
       <h2 className={styles.alertsTitle}>{`開いている異常 ${formatNumber(alerts.length)} 件`}</h2>
       <div className={styles.alertRows}>
-        {alerts.map((alert) => {
+        {[...alerts].sort((a, b) => {
+          const rank = { danger: 0, warning: 1, unknown: 2 }
+          const priority = rank[a.severity] - rank[b.severity]
+          if (priority) return priority
+          const time = (value: string) => { const parsed = Date.parse(value); return Number.isFinite(parsed) ? parsed : 0 }
+          return time(b.lastDetectedAt) - time(a.lastDetectedAt)
+        }).map((alert) => {
           const busy = busyId === alert.id
           const lastEvent = alert.events[0]
           const notification = alert.notification.unconfigured > 0

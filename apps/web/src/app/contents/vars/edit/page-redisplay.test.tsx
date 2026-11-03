@@ -159,6 +159,7 @@ async function pickCalendarDay(iso: string) {
     (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
   )!
   await click(day)
+  await click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
 }
 
 /** 日付の選択で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
@@ -197,6 +198,7 @@ async function clearPickerDate(id: string) {
   const picker = document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!
   const clear = Array.from(picker.querySelectorAll('button')).find((b) => b.textContent?.trim() === '消す')!
   await click(clear)
+  await click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
 }
 
 beforeEach(() => {

@@ -4,6 +4,8 @@ import { jstDate } from '@/lib/jst-datetime'
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
+import Button from './button'
+import selectStyles from './select-menu.module.css'
 import styles from './date-field.module.css'
 import { joinDescribedBy, useFieldContext } from './field-context'
 
@@ -16,7 +18,7 @@ import { joinDescribedBy, useFieldContext } from './field-context'
  *
  * - 表示は「2026年9月23日（水）」。暦は6週を常に出す（月によって高さが変わらない）
  * - キーボード：欄で Enter・↓ で開く／矢印で1日・1週／PageUp・PageDown で月／Home・End で週の端／
- *   Enter・Space で選ぶ／Esc で閉じて欄へ戻る
+ *   Enter・Space で仮選択／確定で反映／Esc で破棄して欄へ戻る
  * - 動き：暦は motion-fast で欄の下から出る。月送りは段が 12px 横から薄く入る（motion-base）
  */
 export default function DateField({
@@ -64,6 +66,8 @@ export default function DateField({
   const dialogId = `${fieldId}-calendar`
   const selected = parseDate(value)
   const [open, setOpen] = useState(false)
+  const [draftValue, setDraftValue] = useState(value)
+  const openedValue = useRef(value)
   const [focused, setFocused] = useState<Date>(() => selected ?? today())
   const [slide, setSlide] = useState<'next' | 'prev' | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -88,6 +92,11 @@ export default function DateField({
   const minDate = parseDate(min ?? '')
   const maxDate = parseDate(max ?? '')
   const isDisabled = (day: Date) => Boolean((minDate && day < minDate) || (maxDate && day > maxDate))
+  const draftDate = parseDate(draftValue)
+  const draftInvalid = Boolean(draftValue && (!draftDate || isDisabled(draftDate)))
+  const stale = value !== openedValue.current
+  const confirmDisabled = disabled || stale || draftInvalid
+  const confirmReason = stale ? 'ほかで日付が変わりました。開き直してください。' : draftInvalid ? '選んだ日付を確認してください。' : disabled ? '日付を変更できません。' : undefined
 
   // 外側を押したときの扱いは MenuPortal に任せる（箱の中の日付押しで閉じない）。
 
@@ -96,8 +105,21 @@ export default function DateField({
     gridRef.current?.querySelector<HTMLButtonElement>('button[tabindex="0"]')?.focus()
   }, [open, focused])
 
+  useEffect(() => {
+    if (!open) return
+    const dismissOutside = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (triggerRef.current?.contains(target) || document.getElementById(dialogId)?.contains(target)) return
+      setOpen(false)
+    }
+    document.addEventListener('pointerdown', dismissOutside, true)
+    return () => document.removeEventListener('pointerdown', dismissOutside, true)
+  }, [open, dialogId])
+
   const openCalendar = () => {
     if (disabled) return
+    openedValue.current = value
+    setDraftValue(value)
     setFocused(selected ?? today())
     setSlide(null)
     setOpen(true)
@@ -127,8 +149,8 @@ export default function DateField({
 
   const choose = (day: Date) => {
     if (isDisabled(day)) return
-    onChange(formatValue(day))
-    close()
+    setDraftValue(formatValue(day))
+    moveTo(day)
   }
 
   const onGridKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -205,6 +227,7 @@ export default function DateField({
           align="start"
           getAnchor={() => triggerRef.current}
           onClose={() => setOpen(false)}
+          className={selectStyles.surface}
         >
         <div
           id={dialogId}
@@ -244,7 +267,8 @@ export default function DateField({
               <div role="row" key={week} className={styles.week}>
                 {days.slice(week * 7, week * 7 + 7).map((day) => {
                   const inMonth = day.getMonth() === month.getMonth()
-                  const isSelected = Boolean(selected && sameDay(day, selected))
+                  const draftDate = parseDate(draftValue)
+                  const isSelected = Boolean(draftDate && sameDay(day, draftDate))
                   const isToday = sameDay(day, today())
                   const off = isDisabled(day)
                   return (
@@ -269,8 +293,14 @@ export default function DateField({
             ))}
           </div>
           <div className={styles.footer}>
-            <button type="button" className={styles.today} disabled={isDisabled(today())} onClick={() => choose(today())}>今日</button>
-            <button type="button" className={styles.reset} onClick={() => { onChange(''); close() }}>消す</button>
+            <div className={styles.footerGroup}>
+              <Button type="button" size="inline" variant="text" textTone="accent" disabled={isDisabled(today())} onClick={() => choose(today())}>今日</Button>
+              <Button type="button" size="inline" variant="text" textTone="quiet" onClick={() => setDraftValue('')}>消す</Button>
+            </div>
+            <div className={styles.footerGroup}>
+              <Button type="button" size="compact" variant="secondary" onClick={close}>キャンセル</Button>
+              <Button type="button" size="compact" variant="primary" disabled={confirmDisabled} disabledReason={confirmReason} onClick={() => { if (confirmDisabled) return; onChange(draftValue); close() }}>確定</Button>
+            </div>
           </div>
         </div>
         </MenuPortal>

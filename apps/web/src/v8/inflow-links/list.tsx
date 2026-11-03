@@ -510,21 +510,21 @@ export default function InflowListV8({
 
   /* ===== フォルダ ===== */
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: accountRows.length, icon: <Inbox size={16} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: routeCountAvailable ? accountRows.length : null, icon: <Inbox size={16} aria-hidden="true" /> },
     ...availableGenres.map((genre) => ({
       kind: 'folder' as const,
       id: genre.name,
       label: genre.name,
       // entry_route_genres に color 欄がない。追加はオーナーの migration 承認待ち。
       colorEditable: false,
-      count: accountRows.filter((row) => row.genre === genre.name).length,
+      count: routeCountAvailable ? accountRows.filter((row) => row.genre === genre.name).length : null,
       // 名前の変更は各フォルダの「…」から（ほかの一覧と同じ・）。
       // 消す・並べ替え・色はフォルダの口（entry-route-genres）に無いので出さない（押せない口を置かない）。
       ...(canManageFolders && !genre.id.startsWith('legacy-')
         ? { onEdit: () => setEditingGenre(genre) }
         : {}),
     })),
-    { kind: 'unfiled' as const, id: UNCATEGORIZED, label: '未分類', count: accountRows.filter((row) => !row.genre).length },
+    { kind: 'unfiled' as const, id: UNCATEGORIZED, label: '未分類', count: routeCountAvailable ? accountRows.filter((row) => !row.genre).length : null },
   ]
   const selectGenre = (id: string) => { setSelectedGenre(id); setPage(1) }
   const folderSelect = (

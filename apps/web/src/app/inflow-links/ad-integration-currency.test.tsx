@@ -241,6 +241,7 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     fireEvent.change(document.querySelector('#ad-cost-name')!, { target: { value: 'チラシ' } })
     await act(async () => { fireEvent.click(document.querySelector('#ad-cost-day')!) })
     await act(async () => { fireEvent.click(document.querySelector('[role="grid"] button[data-today]')!) })
+    await act(async () => { button('確定').click() })
     await act(async () => { button('記録する').click(); await Promise.resolve() })
     expect(document.body.textContent).toContain('費用を入力してください')
     expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
