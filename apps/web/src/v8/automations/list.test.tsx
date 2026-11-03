@@ -359,3 +359,27 @@ it('自動処理のフォルダ数も、すべてと同じルール一覧で数�
  expect(archivedRows).toEqual(expect.arrayContaining(['すべて1','問合せ1','未分類0']))
  expect(host.textContent).toContain('保管したルール')
 })
+
+it('保管したルールを合計から除き、下書きは停止側に数える', async () => {
+  vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: [
+    automation('active', '稼働中'),
+    automation('draft', '下書き', { status: 'draft', isActive: false }),
+    automation('archive', '保管済み', { status: 'archived', isActive: false }),
+  ], summary: null })
+  await render(<AutomationListV8 />)
+  await waitFor(() => Boolean(host.textContent?.includes('下書き')), '一覧')
+  const band = host.querySelector('[aria-label="ルールの数の帯"]')!
+  expect(band.textContent?.replace(/\s/g, '')).toContain('ルール2件')
+  expect(band.textContent?.replace(/\s/g, '')).toContain('動いている1・止めている1')
+  expect(host.textContent).not.toContain('保管済み')
+})
+
+it('動いていない稼働ルールの件数に保管済みを含めない', async () => {
+  vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: [
+    automation('active-idle', '稼働中', { executionCount30d: 0 }),
+    automation('archived-idle', '保管済み', { status: 'archived', isActive: true, executionCount30d: 0 }),
+  ], summary: null })
+  await render(<AutomationListV8 />)
+  await waitFor(() => Boolean(host.textContent?.includes('稼働中')), '一覧')
+  expect(host.textContent).toContain('稼働中で直近30日動いていないルール 1')
+})
