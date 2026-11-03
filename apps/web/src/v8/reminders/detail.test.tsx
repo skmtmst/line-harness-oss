@@ -365,6 +365,30 @@ describe('V8 リマインダの詳細', () => {
     expect(state.updates).toEqual([])
   })
 
+  it('停止の窓はアカウントを切り替えたら閉じる', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    expect(document.querySelector('[data-design-node="RwVo5"]')).not.toBeNull()
+    state.accountId = 'account-b'; await act(async () => { root.render(<ReminderDetailV8Page />) })
+    expect(document.querySelector('[data-design-node="RwVo5"]')).toBeNull()
+    expect(state.updates).toEqual([])
+  })
+
+  it('停止の窓は URL を変えて別のリマインダを開いたら閉じる', async () => {
+    const runs = vi.mocked(api.reminders.runs), get = vi.mocked(api.reminders.get)
+    const originalRuns = runs.getMockImplementation()!, originalGet = get.getMockImplementation()!
+    runs.mockImplementation(async (id, params) => { const res = await originalRuns(id, params); return res.success ? { ...res, data: { ...res.data, reminder: { ...res.data.reminder, id } } } : res })
+    get.mockImplementation(async id => { const res = await originalGet(id); return res.success ? { ...res, data: { ...res.data, id } } : res })
+    try {
+      await render()
+      await act(async () => { buttonByText('一時停止する')!.click() })
+      expect(document.querySelector('[data-design-node="RwVo5"]')).not.toBeNull()
+      state.urlId = 'reminder-2'; await render()
+      expect(document.querySelector('[data-design-node="RwVo5"]')).toBeNull()
+      expect(state.updates).toEqual([])
+    } finally { runs.mockImplementation(originalRuns); get.mockImplementation(originalGet) }
+  })
+
   it('閲覧のみ：一時停止・編集・複製・削除を置かず、書き出しだけ残す', async () => {
     state.role = 'viewer'
     await render()
