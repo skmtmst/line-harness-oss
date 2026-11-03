@@ -98,6 +98,7 @@ describe('637: 停止者を外して一斉配信を続ける', () => {
       expect(f.raw.prepare('SELECT batch_offset FROM broadcasts WHERE id=?').get(child)).toEqual({batch_offset:-1});
     } finally {release();releaseNew();await old;await current;}
     expect(sentIds().sort()).toEqual(['U-allowed','U-stopped','U-unknown']);
+    if(!personalized)expect(calls.multicast).toHaveBeenCalledTimes(1);
   });
   it('送信要求の応答待ちで復旧しても同じ相手を送り直さない',async()=>{
     let entered!:()=>void,release!:()=>void;
