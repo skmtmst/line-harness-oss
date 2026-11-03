@@ -448,11 +448,15 @@ export const post__api_rich_menu_groups_groupId_reconcile_10 = async (c: Context
 
 export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context<Env, "/api/rich-menu-groups/:groupId/unpublish">) => {
   const groupId = c.req.param('groupId');
-  const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
+  let group = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return fail(c, 404, 'NOT_FOUND');
   }
-
+  const body = await c.req.json<{ expectedPublicationGeneration?: unknown }>().catch(() => ({} as { expectedPublicationGeneration?: unknown }));
+  const expected = body.expectedPublicationGeneration;
+  if (expected !== undefined && (!Number.isSafeInteger(expected) || (expected as number) < 0)) {
+    return inputError(c, { success: false, error: '確認した公開の世代が不正です' }, 400, ['expectedPublicationGeneration']);
+  }
   const account = await getLineAccountById(c.env.DB, group.account_id);
   if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
 
@@ -460,12 +464,20 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   // lease なしで畳むと、同じ group を公開中の実行の owner と期限を消してしまう。
   const unpublishOwner = `unpublish-${crypto.randomUUID()}`;
   const unpublishGeneration = await acquirePublishLease(
-    c.env.DB, groupId, unpublishOwner, new Date().toISOString(),
+    c.env.DB, groupId, unpublishOwner, new Date().toISOString(), undefined, expected as number | undefined,
   );
   if (unpublishGeneration === null) {
-    return c.json({ success: false, error: 'already publishing' }, 409);
+    const current = await getRichMenuGroupById(c.env.DB, groupId);
+    return c.json({ success: false, error: '公開状態が変わったか、別の操作が進行中です。読み直してください。', data: current ? { publicationGeneration: current.publishing_generation, status: current.status } : null }, 409);
   }
   const unpublishFence = { owner: unpublishOwner, generation: unpublishGeneration };
+  // lease 取得前に読んだページは古い可能性があるため、取得後に読み直す。
+  const lockedGroup = await getRichMenuGroupWithPages(c.env.DB, groupId);
+  if (!lockedGroup) {
+    await releasePublishLease(c.env.DB, groupId, unpublishFence);
+    return fail(c, 404, 'NOT_FOUND');
+  }
+  group = lockedGroup;
 
   // 取り下げも台帳に残す。
   const unpublishRun = await ensureRichMenuPublishRun(c.env.DB, {

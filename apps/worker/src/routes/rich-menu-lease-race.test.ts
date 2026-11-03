@@ -166,6 +166,21 @@ function expireLease() {
 }
 
 describe('実の停止API × 別D1接続の割り込み', () => {
+
+  test('確認後に別の公開が入ると、古い世代ではLINEへ取り下げない', async () => {
+    const dbRoute = hookedDb(db, /UPDATE rich_menu_groups\s+SET publishing_at = \?, publishing_owner/, async () => {
+      sqlite.prepare("UPDATE rich_menu_groups SET publishing_generation = publishing_generation + 1 WHERE id = 'g1'").run();
+    });
+    const res = await setupApp(dbRoute).request('/api/rich-menu-groups/g1/unpublish', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedPublicationGeneration: 0 }),
+    });
+    expect(res.status).toBe(409);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(pageRichMenuId()).toBe('line-old-1');
+    expect(groupRow().s).toBe('published');
+  });
+
   test('停止の確定直前に別接続が引き継ぐと、409で止まりpage IDもgroupも変えない', async () => {
     const dbTaker = asD1(sqlite);
     let takerGeneration: number | null = null;

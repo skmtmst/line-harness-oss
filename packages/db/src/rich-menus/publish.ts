@@ -30,6 +30,7 @@ export async function acquirePublishLease(
   owner: string,
   nowIso: string,
   ttlMs = PUBLISH_LEASE_MS,
+  expectedGeneration?: number,
 ): Promise<number | null> {
   // 取得と世代の採番を1文にする。別々にすると、間に割り込んだ取得の世代を
   // 自分のものと取り違える。
@@ -42,9 +43,10 @@ export async function acquirePublishLease(
          AND (publishing_owner IS NULL
            OR publishing_expires_at IS NULL
            OR publishing_expires_at <= ?)
+         AND (? IS NULL OR publishing_generation = ?)
        RETURNING publishing_generation`,
     )
-    .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso)
+    .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso, expectedGeneration ?? null, expectedGeneration ?? null)
     .first<{ publishing_generation: number }>();
   return row ? row.publishing_generation : null;
 }
