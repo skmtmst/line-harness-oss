@@ -414,11 +414,11 @@ export const get__api_friend_add_rules_7 = async (c: Context<Env, "/api/friend-a
        */
       c.env.DB.prepare(
         `SELECT
-           SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') THEN 1 ELSE 0 END) AS recent_adds,
-           SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') AND attribution_status = 'captured' THEN 1 ELSE 0 END) AS captured,
-           SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') AND attribution_status = 'unavailable' THEN 1 ELSE 0 END) AS unknown_route,
-           SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') THEN COALESCE(delivery_count, 0) ELSE 0 END) AS delivered,
-           SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') AND routing_status IN ('failed', 'partial_failed') THEN 1 ELSE 0 END) AS failed
+           COALESCE(SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') THEN 1 ELSE 0 END), 0) AS recent_adds,
+           COALESCE(SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') AND attribution_status = 'captured' THEN 1 ELSE 0 END), 0) AS captured,
+           COALESCE(SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') AND attribution_status = 'unavailable' THEN 1 ELSE 0 END), 0) AS unknown_route,
+           COALESCE(SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') THEN COALESCE(delivery_count, 0) ELSE 0 END), 0) AS delivered,
+           COALESCE(SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') AND routing_status IN ('failed', 'partial_failed') THEN 1 ELSE 0 END), 0) AS failed
          FROM friend_add_events WHERE line_account_id = ? AND friend_kind = ?`,
       ).bind(accountId, kind).first<{
         recent_adds: number | null; captured: number | null; unknown_route: number | null;
