@@ -34,3 +34,21 @@ describe('作れたあと公開だけ失敗（WEB199）', () => {
     expect(outcome.kind === 'failed' ? outcome.createdDefinition?.id : null).toBe('def-1')
   })
 })
+
+describe('保存中に画面を閉じた場合', () => {
+  it('保存結果を閉じた画面へ反映しない', async () => {
+    const { saveCustomerNotification } = await import('./screen')
+    const definition = { id: 'def-1', version: 1, lineAccountId: 'acc', draft: {} }
+    const outcome = await saveCustomerNotification({
+      api: {
+        updateDraft: async () => ({ success: true, data: definition }),
+      } as never,
+      accountId: 'acc',
+      setting: { eventType: 'ec.order', label: '注文', title: '注文ありがとう', isEnabled: false, category: 'order', introText: '', outroText: '', buttonLabel: '', buttonUrl: '', imageUrl: '', fixedFields: [] } as never,
+      definition: definition as never,
+      enabled: false,
+      guard: { generation: 1, currentGeneration: () => 1, forAccountId: 'acc', currentAccountId: () => null, sentFingerprint: 'x', currentFingerprint: () => 'x' },
+    })
+    expect(outcome).toEqual({ kind: 'stale', contentSaved: true, settleDraft: false })
+  })
+})

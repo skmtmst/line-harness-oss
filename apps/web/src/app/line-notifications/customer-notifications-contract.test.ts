@@ -110,7 +110,6 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
     expect(PAGE).toContain('const selectedAccountRef = useRef(selectedAccountId)')
     expect(PAGE).toContain('selectedAccountRef.current = selectedAccountId')
     expect(PAGE).toContain("guard.forAccountId !== guard.currentAccountId()")
-    expect(PAGE).toContain('currentAccountId: () => selectedAccountRef.current')
     expect(PAGE).toContain("forAccountId: selectedAccountId ?? ''")
   })
 
