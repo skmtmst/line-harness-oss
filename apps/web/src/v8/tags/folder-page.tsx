@@ -1,5 +1,8 @@
 'use client'
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useContext, useEffect, useRef, useState } from 'react'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { FolderCheck, FolderPlus, Trash2 } from 'lucide-react'
@@ -83,6 +86,13 @@ function TagFolderPage() {
   const activeRef = useRef<RequestKey>({ editId, generation: 0 })
   /* 直すとき、ready になるまで名前も色も本物ではない。空のまま保存して元の名前を消さない。 */
   const [loadState, setLoadState] = useState<'ready' | 'loading' | 'error' | 'forbidden'>(editId ? 'loading' : 'ready')
+  const baseline = useRef({ name: '', color: DEFAULT_COLOR })
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({
+    dirty: (loadState === 'ready' && (name !== baseline.current.name || color !== baseline.current.color)) || saving,
+    busy: saving,
+    onDiscard: () => { setName(baseline.current.name); setColor(baseline.current.color) },
+  })
 
   const close = () => router.push(scope === 'tag' ? '/tags' : '/tags?tab=fields')
 
@@ -93,6 +103,7 @@ function TagFolderPage() {
     setNameError('')
     setSaving(false)
     if (!editId) {
+      baseline.current = { name: '', color: DEFAULT_COLOR }
       setName('')
       setColor(DEFAULT_COLOR)
       setFolderAccountId(selectedAccountId)
@@ -108,6 +119,7 @@ function TagFolderPage() {
         if (!result.success) { setLoadState('error'); return }
         const group = result.data.find((item) => item.id === editId)
         if (!group) { setLoadState('error'); return }
+        baseline.current = { name: group.name, color: folderDisplayColor(group) }
         setName(group.name)
         setColor(folderDisplayColor(group))
         setFolderAccountId(group.accountId)
@@ -139,6 +151,7 @@ function TagFolderPage() {
         if (!result.success) throw new Error('save_failed')
       }
       if (!sameRequest(activeRef.current, request)) return
+      guard.disarm()
       close()
     } catch (reason) {
       if (!sameRequest(activeRef.current, request)) return
@@ -160,6 +173,7 @@ function TagFolderPage() {
       const result = await api.tagGroups.delete(editId, folderAccountId)
       if (!result.success) throw new Error('delete_failed')
       if (!sameRequest(activeRef.current, request)) return
+      guard.disarm()
       router.push('/tags')
       return true
     } catch (reason) {
@@ -226,6 +240,7 @@ function TagFolderPage() {
           ) : null}
         </>
       </FolderEditorDialog>
+      <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
       <ConfirmDialog
         open={deleteOpen}
         title={`「${name}」を削除しますか？`}

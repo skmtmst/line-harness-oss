@@ -2,7 +2,10 @@
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
 const changeReasonRequirement = requiredText('変更理由を入力してください。')
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -168,6 +171,23 @@ export default function MediaDetailDialog({
   const [termsConsentNote, setTermsConsentNote] = useState('')
   const [termsBusy, setTermsBusy] = useState(false)
   const [termsError, setTermsError] = useState('')
+  const [termsDiscardOpen, setTermsDiscardOpen] = useState(false)
+  const [versionNotice, setVersionNotice] = useState('')
+  const [pendingVersionMessage, setPendingVersionMessage] = useState<string | null>(null)
+  const termsDirty = termsEditing && (termsExpiresAt !== (item?.usageExpiresAt ?? '') || termsConsentNote !== (item?.usageConsentNote ?? ''))
+  const editBusy = termsBusy || versionPhase === 'uploading' || versionPhase === 'publishing'
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({
+    dirty: termsDirty || Boolean(versionFile || versionPreview || changeReason) || editBusy,
+    busy: editBusy,
+    onDiscard: () => { setTermsEditing(false); setVersionFile(null); setVersionPreview(null); setVersionPhase('idle'); setChangeReason('') },
+  })
+  useEffect(() => {
+    if (!pendingVersionMessage) return
+    const message = pendingVersionMessage
+    setPendingVersionMessage(null)
+    guard.guarded(() => onVersionCreated(message))
+  }, [pendingVersionMessage, guard.guarded, onVersionCreated])
 
   /** 保存URLへ直接行かず、権限確認と監査を通る口から受け取って保存させる。 */
   const displaySrc = item && accountId ? api.media.contentUrl(item.id, accountId) : ''
@@ -321,6 +341,8 @@ export default function MediaDetailDialog({
     setVersionDownloadError('')
     setTermsEditing(false)
     setTermsError('')
+    setVersionNotice('')
+    setPendingVersionMessage(null)
   }, [item?.id])
 
   function chooseVersionFile(file: File | null) {
@@ -400,7 +422,13 @@ export default function MediaDetailDialog({
         changeReason: changeReason.trim(),
       })
       if (!response.success) throw new Error(response.error)
-      onVersionCreated(`「${item.filename}」へ第${response.data.versionNo}版を追加しました。使用先の固定版は変えていません。`)
+      const message = `「${item.filename}」へ第${response.data.versionNo}版を追加しました。使用先の固定版は変えていません。`
+      setVersionFile(null)
+      setVersionPreview(null)
+      setChangeReason('')
+      setVersionPhase('idle')
+      setVersionNotice(message)
+      setPendingVersionMessage(message)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
       setVersionPhase('preview')
@@ -420,7 +448,7 @@ export default function MediaDetailDialog({
               href="/contents"
               onClick={(event) => {
                 event.preventDefault()
-                onClose()
+                guard.guarded(onClose)
               }}
               className="hover:underline"
             >
@@ -438,7 +466,7 @@ export default function MediaDetailDialog({
           </Button>
           {downloadError ? <Notice tone="danger" >{downloadError}</Notice> : null}
           {impact && impact.usageCount > 0 ? (
-            <Button type="button" variant="primary" onClick={() => onOpenReplacement(item)}>使用先を差し替える</Button>
+            <Button type="button" variant="primary" onClick={() => guard.guarded(() => onOpenReplacement(item))}>使用先を差し替える</Button>
           ) : null}
         </div>
       </div>
@@ -488,6 +516,7 @@ export default function MediaDetailDialog({
             {versionPreview?.canReplace ? (
               <div className="mt-3"><Field label="変更理由" htmlFor={`${fileInputId}-reason`} requirement={changeReasonRequirement}><SaveErrorField names={["changeReason","change_reason"]}><SharedTextField id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" /></SaveErrorField></Field></div>
             ) : null}
+            {versionNotice ? <Notice tone="success" message={versionNotice} className="mt-3" /> : null}
             {versionError ? <Notice tone="danger" message={versionError} className="mt-3" /> : null}
             {impact && impact.usageCount > 0 ? (
               <Notice tone="warn" className="mt-3">
@@ -575,7 +604,7 @@ export default function MediaDetailDialog({
                   /></SaveErrorField></Field></div>
                 {termsError ? <Notice tone="danger" message={termsError} /> : null}
                 <div className="flex justify-end gap-2">
-                  <Button type="button" onClick={() => setTermsEditing(false)} disabled={termsBusy}>キャンセル</Button>
+                  <Button type="button" onClick={() => { if (termsDirty) setTermsDiscardOpen(true); else setTermsEditing(false) }} disabled={termsBusy}>キャンセル</Button>
                   <Button type="button" variant="primary" onClick={() => void saveTerms()} disabled={termsBusy} busy={termsBusy} busyLabel="保存しています…">保存する
                   </Button>
                 </div>
@@ -708,6 +737,9 @@ export default function MediaDetailDialog({
           ) : null}
         </aside>
       </div>
-    </div></SaveErrorScope>
+    </div><OverlayDepthContext.Provider value={depth + 2}>
+      <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={editBusy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+      <UnsavedLeaveDialog open={termsDiscardOpen} title="入力を破棄しますか？" description="利用期限と同意の入力が消えます。" discardLabel="破棄する" onConfirm={() => { setTermsDiscardOpen(false); setTermsEditing(false) }} onCancel={() => setTermsDiscardOpen(false)} />
+    </OverlayDepthContext.Provider></SaveErrorScope>
   )
 }

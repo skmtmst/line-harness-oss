@@ -60,6 +60,14 @@ const GUARDED = [
   'v8/broadcasts/quick-send.tsx',
   'v8/auto-replies/quick-create.tsx',
   'v8/forms/list.tsx',
+  'v8/contents/list.tsx',
+  'v8/contents/media-replacement-dialog.tsx',
+  'v8/contents/media-detail-dialog.tsx',
+  'v8/webhooks/incoming.tsx',
+  'v8/webhooks/outgoing.tsx',
+  'v8/hq/account-dialogs.tsx',
+  'v8/tags/folder-page.tsx',
+  'v8/tags/tags-tab.tsx',
   'v8/hq-broadcasts/list.tsx',
   'v8/hq-templates/store-list.tsx',
   'v8/hq/home.tsx',
@@ -375,10 +383,6 @@ const EXEMPTIONS: Record<string, string> = {
     '詳細のシナリオ名は use-inline-detail-guard.tsx が保護する。複製やフォルダの窓は別途確認する。',
   'v8/auto-replies/list.tsx':
     '★V8 の自動応答一覧（uE9gf）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。止める窓の理由欄は閉じると戻るダイアログ内の入力',
-  'v8/webhooks/incoming.tsx':
-    '★V8 外部連携・こちらで受け取る（gW0F2）。作る窓・合言葉窓・試す窓の入力は閉じると戻る窓の中だけで、保存は窓の中の「作る」「更新する」で確定する。一覧上の操作（動かす・止める・結び付ける・確認した・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない',
-  'v8/webhooks/outgoing.tsx':
-    '★V8 外部連携・こちらから送る。一覧上の操作（動かす・止める）は押した直後に即時保存し、窓の中の入力は閉じると戻る。画面に残る下書きを持たない',
   'v8/analytics/cross.tsx':
     '★V8 分析のクロス集計。選ぶ欄は集計の条件で、結果の枡から対象者を作って友だち一覧・配信へ渡すだけ。保存する編集画面ではなく、画面に残る下書きを持たない',
   'v8/analytics/funnel.tsx':
@@ -398,18 +402,12 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 LINEアカウントの詳細から開く窓（送受信を止める・資格情報の差し替え・アーカイブ・登録の内容を編集）。入力はすべて窓の中で、閉じると戻る',
   'v8/booking-staff/shifts.tsx':
     'app/booking/staff/shifts/staff-detail-v8.tsx と同じ画面の★V8版（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定する。元の画面と同じ扱い',
-  'v8/contents/list.tsx':
-    'app/contents/list-v8.tsx と同じ一覧の★V8版（O7hUt7）。一覧上の操作は押した直後に確認窓か即時保存で確定し、名前・理由・移し先の入力は閉じると戻る札・窓の中だけ',
-  'v8/contents/media-detail-dialog.tsx':
-    '★V8 登録メディアの詳細の窓（app/contents/media-detail-dialog.tsx の写し）。名前・差し替えの入力は窓の中で、閉じると戻る',
   'v8/events/bookings.tsx':
     'app/events/bookings/bookings-v8.tsx と同じ画面の★V8版（Mu8qW）。承認・キャンセル・待ち順は確認窓で確定して即時保存し、お知らせは「送る」で即時送信する。窓内の理由欄は閉じると戻る',
   'v8/friend-detail/dialogs.tsx':
     '★V8 友だち詳細の個別操作から開く2つの窓（対応状況を編集・シナリオに登録する）。入力は窓の中で、閉じると戻る',
   'v8/hq-templates/console.tsx':
     'app/hq/templates/template-console.tsx と同じ画面の★V8版。多段の作る・配る流れで、段の途中離脱の扱いは元の画面と一緒に決めるため同じ扱い',
-  'v8/hq/account-dialogs.tsx':
-    'app/hq/account-settings-dialogs.tsx と同じ3つの窓の★V8版（HMpVx・D6ljr・HFsO9）。窓内の入力は閉じると戻り、画面に残る下書きを持たない',
   'v8/inflow-links/detail.tsx':
     'app/inflow-links/detail/page.tsx と同じ画面の★V8版（Q5le3）。リンクの編集は窓の中の保存で確定し、ほかの欄は読み取り専用のURL・絞り込み・件数',
   'v8/nen-posts/policy-history.tsx':
@@ -422,8 +420,6 @@ const EXEMPTIONS: Record<string, string> = {
     'app/restaurant-test/v8/tables.tsx と同じ画面の★V8版（BERxg）。卓の追加・変更は窓（gBrCz）の中で、閉じると戻る',
   'v8/scenario-first-step/first-step.tsx':
     'app/scenarios/first-step-v8.tsx と同じ画面の★V8版（V6xAo）。番兵の要否は元の画面（first-step/page.tsx・未判定）と一緒に決めるため同じ扱い',
-  'v8/tags/tags-tab.tsx':
-    'app/tags/tags-tab-v8.tsx と同じ一覧の★V8版（I1E7Bt）。一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、フォルダの窓は閉じると戻る',
   'v8/templates/list.tsx':
     '詳細のテンプレート名は use-inline-detail-guard.tsx が保護する。種類ごとの窓や移動中の選択は別途確認する。',
   'v8/nen-pets/editor.tsx':

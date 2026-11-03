@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import type { MediaItem } from '@line-crm/shared'
 
 /*
@@ -321,4 +322,43 @@ describe('IDEA-15 版と元ファイルの取り出し', () => {
 
     expect(fixture.downloadedVersions).toEqual([{ id: 'media-a', versionNo: 2, accountId: 'account-a' }])
   })
+})
+it('利用期限の編集を保存せず一覧へ戻る前に確認する', async () => {
+  window.history.replaceState(null, '', '/contents')
+  await renderDialog()
+  await clickButton('記録する')
+  const input = dialog().querySelector<HTMLInputElement>('input[id$="-consent"]')!
+  await setInputValue(input, '確認した内容')
+  const back = [...dialog().querySelectorAll('a')].find(a => a.textContent?.trim() === '登録メディア')!
+  await act(async () => { back.click(); await settle() })
+  expect(document.body.textContent).toContain('保存していない変更があります')
+})
+it('新しい版のファイルを選んだ後は一覧へ戻る前に確認する', async () => {
+  window.history.replaceState(null, '', '/contents')
+  await renderDialog()
+  const input = dialog().querySelector<HTMLInputElement>('input[type="file"]')!
+  await act(async () => {
+    Object.defineProperty(input, 'files', { configurable: true, value: [new File(['test'], 'sample.png', { type: 'image/png' })] })
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    await settle()
+  })
+  const back = [...dialog().querySelectorAll('a')].find(a => a.textContent?.trim() === '登録メディア')!
+  await act(async () => { back.click(); await settle() })
+  expect(document.body.textContent).toContain('保存していない変更があります')
+})
+it('期限と同意の入力だけを破棄しても選んだファイルは残る', async () => {
+  await renderDialog()
+  const fileInput = dialog().querySelector<HTMLInputElement>('input[type="file"]')!
+  await act(async () => {
+    Object.defineProperty(fileInput, 'files', { configurable: true, value: [new File(['test'], 'sample.png', { type: 'image/png' })] })
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }))
+    await settle()
+  })
+  await clickButton('記録する')
+  await setInputValue(dialog().querySelector<HTMLInputElement>('input[id$="-consent"]')!, '確認した内容')
+  await clickButton('キャンセル')
+  expect(document.body.textContent).toContain('利用期限と同意の入力が消えます')
+  await clickButton('破棄する')
+  expect(document.body.textContent).toContain('選んだファイル：sample.png')
+  expect(document.body.textContent).not.toContain('確認した内容')
 })
