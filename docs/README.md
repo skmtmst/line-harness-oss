@@ -1196,5 +1196,4 @@
 - [2002 kenta hotfix broadcast scope](release-log/unreleased/2002-kenta-hotfix-broadcast-scope.md)
 - [2038 masato operation alert prod](release-log/unreleased/2038-masato-operation-alert-prod.md)
 - [2040 masato operation alert quota](release-log/unreleased/2040-masato-operation-alert-quota.md)
-- [2069 masato hq inherited users](release-log/unreleased/2069-masato-hq-inherited-users.md)
 - [musubo product name](release-log/unreleased/musubo-product-name.md)
