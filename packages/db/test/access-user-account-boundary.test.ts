@@ -7,13 +7,15 @@ import { listAccessUsers } from '../src/access-audit.js';
 import { asD1 } from './d1-test-helper.js';
 
 describe('access users for a selected account', () => {
-  it('shows its creator and members without other HQ members or account IDs', async () => {
+  it('inherits all same-tenant HQ users without other account members or account IDs', async () => {
     const sqlite = new Database(':memory:');
     sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'bootstrap.sql'), 'utf8'));
+    sqlite.prepare("INSERT INTO tenants(id,name) VALUES ('foreign-tenant','別統括')").run();
     const staff = sqlite.prepare(`INSERT INTO staff_members(id,name,role,api_key,tenant_id,account_scope)
       VALUES (?,?,'admin',?,?,?)`);
     staff.run('creator', '作成者', 'key-creator', DEFAULT_TENANT_ID, 'all');
-    staff.run('hq-other', '他の統括', 'key-hq-other', DEFAULT_TENANT_ID, 'all');
+    staff.run('hq-other', '同じ統括の管理者', 'key-hq-other', DEFAULT_TENANT_ID, 'all');
+    staff.run('foreign-hq', '別統括の管理者', 'key-foreign', 'foreign-tenant', 'all');
     staff.run('hq-admin', '兼任管理者', 'key-hq-admin', DEFAULT_TENANT_ID, 'all');
     staff.run('account-member', '担当者', 'key-account-member', DEFAULT_TENANT_ID, 'accounts');
     staff.run('other-account-member', '別アカウント担当者', 'key-other', DEFAULT_TENANT_ID, 'accounts');
@@ -33,9 +35,17 @@ describe('access users for a selected account', () => {
       allowedLineAccountIds: ['account-a'],
       lineAccountId: 'account-a',
     });
-    expect(result.items.map((item) => item.id).sort()).toEqual(['account-member', 'creator', 'hq-admin']);
+    expect(result.items.map((item) => item.id).sort()).toEqual(['account-member', 'creator', 'hq-admin', 'hq-other']);
     expect(result.items.find((item) => item.id === 'account-member')?.accountScope.lineAccountIds).toEqual(['account-a']);
     expect(result.items.find((item) => item.id === 'hq-admin')?.roleBundle).toBe('administrator');
+    expect(result.items.find(item => item.id === 'foreign-hq')).toBeUndefined();
+    for (const lineAccountId of ['missing-account', 'account-b']) {
+      const inaccessible = await listAccessUsers(asD1(sqlite), {
+        tenantId: DEFAULT_TENANT_ID, allowedLineAccountIds: ['account-a'], lineAccountId,
+      });
+      expect(inaccessible.items).toEqual([]);
+      expect(inaccessible.summary.active).toBe(0);
+    }
     sqlite.close();
   });
 });
