@@ -65,3 +65,19 @@ it('本人が確認したパスキーだけを削除要求へ渡す', async () =
   fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
   await waitFor(() => expect(fx.call).toHaveBeenCalledWith('/api/auth/passkeys/self', expect.objectContaining({ method: 'DELETE', body: JSON.stringify({ id: 'key-2' }) })))
 })
+
+it('本人確認の途中で別の本人に切り替わったら削除を送らない', async () => {
+  let finish!: (grant: string) => void
+  fx.gate.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  fx.call.mockResolvedValue({ success: true, data: [{ id: 'key-2', createdAt: '2026-02-01T00:00:00Z', lastUsedAt: null }] })
+  const view = render(<SelfPasskeys enabled />)
+  await screen.findByText('パスキー 1')
+  fireEvent.click(screen.getByRole('button', { name: '削除' }))
+  const dialog = await screen.findByRole('alertdialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+  expect(fx.gate).toHaveBeenCalledOnce()
+  fx.id = 'operator-2'
+  view.rerender(<SelfPasskeys enabled />)
+  await act(async () => { finish('fixture-grant'); await Promise.resolve() })
+  expect(fx.call.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false)
+})

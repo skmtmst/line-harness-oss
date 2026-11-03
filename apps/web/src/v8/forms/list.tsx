@@ -674,12 +674,16 @@ export default function FormsListV8() {
 
   const removeFolder = async () => {
     if (!deletingFolder || folderBusy || !selectedAccountId || !renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current || folderDeleteScope !== accountScope.current) return
+    if (deletingFolder.accountId === undefined || (typeof deletingFolder.accountId === 'string' && deletingFolder.accountId !== selectedAccountId)) {
+      setFolderError('フォルダの所有先を確認できません。一覧を読み直してください。')
+      return
+    }
     const scope = folderDeleteScope
     const targetId = deletingFolder.id
     setFolderBusy(true)
     setFolderError('')
     try {
-      const res = await api.folders.delete(targetId, selectedAccountId)
+      const res = await api.folders.delete(targetId, deletingFolder.accountId ?? undefined)
       if (!res.success) throw new Error(res.error)
       if (scope !== accountScope.current) return
       folderDeleteTicket.current = null

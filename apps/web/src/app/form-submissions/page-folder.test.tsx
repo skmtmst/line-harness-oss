@@ -194,6 +194,21 @@ async function clickFolder(label: string) {
 }
 
 describe('フォームのフォルダ削除確認', () => {
+  it.each([{ accountId: null }, { accountId: 'account-b' }, {}])('共通・別所有・不明の削除対象を確認する %o', async owner => {
+    apiFolders.list.mockResolvedValue({ success: true, data: [{ ...folderA, ...owner }] })
+    await act(async () => { root.render(<FormSubmissionsPage />) })
+    await clickFolder('A箱')
+    const action = [...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'フォルダ「A箱」の操作')!
+    await act(async () => { action.click() })
+    const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('消す')) as HTMLElement
+    await act(async () => { remove.click() })
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    if ('accountId' in owner && owner.accountId === null) expect(dialog.textContent).toContain('共通（全アカウント）')
+    const retained = heldFolderConfirm.current!
+    await act(async () => { await retained() })
+    if ('accountId' in owner && owner.accountId === null) expect(apiFolders.delete).toHaveBeenCalledWith('fol-a', undefined)
+    else expect(apiFolders.delete).not.toHaveBeenCalled()
+  })
   it('未保存確認の間にアカウントが往復した古い削除操作は開かない', async () => {
     await act(async () => { root.render(<FormSubmissionsPage />) })
     await clickFolder('A箱')

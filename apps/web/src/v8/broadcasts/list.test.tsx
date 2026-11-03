@@ -1092,6 +1092,15 @@ describe('保持した一斉配信一覧の変更操作', () => {
     expect(document.querySelector('[role="alertdialog"]')?.textContent).not.toContain('選択中の店')
   })
 
+  it('共通フォルダの削除は共通の対象を示す', async () => {
+    resetUrl()
+    listFolders.mockResolvedValue({ success: true, data: [{ id: 'a', name: '分類A', kind: 'broadcast', accountId: null }], unfiledCount: 2 })
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
+    act(() => fireEvent.click(menuItem('消す'))); await flush()
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('共通（全アカウント）')
+  })
+
   it('閉じたフォルダ削除の古い確定は実行しない', async () => {
     resetUrl()
     listFolders.mockResolvedValue({ success: true, data: [{ id: 'a', name: '分類A', kind: 'broadcast' }], unfiledCount: 2 })

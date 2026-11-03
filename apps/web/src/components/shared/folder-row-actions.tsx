@@ -217,7 +217,7 @@ export function useFolderRowActions({
         onConfirm={() => void remove()}
         confirmLockedReason={livePermission ? permissionReason : undefined}
         confirmDisabled={livePermission ? !actionEnabled && !permissionReason : undefined}
-      >{deleting ? <OperationTargetSummary allAccounts={deleting.accountId === null} accounts={deleting.accountId === null ? [] : [{ id: deleting.accountId ?? '' }]} /> : null}</ConfirmDialog>
+      >{deleting ? <OperationTargetSummary accounts={deleting.accountId === null ? [] : [{ id: deleting.accountId ?? '' }]} externalTarget={deleting.accountId === null ? { label: 'フォルダの対象', name: '共通（全アカウント）' } : undefined} /> : null}</ConfirmDialog>
     </>
   ) : null
 

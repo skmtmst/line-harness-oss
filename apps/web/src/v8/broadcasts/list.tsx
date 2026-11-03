@@ -1340,7 +1340,7 @@ menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedR
             setDeletingFolder(null)
             setFolderError('')
           }}
-        >{deletingFolder ? <OperationTargetSummary accounts={[{ id: 'accountId' in deletingFolder && typeof deletingFolder.accountId === 'string' ? deletingFolder.accountId : '' }]} /> : null}</ConfirmDialog>
+        >{deletingFolder ? <OperationTargetSummary accounts={deletingFolder.accountId === null ? [] : [{ id: deletingFolder.accountId ?? '' }]} externalTarget={deletingFolder.accountId === null ? { label: 'フォルダの対象', name: '共通（全アカウント）' } : undefined} /> : null}</ConfirmDialog>
         <ConfirmDialog
           open={deleteTarget !== null && renderedDeleteScope?.generation === accountScope.current.generation}
           title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}

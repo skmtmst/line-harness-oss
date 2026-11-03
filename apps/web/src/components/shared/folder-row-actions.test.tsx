@@ -132,7 +132,7 @@ describe('フォルダの「…」（共通）', () => {
     await act(async () => { root.render(<Screen enabled folders={folders} onChanged={() => {}} onDeleted={() => {}} />) })
     await click(menuButton('キャンペーン'))
     await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.trim() === '消す'))
-    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('すべてのLINEアカウント')
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('共通（全アカウント）')
     await act(async () => { await capturedConfirm.current?.() })
     expect(remove).toHaveBeenCalledWith('f-1', undefined)
   })

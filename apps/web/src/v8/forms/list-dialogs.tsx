@@ -123,7 +123,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
           setDeletingFolder(null)
           setFolderError('')
         }}
-      ><OperationTargetSummary accounts={[{ id: deletingFolder && 'accountId' in deletingFolder && typeof deletingFolder.accountId === 'string' ? deletingFolder.accountId : '' }]} /></ConfirmDialog>
+      ><OperationTargetSummary accounts={deletingFolder?.accountId === null ? [] : [{ id: deletingFolder?.accountId ?? '' }]} externalTarget={deletingFolder?.accountId === null ? { label: 'フォルダの対象', name: '共通（全アカウント）' } : undefined} /></ConfirmDialog>
 
       {moveTarget !== null ? (
         <DetailPanel
