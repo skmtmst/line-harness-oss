@@ -5,7 +5,7 @@ import { simulationContext } from '../features/broadcasts/broadcast-simulation/i
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { parseJsonArray, sameJsonMeaning } from './broadcast-json.js';
-import { inputError, validatedInputBody } from '../lib/input-errors.js';
+import { inputError, validatedInputBody, readBoundedBytes } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
 import { getBroadcastById, updateBroadcast, requestBroadcastStop, resumeBroadcastSending, beginBroadcastRetryAttempt, closeClaimsForStop, reopenFailedClaims, getRetryableRecipientIds } from '@line-crm/db';
 import type { BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
@@ -369,6 +369,38 @@ export const post__api_broadcasts_id_cancel_2 = async (c: Context<Env, "/api/bro
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
   const body = validatedInputBody(c) ?? {};
+  if(!validatedInputBody(c)) {
+    let value: unknown;
+    const bytes=await readBoundedBytes(c.req.raw,64*1024);
+    if(bytes===null)return c.json({success:false,error:'送信内容が大きすぎます'},413);
+    if(bytes.length){
+      const type=(c.req.header('content-type')??'').split(';')[0].trim().toLowerCase();
+      if(type==='application/x-www-form-urlencoded') {
+        const values=new URLSearchParams(new TextDecoder().decode(bytes)).getAll('expectedVersion');
+        if(values.length>1)return inputError(c,{success:false,error:'版を確認してください'},400,['expectedVersion']);
+        value=values[0];
+      } else if(type==='multipart/form-data') {
+        try {
+          const form=await new Request(c.req.url,{method:'POST',headers:c.req.raw.headers,body:bytes}).formData();
+          const values=form.getAll('expectedVersion');
+          if(values.length>1)return inputError(c,{success:false,error:'版を確認してください'},400,['expectedVersion']);
+          value=values[0];
+        } catch { return inputError(c,{success:false,error:'送信内容の形式を確認してください'},400); }
+      } else {
+        // 従来どおり本文だけの呼び出しは受けるが、版を含みそうなら無視しない。
+        const text=new TextDecoder().decode(bytes);
+        let decoded=text;
+        try { decoded=decodeURIComponent(text); } catch { /* 不正なエスケープはそのまま調べる。 */ }
+        let hasVersion=/expected\s*version/i.test(decoded);
+        try { const object=JSON.parse(text);hasVersion ||= !!object&&typeof object==='object'&&'expectedVersion' in object; } catch { /* JSON以外の従来本文。 */ }
+        if(hasVersion)return inputError(c,{success:false,error:'版はJSONまたはフォームで指定してください'},400,['expectedVersion']);
+      }
+    }
+    if(value!==undefined) {
+      if(typeof value!=='string'||!/^\d+$/.test(value))return inputError(c,{success:false,error:'版を確認してください'},400,['expectedVersion']);
+      body.expectedVersion=Number(value);
+    }
+  }
   const version = body.expectedVersion;
   if (version !== undefined && (!Number.isSafeInteger(version) || (version as number) < 1)) {
     return inputError(c, { success: false, error: 'expectedVersion must be a positive integer' }, 400, ['expectedVersion']);
@@ -391,6 +423,7 @@ export const post__api_broadcasts_id_cancel_2 = async (c: Context<Env, "/api/bro
        WHERE id = ? AND status = 'scheduled' AND scheduled_at IS NOT NULL
          AND (? IS NULL OR COALESCE(lock_version, 1) = ?)`,
   ).bind(id, version ?? null, version ?? null).run();
+
   if ((result.meta.changes ?? 0) !== 1) {
     return version === undefined ? c.json({ success: false, error: 'Broadcast is no longer scheduled' }, 409) : conflict();
   }
