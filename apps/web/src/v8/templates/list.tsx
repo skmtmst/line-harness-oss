@@ -17,7 +17,8 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Button from '@/components/shared/button'
 import { type ContextMenuItem } from '@/components/shared/context-menu'
-import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
 import FilterChip from '@/components/shared/filter-chip'
@@ -73,6 +74,8 @@ export default function TemplatesListV8() {
   const lockedReason = usePermissionLockReason(canMutateTemplates)
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
+  const detailGuard = useInlineDetailGuard('row')
+  const { id: activeId, setId: setActiveId } = detailGuard
 
   /*
    * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
@@ -80,7 +83,10 @@ export default function TemplatesListV8() {
    */
   const [urlView, setUrlView] = useListUrlState({ q: '', folder: 'all', chips: '', view: '', size: '20', page: '1', tab: 'message' })
   const knownSections: Section[] = ['message', 'question', 'rich_video', 'card_message', 'rich_message', 'coupon', 'research']
-  const activeSection: Section = knownSections.includes(urlView.tab as Section) ? urlView.tab as Section : 'message'
+  const requestedSection: Section = knownSections.includes(urlView.tab as Section) ? urlView.tab as Section : 'message'
+  const heldSection = useRef(requestedSection)
+  if (!detailGuard.holding) heldSection.current = requestedSection
+  const activeSection = detailGuard.holding ? heldSection.current : requestedSection
   /* フォルダの数は、テンプレート以外のタブでは最後の種類を保つ。 */
   const [folderSection, setFolderSection] = useState<FolderCountSection>(() => activeSection === 'question' || activeSection === 'rich_video' ? activeSection : 'message')
   useEffect(() => { if (activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video') setFolderSection(activeSection) }, [activeSection])
@@ -158,7 +164,6 @@ export default function TemplatesListV8() {
   const moveLock = useRef(false)
   const [moveError, setMoveError] = useState('')
   /* 右から出る詳細パネル。URL（?row=）に今の行を残す。 */
-  const [activeId, setActiveId] = useDetailPanelUrl('row')
   /* パネルを開いている1件の移動は、窓ではなくパネルの中で選ぶ。 */
   const [panelMove, setPanelMove] = useState(false)
   /* 右クリックされた行（「…」と同じ項目を出す）。 */
@@ -705,11 +710,17 @@ export default function TemplatesListV8() {
           onSelect: () => handleDelete(t),
         },
       ] : []),
-    ]
+    ].map(item => item.onSelect ? { ...item, onSelect: () => detailGuard.protect(() => { void item.onSelect?.() }) } : item)
   }
 
   /* 右から出る詳細パネルの今の行。一覧に無ければ閉じる。 */
-  const activeTemplate = activeId ? (templates.find((t) => t.id === activeId) ?? null) : null
+  const currentTemplate = activeId ? (templates.find((t) => t.id === activeId) ?? null) : null
+  const heldTemplate = useRef<Template | null>(null)
+  const heldAccount = useRef(selectedAccountId)
+  if (heldAccount.current !== selectedAccountId) { heldAccount.current = selectedAccountId; heldTemplate.current = null }
+  if (currentTemplate) heldTemplate.current = currentTemplate
+  else if (!detailGuard.holding || heldTemplate.current?.id !== activeId) heldTemplate.current = null
+  const activeTemplate = currentTemplate ?? heldTemplate.current
   const panelDetail = useTemplatePanelDetail(activeTemplate?.id ?? null, selectedAccountId, canMutateTemplates, load)
   const panelUsageRows = panelDetail.detail?.usedBy ? usageRows(panelDetail.detail.usedBy) : []
   const navItems = activeTemplate && shownItems.some((t) => t.id === activeTemplate.id) ? shownItems : templates
@@ -764,10 +775,10 @@ export default function TemplatesListV8() {
       count: folder.itemCount ?? null,
       color: folder.color,
       qaOpen: canMutateTemplates && folder.name === '予約' ? 'CzndJ' : undefined,
-      onEdit: canMutateTemplates ? () => setEditingFolder(folder) : undefined,
-      onMoveUp: canMutateTemplates && index > 0 ? () => void moveFolder(index, -1) : undefined,
-      onMoveDown: canMutateTemplates && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
-      onDelete: canMutateTemplates ? () => setDeletingFolder(folder) : undefined,
+      onEdit: canMutateTemplates ? () => detailGuard.protect(() => setEditingFolder(folder)) : undefined,
+      onMoveUp: canMutateTemplates && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
+      onMoveDown: canMutateTemplates && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
+      onDelete: canMutateTemplates ? () => detailGuard.protect(() => setDeletingFolder(folder)) : undefined,
       deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: 'unfiled', label: '未分類', count: ready ? unfiledCount : null },
@@ -798,7 +809,7 @@ export default function TemplatesListV8() {
       createAction={createButton(true)}
       activeId={selectedCategory}
       onSelect={selectCategory}
-      onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
+      onAddFolder={canMutateTemplates ? () => detailGuard.protect(() => setFolderDialogOpen(true)) : undefined}
       addFolderLabel="フォルダを追加"
       rows={folderRows}
     >
@@ -909,11 +920,11 @@ export default function TemplatesListV8() {
   )
 
   const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
-  const switchSection = (next: Section) => {
+  const switchSection = (next: Section) => requestUnsavedAction(() => {
     setUrlView({ tab: next, page: '1' })
     if (next === 'message' || next === 'question' || next === 'rich_video') setFolderSection(next)
     setSelectedIds(new Set())
-  }
+  })
 
   /* 種類のタブ（件数つき）。閲覧のみの帯（）はタブの上。 */
   const tabs = (
@@ -940,7 +951,7 @@ export default function TemplatesListV8() {
   const blockedRows = blockedUsage ? usageRows(blockedUsage) : []
   const blockedTotal = blockedDelete ? Math.max(blockedDelete.item.usageCount, blockedRows.length) : 0
 
-  const overlays = renderTemplateDialogs({ activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates })
+  const overlays = <>{renderTemplateDialogs({ activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates, detailGuard })}{detailGuard.dialog}</>
 
   const heading = {
     title: 'テンプレート',
@@ -948,9 +959,9 @@ export default function TemplatesListV8() {
   }
 
   if (!isTemplateSection && selectedAccountId) {
-    return <AssetTemplatesList key={`${selectedAccountId}:${activeSection}`} kind={activeSection}
+    return <>{detailGuard.dialog}<AssetTemplatesList key={`${selectedAccountId}:${activeSection}`} kind={activeSection}
       accountId={selectedAccountId} tabs={tabs} canMutate={canMutateTemplates}
-      lockedReason={lockedReason} onChanged={() => void loadAssetCounts()} />
+      lockedReason={lockedReason} onChanged={() => void loadAssetCounts()} /></>
   }
 
   return (
@@ -959,7 +970,7 @@ export default function TemplatesListV8() {
       boardId={narrow ? 'L7zA7C' : 'v19Ivv'}
       headingSize="regular"
       {...heading}
-      actions={activeSection === 'message' ? <Button onClick={openPicker}
+      actions={activeSection === 'message' ? <Button onClick={() => detailGuard.protect(openPicker)}
         disabled={!canMutateTemplates} lockedReason={lockedReason}>種類を選んで作る</Button> : undefined}
       tabs={tabs}
       stats={

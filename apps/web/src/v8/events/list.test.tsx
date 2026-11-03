@@ -116,12 +116,26 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  window.history.replaceState(null, '', '/events')
   role.value = 'owner'
 })
 
 const createLink = () => [...host.querySelectorAll('a')].find((a) => a.textContent?.includes('イベントを作る'))
 
 describe('V8 イベント予約の一覧', () => {
+  it('詳細でイベント名を編集中に移動すると入力を保って確認する', async () => {
+    window.history.replaceState(null, '', '/events?event=ev-1')
+    await render()
+    fireEvent.click(await screen.findByRole('button', { name: 'イベント名を変更する' }))
+    const input = screen.getByRole('textbox', { name: 'イベント名' }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: '編集中の名前' } })
+    fireEvent.blur(input)
+    const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+    fireEvent.click(link)
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect((screen.getByRole('textbox', { name: 'イベント名' }) as HTMLInputElement).value).toBe('編集中の名前')
+    link.remove()
+  })
   it('絞り込みと並び順を別に選び、同時に使える', async () => {
     await render()
     fireEvent.click(screen.getByLabelText('よく使う絞り込み'))

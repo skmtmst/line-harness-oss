@@ -7,6 +7,7 @@ import Button from '@/components/shared/button';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
 import CopyTextButton from '@/components/shared/copy-text-button';
 import DetailPanel from '@/components/shared/detail-panel';
+import type { useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
 import Dialog,{ DialogActions } from '@/components/shared/dialog';
 import FolderAddDialog from '@/components/shared/folder-add-dialog';
 import { Field } from '@/components/shared/form-controls';
@@ -26,6 +27,7 @@ import { TextField as SharedTextField } from '@/components/shared/text-field'
 import StatusBadge from '@/components/shared/status-badge'
 
 type RenderFormDialogsContext = {
+  detailGuard: ReturnType<typeof useInlineDetailGuard>
   active: Form | null
   activeIndex: number
   canEditForms: boolean
@@ -84,7 +86,7 @@ type RenderFormDialogsContext = {
   visibleForms: Form[]
 }
 
-export function renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget, visibleForms }: RenderFormDialogsContext) {
+export function renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget, visibleForms, detailGuard }: RenderFormDialogsContext) {
   const recommendDelete = deleteImpact?.recommendedAction === 'delete' && deleteImpact.canDelete
   const recommendArchive = deleteImpact?.recommendedAction === 'archive' && deleteImpact.canArchive
   const hasPublishedVersion = Boolean(deleteImpact?.blockers.includes('published'))
@@ -152,6 +154,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
 
       <DetailPanel
         open={active !== null}
+        busy={detailGuard.busy}
         title={active ? displayFormName(active.name) : ''}
         description={active ? subLineText(active) : undefined}
         onClose={closeDetail}
@@ -165,15 +168,15 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
     secondary: (active ? <Button type="button" variant="secondary" href={`/form-submissions/responses?id=${encodeURIComponent(active.id)}`}>
               集まった回答
             </Button> : null),
-    menuItems: [...(active ? [{ allowed: canEditForms, id: 'body-0', label: "複製", onSelect: () => { closeDetail(); openDuplicate(active); } }] : []),
-        ...(active && active.isActive ? [{ allowed: canEditForms, id: 'body-1', label: "受付を止める", onSelect: () => { closeDetail(); return openStop(active); } }] : []),
-        ...(active ? [{ allowed: canEditForms, id: 'body-2', label: "フォルダへ移す", onSelect: () => { closeDetail(); openMove(active); } }] : []),
-        ...(active ? [{ allowed: canEditForms, id: 'body-3', label: "アーカイブ・削除", onSelect: () => { closeDetail(); return openDelete(active); } }] : []),], primaryAllowed: canEditForms }}
+    menuItems: [...(active ? [{ allowed: canEditForms, id: 'body-0', label: "複製", onSelect: () => detailGuard.protect(() => { closeDetail(); openDuplicate(active) }) }] : []),
+        ...(active && active.isActive ? [{ allowed: canEditForms, id: 'body-1', label: "受付を止める", onSelect: () => detailGuard.protect(() => { closeDetail(); void openStop(active) }) }] : []),
+        ...(active ? [{ allowed: canEditForms, id: 'body-2', label: "フォルダへ移す", onSelect: () => detailGuard.protect(() => { closeDetail(); openMove(active) }) }] : []),
+        ...(active ? [{ allowed: canEditForms, id: 'body-3', label: "アーカイブ・削除", onSelect: () => detailGuard.protect(() => { closeDetail(); void openDelete(active) }) }] : []),], primaryAllowed: canEditForms }}
        status={active ? <><StatusBadge tone={active.isActive ? 'success' : 'neutral'}>{active.isActive ? '公開中' : '下書き'}</StatusBadge>{(active.pendingPostActionCount ?? 0) > 0 ? <StatusBadge tone="danger">{'後処理の未完 ' + active.pendingPostActionCount}</StatusBadge> : null}</> : null}>
 <DetailContent>
         {active ? (
           <div>
-            <DetailField label="フォーム名"> <DetailInlineEdit allowed={canEditForms}
+            <DetailField label="フォーム名"> <DetailInlineEdit {...detailGuard.editor} allowed={canEditForms}
               value={active.name}
               label="フォーム名"
               placeholder="名称未設定のフォーム"

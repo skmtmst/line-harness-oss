@@ -5,7 +5,8 @@ import OperationTargetSummary from '@/components/shared/operation-target-summary
 import { DetailContent, DetailField, DetailSection } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import FolderSelect from '@/components/shared/folder-select'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import DetailPanel from '@/components/shared/detail-panel';
+import { useHeldDetail, useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
 import { useStaffRole } from '@/lib/staff-role';
 import ListToolbar from '@/components/shared/list-toolbar';
 
@@ -210,7 +211,8 @@ export default function ScenariosListV8() {
   const [pendingStop, setPendingStop] = useState<string[] | null>(null)
   const [stopAccountTargets, setStopAccountTargets] = useState<{ accounts: Array<{ id: string }>; allAccounts: boolean }>({ accounts: [], allAccounts: false })
   const toggleBusyRef = useRef(false)
-  const [panelId, setPanelId] = useDetailPanelUrl('scenario')
+  const detailGuard = useInlineDetailGuard('scenario')
+  const { id: panelId, setId: setPanelId } = detailGuard
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
   /** キーボードで動かした結果を読み上げる（live 領域）。 */
@@ -829,7 +831,7 @@ export default function ScenariosListV8() {
       lockedReason={folderAccess.reason ?? null}
       itemLabel="シナリオ"
       activeId={folderFilter}
-      onSelect={setFolderFilter}
+      onSelect={(id) => detailGuard.protect(() => setFolderFilter(id))}
       allId=""
       unfiledId={UNFILED}
       allCount={overallTotal}
@@ -889,7 +891,7 @@ export default function ScenariosListV8() {
       disabled: editDisabled || duplicating,
       lockedReason: editAccess.reason,
       disabledReason: duplicating ? '複製しています…' : undefined,
-      onSelect: () => openDuplicate(s),
+      onSelect: () => detailGuard.protect(() => openDuplicate(s)),
     },
     {
       id: 'results',
@@ -906,7 +908,7 @@ export default function ScenariosListV8() {
       lockedReason: editAccess.reason,
       tone: 'danger',
       dividerBefore: true,
-      onSelect: () => { void requestDelete(s) },
+      onSelect: () => detailGuard.protect(() => { void requestDelete(s) }),
     },
   ] as ActionMenuItem[])
 
@@ -930,7 +932,7 @@ export default function ScenariosListV8() {
     }))
 
   const panelIndex = panelId === null ? -1 : scenarios.findIndex((s) => s.id === panelId)
-  const panelRow = panelIndex >= 0 ? scenarios[panelIndex] : null
+  const panelRow = useHeldDetail(panelIndex >= 0 ? scenarios[panelIndex] : null, panelId, detailGuard.holding, selectedAccountId ?? null)
 
   /** パネル内の名前のその場の書き換え。失敗したら InlineEdit が戻す。 */
   const renameScenario = async (id: string, next: string): Promise<unknown> => {
@@ -1348,11 +1350,13 @@ export default function ScenariosListV8() {
         </KpiBand>
       </>}
       overlays={<>
+        {detailGuard.dialog}
 
         {/* 行の詳細パネル。一覧は左に見えたまま。 */}
         {panelRow && (
           <DetailPanel
             open
+            busy={detailGuard.busy}
             contentSpacing="sections"
             title={panelRow.name}
             description={[
@@ -1377,7 +1381,7 @@ secondary: <Button
                  busyLabel="移動中…">
                   配信結果
                 </Button>,
-menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map(item => item.id === 'delete' ? { ...item, onSelect: () => { if (!requireWrite()) return; setPanelId(null); requestDelete(panelRow) } } : item))]}}
+menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map(item => item.id === 'delete' ? { ...item, onSelect: () => detailGuard.protect(() => { if (!requireWrite()) return; setPanelId(null); void requestDelete(panelRow) }) } : item))]}}
            status={<StatusBadge status={panelRow.isActive ? 'active' : 'stopped'} tone={panelRow.isActive ? 'success' : 'neutral'} />}>
 <DetailContent>
             <DetailSection label="配信状況" title="配信状況" help={<HelpTip label="配信状況の説明">配信中は、このシナリオに登録されていて最後までの配信が終わっていない人です。シナリオが停止中の間は送信されません。最後まで配信は、最終ステップまで処理が終わった人です。既読人数ではありません。</HelpTip>}>
@@ -1389,6 +1393,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
             </DetailSection> : null}
             <DetailSection label="シナリオ名の変更" title="名前を変更" help={<HelpTip label="名前の変更方法">下の名前を押すと編集できます。Enterで保存し、Escで取り消します。</HelpTip>}>
               <InlineEdit
+                {...detailGuard.editor}
                 value={panelRow.name}
                 label="シナリオ名"
                 onSave={(next) => renameScenario(panelRow.id, next)}

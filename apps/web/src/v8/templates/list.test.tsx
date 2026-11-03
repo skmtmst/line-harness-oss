@@ -118,6 +118,18 @@ afterEach(() => {
 })
 
 describe('V8 テンプレートの一覧', () => {
+  it('詳細の名前を編集中に画面を移ると入力を保って確認する', async () => {
+    window.history.replaceState(null, '', '/templates?row=t-used')
+    await renderList()
+    fireEvent.click(await screen.findByRole('button', { name: 'テンプレートの名前を変更する' }))
+    const input = screen.getByRole('textbox', { name: 'テンプレートの名前' }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: '編集中の名前' } }); fireEvent.blur(input)
+    const link = document.createElement('a'); link.href = '/webinars'; document.body.appendChild(link)
+    fireEvent.click(link)
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect((screen.getByRole('textbox', { name: 'テンプレートの名前' }) as HTMLInputElement).value).toBe('編集中の名前')
+    link.remove()
+  })
   it('差し込みのキーを実名へ置き換えて見せ、一覧の本文は保存値のままにする', async () => {
     listTemplates.mockResolvedValue({ success: true, data: [{ ...used, messageContent: '{{account.name}} {{var.business_hours}} {{field.pet_name}}' }] })
     await renderList()

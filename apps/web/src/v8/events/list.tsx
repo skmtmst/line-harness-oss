@@ -34,7 +34,8 @@ import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { eventOperationAccounts } from '@/components/events/event-draft-shared'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import DetailPanel from '@/components/shared/detail-panel'
+import { useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -148,7 +149,8 @@ export default function EventsListV8() {
   const [foldersError, setFoldersError] = useState(false)
   const [pendingTotal, setPendingTotal] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [activeId, setActiveId] = useDetailPanelUrl('event')
+  const detailGuard = useInlineDetailGuard('event')
+  const { id: activeId, setId: setActiveId } = detailGuard
   const [deleteTarget, setDeleteTarget] = useState<{ event: EventListItem; accountId: string; scope: object } | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -319,11 +321,11 @@ export default function EventsListV8() {
   })
 
   const rowMenuItems = (e: EventListItem): ActionMenuItem[] => [
-    { id: 'detail', label: "イベントの設定を見る", onSelect: () => router.push(`/events/edit?id=${e.id}`) },
-    { id: 'applicants', label: '申込者を見る', onSelect: () => router.push(`/events/bookings?id=${e.id}`) },
-    { id: 'change', label: '日時・定員を変える', onSelect: () => router.push(`/events/change-review?id=${e.id}`) },
-    { id: 'preview', label: 'プレビュー', onSelect: () => router.push(`/events/preview?id=${e.id}`) },
-    ...(canEdit ? [{ id: 'duplicate', label: '複製する', disabled: duplicatingId !== null, onSelect: () => void duplicateEvent(e) }, { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(e) }, { id: 'delete-event', label: '削除する', tone: 'danger' as const, dividerBefore: true, onSelect: () => requestDelete(e) }] : []),
+    { id: 'detail', label: "イベントの設定を見る", onSelect: () => detailGuard.protect(() => router.push(`/events/edit?id=${e.id}`)) },
+    { id: 'applicants', label: '申込者を見る', onSelect: () => detailGuard.protect(() => router.push(`/events/bookings?id=${e.id}`)) },
+    { id: 'change', label: '日時・定員を変える', onSelect: () => detailGuard.protect(() => router.push(`/events/change-review?id=${e.id}`)) },
+    { id: 'preview', label: 'プレビュー', onSelect: () => detailGuard.protect(() => router.push(`/events/preview?id=${e.id}`)) },
+    ...(canEdit ? [{ id: 'duplicate', label: '複製する', disabled: duplicatingId !== null, onSelect: () => detailGuard.protect(() => { void duplicateEvent(e) }) }, { id: 'move', label: 'フォルダへ移す', onSelect: () => detailGuard.protect(() => folderMove.open(e)) }, { id: 'delete-event', label: '削除する', tone: 'danger' as const, dividerBefore: true, onSelect: () => detailGuard.protect(() => requestDelete(e)) }] : []),
   ]
 
   const folderDotOf = (folderId: string | null | undefined) => {
@@ -628,9 +630,11 @@ export default function EventsListV8() {
 
   const overlays = (
     <>
+      {detailGuard.dialog}
       {folderMove.overlays}
       <DetailPanel
         open={active !== null}
+        busy={detailGuard.busy}
         title={active?.name ?? ''}
         description={active ? `${whenText(displaySlot(active).startsAt)}${active.venue_name ? `・${active.venue_name}` : ''}` : undefined}
         onClose={closeDetail}
@@ -639,12 +643,12 @@ export default function EventsListV8() {
         onPrev={activeIndex > 0 ? () => goDetail(-1) : undefined}
         onNext={activeIndex >= 0 && activeIndex < items.length - 1 ? () => goDetail(1) : undefined}
         actions={{permissionNeed: "manager", primary: (active ? <Button variant="primary" href={`/events/edit?id=${active.id}`}>中身を見る</Button> : null),
-    menuItems: [...(active ? [{ id: 'body-1', label: "プレビュー", onSelect: () => router.push(`/events/preview?id=${active.id}`) }] : []), ...(active ? [{ allowed: canEdit, id: 'detail-0', label: "削除する", onSelect: () => { const transition = closeDetail(); requestDelete(active); return transition; }, tone: 'danger' as const }] : [])], secondary: (active ? <Button variant="secondary" onClick={() => router.push(`/events/bookings?id=${active.id}`)}>申込者を見る</Button> : null) }}
+    menuItems: [...(active ? [{ id: 'body-1', label: "プレビュー", onSelect: () => detailGuard.protect(() => router.push(`/events/preview?id=${active.id}`)) }] : []), ...(active ? [{ allowed: canEdit, id: 'detail-0', label: "削除する", onSelect: () => detailGuard.protect(() => { closeDetail(); requestDelete(active) }), tone: 'danger' as const }] : [])], secondary: (active ? <Button variant="secondary" onClick={() => detailGuard.protect(() => router.push(`/events/bookings?id=${active.id}`))}>申込者を見る</Button> : null) }}
        status={active ? <StatusBadge tone={eventRowState(active) === 'open' ? 'success' : 'neutral'}>{STATE_LABEL[eventRowState(active)]}</StatusBadge> : null}>
 <DetailContent>
         {active ? (
           <div className={styles.panelBody}>
-            <DetailField label="イベント名"> <DetailInlineEdit need="manager" allowed={canEdit} value={active.name} label="イベント名" onSave={(next) => renameEvent(active, next)} /> </DetailField>
+            <DetailField label="イベント名"> <DetailInlineEdit {...detailGuard.editor} need="manager" allowed={canEdit} value={active.name} label="イベント名" onSave={(next) => renameEvent(active, next)} /> </DetailField>
 
             <DetailField label="予約・承認待ち"> {`予約 ${active.total_active} / ${active.total_capacity ?? emptyValue('unknown')}　承認待ち ${active.pending_count > 0 ? active.pending_count : emptyValue('unknown')}`} </DetailField>
 

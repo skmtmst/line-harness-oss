@@ -1,4 +1,5 @@
 'use client'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 /*
  * ★V8 一覧の左のフォルダの列を、全部の一覧で同じにするための部品（ 2026-10-09「統一になっていない」）。
@@ -228,7 +229,7 @@ export default function ManagedFolderPanel({
       && !lockReason(latest.current.canManage) && latest.current.canWriteNow !== undefined && latest.current.canWriteNow()
     : editable
   const sameAddDialog = () => renderedScope === scope.current && addScope.current === renderedScope && renderedAdd === addEpoch.current
-  const startAdd = () => {
+  const startAdd = () => requestUnsavedAction(() => {
     if (!canAddNow()) return
     if (livePermission) {
       if (latest.current.adding) return
@@ -236,7 +237,7 @@ export default function ManagedFolderPanel({
       addEpoch.current = {}
     }
     onAddStart?.(); setAdding(true)
-  }
+  })
   const permissionReason = lockedReason === undefined ? lockReason(canManage) : lockedReason ?? undefined
   const actions = useFolderRowActions({
     kind: kind ?? '',

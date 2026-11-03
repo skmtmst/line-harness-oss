@@ -1,5 +1,6 @@
 'use client'
 import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
+import type { useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
 
 import type { BroadcastBubble } from '@/lib/api'
 import type { UsageRow } from './words'
@@ -33,6 +34,7 @@ import StatusBadge from '@/components/shared/status-badge'
 const PUBLISH_TONE = { live: 'success', changes: 'warning', draft: 'neutral' } as const
 
 type RenderTemplateDialogsContext = {
+  detailGuard: ReturnType<typeof useInlineDetailGuard>
   activeFolderName: string | null
   activeIndex: number
   activeTemplate: Template | null
@@ -102,7 +104,7 @@ type RenderTemplateDialogsContext = {
   templates: Template[]
 }
 
-export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates }: RenderTemplateDialogsContext) {
+export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates, detailGuard }: RenderTemplateDialogsContext) {
   return ((
     <>
       {savedMenu}
@@ -331,35 +333,36 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
       {activeTemplate && isTemplateSection ? (
         <DetailPanel
           open
+          busy={detailGuard.busy}
           title={activeTemplate.name}
           description={activeFolderName ?? undefined}
-          onClose={() => {
+          onClose={() => detailGuard.protect(() => {
             setActiveId(null)
             setPanelMove(false)
-          }}
+          })}
           hasPrev={activeIndex > 0}
           hasNext={activeIndex >= 0 && activeIndex < navItems.length - 1}
           onPrev={() => setActiveId(navItems[activeIndex - 1]?.id ?? null)}
           onNext={() => setActiveId(navItems[activeIndex + 1]?.id ?? null)}
-          actions={{ primary: ((panelMove ? <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => void runMove()} busyLabel="移動中…">
+          actions={{ primary: ((panelMove ? <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => detailGuard.protect(() => { void runMove() })} busyLabel="移動中…">
                     移動する
-                  </Button> : null)) ?? (<Button type="button" variant="primary" onClick={() => withViewTransition(() => router.push(detailHref(activeTemplate)))} busyLabel="移動中…">
+                  </Button> : null)) ?? (<Button type="button" variant="primary" onClick={() => detailGuard.protect(() => withViewTransition(() => router.push(detailHref(activeTemplate))))} busyLabel="移動中…">
                 詳細を見る
               </Button>),
-    secondary: (<Button type="button" variant="secondary" onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))} busyLabel="移動中…">
+    secondary: (<Button type="button" variant="secondary" onClick={() => detailGuard.protect(() => withViewTransition(() => router.push(editHref(activeTemplate))))} busyLabel="移動中…">
                   編集する
                 </Button>),
-    menuItems: [...(panelDetail.detail?.hasDraft ? [{ allowed: canMutateTemplates, id: 'detail-0', label: "公開する", disabled: panelDetail.publishing, onSelect: () => void panelDetail.publish() }] : []),
-        ...([{ allowed: canMutateTemplates, id: 'detail-1', label: "複製する", onSelect: () => {
+    menuItems: [...(panelDetail.detail?.hasDraft ? [{ allowed: canMutateTemplates, id: 'detail-0', label: "公開する", disabled: panelDetail.publishing, onSelect: () => detailGuard.protect(() => { void panelDetail.publish() }) }] : []),
+        ...([{ allowed: canMutateTemplates, id: 'detail-1', label: "複製する", onSelect: () => detailGuard.protect(() => {
                     setDuplicateError('');
                     void runDuplicate(activeTemplate);
-                } }]),
-        ...([{ allowed: canMutateTemplates, id: 'detail-2', label: "フォルダへ移す", onSelect: () => openMove([activeTemplate.id]) }]),
-        ...([{ allowed: canMutateTemplates, id: 'detail-3', label: "削除する", onSelect: () => handleDelete(activeTemplate), tone: 'danger' as const }])], primaryAllowed: !panelMove || canMutateTemplates, secondaryAllowed: canMutateTemplates }}
+                }) }]),
+        ...([{ allowed: canMutateTemplates, id: 'detail-2', label: "フォルダへ移す", onSelect: () => detailGuard.protect(() => openMove([activeTemplate.id])) }]),
+        ...([{ allowed: canMutateTemplates, id: 'detail-3', label: "削除する", onSelect: () => detailGuard.protect(() => handleDelete(activeTemplate)), tone: 'danger' as const }])], primaryAllowed: !panelMove || canMutateTemplates, secondaryAllowed: canMutateTemplates }}
          status={<StatusBadge tone={PUBLISH_TONE[publishStateOf(activeTemplate).tone]}>{publishStateOf(activeTemplate).label}</StatusBadge>}>
 <DetailContent>
           <div className={styles.panelBody}>
-            <DetailField label="名前"> <DetailInlineEdit allowed={canMutateTemplates}
+            <DetailField label="名前"> <DetailInlineEdit {...detailGuard.editor} allowed={canMutateTemplates}
                 value={activeTemplate.name}
                 label="テンプレートの名前"
                 maxLength={100}

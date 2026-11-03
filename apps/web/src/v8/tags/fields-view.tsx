@@ -29,7 +29,7 @@ import { fieldTypeWord } from './fields-list-model'
 import FieldsTable from './fields-table'
 
 export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
-  const { accountId, canEdit, host, explanation, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, pendingDelete, setPendingDelete, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, setActiveFieldId, load, loadFolders, pageItems, activeField, activeFieldIndex, applyOrder, remove, removeFolder, kpis, folderRows, createButton } = model
+  const { accountId, canEdit, host, explanation, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, pendingDelete, setPendingDelete, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, setActiveFieldId, load, loadFolders, pageItems, activeField, activeFieldIndex, applyOrder, remove, removeFolder, kpis, folderRows, createButton, detailGuard } = model
   const deleteLockedReason = usePermissionLockReason(canEdit)
   const table = <FieldsTable {...model} />
   const operationHelp = canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'
@@ -61,7 +61,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
             createAction={createButton(true)}
             activeId={folderFilter}
             onSelect={setFolderFilter}
-            onAddFolder={canEdit ? () => host ? host.onAddFolder?.() : setFolderDialog('new') : undefined}
+            onAddFolder={canEdit ? () => detailGuard.protect(() => { if (host) host.onAddFolder?.(); else setFolderDialog('new') }) : undefined}
             addFolderLabel="フォルダを追加"
             rows={folderRows}
           >
@@ -104,8 +104,10 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
       </ListPageBody>
 
       {/* 行の詳細パネル。名前はその場で直せる。 */}
+      {detailGuard.dialog}
       <DetailPanel
         open={!host && activeField !== null}
+        busy={detailGuard.busy}
         title={activeField?.name ?? ''}
         description={activeField ? `{{field.${activeField.fieldKey}}}・${fieldTypeWord(activeField.type)}` : undefined}
         onClose={() => setActiveFieldId(null)}
@@ -123,7 +125,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
             <div>
               <dt>項目名</dt>
               <dd>
-                <DetailInlineEdit allowed={canEdit}
+                <DetailInlineEdit {...detailGuard.editor} allowed={canEdit}
                     label="項目名"
                     value={activeField.name}
                     maxLength={40}

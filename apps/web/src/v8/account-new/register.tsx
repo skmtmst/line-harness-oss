@@ -37,6 +37,7 @@ import Step1Precheck from './step1-precheck'
 import Step2Connect, { type Step2Field } from './step2-connect'
 import Step4Template from './step4-template'
 import RegistrationStyleDialog from './registration-style-dialog'
+import RegistrationUnsavedGuard from './registration-unsaved-guard'
 import Step5Completion from './step5-completion'
 import RegistrationSession from './registration-session'
 import { registrationImportChoiceKey, registrationStorageKey } from './registration-storage'
@@ -893,6 +894,8 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
           </>} />
       </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
+      {currentStep === 4 ? <RegistrationUnsavedGuard dirty={registrationStyle.dirty} busy={registrationStyle.busy} onDiscard={registrationStyle.discard} /> : null}
+      {!createdId && currentStep < 4 && (form.channelSecret || form.loginChannelSecret || busyAction || checkRunning) ? <RegistrationUnsavedGuard dirty={Boolean(form.channelSecret || form.loginChannelSecret)} busy={Boolean(busyAction) || checkRunning} onDiscard={() => setForm(current => ({ ...current, channelSecret: '', loginChannelSecret: '' }))} /> : null}
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </PageFrame></SaveErrorScope>
   )

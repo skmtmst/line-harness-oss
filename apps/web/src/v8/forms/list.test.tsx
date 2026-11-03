@@ -139,6 +139,18 @@ afterEach(() => {
 });
 
 describe('V8 回答フォーム一覧', () => {
+  it('詳細のフォーム名を編集中に画面を移ると入力を保って確認する', async () => {
+    window.history.replaceState(null, '', '/form-submissions?form=f-1')
+    await mount()
+    fireEvent.click(await screen.findByRole('button', { name: 'フォーム名を変更する' }))
+    const input = screen.getByRole('textbox', { name: 'フォーム名' }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: '編集中のフォーム' } }); fireEvent.blur(input)
+    const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+    fireEvent.click(link)
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect((screen.getByRole('textbox', { name: 'フォーム名' }) as HTMLInputElement).value).toBe('編集中のフォーム')
+    link.remove()
+  })
   it.each([false,true])('未完を名前と分けて状態の列に残し、詳細の入口を保つ（狭い=%s）', async (small) => {
     narrow.value = small
     fetchApi.mockImplementation(async (path: string) => path.startsWith('/api/forms?') ? {
