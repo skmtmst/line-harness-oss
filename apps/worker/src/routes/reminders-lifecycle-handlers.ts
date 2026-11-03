@@ -64,7 +64,7 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
       success: true,
       data: buildOffsetListResponse({ reminder: {
           id: reminder.id,
-          lineAccountId: accountId,
+          lineAccountId: canSeeParent ? accountId : null,
           name: reminder.name,
           isActive: Boolean(reminder.is_active),
           lifecycleStatus: reminder.lifecycle_status,
