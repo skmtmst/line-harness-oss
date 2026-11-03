@@ -14,6 +14,7 @@ vi.hoisted(() => {
 const fetchApi = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 const remindersDelete = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ id: 'account-a' }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -36,7 +37,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, loading: false }),
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
@@ -61,6 +62,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  account.id = 'account-a'
   routerPush.mockClear()
   remindersDelete.mockResolvedValue({ success: true, data: null })
   fetchApi.mockImplementation(async (url: string) => {
@@ -96,6 +98,18 @@ async function flush() {
 }
 
 describe('リマインダ一覧の行操作', () => {
+  it('アカウント切替後は古い削除確認を使えない', async () => {
+    await act(async () => { root.render(<RemindersPage />) }); await flush()
+    const more = host.querySelector('button[aria-label="リマインダ「予約前のお知らせ」の操作"]') as HTMLButtonElement
+    act(() => { more.click() })
+    const item = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent === '削除する') as HTMLButtonElement
+    await act(async () => { item.click() }); await flush()
+    expect(document.querySelector('[data-design-node="VsSyu"]')).toBeTruthy()
+    account.id = 'account-b'
+    await act(async () => { root.render(<RemindersPage />) }); await flush()
+    expect(document.querySelector('[data-design-node="VsSyu"]')).toBeNull()
+    expect(remindersDelete).not.toHaveBeenCalled()
+  })
   it('行に名前のリンクと「…」が並び、削除は行に無い', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
@@ -135,6 +149,8 @@ describe('リマインダ一覧の行操作', () => {
     await flush()
     // 削除の確認が出る（確認の窓は body 直下の portal）。行の詳細遷移（router.push）は動かない。
     expect(document.body.textContent).toContain('「予約前のお知らせ」を削除しますか？')
+    expect(document.body.textContent).toContain('名前を確認できません')
+    expect(document.querySelector('[data-design-node="VsSyu"]')?.textContent).toContain('環境')
     expect(routerPush).not.toHaveBeenCalled()
   })
 

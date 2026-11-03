@@ -2,7 +2,7 @@ import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
@@ -80,8 +80,29 @@ describe('MJoJR メニュー管理', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     const dialog = document.querySelector('[data-design-node="MV5Os"]') as HTMLElement
     expect(dialog).not.toBeNull()
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('店舗')
+    expect(dialog.textContent).toContain('渋谷店')
+    expect(dialog.textContent).toContain('環境')
     fireEvent.click(within(dialog).getByRole('button', { name: '停止する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived' }))
+  })
+
+  it('アカウント切替後の取得中は前の一覧から削除を開けない', async () => {
+    let finish!: (value: unknown) => void
+    fixture.snapshot.mockResolvedValueOnce({ data: snapshotOf() }).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const view = render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    account.id = 'account-2'; view.rerender(<MenuPage />)
+    await waitFor(() => expect(fixture.snapshot.mock.calls.some(([id]) => id === 'account-2')).toBe(true))
+    openMenu('春の下書きコース')
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    expect(screen.queryByRole('dialog', { name: 'このメニューを削除しますか？' })).toBeNull()
+    expect(fetchApi).not.toHaveBeenCalledWith(expect.stringContaining('/api/restaurant-test/menus/m4'), expect.anything())
+    await act(async () => { finish({ data: snapshotOf() }) })
+    openMenu('春の下書きコース')
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    expect(screen.getByRole('dialog', { name: 'このメニューを削除しますか？' })).toBeTruthy()
   })
 
   it('公開中と下書きのメニューに削除があり、確認して DELETE の口へ届く', async () => {
@@ -92,6 +113,7 @@ describe('MJoJR メニュー管理', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     openMenu('春の下書きコース')
     fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    expect(screen.getByRole('dialog', { name: 'このメニューを削除しますか？' }).textContent).toContain('環境')
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
     await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE' }))
   })
@@ -231,6 +253,7 @@ describe('mauOC コースの編集ページ', () => {
     fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
     expect(fixture.updateMenu).not.toHaveBeenCalled()
     expect(screen.getByText('価格変更を確定しますか？')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '価格変更を確定しますか？' }).textContent).toContain('環境')
     fireEvent.click(screen.getByRole('button', { name: '確定して保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ price: 9900, effectiveAt: new Date(`${ymd}T10:00:00+09:00`).toISOString() })))
   })
@@ -265,6 +288,7 @@ describe('mauOC コースの編集ページ', () => {
     render(<MenuEditPage />)
     await screen.findByLabelText('メニュー名')
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+    expect(screen.getByRole('alertdialog', { name: /削除しますか/ }).textContent).toContain('環境')
     const confirm = await screen.findAllByRole('button', { name: '削除する' })
     fireEvent.click(confirm[confirm.length - 1])
     await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE' }))

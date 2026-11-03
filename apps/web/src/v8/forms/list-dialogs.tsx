@@ -64,6 +64,7 @@ type RenderFormDialogsContext = {
   renameForm: (target: Form, next: string) => Promise<void>
   renameName: string
   renameTarget: Form | null
+  renameAccountId: string | null
   renaming: boolean
   saveRename: () => Promise<void>
   selectedAccount: AccountWithStats | null
@@ -87,7 +88,7 @@ type RenderFormDialogsContext = {
   visibleForms: Form[]
 }
 
-export function renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget, deleteAccountId, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget, stopAccountId, visibleForms }: RenderFormDialogsContext) {
+export function renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget, deleteAccountId, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renameAccountId, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget, stopAccountId, visibleForms }: RenderFormDialogsContext) {
   const recommendDelete = deleteImpact?.recommendedAction === 'delete' && deleteImpact.canDelete
   const recommendArchive = deleteImpact?.recommendedAction === 'archive' && deleteImpact.canArchive
   const hasPublishedVersion = Boolean(deleteImpact?.blockers.includes('published'))
@@ -326,6 +327,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
             </Button>
           </DialogActions>)}
       >
+        <OperationTargetSummary accounts={[{ id: renameAccountId ?? '' }]} />
         <Field label="フォーム名"><SaveErrorField names={["renameName","rename_name"]}><SharedTextField
             type="text"
             value={renameName}

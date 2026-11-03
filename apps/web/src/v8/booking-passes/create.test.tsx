@@ -80,6 +80,8 @@ describe('回数券・月謝を作る', () => {
     fireEvent.click(screen.getByRole('button', { name: '作る' }))
     const dialog = await screen.findByRole('dialog')
     expect(dialog.textContent).toContain('変えられません')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
     expect(api.create).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '販売を始める' })) })
     await waitFor(() => expect(api.start).toHaveBeenCalledWith('a', 'p-new', 1))

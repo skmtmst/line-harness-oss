@@ -12,6 +12,7 @@ vi.hoisted(() => {
 })
 
 const state = vi.hoisted(() => ({
+  accountId: 'account-a',
   role: 'owner' as string,
   tab: '' as string,
   updates: [] as Array<Record<string, unknown>>,
@@ -33,7 +34,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', name: '本店' }, accounts: [], loading: false }),
+  useAccount: () => ({ selectedAccountId: state.accountId, selectedAccount: { id: state.accountId, name: '本店' }, accounts: [], loading: false }),
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
@@ -106,6 +107,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  state.accountId = 'account-a'
   document.documentElement.dataset.theme = 'v8'
   state.role = 'owner'
   state.tab = ''
@@ -135,6 +137,27 @@ const buttonByText = (text: string) =>
   [...document.querySelectorAll('button')].find((el) => el.textContent?.trim() === text) as HTMLButtonElement | undefined
 
 describe('V8 リマインダの詳細', () => {
+  it('削除確認を開いて別のアカウントに切り替えたら古い窓を閉じる', async () => {
+    await render()
+    const more = [...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label')?.includes('その他の操作')) as HTMLButtonElement
+    await act(async () => { more.click() })
+    const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('削除する')) as HTMLElement
+    await act(async () => { remove.click() })
+    expect(document.querySelector('[role="alertdialog"]')).toBeTruthy()
+    state.accountId = 'account-b'
+    await render()
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+  })
+  it('削除確認は所属が取れない場合に不明と環境を示す', async () => {
+    await render()
+    const more = [...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label')?.includes('その他の操作')) as HTMLButtonElement
+    await act(async () => { more.click() })
+    const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('削除する')) as HTMLElement
+    await act(async () => { remove.click() })
+    const dialog = document.querySelector('[role="alertdialog"]')
+    expect(dialog?.textContent).toContain('名前を確認できません')
+    expect(dialog?.textContent).toContain('環境')
+  })
   it('URLに対象が無いときは共通の対象なし画面を出す', async () => {
     state.omitId = true
     await render()

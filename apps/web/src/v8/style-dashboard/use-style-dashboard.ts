@@ -322,7 +322,7 @@ export function useStyleDashboard(style: IndustryStyle) {
   }
 
   const KIND: Record<string, RestaurantClosureKind> = { 貸切: 'private_event', 臨時休業: 'temporary_closed' }
-  const saveClosure = async (input: StyleClosureInput, overlap?: { mode: 'ask' | 'cancel'; message: string }) => {
+  const saveClosure = async (input: StyleClosureInput) => {
     setBusy('closure')
     try {
       if (style === 'restaurant' && store.store) {
@@ -340,8 +340,6 @@ export function useStyleDashboard(style: IndustryStyle) {
         notifyToast(failedNames.length ? `休みを入れました。${failedNames.join('・')}は入れられませんでした。` : '休みを入れました。予約は取り消していません。', failedNames.length ? { tone: 'error' } : undefined)
       }
       setClosureOpen(false)
-      // 重なる予約への LINE・取り消しの口はまだ無い（口が要る）。休みだけ入れて、連絡は準備中の窓で伝える。
-      if (overlap) preparing.open('重なる予約への連絡')
       void reload()
     } catch (caught) {
       notifyToast(japaneseDetailOf(caught) || '休みを入れられませんでした。', { tone: 'error' })

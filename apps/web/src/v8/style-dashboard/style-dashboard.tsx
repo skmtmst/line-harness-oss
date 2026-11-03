@@ -280,11 +280,11 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         onChangeStyle={(next) => { if (!layout) return; setBusy('layout'); void styleApi.save(accountId, { expectedVersion: layout.version, style: next }).then(() => { notifyToast('型を変えました。'); window.location.assign('/') }).catch((e) => { if (!viewErrors.capture(e)) notifyToast(japaneseDetailOf(e) || '型を変えられませんでした。', { tone: 'error' }) }).finally(() => setBusy('')) }}
         onReset={() => { if (!layout) return; setBusy('layout'); void styleApi.resetCards(accountId, layout.version).then((r) => { if (!applyPresentation(r.data, true)) return; setCardDefaults(r.data.cards); notifyToast('型に戻しました。') }).catch((e) => notifyToast(japaneseDetailOf(e) || '型に戻せませんでした。', { tone: 'error' })).finally(() => setBusy('')) }}
         onSave={(next, metricIds) => { if (!layout) return; setBusy('layout'); void styleApi.saveCards(accountId, layout.version, next.map((c) => ({ id: c.id, visible: c.on })), metricIds).then((r) => { if (!applyPresentation(r.data)) return; setViewOpen(false); notifyToast('表示を保存しました。'); void load() }).catch((e) => { if (!viewErrors.capture(e)) notifyToast(japaneseDetailOf(e) || '表示を保存できませんでした。時間をおいて、もう一度お試しください。', { tone: 'error' }) }).finally(() => setBusy('')) }} /></SaveErrorScope>
-      <ClosureDialog open={closureOpen} date={date} busy={busy === 'closure'} seatNoun={style === 'restaurant' ? '卓' : style === 'lesson' ? '講師' : '担当者'}
+      <ClosureDialog key={JSON.stringify([accountId, store?.store?.id ?? null])} open={closureOpen} date={date} busy={busy === 'closure'} seatNoun={style === 'restaurant' ? '卓' : style === 'lesson' ? '講師' : '担当者'} accountId={accountId} store={style === 'restaurant' && store.store ? { id: store.store.id, name: store.store.name } : { id: '' }}
         targets={{ staff: style === 'restaurant' ? [] : (today?.staff ?? []), seats: style === 'restaurant' ? (today?.staff ?? []) : [] }}
-        affectedNote={style === 'restaurant' ? 'その時間の予約は取り消しません。連絡は次の画面で選べます。' : 'その時間の予約は取り消しません。連絡は次の画面で選べます。'}
+        affectedNote="その時間の予約は取り消しません。重なる予約への連絡は自動では送られません。"
         onClose={() => setClosureOpen(false)}
-        onSave={(input, overlap) => void saveClosure(input, overlap)}
+        onSave={(input) => void saveClosure(input)}
         preview={async (input) => {
           const inRange = (t: string) => input.allDay || ((input.from ?? '00:00') <= t && t < (input.to ?? '24:00'))
           if (style === 'restaurant' && store.store) {
@@ -293,7 +293,6 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
           }
           return input.date !== date ? [] : (today?.rows ?? []).filter((r) => r.live !== false && r.booking && inRange(r.time) && (input.target === 'store' || input.ids.length === 0 || input.ids.some((id) => r.staff === today?.staff.find((x) => x.id === id)?.name))).map((r) => ({ time: r.time, name: `${withHonorific(r.name, 'さま')}`, sub: [r.people ? `${formatNumber(r.people)}名` : null, r.course].filter(Boolean).join('・'), pay: null }))
         }}
-        overlapMessage={(input) => `〇〇さま　${input.date.slice(5).replace('-', '/')} はお店の都合でお休みをいただくことになりました。ご予約の日を変えるか、取り消すかを選んでください。`}
         mediaNote={style === 'restaurant' ? '他の予約サイトの同じ時間の枠は、それぞれの管理画面で閉じてください。' : null} />
       {start.arrived && accountId && canManageRole(role) ? <FirstRunDoneDialog accountId={accountId} style={style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
       {preparing.dialog}

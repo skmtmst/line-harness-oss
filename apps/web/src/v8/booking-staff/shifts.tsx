@@ -28,6 +28,7 @@ import { PageHeading } from '@/components/templates/page-frame'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError,bookingApi,type BookingAvailabilitySlot,type BookingException,type BookingMenu,type BookingShift,type BookingStaff } from '@/lib/api'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { jstDate } from '@/lib/jst-datetime'
 import { canViewFeature } from '@/lib/staff-capability'
@@ -386,6 +387,9 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const [shiftError, setShiftError] = useState<string | null>(null)
   const [savingShift, setSavingShift] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<DayRow | null>(null)
+  const removeContext = JSON.stringify([selectedAccountId, staffId])
+  const [removeTargetContext, setRemoveTargetContext] = useState('')
+  useEffect(() => { setRemoveTarget(null); setRemoveTargetContext('') }, [removeContext])
   const [deleting, setDeleting] = useState(false)
   const [genFrom, setGenFrom] = useState('')
   const [genWeeks, setGenWeeks] = useState('4')
@@ -876,7 +880,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
 
   async function removeDayEntry() {
     const saveGeneration = requestRef.current
-    if (!selectedAccountId || !removeTarget) return
+    if (!selectedAccountId || !removeTarget || removeTargetContext !== removeContext) return
     setDeleting(true)
     try {
       if (removeTarget.kind === 'shift') {
@@ -1285,7 +1289,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                       )}
                       <span className={styles.exMemo}>{row.kind === 'exception' ? (row.item.reason ?? '') : ''}</span>
                       {canEdit ? (
-                        <IconButton onClick={() => { setShiftError(null); setRemoveTarget(row) }} aria-label={`${shortDay(row.date)} の${kindLabel}を削除`}>
+                        <IconButton onClick={() => { setShiftError(null); setRemoveTargetContext(removeContext); setRemoveTarget(row) }} aria-label={`${shortDay(row.date)} の${kindLabel}を削除`}>
                           <Trash2 aria-hidden="true" />
                         </IconButton>
                       ) : null}
@@ -1408,7 +1412,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       </CreatePage>
 
       <ConfirmDialog
-        open={removeTarget !== null}
+        open={removeTarget !== null && removeTargetContext === removeContext}
         title={removeTarget ? `「${shortDay(removeTarget.date)}」の${removeTarget.kind === 'exception' ? '休み' : removeTarget.kind === 'shift' ? 'シフト' : '休憩'}を消しますか？` : ''}
         description={removeTarget?.kind === 'exception'
           ? 'この日の休みを消すと、いつもの勤務時間どおりに枠が出ます。この操作は取り消せません。'
@@ -1420,7 +1424,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         busy={deleting}
         onCancel={() => setRemoveTarget(null)}
         error={shiftError || undefined} confirmDisabled={removeTarget?.kind === 'break' && Boolean(dateSaveConflict.conflict)} confirmDisabledReason="閉じて最新の内容と比べてください。" onSuccess={() => setRemoveTarget(null)} onConfirm={() => removeDayEntry()}
-      />
+      ><OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} /></ConfirmDialog>
       <ConfirmDialog
         open={confirmDisconnect}
         title="外の予定とのつながりを切りますか？"
