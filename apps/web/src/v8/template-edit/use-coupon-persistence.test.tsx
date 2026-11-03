@@ -46,6 +46,12 @@ describe('クーポンの保存と公開', () => {
     expect(ports.update).not.toHaveBeenCalled()
     expect(ports.publish.mock.calls[1]).toEqual(first)
   })
+  it.each(['rich_message', 'research'] as const)('%s の2回目保存は資産フォルダを上書きしない', async kind => {
+    const existing = { ...asset, kind, folderId: 'asset-folder-1' } as BroadcastMessageAsset
+    const { result } = renderHook(() => useCouponPersistence('account-a', existing, kind))
+    await result.current('編集', { ...payload, folder: '旧形式のフォルダ' }, null, 'changed', false)
+    expect(ports.update).toHaveBeenCalledWith('coupon-1', { name: '編集', payload: { ...payload, folder: '旧形式のフォルダ' } })
+  })
   it('公開失敗後に編集すると新しい下書きの版とキーを使う', async () => {
     ports.publish.mockRejectedValueOnce(new Error('競合'))
     const { result } = renderHook(() => useCouponPersistence('account-a'))
@@ -72,6 +78,17 @@ describe('クーポンの保存と公開', () => {
     const { result, rerender } = renderHook(({ account }) => useCouponPersistence(account), { initialProps: { account: 'account-a' } })
     const saving = result.current('券', payload, null, 'snapshot', true)
     act(() => rerender({ account: 'account-b' }))
+    wait.resolve({ success: true, data: asset })
+    await expect(saving).rejects.toThrow('アカウントが変わりました')
+    expect(ports.publish).not.toHaveBeenCalled()
+  })
+  it('保存中にアカウントを行き来しても元の操作を公開しない', async () => {
+    const wait = deferred<{ success: true; data: BroadcastMessageAsset }>()
+    ports.create.mockReturnValue(wait.promise)
+    const { result, rerender } = renderHook(({ account }) => useCouponPersistence(account), { initialProps: { account: 'account-a' } })
+    const saving = result.current('券', payload, null, 'snapshot', true)
+    act(() => rerender({ account: 'account-b' }))
+    act(() => rerender({ account: 'account-a' }))
     wait.resolve({ success: true, data: asset })
     await expect(saving).rejects.toThrow('アカウントが変わりました')
     expect(ports.publish).not.toHaveBeenCalled()
