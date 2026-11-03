@@ -1268,8 +1268,9 @@ async function processQueuedBroadcastBatches(
             lineAccountId: accountId,
             friendIds: [friend.id],
             expectedLockVersion: lockVersion,
+            expectedRecipients: fixedHqAudience ? [{id:friend.id,lineUserId:friend.line_user_id}] : undefined,
           });
-          if(dispatched.length!==1){await releaseProgress(progressBase+currentOffset);return;}
+          if(dispatched.length!==1){if(fixedHqAudience)await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:fixedHqAudience.count,known:0,started:true,expectedLockVersion:lockVersion,requireBatchLock:true});else await releaseProgress(progressBase+currentOffset);return;}
           const { requestId: pushRequestId } = await lineClient.pushMessageWithRequestId(friend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
 
           await db.batch([
@@ -1383,7 +1384,9 @@ async function processQueuedBroadcastBatches(
       lineAccountId: accountId,
       friendIds: sendableIds,
       expectedLockVersion: lockVersion,
+      expectedRecipients: fixedHqAudience ? sendable.map(friend=>({id:friend.id,lineUserId:friend.line_user_id})) : undefined,
     });
+    if(dispatched.length!==sendableIds.length && fixedHqAudience){await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:fixedHqAudience.count,known:0,started:true,expectedLockVersion:lockVersion,requireBatchLock:true});return;}
     if(!dispatched.length){await releaseProgress(progressBase+currentOffset);return;}
     const dispatchedSet=new Set(dispatched);
     sendable=sendable.filter(friend=>dispatchedSet.has(friend.id));

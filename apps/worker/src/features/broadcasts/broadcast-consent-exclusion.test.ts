@@ -37,6 +37,25 @@ beforeEach(() => {
 });
 afterEach(() => { f.raw.close(); vi.unstubAllGlobals(); });
 describe('637: 停止者を外して一斉配信を続ける', () => {
+  it.each([[false,'line'],[true,'line'],[false,'consent'],[true,'consent']] as const)('束を出す直前の変更で送らず停止する（差し込み=%s・変更=%s）',async(personalized,kind)=>{
+    const input={requestId:'hq-presend-drift',title:'配信',messageType:'text' as const,messageContent:personalized?'{{name}} さん':'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all' as const},scheduledAt:null};
+    const run=await prepareHqBroadcast(f.db,tenant,'owner',input);
+    const {hqAudienceSnapshot}=await import('../hq-broadcasts/hq-audience-confirmation.js');
+    const before=await hqAudienceSnapshot(f.db,tenant,'shop',input);
+    const sent=await dispatchHqBroadcast(f.db,run,'owner',1,undefined,undefined,[{accountId:'shop',recipientCount:before.recipientCount,recipientToken:before.recipientToken}]);
+    const child=sent.targets[0].broadcastId!;
+    await processScheduledBroadcasts(f.db,calls as never);
+    const original=f.db.prepare.bind(f.db);let changed=false;
+    const spy=vi.spyOn(f.db,'prepare').mockImplementation(sql=>{
+      if(!changed && sql.includes("SET state='claimed',attempt_no=?") && sql.includes('dispatched_at=?')){
+        changed=true;if(kind==='line')f.raw.prepare("UPDATE friends SET line_user_id='U-swapped' WHERE id='allowed'").run();else consent('allowed');
+      }
+      return original(sql);
+    });
+    try { await processQueuedBroadcasts(f.db,calls as never); } finally { spy.mockRestore(); }
+    expect(changed).toBe(true);expect(sentIds()).toEqual([]);
+    expect(f.raw.prepare('SELECT stopped_at FROM broadcasts WHERE id=?').get(child)).toMatchObject({stopped_at:expect.any(String)});
+  });
   it('古い処理は送信直前の台帳を確定できない',async()=>{
     seedBroadcast('sending');
     f.raw.prepare("UPDATE broadcasts SET lock_version=2,batch_offset=-1 WHERE id='b'").run();
