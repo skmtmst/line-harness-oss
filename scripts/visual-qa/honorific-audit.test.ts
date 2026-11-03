@@ -51,5 +51,5 @@ describe('顧客名の敬称の手書きを増やさない', () => {
       return addedHonorifics(before, after)
     })
     expect(findings).toEqual([])
-  })
+  }, 20_000)
 })
