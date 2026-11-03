@@ -102,3 +102,8 @@ it('閲覧のみの追加入口は今回の変更で開放しない', async () =
   expect(screen.queryByRole('button', { name: '媒体を足す', exact: true })).toBeNull()
   expect(net.add).not.toHaveBeenCalled()
 })
+
+it('追加窓で予約サイトが現れる方法を案内する', async () => {
+  const { dialog } = await openAdd()
+  expect(dialog.textContent).toContain('予約サイトは、予約メールを取り込むと自動で現れます')
+})
