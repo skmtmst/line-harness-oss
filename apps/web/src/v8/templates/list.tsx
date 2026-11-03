@@ -130,6 +130,9 @@ export default function TemplatesListV8() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const folderDeleteTicket = useRef<object | null>(null)
+  const renderedFolderDeleteTicket = folderDeleteTicket.current
+  const folderDeleteLock = useRef(false)
   const [folderBusy, setFolderBusy] = useState(false)
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -206,6 +209,7 @@ export default function TemplatesListV8() {
     setUnfiledCount(null)
     setFolderDialogOpen(false)
     setEditingFolder(null)
+    folderDeleteTicket.current = null
     setDeletingFolder(null)
     setFolderError('')
     setPendingDelete(null)
@@ -499,23 +503,34 @@ export default function TemplatesListV8() {
   }
 
   const removeFolder = async () => {
-    if (!deletingFolder) return
+    if (!deletingFolder || folderBusy || folderDeleteLock.current || !renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current || renderedScope !== accountScope.current) return
+    folderDeleteLock.current = true
     setFolderBusy(true)
     setFolderError('')
     try {
       const res = await api.folders.delete(deletingFolder.id, selectedAccountId ?? undefined)
       if (!res.success) throw new Error(res.error ?? '削除できませんでした。時間をおいて、もう一度お試しください。')
+      if (renderedFolderDeleteTicket !== folderDeleteTicket.current || renderedScope !== accountScope.current) return
+      folderDeleteTicket.current = null
       setDeletingFolder(null)
       if (selectedCategory === deletingFolder.id) setSelectedCategory('all')
       await loadFolders()
     } catch (saveFailure) {
+      if (renderedFolderDeleteTicket !== folderDeleteTicket.current || renderedScope !== accountScope.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setFolderError('フォルダを削除できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
+      folderDeleteLock.current = false
       setFolderBusy(false)
     }
+  }
+  const cancelFolderDelete = () => {
+    if (folderBusy || folderDeleteLock.current) return
+    folderDeleteTicket.current = null
+    setDeletingFolder(null)
+    setFolderError('')
   }
 
   /*
@@ -824,7 +839,7 @@ export default function TemplatesListV8() {
       onEdit: canMutateTemplates ? () => detailGuard.protect(() => setEditingFolder(folder)) : undefined,
       onMoveUp: canMutateTemplates && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
       onMoveDown: canMutateTemplates && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
-      onDelete: canMutateTemplates ? () => detailGuard.protect(() => setDeletingFolder(folder)) : undefined,
+      onDelete: canMutateTemplates ? () => detailGuard.protect(() => { if (renderedScope !== accountScope.current) return; folderDeleteTicket.current = {}; setDeletingFolder(folder) }) : undefined,
       deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: 'unfiled', label: '未分類', count: ready ? unfiledCount : null },
@@ -997,7 +1012,7 @@ export default function TemplatesListV8() {
   const blockedRows = blockedUsage ? usageRows(blockedUsage) : []
   const blockedTotal = blockedDelete ? Math.max(blockedDelete.item.usageCount, blockedRows.length) : 0
 
-  const overlays = <Fragment key={renderedScope.generation}>{renderTemplateDialogs({ deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates, detailGuard })}{detailGuard.dialog}</Fragment>
+  const overlays = <Fragment key={renderedScope.generation}>{renderTemplateDialogs({ folderDeleteAccounts: [{ id: selectedAccountId ?? '', name: accounts.find(account => account.id === selectedAccountId)?.name }], cancelFolderDelete, deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates, detailGuard })}{detailGuard.dialog}</Fragment>
 
   const heading = {
     title: 'テンプレート',
