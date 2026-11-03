@@ -13,6 +13,15 @@ import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { ApiError, type WebinarListItem, type WebinarListParams } from '@/lib/api'
 import WebinarList from './page'
 
+const heldInlineAction = vi.hoisted(() => ({ hold: false, run: null as null | (() => void) }))
+vi.mock('@/components/shared/use-inline-detail-guard', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/use-inline-detail-guard')>()
+  return { ...actual, useInlineDetailGuard: (key: string) => {
+    const guard = actual.useInlineDetailGuard(key)
+    return { ...guard, protect: (action: () => void) => { if (heldInlineAction.hold) { heldInlineAction.run = action; return } return guard.protect(action) } }
+  } }
+})
+
 const mocks = vi.hoisted(() => ({
   accountId: 'account-1' as string | null,
   accounts: [{ id: 'account-1' }, { id: 'account-2' }] as Array<{ id: string }>,
@@ -63,6 +72,8 @@ function folderRow(label: string) {
 }
 
 beforeEach(() => {
+  heldInlineAction.hold = false
+  heldInlineAction.run = null
   vi.clearAllMocks()
   window.history.replaceState(null, '', '/webinars')
   window.dispatchEvent(new PopStateEvent('popstate'))
@@ -144,6 +155,21 @@ describe('フォルダ', () => {
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /保存する/ })) })
     expect(mocks.updateFolder).toHaveBeenCalledWith('account-1', 'folder-a', { name: '説明会', color: '#2f6fde' })
     expect(mocks.createFolder).not.toHaveBeenCalled()
+  })
+
+  it('未保存確認の間にアカウントが往復した古い削除操作は開かない', async () => {
+    const view = await start()
+    await waitFor(() => expect(folderRow('セミナー')).toBeTruthy())
+    await act(async () => { fireEvent.click(folderRow('セミナー')) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
+    heldInlineAction.hold = true
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /消す/ })) })
+    expect(heldInlineAction.run).toBeTypeOf('function')
+    mocks.accountId = 'account-2'; view.rerender(<WebinarList />)
+    mocks.accountId = 'account-1'; view.rerender(<WebinarList />)
+    await act(async () => { heldInlineAction.run!() })
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(mocks.deleteFolder).not.toHaveBeenCalled()
   })
 
   it('折りたたんだフォルダ欄でも選択したフォルダを操作できる', async () => {

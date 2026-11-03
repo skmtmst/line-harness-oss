@@ -320,6 +320,9 @@ function WebinarList() {
   const router = useRouter()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId }
+  const renderedAccountScope = accountScope.current
   // 「閲覧のみ」：押せない形にする（隠さない）。
   const role = useStaffRole()
   const featureAccess = useFeatureAccess('webinars')
@@ -745,7 +748,7 @@ function WebinarList() {
         onEdit: manageable ? () => detailGuard.protect(() => { setFolderError(''); closeDetail(); setEditingFolder(folder) }) : undefined,
         onMoveUp: manageable && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
         onMoveDown: manageable && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
-        onDelete: manageable ? () => detailGuard.protect(() => { setFolderError(''); setDeletingFolderAccountId(selectedAccountId); setDeletingFolder(folder) }) : undefined,
+        onDelete: manageable ? () => detailGuard.protect(() => { if (renderedAccountScope !== accountScope.current) return; setFolderError(''); setDeletingFolderAccountId(selectedAccountId); setDeletingFolder(folder) }) : undefined,
         deleteNote: '削除しても、中のウェビナーは未分類に残ります。',
       }
     }),

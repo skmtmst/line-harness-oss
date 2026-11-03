@@ -7,7 +7,25 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const heldInlineAction = vi.hoisted(() => ({ hold: false, run: null as null | (() => void) }))
+vi.mock('@/components/shared/use-inline-detail-guard', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/use-inline-detail-guard')>()
+  return { ...actual, useInlineDetailGuard: (key: string) => {
+    const guard = actual.useInlineDetailGuard(key)
+    return { ...guard, protect: (action: () => void) => { if (heldInlineAction.hold) { heldInlineAction.run = action; return } return guard.protect(action) } }
+  } }
+})
+
+const heldFolderConfirm = vi.hoisted(() => ({ current: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.description?.startsWith('削除しても、中のフォームは未分類') && props.onConfirm) heldFolderConfirm.current = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 const fetchApi = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ id: 'account-a' }))
 const apiFolders = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
@@ -29,6 +47,11 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+vi.mock('@/lib/line-accounts-cache', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/line-accounts-cache')>()),
+  loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '選択中の店' }, { id: 'account-b', name: 'フォルダの所有店' }] })),
+}))
+
 /* 操作の試験は、本人確認が済んだ管理者として行う。 */
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -46,8 +69,8 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
-  useOptionalAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, loading: false }),
+  useOptionalAccount: () => ({ selectedAccountId: account.id, loading: false }),
 }))
 
 /* 新しい一覧（src/v8/forms/list.tsx）を描く。2026-10-06 に `./list-v8` から向け直した。 */
@@ -117,6 +140,9 @@ function mockResponse(url: string, options?: { method?: string; body?: string })
 const folderA = { id: 'fol-a', kind: 'form', name: 'A箱', parentId: null, displayOrder: 0, color: null }
 
 beforeEach(() => {
+  heldInlineAction.hold = false
+  heldInlineAction.run = null
+  account.id = 'account-a'
   const storage = new MemoryStorage()
   storage.setItem('lh_staff_role', 'admin')
   vi.stubGlobal('localStorage', storage)
@@ -166,6 +192,76 @@ async function clickFolder(label: string) {
     button!.click()
   })
 }
+
+describe('フォームのフォルダ削除確認', () => {
+  it('未保存確認の間にアカウントが往復した古い削除操作は開かない', async () => {
+    await act(async () => { root.render(<FormSubmissionsPage />) })
+    await clickFolder('A箱')
+    const action = [...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'フォルダ「A箱」の操作')!
+    await act(async () => { action.click() })
+    heldInlineAction.hold = true
+    const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('消す')) as HTMLElement
+    await act(async () => { remove.click() })
+    expect(heldInlineAction.run).toBeTypeOf('function')
+    account.id = 'account-b'; await act(async () => { root.render(<FormSubmissionsPage />) })
+    account.id = 'account-a'; await act(async () => { root.render(<FormSubmissionsPage />) })
+    await act(async () => { heldInlineAction.run!() })
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(apiFolders.delete).not.toHaveBeenCalled()
+  })
+
+  it('折りたたんだフォルダ欄でも削除入口を出す', async () => {
+    await act(async () => { root.render(<FormSubmissionsPage />) })
+    await clickFolder('A箱')
+    expect(document.querySelectorAll('[aria-label="フォルダ「A箱」の操作"]')).toHaveLength(2)
+  })
+
+  it('フォルダに記録された所有先を表示する', async () => {
+    apiFolders.list.mockResolvedValue({ success: true, data: [{ ...folderA, accountId: 'account-b' }] })
+    await act(async () => { root.render(<FormSubmissionsPage />) })
+    await clickFolder('A箱')
+    const action = [...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'フォルダ「A箱」の操作')!
+    await act(async () => { action.click() })
+    const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('消す')) as HTMLElement
+    await act(async () => { remove.click() })
+    await act(async () => { await Promise.resolve() })
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('フォルダの所有店')
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).not.toContain('選択中の店')
+  })
+
+  it('閉じたフォルダ削除の古い確定は実行しない', async () => {
+    await act(async () => { root.render(<FormSubmissionsPage />) })
+    await clickFolder('A箱')
+    const action = [...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'フォルダ「A箱」の操作')!
+    await act(async () => { action.click() })
+    const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('消す')) as HTMLElement
+    await act(async () => { remove.click() })
+    const retained = heldFolderConfirm.current!
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    await act(async () => { [...dialog.querySelectorAll('button')].find(b => b.textContent?.trim() === 'キャンセル')!.click() })
+    await act(async () => { await retained() })
+    expect(apiFolders.delete).not.toHaveBeenCalled()
+  })
+
+  it('対象アカウントと環境を出し、切替後に前の窓を確定できない', async () => {
+    await act(async () => { root.render(<FormSubmissionsPage />) })
+    await clickFolder('A箱')
+    const action = [...document.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'フォルダ「A箱」の操作')
+    expect(action).toBeTruthy()
+    await act(async () => { action!.click() })
+    const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('消す')) as HTMLElement | undefined
+    expect(remove).toBeTruthy()
+    await act(async () => { remove!.click() })
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
+    expect(dialog.textContent).toContain('名前を確認できません')
+    account.id = 'account-b'
+    await act(async () => { root.render(<FormSubmissionsPage />) })
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(apiFolders.delete).not.toHaveBeenCalled()
+  })
+})
 
 describe('フォルダ選択はサーバーへ渡す（N-175・実マウント）', () => {
   it('箱を選ぶとfolder_id付きで取り直す', async () => {

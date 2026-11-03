@@ -123,7 +123,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
           setDeletingFolder(null)
           setFolderError('')
         }}
-      />
+      ><OperationTargetSummary accounts={[{ id: deletingFolder && 'accountId' in deletingFolder && typeof deletingFolder.accountId === 'string' ? deletingFolder.accountId : '' }]} /></ConfirmDialog>
 
       {moveTarget !== null ? (
         <DetailPanel
