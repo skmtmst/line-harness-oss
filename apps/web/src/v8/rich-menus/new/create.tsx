@@ -4,6 +4,8 @@ import { useListNavigationRouter } from '@/components/shared/list-navigation'
 import { useMenuMediaScope } from './use-menu-media-scope'
 
 import { useMenuShapeDraft } from './use-menu-shape-draft'
+import { useHqRichMenuDraft } from './use-hq-rich-menu-draft'
+import { makeHqMenuSeed } from './hq-menu-seed'
 
 import { publishMenuNow } from './create-publish-actions'
 import { reloadMenuGroup } from './create-reload-group'
@@ -237,6 +239,15 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const aggregateOnly = staffRole === 'staff' || staffRole === 'viewer'
   const storeCanOperate = useFeatureAccess('richMenus')
   const canOperate = host ? host.canOperate : storeCanOperate
+  const hqDraft = useHqRichMenuDraft(host?.draftKey, {
+    version: 1, step, maxStepIndex, group, pages, activePageId, selectedAreaId, name, chatBarText, folderId, size, tabCount, templateKey,
+    pendingImages, tabNames, audience, hqTagName, targetingPriority, defaultOpen, selectedIds: host?.selectedIds ?? [], uploadedKeys: host?.uploadedKeys ?? [], duplicateMode: hqDuplicateMode,
+  }, draft => {
+    setStep(draft.step); setMaxStepIndex(draft.maxStepIndex); setGroup(draft.group); setPages(draft.pages); setActivePageId(draft.activePageId); setSelectedAreaId(draft.selectedAreaId)
+    setName(draft.name); setChatBarText(draft.chatBarText); setFolderId(draft.folderId); setSize(draft.size); setTabCount(draft.tabCount); setTemplateKey(draft.templateKey)
+    setPendingImages(draft.pendingImages); setTabNames(draft.tabNames); setAudience(draft.audience); setHqTagName(draft.hqTagName); setTargetingPriority(draft.targetingPriority)
+    setDefaultOpen(draft.defaultOpen); setHqDuplicateMode(draft.duplicateMode); host?.restoreSelectedIds?.(draft.selectedIds); host?.restoreUploadedKeys?.(draft.uploadedKeys)
+  })
 
   /* ---------- 署名（未保存の検知） ---------- */
 
@@ -1198,22 +1209,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     if (!validateBasics()) return
     host.onSave(seedNow(), distribute, hqDuplicateMode)
   }
-  function seedNow(): HqRichMenuSeed {
-    return {
-      id: host?.initial?.id,
-      name: name.trim(),
-      chatBarText: chatBarText.trim(),
-      folderId: folderId || null,
-      size: group?.size ?? size,
-      displayAudience: audience === 'all' ? 'all' : audience === 'tag' ? 'tag' : 'store',
-      displayTagName: audience === 'tag' ? hqTagName.trim() : '',
-      defaultOpen,
-      displayOrder: targetingPriority,
-      defaultPageId: group?.defaultPageId ?? pages[0]?.id ?? '',
-      pages: pages.map((page) => ({ id: page.id, name: page.name, imageR2Key: page.imageR2Key, areas: page.areas })),
-    }
-  }
+  function seedNow(): HqRichMenuSeed { return makeHqMenuSeed({ host, name, chatBarText, folderId, size, group, audience, hqTagName, defaultOpen, targetingPriority, pages }) }
 
+  if (!hqDraft.ready) return <ListState kind="loading" title="作りかけを確認しています" />
   if (editGroupId && editLoad !== 'ready') {
     if (editLoad === 'forbidden') {
       return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden"
@@ -1323,6 +1321,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             )}
           </>
         } status={dirty ? '未保存の変更があります' : undefined} >
+      {hqDraft.failed ? <Notice tone="danger" message="一時保存できません。再読み込み前に入力を控えるか、下書きを保存してください。" /> : null}
       {host?.notice}
 
       {error ? (

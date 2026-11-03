@@ -15,6 +15,12 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const hqDraftMemory = vi.hoisted(() => new Map<string, unknown>())
+vi.mock('@/lib/hq-rich-menu-draft-store', () => ({
+  readHqRichMenuDraft: async (key: string) => hqDraftMemory.get(key),
+  writeHqRichMenuDraft: async (key: string, value: unknown) => { hqDraftMemory.set(key, value) },
+  clearHqRichMenuDraft: async (key: string) => { hqDraftMemory.delete(key) },
+}))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: ACCOUNT, loading: false }),
 }))
@@ -106,6 +112,7 @@ function currentStep(): string {
 
 beforeEach(() => {
   failing = {}
+  hqDraftMemory.clear()
   groupBody = GROUP
   stubFetch()
   host = document.createElement('div')
@@ -447,4 +454,76 @@ it.each([
   ['all', true, '全員'], ['tag', true, 'タグが付いた人'], ['targeted', true, '決めない'],
 ] as const)('比較する表示先%s（統括=%s）は選択の題と一致する', (audience, forHq, expected) => {
   expect(describeMenuSummary({ name: 'メニュー', chatBarText: 'メニュー', audience, forHq, pages: [] })).toContain(`出す相手：${expected}`)
+})
+
+it('統括の新規メニューは再読込しても名前を戻す', async () => {
+  const hq = { ...makeHqHost(), draftKey: 'test-hq-reload' }
+  await open('', { host: hq })
+  await act(async () => { fireEvent.change(screen.getByRole('textbox', { name:/^メニュー名/ }), { target:{ value:'再開するメニュー' } }) })
+  await settle()
+  await act(async () => { root.unmount(); root = createRoot(host) })
+  await open('', { host:hq })
+  expect((screen.getByRole('textbox', { name:/^メニュー名/ }) as HTMLInputElement).value).toBe('再開するメニュー')
+})
+
+it('統括の画像ファイルも再読込後に残す', async () => {
+  vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:test-image'), revokeObjectURL: vi.fn() }))
+  const hq = { ...makeHqHost(), draftKey: 'test-hq-image' }
+  await open('', { host:hq })
+  const file = new File(['fixture'], '架空.png', { type:'image/png' })
+  const input = host.querySelector('input[type="file"]') as HTMLInputElement
+  await act(async () => { fireEvent.change(input, { target:{ files:[file] } }) })
+  await settle()
+  const saved = hqDraftMemory.get('test-hq-image') as {pendingImages:Array<{file:File}>}
+  expect(saved.pendingImages[0]?.file.name).toBe('架空.png')
+  await act(async () => { root.unmount(); root = createRoot(host) })
+  await open('', { host:hq })
+  expect(screen.getByText('架空.png')).toBeTruthy()
+})
+
+it('所属が変わると別の一時下書きを読まない', async () => {
+  const first = { ...makeHqHost(), draftKey:'tenant-a:owner' }
+  await open('', { host:first })
+  await act(async () => { fireEvent.change(screen.getByRole('textbox', { name:/^メニュー名/ }), { target:{value:'Aの名前'} }) })
+  await settle()
+  await act(async () => { root.unmount(); root = createRoot(host) })
+  await open('', { host:{ ...makeHqHost(), draftKey:'tenant-b:owner' } })
+  expect((screen.getByRole('textbox', { name:/^メニュー名/ }) as HTMLInputElement).value).toBe('')
+})
+
+it('壊れた一時下書きを上書きせず、保存できない理由を表示する', async () => {
+  hqDraftMemory.set('broken-draft', { version: 999, name:'元の値' })
+  await open('', { host:{ ...makeHqHost(), draftKey:'broken-draft' } })
+  expect(screen.getByText(/一時保存できません/)).toBeTruthy()
+  await act(async () => { fireEvent.change(screen.getByRole('textbox', { name:/^メニュー名/ }), { target:{value:'入力した値'} }) })
+  await settle()
+  expect(hqDraftMemory.get('broken-draft')).toEqual({ version:999, name:'元の値' })
+})
+
+it('統括で配る先と一時アップロードの後片付け情報も復元する', async () => {
+  const restoreSelectedIds = vi.fn(), restoreUploadedKeys = vi.fn()
+  const hq = { ...makeHqHost(), draftKey:'hq-targets', selectedIds:['store-1'], uploadedKeys:['hq-templates/t/uploads/photo.png'], restoreSelectedIds, restoreUploadedKeys }
+  await open('', { host:hq })
+  await act(async () => { fireEvent.change(screen.getByRole('textbox', { name:/^メニュー名/ }), { target:{value:'作りかけ'} }) })
+  await settle()
+  await act(async () => { root.unmount(); root = createRoot(host) })
+  await open('', { host:hq })
+  expect(restoreSelectedIds).toHaveBeenCalledWith(['store-1'])
+  expect(restoreUploadedKeys).toHaveBeenCalledWith(['hq-templates/t/uploads/photo.png'])
+})
+
+it('統括のボタン設定中に再読込しても手順と編集中の内容を戻す', async () => {
+  const hq = { ...makeHqHost(), draftKey:'hq-step' }
+  await open('', { host:hq })
+  await act(async () => { fireEvent.change(screen.getByRole('textbox', { name:/^メニュー名/ }), { target:{value:'作りかけのメニュー'} }) })
+  await act(async () => { fireEvent.click(getPageAction({name:'次へ：ボタンの動き',exact:true})) })
+  await settle()
+  expect(currentStep()).toContain('ボタンの動き')
+  const previousText = host.textContent
+  await act(async () => { root.unmount(); root = createRoot(host) })
+  await open('', {host:hq})
+  expect(currentStep()).toContain('ボタンの動き')
+  expect(host.textContent).toContain('作りかけのメニュー')
+  expect(host.textContent).toContain('面 A')
+  expect(previousText).toContain('面 A')
 })
