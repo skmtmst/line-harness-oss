@@ -135,8 +135,9 @@ it('指定なしは元のボタンとTab順・文字数・名前と候補の差�
   expect(view.container.querySelector('[data-permission-locked], [aria-disabled], [hidden]')).toBeNull()
   const buttons = screen.getAllByRole('button') as HTMLButtonElement[]
   expect(buttons.map(b => [b.textContent, b.disabled, b.tabIndex])).toEqual([
-    ['名前', false, 0], ['友だち情報', false, 0], ['共通情報', false, 0], ['回答フォーム', false, 0], ['配信日', false, 0], ['その他', false, 0],
+    ['名前', false, 0], ['友だち情報', false, 0], ['共通情報', false, 0], ['回答フォーム', false, 0], ['配信日', false, 0], ['その他', false, 0], ['', false, 0],
   ])
+  expect(buttons.at(-1)).toBe(screen.getByRole('button', { name: '文字数の数え方' }))
   fireEvent.click(screen.getByRole('button', { name: '名前' }))
   expect(p.onChange).toHaveBeenCalledExactlyOnceWith('本文{{name}}')
   p.onChange.mockClear()

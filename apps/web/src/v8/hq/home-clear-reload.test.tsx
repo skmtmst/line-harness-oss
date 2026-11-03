@@ -128,3 +128,18 @@ test('フォルダの数はすべてと同じ非アーカイブの一覧から�
   fireEvent.click(screen.getByRole('button',{name:'フォルダの説明'}))
   expect((document.body.textContent?.match(/フォルダを消しても/g) ?? [])).toHaveLength(1)
 })
+
+test('同名フォルダを拒否したら名前欄に理由を出し、直すと消える', async () => {
+  const { ApiError } = await import('@/lib/api')
+  vi.mocked(api.lineAccountFolders.create).mockRejectedValueOnce(new ApiError(409, '同じ名前のフォルダがあります'))
+  render(<HqHomeV8 />)
+  await screen.findAllByText('銀座店')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  const input = screen.getByRole('textbox', { name: 'フォルダの名前' })
+  fireEvent.change(input, { target: { value: '関西' } })
+  fireEvent.click(screen.getByRole('button', { name: '追加する' }))
+  await waitFor(() => expect(input.getAttribute('aria-invalid')).toBe('true'))
+  expect(screen.getByText('同じ名前のフォルダがあります')).toBeTruthy()
+  fireEvent.change(input, { target: { value: '九州' } })
+  expect(screen.queryByText('同じ名前のフォルダがあります')).toBeNull()
+})

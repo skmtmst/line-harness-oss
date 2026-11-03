@@ -15,7 +15,7 @@ import {useAccount} from '@/contexts/account-context'
  * 内訳・つながる先。1152 では右の欄が表の下に積まれる（CSS だけ）。
  * 箱は予約元の色（LINE・レストランボード＝緑、予約媒体＝赤、電話＝灰）、承認待ちは黄の枠、押さえは灰の枠。
  */
-import { useMemo,useState } from 'react'
+import { useEffect,useMemo,useState } from 'react'
 import type {ReservationAxis} from '@line-crm/shared'
 import KpiCard from '@/components/shared/kpi-card'
 import Link from '@/components/shared/list-navigation'
@@ -79,31 +79,40 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   const visibleFloor = floor ? {...floor,tables:floor.tables.filter(table => columns.some(column => column.id===table.id))} : undefined
   const hidden = tables.filter((table) => !table.is_active && !columns.includes(table))
 
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setTimeout(() => setNow(Date.now()), 1_800_000 - (now % 1_800_000))
+    return () => window.clearTimeout(timer)
+  }, [now])
+
   /* 次の予約：その日の残りから。無ければ（営業の後など）次の日以降の予約から出し、日付も書く。 */
   const next = useMemo(() => {
-    const nowMs = isToday ? Date.now() : Date.parse(dayRange(day).from)
+    const nowMs = isToday ? now : Date.parse(dayRange(day).from)
     const sorted = (list: RestaurantReservation[]) => list
       .filter((item) => !INACTIVE_STATUSES.includes(item.status) && !isHold(item) && new Date(item.starts_at).getTime() >= nowMs)
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
     return sorted(bookings)[0] ?? sorted(later.filter((item) => source === 'all' || item.source === source))[0] ?? null
-  }, [bookings, later, isToday, day, source])
+  }, [bookings, later, isToday, day, source, now])
   const nextOtherDay = next ? !sameDay(new Date(next.starts_at), day) : false
 
   const pending = countedBookings.filter((item) => item.status === 'pending')
   const allergies = bookings.filter((item) => item.allergy_note).sort((a, b) => a.starts_at.localeCompare(b.starts_at))
   const tableById = new Map(tables.map((table) => [table.id, table]))
 
-  /* いちばん混む時間（始まる予約の人数がいちばん多い30分）に空いている卓。 */
+  /* 選んだ日の、これからの混む時間に空いている卓。 */
   const peak = useMemo(() => {
+    const dayStart = Date.parse(dayRange(day).from)
+    const sameDayRows = shown.filter((item) => sameDay(new Date(item.starts_at), day))
     let best = -1
     let bestSeats = 0
     for (const slot of Array.from({length:48},(_,i)=>i*30)) {
-      const seats = shown.filter((item) => minutesOf(item.starts_at) <= slot && minutesOf(item.ends_at) > slot).reduce((sum, item) => sum + item.guest_count, 0)
+      if (dayStart + slot * 60_000 <= now) continue
+      const seats = sameDayRows.filter((item) => minutesOf(item.starts_at) <= slot && minutesOf(item.ends_at) > slot).reduce((sum, item) => sum + item.guest_count, 0)
       if (seats > bestSeats) { best = slot; bestSeats = seats }
     }
     return best
-  }, [shown])
-  const freeAtPeak = peak < 0 ? [] : columns.filter((table) => table.is_active && !shown.some((item) => !item.departed_at && seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(table.id) && minutesOf(item.starts_at) <= peak && minutesOf(item.ends_at) > peak))
+  }, [shown, day, now])
+  const freeAtPeak = peak < 0 ? [] : columns.filter((table) => table.is_active && !shown.some((item) => sameDay(new Date(item.starts_at), day) && !item.departed_at && seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(table.id) && minutesOf(item.starts_at) <= peak && minutesOf(item.ends_at) > peak))
 
   const guests = countedBookings.reduce((sum, item) => sum + item.guest_count, 0)
   const lineCount = countedBookings.filter((item) => item.source === 'line').length
