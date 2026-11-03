@@ -404,6 +404,10 @@
   gap: var(--polish-space-row);
 }
 
+.selfSecurityFullWidth {
+  max-width: none;
+}
+
 .selfSecurityTitle {
   margin: 0;
   color: var(--color-ink);
