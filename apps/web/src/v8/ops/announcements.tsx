@@ -7,6 +7,7 @@ import { opsCall } from '@/components/ops/ops-ui'
 import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import { useListUrlState } from '@/components/shared/list-url-state'
@@ -193,7 +194,7 @@ export default function OpsAnnouncementsV8() {
         error={actionError}
         onConfirm={() => remove()}
         onCancel={() => { if (!busy) setDeleting(null) }}
-      />
+      ><OperationTargetSummary accounts={[]} /></ConfirmDialog>
     </div></SaveErrorScope>
   )
 }

@@ -19,7 +19,19 @@ const fixture = vi.hoisted(() => ({
   putBreaks: vi.fn(), putRules: vi.fn(), putDates: vi.fn(),
   rules: [{ weekday: 1, start_time: '10:00', end_time: '19:00' }] as Array<{ weekday: number; start_time: string; end_time: string }>,
   getRules: vi.fn(), getBreaks: vi.fn(), listMenus: vi.fn(), getAvailability: vi.fn(), getDates: vi.fn(), createException: vi.fn(),
+  getCalendar: vi.fn(), deleteCalendar: vi.fn(),
 }))
+
+const disconnectSnapshots = vi.hoisted(() => [] as Array<{ open: boolean; confirm: () => unknown }>)
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (fixture.accountId === 'account-b' && props.title === '外の予定とのつながりを切りますか？' && props.onConfirm) {
+      disconnectSnapshots.push({ open: Boolean(props.open), confirm: props.onConfirm })
+    }
+    return <actual.default {...props} />
+  } }
+})
 
 const stableRouter = { replace: (...args: unknown[]) => fixture.replace(...args), push: (...args: unknown[]) => fixture.push(...args) }
 vi.mock('next/navigation', () => ({ useRouter: () => stableRouter, useSearchParams: () => new URLSearchParams(fixture.query) }))
@@ -52,7 +64,8 @@ vi.mock('@/lib/api', () => {
       getBreaks: (...args: unknown[]) => fixture.getBreaks(...args),
       getBreakDates: (...args: unknown[]) => fixture.getDates(...args),
       createException: (...args: unknown[]) => fixture.createException(...args),
-      getGoogleCalendar: async () => ({ connection: null, service_account: { configured: true } }),
+      getGoogleCalendar: (...args: unknown[]) => fixture.getCalendar(...args),
+      deleteGoogleCalendar: (...args: unknown[]) => fixture.deleteCalendar(...args),
       putBreaks: (...args: unknown[]) => fixture.putBreaks(...args),
       putAvailabilityRules: (...args: unknown[]) => fixture.putRules(...args),
       putBreakDates: (...args: unknown[]) => fixture.putDates(...args),
@@ -80,7 +93,10 @@ const memStorage = vi.hoisted(() => {
 vi.stubGlobal('localStorage', memStorage)
 
 beforeEach(() => {
+  disconnectSnapshots.length = 0
   fixture.accountId = 'account-a'
+  fixture.getCalendar.mockReset().mockResolvedValue({ connection: null, service_account: { configured: true } })
+  fixture.deleteCalendar.mockReset().mockResolvedValue({})
   fixture.query = ''
   memStorage.setItem('lh_staff_role', 'owner')
   fixture.role = 'owner'
@@ -174,6 +190,33 @@ describe('役割はサーバーで決める', () => {
 })
 
 describe('勤務とシフト（管理者）', () => {
+  test('アカウント切替直後の古いカレンダー解除確認は開かず解除もしない', async () => {
+    fixture.getCalendar.mockResolvedValue({ connection: { calendar_id: 'fixture-calendar', last_verified_at: null, last_error: null }, service_account: { configured: true } })
+    const view = render(<StaffShiftsV8 staffId="bs-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: '外す' }))
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
+    fixture.accountId = 'account-b'
+    view.rerender(<StaffShiftsV8 staffId="bs-1" />)
+    const first = disconnectSnapshots[0]
+    expect(first).toBeTruthy()
+    expect(first.open).toBe(false)
+    await act(async () => { await first.confirm() })
+    expect(fixture.deleteCalendar).not.toHaveBeenCalled()
+  })
+  test('外の予定を切る確認に対象と環境を出し、アカウント切替で閉じる', async () => {
+    fixture.getCalendar.mockResolvedValue({ connection: { calendar_id: 'fixture-calendar', last_verified_at: null, last_error: null }, service_account: { configured: true } })
+    const view = render(<StaffShiftsV8 staffId="bs-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: '外す' }))
+    const dialog = screen.getByRole('alertdialog')
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
+    expect(within(dialog).getByText('佐々木 亮太')).toBeTruthy()
+    fixture.accountId = 'account-b'
+    view.rerender(<StaffShiftsV8 staffId="bs-1" />)
+    await screen.findByRole('button', { name: '外す' })
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(fixture.deleteCalendar).not.toHaveBeenCalled()
+  })
   test('この日だけの休憩削除は対象と環境を示し、アカウント変更で閉じる', async () => {
     fixture.getDates.mockResolvedValue({ version: 'd1', breaks: [{ id: 'br1', work_date: '2099-10-12', start_time: '12:00', end_time: '13:00' }] })
     const view = render(<StaffShiftsV8 staffId="bs-1" />)

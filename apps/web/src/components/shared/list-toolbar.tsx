@@ -388,7 +388,7 @@ function contentSizedSelects(node: ReactNode): ReactNode {
   if (isContentSizedControl(node)) return contentSizedControl(node)
   if (isValidElement<{ children?: ReactNode }>(node) && node.props.children) {
     const children = contentSizedSelects(node.props.children)
-    return children === node.props.children ? node : cloneElement(node, {}, children)
+    return children === node.props.children ? node : Array.isArray(children) ? cloneElement(node, {}, ...children) : cloneElement(node, {}, children)
   }
   return node
 }

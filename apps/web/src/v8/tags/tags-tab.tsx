@@ -237,9 +237,14 @@ export default function TagsTab({
   const { leavingId, leave } = useRowLeaving()
   // 使っている所が0のタグは窓なしで保管し、5秒は「元に戻す」で取り消せる（動きの点検 17 番・旧い一覧と同じ）。
   const [manageFoldersOpen, setManageFoldersOpen] = useState(false)
-  useEffect(() => { setManageFoldersOpen(false) }, [accountId])
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
+  const deleteTicket = useRef<object | null>(null)
+  const renderedDeleteTicket = deleteTicket.current
+  const deleteLock = useRef(false)
+  const currentAccount = useRef(accountId)
+  currentAccount.current = accountId
+  useEffect(() => { deleteTicket.current = null; setDeletingGroup(null); setManageFoldersOpen(false) }, [accountId])
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
   /* 行の「…」メニュー。「フォルダへ移す」はメニューの2段目。 */
@@ -465,22 +470,27 @@ export default function TagsTab({
   }
 
   const removeGroup = async () => {
-    if (!deletingGroup || folderBusy) return
+    if (!deletingGroup || folderBusy || !renderedDeleteTicket || renderedDeleteTicket !== deleteTicket.current || deleteLock.current || accountId !== currentAccount.current) return
     const group = deletingGroup
+    deleteLock.current = true
     setFolderBusy(true)
     setFolderError('')
     try {
       const result = await api.tagGroups.delete(group.id, group.accountId)
       if (!result.success) throw new Error(result.error)
+      if (renderedDeleteTicket !== deleteTicket.current || accountId !== currentAccount.current) return
+      deleteTicket.current = null
       if (folder === group.id) setFolder('')
       setDeletingGroup(null)
       void load()
     } catch (reason) {
+      if (renderedDeleteTicket !== deleteTicket.current || accountId !== currentAccount.current) return
       const fieldFailure = saveErrors.capture(reason)
 
       { if (!fieldFailure)
       setFolderError(describeApiFailure(reason, '削除')) }
     } finally {
+      deleteLock.current = false
       setFolderBusy(false)
     }
   }
@@ -571,7 +581,7 @@ export default function TagsTab({
       onEdit: canEdit ? () => { setManageFoldersOpen(false); setFolderDialog(group) } : undefined,
       onMoveUp: canEdit && index > 0 ? () => void moveGroupOrder(group, -1) : undefined,
       onMoveDown: canEdit && index < groups.length - 1 ? () => void moveGroupOrder(group, 1) : undefined,
-      onDelete: canEdit ? () => { setManageFoldersOpen(false); setDeletingGroup(group) } : undefined,
+      onDelete: canEdit ? () => { deleteTicket.current = {}; setManageFoldersOpen(false); setDeletingGroup(group) } : undefined,
       deleteNote: '削除しても、中のタグは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? folderItems.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={16} aria-hidden="true" /> },
@@ -925,9 +935,9 @@ export default function TagsTab({
         destructive
         busy={folderBusy}
         error={folderError || undefined}
-        onCancel={() => { if (!folderBusy) setDeletingGroup(null) }}
+        onCancel={() => { if (!folderBusy && !deleteLock.current) { deleteTicket.current = null; setDeletingGroup(null) } }}
         onConfirm={() => removeGroup()}
-      />
+      >{deletingGroup ? <OperationTargetSummary accounts={[{ id: deletingGroup.accountId ?? '' }]} /> : null}</ConfirmDialog>
 
       <ConfirmDialog open={restoreTarget !== null} title={`「${restoreTarget?.name ?? ''}」を保管から戻しますか？`}
         description="同じタグを通常の一覧へ戻します。保管時に付け替えた友だちは、そのまま残ります。"

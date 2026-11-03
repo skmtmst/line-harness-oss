@@ -19,7 +19,17 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const heldFolderConfirm = vi.hoisted(() => ({ current: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.description.startsWith('中のアカウント') && props.onConfirm) heldFolderConfirm.current = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 const attention = vi.hoisted(() => vi.fn())
+const accountFolders = vi.hoisted(() => vi.fn())
+const removeAccountFolder = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
 const accounts = vi.hoisted(() => vi.fn())
 const checkConnection = vi.hoisted(() => vi.fn())
 const importState = vi.hoisted(() => vi.fn())
@@ -39,7 +49,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     api: {
       ...actual.api,
       lineAccounts: { ...actual.api.lineAccounts, list: accounts, followerImportState: importState, restore: restoreApi },
-      lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })) },
+      lineAccountFolders: { ...actual.api.lineAccountFolders, list: accountFolders, remove: removeAccountFolder },
       tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '然 -NEN-' } })) },
     },
   }
@@ -101,6 +111,7 @@ beforeEach(() => {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
+  accountFolders.mockResolvedValue({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })
   attention.mockReset()
   attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { unhandledChats: 2, pendingBookings: 1, unpaid: 0, connections: 1, stoppedDeliveries: 0 } }] } })
   accounts.mockResolvedValue({ success: true, data: [warnedAccount] })
@@ -126,6 +137,30 @@ async function render() {
   await act(async () => { root.render(<HqHomeV8 />) })
   await act(async () => { await Promise.resolve() })
 }
+
+it('閉じた統括アカウントフォルダの古い確定は削除しない', async () => {
+  removeAccountFolder.mockClear()
+  accountFolders.mockResolvedValue({ success: true, data: { folders: [{ id: 'folder-a', name: '確認用フォルダ', displayOrder: 0, color: null, itemCount: 1 }], total: 1, unclassifiedCount: 0 } })
+  await render()
+  await act(async () => { container.querySelector<HTMLButtonElement>('[aria-label="フォルダ「確認用フォルダ」の操作"]')!.click() })
+  await act(async () => { [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(el => el.textContent?.trim() === '消す')!.click() })
+  const held = heldFolderConfirm.current!
+  await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(el => el.textContent?.trim() === 'キャンセル')!.click() })
+  await act(async () => { await held() })
+  expect(removeAccountFolder).not.toHaveBeenCalled()
+})
+
+it('統括アカウントのフォルダ削除前に環境と対象の不確実さを示す', async () => {
+  accountFolders.mockResolvedValue({ success: true, data: { folders: [{ id: 'folder-a', name: '確認用フォルダ', displayOrder: 0, color: null, itemCount: 1 }], total: 1, unclassifiedCount: 0 } })
+  await render()
+  const action = container.querySelector<HTMLButtonElement>('[aria-label="フォルダ「確認用フォルダ」の操作"]')!
+  await act(async () => { action.click() })
+  const remove = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(el => el.textContent?.trim() === '消す')!
+  await act(async () => { remove.click() })
+  const dialog = document.querySelector('[role="alertdialog"]')!
+  expect(dialog.textContent).toContain('環境')
+  expect(dialog.textContent).toContain('未分類へ移るアカウントの名前を確認できません')
+})
 
 it('表の対応が要る件数は同じアカウントの対応一覧の5種類を合計する', async () => {
   await render()

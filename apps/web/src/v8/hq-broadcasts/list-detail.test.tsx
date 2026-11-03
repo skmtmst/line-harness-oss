@@ -13,8 +13,16 @@ const hq = vi.hoisted(() => ({
   list: vi.fn(), get: vi.fn(),
   folders: vi.fn(async () => ({ success: true, data: [] })),
   approvalCandidates: vi.fn(async () => ({ success: true, data: [] })),
-  approval: vi.fn(), updateFolder: vi.fn(), createFolder: vi.fn(),
+  approval: vi.fn(), updateFolder: vi.fn(), createFolder: vi.fn(), deleteFolder: vi.fn(async () => ({ success: true })),
 }))
+const heldFolderConfirm = vi.hoisted(() => ({ current: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.description.startsWith('中の一括配信') && props.onConfirm) heldFolderConfirm.current = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 const params = vi.hoisted(() => ({ value: new URLSearchParams() }))
 vi.mock('@/lib/hq-broadcasts-api', () => ({ hqBroadcastsApi: hq }))
 vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
@@ -127,6 +135,27 @@ describe('統括の一括配信の詳細（M2tJM）', () => {
     expect(deliveryWayText({ stealthSpreadMinutes: 30 }, true)).toBe('30分かけて分けて送る')
     expect(deliveryWayText({}, false)).toBe('すぐに全員へ')
   })
+})
+
+it('閉じた統括配信フォルダの古い確定は削除しない', async () => {
+  hq.folders.mockResolvedValue({ success: true, data: [{ id: 'f1', name: 'キャンペーン', revision: 1, item_count: 0, color: '#3b82f6' }] } as never)
+  hq.list.mockResolvedValue({ data: [] }); hq.deleteFolder.mockClear()
+  render(<HqBroadcastList />)
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「キャンペーン」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  const held = heldFolderConfirm.current!
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセル' }))
+  await held()
+  expect(hq.deleteFolder).not.toHaveBeenCalled()
+})
+
+it('統括配信のフォルダ削除前に環境を示す', async () => {
+  hq.folders.mockResolvedValue({ success: true, data: [{ id: 'f1', name: 'キャンペーン', revision: 1, item_count: 0, color: '#3b82f6' }] } as never)
+  hq.list.mockResolvedValue({ data: [] })
+  render(<HqBroadcastList />)
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「キャンペーン」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  expect(screen.getByRole('alertdialog').textContent).toContain('環境')
 })
 
 it('統括のフォルダは色の保存に失敗しても窓を残し、再試行・読み直し後にも色が残る', async () => {

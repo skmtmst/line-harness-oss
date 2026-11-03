@@ -25,7 +25,7 @@ import ContextMenu,{ type ContextMenuItem } from '@/components/shared/context-me
 import EmptyList from '@/components/shared/empty-list'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
-import FolderPanel,{ FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel,{ CollapsedFolderActions,FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -105,6 +105,9 @@ export default function FormsListV8() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderDeleteScope, setFolderDeleteScope] = useState<typeof accountScope.current | null>(null)
+  const folderDeleteTicket = useRef<object | null>(null)
+  const renderedFolderDeleteTicket = folderDeleteTicket.current
   /** 消す箱に入っているフォーム数。`null` はまだ数えていない。 */
   const [deletingFolderCount, setDeletingFolderCount] = useState<number | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
@@ -182,7 +185,9 @@ export default function FormsListV8() {
     setActiveFolderId('all')
     setFolderDialogOpen(false)
     setEditingFolder(null)
+    folderDeleteTicket.current = null
     setDeletingFolder(null)
+    setFolderDeleteScope(null)
     setFolderError('')
     setDeleteTarget(null)
     setDeleteImpact(null)
@@ -643,6 +648,11 @@ export default function FormsListV8() {
   }
 
   const openFolderDelete = async (folder: Folder) => {
+    const scope = accountScope.current
+    if (!scope.id) return
+    const ticket = {}
+    folderDeleteTicket.current = ticket
+    setFolderDeleteScope(scope)
     setDeletingFolder(folder)
     setDeletingFolderCount(null)
     setFolderError('')
@@ -652,29 +662,36 @@ export default function FormsListV8() {
       const res = await fetchApi<{ success: boolean; data: FormListResponse }>(
         `/api/forms?${account}&folder_id=${encodeURIComponent(folder.id)}&with_list_summary=1&page=1&limit=1&filter=all&sort=latest-answer`,
       )
-      if (res.success) {
+      if (res.success && scope === accountScope.current && ticket === folderDeleteTicket.current) {
         setDeletingFolderCount(Array.isArray(res.data) ? res.data.length : res.data.total)
       }
     } catch (saveFailure) {
+      if (scope !== accountScope.current || ticket !== folderDeleteTicket.current) return
       saveErrors.capture(saveFailure)
       setDeletingFolderCount(null)
     }
   }
 
   const removeFolder = async () => {
-    if (!deletingFolder || folderBusy || !selectedAccountId)
-
- return
+    if (!deletingFolder || folderBusy || !selectedAccountId || !renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current || folderDeleteScope !== accountScope.current) return
+    if (deletingFolder.accountId === undefined || (typeof deletingFolder.accountId === 'string' && deletingFolder.accountId !== selectedAccountId)) {
+      setFolderError('フォルダの所有先を確認できません。一覧を読み直してください。')
+      return
+    }
+    const scope = folderDeleteScope
     const targetId = deletingFolder.id
     setFolderBusy(true)
     setFolderError('')
     try {
-      const res = await api.folders.delete(targetId, selectedAccountId)
+      const res = await api.folders.delete(targetId, deletingFolder.accountId ?? undefined)
       if (!res.success) throw new Error(res.error)
+      if (scope !== accountScope.current) return
+      folderDeleteTicket.current = null
       setDeletingFolder(null)
       if (activeFolderId === targetId) setActiveFolderId('all')
       await loadForms()
     } catch (saveFailure) {
+      if (scope !== accountScope.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
@@ -850,11 +867,13 @@ export default function FormsListV8() {
       onEdit: canManageFolders ? () => detailGuard.protect(() => { closeDetail(); setEditingFolder(folder) }) : undefined,
       onMoveUp: canManageFolders && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
       onMoveDown: canManageFolders && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
-      onDelete: canManageFolders ? () => detailGuard.protect(() => { void openFolderDelete(folder) }) : undefined,
+      onDelete: canManageFolders ? () => detailGuard.protect(() => { if (renderedScope === accountScope.current) void openFolderDelete(folder) }) : undefined,
       deleteNote: '削除しても、中のフォームは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNFILED_VALUE, label: '未分類', count: loading || loadError ? null : unfiledCount },
   ]
+
+  const selectedFolderActions = folderRows.find(row => row.id === activeFolderId && row.onDelete)
 
   const folderSelectOptions = [
     { value: 'all', label: 'フォルダ：すべて' },
@@ -1194,7 +1213,7 @@ export default function FormsListV8() {
     <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null
 
-  const overlays = <>{renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms, detailGuard })}{detailGuard.dialog}</>
+  const overlays = <>{renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder: folderDeleteScope === accountScope.current ? deletingFolder : null, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder: (value) => { if (value === null) folderDeleteTicket.current = null; setDeletingFolder(value) }, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms, detailGuard })}{detailGuard.dialog}</>
 
   return (
     /* 一覧の状態（読込中・失敗・空・表）を外から待てるように出す。箱は作らない（display: contents）。 */
@@ -1234,6 +1253,7 @@ export default function FormsListV8() {
           </KpiBand>
         )}
         folderNav={{ rows: folderRows, activeId: activeFolderId, onSelect: selectFolder, createAction: createButton(false) }}
+        collapsedFolders={<>{createButton(false)}<Select size="content" aria-label="フォルダ" value={activeFolderId} onChange={selectFolder} options={folderSelectOptions} />{selectedFolderActions ? <CollapsedFolderActions row={selectedFolderActions} /> : null}</>}
         folders={reviewMode ? undefined : folderPanel}
         toolbar={(
           <>
