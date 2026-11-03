@@ -42,11 +42,11 @@ import { usePermissionLockReason } from '@/components/shared/use-permission-lock
 export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved', 'segments'] as const
 export type AnalyticsTabV8 = (typeof ANALYTICS_TABS)[number] | 'conversion-report'
 
-/** 絵の二段：上は組（ふだん見る・深く見る・見直す）、下はその組の見かた。 */
+/** 絵の二段：上は組（成果を見る・お客さまを分析・利用と保存）、下はその組の見かた。 */
 const GROUPS: Array<{ label: string; tabs: Array<{ key: string; label: string }> }> = [
-  { label: 'ふだん見る', tabs: [{ key: 'friends', label: '友だちの増減' }, { key: 'reactions', label: '配信の反応' }, { key: 'routes', label: '経路と成果' }, { key: 'url-clicks', label: 'URLクリック' }] },
-  { label: '深く見る', tabs: [{ key: 'funnel', label: 'ファネル' }, { key: 'cross', label: 'クロス分析' }, { key: 'segments', label: 'お客さまの分け方' }] },
-  { label: '見直す', tabs: [{ key: 'usage', label: '使われ方' }, { key: 'saved', label: '保存した分析' }] },
+  { label: '成果を見る', tabs: [{ key: 'friends', label: '友だちの増減' }, { key: 'reactions', label: '配信の反応' }, { key: 'routes', label: '経路と成果' }, { key: 'url-clicks', label: 'URLクリック' }] },
+  { label: 'お客さまを分析', tabs: [{ key: 'funnel', label: 'ファネル' }, { key: 'cross', label: 'クロス分析' }, { key: 'segments', label: 'お客さまの分け方' }] },
+  { label: '利用と保存', tabs: [{ key: 'usage', label: '使われ方' }, { key: 'saved', label: '保存した分析' }] },
 ]
 /** 成果地点ごとのレポートは「経路と成果」の中の1つの見かた（ はタブが経路と成果）。 */
 const tabOwner = (tab: string) => tab === 'conversion-report' ? 'routes' : tab
