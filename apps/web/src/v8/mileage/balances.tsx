@@ -558,6 +558,7 @@ export default function BalancesTab() {
       overlays={
         <Dialog
           open={rejectTarget !== null && rejectScope?.generation === scope.current.generation}
+          contentLayout="form"
           title="この変更依頼を差し戻しますか？"
           description={rejectTarget ? `${rejectTarget.friend_display_name ?? rejectTarget.friend_id} への変更は行われず、台帳は変わりません。` : undefined}
           tone="destructive"

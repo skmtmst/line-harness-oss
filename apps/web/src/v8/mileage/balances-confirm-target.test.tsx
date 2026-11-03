@@ -20,6 +20,8 @@ it('差し戻しの確認に操作対象を表示する', async () => {
  const dialog = await open()
  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
  expect(within(dialog).getByText('環境')).toBeTruthy()
+ const reason = within(dialog).getByRole('textbox', { name: '差し戻す理由' })
+ expect(reason.closest('[data-dialog-content]')?.getAttribute('data-content-layout')).toBe('form')
 })
 it('切替後の古い差し戻し確認を送らない', async () => {
  const view = render(<BalancesTab />)
