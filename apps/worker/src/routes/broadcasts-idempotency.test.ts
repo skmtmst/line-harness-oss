@@ -290,6 +290,42 @@ describe('PUT /api/broadcasts/:id', () => {
 });
 
 describe('POST /api/broadcasts/:id/cancel', () => {
+  test.each([
+    ['application/json', '{"expectedVersion":2}'],
+    ['application/x-www-form-urlencoded', 'expectedVersion=2'],
+    ['text/plain', 'expectedVersion=2'],
+  ])('古い版を本文 %s で送ると無条件に取り消さない', async (contentType, body) => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row);
+    const response = await setupApp().request(`/api/broadcasts/${KEY}/cancel`, {method:'POST',headers:{'Content-Type':contentType},body});
+    expect([400,409]).toContain(response.status);
+    expect(d1Prepare).not.toHaveBeenCalled();
+  });
+
+  test('確認した版は取消更新の条件にも入れる', async () => {
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row);
+    const app=setupApp({changes:0});const bind=vi.fn(()=>({run:vi.fn(async()=>({meta:{changes:0}}))}));d1Prepare.mockReturnValueOnce({bind});
+    const response=await app.request(`/api/broadcasts/${KEY}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedVersion:3})});
+    expect(response.status).toBe(409);
+    expect(d1Prepare).toHaveBeenCalledWith(expect.stringMatching(/WHERE[\s\S]*lock_version\s*=\s*\?/));
+    expect(bind).toHaveBeenCalledWith(3,KEY,3,3);
+  });
+  test.each(['json','form','multipart'])('一致する版を%sで送ると取り消せる',async kind=>{
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row).mockResolvedValueOnce({...row,status:'draft',scheduled_at:null});
+    const app=setupApp();const form=new FormData();form.set('expectedVersion','3');
+    const init:RequestInit=kind==='json'?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedVersion:3})}
+      :kind==='form'?{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'expectedVersion=3'}:{method:'POST',body:form};
+    expect((await app.request(`/api/broadcasts/${KEY}/cancel`,init)).status).toBe(200);
+    expect(d1Prepare).toHaveBeenCalledWith(expect.stringMatching(/WHERE[\s\S]*lock_version\s*=\s*\?/));
+  });
+  test.each(['expectedVersion=', 'expectedVersion=3&expectedVersion=3', 'expectedVersion=invalid'])('不正なフォームの版を拒否する: %s',async body=>{
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row);
+    const response=await setupApp().request(`/api/broadcasts/${KEY}/cancel`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+    expect(response.status).toBe(400);expect(d1Prepare).not.toHaveBeenCalled();
+  });
+  test('版のない旧来のテキスト本文を受け付ける',async()=>{
+    dbMocks.getBroadcastById.mockResolvedValueOnce(row).mockResolvedValueOnce({...row,status:'draft',scheduled_at:null});
+    expect((await setupApp().request(`/api/broadcasts/${KEY}/cancel`,{method:'POST',headers:{'Content-Type':'text/plain'},body:'cancel'})).status).toBe(200);
+  });
   test('予約中の配信だけを削除せず原子的に下書きへ戻す', async () => {
     dbMocks.getBroadcastById
       .mockResolvedValueOnce(row)
