@@ -586,9 +586,8 @@ function ReminderDetailV8() {
             <ScheduleTab key={`${selectedAccountId}:${reminderId}`} reminderId={reminderId} steps={data.steps} />
           ) : tab === 'runs' ? (
             <RunsTab
-              key={`${selectedAccountId}:${reminderId}`}
               // 概要の警告帯から飛んだとき、絞り込みを確実に掛け直す。
-              key={runsStatusParam ?? ''}
+              key={JSON.stringify([selectedAccountId, reminderId, runsStatusParam])}
               reminderId={reminderId}
               canManage={canManage}
               initialStatus={runsStatusParam === 'permanent_failed' ? 'permanent_failed' : ''}
