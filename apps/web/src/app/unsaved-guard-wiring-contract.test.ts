@@ -24,6 +24,8 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 const GUARDED = [
   'components/shared/folder-add-dialog.tsx',
   'components/shared/folder-select.tsx',
+  // 顧客情報の編集は自身の未保存確認で画面離脱を守る。
+  'components/shared/customer-info-panel.tsx',
   'components/shared/use-inline-detail-guard.tsx',
   'v8/common-vars/list.tsx',
   'v8/templates/list.tsx',

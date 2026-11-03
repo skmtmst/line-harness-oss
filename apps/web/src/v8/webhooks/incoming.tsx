@@ -892,7 +892,7 @@ export default function WebhooksIncomingV8() {
         <WebhookBand
           cells={[
             { key: 'inlets', title: '受け取り口', icon: <Inbox aria-hidden="true" />, value: overview.incomingCount, unit: '件', detail: '作成した受け取り口' },
-            { key: 'received', title: '直近30日 受け取った', icon: <Inbox aria-hidden="true" />, value: overview.summary?.incoming ?? null, unit: '回', detail: overview.summary ? '受け取りの記録' : '集計を読み込めませんでした' },
+            { key: 'received', title: '過去30日 受け取った', icon: <Inbox aria-hidden="true" />, value: overview.summary?.incoming ?? null, unit: '回', detail: overview.summary ? '受け取りの記録' : '集計を読み込めませんでした' },
           ]}
         />
       </>}
