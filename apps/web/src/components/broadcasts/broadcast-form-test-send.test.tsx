@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const sendApi = vi.hoisted(() => vi.fn())
 const createApi = vi.hoisted(() => vi.fn())
 const recipientsApi = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ id: 'acc-1' }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -63,7 +64,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, loading: false }),
 }))
 
 import BroadcastForm from './broadcast-form'
@@ -148,6 +149,7 @@ function resultBanner(): HTMLElement {
 }
 
 beforeEach(() => {
+  account.id = 'acc-1'
   vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network is blocked in this test') }))
   createApi.mockResolvedValue({ success: true, data: { id: 'fake-draft', version: 1 } })
   recipientsApi.mockResolvedValue({
@@ -164,6 +166,23 @@ afterEach(() => {
 })
 
 describe('一斉配信のテスト送信（#986）', () => {
+  it('テスト送信の確認にLINEアカウントと環境を出す', async () => {
+    await openTestDialog()
+    expect(dialog().textContent).toContain('LINEアカウント')
+    expect(dialog().textContent).toContain('環境')
+  })
+  it('下書き保存中にアカウントが変わったらテスト送信へ進まない', async () => {
+    let finish!: (value: unknown) => void
+    createApi.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    await openTestDialog()
+    const button = [...dialog().querySelectorAll('button')].find(b => b.textContent?.trim() === 'テストを送る')!
+    await act(async () => { button.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(createApi).toHaveBeenCalled()
+    account.id = 'acc-2'
+    await act(async () => { root.render(<BroadcastForm tags={[]} onSuccess={() => {}} onCancel={() => {}} />) })
+    await act(async () => { finish({ success: true, data: { id: 'fake-draft', version: 1 } }); await Promise.resolve() })
+    expect(sendApi).not.toHaveBeenCalled()
+  })
   it('送信先を読み込んだだけでは実行履歴は0件で、固定の成功・日時を出さない', async () => {
     await openTestDialog()
     expect(sendApi).not.toHaveBeenCalled()

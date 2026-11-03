@@ -11,6 +11,7 @@ import type { Dispatch,SetStateAction } from 'react'
 import { testSendFailure,testSendResult,type TestSendView } from './test-send-view'
 
 type TestBroadcastContext = {
+  isCurrent: () => boolean
   onDraftSaved: ((broadcast: ApiBroadcast) => void) | undefined
   persistDraft: (scheduledAt: string | null, saveAsDraft?: boolean, confirmedCount?: number, autosaveStep?: BroadcastStepKey | null) => Promise<ApiBroadcast | null>
   rejectValidation: (validationError: string) => void
@@ -23,7 +24,7 @@ type TestBroadcastContext = {
   validate: () => string
 }
 
-export async function testBroadcast({ onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, setTestRetryBlocked, validate }: TestBroadcastContext) {
+export async function testBroadcast({ isCurrent, onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, setTestRetryBlocked, validate }: TestBroadcastContext) {
     const validationError = validate()
     if (validationError) {
       rejectValidation(validationError)
@@ -38,7 +39,7 @@ export async function testBroadcast({ onDraftSaved, persistDraft, rejectValidati
     let acknowledged = false
     try {
       const draft = await persistDraft(null, true)
-      if (!draft) return
+      if (!draft || !isCurrent()) return
       // BROADCAST-16: テスト送信でも下書きが増えるので、一覧と
       // フォルダ件数を読み直してもらう。
       onDraftSaved?.(draft)

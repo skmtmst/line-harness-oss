@@ -96,17 +96,17 @@ export function daysUntilIso(iso: string | null, nowMs = Date.now()): number | n
 
 /**
  * U: 一覧・編集の状態印の決め方。保存する状態が正本で、「満席」だけが
- * 計算の札（R81: 公開中でも今後の枠が無ければ終了）。
+ * 計算の札。公開中でも過去の回だけなら終了とし、開催回が無ければ保存状態を保つ。
  */
 export type EventRowState = 'draft' | 'paused' | 'cancelled' | 'ended' | 'full' | 'open'
 
-export function eventRowState(item: Pick<EventListItem, 'is_published' | 'lifecycle_status' | 'next_slot_starts_at' | 'total_capacity' | 'total_active'>): EventRowState {
+export function eventRowState(item: Pick<EventListItem, 'is_published' | 'lifecycle_status' | 'next_slot_starts_at' | 'latest_past_slot_starts_at' | 'total_capacity' | 'total_active'>): EventRowState {
   const lifecycle = lifecycleOf(item)
   if (lifecycle === 'draft') return 'draft'
   if (lifecycle === 'paused') return 'paused'
   if (lifecycle === 'cancelled') return 'cancelled'
   if (lifecycle === 'ended') return 'ended'
-  if (!item.next_slot_starts_at) return 'ended'
+  if (!item.next_slot_starts_at) return item.latest_past_slot_starts_at === null ? 'open' : 'ended'
   if (item.total_capacity != null && item.total_active >= item.total_capacity) return 'full'
   return 'open'
 }

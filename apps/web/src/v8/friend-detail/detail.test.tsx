@@ -20,6 +20,8 @@ const fetchApi = vi.hoisted(() => vi.fn())
 const forFriend = vi.hoisted(() => vi.fn())
 const saveForFriend = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ current: 'owner' as string | null }))
+const account = vi.hoisted(() => ({ current: 'account-a' }))
+const capturedDeleteConfirm = vi.hoisted(() => ({ current: null as null | (() => unknown) }))
 const params = vi.hoisted(() => ({ current: new URLSearchParams('id=friend-1') }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -71,8 +73,19 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', name: '本店' }, accounts: [], loading: false }),
+  useAccount: () => ({ selectedAccountId: account.current, selectedAccount: { id: account.current, name: '本店' }, accounts: [], loading: false }),
 }))
+vi.mock('@/lib/line-accounts-cache', async (importOriginal: () => Promise<typeof import('@/lib/line-accounts-cache')>) => ({
+  ...await importOriginal(),
+  loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-b', name: '別のLINEアカウント' }] }),
+}))
+vi.mock('@/components/shared/confirm-dialog', async (importOriginal: () => Promise<typeof import('@/components/shared/confirm-dialog')>) => {
+  const actual = await importOriginal()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.deleteName === 'この友だちのデータ') capturedDeleteConfirm.current = props.onConfirm ?? null
+    return React.createElement(actual.default, props)
+  } }
+})
 
 vi.mock('@/lib/use-feature-visibility', () => ({
   useFeatureVisibility: () => ({ enabled: () => true }),
@@ -135,6 +148,8 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  account.current = 'account-a'
+  capturedDeleteConfirm.current = null
   fetchApi.mockClear()
   forgetStaffIdentity();
   document.documentElement.dataset.theme = 'v8'
@@ -305,6 +320,47 @@ it('友だち削除の確認窓に消す物・残す物を出し、取消は削�
   expect(dialog.textContent).toContain('監査・支払・審査の記録')
   act(() => bodyButtons().find(button => button.textContent === 'キャンセル')!.click()); await flush()
   expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+})
+it('友だち削除の確認には対象アカウントが不明な場合も明示する', async () => {
+  await render(); await friendMoreMenu()
+  act(() => bodyButtons().find(button => button.textContent === '友だちのデータを削除する')!.click()); await flush()
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+  expect(dialog.textContent).toContain('LINEアカウント')
+  expect(dialog.textContent).toContain('山田 花子')
+  expect(dialog.textContent).toContain('名前を確認できません')
+  expect(dialog.textContent).toContain('環境')
+})
+it('友だち削除の確認には選択中ではなく友だちのアカウントを出す', async () => {
+  getFriend.mockResolvedValue({ success: true, data: { ...friend, lineAccountId: 'account-b' } })
+  await render(); await friendMoreMenu()
+  act(() => bodyButtons().find(button => button.textContent === '友だちのデータを削除する')!.click()); await flush()
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+  expect(dialog.textContent).toContain('別のLINEアカウント')
+  expect(dialog.textContent).not.toContain('本店')
+})
+it('友だち削除の確認はアカウントを行き来しても復活しない', async () => {
+  await render(); await friendMoreMenu()
+  act(() => bodyButtons().find(button => button.textContent === '友だちのデータを削除する')!.click()); await flush()
+  const previousConfirm = capturedDeleteConfirm.current!
+  account.current = 'account-b'; await render()
+  account.current = 'account-a'; await render()
+  act(() => { previousConfirm() }); await flush()
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+  expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+})
+it('再表示した友だち削除の窓では古い確定を受け付けない', async () => {
+  await render(); await friendMoreMenu()
+  act(() => bodyButtons().find(button => button.textContent === '友だちのデータを削除する')!.click()); await flush()
+  const previousConfirm = capturedDeleteConfirm.current!
+  act(() => bodyButtons().find(button => button.textContent === 'キャンセル')!.click()); await flush()
+  await friendMoreMenu()
+  act(() => bodyButtons().find(button => button.textContent === '友だちのデータを削除する')!.click()); await flush()
+  act(() => { previousConfirm() }); await flush()
+  expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+  act(() => { capturedDeleteConfirm.current!() }); await flush()
+  expect(fetchApi.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
+  act(() => { capturedDeleteConfirm.current!() }); await flush()
+  expect(fetchApi.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
 })
 it('友だち削除は確認のヘッダーを付け、失敗の窓から再試行できる', async () => {
   const normal = fetchApi.getMockImplementation()!

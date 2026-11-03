@@ -296,7 +296,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
             ) : null}
           </div>
           {m.runs.length === 0 ? (
-            <ListState kind="empty" title="移行履歴はまだありません" />
+            <ListState kind="empty" title="まだ移行していません" description="" />
           ) : (
             <DataTable className={styles.table}>
               <colgroup>

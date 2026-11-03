@@ -42,7 +42,7 @@ describe('プールの削除確認', () => {
 
   it('プール削除が二度押しを受け付けず、既定のプールは消せない', () => {
     const body = fnBody(PAGE, 'const onDelete = async ()')
-    expect(body, '既定のプールを止めていない').toContain('if (isMain || deleting) return')
+    expect(body, '既定のプールを止めていない').toContain('if (isMain || deleting || deleteLock.current || !deleteContext || !deleteContext.accounts || !alive.current || !canManageRef.current || deleteContext.ticket !== deleteTicket.current || deleteContext.poolId !== poolRef.current.id || deleteContext.updatedAt !== poolRef.current.updatedAt) return')
     expect(body).toContain('setDeleting(true)')
     expect(body, '処理中の印を必ず戻していない').toMatch(/finally\s*\{[\s\S]*setDeleting\(false\)/)
   })
@@ -71,14 +71,14 @@ describe('プールの削除確認', () => {
     expect(jsx).toContain('confirmLabel="削除する"')
     expect(jsx, '処理中でも押せてしまう').toContain('busy={deleting}')
     expect(jsx, '失敗が窓の中に出ない').toContain('error={deleteError}')
-    expect(jsx, '処理中に閉じられてしまう').toContain('if (deleting) return')
+    expect(jsx, '処理中に閉じられてしまう').toContain('if (deleting || !deleteContext || deleteContext.ticket !== deleteTicket.current) return')
   })
 })
 
 describe('プールからアカウントを外す確認', () => {
   it('外す処理が二度押しを受け付けない', () => {
     const body = fnBody(PAGE, 'const onRemove = async ()')
-    expect(body, '押している間の二度押しを止めていない').toContain('if (!removeTarget || removing) return')
+    expect(body, '押している間の二度押しを止めていない').toContain('if (!removeTarget || removing || lock.current || !alive.current || !manageRef.current || removeTarget.scope !== poolScope.current || loadedScope.current !== removeTarget.scope || removeTarget.ticket !== ticketRef.current || !membersRef.current.some(member => member.id === removeTarget.id && member.lineAccountId === removeTarget.lineAccountId)) return')
     expect(body).toContain('setRemoving(true)')
     expect(body, '処理中の印を必ず戻していない').toMatch(/finally\s*\{[\s\S]*setRemoving\(false\)/)
   })
@@ -106,10 +106,10 @@ describe('プールからアカウントを外す確認', () => {
     )
     expect(jsx, '処理中でも押せてしまう').toContain('busy={removing}')
     expect(jsx, '失敗が窓の中に出ない').toContain('error={removeError}')
-    expect(jsx, '処理中に閉じられてしまう').toContain('if (removing) return')
+    expect(jsx, '処理中に閉じられてしまう').toContain('if (removing || !removeTarget || removeTarget.ticket !== ticketRef.current) return')
   })
 
   it('外すボタンは窓を開くだけで、押した時点では外さない', () => {
-    expect(PAGE).toContain("setRemoveTarget({ id: m.id, name })")
+    expect(PAGE).toContain("setRemoveTarget({ id: m.id, lineAccountId: m.lineAccountId, name, accountName: acc?.name ?? null, poolName, scope: renderedScope, ticket })")
   })
 })

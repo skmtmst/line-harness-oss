@@ -65,6 +65,13 @@ beforeEach(() => {
   mocks.preflight.mockResolvedValue({ success: true, data: { audienceCount: 10, hiddenExcluded: 0 } })
 })
 afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot(); vi.useRealTimers() })
+it('かんたん送信の窓にLINEアカウントと環境を出す', async () => {
+  render(<QuickSend open accountId="account-a" onClose={onClose} onSent={onSent} />)
+  await act(async () => {})
+  const dialog = screen.getByRole('dialog', { name: 'かんたんに送る' })
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+})
 it('新規は相手も時間も未選択で、本文だけでは人数確認も送信もしない', async () => {
   render(<QuickSend open accountId="account-a" onClose={onClose} onSent={onSent} />)
   await act(async () => {})

@@ -121,7 +121,17 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   }, [accountId, storeId, editTarget, setOpenId])
   const [detailId, setDetailId] = useState('')
   useEffect(()=>{const id=new URLSearchParams(window.location.search).get('id');if(id)setDetailId(id)},[])
-  const [cancelId, setCancelId] = useState('')
+  const cancelScope = useRef({ accountId, storeId, generation: 0 })
+  if (cancelScope.current.accountId !== accountId || cancelScope.current.storeId !== storeId) {
+    cancelScope.current = { accountId, storeId, generation: cancelScope.current.generation + 1 }
+  }
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; accountId: string; storeId: string; generation: number } | null>(null)
+  const cancelGeneration = cancelScope.current.generation
+  const setCancelId = (id: string) => {
+    if (cancelGeneration !== cancelScope.current.generation) return
+    setCancelTarget(id ? { id, ...cancelScope.current } : null)
+  }
+  const cancelId = cancelTarget?.generation === cancelScope.current.generation ? cancelTarget.id : ''
   const [showImport, setShowImport] = useState(false)
   const [lineWarning, setLineWarning] = useState('')
 
@@ -318,9 +328,11 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
       />
       <CancelReservationDialog
         reservation={cancelling}
+        accountId={cancelTarget?.accountId ?? ''}
         busy={busy}
         onClose={() => setCancelId('')}
         onConfirm={(id) => {
+          if (!cancelTarget || cancelTarget.id !== id || cancelTarget.generation !== cancelScope.current.generation || cancelTarget.accountId !== cancelScope.current.accountId || cancelTarget.storeId !== cancelScope.current.storeId) return
           return save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), cancelling && cancelling.hold_expires_at && cancelling.status === 'pending' ? '押さえを解除しました。' : '予約を取り消しました。').then((ok) => { if (ok) setCancelId('') })
         }}
       />

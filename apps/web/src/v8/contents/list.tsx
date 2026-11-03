@@ -17,6 +17,7 @@ import TextLink from '@/components/shared/text-link'
 import Checkbox from '@/components/shared/checkbox'
 import { collectListRows } from '@/components/shared/collect-list-rows'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import EmptyList from '@/components/shared/empty-list'
 import { emptyValue } from '@/components/shared/empty-value'
 import FilterChip from '@/components/shared/filter-chip'
@@ -71,6 +72,11 @@ export default function MediaLibraryListV8() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const renderedScope = accountScope.current
+  const mounted = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const [items, setItems] = useState<MediaItem[]>([])
   const [total, setTotal] = useState(0)
   /*
@@ -190,6 +196,12 @@ export default function MediaLibraryListV8() {
   const [deleteError, setDeleteError] = useState('')
   /** まとめて削除の確認。ブラウザ標準の確認では戻せないことが伝わらない。 */
   const [bulkConfirm, setBulkConfirm] = useState<string[] | null>(null)
+  const [bulkContext, setBulkContext] = useState<{ scope: typeof renderedScope; ticket: object; accounts: string[] } | null>(null)
+  const bulkTicket = useRef<object | null>(null)
+  const singleTicket = useRef<object | null>(null)
+  const [singleContext, setSingleContext] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const singleLock = useRef(false)
+  const bulkLock = useRef(false)
   const [bulkBusy, setBulkBusy] = useState(false)
   /** まとめて削除の進み具合。件数が多いときに止まっているように見せない。 */
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
@@ -310,6 +322,7 @@ export default function MediaLibraryListV8() {
   }, [detailId])
 
   const canManageMedia = mediaManagementPermission === 'allowed' && mediaEditAccess
+  const canManageRef = useRef(canManageMedia); canManageRef.current = canManageMedia
   const managementPermissionReason = mediaManagementPermission === 'loading'
     ? LOADING_MESSAGE
     : mediaManagementPermission === 'error'
@@ -470,7 +483,7 @@ export default function MediaLibraryListV8() {
 
   /** 選んだ札をまとめて消す。使用中はAPIでも必ず止める。 */
   const removeSelected = async () => {
-    if (selected.size === 0 || !selectedAccountId) return
+    if (selected.size === 0 || !selectedAccountId || !mounted.current || !canManageRef.current || renderedScope !== accountScope.current) return
     const removableSelected = [...selected].filter((id) =>
       [...items, ...selectionItems].some((item) => item.id === id && isKnownUnused(item)),
     )
@@ -484,10 +497,24 @@ export default function MediaLibraryListV8() {
       戻せないことも、どこにも使われていないと確かめた結果も出ない。
       画面の中の窓で読み合わせてから押させる。
     */
+    const ticket = {}; bulkTicket.current = ticket
+    const accounts = [...new Set(removableSelected.map(id => [...items, ...selectionItems].find(item => item.id === id)?.lineAccountId ?? ''))]
+    setBulkContext({ scope: renderedScope, ticket, accounts })
     setBulkConfirm(removableSelected)
   }
 
-  function runBulkDelete(ids: string[]) { return deleteMediaSelection({ items, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, selectionItems, setBulkBusy, setBulkConfirm, setBulkProgress, setError, setSelected }, ids) }
+  function runBulkDelete(ids: string[]) {
+    const context = bulkContext
+    const current = () => mounted.current && canManageRef.current && context?.scope === accountScope.current && context.ticket === bulkTicket.current
+    if (!current() || bulkLock.current) return
+    bulkLock.current = true
+    void deleteMediaSelection({ items, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, selectionItems, setBulkBusy, setBulkConfirm, setBulkProgress, setError, setSelected, isCurrent: current }, ids).finally(() => {
+      bulkLock.current = false
+      if (mounted.current && context?.scope === accountScope.current && context.ticket === bulkTicket.current) {
+        bulkTicket.current = null; setBulkBusy(false); setBulkConfirm(null); setBulkProgress(null)
+      }
+    })
+  }
 
   /**
    * 札のダウンロード。保存URL（認証なし）へ直接リンクせず、
@@ -521,11 +548,23 @@ export default function MediaLibraryListV8() {
     }
   }
 
-  function openDelete(item: MediaItem) { return loadMediaDeleteImpact({ deleteRequestRef, impactRequestRef, saveErrors, selectedAccountId, setDeleteError, setDeleting, setImpact, setImpactPhase }, item) }
+  function openDelete(item: MediaItem) {
+    if (!mounted.current || !canManageRef.current || renderedScope !== accountScope.current) return
+    const ticket = {}; singleTicket.current = ticket; setSingleContext({ scope: renderedScope, ticket })
+    return loadMediaDeleteImpact({ deleteRequestRef, impactRequestRef, saveErrors, selectedAccountId, setDeleteError, setDeleting, setImpact, setImpactPhase }, item)
+  }
 
-  function confirmDeleteOne() { return deleteMediaItem({ deleteBusy, deleteRequestRef, deleting, impactRequestRef, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, setDeleteBusy, setDeleteError, setDeleting, setImpact, setImpactPhase }) }
+  async function confirmDeleteOne() {
+    if (!mounted.current || !canManageRef.current || !singleContext || singleContext.scope !== accountScope.current || singleContext.ticket !== singleTicket.current || singleLock.current || impactRequestRef.current.accountId !== selectedAccountId || impactRequestRef.current.mediaId !== deleting?.id) return
+    singleLock.current = true
+    try {
+      const success = await deleteMediaItem({ deleteBusy, deleteRequestRef, deleting, impactRequestRef, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, setDeleteBusy, setDeleteError, setDeleting, setImpact, setImpactPhase })
+      if (success && singleContext.ticket === singleTicket.current) singleTicket.current = null
+    } finally { singleLock.current = false }
+  }
 
   function closeDeleteDialog() {
+    singleTicket.current = null
     impactRequestRef.current = {
       accountId: selectedAccountId,
       mediaId: null,
@@ -1064,7 +1103,7 @@ export default function MediaLibraryListV8() {
         聞かない。** 聞いてから断るより、最初から消せないと言うほうが短い。
       */}
       <Dialog
-        open={deleting !== null}
+        open={deleting !== null && singleContext?.scope === accountScope.current}
         designNode="YfTfJ"
         tone="destructive"
         title={deleting ? dialogTitle(impact, deleting.filename) : ''}
@@ -1076,7 +1115,7 @@ export default function MediaLibraryListV8() {
           closeDeleteDialog()
         }}
         footer={deleting && impact && (impact.usageCount > 0 || canDeleteMedia({ impact, busy: false })) ? (
-          <DialogActions leadingAction={impact && !impact.canDelete ? '使用先から外すと削除できます' : undefined}>
+          <DialogActions leadingAction={impact && impact.verified !== false && !impact.canDelete ? '使用先から外すと削除できます' : undefined}>
             <>
               <Button type="button" onClick={closeDeleteDialog} disabled={deleteBusy}>
                 キャンセル
@@ -1101,6 +1140,7 @@ export default function MediaLibraryListV8() {
         ) : undefined}
       >
         <div data-design-node="YfTfJ">
+        {deleting ? <OperationTargetSummary accounts={[{ id: deleting.lineAccountId ?? '' }]} /> : null}
         {impactPhase === 'loading' ? (
           <p>使われている場所を確認しています…</p>
         ) : impactPhase === 'error' ? (
@@ -1144,8 +1184,8 @@ export default function MediaLibraryListV8() {
             ) : null}
 
             <p>
-              {impact.verified !== false && impact.usageCount === 0 ? null : <>使われている場所から外すと削除できます。別のメディアを選ぶと、使用先をまとめて差し替えられます。<br /></>}
-              {checkedAtText(impact.checkedAt)} 時点で、テンプレート・一斉配信・リッチメニュー・シナリオ・コラム・イベント・ウェビナーの7種類を確認しました。
+              {impact.verified !== false && impact.usageCount > 0 ? <>使われている場所から外すと削除できます。別のメディアを選ぶと、使用先をまとめて差し替えられます。<br /></> : null}
+              {checkedAtText(impact.checkedAt)} 時点で、{impact.verified === false ? '確認できなかった場所があります。' : 'テンプレート・一斉配信・リッチメニュー・シナリオ・コラム・イベント・ウェビナーの7種類を確認しました。'}
             </p>
           </div>
         ) : null}
@@ -1153,18 +1193,18 @@ export default function MediaLibraryListV8() {
       </Dialog>
 
       <Dialog
-        open={bulkConfirm !== null}
+        open={bulkConfirm !== null && bulkContext?.scope === accountScope.current}
         tone="destructive"
         title={bulkConfirm ? `${formatNumber(bulkConfirm.length)} 件のメディアを削除しますか？` : ''}
         description="どこにも使われていないと確かめたものだけを消します。元に戻せません。"
         busy={bulkBusy}
         onCancel={() => {
           if (bulkBusy) return
-          setBulkConfirm(null)
+          bulkTicket.current = null; setBulkConfirm(null)
         }}
         footer={
           <DialogActions>
-            <Button type="button" onClick={() => setBulkConfirm(null)} disabled={bulkBusy}>
+            <Button type="button" onClick={() => { bulkTicket.current = null; setBulkConfirm(null) }} disabled={bulkBusy}>
               キャンセル
             </Button>
             <Button
@@ -1176,6 +1216,7 @@ export default function MediaLibraryListV8() {
           </DialogActions>
         }
       >
+        {bulkContext ? <OperationTargetSummary accounts={bulkContext.accounts.map(id => ({ id }))} /> : null}
         <p>
           使われている場所があるものは、はじめから選べません。消したあとは元に戻せません。
         </p>
@@ -1283,6 +1324,7 @@ export default function MediaLibraryListV8() {
           notifyToast('登録できたメディアを一覧へ反映しました。')
           void load()
           void loadKpis()
+          void loadFolders()
         }}
       />
 

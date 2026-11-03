@@ -144,7 +144,7 @@ export default function AutoRepliesListV8() {
   const [quickOpen, setQuickOpen] = useState(false)
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
   const [panelId, setPanelId] = useDetailPanelUrl('reply')
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<(PendingDelete & { generation: number }) | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [pendingToggle, setPendingToggle] = useState<PendingToggle | null>(null)
@@ -164,8 +164,15 @@ export default function AutoRepliesListV8() {
   const [moveNotice, setMoveNotice] = useState('')
 
   const selectedAccountIdRef = useRef(selectedAccountId)
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const renderedScope = accountScope.current
+  const loadedScope = useRef<typeof accountScope.current | null>(null)
+  const deleteLock = useRef(false)
+  const mounted = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   selectedAccountIdRef.current = selectedAccountId
-  const canRunList = () => canEditAutoReplyListNow() && selectedAccountIdRef.current === selectedAccountId
+  const canRunList = () => mounted.current && canEditAutoReplyListNow() && renderedScope === accountScope.current && loadedScope.current === renderedScope && selectedAccountIdRef.current === selectedAccountId
   useEffect(() => {
     setSelectedIds(new Set()); setOpenMenuId(null); setCreateMenuOpen(false); setDragId(null)
   }, [selectedAccountId])
@@ -174,6 +181,7 @@ export default function AutoRepliesListV8() {
 
   const load = useCallback(async () => {
     const requestAccountId = selectedAccountId
+    const requestScope = renderedScope
     const requestGeneration = ++loadGenerationRef.current
     setLoadState('loading')
     setLoadError(null)
@@ -197,6 +205,8 @@ export default function AutoRepliesListV8() {
         setLoadState('error')
         return
       }
+      if (requestScope !== accountScope.current) return
+      loadedScope.current = requestScope
       setItems(arRes.data as AutoReply[])
       setConflictCount(summaryRes?.success ? summaryRes.data.conflictCount : null)
       setTemplateListAvailable(tplRes.success)
@@ -248,8 +258,21 @@ export default function AutoRepliesListV8() {
     page,
   })
   const rules = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : items
+  const pendingToggleRef = useRef(pendingToggle); pendingToggleRef.current = pendingToggle
+  const openPendingToggle = (target: PendingToggle) => {
+    if (!canRunList()) return
+    const targets = target.ids.map(id => rules.find(rule => rule.id === id)?.lineAccountId)
+    const next: PendingToggle = { ...target, generation: renderedScope.generation, allAccounts: targets.some(id => id === null), targetAccountIds: [...new Set(targets.filter(id => id !== null).map(id => id ?? ''))] }
+    pendingToggleRef.current = next
+    setPendingToggle(next)
+  }
+  const setPendingToggleFromList: typeof setPendingToggle = (value) => {
+    if (typeof value === 'function') { setPendingToggle(value); return }
+    if (value) openPendingToggle(value)
+    else { pendingToggleRef.current = null; setPendingToggle(null) }
+  }
   /* 削除は、利用状況にかかわらず確認してから実行する。 */
-  const requestDelete = (r: AutoReply) => { if (!canRunList()) return; setDeleteError(''); setPendingDelete({ item: r, accountId: selectedAccountId }) }
+  const requestDelete = (r: AutoReply) => { if (!canRunList() || !mounted.current || renderedScope !== accountScope.current || loadedScope.current !== renderedScope) return; setDeleteError(''); setPendingDelete({ item: r, accountId: selectedAccountId, generation: renderedScope.generation }) }
 
   /* ===== 数の帯 ===== */
   const hitsAllKnown = rules.every((r) => r.hits !== undefined)
@@ -362,20 +385,22 @@ export default function AutoRepliesListV8() {
    * 再開したなら止める。止め直すときは変える前の理由を使う）。
    * 送れなかったら戻して「もう一度」の知らせを出す。
    */
-  const runToggle = (target = pendingToggle) => { if (!canRunList()) return; toggleAutoReply({ listContextKey, load, pendingToggle, rules, saveErrors, selectedAccountId, selectedAccountIdRef, setOptimisticRows, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, toggleReason }, target) }
+  const runToggle = (target = pendingToggle) => { if (!canRunList()) return; if (target && target === pendingToggle) { if (target !== pendingToggleRef.current || target.generation !== accountScope.current.generation) return; pendingToggleRef.current = null }; toggleAutoReply({ listContextKey, load, pendingToggle, rules, saveErrors, selectedAccountId, selectedAccountIdRef, isCurrent: () => mounted.current && renderedScope === accountScope.current, setOptimisticRows, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, toggleReason }, target) }
 
   const runDelete = async () => {
-    if (!canRunList() || !pendingDelete) return
+    if (!canRunList() || !pendingDelete || !mounted.current || deleteLock.current || pendingDelete.generation !== accountScope.current.generation || loadedScope.current !== accountScope.current) return
     if (pendingDelete.accountId !== selectedAccountId) {
       setDeleteError('アカウントが切り替わりました。削除する自動応答を選び直してください。')
       return
     }
     const requestAccountId = pendingDelete.accountId
     const targetId = pendingDelete.item.id
+    deleteLock.current = true
     setDeleting(true)
     setDeleteError('')
     try {
       const result = await api.autoReplies.delete(targetId)
+      if (!mounted.current || pendingDelete.generation !== accountScope.current.generation) return
       if (!result.success) {
         setDeleteError('自動応答を削除できませんでした。状態を読み直してからお試しください。')
         return
@@ -383,6 +408,7 @@ export default function AutoRepliesListV8() {
       setPendingDelete(null)
       if (selectedAccountIdRef.current === requestAccountId) await load()
     } catch (reason) {
+      if (!mounted.current || pendingDelete.generation !== accountScope.current.generation) return
       const fieldFailure = saveErrors.capture(reason)
 
       { if (!fieldFailure)
@@ -392,16 +418,17 @@ export default function AutoRepliesListV8() {
           : '自動応答を削除できませんでした。状態を読み直してからお試しください。',
       ) }
     } finally {
-      setDeleting(false)
+      deleteLock.current = false
+      if (mounted.current) setDeleting(false)
     }
   }
 
   /** 削除の窓の「代わりに止める」。削除をやめて、停止の窓へ移す。 */
   const stopInsteadOfDelete = () => {
-    if (!canRunList() || !pendingDelete) return
+    if (!canRunList() || !pendingDelete || !mounted.current || pendingDelete.generation !== accountScope.current.generation || loadedScope.current !== accountScope.current) return
     setToggleError('')
     setToggleReason('')
-    setPendingToggle({
+    openPendingToggle({
       ids: [pendingDelete.item.id],
       names: [displayName(pendingDelete.item)],
       kind: 'stop',
@@ -591,7 +618,7 @@ export default function AutoRepliesListV8() {
     duplicate: () => { setDuplicateError(''); void runDuplicate(r) },
     stop: () => {
       setToggleError(''); setToggleReason('')
-      setPendingToggle({ ids: [r.id], names: [displayName(r)], kind: 'stop', accountId: selectedAccountId })
+      openPendingToggle({ ids: [r.id], names: [displayName(r)], kind: 'stop', accountId: selectedAccountId })
     },
     resume: () => { setToggleError(''); runToggle({ ids: [r.id], names: [displayName(r)], kind: 'resume', accountId: selectedAccountId }) },
     move: () => openMove([r.id]),
@@ -620,7 +647,7 @@ export default function AutoRepliesListV8() {
     setToggleError('')
     setToggleReason('')
     const target: PendingToggle = { ids: [r.id], names: [name], kind: r.isActive ? 'stop' : 'resume', accountId: selectedAccountId }
-    if (r.isActive) setPendingToggle(target)
+    if (r.isActive) openPendingToggle(target)
     else runToggle(target)
     setPanelId(null)
   }
@@ -733,9 +760,9 @@ export default function AutoRepliesListV8() {
 
   /* ===== 一覧の中身 ===== */
   const deleteTargetStale =
-    pendingDelete !== null && pendingDelete.accountId !== selectedAccountId
+    pendingDelete !== null && (pendingDelete.accountId !== selectedAccountId || pendingDelete.generation !== accountScope.current.generation)
   const toggleTargetStale =
-    pendingToggle !== null && pendingToggle.accountId !== selectedAccountId
+    pendingToggle !== null && (pendingToggle.accountId !== selectedAccountId || pendingToggle.generation !== accountScope.current.generation)
   const moveTargetStale = moveIds !== null && moveAccountId !== selectedAccountId
 
   /*
@@ -756,7 +783,7 @@ export default function AutoRepliesListV8() {
     </>
   )
 
-  const listBody = renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lockedReason, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState })
+  const listBody = renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lockedReason, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle: setPendingToggleFromList, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState })
 
   /* ページ送りは型の pagination 枠へ（余白は型）。 */
   const listPager = ready ? (
@@ -941,13 +968,14 @@ export default function AutoRepliesListV8() {
         onCancel={() => {
           setToggleError('')
           setToggleReason('')
+          pendingToggleRef.current = null
           setPendingToggle(null)
         }}
         confirmDisabled={toggleTargetStale || !canEdit}
         confirmLockedReason={lockedReason}
         onConfirm={() => runToggle()}
       >
-        <OperationTargetSummary accounts={[{ id: pendingToggle?.accountId ?? '' }]} />
+        <OperationTargetSummary allAccounts={pendingToggle?.allAccounts} accounts={(pendingToggle?.targetAccountIds ?? ['']).map(id => ({ id }))} />
         {pendingToggle?.kind === 'stop' && (
           <div className={styles.reasonField}>
             <Field label="止める理由" htmlFor="auto-reply-stop-reason" optional>
@@ -1031,6 +1059,7 @@ export default function AutoRepliesListV8() {
           </DialogActions>
         }
       >
+        {pendingDelete ? <OperationTargetSummary allAccounts={pendingDelete.item.lineAccountId === null} accounts={pendingDelete.item.lineAccountId === null ? [] : [{ id: pendingDelete.item.lineAccountId ?? '' }]} /> : null}
         <Notice tone="warn" role="alert" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message={pendingDelete?.item.isActive ? '削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。' : '削除は元に戻せません。'} />
         {deleteTargetStale && (
           <Notice tone="warn" role="alert">アカウントが切り替わりました。削除する自動応答を選び直してください。</Notice>

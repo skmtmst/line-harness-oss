@@ -17,6 +17,7 @@ const folderList = vi.hoisted(() => ({ value: { success: true, data: [] as unkno
 const usages = vi.hoisted(() => vi.fn())
 const removeTemplate = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const account = vi.hoisted(() => ({ id: 'account-1' }))
 const push = vi.hoisted(() => vi.fn())
 const fetchApi = vi.hoisted(() => vi.fn())
 
@@ -31,7 +32,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ accounts: [{ id: 'account-1', name: '本店' }], selectedAccountId: 'account-1', loading: false }),
+  useAccount: () => ({ accounts: [{ id: 'account-1', name: '本店' }, { id: 'account-2', name: '別アカウント' }], selectedAccountId: account.id, loading: false }),
 }))
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => role.value,
@@ -74,7 +75,7 @@ const base = {
   updatedAt: '2026-08-22T00:00:00.000Z',
 }
 const used = { ...base, id: 't-used', name: '予約前日のご案内', messageContent: '明日のご予約です', usageCount: 11, publishedAt: '2026-08-01T00:00:00.000Z', hasDraft: true }
-const unused = { ...base, id: 't-unused', name: '秋の新商品（画像）', messageType: 'image', messageContent: '{"originalContentUrl":"https://example.com/a.jpg"}', monthlySendCount: 0, totalSendCount: 0, usageCount: 0, publishedAt: null, hasDraft: true }
+const unused = { ...base, id: 't-unused', accountId: 'account-2', name: '秋の新商品（画像）', messageType: 'image', messageContent: '{"originalContentUrl":"https://example.com/a.jpg"}', monthlySendCount: 0, totalSendCount: 0, usageCount: 0, publishedAt: null, hasDraft: true }
 
 async function renderList() {
   await act(async () => {
@@ -91,6 +92,7 @@ function openMenuAndDelete(name: string) {
 }
 
 beforeEach(() => {
+  account.id = 'account-1'
   flushListUrlState()
   window.history.replaceState(null, '', '/templates')
   window.dispatchEvent(new PopStateEvent('popstate'))
@@ -118,6 +120,15 @@ afterEach(() => {
 })
 
 describe('V8 テンプレートの一覧', () => {
+  it('空の動画・質問にも内容に合う説明を出す', async () => {
+    listTemplates.mockResolvedValue({ success: true, data: [] })
+    await renderList()
+    for (const tab of ['リッチビデオ', '質問']) {
+      await act(async () => { fireEvent.click(screen.getByRole('tab', { name: new RegExp(`^${tab}`) })) })
+      expect(screen.getByText('よく使う内容を保存しておくと、一斉配信・自動応答・シナリオから選べます。')).toBeTruthy()
+    }
+  })
+
   it('差し込みのキーを実名へ置き換えて見せ、一覧の本文は保存値のままにする', async () => {
     listTemplates.mockResolvedValue({ success: true, data: [{ ...used, messageContent: '{{account.name}} {{var.business_hours}} {{field.pet_name}}' }] })
     await renderList()
@@ -187,10 +198,72 @@ describe('V8 テンプレートの一覧', () => {
     await renderList()
     openMenuAndDelete('秋の新商品（画像）')
     expect(screen.getByRole('alertdialog')).toBeTruthy()
+    expect(screen.getByRole('alertdialog').textContent).toContain('別アカウント')
+    expect(screen.getByRole('alertdialog').textContent).toContain('環境')
     expect(screen.getByText('秋の新商品（画像）')).toBeTruthy()
     expect(removeTemplate).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })) })
     expect(removeTemplate).toHaveBeenCalledWith('t-unused')
+  })
+
+  it('まとめて削除には実際の対象アカウントを出す', async () => {
+    await renderList()
+    fireEvent.click(screen.getByRole('checkbox', { name: '「秋の新商品（画像）」を選択' }))
+    fireEvent.click(screen.getByRole('button', { name: 'まとめて削除' }))
+    expect(screen.getByRole('alertdialog').textContent).toContain('別アカウント')
+    expect(screen.getByRole('alertdialog').textContent).toContain('環境')
+  })
+
+  it('削除の確認後にアカウントを行き来しても古い確定を受け付けない', async () => {
+    const view = render(<TemplatesListV8 />)
+    await act(async () => { await Promise.resolve() })
+    openMenuAndDelete('秋の新商品（画像）')
+    const button = within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })
+    const key = Object.keys(button).find(name => name.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    account.id = 'account-2'; await act(async () => { view.rerender(<TemplatesListV8 />) })
+    account.id = 'account-1'; await act(async () => { view.rerender(<TemplatesListV8 />) })
+    await act(async () => { oldClick() })
+    expect(removeTemplate).not.toHaveBeenCalled()
+  })
+
+  it.each(['単体', 'まとめて'])('%s削除の通信中に切り替えても新しいアカウントで削除できる', async (mode) => {
+    let finishOld!: (value: unknown) => void
+    removeTemplate.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve })).mockImplementation(() => new Promise(() => {}))
+    const view = render(<TemplatesListV8 />)
+    await act(async () => { await Promise.resolve() })
+    const open = () => {
+      if (mode === '単体') openMenuAndDelete('秋の新商品（画像）')
+      else { fireEvent.click(screen.getByRole('checkbox', { name: '「秋の新商品（画像）」を選択' })); fireEvent.click(screen.getByRole('button', { name: 'まとめて削除' })) }
+    }
+    open()
+    await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })) })
+    expect(removeTemplate).toHaveBeenCalledTimes(1)
+    account.id = 'account-2'
+    await act(async () => { view.rerender(<TemplatesListV8 />); await Promise.resolve() })
+    open()
+    const dialog = screen.getByRole('alertdialog')
+    expect((within(dialog).getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+    expect(removeTemplate).toHaveBeenCalledTimes(2)
+    await act(async () => { finishOld({ success: true }); await Promise.resolve() })
+    expect((within(dialog).getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(removeTemplate).toHaveBeenCalledTimes(2)
+  })
+
+  it('まとめて削除の窓を再表示すると古い確定は受け付けない', async () => {
+    await renderList()
+    fireEvent.click(screen.getByRole('checkbox', { name: '「秋の新商品（画像）」を選択' }))
+    fireEvent.click(screen.getByRole('button', { name: 'まとめて削除' }))
+    const button = within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })
+    const key = Object.keys(button).find(name => name.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(screen.getByRole('button', { name: 'まとめて削除' }))
+    await act(async () => { oldClick() })
+    expect(removeTemplate).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })) })
+    expect(removeTemplate).toHaveBeenCalledTimes(1)
   })
 
   it('決まり2：確認をキャンセルしたら削除しない', async () => {

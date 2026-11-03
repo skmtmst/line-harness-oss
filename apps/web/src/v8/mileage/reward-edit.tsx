@@ -15,6 +15,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import DateTimeField from '@/components/shared/date-time-field'
 import { Field, OptionalBadge } from '@/components/shared/form-controls'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -160,13 +161,18 @@ function RewardEditorInner() {
   const rewardId = useSearchParams().get('id')
   const editing = Boolean(rewardId)
   const { selectedAccountId } = useAccount()
+  const scope = useRef({ id: selectedAccountId, generation: 0 })
+  if (scope.current.id !== selectedAccountId) scope.current = { id: selectedAccountId, generation: scope.current.generation + 1 }
+  const loadedScope = useRef(-1)
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const [form, setForm] = useState<FormState>(EMPTY)
   const [reward, setReward] = useState<MileageRewardSummary | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>(editing ? 'loading' : 'ready')
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<MileageRewardTestResult | null>(null)
-  const [publishOpen, setPublishOpen] = useState(false)
+  const [publishTarget, setPublishTarget] = useState<{ accountId: string; generation: number } | null>(null)
   const [failure, setFailure] = useState('')
   const [commonActions, setCommonActions] = useState<CommonActionOption[]>([])
   const [commonActionsFailed, setCommonActionsFailed] = useState(false)
@@ -176,22 +182,26 @@ function RewardEditorInner() {
 
   const load = useCallback(async () => {
     if (!rewardId || !selectedAccountId) return
+    const requestScope = scope.current.generation
     setState('loading')
     try {
       const [detail, overview] = await Promise.all([
         api.mileage.reward(rewardId, selectedAccountId).catch(() => null),
         api.mileage.rewards(selectedAccountId).catch(() => null),
       ])
+      if (!alive.current || requestScope !== scope.current.generation) return
       const fallback = overview?.success ? overview.data.rewards.find((item) => item.id === rewardId) : undefined
       const found = detail?.success && isMileageRewardSummary(detail.data) ? detail.data : fallback
       if (!found) throw new Error('failed')
       setReward(found)
+      loadedScope.current = requestScope
       const loaded = formOf(found)
       setForm(loaded)
       setAudience(loaded.targetConditions ? 'conditioned' : 'all')
       setBaseline(JSON.stringify(loaded))
       setState('ready')
     } catch (err) {
+      if (!alive.current || requestScope !== scope.current.generation) return
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
@@ -254,7 +264,7 @@ function RewardEditorInner() {
     setTestResult(null)
   }
 
-  const persistDraft = async () => {
+  const persistDraft = async (isCurrent: () => boolean = () => true) => {
     if (!selectedAccountId) throw new Error('account-required')
     const formKey = JSON.stringify(form)
     if (completedDraft.current?.accountId === selectedAccountId && completedDraft.current.form === formKey) return completedDraft.current.reward
@@ -267,6 +277,7 @@ function RewardEditorInner() {
       let expectedRevision = currentReward?.currentVersion?.revision
       if (!expectedVersionId || expectedRevision == null) {
         const createdDraft = await api.mileage.createRewardDraft(savedId, selectedAccountId)
+        if (!isCurrent()) throw new Error('scope-changed')
         if (!createdDraft.success || !createdDraft.data.currentDraftVersionId) throw new Error('failed')
         completedDraft.current = { accountId: selectedAccountId, form: "", reward: createdDraft.data }
         setReward(createdDraft.data)
@@ -278,6 +289,7 @@ function RewardEditorInner() {
     } else {
       saved = await api.mileage.createReward(selectedAccountId, draft)
     }
+    if (!isCurrent()) throw new Error('scope-changed')
     if (!saved.success) throw new Error('failed')
     completedDraft.current = { accountId: selectedAccountId, form: formKey, reward: saved.data }
     setReward(saved.data)
@@ -286,7 +298,9 @@ function RewardEditorInner() {
     return saved.data
   }
 
-  const save = async (thenPublish: boolean) => {
+  const save = async (thenPublish: boolean, target = publishTarget) => {
+    const current = () => alive.current && !!target && target.accountId === scope.current.id && target.generation === scope.current.generation
+    if (thenPublish && !current()) return
     if (!validateInputs() || !selectedAccountId) return
     if (!feedback.begin('マイルの使い道')) return
     retryPublish.current = thenPublish
@@ -294,9 +308,10 @@ function RewardEditorInner() {
     setFailure('')
     let savedDraft = false
     try {
-      const saved = await persistDraft()
+      const saved = await persistDraft(thenPublish ? current : undefined)
       savedDraft = true
       if (thenPublish) {
+        if (!current()) throw new Error('scope-changed')
         const published = await api.mileage.publishReward(
           saved.id,
           selectedAccountId,
@@ -308,10 +323,14 @@ function RewardEditorInner() {
         setReward(published.data)
       }
       feedback.success(thenPublish ? 'マイルの使い道と公開設定' : 'マイルの使い道の下書き')
-      setPublishOpen(false)
+      setPublishTarget(null)
       notifySaved(thenPublish ? '公開しました' : '下書きを保存しました')
       if (!editing) router.push(createPageReturnHref('/mileage?tab=rewards', saved.id))
     } catch (err) {
+      if (thenPublish && !current()) {
+        feedback.failure('アカウントが切り替わったため公開を中止しました。保存状況は元のアカウントで確認してください。')
+        return
+      }
       feedback.failure(describeApiFailure(err, '保存'), savedDraft ? ['マイルの使い道の下書き'] : [], savedDraft ? ['公開'] : ['マイルの使い道の保存'])
       const fieldFailure = saveErrors.capture(err)
 
@@ -373,7 +392,8 @@ function RewardEditorInner() {
   const published = reward?.status === 'published'
   const requestPublish = () => {
     if (!validateInputs()) return
-    setPublishOpen(true)
+    if (editing && loadedScope.current !== scope.current.generation) return
+    if (selectedAccountId) setPublishTarget({ accountId: selectedAccountId, generation: scope.current.generation })
   }
   const kindNote = KINDS.find((kind) => kind.value === form.rewardKind)?.note ?? ''
   const requiredMiles = Number(form.requiredMiles)
@@ -423,7 +443,7 @@ function RewardEditorInner() {
       </>} dirty={false}
     >
       {failure && feedback.state.kind === 'idle' ? <Notice tone="danger" message={failure} /> : null}
-      <SaveFeedback state={feedback.state} onRetry={() => save(retryPublish.current)} />
+      <SaveFeedback state={feedback.state} onRetry={() => { if (retryPublish.current && !publishTarget) requestPublish(); else void save(retryPublish.current) }} />
       {testResult ? (
         <Notice tone={testResult.canDeliver ? 'success' : 'warn'}>
           {testResult.canDeliver
@@ -568,15 +588,15 @@ function RewardEditorInner() {
       </Card>
 
       <ConfirmDialog
-        open={publishOpen}
+        open={publishTarget !== null && publishTarget.generation === scope.current.generation}
         title="この使い道を公開しますか？"
         description="公開すると、お客様がマイルを交換できるようになります。内容と必要マイルを確認してください。"
         confirmLabel="使い道を公開"
         busy={saving}
         error={failure || undefined}
-        onCancel={() => setPublishOpen(false)}
-        onConfirm={() => save(true)}
-      />
+        onCancel={() => setPublishTarget(null)}
+        onConfirm={() => save(true, publishTarget)}
+      >{publishTarget ? <OperationTargetSummary accounts={[{ id: publishTarget.accountId }]} /> : null}</ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した使い道" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage></SaveErrorScope>
   )

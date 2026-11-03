@@ -33,7 +33,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'staff' } }) },
       mileage: {
         ...actual.api.mileage,
-        friendsV6: async () => ({ success: false, error: 'x' }),
+        friendsV6: async () => ({ success: true, data: { balanceSource: 'musubo', items: [] } }),
         history: async () => ({ success: false, error: 'x' }),
       },
     },

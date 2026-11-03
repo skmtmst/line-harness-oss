@@ -4,14 +4,14 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import TemplateDetail from '@/v8/template-detail/detail'
 
-const m = vi.hoisted(() => ({ get: vi.fn(), remove: vi.fn(), push: vi.fn() }))
+const m = vi.hoisted(() => ({ get: vi.fn(), remove: vi.fn(), push: vi.fn(), account: 'account-a' }))
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: { templates: { get: m.get, delete: m.remove, versions: async () => ({ success: true, data: [] }), list: async () => ({ success: true, data: [] }) },
     folders: { list: async () => ({ success: true, data: [] }) } },
 }))
 vi.mock('@/lib/use-feature-access', () => ({ useFeatureAccess: () => true }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: m.account, accounts: [], loading: false }) }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams('id=tpl-1'), useRouter: () => ({ push: m.push, replace: vi.fn(), prefetch: vi.fn() }),
 }))
@@ -23,6 +23,7 @@ const template = {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  m.account = 'account-a'
   m.get.mockResolvedValue({ success: true, data: template })
   m.remove.mockResolvedValue({ success: true, data: null })
 })
@@ -65,4 +66,26 @@ it('失敗は窓に残し、同じ対象で再試行できる', async () => {
   fireEvent.click(screen.getByRole('button', { name: '削除する' }))
   await waitFor(() => expect(m.push).toHaveBeenCalledWith('/templates'))
   expect(m.remove).toHaveBeenCalledTimes(2)
+})
+
+it('削除通信中にアカウントを切り替えても新しい窓は操作できる', async () => {
+  let finishOld!: (value: unknown) => void
+  m.remove.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve })).mockImplementation(() => new Promise(() => {}))
+  const view = render(<TemplateDetail />)
+  await screen.findByRole('heading', { name: '使っている所' })
+  fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+  expect(m.remove).toHaveBeenCalledTimes(1)
+  m.account = 'account-b'
+  view.rerender(<TemplateDetail />)
+  await screen.findByRole('heading', { name: '使っている所' })
+  fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  expect((screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+  expect(m.remove).toHaveBeenCalledTimes(2)
+  await act(async () => { finishOld({ success: true }); await Promise.resolve() })
+  expect((screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(m.push).not.toHaveBeenCalled()
 })

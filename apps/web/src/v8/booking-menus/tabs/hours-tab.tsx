@@ -8,6 +8,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateField from '@/components/shared/date-field'
@@ -307,7 +308,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
               <p className={styles.noteText}>設備はまだありません。</p>
             ) : resources.map((resource) => (
               <ResourceRowV8
-                key={`${resource.id}:${resource.version}`}
+                key={`${accountId}:${resource.id}:${resource.version}`}
                 accountId={accountId}
                 resource={resource}
                 canEdit={canEdit}
@@ -343,6 +344,14 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
 
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmScope, setConfirmScope] = useState<{ accountId: string; generation: number; id: string; version: number } | null>(null)
+  const targetScope = useRef({ accountId, generation: 0 })
+  if (targetScope.current.accountId !== accountId) targetScope.current = { accountId, generation: targetScope.current.generation + 1 }
+  const renderedScope = targetScope.current
+  const canEditRef = useRef(canEdit); canEditRef.current = canEdit
+  const resourceRef = useRef(resource); resourceRef.current = resource
+  const mounted = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inFlightRef = useRef(false)
@@ -384,14 +393,14 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
   }
 
   async function remove() {
-    if (!canEdit || inFlightRef.current) return
+    if (!confirmScope || !mounted.current || !canEditRef.current || confirmScope.generation !== targetScope.current.generation || confirmScope.id !== resourceRef.current.id || confirmScope.version !== resourceRef.current.version || inFlightRef.current) return
     const generation = generationRef.current
     const alive = () => generation === generationRef.current
     inFlightRef.current = true
     setBusy(true)
     setError(null)
     try {
-      await bookingApi.deleteResource(accountId, resource.id, resource.version)
+      await bookingApi.deleteResource(confirmScope.accountId, confirmScope.id, confirmScope.version)
       if (!alive()) return
       setConfirmDelete(false)
       onDeleted(resource.id)
@@ -426,7 +435,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
       tone: 'danger' as const,
       dividerBefore: true,
       disabled: busy,
-      onSelect: () => { setError(null); setConfirmDelete(true) },
+      onSelect: () => { if (!mounted.current || !canEditRef.current || renderedScope !== targetScope.current) return; setError(null); setConfirmScope({ ...renderedScope, id: resource.id, version: resource.version }); setConfirmDelete(true) },
     }] : []),
   ] : []
 
@@ -456,7 +465,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
         onSaved={(saved) => { setEditing(false); onSaved(saved) }}
       />
       <ConfirmDialog
-        open={confirmDelete}
+        open={confirmDelete && confirmScope?.generation === targetScope.current.generation}
         title={`「${resource.name}」を削除しますか？`}
         description="削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。"
         confirmLabel="削除する"
@@ -465,7 +474,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
         error={error ?? undefined}
         onCancel={() => { if (!busy) setConfirmDelete(false) }}
         onConfirm={() => remove()}
-      />
+      >{confirmScope ? <OperationTargetSummary accounts={[{ id: confirmScope.accountId }]} /> : null}</ConfirmDialog>
     </div></SaveErrorScope>
   )
 }

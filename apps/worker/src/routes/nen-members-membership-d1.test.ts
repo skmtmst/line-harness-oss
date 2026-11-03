@@ -57,6 +57,10 @@ async function member(lineUserId: string) {
 }
 
 describe('GET /api/liff/nen/member membership', () => {
+  it('EC残高0は古いpoint_balanceで上書きしない', async () => {
+    sql.prepare("UPDATE nen_ec_member_snapshots SET mile_balance=0, point_balance=29 WHERE friend_id='friend-a'").run();
+    expect((await member('U-a')).data.membership.mileBalance).toBe(0);
+  });
   it.each(['suspended', 'archived', 'inactive', 'missing-tenant'])('S15 %s membership owner is rejected even without an account or LIFF query', async state => {
     sql.exec("INSERT INTO tenants(id,name,status) VALUES ('fixture-tenant','Fixture','active'); UPDATE line_accounts SET tenant_id='fixture-tenant' WHERE id='account-nen'");
     if (state === 'inactive') sql.exec("UPDATE line_accounts SET is_active=0 WHERE id='account-nen'");
@@ -89,7 +93,7 @@ describe('GET /api/liff/nen/member membership', () => {
 
   it('ECのランクキー未着では金額からランクを推測しない', async () => {
     const body = await member('U-b');
-    expect(body.data.membership).toMatchObject({ rankKey: null, rankName: '未設定', mileRatePercent: null, annualMilesYen: 34_200, lifetimeMilesYen: 34_200, mileBalance: 640 });
+    expect(body.data.membership).toMatchObject({ rankKey: null, rankName: '未設定', mileRatePercent: null, annualMilesYen: 34_200, lifetimeMilesYen: 34_200, mileBalance: 0 });
   });
 
   it('連携前の友だちはランク未設定で 0', async () => {

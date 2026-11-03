@@ -16,6 +16,7 @@ import Dialog, { DialogActions } from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import PageHeader from '@/components/shared/page-header'
 import StatusBadge from '@/components/shared/status-badge'
 import { notifyToast } from '@/components/shared/toast'
@@ -280,12 +281,19 @@ function AnalyticsReportFormPage() {
   const editId = searchParams.get('id')
   usePageTitle(editId ? '定期レポートを直す' : '定期レポートをつくる')
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
+  const scopeKey = JSON.stringify([selectedAccountId, editId])
+  const scope = useRef({ key: scopeKey, generation: 0 })
+  if (scope.current.key !== scopeKey) scope.current = { key: scopeKey, generation: scope.current.generation + 1 }
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const [options, setOptions] = useState<AnalyticsReportScheduleOptions | null>(null)
   const [editing, setEditing] = useState<AnalyticsReportSchedule | null>(null)
   const [editMissing, setEditMissing] = useState(false)
   /* WEB308：履歴の口が読めなかったことを「見つかりません」と分ける。 */
   const [editLoadFailed, setEditLoadFailed] = useState(false)
   const canManage = canManageRole(useStaffRole())
+  const canManageRef = useRef(canManage)
+  canManageRef.current = canManage
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -716,6 +724,8 @@ function AnalyticsReportFormPage() {
 
   const submitLock = useRef<{ target: string } | null>(null)
   const [sendOnceOpen, setSendOnceOpen] = useState(false)
+  const sendOnceScope = useRef<{ accountId: string; generation: number } | null>(null)
+  const renderedSendOnceScope = sendOnceScope.current
   useEffect(() => { setSendOnceOpen(false) }, [selectedAccountId, editId, canManage])
   const submit = async (sendOnce: boolean) => {
     const target = `${selectedAccountId}:${editId}:${switchSeqRef.current}`
@@ -1137,7 +1147,7 @@ function AnalyticsReportFormPage() {
         footerActions={<>
         <Button href="/analytics">キャンセル</Button>
         {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
-        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { const built = buildReportPayload(options); if (!built.ok) { showValidation(built); return }; setError(''); setSendOnceOpen(true) }}>今すぐ1回だけ送る</Button>}
+        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { const built = buildReportPayload(options); if (!built.ok) { showValidation(built); return }; if (!selectedAccountId) return; sendOnceScope.current = { accountId: selectedAccountId, generation: scope.current.generation }; setError(''); setSendOnceOpen(true) }}>今すぐ1回だけ送る</Button>}
         {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={16} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
       </>}
       >
@@ -1240,7 +1250,8 @@ function AnalyticsReportFormPage() {
       <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<DialogActions><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></DialogActions>} error={compareError || undefined} busy={compareBusy || latestBusy}>
         <VersionCompare before={latestSummary} after={draftSummary} />
       </Dialog>
-      <ConfirmDialog open={sendOnceOpen && canManage} title="レポートを今すぐ1回だけ送りますか？" description="次の宛先と通知方法で送る依頼を作ります。" confirmLabel="この宛先へ1回だけ送る" busy={saving} onCancel={() => { if (!saving) setSendOnceOpen(false) }} error={error || undefined} confirmDisabled={updateConflict || Boolean(conflictId)} confirmDisabledReason="閉じて最新の内容を確認してください。" onSuccess={() => setSendOnceOpen(false)} onConfirm={() => submit(true)}>
+      <ConfirmDialog open={sendOnceOpen && canManage && renderedSendOnceScope?.generation === scope.current.generation} title="レポートを今すぐ1回だけ送りますか？" description="次の宛先と通知方法で送る依頼を作ります。" confirmLabel="この宛先へ1回だけ送る" busy={saving} onCancel={() => { if (!saving) setSendOnceOpen(false) }} error={error || undefined} confirmDisabled={updateConflict || Boolean(conflictId)} confirmDisabledReason="閉じて最新の内容を確認してください。" onSuccess={() => setSendOnceOpen(false)} onConfirm={() => { if (!alive.current || !canManageRef.current || !renderedSendOnceScope || renderedSendOnceScope !== sendOnceScope.current || renderedSendOnceScope.generation !== scope.current.generation) return; return submit(true) }}>
+        {renderedSendOnceScope ? <OperationTargetSummary accounts={[{ id: renderedSendOnceScope.accountId }]} /> : null}
         <p className="whitespace-pre-wrap break-words">{oneTimeSummary}</p>
       </ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した定期レポート" onConfirm={confirmLeave} onCancel={cancelLeave} />

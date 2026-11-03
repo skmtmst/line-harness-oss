@@ -5,6 +5,7 @@ import { mileageStatusTone } from './parts'
 
 
 import { createAccountTracker, createMileageRewardsFetchGuards, createSingleFlightLock } from './redemption-request-guard'
+import HeldRedemptions from './held-redemptions'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -144,7 +145,8 @@ const PRESETS: Array<{ value: string; label: string }> = [
 
 export default function RewardsTab() {
   const saveErrors = useSaveFormErrors()
-  const { readonly, narrow, setCount } = useMileageShell()
+  const { readonly: roleReadonly, narrow, setCount, balanceSource } = useMileageShell()
+  const readonly = roleReadonly || balanceSource === 'ec'
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId
   const router = useRouter()
@@ -666,6 +668,7 @@ export default function RewardsTab() {
   )
 
   const rowMenu = (reward: MileageRewardSummary) => {
+    if (balanceSource === 'ec') return null
     const operable = !readonly && (reward.status === 'published' || reward.status === 'draft' || reward.status === 'stopped')
     return (
       <div className={styles.menuBox}>
@@ -894,6 +897,7 @@ export default function RewardsTab() {
     >
       {body}
       {!failedSection && retryNotice ? <Notice tone="success" message={retryNotice} /> : null}
+      {balanceSource === 'ec' && accountId ? <HeldRedemptions accountId={accountId} /> : null}
       {failedSection}
       {folderMove.overlays}
     </MileageFrame></SaveErrorScope>

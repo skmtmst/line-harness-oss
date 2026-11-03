@@ -4,6 +4,7 @@ import { restaurantBookingVariables, substituteRestaurantBooking } from '../../s
 import { expandVariables } from '../../services/message-interpolation.js';
 import { resolveMetadata } from '../../services/step-metadata.js';
 import { resolveSendInterpolationExtra } from '../../services/interpolation-context.js';
+import { resolveMileageSource } from '../../services/mileage-ec-source.js';
 import type { EventDispatcher } from '../../services/event-payload.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { classifyLinePushError } from './automation-line-errors.js';
@@ -712,6 +713,10 @@ async function mileageExecutor(context: AutomationActionContext): Promise<void> 
   if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 1 || amount > 1_000_000) {
     throw invalid('mileage_amount_invalid', '付与マイルは1から100万の整数で指定してください');
   }
+  let source: 'ec' | 'musubo';
+  try { source = await resolveMileageSource(context.db, context.lineAccountId); }
+  catch { throw new AutomationActionError('MILEAGE_SOURCE_UNAVAILABLE', 'マイルの管理元を確認できませんでした', true); }
+  if (source === 'ec') return;
   const { postMileageEntry } = await import('@line-crm/db');
   await postMileageEntry(context.db, { beneficiaryFriendId: friend.id, entryType: 'grant', amount,
     reason: '設定した処理による付与', source: 'automation', sourceEventId: context.sourceEventId,

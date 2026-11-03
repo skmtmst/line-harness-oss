@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { NenRankSettingsData } from '@/lib/nen-ranks-api'
 import Lifetime from './lifetime'
@@ -34,4 +34,15 @@ it('閲覧のみの人には保存も変更操作も置かない', () => {
   expect(screen.getByText('常連')).toBeTruthy()
   expect(screen.queryByRole('button', { name: '保存して EC へ同期する' })).toBeNull()
   expect(screen.queryByRole('button', { name: /節目.*操作/ })).toBeNull()
+})
+
+it('新しい節目の通知はオフで、既存の通知オンはそのまま表示する', () => {
+  render(<Lifetime accountId="a" status="ready" settings={settings} onSaved={vi.fn()} onRetry={vi.fn()} readonly={false} />)
+  fireEvent.click(screen.getByRole('button', { name: /節目.*常連.*操作/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
+  expect(screen.getByRole('switch', { name: '到達したら LINE で通知する' }).getAttribute('aria-checked')).toBe('true')
+  fireEvent.click(within(screen.getByRole('dialog', { name: '節目を直す' })).getByRole('button', { name: 'キャンセル' }))
+  fireEvent.click(screen.getByRole('button', { name: /節目を足す/ }))
+  expect(screen.getByRole('switch', { name: '到達しても通知しない' }).getAttribute('aria-checked')).toBe('false')
+  expect(screen.getByText('到達しても通知しない')).toBeTruthy()
 })

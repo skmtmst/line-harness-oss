@@ -41,6 +41,8 @@ import { useSearchParams } from 'next/navigation'
 import { Scale, Map as MapIcon } from 'lucide-react'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+import { notifyToast } from '@/components/shared/toast'
 
 
 /*
@@ -80,13 +82,21 @@ type MoveMode = 'move' | 'unassign'
 
 function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:number }) {
   const saveErrors = useSaveFormErrors()
-  const { data, store, busy, mutate } = ctx
-  const { selectedAccountId } = useAccount()
+  const { data, store, busy, mutate, tableDefinition } = ctx
+  const { selectedAccountId, accounts } = useAccount()
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const snapshotAccountCurrent = Boolean(tableDefinition && tableDefinition.accountId === selectedAccountId && tableDefinition.snapshot === data)
+  const snapshotCurrentRef = useRef(snapshotAccountCurrent); snapshotCurrentRef.current = snapshotAccountCurrent
+  const scope = useRef({ accountId: selectedAccountId, storeId: store?.id, generation: 0 })
+  if (scope.current.accountId !== selectedAccountId || scope.current.storeId !== store?.id) scope.current = { accountId: selectedAccountId, storeId: store?.id, generation: scope.current.generation + 1 }
+  const renderedScope = scope.current
   const [floors,setFloors]=useState<RestaurantFloor[]>([])
   useEffect(()=>{let active=true;if(selectedAccountId&&store)void reservationBoardApi.floors(selectedAccountId,store.id).then(r=>{if(active)setFloors(r.data)}).catch(()=>{});return ()=>{active=false}},[selectedAccountId,store?.id,data.tables])
   const role = useStaffRole()
   /* 閲覧のみの人には、追加・変更・停止・再開・並べ替えを置かない（2026-10-06 オーナー）。 */
   const canEdit = canManageRole(role)
+  const canEditRef = useRef(canEdit); canEditRef.current = canEdit
   const rows = useMemo(() => (store ? data.tables.filter((row) => row.store_id === store.id) : data.tables), [data.tables, store])
   const placed = useMemo(
     () => [...rows].sort((a, b) => a.floor_y - b.floor_y || a.floor_x - b.floor_x || a.code.localeCompare(b.code)),
@@ -105,12 +115,18 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const [deleteId, setDeleteId] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [stopId, setStopId] = useState('')
+  const [deleteScope, setDeleteScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const deleteTicket = useRef<object | null>(null)
+  const stopTicket = useRef<object | null>(null)
   const [stopError, setStopError] = useState('')
+  const [stopProgress, setStopProgress] = useState('')
+  const stopProgressRef = useRef(false)
   const [moveMode, setMoveMode] = useState<MoveMode>('move')
   useEffect(()=>{if(addRequest>0)openNew()},[addRequest]) // eslint-disable-line react-hooks/exhaustive-deps
   const editing = editor && editor !== 'new' ? rows.find((row) => row.id === editor) ?? null : null
-  const deleting = rows.find((row) => row.id === deleteId)
-  const stopping = rows.find((row) => row.id === stopId)
+  const deleting = deleteScope?.scope === scope.current && deleteScope.ticket === deleteTicket.current ? rows.find((row) => row.id === deleteId) : undefined
+  const stopping = stopScope?.scope === scope.current && stopScope.ticket === stopTicket.current ? rows.find((row) => row.id === stopId) : undefined
   const now = Date.now()
   /* この卓に入っている、これから先の予約（取消・無断キャンセル・来店済みは除く）。 */
   const upcoming = useMemo(() => (stopping
@@ -211,32 +227,45 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
 
   /* 先の予約を移して（または未配席に戻して）から卓を止める。1件ずつ送り、失敗したらそこで止める。 */
   const stop = (table: RestaurantTable, reservations: RestaurantReservation[]) => {
-    if (!selectedAccountId) return
-    setStopError('')
+    if (!alive.current || stopProgressRef.current || !selectedAccountId || !snapshotCurrentRef.current || !canEditRef.current || !stopScope || stopScope.scope !== scope.current || stopScope.ticket !== stopTicket.current) return
+    const belongs = () => alive.current && canEditRef.current && stopScope.scope === scope.current && stopScope.ticket === stopTicket.current
+    const current = () => snapshotCurrentRef.current && belongs()
+    setStopError(''); setStopProgress('')
+    let moved = 0
+    let unassigned = 0
+    let inFlight = false
     void mutate(async () => {
       try {
         const taken: RestaurantReservation[] = data.reservations.filter((item) => item.table_id !== table.id)
-        let moved = 0
-        let unassigned = 0
         for (const item of reservations) {
+          if (!current()) throw new QuietError()
           const target = moveMode === 'move' ? pickMoveTarget(item, rows.filter((row) => row.id !== table.id), taken) : null
+          inFlight = true
           await restaurantTestApi.updateReservation(selectedAccountId, item.id, { tableId: target?.id ?? null, expectedVersion: item.customer_version ?? 1 })
+          inFlight = false
           if (target) { moved += 1; taken.push({ ...item, table_id: target.id }) } else { unassigned += 1 }
         }
+        if (!current()) throw new QuietError()
+        inFlight = true
         await restaurantTestApi.updateTable(selectedAccountId, table.id, { isActive: false })
+        inFlight = false
         return { moved, unassigned }
       } catch (error) {
+        const target = accounts.find(account => account.id === selectedAccountId)?.name || '名前を確認できないLINEアカウント'
+        const progress = `${target}・${store?.name || '名前を確認できない店舗'}の卓「${table.code}」：予約${moved + unassigned}件の変更を確認しました（別の卓へ${moved}件、未配席${unassigned}件）。${inFlight ? '通信中の変更は結果を確認できません。' : ''}予約台帳と卓の状態を確認してください。`
+        if (!current()) { notifyToast(progress, { tone: 'info', duration: 0 }); throw new QuietError() }
+        stopProgressRef.current = true; setStopProgress(progress)
         const fieldFailure = saveErrors.capture(error)
 
-        { if (!fieldFailure)
-        setStopError(japaneseDetailOf(error) || '予約の移動・卓の停止に失敗しました。時間をおいて、もう一度お試しください。') }
+        { if (!fieldFailure && current())
+        setStopError(japaneseDetailOf(error) || '予約の移動・卓の停止を完了できませんでした。予約台帳と卓の状態を確認してください。') }
         throw new QuietError()
       }
     }, reservations.length === 0
       ? '卓を停止しました。予約履歴と卓の情報は残ります。'
       : moveMode === 'move'
         ? '先の予約を別の卓へ移して、卓を停止しました。入る卓が無かった予約は未配席にしました。'
-        : '先の予約を未配席に戻して、卓を停止しました。予約台帳で卓を割り当ててください。').then((ok) => { if (ok) setStopId('') })
+        : '先の予約を未配席に戻して、卓を停止しました。予約台帳で卓を割り当ててください。').then((ok) => { if (ok && belongs()) { stopTicket.current = null; setStopId('') } })
   }
 
   const resume = (table: RestaurantTable) => {
@@ -245,6 +274,12 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       () => restaurantTestApi.updateTable(selectedAccountId, table.id, { isActive: true }),
       '卓を再開しました。',
     )
+  }
+
+  const closeStop = () => {
+    if (stopScope?.ticket !== stopTicket.current) return
+    stopTicket.current = null; setStopId('')
+    if (stopProgressRef.current) void ctx.reload()
   }
 
   const activeRows = rows.filter((item) => item.is_active)
@@ -284,9 +319,9 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
                   <p className={styles.detailSub}>{`${seatTypeLabel(item.seat_type)} / ${item.min_capacity}〜${item.max_capacity}名`}</p>
                 </div>
                 <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} /></span>
-                <TableRowActions table={item} canEdit={canEdit} busy={busy} onEdit={openEdit} onResume={resume}
-                  onDelete={(table) => { setDeleteError(''); setDeleteId(table.id) }}
-                  onStop={(table) => { setStopError(''); setMoveMode('move'); setStopId(table.id) }} />
+                <TableRowActions table={item} canEdit={canEdit} busy={busy} pendingAccount={!snapshotAccountCurrent} onEdit={openEdit} onResume={resume}
+                  onDelete={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteError(''); setDeleteId(table.id) }}
+                  onStop={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket }); setStopError(''); stopProgressRef.current = false; setStopProgress(''); setMoveMode('move'); setStopId(table.id) }} />
               </li>
             ))}
           </ul>
@@ -301,17 +336,20 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         <Panel fusion title="卓を止めるとき"><p className={styles.ruleText}>先の予約を同じ人数が入る別の卓へ自動で移すか、未配席に戻します。お客さまへの通知はこの画面からは送りません。</p></Panel>
       </div>
       <RsDialog open={Boolean(deleting)} title="この卓を削除しますか？" width={480} top={300} busy={busy}
-        onCancel={() => setDeleteId('')} actions={<>
-          <Button disabled={busy} onClick={() => setDeleteId('')}>キャンセル</Button>
+        onCancel={() => { if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setDeleteId('') } }} actions={<>
+          <Button disabled={busy} onClick={() => { if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setDeleteId('') } }}>キャンセル</Button>
           <Button variant="danger" disabled={busy} onClick={() => {
-            if (!selectedAccountId || !deleting) return
+            if (!alive.current || !selectedAccountId || !deleting || !snapshotCurrentRef.current || !canEditRef.current || !deleteScope || deleteScope.scope !== scope.current || deleteScope.ticket !== deleteTicket.current) return
+            const belongs = () => alive.current && canEditRef.current && deleteScope.scope === scope.current && deleteScope.ticket === deleteTicket.current
+            const current = () => snapshotCurrentRef.current && belongs()
             setDeleteError('')
             void mutate(async () => {
               try { await restaurantTestApi.deleteTable(selectedAccountId, deleting.id) }
-              catch (error) { setDeleteError(japaneseDetailOf(error) || '削除できませんでした。'); throw new QuietError() }
-            }, '卓を削除しました。').then((ok) => { if (ok) setDeleteId('') })
+              catch (error) { if (current()) setDeleteError(japaneseDetailOf(error) || '削除できませんでした。'); throw new QuietError() }
+            }, '卓を削除しました。').then((ok) => { if (ok && belongs()) { deleteTicket.current = null; setDeleteId('') } })
           }}>削除する</Button>
         </>}>
+        {deleteScope?.scope.accountId && store && <OperationTargetSummary accounts={[{ id: deleteScope.scope.accountId, name: accounts.find(account => account.id === deleteScope.scope.accountId)?.name }]} store={{ id: store.id, name: store.name }} />}
         <p>{deleting?.code}・{deleting?.label}</p>
         <DialogNote>予約や設定で使われていない卓だけ削除できます。元に戻せません。</DialogNote>
         {deleteError ? <Notice tone="danger">{deleteError}</Notice> : null}
@@ -366,22 +404,25 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       </RsDialog>
       <RsDialog
         open={Boolean(stopping)}
+        actionsPlacement="footer"
         title={stopping ? `卓「${stopping.code}・${stopping.label}」を止めますか？` : ''}
         width={560}
         top={260}
         busy={busy}
         designNode="eY9F3"
-        onCancel={() => setStopId('')}
+        onCancel={closeStop}
         actions={(
           <>
-            <Button presentation="restaurant" onClick={() => setStopId('')} disabled={busy}>キャンセル</Button>
-            <Button presentation="restaurant" variant="danger" disabled={busy} onClick={() => { if (stopping) stop(stopping, upcoming) }}>
+            <Button presentation="restaurant" onClick={closeStop} disabled={busy}>キャンセル</Button>
+            <Button presentation="restaurant" variant="danger" disabled={busy} lockedReason={stopProgress ? '予約台帳と卓の状態を確認してから、操作をやり直してください。' : undefined} onClick={() => { if (stopping) stop(stopping, upcoming) }}>
               {upcoming.length === 0 ? '止める' : moveMode === 'move' ? '予約を移して止める' : '未配席に戻して止める'}
             </Button>
           </>
         )}
       >
+        {stopScope?.scope.accountId && store && <OperationTargetSummary accounts={[{ id: stopScope.scope.accountId, name: accounts.find(account => account.id === stopScope.scope.accountId)?.name }]} store={{ id: store.id, name: store.name }} />}
         {stopError ? <Notice tone="danger" role="alert" message={stopError} /> : null}
+        {stopProgress ? <Notice tone="info">{stopProgress}</Notice> : null}
         {upcoming.length === 0 ? (
           <>
             <p className={styles.stopLead}>この卓には、これから先の予約はありません。</p>

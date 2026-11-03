@@ -18,6 +18,7 @@ import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './quick-send.module.css'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import MessageInsertRow, { MessageBody, MessageInsertButton } from '@/components/shared/message-insert-row'
 import { Field } from '@/components/shared/form-controls'
@@ -353,7 +354,7 @@ export default function QuickSendV8({
 
         </DialogActions>)}
     >
-      <div className={styles.body}>{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField tokenNames={tokenNames}
+      <div className={styles.body}><OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField tokenNames={tokenNames}
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}

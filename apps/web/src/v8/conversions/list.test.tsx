@@ -279,6 +279,23 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.queryByRole('menuitem', { name: '複製する' })).toBeNull()
   })
 
+  it('下書きと停止中が混じるとき、それぞれの数を帯と絞り込みに表示する', async () => {
+    const base = fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await base(input, init)
+      if (new URL(String(input)).pathname !== '/api/conversions/definitions') return response
+      const body = await response.json()
+      body.data.items.push(point('cp-draft', '架空の下書き', { status: 'draft', state: 'draft' }))
+      body.data.stateCounts.draft = 1
+      body.data.pagination.total = 3
+      return json(body)
+    })
+    await mount()
+    expect(screen.getByText('有効 1・下書き 1・停止中 1')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '下書き 1' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '停止中 1' })).toBeTruthy()
+  })
+
   it('1152 の板：札は「動いている」「止めている」の2つだけ（ほかはよく使う絞り込みから）', async () => {
     narrow.value = true
     await mount()

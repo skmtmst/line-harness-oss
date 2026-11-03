@@ -17,7 +17,7 @@ type RankHistory = { id: string; from_tier_id: string | null; to_tier_id: string
 const REASONS: Record<string, string> = { activated: 'ランクを動かした', upgrade: '条件を満たした', downgrade: '条件を下回った', grace: '猶予が終わった', recovered: '回復した', manual: '店が変えた' }
 const md = (value: string) => `${value.slice(0, 4)}/${Number(value.slice(5, 7))}/${Number(value.slice(8, 10))}`
 
-export default function MilesTab({ friendId }: { friendId: string }) {
+export default function MilesTab({ friendId, balanceSource }: { friendId: string; balanceSource: 'ec' | 'musubo' | null }) {
   const { selectedAccountId } = useAccount()
   const [history, setHistory] = useState<RankHistory[]>([])
   const [names, setNames] = useState<Record<string, string>>({})
@@ -39,9 +39,9 @@ export default function MilesTab({ friendId }: { friendId: string }) {
         text="マイル残高と履歴は、マイル画面で確認できます。"
         actions={[{ label: 'マイルを確認 ↗', href: `/mileage/friends/detail?id=${encodeURIComponent(friendId)}` }]}
       />
-      {history.length > 0 ? (
-        <section className={styles.body} aria-label="会員ランクの履歴">
-          <h3 className={styles.sectionTitle}>会員ランクの履歴</h3>
+      {history.length > 0 && balanceSource !== null ? (
+        <section className={styles.body} aria-label={balanceSource === 'ec' ? 'musubo側の会員ランク履歴' : '会員ランクの履歴'}>
+          <h3 className={styles.sectionTitle}>{balanceSource === 'ec' ? 'musubo側の会員ランク履歴' : '会員ランクの履歴'}</h3>
           <DataTable>
             <thead><TableHeadRow><Th>日時</Th><Th>前 → 後</Th><Th grow>理由</Th></TableHeadRow></thead>
             <tbody>

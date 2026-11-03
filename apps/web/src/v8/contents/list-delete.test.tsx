@@ -29,7 +29,7 @@ import MediaLibraryListV8 from './list'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-type Media = { id: string; filename: string; usageCount: number }
+type Media = { id: string; filename: string; usageCount: number; lineAccountId?: string | null }
 type Impact = {
   usageCount: number
   canDelete: boolean
@@ -38,8 +38,8 @@ type Impact = {
   references?: Array<{ kind: string; name: string | null; href: string | null; state: 'available' | 'unavailable' }>
 }
 
-const item = ({ id, filename, usageCount }: Media) => ({
-  id, lineAccountId: account.id, folderId: null, filename, kind: 'image', mimeType: 'image/png', sizeBytes: 1000,
+const item = ({ id, filename, usageCount, lineAccountId = account.id }: Media) => ({
+  id, lineAccountId, folderId: null, filename, kind: 'image', mimeType: 'image/png', sizeBytes: 1000,
   width: 10, height: 10, durationMs: null, usageCount, archivedAt: null, archiveReason: null,
   url: `https://example.test/${id}.png`, createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-02T00:00:00.000Z',
 })
@@ -128,6 +128,12 @@ const click = async (element: Element | null | undefined) => {
   await settle()
 }
 const dialog = () => document.querySelector<HTMLElement>('[role="dialog"], [role="alertdialog"]')
+const reactClick = (element: Element | undefined) => {
+  if (!element) throw new Error('押す相手がありません')
+  const key = Object.keys(element).find(name => name.startsWith('__reactProps$'))
+  if (!key) throw new Error('操作を取得できません')
+  return (element as unknown as Record<string, { onClick: () => void }>)[key].onClick
+}
 const buttonIn = (scope: ParentNode | null, text: string) =>
   [...(scope?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((button) => button.textContent?.trim() === text)
 const menuItem = (text: string) =>
@@ -145,6 +151,12 @@ const deferred = <T,>() => {
 }
 
 describe('1件ずつの削除確認（YfTfJ）', () => {
+  it('メディアのアカウントが不明なら選択中のアカウントで補わない', async () => {
+    media = [{ id: 'm-1', filename: '秋の新商品.png', usageCount: 0, lineAccountId: null }]
+    impacts.set('m-1', { usageCount: 0, canDelete: true })
+    await render(); await openDeleteFor('秋の新商品.png')
+    expect(dialog()?.textContent).toContain('名前を確認できません')
+  })
   it('一覧を出しただけでは使用先を読まず、窓を開けてから選択中のアカウントで読む', async () => {
     impacts.set('m-1', { usageCount: 0, canDelete: true })
     await render()
@@ -155,6 +167,8 @@ describe('1件ずつの削除確認（YfTfJ）', () => {
     expect(impactCalls('m-1')).toHaveLength(1)
     expect(impactCalls('m-1')[0].params.get('accountId')).toBe('account-a')
     expect(dialog()?.textContent).toContain('「秋の新商品.png」を削除しますか？')
+    expect(dialog()?.textContent).toContain('LINEアカウント')
+    expect(dialog()?.textContent).toContain('環境')
     expect(dialog()?.textContent).toContain('どこでも使っていません。')
   })
 
@@ -301,7 +315,8 @@ describe('使用状況に合わせた削除確認の案内', () => {
     await openDeleteFor('秋の新商品.png')
     expect(dialog()?.textContent).toContain('使われている場所を確かめられませんでした。')
     expect(dialog()?.textContent).not.toContain('どこでも使っていません。')
-    expect(dialog()?.textContent).toContain('使われている場所から外すと削除できます。')
+    expect(dialog()?.textContent).not.toContain('使われている場所から外すと削除できます。')
+    expect(dialog()?.textContent).not.toContain('7種類を確認しました。')
     expect(buttonIn(dialog(), 'もう一度読み込む')).toBeDefined()
     expect(buttonIn(dialog(), '削除する')).toBeUndefined()
     expect(impactCalls('m-1')).toHaveLength(1)
@@ -310,6 +325,17 @@ describe('使用状況に合わせた削除確認の案内', () => {
 })
 
 describe('遅れて返った結果の照合', () => {
+  it('同じメディアの窓を再表示した後は古い削除操作を受け付けない', async () => {
+    impacts.set('m-1', { usageCount: 0, canDelete: true })
+    await render(); await openDeleteFor('秋の新商品.png')
+    const oldClick = reactClick(buttonIn(dialog(), '削除する'))
+    await click(dialog()?.querySelector('button[aria-label="閉じる"]'))
+    await openDeleteFor('秋の新商品.png')
+    await act(async () => { oldClick() }); await settle()
+    expect(deleteCalls()).toHaveLength(0)
+    await click(buttonIn(dialog(), '削除する'))
+    expect(deleteCalls()).toHaveLength(1)
+  })
   it('A を読み込み中に閉じて B を開くと、あとから返る A の結果を B の窓に映さない', async () => {
     media = [{ id: 'm-a', filename: 'A.png', usageCount: 0 }, { id: 'm-b', filename: 'B.png', usageCount: 0 }]
     const slowA = deferred<Impact>()
@@ -396,6 +422,32 @@ describe('まとめて削除', () => {
     await click(host.querySelector('input[aria-label="B.pngを選ぶ"]'))
   }
 
+  it('一括削除の窓を再表示した後は古い操作を受け付けない', async () => {
+    media = [{ id: 'm-a', filename: 'A.png', usageCount: 0 }, { id: 'm-b', filename: 'B.png', usageCount: 0 }]
+    await render(); await selectAll()
+    await click(buttonIn(document, '選択したメディアを削除（2）'))
+    const oldClick = reactClick(buttonIn(dialog(), '削除する'))
+    await click(buttonIn(dialog(), 'キャンセル'))
+    await click(buttonIn(document, '選択したメディアを削除（2）'))
+    await act(async () => { oldClick() }); await settle()
+    expect(deleteCalls()).toHaveLength(0)
+    await click(buttonIn(dialog(), '削除する'))
+    expect(deleteCalls()).toHaveLength(2)
+  })
+
+  it('一括削除中にアカウントを行き来したら残りを消さない', async () => {
+    media = [{ id: 'm-a', filename: 'A.png', usageCount: 0 }, { id: 'm-b', filename: 'B.png', usageCount: 0 }]
+    const firstDelete = deferred<number>()
+    deleteStatus.set('m-a', () => firstDelete.promise)
+    await render(); await selectAll()
+    await click(buttonIn(document, '選択したメディアを削除（2）'))
+    await click(buttonIn(dialog(), '削除する'))
+    account.id = 'account-b'; await render()
+    account.id = 'account-a'; await render()
+    await act(async () => { firstDelete.resolve(200) }); await settle()
+    expect(deleteCalls().map(call => call.path)).toEqual(['/api/media/m-a'])
+  })
+
   it('M2 処理中は何件目かを読み上げ欄に出し、失敗した1件があっても残りへ進む', async () => {
     media = [{ id: 'm-a', filename: 'A.png', usageCount: 0 }, { id: 'm-b', filename: 'B.png', usageCount: 0 }]
     const firstDelete = deferred<number>()
@@ -405,6 +457,8 @@ describe('まとめて削除', () => {
     await selectAll()
     await click(buttonIn(document, '選択したメディアを削除（2）'))
     expect(dialog()?.textContent).toContain('2 件のメディアを削除しますか？')
+    expect(dialog()?.textContent).toContain('LINEアカウント')
+    expect(dialog()?.textContent).toContain('環境')
     await click(buttonIn(dialog(), '削除する'))
     const progress = dialog()?.querySelector('[aria-live="polite"]')
     expect(progress?.textContent).toContain('処理中…（0/2 件）')

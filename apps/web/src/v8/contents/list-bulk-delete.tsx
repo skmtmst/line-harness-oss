@@ -16,6 +16,7 @@ type DeleteMediaSelectionContext = {
   saveErrors: ReturnType<typeof useSaveFormErrors>
   selectedAccountId: string | null
   selectionItems: MediaItem[]
+  isCurrent: () => boolean
   setBulkBusy: Dispatch<SetStateAction<boolean>>
   setBulkConfirm: Dispatch<SetStateAction<string[] | null>>
   setBulkProgress: Dispatch<SetStateAction<{ done: number; total: number; } | null>>
@@ -23,7 +24,7 @@ type DeleteMediaSelectionContext = {
   setSelected: Dispatch<SetStateAction<Set<string>>>
 }
 
-export async function deleteMediaSelection({ items, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, selectionItems, setBulkBusy, setBulkConfirm, setBulkProgress, setError, setSelected }: DeleteMediaSelectionContext, ids: string[]) {
+export async function deleteMediaSelection({ items, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, selectionItems, setBulkBusy, setBulkConfirm, setBulkProgress, setError, setSelected, isCurrent }: DeleteMediaSelectionContext, ids: string[]) {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) return
     setBulkBusy(true)
@@ -32,10 +33,12 @@ export async function deleteMediaSelection({ items, latestAccountRef, load, load
     let deleted = 0
     const failedNames: string[] = []
     for (const id of ids) {
+      if (!isCurrent()) return
       const name = [...items, ...selectionItems].find((m) => m.id === id)?.filename ?? id
       try {
         await api.media.delete(id, accountAtRequest)
       } catch (saveFailure) {
+        if (!isCurrent()) return
         saveErrors.capture(saveFailure)
         /*
           409（読み直したら使われ始めていた）も通信失敗も、ここでは
@@ -45,6 +48,7 @@ export async function deleteMediaSelection({ items, latestAccountRef, load, load
         setBulkProgress({ done: deleted + failedNames.length, total: ids.length })
         continue
       }
+      if (!isCurrent()) return
       if (accountAtRequest !== latestAccountRef.current) {
         /*
           アカウントが変わったら、前の窓のままにしない。処理中の表示を

@@ -65,11 +65,12 @@ function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
   const { mileage, insights } = wallet;
   return (
     <section aria-label="貯まったマイル" className="flex flex-col gap-3 rounded-2xl bg-liff-deep p-[18px] text-white">
-      <p className="text-xs text-liff-deep-sub">使えるマイル</p>
+      <p className="text-xs text-liff-deep-sub">{mileage.balanceSource === 'ec' ? '使えるマイル（ECと同期）' : '使えるマイル'}</p>
       <p className="flex items-end gap-1">
-        <span className="liff-num text-4xl font-bold tabular-nums">{mileage.available.toLocaleString()}</span>
+        <span className="liff-num text-4xl font-bold tabular-nums">{mileage.available == null ? '—' : mileage.available.toLocaleString()}</span>
         <span className="text-[13px] text-liff-deep-sub">マイル</span>
       </p>
+      {mileage.balanceSource === 'ec' && <p className="text-xs text-liff-deep-sub">以下はmusubo側の記録です</p>}
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-1 rounded-xl bg-white/10 p-3">
           <p className="text-[11px] text-liff-deep-sub">これまでに得た</p>
@@ -204,7 +205,7 @@ function MileageHistory({ wallet }: { wallet: MileageWalletData }) {
     <section aria-label="マイルの履歴" className="space-y-3">
       <div className="px-1">
         <h2 className="flex items-center gap-1 text-sm font-bold text-ink">
-          マイルの履歴
+          {wallet.mileage.balanceSource === 'ec' ? 'musubo側のマイル履歴' : 'マイルの履歴'}
           <HelpTip label="マイル履歴の説明">行動後、定期集計で反映されます。確定待ちは条件の確定待ち、取消は取り消されたものです。</HelpTip>
         </h2>
         <p className="mt-0.5 text-xs text-ink-faint">行動のあと、決まった時間にまとめて反映されます</p>
@@ -340,11 +341,13 @@ function ReferralCard({
   links,
   offers,
   pendingMiles,
+  ecManaged,
   onEnrolled,
 }: {
   links: AffiliateLinkData[];
   offers: OfferData[];
   pendingMiles: number;
+  ecManaged: boolean;
   onEnrolled: (link: AffiliateLinkData) => void;
 }) {
   const [shareNote, setShareNote] = useState<string | null>(null);
@@ -385,7 +388,7 @@ function ReferralCard({
       <ReferralSummary links={links} />
       {pendingMiles > 0 && (
         <p className="text-xs font-semibold text-liff-wait-ink">
-          確定待ち {pendingMiles.toLocaleString()} マイル（成果の確認後に入ります）
+          確定待ち {pendingMiles.toLocaleString()} マイル（{ecManaged ? 'EC管理のため保留しています' : '成果の確認後に入ります'}）
         </p>
       )}
       {ordered.map((l) => (
@@ -515,6 +518,7 @@ function OfferCard({
   offerLinks,
   atLimit,
   totalLinks,
+  showMileageReward,
   onEnrolled,
   onLinkAdded,
 }: {
@@ -522,6 +526,7 @@ function OfferCard({
   offerLinks: AffiliateLinkData[];
   atLimit: boolean;
   totalLinks: number;
+  showMileageReward: boolean;
   onEnrolled: (link: AffiliateLinkData) => void;
   onLinkAdded: (link: AffiliateLinkData) => void;
 }) {
@@ -561,7 +566,7 @@ function OfferCard({
           )}
         </div>
         <p className="shrink-0 text-xs font-bold whitespace-nowrap text-ok-ink tabular-nums">
-          {rewardText(offer.rewardAmount, offer.rewardMiles)}
+          {rewardText(offer.rewardAmount, showMileageReward ? offer.rewardMiles : 0)}
         </p>
       </div>
 
@@ -674,11 +679,11 @@ export default function Affiliate() {
         <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
           <MemberCard />
           {wallet && <MileageSummaryCard wallet={wallet} />}
-          {wallet && <MileageOpportunities items={wallet.opportunities} />}
+          {wallet && wallet.mileage.balanceSource === 'musubo' && <MileageOpportunities items={wallet.opportunities} />}
           <Card className="space-y-3 p-4" data-design-node="vqu9B">
             <p className="text-xs text-ink-secondary">紹介者に登録していないとき</p>
             <div>
-              <h2 className="text-base font-bold text-ink">お友だちを紹介してマイルをもらう</h2>
+              <h2 className="text-base font-bold text-ink">{wallet?.mileage.balanceSource === 'musubo' ? 'お友だちを紹介してマイルをもらう' : 'お友だちを紹介する'}</h2>
               <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
                 紹介者になると、条件ごとのリンクが使えます。
               </p>
@@ -754,13 +759,14 @@ export default function Affiliate() {
           links={links}
           offers={offers}
           pendingMiles={wallet?.mileage.pending ?? 0}
+          ecManaged={wallet?.mileage.balanceSource !== 'musubo'}
           onEnrolled={handleOfferEnrolled}
         />
 
         {wallet && <MileageRewards onChanged={async () => setWallet(await fetchMileage())} />}
         {wallet && <MileageHistory wallet={wallet} />}
 
-        {wallet && <MileageOpportunities items={wallet.opportunities} />}
+        {wallet && wallet.mileage.balanceSource === 'musubo' && <MileageOpportunities items={wallet.opportunities} />}
 
         <AffiliatePayments editable={state.affiliate.isActive} />
 
@@ -774,6 +780,7 @@ export default function Affiliate() {
                 offerLinks={linksByOffer.get(offer.id) ?? []}
                 atLimit={atLimit}
                 totalLinks={links.length}
+                showMileageReward={wallet?.mileage.balanceSource === 'musubo'}
                 onEnrolled={handleOfferEnrolled}
                 onLinkAdded={handleLinkAdded}
               />
@@ -791,6 +798,7 @@ export default function Affiliate() {
                 offerLinks={[]}
                 atLimit={atLimit}
                 totalLinks={links.length}
+                showMileageReward={wallet?.mileage.balanceSource === 'musubo'}
                 onEnrolled={handleOfferEnrolled}
                 onLinkAdded={handleLinkAdded}
               />

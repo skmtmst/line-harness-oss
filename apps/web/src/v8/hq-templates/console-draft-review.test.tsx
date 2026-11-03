@@ -317,7 +317,7 @@ describe('P 正常入力を検査が弾かないか', () => {
     expect(document.body.textContent).not.toContain(BANNER)
     expect(raw).toContain('架空の調査')
   })
-  it('Pa2 選択肢を消した後に再読込しても入力が戻る', async () => {
+  it('Pa2 選択肢の削除後に再読込しても入力が戻る', async () => {
     const v = render(<HqTemplatesV8 type="template" />)
     const name = await openCreate(/リサーチ/)
     fireEvent.change(name, { target: { value: '架空の調査' } })

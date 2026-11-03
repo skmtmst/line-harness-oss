@@ -118,7 +118,7 @@ describe('N-235：点数の手動調整と帯の試算', () => {
     expect(SCORE_TAB).toContain('<ScoreAdjustDialog')
     expect(ROLE).toContain("role === 'owner' || role === 'admin'")
     expect(SHELL).toContain("const readonly = !canManageRole(role)")
-    expect(SCORE_TAB).toContain('adjustTarget && !readonly')
+    expect(SCORE_TAB).toContain('adjustTarget && adjustScope?.generation === scope.current.generation && !readonly')
     expect(SCORE_TAB).toContain("...(readonly ? [] : [{ id: 'adjust'")
   })
 

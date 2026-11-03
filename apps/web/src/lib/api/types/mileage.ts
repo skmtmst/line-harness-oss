@@ -3,7 +3,9 @@ import type { MileageFriendHistorySummary } from '@line-crm/shared'
 export type MileageSummary = {
   programId: string
   programName: string
-  available: number
+  available: number | null
+  balanceSource?: 'ec' | 'musubo'
+  ecRank?: string
   pending: number
   lifetimeEarned: number
   spent: number
@@ -337,7 +339,7 @@ export type MileageFriendV6 = {
   nextRankThreshold: number | null
   milesToNextRank: number | null
   monthChange: number
-  available: number
+  available: number | null
   pending: number
   /** 30日以内に期限を迎える分。期限つきロットが無いときは null（0 とは別物）。 */
   expiringMiles30d: number | null
@@ -352,10 +354,12 @@ export type MileageFriendV6 = {
 }
 
 export type MileageFriendsV6Overview = {
+  balanceSource: 'ec' | 'musubo'
+  ecKnownCount?: number
   summary: {
     totalMembers: number
     withBalanceCount: number
-    available: number
+    available: number | null
     pending: number
     monthChange: number
     rankCounts: Array<{ rewardId: string; rankName: string; requiredMiles: number; friendCount: number }>

@@ -33,6 +33,7 @@ import { FolderDotName } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { useManagedFolders } from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
 import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox';
@@ -227,6 +228,8 @@ export default function BroadcastListV8() {
   usePageTitle('一斉配信')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
   /* かんたんに送る（板 ）の窓。 */
   const [quickSendOpen, setQuickSendOpen] = useState(false)
   const staffRole = useStaffRole()
@@ -281,6 +284,8 @@ export default function BroadcastListV8() {
   const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
   const [page, setPage] = useListUrlValue('page', 1)
   const [deleteTarget, setDeleteTarget] = useState<ApiBroadcast | null>(null)
+  const deleteScope = useRef<{ generation: number } | null>(null)
+  const renderedDeleteScope = deleteScope.current
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -567,11 +572,12 @@ export default function BroadcastListV8() {
   /* 削除は、利用状況にかかわらず確認してから実行する。 */
   const requestDelete = (broadcast: ApiBroadcast) => {
     if (!canChangeBroadcastNow(broadcast)) { notifyToast('権限が変わったため、配信の削除を中止しました。', { tone: 'error' }); return }
-    setDeleteError(''); setDeleteTarget(broadcast)
+    deleteScope.current = { generation: accountScope.current.generation }
+    setDeleteError(''); setDeleteTarget({ ...broadcast })
   }
 
   const handleDelete = async () => {
-    if (!deleteTarget || deleting) return
+    if (!deleteTarget || deleting || !renderedDeleteScope || renderedDeleteScope !== deleteScope.current || renderedDeleteScope.generation !== accountScope.current.generation) return
     if (!canChangeBroadcastNow(deleteTarget)) { setDeleteError('権限が変わったため、配信の削除を中止しました。'); return }
     const targetId = deleteTarget.id
     const requestKey = listRequestKey
@@ -1322,7 +1328,7 @@ menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedR
           }}
         />
         <ConfirmDialog
-          open={deleteTarget !== null}
+          open={deleteTarget !== null && renderedDeleteScope?.generation === accountScope.current.generation}
           title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}
           description="削除すると配信設定と確認画面から消えます。予約中の配信は中止され、この操作は取り消せません。"
           confirmLabel="削除する"
@@ -1337,7 +1343,7 @@ menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedR
             setDeleteTarget(null)
             setDeleteError('')
           }}
-        />
+        >{deleteTarget ? <OperationTargetSummary accounts={(() => { const ids = deleteTarget.targetType === 'multi-account-dedup' ? deleteTarget.accountIds : deleteTarget.lineAccountId ? [deleteTarget.lineAccountId] : null; return ids?.length ? [...new Set(ids)].map(id => ({ id })) : [{ id: '' }] })()} showAccountCount={deleteTarget.targetType === 'multi-account-dedup'} /> : null}</ConfirmDialog>
       </>}
     >
       {showCreate ? (

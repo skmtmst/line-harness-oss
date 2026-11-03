@@ -2,7 +2,7 @@
 
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RowNameLink, DataTable, TableHeadRow, Tr, Th, Td } from '@/components/shared/table'
 import HelpTip from '@/components/shared/help-tip'
 import { ListChecks, Plus } from 'lucide-react'
@@ -10,6 +10,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Pagination from '@/components/shared/pagination'
 import { RowMenu } from '@/components/shared/row-actions'
 import ListRange from '@/components/ui/list-range'
@@ -61,6 +62,17 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
   const [removeTarget, setRemoveTarget] = useState<BookingStaff | null>(null)
+  const [removeScope, setRemoveScope] = useState<{ accountId: string; generation: number } | null>(null)
+  const [pauseScope, setPauseScope] = useState<{ accountId: string; generation: number } | null>(null)
+  const scope = useRef({ accountId, generation: 0, awaitingLoad: false })
+  if (scope.current.accountId !== accountId) scope.current = { accountId, generation: scope.current.generation + 1, awaitingLoad: true }
+  if (scope.current.awaitingLoad && status === 'loading') scope.current.awaitingLoad = false
+  const renderedScope = scope.current
+  const statusRef = useRef(status); statusRef.current = status
+  const canEditRef = useRef(canEdit); canEditRef.current = canEdit
+  const alive = useRef(false)
+  const operationLock = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const [removeError, setRemoveError] = useState('')
   const [removing, setRemoving] = useState(false)
   const [pauseTarget, setPauseTarget] = useState<BookingStaff | null>(null)
@@ -99,13 +111,17 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   }
 
   async function setActive(person: BookingStaff, nextActive: boolean) {
+    if (!pauseScope || !alive.current || !canEditRef.current || statusRef.current !== 'ready' || scope.current.awaitingLoad || pauseScope.generation !== scope.current.generation || operationLock.current) return
+    operationLock.current = true
     setPausing(true)
     setPauseError(null)
     try {
-      await bookingApi.updateStaff(accountId, person.id, { is_active: nextActive ? 1 : 0 })
+      await bookingApi.updateStaff(pauseScope.accountId, person.id, { is_active: nextActive ? 1 : 0 })
+      if (!alive.current || pauseScope.generation !== scope.current.generation) return
       setPauseTarget(null)
       onReload()
     } catch (cause) {
+      if (!alive.current || pauseScope.generation !== scope.current.generation) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
@@ -113,20 +129,24 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         ? permissionDeniedMessage('store')
         : '変更できませんでした。もう一度お試しください。') }
     } finally {
-      setPausing(false)
+      operationLock.current = false
+      if (alive.current) setPausing(false)
     }
   }
 
   async function remove() {
     const target = removeTarget
-    if (!target) return
+    if (!target || !removeScope || !alive.current || !canEditRef.current || statusRef.current !== 'ready' || scope.current.awaitingLoad || removeScope.generation !== scope.current.generation || operationLock.current) return
+    operationLock.current = true
     setRemoving(true)
     setRemoveError('')
     try {
-      await bookingApi.deleteStaff(accountId, target.id)
+      await bookingApi.deleteStaff(removeScope.accountId, target.id)
+      if (!alive.current || removeScope.generation !== scope.current.generation) return
       setRemoveTarget(null)
       onReload()
     } catch (cause) {
+      if (!alive.current || removeScope.generation !== scope.current.generation) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
@@ -134,7 +154,8 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         ? permissionDeniedMessage('store')
         : '消せませんでした。もう一度お試しください。') }
     } finally {
-      setRemoving(false)
+      operationLock.current = false
+      if (alive.current) setRemoving(false)
     }
   }
 
@@ -213,14 +234,14 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
             {
               id: 'pause',
               label: person.is_active ? '止める' : '再開する',
-              onSelect: () => { setPauseError(null); setPauseTarget(person) },
+              onSelect: () => { if (!alive.current || !canEditRef.current || renderedScope !== scope.current || renderedScope.awaitingLoad || statusRef.current !== 'ready') return; setPauseScope(renderedScope); setPauseError(null); setPauseTarget(person) },
             },
             {
               id: 'delete',
               label: '削除する',
               tone: 'danger' as const,
               dividerBefore: true,
-              onSelect: () => { setRemoveError(''); setRemoveTarget(person) },
+              onSelect: () => { if (!alive.current || !canEditRef.current || renderedScope !== scope.current || renderedScope.awaitingLoad || statusRef.current !== 'ready') return; setRemoveScope(renderedScope); setRemoveError(''); setRemoveTarget(person) },
             },
           ] satisfies ActionMenuItem[] : []),
         ]
@@ -315,7 +336,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       ) : null}
 
       <ConfirmDialog
-        open={pauseTarget !== null}
+        open={pauseTarget !== null && pauseScope?.generation === scope.current.generation}
         title={`${pauseTarget?.display_name ?? ''}の受付を${pauseTarget?.is_active ? '止め' : '再開し'}ますか？`}
         description={pauseTarget?.is_active
           ? 'お客さまの画面から外れ、新しい予約を受けなくなります。すでに入っている予約はそのまま残ります。'
@@ -326,10 +347,10 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         error={pauseError ?? undefined}
         onCancel={() => { if (!pausing) setPauseTarget(null) }}
         onConfirm={() => { if (pauseTarget) void setActive(pauseTarget, !pauseTarget.is_active) }}
-      />
+      >{pauseScope ? <OperationTargetSummary accounts={[{ id: pauseScope.accountId }]} /> : null}</ConfirmDialog>
 
       <ConfirmDialog
-        open={removeTarget !== null}
+        open={removeTarget !== null && removeScope?.generation === scope.current.generation}
         title={`「${removeTarget?.display_name ?? ''}」を削除しますか？`}
         description="削除すると元に戻せません。受付だけ止めたいときは「止める」を使ってください。"
         confirmLabel="削除する"
@@ -338,7 +359,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         error={removeError || undefined}
         onCancel={() => { if (!removing) setRemoveTarget(null) }}
         onConfirm={() => remove()}
-      />
+      >{removeScope ? <OperationTargetSummary accounts={[{ id: removeScope.accountId }]} /> : null}</ConfirmDialog>
 
     </div></SaveErrorScope>
   )
