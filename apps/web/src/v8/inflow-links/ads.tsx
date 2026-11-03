@@ -74,6 +74,7 @@ type AdCostRow = {
 
 type ManualCostEntry = {
   id: string
+  loadedAccountId: string
   sourceLabel: string
   day: string
   amountMinor: number
@@ -203,7 +204,7 @@ export default function AdsV8() {
       if (costResponse.success) {
         setCostRows((costResponse.data.rows ?? []) as AdCostRow[])
         setCostPlatforms((costResponse.data.platforms ?? []) as AdCostPlatformStatus[])
-        setManualEntries((costResponse.data.manualEntries ?? []) as ManualCostEntry[])
+        setManualEntries(((costResponse.data.manualEntries ?? []) as Omit<ManualCostEntry, 'loadedAccountId'>[]).map(entry => ({ ...entry, loadedAccountId: accountAtRequest })))
         setConversionCost(costResponse.data.conversionCost ?? null)
         setCostFailed(false)
       } else {
@@ -283,6 +284,7 @@ export default function AdsV8() {
   }
 
   const openCancel = (entry: ManualCostEntry) => {
+    if (entry.loadedAccountId !== cancelContext.current.accountId) return
     cancelRef.current = { target: entry, generation: cancelContext.current.generation }
     setCancelTarget(entry)
     setCancelReason('')
@@ -586,7 +588,7 @@ export default function AdsV8() {
       >
         {cancelTarget ? (
           <div className={styles.dialogBody}>
-            <OperationTargetSummary accounts={[{ id: '', name: '不明' }]} externalTarget={{ label: '対象件数', name: '1件' }} />
+            <OperationTargetSummary accounts={[{ id: cancelTarget.loadedAccountId }]} externalTarget={{ label: '対象件数', name: '1件' }} />
             <p className={styles.dialogLead}>{`対象: ${cancelTarget.day} ／ ${cancelTarget.sourceLabel} ／ ${formatMinor(cancelTarget.amountMinor, cancelTarget.currency)}`}</p>
             <Field label="取り消す理由" required><SaveErrorField names={["cancelReason","cancel_reason"]}><TextField id="ad-cancel-reason" aria-invalid={Boolean(cancelReasonError)} aria-describedby={cancelReasonError ? 'ad-cancel-reason-error' : undefined} value={cancelReason} onChange={(event) => { setCancelReason(event.target.value); setCancelReasonError('') }} placeholder="例：金額を間違えた" maxLength={200} /></SaveErrorField>
 {cancelReasonError ? <span id="ad-cancel-reason-error" className={styles.error} role="alert">{cancelReasonError}</span> : null}</Field>

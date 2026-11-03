@@ -3,6 +3,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const state=vi.hoisted(()=>({ account:'a', cancel:vi.fn() }))
+vi.mock('@/lib/line-accounts-cache',()=>({loadLineAccounts:async()=>({success:true,data:[{id:'a',name:'店A'},{id:'b',name:'店B'}]})}))
 vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn(),replace:vi.fn()}),usePathname:()=>'/inflow-links/ads',useSearchParams:()=>new URLSearchParams()}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:state.account,loading:false})}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}))
@@ -14,13 +15,13 @@ vi.mock('@/lib/api',async original=>{const actual=await original<typeof import('
 }}})
 import AdsV8 from './ads'
 afterEach(()=>{cleanup();state.account='a';state.cancel.mockReset()})
-it('広告費の取消窓に所属不明と環境を示し、切替後の古い確認を断る',async()=>{
+it('広告費の取消窓に読込時のアカウントと環境を示し、切替後の古い確認を断る',async()=>{
  const view=render(<AdsV8 />)
  fireEvent.click(await screen.findByRole('button',{name:/広告Aの操作/}))
  fireEvent.click(await screen.findByRole('menuitem',{name:'取り消す'}))
  const dialog=await screen.findByRole('dialog')
  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
- expect(within(dialog).getByText('不明')).toBeTruthy()
+ expect(await within(dialog).findByText('店A')).toBeTruthy()
  expect(within(dialog).getByText('環境')).toBeTruthy()
  fireEvent.change(within(dialog).getByRole('textbox'),{target:{value:'金額誤り'}})
  const button=within(dialog).getByRole('button',{name:'取り消す'})
