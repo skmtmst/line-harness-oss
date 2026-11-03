@@ -21,10 +21,26 @@ it('畳んだフォルダ選択から追加と切り替えができる', () => {
 
 it('画面側で畳んだフォルダ欄を渡す場合も同じ追加操作に届く', () => {
   const add = vi.fn()
-  render(<ListPageBody folders={<FolderPanel rows={rows} activeId="all" onSelect={() => {}} onAddFolder={add} />} collapsedFolders={<Select aria-label="フォルダ" value="all" onChange={() => {}} options={[...rows.map(row => ({ value: row.id, label: row.label })), { value: 'manage', label: 'フォルダを管理' }]} />}>本文</ListPageBody>)
+  render(<ListPageBody folders={<FolderPanel rows={rows} activeId="all" onSelect={() => {}} onAddFolder={add} />} collapsedFolders={<Select narrowFolderPicker aria-label="フォルダ" value="all" onChange={() => {}} options={[...rows.map(row => ({ value: row.id, label: row.label })), { value: 'manage', label: 'フォルダを管理' }]} />}>本文</ListPageBody>)
   fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
   fireEvent.click(within(document.querySelector('[data-select-menu]') as HTMLElement).getByRole('button', { name: 'フォルダを追加する' }))
   expect(add).toHaveBeenCalledOnce()
+})
+
+it('フォルダ選択の印がない欄は、名前と候補が一致しても追加操作を出さない', () => {
+  const add = vi.fn()
+  render(<ListPageBody folders={<FolderPanel rows={rows} activeId="all" onSelect={() => {}} onAddFolder={add} />} collapsedFolders={<Select aria-label="フォルダ" value="all" onChange={() => {}} options={rows.map(row => ({ value: row.id, label: row.label }))} />}>本文</ListPageBody>)
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  expect(within(document.querySelector('[data-select-menu]') as HTMLElement).queryByRole('button', { name: 'フォルダを追加する' })).toBeNull()
+  expect(add).not.toHaveBeenCalled()
+})
+
+it('印がある欄でも候補が一部しか一致しないと追加操作を出さない', () => {
+  const add = vi.fn()
+  render(<ListPageBody folders={<FolderPanel rows={rows} activeId="all" onSelect={() => {}} onAddFolder={add} />} collapsedFolders={<Select narrowFolderPicker aria-label="フォルダ" value="all" onChange={() => {}} options={[{ value: 'all', label: 'すべて' }, { value: 'other', label: '別の分類' }]} />}>本文</ListPageBody>)
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  expect(within(document.querySelector('[data-select-menu]') as HTMLElement).queryByRole('button', { name: 'フォルダを追加する' })).toBeNull()
+  expect(add).not.toHaveBeenCalled()
 })
 
 it('権限が変わると畳んだ追加操作も消え、以前の処理を呼ばない', () => {

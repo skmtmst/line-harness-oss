@@ -37,6 +37,8 @@ export type SelectCreateAction = {
 
 export interface SelectProps {
   'aria-label': string
+  /** 一覧で畳んだフォルダ選択だけが、対応する追加操作を受け取る。 */
+  narrowFolderPicker?: boolean
   className?: string
   defaultOpen?: boolean
   /** 権限の理由。入力や状態のdisabledとは分ける。 */

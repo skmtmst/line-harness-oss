@@ -442,7 +442,7 @@ export default function WebhooksOutgoingV8() {
   const folderCountOf = (folder: Folder) => (ready ? displayed.filter((item) => item.folderId === folder.id).length : null)
   const folderSelect = (
     <SaveErrorField names={["folderFilter","folder_filter"]}><Select
-      aria-label="フォルダ"
+      narrowFolderPicker aria-label="フォルダ"
       value={folderFilter}
       onChange={(value) => setFolderFilter(value)}
       options={managedFolderOptions('webhook', folders, { allId: '', unfiledId: UNFILED })}

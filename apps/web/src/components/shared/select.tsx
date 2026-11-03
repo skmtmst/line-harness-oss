@@ -31,6 +31,7 @@ const WINDOW_OVERSCAN = 12
 /** Pencil V5 `rpot9` / `Gfsb4` を正本にした単一選択。 */
 export default function Select({
   'aria-label': ariaLabel,
+  narrowFolderPicker = false,
   className,
   defaultOpen = false,
   disabled = false,
@@ -56,7 +57,7 @@ export default function Select({
   menuAlign,
 }: SelectProps) {
   const narrowFolderActions = React.useContext(FolderNarrowActionsContext)
-  const narrowFolderAction = ariaLabel === 'フォルダ' ? uniqueFolderAction(narrowFolderActions, action => (JSON.parse(action.rowIds) as string[]).every(id => suppliedOptions.some(option => option.value === id))) : undefined
+  const narrowFolderAction = narrowFolderPicker ? uniqueFolderAction(narrowFolderActions, action => (JSON.parse(action.rowIds) as string[]).every(id => suppliedOptions.some(option => option.value === id))) : undefined
   const createAction: SelectCreateAction | undefined = explicitCreateAction ?? (narrowFolderAction ? { label: narrowFolderAction.label, disabled: narrowFolderAction.disabled, lockedReason: narrowFolderAction.lockedReason, onSelect: narrowFolderAction.run } : undefined)
   // Width is a visual preset; a duration selector may use it too. The role
   // comes from the explicit flag or the control's accessible page-size name.

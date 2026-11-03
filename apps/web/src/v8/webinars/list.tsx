@@ -751,7 +751,7 @@ function WebinarList() {
   ]
   const folderSelect = (
     <SaveErrorField names={["selectedFolder","selected_folder"]}><Select
-      aria-label="フォルダ"
+      narrowFolderPicker aria-label="フォルダ"
       value={selectedFolder}
       onChange={(value) => { setSelectedFolder(value); setPage(1) }}
       options={[

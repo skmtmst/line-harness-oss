@@ -1128,7 +1128,7 @@ export default function RemindersListV8() {
 
   const folderSelect = (
     <SaveErrorField names={["folderFilter","folder","folder_filter"]}><Select
-      aria-label="フォルダ"
+      narrowFolderPicker aria-label="フォルダ"
       value={folderFilter}
       onChange={setFolderFilter}
       options={folderSelectOptions}

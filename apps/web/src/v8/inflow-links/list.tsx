@@ -523,7 +523,7 @@ export default function InflowListV8({
   const selectGenre = (id: string) => { setSelectedGenre(id); setPage(1) }
   const folderSelect = (
     <SaveErrorField names={["selectedGenre","selected_genre"]}><Select
-      aria-label="フォルダ"
+      narrowFolderPicker aria-label="フォルダ"
       value={selectedGenre}
       onChange={selectGenre}
       options={[
