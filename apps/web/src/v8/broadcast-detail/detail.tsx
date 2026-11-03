@@ -391,7 +391,7 @@ export default function BroadcastDetail({
 </>}>
 <div className={styles.main}>
           {tab === 'recipients' ? recipients : tab === 'activity' ? activity : (<>
-            <BroadcastAbResult broadcastId={broadcast.id} ab={abResult} canSend={canEdit} />
+            <BroadcastAbResult broadcastId={broadcast.id} ab={abResult} canSend={canEdit} accounts={broadcastOperationAccounts(broadcast)} />
             <Overview
               broadcast={broadcast}
               insight={insight}

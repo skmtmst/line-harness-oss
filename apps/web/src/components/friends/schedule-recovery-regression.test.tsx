@@ -10,6 +10,13 @@ beforeEach(() => {
   mocks.list.mockResolvedValue({ success: true, data: [] })
 })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
+it('友だちへの予約窓に送信元と環境を示す', () => {
+  render(<ScheduleDialog friendId="f-1" friendName="ソラ" accountId="acc-1" onClose={() => {}} onReserved={() => {}} />)
+  expect(screen.getByText('LINEアカウント')).toBeTruthy()
+  expect(screen.getByText('名前を確認できません')).toBeTruthy()
+  expect(screen.getByText('環境')).toBeTruthy()
+  expect(mocks.schedule).not.toHaveBeenCalled()
+})
 it('WEB244: 通信例外の後も入力を保持し、同じ操作キーで再試行して成功時だけ閉じる', async () => {
   let reject!: (reason: Error) => void
   mocks.schedule.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail }))

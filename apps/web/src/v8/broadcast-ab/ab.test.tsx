@@ -35,15 +35,33 @@ describe('G1 A/B の決まり', () => {
 })
 
 describe('A/B の結果（Eoi7q）', () => {
+  it('残りへの送信確認で配信元と環境を示す', async () => {
+    render(<BroadcastAbResult broadcastId="b1" ab={ab(undecided)} canSend accounts={[{ id: 'a1', name: '銀座店' }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'A を送る' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.textContent).toContain('銀座店')
+    expect(dialog.textContent).toContain('環境')
+    expect(choose).not.toHaveBeenCalled()
+  })
+  it('配信対象が切り替わったら古い送信確認を閉じる', () => {
+    const view = render(<BroadcastAbResult broadcastId="b1" ab={ab(undecided)} canSend accounts={[{ id: 'a1', name: '銀座店' }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'A を送る' }))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    view.rerender(<BroadcastAbResult broadcastId="b2" ab={ab(undecided)} canSend accounts={[{ id: 'a2', name: '新宿店' }]} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    view.rerender(<BroadcastAbResult broadcastId="b1" ab={ab(undecided)} canSend accounts={[{ id: 'a1', name: '銀座店' }]} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(choose).not.toHaveBeenCalled()
+  })
   it('決められないときは［A を送る］で確かめの窓を通してから選ぶ（AB-05）', async () => {
-    render(<BroadcastAbResult broadcastId="b1" ab={ab(undecided)} canSend />)
+    render(<BroadcastAbResult broadcastId="b1" ab={ab(undecided)} canSend accounts={[{ id: 'a1', name: '銀座店' }]} />)
     fireEvent.click(screen.getByRole('button', { name: 'A を送る' }))
     expect(choose).not.toHaveBeenCalled()
     fireEvent.click(await screen.findByRole('button', { name: '3,240 人に送る' }))
     await waitFor(() => expect(choose).toHaveBeenCalledWith('b1', 'A', 3240, expect.any(String)))
   })
   it('閲覧のみ（送る権限なし）には［A を送る］などを出さない（AB-22）', () => {
-    render(<BroadcastAbResult broadcastId="b1" ab={ab(undecided)} canSend={false} />)
+    render(<BroadcastAbResult broadcastId="b1" ab={ab(undecided)} canSend={false} accounts={[{ id: 'a1', name: '銀座店' }]} />)
     expect(screen.queryByRole('button', { name: 'A を送る' })).toBeNull()
     expect(screen.getByText(/残りの 3,240 人へ送る案を選んでください/)).toBeTruthy()
   })

@@ -148,6 +148,8 @@ describe('V8 投稿（審査）', () => {
     expect(offsets).toContain('200')
     await click(buttons('まとめて採用')[0])
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain('201枚をまとめて採用')
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('LINEアカウント')
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('環境')
   })
 
   it('V8 のテーマで、札の名前と件数を1つの文字で出し、数の帯と右の決まりを並べる', async () => {
@@ -167,9 +169,20 @@ describe('V8 投稿（審査）', () => {
     await click(buttons('そらちゃんの写真を見送る')[0])
     const dialog = document.querySelector('[data-design-node="ujcar"]')
     expect(dialog?.textContent).toContain('この写真を見送りますか？')
+    expect(dialog?.textContent).toContain('LINEアカウント')
+    expect(dialog?.textContent).toContain('環境')
     expect(dialog?.textContent).toContain('写真が暗い・ぼやけている')
     await click([...document.querySelectorAll('input[type="radio"]')].find((radio) => radio.parentElement?.textContent?.includes('ほかの人の顔')))
     expect(document.querySelector('[data-design-node="ujcar"]')?.textContent).toContain('人の顔や個人情報が写っている')
+  })
+
+  it('まとめて見送る確認には送信元と環境を出す', async () => {
+    await render()
+    await click(host.querySelector('input[type="checkbox"]') ?? undefined)
+    await click(buttons('まとめて見送り')[0])
+    const dialog = document.querySelector('[role="alertdialog"]')
+    expect(dialog?.textContent).toContain('LINEアカウント')
+    expect(dialog?.textContent).toContain('環境')
   })
 
   it('そのほかの理由が空なら送らず、補足の欄だけで知らせる', async () => {
@@ -237,6 +250,21 @@ describe('V8 投稿（審査）', () => {
     expect(cards[1].textContent).toContain('公開しない')
     expect(cards[1].textContent).toContain('LINE通知を再送')
     expect(host.textContent).toContain('写真を採用しても自動公開しません')
+  })
+
+  it('掲載の確認に対象アカウントと環境を示す', async () => {
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://worker.test')
+      if (url.pathname === '/api/nen-members/photos/ph-4') return json({ success: true, data: { publication: { version: 2 } } })
+      return originalFetch(input, init)
+    })
+    await render()
+    await click([...document.querySelectorAll('[role="tab"]')].find(tab => tab.textContent?.startsWith('採用')))
+    await click(buttons('公式サイトに出す')[0])
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
   })
 
   it('版の履歴（N1br7）：版の行・予約中の版。閲覧のみには新しい版の入力を置かない', async () => {
@@ -310,6 +338,8 @@ it('掲載先の保存失敗は編集中の窓だけで伝え、選択を保持�
   await click(buttons('その他操作')[0])
   await click(buttons('使う場所')[0])
   const dialog = document.querySelector('[role="dialog"]')!
+  expect(dialog.textContent).toContain('LINEアカウント')
+  expect(dialog.textContent).toContain('環境')
   const firstChoice = dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')!
   await click(firstChoice)
   expect(firstChoice.checked).toBe(true)
@@ -318,4 +348,21 @@ it('掲載先の保存失敗は編集中の窓だけで伝え、選択を保持�
   expect(alerts).toHaveLength(1)
   expect(dialog.contains(alerts[0])).toBe(true)
   expect(firstChoice.checked).toBe(true)
+})
+
+it('掲載解除の確認に対象アカウントと環境を示す', async () => {
+  const item = { id: 'publication-a', version: 3, pet_name: 'こむぎ', hide_owner_name: 1, placements: [], view_count_30_days: null }
+  const originalFetch = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), 'http://worker.test')
+    if (url.pathname === '/api/nen-members/photos/publications') return json({ success: true, data: { summary: { publishedCount: 1 }, items: [item], pendingWithdrawals: [], withdrawnItems: [] } })
+    return originalFetch(input, init)
+  })
+  await render()
+  await click(buttons('公式サイト掲載')[0])
+  await click(buttons('その他操作')[0])
+  await click(buttons('掲載先から外す')[0])
+  const dialog = document.querySelector('[role="dialog"]')!
+  expect(dialog.textContent).toContain('LINEアカウント')
+  expect(dialog.textContent).toContain('環境')
 })

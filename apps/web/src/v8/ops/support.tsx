@@ -15,6 +15,7 @@ import { planLabel, tenantDetailHref, opsCall, formatDateTime, PLAN_STATUS_LABEL
 import { compareLabel, durationLabel, elapsedLabel } from '@/v8/ops/support/format'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { ListToolbarEnd, ListToolbarRow } from '@/components/shared/list-toolbar'
 import SectionHeader from '@/components/shared/section-header'
 import ListState from '@/components/shared/list-state'
@@ -567,6 +568,7 @@ export default function OpsSupportV8() {
           )}
         >
           <div className={parts.dialogBody}>
+            <OperationTargetSummary accounts={[]} />
             <dl className={styles.facts}>
               <div className={styles.fact}><dt>宛先</dt><dd>{`${ticket.tenantName}（担当：${ticket.staffName || emptyValue('unknown')}）・${ticket.channelLabel}`}</dd></div>
               <div className={styles.fact}><dt>状態</dt><dd>{`${ticket.stageLabel} → ${STAGE_CHIPS.find(item => item.key === replyStage)?.label ?? replyStage}（送ったあと）`}</dd></div>
