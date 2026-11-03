@@ -6,6 +6,7 @@ const accountNameRequirement = requiredText('名前を入力してください�
 
 import { useContext, useEffect, useRef, useState } from 'react'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { Pencil, RotateCcw, Users } from 'lucide-react'
@@ -76,7 +77,7 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
   const [error, setError] = useState('')
   const savedName = useRef(account.name)
   const depth = useContext(OverlayDepthContext)
-  const guard = useUnsavedGuard({ dirty: name !== savedName.current || folderId !== initialFolder || busy, busy, onDiscard: onClose })
+  const guard = useUnsavedGuard({ dirty: name !== savedName.current || folderId !== initialFolder || busy, busy, subject: 'アカウント設定の変更', onDiscard: onClose })
 
   useEffect(() => {
     let cancelled = false
@@ -146,14 +147,14 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
       designTop={SETTINGS_TOP}
       busy={busy}
       error={error || undefined}
-      onCancel={onClose}
+      onCancel={() => requestUnsavedAction(onClose)}
       footer={
-        <DialogActions align="center" leadingAction={<Button type="button" variant="secondary" disabled={busy} onClick={() => guard.guarded(onArchive)}>
+        <DialogActions align="center" leadingAction={<Button type="button" variant="secondary" disabled={busy} onClick={() => requestUnsavedAction(onArchive)}>
             {archived ? '戻す' : 'アーカイブ'}
           </Button>}>
 
           <>
-            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
+            <Button type="button" variant="secondary" onClick={() => requestUnsavedAction(onClose)} disabled={busy}>キャンセル</Button>
             <Button type="button" variant="primary" onClick={() => save()} disabled={busy || folderState !== 'ready'} busy={busy} busyLabel="保存中…">保存</Button>
           </>
         </DialogActions>
@@ -200,7 +201,7 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
         <div className={styles.field}>
           <p className={styles.label}>ほかの設定</p>
           <div className={styles.buttonRow}>
-            <Button type="button" disabled={busy} onClick={() => guard.guarded(onEditRegistration)}>
+            <Button type="button" disabled={busy} onClick={() => requestUnsavedAction(onEditRegistration)}>
               <Pencil aria-hidden="true" className={styles.icon} />LINE の登録内容を編集
             </Button>
             <Button href="/hq/members">

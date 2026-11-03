@@ -7,6 +7,7 @@ const FIELD_REQUIREMENTS = {
 
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -195,6 +196,7 @@ export default function WebhooksIncomingV8() {
   const guard = useUnsavedGuard({
     dirty: Boolean((showCreate && (createName || createSourceFree || createSecret || createSource !== (initialSource || SOURCE_PRESETS[0].value))) || (rotateTarget && rotateSecret) || nameDirty || editingBusy),
     busy: editingBusy,
+    subject: '受け取り口の変更',
     onDiscard: () => {
       if (showCreate) { setShowCreate(false); setCreateName(''); setCreateSource(initialSource || SOURCE_PRESETS[0].value); setCreateSourceFree(''); setCreateSecret('') }
       if (rotateTarget) { setRotateTarget(null); setRotateSecret('') }
@@ -297,7 +299,7 @@ export default function WebhooksIncomingV8() {
     setUnmatchedStatus('ready')
   }, [selectedAccountId, selectedDetailId])
 
-  const selectInlet = (id: string) => { const select = () => guard.guarded(() => withViewTransition(() => setSelectedId(id))); if (actionsGuard.current) actionsGuard.current(select); else select() }
+  const selectInlet = (id: string) => requestUnsavedAction(() => withViewTransition(() => setSelectedId(id)))
   const moveSelection = (delta: -1 | 1) => {
     if (displayed.length === 0) return
     const current = selected ? displayed.findIndex((item) => item.id === selected.id) : -1
@@ -1032,7 +1034,7 @@ export default function WebhooksIncomingV8() {
           </div>
         </Dialog>
 
-        <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={editingBusy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
+        <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="受け取り口の変更" busy={editingBusy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
         {createdSecret ? (
           <Dialog
             open

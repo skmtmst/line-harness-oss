@@ -606,3 +606,31 @@ it('編集途中の受け取り口が再読込で消えたら、残った画面�
     expect(document.body.textContent).not.toContain('保存していない変更があります')
   } finally { link.remove() }
 })
+
+it('受け取り口を切り替える前に名前と行うことの両方を確認する', async () => {
+  const original = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/api/webhooks/incoming/in-2')) return json({ success: true, data: { ...INLET, id: 'in-2', name: '二つ目の窓口', version: 1, identityMatching: { methods: [{ kind: 'verified_email', path: '$.email' }], onNotFound: 'do_nothing' }, actions: [], actionExecution: { state: 'not_configured', reason: null }, latestSample: null, templateFields: [], pendingUnmatched: 0, previousSecretUsableUntil: null } })
+    if (url.includes('/api/common-actions/resources')) return json({ success: true, data: { tags: [{ id: 'tag-new', name: '新しいタグ' }], templates: [], scenarios: [], webhooks: [], richMenus: [], commonActions: [], supportMarks: [] } })
+    if (url.includes('/api/webhooks/incoming') && !url.includes('/in-1') && !url.includes('/unmatched')) return json({ success: true, data: [INLET, { ...INLET, id: 'in-2', name: '二つ目の窓口' }] })
+    return original(input, init)
+  })
+  window.history.replaceState(null, '', '/webhooks?tab=incoming')
+  await render(<WebhooksIncomingV8 />)
+  const edit = await vi.waitFor(() => within(host).getByRole('button', { name: '受け取り口の名前を変更する' }))
+  await act(async () => { edit.click() })
+  await act(async () => { fireEvent.change(within(host).getByRole('textbox', { name: '受け取り口の名前' }), { target: { value: '変更中の名前' } }) })
+  const add = await vi.waitFor(() => within(host).getByRole('button', { name: '行うことを足す' }))
+  await act(async () => { add.click() })
+  await act(async () => { within(document.body).getByRole('menuitem', { name: /タグを付ける/ }).click() })
+  const picker = within(document.body).getByRole('dialog', { name: 'タグを付ける対象を選ぶ' })
+  await act(async () => { within(picker).getByRole('radio', { name: '新しいタグ' }).click(); within(picker).getByRole('button', { name: '選ぶ' }).click() })
+  await act(async () => { within(host).getByText('二つ目の窓口').click() })
+  const dialog = within(document.body).getByRole('dialog', { name: '保存していない変更があります' })
+  expect(dialog.textContent).toContain('受け取り口の変更')
+  expect(dialog.textContent).toContain('行うことの変更')
+  await act(async () => { within(dialog).getByRole('button', { name: 'すべて保存せずに移る' }).click() })
+  await vi.waitFor(() => expect(within(document.body).queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull())
+  await vi.waitFor(() => expect(within(host).getByRole('switch', { name: '二つ目の窓口を動かす' })).toBeTruthy())
+})

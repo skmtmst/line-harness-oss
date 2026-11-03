@@ -165,3 +165,22 @@ it('破棄の確認後に別の入力が増えたら、先に確認を更新す�
   expect(leave).not.toHaveBeenCalled(); expect(discarded).not.toHaveBeenCalled()
   expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('吹き出しの作成内容')
 })
+
+it('子の局所キャンセルでは親の入力を捨てない', async () => {
+  const parentDiscard = vi.fn(), childDiscard = vi.fn(), closeChild = vi.fn()
+  function ParentInput() {
+    useUnsavedGuard({ dirty: true, subject: '親の入力', onDiscard: parentDiscard })
+    return null
+  }
+  function ChildInput() {
+    const guard = useUnsavedGuard({ dirty: true, subject: '子の入力', onDiscard: childDiscard })
+    return <><button onClick={() => guard.guarded(closeChild)}>子だけ閉じる</button><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="子の入力" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></>
+  }
+  render(<><ParentInput /><ChildInput /></>)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '子だけ閉じる' })) })
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('子の入力')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' })) })
+  expect(childDiscard).toHaveBeenCalledTimes(1)
+  expect(closeChild).toHaveBeenCalledTimes(1)
+  expect(parentDiscard).not.toHaveBeenCalled()
+})

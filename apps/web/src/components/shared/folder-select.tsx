@@ -243,6 +243,7 @@ function FolderCreationGuard({ busy, onDiscard, actionRef, draftGuardRef }: {
   }, [actionRef, draftGuardRef, busy, guard.guarded])
   return <UnsavedLeaveDialog
     open={guard.leaveTarget !== null}
+    subject="作りかけのフォルダ"
     busy={busy}
     description={savingParent ? '作りかけのフォルダを破棄して、画面の内容を保存します。' : undefined}
     discardLabel={savingParent ? 'フォルダを破棄して保存' : undefined}
