@@ -696,7 +696,7 @@ export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
   //    マイグレーション 031 で在庫 row には batch_lock_at が backfill 済み。
   await db
     .prepare(
-      `UPDATE broadcasts SET batch_offset = 0, batch_lock_at = NULL
+      `UPDATE broadcasts SET batch_offset = 0, batch_lock_at = NULL, ${ADVANCE_DELIVERY_CONFIRMATION_SQL.replace('json_valid(message_options_json)', "target_type <> 'multi-account-dedup' AND json_valid(message_options_json)")}, lock_version = CASE WHEN target_type <> 'multi-account-dedup' THEN lock_version + 1 ELSE lock_version END
        WHERE status = 'sending' AND batch_offset = -1
        AND sent_at IS NULL AND stopped_at IS NULL AND success_count = 0
        AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL)
@@ -733,7 +733,7 @@ export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
   // is acknowledged by LINE as retry-key 409 and then logged once.
   await db
     .prepare(
-      `UPDATE broadcasts SET batch_offset = 0, batch_lock_at = NULL
+      `UPDATE broadcasts SET batch_offset = 0, batch_lock_at = NULL, ${ADVANCE_DELIVERY_CONFIRMATION_SQL}, lock_version = lock_version + 1
        WHERE status = 'sending' AND batch_offset = -1
        AND sent_at IS NULL AND stopped_at IS NULL
        AND target_type != 'multi-account-dedup'
