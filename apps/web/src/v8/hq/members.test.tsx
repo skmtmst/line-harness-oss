@@ -101,7 +101,7 @@ describe('V8 統括のメンバーの窓', () => {
   })
 
   it('招待は閲覧のみから始め、範囲の選択は無く全アカウントを付けて送る', async () => {
-    await act(async () => { buttonByText('権限者を招待')!.click() })
+    await act(async () => { buttonByText('招待する')!.click() })
     await flush()
     expect(dialogTitles()).toContain('権限者を招待')
     const dialog = document.querySelector('[role="dialog"]')!
@@ -123,7 +123,7 @@ describe('V8 統括のメンバーの窓', () => {
   })
 
   it('招待で名前が空なら送らず、名前の欄に理由を出して名前の欄へ移る', async () => {
-    await act(async () => { buttonByText('権限者を招待')!.click() })
+    await act(async () => { buttonByText('招待する')!.click() })
     await flush()
     const dialog = document.querySelector('[role="dialog"]')!
     const email = screen.getByRole('textbox', { name: 'メールアドレス' }) as HTMLInputElement

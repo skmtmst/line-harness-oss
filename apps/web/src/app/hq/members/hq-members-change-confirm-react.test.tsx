@@ -122,7 +122,7 @@ describe('招待メールの期限は7日（板 yLKwV）', () => {
   it('招待の窓に7日の期限と板の目印が出る', async () => {
     await act(async () => { root.render(<HqMembersPage />) })
     await flush()
-    const invite = Array.from(host.querySelectorAll('button')).find((b) => (b.textContent ?? '').includes('権限者を招待'))
+    const invite = Array.from(host.querySelectorAll('button')).find((b) => (b.textContent ?? '').includes('招待する'))
     expect(invite, '招待ボタンがない').not.toBeUndefined()
     await act(async () => { (invite as HTMLButtonElement).click() })
     await flush()
