@@ -480,7 +480,7 @@ function VisitStampsScreen() {
           label: item.label,
           current: tab === item.key,
           count: item.key === 'paper' && paper !== null ? paper.filter(row => row.status === 'pending').length : undefined,
-          countTone: item.key === 'paper' ? 'warning' : undefined,
+          countTone: item.key === 'paper' && paper?.some(row => row.status === 'pending') ? 'warning' : undefined,
           onClick: () => selectTab(item.key),
         }))} />
       </div>

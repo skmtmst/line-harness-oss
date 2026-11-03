@@ -130,6 +130,32 @@ async function fillToConfirm(body = '{店名}より：1月の限定メニュー'
 }
 
 describe('配信イメージの確認', () => {
+  it('入力後のキャンセルは確認し、編集を続けると入力を残す', async () => {
+    render(<HqBroadcastCreate />)
+    fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '架空の配信' } })
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
+    const dialog = await screen.findByRole('dialog', { name: '保存していない変更があります' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '編集を続ける' }))
+    expect((screen.getByLabelText('配信名') as HTMLInputElement).value).toBe('架空の配信')
+  })
+
+  it('過去の配信が0件なら複製を止めて理由とキャンセル先を表示する', async () => {
+    render(<HqBroadcastCreate />)
+    await screen.findByText('複製できる配信がありません。')
+    expect((screen.getByRole('radio', { name: /過去の配信を複製/ }) as HTMLInputElement).disabled).toBe(true)
+    expect(screen.getByRole('link', { name: 'キャンセル' }).getAttribute('href')).toBe('/hq/broadcasts')
+  })
+
+  it('履歴取得に失敗したら0件と断定せず、読み直しを案内する', async () => {
+    hq.list.mockRejectedValueOnce(new Error('offline'))
+    render(<HqBroadcastCreate />)
+    expect(await screen.findByText('配信履歴を確認できません。画面を読み直してください。')).toBeTruthy()
+    expect((screen.getByRole('radio', { name: /過去の配信を複製/ }) as HTMLInputElement).disabled).toBe(true)
+    expect(screen.queryByText('複製できる配信がありません。')).toBeNull()
+    expect(screen.getByText('配信履歴を読み込めませんでした。')).toBeTruthy()
+    expect(screen.queryByText('最近の配信はまだありません。')).toBeNull()
+  })
+
   it('見本の窓が出ない場合はボタンを押しても確認済みにしない', async () => {
     previewWindow.hidden = true
     params.value = new URLSearchParams('step=message')
@@ -557,6 +583,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     hq.list.mockResolvedValue({ data: [{ id: 'run-s', title: '9月キャンペーンのお知らせ', status: 'sent', version: 3, scheduledAt: '2026-09-20T01:00:00Z', targets: [{ ...check('a1', '銀座店', 1284), status: 'sent', totalCount: 1284, successCount: 1284, version: 1, retryableCount: 0, stopped: false, failureReasons: [] }],
       input: { requestId: 'r', title: '9月キャンペーンのお知らせ', messageType: 'text', messageContent: '9月のご案内です', accountIds: ['a1'], accountTagIds: [], excludedAccountIds: [], audience: { kind: 'tag', tagName: 'VIP' }, scheduledAt: '2026-09-20T01:00:00Z' } }] })
     render(<HqBroadcastCreate />)
+    await waitFor(() => expect((screen.getByRole('radio', { name: /過去の配信を複製/ }) as HTMLInputElement).disabled).toBe(false))
     fireEvent.click(screen.getByRole('radio', { name: /過去の配信を複製/ }))
     hq.get.mockResolvedValue({ data: (await hq.list()).data[0] })
     fireEvent.click(screen.getByRole('button', { name: '過去の配信を選ぶ' }))
@@ -816,6 +843,7 @@ describe('読み込めない配信の保護', () => {
     hq.get.mockResolvedValue({ data: saved })
     render(<HqBroadcastCreate />)
     fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '編集中の名前' } })
+    await waitFor(() => expect((screen.getByRole('radio', { name: /過去の配信を複製/ }) as HTMLInputElement).disabled).toBe(false))
     fireEvent.click(screen.getByRole('radio', { name: /過去の配信を複製/ }))
     fireEvent.click(screen.getByRole('button', { name: '過去の配信を選ぶ' }))
     fireEvent.click(await screen.findByRole('radio', { name: '過去の配信' }))

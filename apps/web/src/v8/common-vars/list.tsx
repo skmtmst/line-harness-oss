@@ -805,7 +805,7 @@ function CommonVarsListInner() {
     },
     {
       key: 'usage',
-      title: '差し込んでいる所',
+      title: '使っている所',
       icon: Link2,
       value: listFailed ? null : stats.usageTotal,
       unit: 'か所',

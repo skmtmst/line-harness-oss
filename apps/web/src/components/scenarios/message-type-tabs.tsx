@@ -44,19 +44,19 @@ interface KindDef {
  */
 export const STEP_MESSAGE_KINDS: KindDef[] = [
   { value: 'text', label: 'テキスト' },
-  { value: 'sticker', label: 'スタンプ' },
   { value: 'image', label: '画像' },
-  { value: 'question', label: '質問' },
+  { value: 'video', label: '動画' },
+  { value: 'audio', label: '音声' },
+  { value: 'sticker', label: 'スタンプ' },
   { value: 'carousel', label: 'カルーセル' },
   { value: 'location', label: '位置情報' },
+  { value: 'question', label: '質問' },
   {
     value: 'intro',
     label: '紹介',
     disabledReason:
       '他のLINEアカウントの紹介は、LINE側に該当するメッセージの種別がありません。テキストに友だち追加のURLを書くか、カードタイプのテンプレートにボタンを置いてください。',
   },
-  { value: 'audio', label: '音声' },
-  { value: 'video', label: '動画' },
 ]
 
 export function isStepMessageKindAvailable(kind: StepMessageKind): boolean {

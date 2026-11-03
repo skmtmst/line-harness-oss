@@ -24,6 +24,7 @@ const updateScenario = vi.hoisted(() => vi.fn())
 const createScenario = vi.hoisted(() => vi.fn())
 const triggerList = vi.hoisted(() => vi.fn(async () => ({ success: true, data: [{ id: 't1', kind: 'friend_add', tagId: null }] })))
 const getScenario = vi.hoisted(() => vi.fn())
+const pageTitle = vi.hoisted(() => vi.fn())
 
 const scenario = vi.hoisted(() => ({
   id: 'sc-1',
@@ -130,7 +131,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
-  usePageTitle: () => {},
+  usePageTitle: pageTitle,
   usePageCrumbs: () => {},
 }))
 
@@ -186,6 +187,11 @@ afterEach(() => {
 })
 
 describe('V8 シナリオ配信の編集', () => {
+  it('読み込んだシナリオ名をパンくずの画面名に使う', async () => {
+    await render()
+    expect(pageTitle).toHaveBeenLastCalledWith('新規登録7日間フォロー')
+  })
+
   it.each([
     'こんにちは、{{name}}さん。{{reservation_datetime}}からです。',
     'こんにちは、{名前}さん。{予約日時}からです。',

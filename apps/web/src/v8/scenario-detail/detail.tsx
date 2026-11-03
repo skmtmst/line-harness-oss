@@ -197,7 +197,7 @@ export default function ScenarioDetailV8({
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [stepForm, setStepForm] = useState<StepFormState>(() => emptyStepForm(1))
-  usePageTitle(editingStepId ? `${[...(scenario?.steps ?? [])].sort((a, b) => a.stepOrder - b.stepOrder).findIndex((step) => step.id === editingStepId) + 1} 通目を編集` : 'シナリオ配信')
+  usePageTitle(editingStepId ? `${[...(scenario?.steps ?? [])].sort((a, b) => a.stepOrder - b.stepOrder).findIndex((step) => step.id === editingStepId) + 1} 通目を編集` : (scenario?.name ?? 'シナリオ配信'))
   const [stepSaving, setStepSaving] = useState(false)
   const [stepError, setStepError] = useState('')
   /* 通の保存で落ちた欄は、その欄の真下に理由を出して移る。検査は保存の直前に1つずつ見る形なので fail で結び付ける。 */
