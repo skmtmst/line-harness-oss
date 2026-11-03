@@ -76,6 +76,17 @@ describe('クーポンの保存と公開', () => {
     await expect(saving).rejects.toThrow('アカウントが変わりました')
     expect(ports.publish).not.toHaveBeenCalled()
   })
+  it('保存中にアカウントを行き来しても元の操作を公開しない', async () => {
+    const wait = deferred<{ success: true; data: BroadcastMessageAsset }>()
+    ports.create.mockReturnValue(wait.promise)
+    const { result, rerender } = renderHook(({ account }) => useCouponPersistence(account), { initialProps: { account: 'account-a' } })
+    const saving = result.current('券', payload, null, 'snapshot', true)
+    act(() => rerender({ account: 'account-b' }))
+    act(() => rerender({ account: 'account-a' }))
+    wait.resolve({ success: true, data: asset })
+    await expect(saving).rejects.toThrow('アカウントが変わりました')
+    expect(ports.publish).not.toHaveBeenCalled()
+  })
   it('版が不明の応答を0で埋めて公開しない', async () => {
     ports.create.mockResolvedValue({ success: true, data: { ...asset, draftRevision: undefined } })
     const { result } = renderHook(() => useCouponPersistence('account-a'))

@@ -8,7 +8,7 @@ export { assetInitial } from './asset-initial'
 import CouponSettings, { CouponGuide } from './coupon-settings'
 import { couponDraftPayload, couponDraftProblems, initialCouponDraft } from './coupon-draft'
 import StoredAssetEditor from './stored-asset-editor'
-import { useCouponPersistence } from './use-coupon-persistence'
+import { AssetPublishError, useCouponPersistence } from './use-coupon-persistence'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import CouponPreview from '@/components/shared/coupon-preview'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
@@ -122,7 +122,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
   const canMutate = host ? !host.readOnly : featureAccess
   const permissionReason = usePermissionLockReason(canMutate)
   const { selectedAccountId, accounts } = useAccount()
-  const persistCoupon = useCouponPersistence(selectedAccountId, existing)
+  const persistAsset = useCouponPersistence(selectedAccountId, existing, kind)
   usePageTitle(host ? 'テンプレート' : existing && kind === 'coupon' ? 'クーポンを編集する' : meta.heading)
   const actionOptions = useActionOptions()
 
@@ -313,7 +313,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
     }
   }
 
-  const save = async (publishCoupon = false): Promise<string | false> => {
+  const save = async (publishAsset = false): Promise<string | false> => {
     if (host || !canMutate) return false
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (fields.submit().length > 0) { setError(''); return false }
@@ -322,28 +322,20 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
     setSaving(true)
     setError('')
     try {
-      if (kind === 'coupon') {
-        const legacyFolder = folderTouched || !initialPayload
+      const legacyFolder = kind === 'coupon'
+        ? folderTouched || !initialPayload
           ? assetFolders.find(item => item.id === folder)?.name ?? ''
           : typeof initialPayload.folder === 'string' ? initialPayload.folder : ''
-        const id = await persistCoupon(name.trim(), { ...built.payload, folder: legacyFolder }, folder || null, snapshot, publishCoupon)
-        setSaved(true); setClean(snapshot)
-        return id
-      }
-      const result = await api.broadcastMessageAssets.create({
-        lineAccountId: selectedAccountId,
-        kind,
-        name: name.trim(),
-        payload: { ...built.payload, folder },
-      })
-      if (!result.success) {
-        setError(result.error || '保存できませんでした。時間をおいて、もう一度お試しください。')
-        return false
-      }
+        : folder
+      const id = await persistAsset(name.trim(), { ...built.payload, folder: legacyFolder }, kind === 'coupon' ? folder || null : null, snapshot, publishAsset)
       setSaved(true)
       setClean(snapshot)
-      return result.data.id
+      return id
     } catch (caught) {
+      if (caught instanceof AssetPublishError) {
+        setError(`下書きは保存しましたが、公開を確認できませんでした。${japaneseDetailOf(caught.cause) || 'もう一度公開してください。'}`)
+        return false
+      }
       const extraError = tapExtraSaveError(caught)
       if (extraError) {
         if (kind === 'coupon') fields.fail('tapExtras', extraError)
@@ -391,7 +383,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
     if (host) { await hostSave(true); return }
     setPublishing(true)
     try {
-      const savedId = await save(kind === 'coupon')
+      const savedId = await save(true)
       if (savedId) {
         disarm()
         router.push(createPageReturnHref('/templates', savedId))
