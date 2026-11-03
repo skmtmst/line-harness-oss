@@ -98,6 +98,17 @@ export default function DateField({
     gridRef.current?.querySelector<HTMLButtonElement>('button[tabindex="0"]')?.focus()
   }, [open, focused])
 
+  useEffect(() => {
+    if (!open) return
+    const dismissOutside = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (triggerRef.current?.contains(target) || document.getElementById(dialogId)?.contains(target)) return
+      setOpen(false)
+    }
+    document.addEventListener('pointerdown', dismissOutside, true)
+    return () => document.removeEventListener('pointerdown', dismissOutside, true)
+  }, [open, dialogId])
+
   const openCalendar = () => {
     if (disabled) return
     openedValue.current = value

@@ -168,3 +168,13 @@ it('日時の暦の仮選択はEscや外へのクリックで反映されない'
   fireEvent.pointerDown(document.body)
   expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
 })
+
+it('日時の窓へ戻るクリックは暦の仮選択を捨てる', () => {
+  render(<DateTimeHarness />)
+  fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
+  fireEvent.click(screen.getByRole('button', { name: '日付' }))
+  fireEvent.click(screen.getByRole('button', { name: '2026年10月2日（金）' }))
+  fireEvent.pointerDown(screen.getByRole('combobox', { name: '時刻' }))
+  expect(screen.queryByRole('dialog', { name:'日付を選ぶ' })).toBeNull()
+  expect(screen.getByTestId('value').textContent).toBe('2026-10-01T10:00')
+})
