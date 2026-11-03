@@ -39,6 +39,6 @@ export default function RestaurantFloorMap({floor,labels,onSelect,onChange,onFlo
  if(canEdit&&e.key.startsWith('Arrow')){e.preventDefault();move(t.id,false,t.x+(e.key==='ArrowLeft'?-10:e.key==='ArrowRight'?10:0),t.y+(e.key==='ArrowUp'?-10:e.key==='ArrowDown'?10:0))}
  }}>
  {t.shape==='circle'?<ellipse cx={t.width/2} cy={t.height/2} rx={t.width/2} ry={t.height/2}/>:<rect width={t.width} height={t.height} rx={t.shape==='counter'?t.height/2:8}/>}
- <text x={t.width/2} y={t.height/2}>{r?.label??t.id}</text><text x={t.width/2} y={t.height/2+18}>{r?`${r.capacity}人卓${r.active===false?'・停止中':''}`:'—'}</text>
+ <title>{r?.label??t.id}</title><foreignObject x={0} y={t.height/2-12} width={t.width} height={18}><div className={styles.tableLabel} title={r?.label??t.id}>{r?.label??t.id}</div></foreignObject><text x={t.width/2} y={t.height/2+18}>{r?`${r.capacity}人卓${r.active===false?'・停止中':''}`:'—'}</text>
  </g>})}</svg>
 }
