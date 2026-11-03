@@ -1115,7 +1115,7 @@ export default function MediaLibraryListV8() {
           closeDeleteDialog()
         }}
         footer={deleting && impact && (impact.usageCount > 0 || canDeleteMedia({ impact, busy: false })) ? (
-          <DialogActions leadingAction={impact && impact.verified !== false && !impact.canDelete ? '使用先から外すと削除できます' : undefined}>
+          <DialogActions leadingAction={impact && impact.verified !== false && !impact.canDelete ? '使用先から外して削除' : undefined}>
             <>
               <Button type="button" onClick={closeDeleteDialog} disabled={deleteBusy}>
                 キャンセル
@@ -1185,7 +1185,7 @@ export default function MediaLibraryListV8() {
 
             <p>
               {impact.verified !== false && impact.usageCount > 0 ? <>使われている場所から外すと削除できます。別のメディアを選ぶと、使用先をまとめて差し替えられます。<br /></> : null}
-              {checkedAtText(impact.checkedAt)} 時点で、{impact.verified === false ? '確認できなかった場所があります。' : 'テンプレート・一斉配信・リッチメニュー・シナリオ・コラム・イベント・ウェビナーの7種類を確認しました。'}
+              {checkedAtText(impact.checkedAt)} 時点で、{impact.verified === false ? '確認できなかった場所があります。' : '使用先を確認しました。'}
             </p>
           </div>
         ) : null}
