@@ -99,7 +99,7 @@ export function UnsavedLeaveDialog({
     const current = otherUnsavedGuardSnapshot()
     return otherUnsavedGuardBusy() || current.length !== shownGuards.length || current.some((guard, i) => guard !== shownGuards[i]) || otherUnsavedChanges().join('\u0000') !== others.join('\u0000')
   }
-  const body = (description ?? `このまま移ると、${subject}が消えます。`) + (onSave && others.length ? ` ${others.join('、')}は保存されず消えます。` : '') + (open && otherUnsavedGuardBusy() ? ' ほかの入力を保存中です。終わるまでお待ちください。' : '')
+  const body = (description ?? `このまま移ると、${subject}が消えます。`) + (others.length ? ` ${others.join('、')}は保存されず消えます。` : '') + (open && otherUnsavedGuardBusy() ? ' ほかの入力を保存中です。終わるまでお待ちください。' : '')
 
   // 「保存して移る」があるとき: 移る系の2択だけ出し、残る口は右上の×（UI-25）
   if (onSave) {
@@ -153,7 +153,7 @@ export function UnsavedLeaveDialog({
       title={title}
       description={body}
       error={error}
-      confirmLabel={discardLabel}
+      confirmLabel={others.length ? 'すべて保存せずに移る' : discardLabel}
       cancelLabel={cancelLabel}
       busy={busy}
       onConfirm={discardAndLeave}

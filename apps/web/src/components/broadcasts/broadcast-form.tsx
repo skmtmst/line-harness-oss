@@ -971,7 +971,7 @@ export default function BroadcastForm({
   })
   const draftDirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
   const dirty = draftDirty || ab.b !== null
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving, subject: '配信の変更' })
   const queuedAutosave = useRef({ fingerprint: formFingerprint, step: currentStep })
   if (queuedAutosave.current.fingerprint !== formFingerprint) queuedAutosave.current = { fingerprint: formFingerprint, step: currentStep }
   const draftAutosave = useDraftAutosave({

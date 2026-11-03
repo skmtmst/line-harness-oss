@@ -72,6 +72,7 @@ vi.mock('@/contexts/account-context', () => ({
 import BroadcastForm from './broadcast-form'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 function UnsavedBubble() {
   useUnsavedGuard({ dirty: true, subject: '吹き出しの作成内容' })
@@ -249,6 +250,18 @@ describe('一斉配信の下書き自動保存（★管理画面 sTJsh §5）', 
     await act(async () => { clickButton('下書きを保存する') })
     expect(document.body.textContent).toContain('B案の文字以外は保存されません。文字だけにしてから保存してください')
     expect(createApi).not.toHaveBeenCalled()
+  })
+
+  it('吹き出し側が先に確認する時も配信の変更が消えると示す', async () => {
+    function FirstBubble() {
+      const guard = useUnsavedGuard({ dirty: true, subject: '吹き出しの作成内容' })
+      return <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="吹き出しの作成内容" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+    }
+    await renderForm()
+    await act(async () => { root.render(<><FirstBubble /><BroadcastForm tags={[]} onSuccess={() => {}} onCancel={onCancelSpy} /></>) })
+    await act(async () => { setValue(titleInput(), '秋の案内') })
+    await act(async () => { clickButton('キャンセル') })
+    expect(document.body.textContent).toContain('配信の変更は保存されず消えます')
   })
 
   it('B案と吹き出しが未保存なら、離脱時に両方を示して保存を押せない', async () => {
