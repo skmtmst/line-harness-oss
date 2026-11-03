@@ -357,7 +357,15 @@ jobs:
             sudo apt-get update -qq
             sudo apt-get install -y -qq ripgrep
           fi
-      - run: pnpm test:scripts
+      - name: Test repository scripts against the PR base
+        env:
+          HONORIFIC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$HONORIFIC_BASE_SHA" ]; then
+            git fetch --no-tags origin \
+              +refs/heads/codex/development:refs/remotes/origin/codex/development
+          fi
+          pnpm test:scripts
       - name: Ratchet code quality against the PR base
         env:
           QUALITY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
