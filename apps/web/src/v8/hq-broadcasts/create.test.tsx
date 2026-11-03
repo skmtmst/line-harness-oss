@@ -1009,3 +1009,40 @@ describe('読み込めない配信の保護', () => {
     expect(hq.create).not.toHaveBeenCalled(); expect(hq.update).not.toHaveBeenCalled(); expect(hq.send).not.toHaveBeenCalled()
   })
 })
+
+it('一括配信の最終確認を閉じた後は古い確定から送らない', async () => {
+  render(<HqBroadcastCreate />)
+  await fillToConfirm()
+  await screen.findByText('送る：1アカウント・6,120 人')
+  fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
+  const dialog = within(await screen.findByRole('dialog', { name: '送る前の確かめ' }))
+  const button = await dialog.findByRole('button', { name: /人に予約する$/ })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const held = (button as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+  fireEvent.click(dialog.getByRole('button', { name: '戻る' }))
+  fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
+  const reopened = within(await screen.findByRole('dialog', { name: '送る前の確かめ' }))
+  await reopened.findByRole('button', { name: /人に予約する$/ })
+  await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+  expect(hq.send).not.toHaveBeenCalled()
+  fireEvent.click(reopened.getByRole('button', { name: /人に予約する$/ }))
+  await waitFor(() => expect(hq.send).toHaveBeenCalledOnce())
+})
+
+it('単独運用の最終確認を閉じた後は古い確定から送らない', async () => {
+  const originalApproval = hq.approval.getMockImplementation()
+  hq.approval.mockResolvedValue({ success: true, data: { approval: { status: 'none', requestedByStaffId: null, requestedAt: null, approverStaffId: null, note: null, decidedByStaffId: null, decidedAt: null, rejectReason: null, confirmedCount: null }, gate: { required: true, recipientCount: 6120, threshold: 1000, singleOperator: true, operatorCount: 1 }, viewer: { isApprover: false, canApprove: false, isRequester: false } } })
+  render(<HqBroadcastCreate />)
+  await fillToConfirm()
+  await screen.findByText('送る：1アカウント・6,120 人')
+  fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
+  const dialog = within(await screen.findByRole('dialog', { name: '1アカウントに送ります' }))
+  fireEvent.change(dialog.getByLabelText('人数を入れる'), { target: { value: '6120' } })
+  const button = dialog.getByRole('button', { name: '予約する' })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const held = (button as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+  fireEvent.click(dialog.getByRole('button', { name: 'キャンセル' }))
+  await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+  expect(hq.send).not.toHaveBeenCalled()
+  if (originalApproval) hq.approval.mockImplementation(originalApproval)
+})
