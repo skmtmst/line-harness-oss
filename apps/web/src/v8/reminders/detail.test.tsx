@@ -442,6 +442,25 @@ describe('V8 リマインダの詳細', () => {
     expect(state.updates).toHaveLength(0)
   })
 
+  it.each(['loading', 'failed'])('予定の取得が %s の時は0通と断定しない', async (status) => {
+    const runs = vi.mocked(api.reminders.runs)
+    const original = runs.getMockImplementation()!
+    runs.mockImplementation(async (id, params) => {
+      if (params?.status === 'planned') {
+        if (status === 'loading') return await new Promise<never>(() => {})
+        throw new Error('取得できませんでした')
+      }
+      return original(id, params)
+    })
+    try {
+      await render()
+      await act(async () => { buttonByText('一時停止する')!.click() })
+      const dialog = document.querySelector('[data-design-node="RwVo5"]')!
+      expect(dialog.textContent).toContain('送る予定の通知の件数は確認できません')
+      expect(dialog.textContent).not.toContain('予定の 0 通')
+    } finally { runs.mockImplementation(original) }
+  })
+
   it('WEB084：予定を読み切れていないとき、一時停止の窓で今後24時間の数を言い切らない', async () => {
     state.plannedTotal = 340
     await render()
