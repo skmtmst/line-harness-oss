@@ -47,3 +47,10 @@ it('再取得中にもう1卓追加されても、古い応答で再取得の必
  expect(await screen.findByRole('button',{name:'T3'})).toBeTruthy()
  expect(api.floors).toHaveBeenCalledTimes(3)
 })
+it('卓の席条件だけが変わった場合も座席図のマークを更新する',async()=>{
+ const view=render(<RestaurantFloorEditor {...props} refreshKey="禁煙"/>);await screen.findByRole('button',{name:'T1'})
+ api.floors.mockResolvedValueOnce({data:[{...floor,tables:[{...table,smokingPolicy:'smoking'}]}]})
+ view.rerender(<RestaurantFloorEditor {...props} refreshKey="喫煙"/>)
+ await waitFor(()=>expect(api.floors).toHaveBeenCalledTimes(2))
+ await waitFor(()=>expect(screen.getByRole('button',{name:'T1'}).querySelector('.lucide-cigarette')).toBeTruthy())
+})
