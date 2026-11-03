@@ -278,3 +278,12 @@ describe('新規（id なし）は確定したときに初めて作る', () => {
     expect(document.body.textContent).not.toContain('D1_ERROR')
   })
 })
+
+test('シナリオ名は一覧の名前変更と同じ80文字までで、文字数を表示する', async () => {
+  render(<ScenarioCreateV8 />)
+  await waitFor(() => expect(nameField().value).toBe('春のフォロー'))
+  expect(nameField().maxLength).toBe(80)
+  fireEvent.focus(nameField())
+  fireEvent.change(nameField(), { target: { value: '新しい名前' } })
+  await waitFor(() => expect(document.body.textContent).toContain('5/80'))
+})

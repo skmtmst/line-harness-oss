@@ -118,3 +118,18 @@ test('役割の区別を共通札へ渡し、名前と権限の読み取りを�
     ['custom', 'neutral', '個別設定'],
   ])
 })
+
+test('役割と権限では名前と役割を分けて一度ずつ表示し、ユーザー表と操作を残す', async () => {
+  route.query = 'tab=roles'
+  net.users.mockResolvedValue({ success: true, data: {
+    items: [{ ...user(1), name: '架空 花子', roleBundle: 'administrator' }],
+    pagination: { total: 1, limit: 200, offset: 0 },
+    summary: { active: 1, suspended: 0, mfaEnabled: 0, invited: 0 },
+  } })
+  render(<StaffV8 />)
+  const table = await screen.findByRole('table', { name: '役割と権限の一覧' })
+  const row = [...table.querySelectorAll('[role="row"]')].find(node => node.textContent?.includes('架空 花子'))!
+  expect(row.textContent?.match(/架空 花子/g)).toHaveLength(1)
+  expect(row.textContent?.match(/管理者/g)).toHaveLength(1)
+  expect(row.querySelector('button[aria-label="架空 花子の操作"]')).toBeTruthy()
+})

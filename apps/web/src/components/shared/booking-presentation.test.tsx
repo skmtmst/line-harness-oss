@@ -66,8 +66,8 @@ it('見えている予約状態だけを出し、全状態は「？」から開�
   render(<BookingVisibleLegend states={['pending', 'active']} />)
   const list = screen.getByRole('list', { name: '予約の状態' })
   expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(['来店中・進行中', '要対応（承認待ち）'])
-  expect(screen.getByRole('button', { name: '予約の印の見本' })).toBeTruthy()
-  expect(screen.queryByRole('list', { name: '予約の印の見本' })).toBeNull()
+  expect(screen.getByRole('button', { name: '予約の印の見方' })).toBeTruthy()
+  expect(screen.queryByRole('list', { name: '予約の印の見方' })).toBeNull()
 })
 
 it.each(['line', 'liff', 'manual', 'walk_in', 'counter', 'tabelog'])('予約の箱は%sの経路を省き、電話だけ灰の札にする', source => {

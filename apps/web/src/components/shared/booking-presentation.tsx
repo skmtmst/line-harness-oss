@@ -27,7 +27,7 @@ export function BookingLegend({ dense = false, states, label = '予約の状態'
 
 /** 表に現れる状態の見本と、全状態を開く共通の入口。 */
 export function BookingVisibleLegend({ states, inline = false, dense = true }: { states: readonly BookingState[]; inline?: boolean; dense?: boolean }) {
-  return <div className={inline ? styles.visibleLegendInline : styles.visibleLegend}><BookingLegend dense={dense} states={states} /><span className={styles.legendHelp}><HelpTip label="予約の印の見本" trigger={<span className={styles.legendItem}><CircleHelp size={14} aria-hidden="true" />印の見本</span>}><BookingLegend dense label="予約の印の見本" /></HelpTip></span></div>
+  return <div className={inline ? styles.visibleLegendInline : styles.visibleLegend}><BookingLegend dense={dense} states={states} /><span className={styles.legendHelp}><HelpTip label="予約の印の見方" trigger={<span className={styles.legendItem}><CircleHelp size={14} aria-hidden="true" />印の見方</span>}><BookingLegend dense label="予約の印の見方" /></HelpTip></span></div>
 }
 
 /** 種類名を文字で伝え、分類色を装飾の丸だけに使う。 */
