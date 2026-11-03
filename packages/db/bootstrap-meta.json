@@ -664,7 +664,8 @@
     "749_booking_monthly_ledger.sql",
     "750_chat_assignee_staff.sql",
     "751_nen_ec_member_rank_name.sql",
-    "752_restaurant_menu_media.sql"
+    "752_restaurant_menu_media.sql",
+    "753_restaurant_store_group_member_version.sql"
   ],
-  "migrationCount": 665
+  "migrationCount": 666
 }
