@@ -219,6 +219,12 @@ async function openHarness(browser) {
     if (path === '/api/settings/features') {
       return json({ success: true, data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 } })
     }
+    if (path === '/api/dashboard/style') {
+      return json({ success: true, data: { style: 'ec', styleSelected: true, version: 1 } })
+    }
+    if (/^\/api\/line-accounts\/[^/]+\/follower-import$/.test(path)) {
+      return json({ success: true, data: { phase: 'completed' } })
+    }
     if (path === '/api/line-notifications/operator-rules') {
       return json({ success: true, data: { items: state.operatorItems, summary: { total: 7, published: 7, stopped: 0, missingRecipients: 0, recipients: 3, acceptedToday: 0, excludedToday: 0 } } })
     }
@@ -271,6 +277,10 @@ async function openHarness(browser) {
 
 async function openEditor(page) {
   await page.goto(`${baseUrl}/line-notifications`)
+  await reopenEditor(page)
+}
+
+async function reopenEditor(page) {
   const editRow = page.getByRole('button', { name: '内容を編集' })
   await editRow.first().waitFor({ timeout: 15_000 })
   await editRow.first().click()
@@ -413,7 +423,7 @@ try {
     await page.getByRole('button', { name: '下書きを保存する', exact: true }).click()
     await page.waitForFunction(() => document.body.innerText.includes('未保存の変更があります'))
 
-    // 編集画面は開いたまま、見ているアカウントだけが替わる。
+    // 共通の店舗切替ゲートは編集画面を一度外す。切替後に同じ通知を開き直す。
     const introValue = () => page.evaluate(() => {
       const box = document.querySelector('#customer-notification-intro')
       return box ? box.value : null
@@ -426,8 +436,10 @@ try {
     }
 
     await switchAccount(page, 'account-b')          // A → B
+    await reopenEditor(page)
     await waitForIntro('B店の本文')
     await switchAccount(page, 'account-a')          // B → A
+    await reopenEditor(page)
     // Aへ戻ると、端末に残した控えが復元される。
     await waitForIntro('Aで保存を押した時点の本文')
     assert.equal(await introValue(), 'Aで保存を押した時点の本文')
@@ -492,6 +504,7 @@ try {
 
     // Bの読み込みを再開させ、普通に終わらせる（隙間を通したことの裏取り）。
     releaseB()
+    await reopenEditor(page)
     await page.waitForFunction(() => {
       const box = document.querySelector('#customer-notification-intro')
       return Boolean(box) && box.value === 'B店の本文'
@@ -503,6 +516,7 @@ try {
 
     // Aへ戻ると、消されていない控えが復元され、未保存の印も戻る。
     await switchAccount(page, 'account-a')
+    await reopenEditor(page)
     await page.waitForFunction(() => {
       const box = document.querySelector('#customer-notification-intro')
       return Boolean(box) && box.value === 'Aで保存を押した時点の本文'

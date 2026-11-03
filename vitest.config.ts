@@ -4,7 +4,9 @@ import { defineConfig } from 'vitest/config';
 // use their own configs; CI runs shared in UTC and Asia/Bangkok.
 export default defineConfig({
   test: {
-    maxWorkers: 4,
+    // Script audits spawn child processes and scan the whole repository.
+    // Two workers keep CI's small runner responsive for their startup checks.
+    maxWorkers: 2,
     // Vitest 4 restoreAllMocks no longer clears standalone vi.fn call history.
     clearMocks: true,
     environment: 'node',

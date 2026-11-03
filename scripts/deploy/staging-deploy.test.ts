@@ -70,5 +70,5 @@ describe('staging-deploy argument parsing', () => {
     } finally {
       rmSync(sandbox, { recursive: true, force: true });
     }
-  });
+  }, 20_000);
 });
