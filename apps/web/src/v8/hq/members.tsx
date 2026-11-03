@@ -26,6 +26,7 @@ import Notice from '@/components/shared/notice'
 import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
 import TruncatedText from '@/components/shared/truncated-text'
 import { RowActions } from '@/components/shared/row-actions'
+import { SelfSecurity } from '@/v8/settings/staff'
 
 /*
  * ★V8 統括のメンバー（Pencil 。招待の窓 ・権限を変える窓 ・
@@ -281,6 +282,8 @@ function MembersInner() {
                 )
               })}
             </GridTable>
+
+            <SelfSecurity fullWidth />
 
           </>
         )}

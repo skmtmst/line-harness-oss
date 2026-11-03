@@ -388,15 +388,11 @@ staff.get('/api/staff', async (c) => {
     const visible = accountId ? await getVisibleLineAccountScope(c.env.DB, c.get('staff')) : null;
     if (accountId && !visible?.allowedAccountIds.includes(accountId)) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     const creator = accountId ? await c.env.DB.prepare('SELECT created_by_staff_id FROM line_accounts WHERE id=?').bind(accountId).first<{ created_by_staff_id: string | null }>() : null;
-    const accountAdminRows = accountId ? await c.env.DB.prepare(
-      'SELECT staff_id FROM line_account_hq_admin_memberships WHERE line_account_id=?',
-    ).bind(accountId).all<{ staff_id: string }>() : null;
-    const accountAdminIds = new Set(accountAdminRows?.results.map((row) => row.staff_id) ?? []);
     const allMembers = await getStaffMembers(c.env.DB, currentTenantId(c));
     const scopedIds = await getStaffAccountScopeMap(c.env.DB, allMembers.filter((member) => member.account_scope === 'accounts').map((member) => member.id));
     const members = accountId
       ? allMembers.filter((member) => member.id === creator?.created_by_staff_id
-        || (member.account_scope === 'all' && (member.role === 'owner' || member.role === 'admin') && accountAdminIds.has(member.id))
+        || member.account_scope === 'all'
         || (member.account_scope === 'accounts' && (scopedIds.get(member.id) ?? []).includes(accountId)))
       : allMembers.filter((member) => member.account_scope === 'all');
     // 担当範囲を1人ずつ読むと人数分の往復になるので一括取得する( 中1)。
@@ -415,7 +411,7 @@ staff.get('/api/staff', async (c) => {
               scopedLineAccountIds: [accountId],
               assignedLineAccountId: accountId,
             } : {}),
-            ...(isAccountCreator || accountAdminIds.has(member.id) ? { role: 'admin' as const } : {}),
+            ...(isAccountCreator && member.account_scope === 'accounts' && member.access_level !== 'read_only' ? { role: 'admin' as const } : {}),
             isAccountCreator,
             canManageInAccount: Boolean(accountId && !isAccountCreator && member.account_scope === 'accounts'
               && (actorCanManageAll || (scopedIds.get(member.id) ?? []).every((id) => actorScopeIds.includes(id)))),
