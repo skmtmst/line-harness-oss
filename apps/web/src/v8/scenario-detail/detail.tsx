@@ -599,8 +599,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
               まとめてテストを送る
             </Button>
           ) : null}{canEdit ? (
-            <span className={styles.menuBox}>
-              <RowMenu
+            <RowMenu
                 appearance="plain"
                 label="このシナリオのその他操作"
                 menuLabel="このシナリオの操作"
@@ -630,8 +629,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
                     },
                   },
                 ]}
-              />
-            </span>
+            />
           ) : null}</>} />
 
       {/* 競合（kz2B6）：ほかの人の保存と食い違った。板の頭のすぐ下に、幅いっぱいで出す。 */}
