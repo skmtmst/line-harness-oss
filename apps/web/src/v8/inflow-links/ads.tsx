@@ -227,6 +227,7 @@ export default function AdsV8() {
 
   useEffect(() => {
     setPlatforms([])
+    setManualEntries([])
     void load()
     return () => {
       loadGenerationRef.current += 1

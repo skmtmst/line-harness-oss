@@ -277,6 +277,16 @@ describe('V8 リマインダの詳細', () => {
     expect(dialog?.textContent).not.toContain('本店')
   })
 
+  it('停止の窓は所属が不明なら不明と環境を示す', async () => {
+    state.ownerId = null
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    const dialog = document.querySelector('[data-design-node="RwVo5"]')!
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('不明')
+    expect(dialog.textContent).toContain('環境')
+  })
+
   it('停止確認を開いた後でアカウントを切り替えると古い確認では送れない', async () => {
     await render()
     await act(async () => { buttonByText('一時停止する')!.click() })

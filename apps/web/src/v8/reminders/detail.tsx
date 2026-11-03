@@ -267,10 +267,12 @@ function ReminderDetailV8() {
    * 配信予定（status=planned）から数える。
    */
   useEffect(() => {
+    setPlanned([])
+    setPlannedTotal(0)
     if (!reminderId) return
     let cancelled = false
     void api.reminders.runs(reminderId, { status: 'planned', limit: PLANNED_LIMIT }).then((res) => {
-      if (cancelled || !res.success) return
+      if (cancelled || !res.success || res.data.reminder.id !== reminderId) return
       setPlanned(res.data.items)
       setPlannedTotal(res.data.pagination.total)
     }).catch(() => undefined)
