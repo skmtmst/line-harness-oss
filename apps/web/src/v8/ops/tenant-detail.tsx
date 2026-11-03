@@ -316,6 +316,9 @@ function StatusDialog({ tenantId, target, tenantName, accounts, routeScope, gene
   const reasonRequirement: FormRequirement = { required: true, check: value => value.trim().length >= 4 ? null : '理由を4文字以上で入力してください' }
   const problem = nameRequirement.check(confirmName) ?? reasonRequirement.check(reason)
   const dialogAccess = useOpsReadOnlyState()
+  const accountNames = accounts.slice(0, 3).map(account => account.name || '不明').join('、')
+  const accountSummary = accountNames || 'なし'
+  const accountLabel = `LINEアカウント（${accounts.length}件）${accounts.length > 3 ? `・ほか${accounts.length - 3}件` : ''}`
 
   const submit = async () => {
     if (!active.current || routeScope.current.generation !== generation || routeScope.current.id !== tenantId || dialogAccess !== 'writer') return
@@ -349,7 +352,8 @@ function StatusDialog({ tenantId, target, tenantName, accounts, routeScope, gene
       onCancel={() => { active.current = false; onClose() }}
     >
       <div className={parts.dialogBody}>
-        <OperationTargetSummary accounts={accounts.length ? accounts : [{ id: '', name: '不明' }]} externalTarget={{ label: '対象件数', name: '1件' }} />
+        <OperationTargetSummary accounts={[]} externalTarget={{ label: accountLabel, name: accountSummary }} />
+        <p className={parts.note}>契約先 1件</p>
         <Notice tone={needsName ? "danger" : "info"}>
           {target === 'suspended'
             ? '停止すると、この契約先の権限者はログインできなくなります。配信も止まります。'

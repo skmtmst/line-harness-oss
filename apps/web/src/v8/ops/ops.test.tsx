@@ -54,6 +54,7 @@ let host: HTMLDivElement
 let meGate: Promise<void> | null = null
 let releaseMe: (() => void) | null = null
 let tenantAccounts: Array<{ id: string; name: string }> = []
+let tenantStatus = 'active'
 
 beforeEach(() => {
   readOnly = false
@@ -62,6 +63,7 @@ beforeEach(() => {
   meGate = null
   releaseMe = null
   tenantAccounts = []
+  tenantStatus = 'active'
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -75,7 +77,8 @@ beforeEach(() => {
       return json({ success: true, data: { ...ME, readOnly } })
     }
     if (url.endsWith('/api/ops/members')) return json({ success: true, data: MEMBERS, summary: { members: 2, invited: 0, awaitingTotp: 0, totpEnabled: 2, impersonationsThisMonth: 0, writeImpersonationsThisMonth: 0, piiRevealsThisMonth: 0 } })
-    if (url.includes('/api/ops/tenants/t1')) return json({ success: true, data: { tenant: TENANT, accounts: tenantAccounts, members: [], audit: [] } })
+    if (url.includes('/api/ops/tenants/t1')) return json({ success: true, data: { tenant: { ...TENANT, status: tenantStatus }, accounts: tenantAccounts, members: [], audit: [] } })
+    if (url.includes('/api/ops/tenants/t2')) return json({ success: true, data: { tenant: { ...TENANT, id: 't2', name: '契約先B', status: 'suspended' }, accounts: [], members: [], audit: [] } })
     if (url.includes('/api/ops/tenants')) return json({ success: true, data: [TENANT], summary: { active: 1, trialing: 0, suspended: 0, pastDue: 0 } })
     if (url.endsWith('/api/ops/announcements/preview')) return json({ success: true, data: { tenants: 1, staff: 1, lineLinked: 0, withEmail: 1 } })
     if (url.endsWith('/api/ops/announcements')) {
@@ -314,6 +317,40 @@ describe('送る・止める前に確かめる', () => {
     expect(dialog.textContent).toContain('店B')
     expect(dialog.textContent).toContain('環境')
     expect(dialog.textContent).toContain('1件')
+  })
+
+  it('契約先を移動したら古い再開の確認では実行できない', async () => {
+    tenantStatus = 'suspended'
+    search = 'id=t1'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    await act(async () => { getPageAction({ name: '再開' }).click() })
+    fireEvent.change(document.querySelector('input[aria-label="理由（4文字以上）"]')!, { target: { value: '確認済みの理由' } })
+    const confirm = buttons('再開する')[0] as HTMLButtonElement
+    const key = Object.keys(confirm).find(k => k.startsWith('__reactProps$'))!
+    const oldClick = (confirm as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    search = 'id=t2'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    const closed = document.querySelector('[role="dialog"], [role="alertdialog"]') === null
+    await act(async () => { oldClick() })
+    expect(calls.some(c => c.method !== 'GET' && c.url.includes('/status'))).toBe(false)
+    expect(closed).toBe(true)
+  })
+
+  it('多数の店舗を短くまとめて件数と残りを示す', async () => {
+    tenantAccounts = Array.from({ length: 6 }, (_, i) => ({ id: `store-${i}`, name: `店舗${i + 1}` }))
+    search = 'id=t1'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    await act(async () => { getPageAction({ name: '停止' }).click() })
+    await settle()
+    const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+    expect(dialog.textContent).toContain('LINEアカウント（6件）')
+    expect(dialog.textContent).toContain('店舗1')
+    expect(dialog.textContent).toContain('ほか')
+    expect(dialog.textContent).not.toContain('店舗6')
+    expect(dialog.textContent).toContain('契約先 1件')
   })
 
   it('閉じた契約先停止の確認では実行できない', async () => {
