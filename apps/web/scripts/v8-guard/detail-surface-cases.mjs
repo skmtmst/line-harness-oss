@@ -226,13 +226,8 @@ export const detailSurfaceCases = [
     "kind": "DetailColumns",
     "selector": "[data-detail-columns] > aside"
   },
-  {
-    "key": "restaurant-line-followup",
-    "label": "飲食店のLINE通知見本",
-    "path": "/restaurant-test/line-followup",
-    "kind": "DetailColumns",
-    "selector": "aside[aria-label=\"LINEでの見え方\"]"
-  },
+  // LINE来店フォローはカード一覧と共通Dialogの編集へ移行済み。
+  // 右の詳細面（data-detail-content）ではないため、この検査の対象外。
   {
     "key": "saved-analysis-history",
     "label": "保存した分析の履歴",

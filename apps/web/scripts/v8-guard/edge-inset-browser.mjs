@@ -56,7 +56,8 @@ export default function scanEdgeInset() {
     const k = kind(el)
     if (!k || !visible(el)) continue
     const r = el.getBoundingClientRect()
-    if (r.width < 200 || r.height < 24) continue
+    // 数の帯は中身が1行でも板の端に付けてはいけない。
+    if (r.width < 200 || (k !== 'band' && r.height < 24)) continue
     const left = r.left - board.left, right = board.right - r.right
     if (left < need - 1 || right < need - 1) findings.push({ kind: 'edge-hug', target: selector(el), text: k, measure: { left: Math.round(left), right: Math.round(right), inset: Math.round(need) } })
   }

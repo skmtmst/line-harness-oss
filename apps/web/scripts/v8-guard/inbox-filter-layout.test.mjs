@@ -41,7 +41,10 @@ function Fixture(){
 ` },
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
   tsconfig: `${webRoot}/tsconfig.json`,
-  define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
+  define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"',
+    'process.env.NEXT_PUBLIC_TERMS_URL': '""', 'process.env.NEXT_PUBLIC_PRIVACY_URL': '""',
+    'process.env.NEXT_PUBLIC_COMMERCE_LAW_URL': '""', 'process.env.NEXT_PUBLIC_CONTACT_URL': '""',
+    'process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY': '""' },
   plugins: [{ name: 'inbox-fixture', setup(builder) {
     builder.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: 'navigation', namespace: 'fixture' }))
     builder.onResolve({ filter: /^@\/contexts\/account-context$/ }, () => ({ path: 'account', namespace: 'fixture' }))
@@ -177,7 +180,7 @@ for (const width of [1152, 1440]) {
       await panel.getByRole('button', { name: '期限で絞り込む' }).click()
       await page.getByRole('option', { name: '1時間以上待ち', exact: true }).getByRole('button').click()
       await expect(page.locator('output')).toContainText('"quickFilter":"overdue"')
-      await panel.getByRole('button', { name: '担当者で絞り込む（パネル）' }).click()
+      await panel.getByRole('button', { name: '担当者で絞り込む' }).click()
       const picker = page.getByRole('dialog').last()
       await expect(picker.getByText('未読 27件', { exact: true })).toBeVisible()
       await picker.getByRole('radio', { name: '未割り当て', exact: true }).check()
