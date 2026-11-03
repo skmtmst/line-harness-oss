@@ -591,6 +591,7 @@ export default function FeatureSettingsScreen() {
         description="止まる仕事があります。オフにしてもデータは削除されず、再度オンにすると再開できます。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。"
         confirmLabel="確認して保存する"
         destructive
+        confirmIcon={false}
         busy={impactBusy || saving}
         error={impactError || undefined}
         onCancel={() => {

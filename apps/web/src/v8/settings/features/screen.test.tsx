@@ -112,6 +112,7 @@ describe('★V8 機能設定の閲覧のみ', () => {
       expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
       expect(within(dialog).getByText('環境')).toBeTruthy()
       expect(dialog.querySelector('[title="account-a"]')).toBeTruthy()
+      expect(dialog.querySelector('.lucide-trash-2')).toBeNull()
       const held = heldImpact.confirm!
       fixture.account = 'account-b'
       await act(async () => { root.render(<FeatureSettingsScreen />) })
