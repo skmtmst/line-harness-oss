@@ -118,8 +118,8 @@ export default function BalancesTab() {
   const [rejectScope, setRejectScope] = useState<{ id: string; generation: number } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const isOwner = isOwnerRole(useStaffRole())
-  const canDecide = useRef(isOwner && !readonly && overview?.balanceSource !== 'ec')
-  canDecide.current = isOwner && !readonly && overview?.balanceSource !== 'ec'
+  const canDecide = useRef(isOwner && !readonly && overview?.balanceSource === 'musubo')
+  canDecide.current = isOwner && !readonly && overview?.balanceSource === 'musubo'
   const [exportError, setExportError] = useState('')
 
   const chipActive = withBalanceOnly || (pendingOnly && overview?.balanceSource !== 'ec')
@@ -368,7 +368,7 @@ export default function BalancesTab() {
               {`${request.reason}・申請 ${request.requested_by_staff_name}（${formatMileageShortDateTime(request.created_at)}）`}
             </span>
           </div>
-          {isOwner && !readonly && !ecSource ? (
+          {canDecide.current ? (
             <>
               <Button
                 variant="secondary"
@@ -386,7 +386,7 @@ export default function BalancesTab() {
               </Button>
             </>
           ) : (
-            <span className={styles.approvalSub}>{ecSource ? 'EC管理のため保留しています' : 'オーナーが対応します'}</span>
+            <span className={styles.approvalSub}>{ecSource ? 'EC管理のため保留しています' : overview?.balanceSource !== 'musubo' ? '管理元を確認できていません' : 'オーナーが対応します'}</span>
           )}
         </div>
       ))}
