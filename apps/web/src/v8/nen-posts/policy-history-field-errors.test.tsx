@@ -2,7 +2,7 @@
 /* ：報酬の決まりの新しい版。保存で落ちた欄は、その欄が赤くなり真下に理由が出て、1つ目の欄へ移る。 */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const create = vi.hoisted(() => vi.fn())
@@ -80,6 +80,7 @@ it('日時を入れた版は予約の操作となり、説明は引き出しの�
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '使い始め（日本時間・空ならすぐ）' })) })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '日付', exact: true })) })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '今日', exact: true })) })
+  await act(async () => { fireEvent.click(within(screen.getByRole('dialog', { name: '日付を選ぶ' })).getByRole('button', { name: '確定' })) })
   await waitFor(() => expect(screen.getByRole('button', { name: '版を予約する' })).toBeTruthy())
   expect(create).not.toHaveBeenCalled()
 })

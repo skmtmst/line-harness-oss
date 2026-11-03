@@ -1,4 +1,5 @@
 'use client'
+import { restaurantWalkIn } from '@/lib/terms'
 import { DetailPreview } from '@/components/shared/detail-content'
 
 import { tableRequirements as b244Requirements } from './requirements'
@@ -331,7 +332,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         </div>
       </DetailColumns>
       <div className={styles.rules}>
-        <Panel fusion title="自動配席ルール" description="収容差が最小の卓を優先"><p className={styles.ruleText}>人数を収容できる卓のうち、余裕が最も少ない卓を候補にします。電話・直接来店も同じ候補を使います。</p></Panel>
+        <Panel fusion title="自動配席ルール" description="収容差が最小の卓を優先"><p className={styles.ruleText}>人数を収容できる卓のうち、余裕が最も少ない卓を候補にします。電話・{restaurantWalkIn}も同じ候補を使います。</p></Panel>
         <Panel fusion title="結合のルール" description="結合グループ"><p className={styles.ruleText}>同じ結合グループの卓は全卓を一緒に確保します。配置と結合グループは卓の変更から設定できます。</p></Panel>
         <Panel fusion title="卓を止めるとき"><p className={styles.ruleText}>先の予約を同じ人数が入る別の卓へ自動で移すか、未配席に戻します。お客さまへの通知はこの画面からは送りません。</p></Panel>
       </div>

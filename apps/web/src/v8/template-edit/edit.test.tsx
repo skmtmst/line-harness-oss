@@ -879,3 +879,32 @@ it.each(['', 'kind=coupon', 'kind=research'])('必須が空の主保存は押せ
   expect(screen.getByText('テンプレート名を入力してください。')).toBeTruthy();
   fireEvent.click(save);await flush();expect(templatesApi.create).not.toHaveBeenCalled();expect(assetsCreate).not.toHaveBeenCalled();
 })
+
+it.each(['rich_message', 'research'])('%s の「保存して公開」は下書き作成後にその版を公開する', async kind => {
+  assetsCreate.mockResolvedValue({ success: true, data: { id: 'asset-1', publishedVersion: 0, draftRevision: 1 } })
+  await mount(`kind=${kind}&visual=1`)
+  if (kind === 'rich_message') type(screen.getByLabelText('画像のURL'), 'https://example.invalid/synthetic.png')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+  await flush()
+  expect(assetsCreate).toHaveBeenCalledOnce()
+  expect(assetsPublish).toHaveBeenCalledWith('asset-1', { expectedVersion: 0, expectedDraftRevision: 1 }, expect.any(String))
+  expect(push).toHaveBeenCalledWith('/templates?highlight=asset-1')
+})
+
+it.each(['rich_message', 'research'])('%s の公開失敗後は同じ下書きと受付番号で再試行する', async kind => {
+  assetsCreate.mockResolvedValue({ success: true, data: { id: 'asset-1', publishedVersion: 0, draftRevision: 1 } })
+  assetsPublish.mockRejectedValueOnce(new Error('通信できませんでした'))
+  await mount(`kind=${kind}&visual=1`)
+  if (kind === 'rich_message') type(screen.getByLabelText('画像のURL'), 'https://example.invalid/synthetic.png')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+  await flush()
+  expect(assetsCreate).toHaveBeenCalledOnce()
+  expect(assetsPublish).toHaveBeenCalledOnce()
+  expect(push).not.toHaveBeenCalled()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+  await flush()
+  expect(assetsCreate).toHaveBeenCalledOnce()
+  expect(assetsPublish).toHaveBeenCalledTimes(2)
+  expect(assetsPublish.mock.calls[1]).toEqual(assetsPublish.mock.calls[0])
+  expect(push).toHaveBeenCalledWith('/templates?highlight=asset-1')
+})

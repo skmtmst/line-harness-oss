@@ -35,3 +35,14 @@ it('履歴のサーバーの失敗を英語で出さず、再試行を案内す�
   expect(document.body.textContent).not.toContain('history fetch')
   expect(document.body.textContent).not.toContain('構成されていないため')
 })
+
+it('統括から来た時だけ統括へ戻れる', () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })))
+  window.history.replaceState({}, '', '/updates?from=hq')
+  const view=render(<UpdatesPage />)
+  expect(screen.getByRole('link', { name: '統括へ戻る' }).getAttribute('href')).toBe('/hq')
+  view.unmount()
+  window.history.replaceState({}, '', '/updates')
+  render(<UpdatesPage />)
+  expect(screen.queryByRole('link', { name: '統括へ戻る' })).toBeNull()
+})

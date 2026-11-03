@@ -11,7 +11,7 @@ import TextLink from '@/components/shared/text-link'
 import styles from './sidebar-version.module.css'
 
 /** 版と環境を1行で出し、配備の詳細と更新の案内は共通の浮く面で開く。 */
-export default function SidebarVersion() {
+export default function SidebarVersion({ hqOrigin = false }: { hqOrigin?: boolean } = {}) {
   const [detail, setDetail] = useState<AdminVersionDetail | null>(null)
   const [ready, setReady] = useState(false)
   const [open, setOpen] = useState(false)
@@ -40,6 +40,7 @@ export default function SidebarVersion() {
   const notice = update.kind === 'upgrade' || update.kind === 'fork'
   const noticeText = update.kind === 'upgrade' ? '更新あり' : update.kind === 'fork' ? 'カスタマイズ版の更新案内' : undefined
   const showManual = notice && canManageRole(role)
+  const updatesHref = hqOrigin ? '/updates?from=hq' : '/updates'
 
   return (
     <div className="border-t border-hairline px-4 pb-3 pt-2.5" data-sidebar-version aria-busy={!ready}>
@@ -63,9 +64,9 @@ export default function SidebarVersion() {
             <p>{lines.line1}</p>
             <p>{lines.line2 || '配備日時・環境の情報なし'}</p>
           </> : <p role="status">{summary}</p>}
-          {update.kind === 'upgrade' ? <TextLink href="/updates">更新あり</TextLink> : null}
-          {update.kind === 'fork' ? <TextLink href="/updates">更新履歴</TextLink> : null}
-          {showManual ? <TextLink href="/updates">手動で更新</TextLink> : null}
+          {update.kind === 'upgrade' ? <TextLink href={updatesHref}>更新あり</TextLink> : null}
+          {update.kind === 'fork' ? <TextLink href={updatesHref}>更新履歴</TextLink> : null}
+          {showManual ? <TextLink href={updatesHref}>手動で更新</TextLink> : null}
         </div>
       </FilterPopover>
     </div>

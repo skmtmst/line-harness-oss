@@ -224,6 +224,9 @@ export const termsStyle = {
   V30: {"standard": "予約管理", "restaurant": "予約台帳", "salon": "予約管理", "consult": "予約管理", "lesson": "イベント予約", "ec": "予約管理"},
 } as const
 
+/** 飲食店で予約をせずに来店するお客さまの呼び方。 */
+export const restaurantWalkIn = 'ウォークイン'
+
 export function styleTerm(style: AccountStyle, key: keyof typeof termsStyle): string { return termsStyle[key][style] }
 
 /** §6 TM-C03（文中の受ける側）。 */

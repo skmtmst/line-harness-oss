@@ -339,6 +339,7 @@ async function typeDatetime(text: string) {
       (b.getAttribute('aria-label') ?? '').startsWith(`${year}年${month}月${day}日（${week}）`),
     ) ?? null,
   )
+  await click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
   await setTimeControl(dialog()?.querySelector('input[role="combobox"]') ?? null, `${match[4]}:${match[5]}`)
 }
 import { setTimeControl } from '@/test-utils/time-control'
