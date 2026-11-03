@@ -108,12 +108,12 @@ function listResult(items: unknown[], total = items.length): Result {
 
 function impact(groupId: string, extra: Record<string, unknown> = {}) {
   return {
-    group: { id: groupId, accountId: 'account-a', name: 'x', status: 'draft' },
+    group: { id: groupId, accountId: 'account-a', name: groupId === 'g-pub' ? '通常メニュー' : 'x', status: groupId === 'g-pub' ? 'published' : 'draft', version:1, publishingGeneration:0 },
     currentAudience: { value: 0, state: 'available', reason: null },
     nextDisplay: { guaranteedGroupId: null, reason: 'no_fallback', candidates: [] },
     incomingSwitches: [],
     operationalReferences: [],
-    lineResources: { pageCount: 1, pagesWithLineRichMenuId: 0, isDefaultForAll: false, publishing: false },
+    lineResources: { pageCount: 1, pagesWithLineRichMenuId: 0, isDefaultForAll: false, publishing: false, pages:[{id:'page-1',orderIndex:0,lineRichMenuId:'line-1'}] },
     blockers: [],
     canDelete: true,
     recommendedAction: 'delete',
@@ -371,8 +371,18 @@ describe('消す・取り下げる', () => {
     expect(text).toContain('残るもの：管理画面の設定と、これまでのタップ記録')
     expect(text).toContain('取り下げたあと、管理画面から削除できます。')
     fireEvent.click(within(dialog).getByRole('button', { name: 'LINEから取り下げる' }))
-    await waitFor(() => expect(mocks.unpublish).toHaveBeenCalledWith('g-pub'))
+    await waitFor(() => expect(mocks.unpublish).toHaveBeenCalledWith('g-pub',{expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:false,expectedPages:[{id:'page-1',orderIndex:0,lineRichMenuId:'line-1'}]}))
     expect(mocks.remove).not.toHaveBeenCalled()
+  })
+
+  test('一覧の名前と確認した公開内容が一致しない場合は取り下げない',async()=>{
+    mocks.deleteImpact.mockResolvedValue({success:true,data:impact('g-pub',{group:{id:'g-pub',accountId:'account-a',name:'変更後',status:'published',version:2,publishingGeneration:1}})})
+    const view=render(<RichMenusListV8 />)
+    await openDelete(view,'通常メニュー','取り下げ・削除する')
+    const dialog=await deleteDialog(view,'通常メニュー')
+    fireEvent.click(within(dialog).getByRole('button',{name:'LINEから取り下げる'}))
+    await waitFor(()=>expect(dialog.textContent).toContain('公開内容を確認できません'))
+    expect(mocks.unpublish).not.toHaveBeenCalled()
   })
 
   test('削除が断られたら窓を開いたまま安全な文を出し、二度押しでも1回しか送らない', async () => {
