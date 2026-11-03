@@ -35,6 +35,7 @@ import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { notifyToast } from '@/components/shared/toast'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import frame from '../sa-frame.module.css'
@@ -238,7 +239,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         <CopyTextButton value={publicUrl} aria-label="公開URLをコピー" variant="secondary" label="公開 URL コピー" icon={<Copy size={16} aria-hidden="true" />} />
       </Card>
       {copyError ? <Notice tone="danger" >{copyError}</Notice> : null}
-      <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
+      <PoolMembers poolId={pool.id} poolName={pool.name} accounts={accounts} canManage={canManage} onChange={onChange} />
 
       <SaveErrorScope errors={saveErrors}><FormLeaveGuard dirty={editing && editName.trim() !== savedName.trim()} busy={editBusy} /><Dialog open={editing} title="プールを編集" designWidth={560} dirty={editName.trim() !== savedName.trim()} busy={editBusy} error={editError} onCancel={closeEdit} onConfirm={conflict.conflict || editName.trim() === savedName.trim() ? undefined : () => void saveEdit()} confirmLabel="保存する">
         {conflict.conflict && <SaveConflictBand title={saveConflictTitle(conflict.conflict.updatedAt, 'プール', pool.name)} description="ほかの人が先に保存しました。入力は残っています。" compareBusy={conflict.compareBusy} onCompare={() => void conflict.compare()} onReload={() => void conflict.reloadLatest()} />}
@@ -266,14 +267,26 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   )
 }
 
-function PoolMembers({ poolId, accounts, canManage, onChange }: {
+function PoolMembers({ poolId, poolName, accounts, canManage, onChange }: {
   poolId: string
+  poolName: string
   accounts: AccountWithStats[]
   canManage: boolean
   onChange: () => void
 }) {
   const [members, setMembers] = useState<PoolAccount[]>([])
-  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null)
+  const poolScope = useRef({ id: poolId, generation: 0 })
+  if (poolScope.current.id !== poolId) poolScope.current = { id: poolId, generation: poolScope.current.generation + 1 }
+  const renderedScope = poolScope.current
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; lineAccountId: string; name: string; accountName: string | null; poolName: string; scope: typeof renderedScope; ticket: object } | null>(null)
+  const ticketRef = useRef<object | null>(null)
+  const lock = useRef(false)
+  const alive = useRef(false)
+  const manageRef = useRef(canManage); manageRef.current = canManage
+  const membersRef = useRef(members); membersRef.current = members
+  const loadedScope = useRef<typeof renderedScope | null>(null)
+  const request = useRef(0)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const [removing, setRemoving] = useState(false)
   const [removeError, setRemoveError] = useState('')
   const [listError, setListError] = useState('')
@@ -282,18 +295,24 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
 
   // 読み直しの失敗は握りつぶさない（空のままだと「所属なし」と読み違える）。
   const reload = useCallback(async () => {
+    if (!alive.current || renderedScope !== poolScope.current) return
+    loadedScope.current = null
+    const sequence = ++request.current
+    const current = () => alive.current && renderedScope === poolScope.current && request.current === sequence
     try {
       const res = await api.pools.accounts.list(poolId)
+      if (!current()) return
       if (res.success) {
+        loadedScope.current = renderedScope
         setMembers(res.data)
         setListError('')
       } else {
         setListError('所属アカウントを読み込めませんでした。もう一度お試しください。')
       }
     } catch {
-      setListError('所属アカウントを読み込めませんでした。もう一度お試しください。')
+      if (current()) setListError('所属アカウントを読み込めませんでした。もう一度お試しください。')
     }
-  }, [poolId])
+  }, [poolId, renderedScope])
 
   useEffect(() => {
     void reload()
@@ -315,19 +334,23 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
 
   // 外す確認。あとから入れ直せるので destructive は付けない。
   const onRemove = async () => {
-    if (!removeTarget || removing) return
-    setRemoving(true)
+    if (!removeTarget || removing || lock.current || !alive.current || !manageRef.current || removeTarget.scope !== poolScope.current || loadedScope.current !== removeTarget.scope || removeTarget.ticket !== ticketRef.current || !membersRef.current.some(member => member.id === removeTarget.id && member.lineAccountId === removeTarget.lineAccountId)) return
+    const current = () => alive.current && manageRef.current && removeTarget.scope === poolScope.current && removeTarget.ticket === ticketRef.current
+    lock.current = true; setRemoving(true)
     setRemoveError('')
     try {
       const res = await api.pools.accounts.remove(poolId, removeTarget.id)
+      if (!current()) return
       if (!res.success) throw new Error(res.error)
+      ticketRef.current = null
       setRemoveTarget(null)
       await reload()
-      onChange()
+      if (alive.current && manageRef.current && removeTarget.scope === poolScope.current) onChange()
     } catch {
-      setRemoveError('このアカウントをプールから外せませんでした。状態を読み直してから、もう一度お試しください。')
+      if (current()) setRemoveError('このアカウントをプールから外せませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setRemoving(false)
+      lock.current = false
+      if (alive.current && removeTarget.scope === poolScope.current) setRemoving(false)
     }
   }
 
@@ -344,7 +367,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
               <span className={styles.memberName} ><TruncatedText value={String(name ?? '')} /></span>
               <span className={styles.memberFriends}>{`友だち ${friends}`}</span>
               {canManage ? (
-                <Button variant="secondary" onClick={() => { setRemoveError(''); setRemoveTarget({ id: m.id, name }) }}>外す</Button>
+                <Button variant="secondary" onClick={() => { if (!alive.current || !manageRef.current || renderedScope !== poolScope.current || loadedScope.current !== renderedScope) return; const ticket = {}; ticketRef.current = ticket; setRemoveError(''); setRemoveTarget({ id: m.id, lineAccountId: m.lineAccountId, name, accountName: acc?.name ?? null, poolName, scope: renderedScope, ticket }) }}>外す</Button>
               ) : null}
             </Card></li>
           )
@@ -379,19 +402,23 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
       ) : null}
 
       <ConfirmDialog
-        open={removeTarget !== null}
+        open={removeTarget !== null && removeTarget.scope === poolScope.current}
         title={`「${removeTarget?.name ?? ''}」をこのプールから外しますか？`}
         description="これから来たお客様は、このアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。外したあとで、同じアカウントを入れ直せます。"
         confirmLabel="外す"
         busy={removing}
+        confirmLockedReason={canManage ? undefined : 'プールを変更する権限がありません。'}
         error={removeError}
         onConfirm={() => onRemove()}
         onCancel={() => {
-          if (removing) return
+          if (removing || !removeTarget || removeTarget.ticket !== ticketRef.current) return
+          ticketRef.current = null
           setRemoveTarget(null)
           setRemoveError('')
         }}
-      />
+      >
+        {removeTarget ? <OperationTargetSummary accounts={[{ id: removeTarget.lineAccountId, name: removeTarget.accountName }]} externalTarget={{ label: 'プール', name: removeTarget.poolName }} /> : null}
+      </ConfirmDialog>
     </>
   )
 }

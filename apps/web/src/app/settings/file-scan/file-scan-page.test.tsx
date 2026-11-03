@@ -10,7 +10,7 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ApiError, type FileScanItem } from '@/lib/api'
 
 const mocks = vi.hoisted(() => ({
@@ -21,11 +21,19 @@ const mocks = vi.hoisted(() => ({
   saveConfig: vi.fn(),
   release: vi.fn(),
   remove: vi.fn(),
+  confirm: null as null | (() => unknown),
 }))
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: mocks.accountId }),
 }))
+vi.mock('@/components/shared/confirm-dialog', async (importOriginal: () => Promise<typeof import('@/components/shared/confirm-dialog')>) => {
+  const actual = await importOriginal()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.title === '使えるように戻す') mocks.confirm = props.onConfirm ?? null
+    return React.createElement(actual.default, props)
+  } }
+})
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn() }),
@@ -94,6 +102,7 @@ function ready() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.confirm = null
   // 一覧のページ・検索語はURLに残る。別の試験の操作を持ち越さない。
   window.history.replaceState(null, '', '/settings/file-scan')
   window.dispatchEvent(new PopStateEvent('popstate'))
@@ -243,6 +252,52 @@ describe('ファイルの安全確認の設定画面', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '使えるように戻す' }))
     expect(screen.getByLabelText(/理由/)).toBeTruthy()
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('LINEアカウント')
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('環境')
+  })
+
+  test('アカウントを行き来した後は前の隔離解除の窓を復活させない', async () => {
+    ready()
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    const view = render(<FileScanSettingsPage />)
+    await screen.findByRole('button', { name: '使えるように戻す' })
+    fireEvent.click(screen.getByRole('button', { name: '使えるように戻す' }))
+    mocks.accountId = 'acc-2'; view.rerender(<FileScanSettingsPage />)
+    mocks.accountId = 'acc-1'; view.rerender(<FileScanSettingsPage />)
+    await waitFor(() => expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull())
+    expect(mocks.release).not.toHaveBeenCalled()
+  })
+
+  test('前のアカウントの遅い一覧で現在の一覧を上書きしない', async () => {
+    ready()
+    let finish: (value: unknown) => void = () => {}
+    const old = new Promise(resolve => { finish = resolve })
+    const response = (item: FileScanItem) => ({ success: true, data: { items: [item], total: 1, limit: 50, offset: 0 } })
+    mocks.list.mockImplementation((id: string) => id === 'acc-1' ? old : Promise.resolve(response(scanOf({ filename: 'current.pdf', lineAccountId: 'acc-2' }))))
+    const view = render(<FileScanSettingsPage />)
+    mocks.accountId = 'acc-2'; view.rerender(<FileScanSettingsPage />)
+    await screen.findByText('current.pdf')
+    await React.act(async () => { finish(response(scanOf({ filename: 'old.pdf' }))); await new Promise(resolve => setTimeout(resolve, 0)) })
+    expect(screen.queryByText('old.pdf')).toBeNull()
+    expect(screen.getByText('current.pdf')).toBeTruthy()
+  })
+
+  test('隔離解除の窓を再表示した後は古い確定を受け付けない', async () => {
+    ready()
+    mocks.release.mockResolvedValue({ success: true, data: {} })
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    render(<FileScanSettingsPage />)
+    await screen.findByRole('button', { name: '使えるように戻す' })
+    fireEvent.click(screen.getByRole('button', { name: '使えるように戻す' }))
+    fireEvent.change(screen.getByLabelText(/理由/), { target: { value: '安全を確認したため' } })
+    const oldConfirm = mocks.confirm!
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(screen.getByRole('button', { name: '使えるように戻す' }))
+    fireEvent.change(screen.getByLabelText(/理由/), { target: { value: '安全を確認したため' } })
+    await React.act(async () => { oldConfirm() })
+    expect(mocks.release).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '使えるように戻す' }))
+    await waitFor(() => expect(mocks.release).toHaveBeenCalledTimes(1))
   })
 
   test('51件以上あるときページ送りが出て、先のページを取りに行く (監査R132)', async () => {
@@ -312,6 +367,8 @@ describe('ファイルの安全確認の設定画面', () => {
     await waitFor(() => {
       expect(screen.getByText('外の検査サービスへの送信設定を消します。内蔵の簡易検査は続きます。もう一度使うには設定を入れ直します。')).toBeTruthy()
     })
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('LINEアカウント')
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('環境')
     fireEvent.click(screen.getAllByRole('button', { name: '外の検査を止める' }).at(-1)!)
     await waitFor(() => {
       expect(mocks.saveConfig).toHaveBeenCalledWith('acc-1', {
@@ -373,6 +430,8 @@ describe('ファイルの安全確認の設定画面', () => {
     await waitFor(() => {
       expect(screen.getByText('「invoice.pdf」を削除しますか？')).toBeTruthy()
     })
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('LINEアカウント')
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('環境')
     confirmInDialog('削除する')
     const message = 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
     await waitFor(() => {

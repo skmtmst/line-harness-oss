@@ -61,6 +61,12 @@ export default function TemplatesListV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const renderedScope = accountScope.current
+  const loadedScope = useRef<typeof renderedScope | null>(null)
+  const mounted = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const tokenNames = useInsertTokenNames(selectedAccountId)
   /*
    * 作成・編集・公開・削除は API が owner/admin で閉じている。
@@ -70,6 +76,7 @@ export default function TemplatesListV8() {
   const staffRole = useStaffRole()
   const featureAccess = useFeatureAccess('templates')
   const canMutateTemplates = featureAccess
+  const canMutateRef = useRef(canMutateTemplates); canMutateRef.current = canMutateTemplates
   const lockedReason = usePermissionLockReason(canMutateTemplates)
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
@@ -144,6 +151,9 @@ export default function TemplatesListV8() {
   const savedAnchorRef = useRef<HTMLElement | null>(null)
 
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  const [deleteScope, setDeleteScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const deleteTicket = useRef<object | null>(null)
+  const deleteLock = useRef(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   /** 使っている所があるので削除できない窓（）。中身は usage 口で取る。 */
@@ -171,14 +181,19 @@ export default function TemplatesListV8() {
 
   /** まとめて削除の確認。対象は「使っていない」ものだけ。 */
   const [pendingBulkDelete, setPendingBulkDelete] = useState<Template[] | null>(null)
+  const [bulkScope, setBulkScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const bulkTicket = useRef<object | null>(null)
+  const bulkLock = useRef(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [bulkDeleteError, setBulkDeleteError] = useState('')
 
   const activeAccountRef = useRef<string | null>(selectedAccountId)
+  activeAccountRef.current = selectedAccountId
   const loadGenerationRef = useRef(0)
 
   useEffect(() => {
     activeAccountRef.current = selectedAccountId
+    deleteTicket.current = null; bulkTicket.current = null
     // フォルダはアカウント単位。切り替えたら前のアカウントの帯も選択も残さない。
     setFolders([])
     setUnfiledCount(null)
@@ -198,6 +213,7 @@ export default function TemplatesListV8() {
   useOnAccountSwitch(selectedAccountId, () => setUrlView({ folder: 'all', page: '1' }))
 
   const load = useCallback(async () => {
+    if (!mounted.current || renderedScope !== accountScope.current) return
     if (!selectedAccountId) {
       setTemplates([])
       setFailure(null)
@@ -212,23 +228,24 @@ export default function TemplatesListV8() {
     setTemplates([])
     try {
       const res = await api.templates.list(undefined, accountId)
-      if (activeAccountRef.current !== accountId || requestGeneration !== loadGenerationRef.current) return
-      if (res.success) setTemplates(res.data as Template[])
+      if (renderedScope !== accountScope.current || activeAccountRef.current !== accountId || requestGeneration !== loadGenerationRef.current) return
+      if (res.success) { loadedScope.current = renderedScope; setTemplates(res.data as Template[]) }
       else setFailure(failureOfResponse())
     } catch (e) {
+      if (!mounted.current || renderedScope !== accountScope.current || activeAccountRef.current !== accountId || requestGeneration !== loadGenerationRef.current) return
       const fieldFailure = saveErrors.capture(e);
 
-      if (activeAccountRef.current === accountId && requestGeneration === loadGenerationRef.current) {
+      if (renderedScope === accountScope.current && activeAccountRef.current === accountId && requestGeneration === loadGenerationRef.current) {
         // 権限不足を「読み込めませんでした」に混ぜない。
         { if (!fieldFailure)
         setFailure(failureOf(e)) }
       }
     } finally {
-      if (activeAccountRef.current === accountId && requestGeneration === loadGenerationRef.current) {
+      if (renderedScope === accountScope.current && activeAccountRef.current === accountId && requestGeneration === loadGenerationRef.current) {
         setLoading(false)
       }
     }
-  }, [selectedAccountId, saveErrors])
+  }, [selectedAccountId, saveErrors, renderedScope])
 
   useEffect(() => { void load() }, [load])
 
@@ -500,34 +517,41 @@ export default function TemplatesListV8() {
    * 使っている数が分からないときは、今までどおり確かめの窓。
    */
   const handleDelete = (t: Template) => {
+    if (!mounted.current || !canMutateRef.current || renderedScope !== accountScope.current || loadedScope.current !== renderedScope || loading) return
     setDeleteError('')
     if (t.usageCount > 0) { setBlockedDelete({ item: t, accountId: selectedAccountId }); return }
+    const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket })
     setPendingDelete({ item: t, accountId: selectedAccountId })
   }
 
   const confirmDelete = async () => {
     // 二度押しを受け付けない。切り替わった後も走らせない。
-    if (!pendingDelete || deleting) return
+    if (!pendingDelete || deleting || deleteLock.current || !mounted.current || !canMutateRef.current || !deleteScope || deleteScope.scope !== accountScope.current || deleteScope.ticket !== deleteTicket.current || loadedScope.current !== deleteScope.scope) return
     if (pendingDelete.accountId !== selectedAccountId) {
       setDeleteError('アカウントが切り替わりました。削除するテンプレートを選び直してください。')
       return
     }
     const target = pendingDelete.item
-    setDeleting(true)
+    const current = () => mounted.current && canMutateRef.current && deleteScope.scope === accountScope.current && deleteScope.ticket === deleteTicket.current
+    deleteLock.current = true; setDeleting(true)
     setDeleteError('')
     try {
       const res = await api.templates.delete(target.id)
+      if (!current()) return
       if (!res.success) throw new Error(res.error)
+      deleteTicket.current = null
       setPendingDelete(null)
       // 件数（未分類・フォルダ別）はフォルダ側の集計が持つので両方読み直す。
       await Promise.all([load(), loadFolders()])
     } catch (saveFailure) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setDeleting(false)
+      deleteLock.current = false
+      if (mounted.current && deleteScope.scope === accountScope.current) setDeleting(false)
     }
   }
 
@@ -628,13 +652,16 @@ export default function TemplatesListV8() {
 
   /** まとめて削除。使用中のものはここへ来ない（帯の側で弾く）。 */
   const runBulkDelete = async () => {
-    if (!pendingBulkDelete) return
-    setBulkDeleting(true)
+    if (!pendingBulkDelete || !bulkScope || bulkScope.scope !== accountScope.current || bulkScope.ticket !== bulkTicket.current || loadedScope.current !== bulkScope.scope || !mounted.current || !canMutateRef.current || bulkLock.current) return
+    const current = () => mounted.current && canMutateRef.current && bulkScope.scope === accountScope.current && bulkScope.ticket === bulkTicket.current
+    bulkLock.current = true; setBulkDeleting(true)
     setBulkDeleteError('')
     try {
       let failed = 0
       for (const t of pendingBulkDelete) {
+        if (!current()) return
         const result = await api.templates.delete(t.id)
+        if (!current()) return
         if (!result.success) failed += 1
       }
       if (failed > 0) {
@@ -642,11 +669,13 @@ export default function TemplatesListV8() {
         await Promise.all([load(), loadFolders()])
         return
       }
+      bulkTicket.current = null
       setPendingBulkDelete(null)
       setSelectedIds(new Set())
       notifyToast(`${formatNumber(pendingBulkDelete.length)} 件のテンプレートを削除しました`, { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(reason)
 
       { if (!fieldFailure)
@@ -656,9 +685,24 @@ export default function TemplatesListV8() {
           : '削除できませんでした。状態を読み直してからお試しください。',
       ) }
     } finally {
-      setBulkDeleting(false)
+      bulkLock.current = false
+      if (mounted.current && bulkScope.scope === accountScope.current) setBulkDeleting(false)
     }
   }
+
+  const changeBulkDelete: typeof setPendingBulkDelete = (next) => {
+    const value = typeof next === 'function' ? next(pendingBulkDelete) : next
+    if (value) {
+      if (!mounted.current || !canMutateRef.current || renderedScope !== accountScope.current || loadedScope.current !== renderedScope || loading) return
+      const ticket = {}; bulkTicket.current = ticket; setBulkScope({ scope: renderedScope, ticket }); setPendingBulkDelete(value)
+    } else if (bulkScope?.ticket === bulkTicket.current) { bulkTicket.current = null; setPendingBulkDelete(null) }
+  }
+  const changePendingDelete: typeof setPendingDelete = (next) => {
+    const value = typeof next === 'function' ? next(pendingDelete) : next
+    if (value) return
+    if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setPendingDelete(null) }
+  }
+  const targetAccounts = (items: Template[]) => [...new Set(items.map(item => item.accountId ?? ''))].map(id => ({ id, name: accounts.find(account => account.id === id)?.name }))
 
   /* ===== 行の「…」（一斉配信で使う・複製・使っている所・削除） ===== */
   const rowMenuItems = (t: Template): ActionMenuItem[] => {
@@ -900,7 +944,7 @@ export default function TemplatesListV8() {
 
   /* ===== 一覧の中身（：読込中・読み込めない・空・0件を分ける） ===== */
   const sectionWord = activeSection === 'rich_video' ? 'リッチビデオのテンプレート' : activeSection === 'question' ? '質問のテンプレート' : 'メッセージのテンプレート'
-  const listBody = renderTemplateList({ tokenNames, accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref: createKind.href, createLabel: createKind.title, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view })
+  const listBody = renderTemplateList({ tokenNames, accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref: createKind.href, createLabel: createKind.title, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete: changeBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view })
 
   /* ページ送りは型の pagination 枠へ。件数は部品の summary に入れる（絵：左に「26件中 1〜20件」、右に頁。帯の内側は部品の 10・20）。 */
   const showPager = view === 'ready' && filteredTemplates.length > 0
@@ -940,7 +984,7 @@ export default function TemplatesListV8() {
   const blockedRows = blockedUsage ? usageRows(blockedUsage) : []
   const blockedTotal = blockedDelete ? Math.max(blockedDelete.item.usageCount, blockedRows.length) : 0
 
-  const overlays = renderTemplateDialogs({ activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates })
+  const overlays = renderTemplateDialogs({ deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates })
 
   const heading = {
     title: 'テンプレート',
