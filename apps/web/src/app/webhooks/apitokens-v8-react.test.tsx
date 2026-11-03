@@ -197,3 +197,13 @@ test('鍵の入れ替えの競合理由は一覧を取り直したあとも残�
   await waitFor(() => expect(refreshed).toBe(2))
   await waitFor(() => expect(host.textContent).toContain('ほかの操作が先にこの鍵を更新しました'))
 })
+
+test.each(['入れ替える', '止める'])('鍵を%s確認する窓に対象アカウントと環境を示す', async (action) => {
+  await renderPage()
+  const row = host.querySelector('[data-row-id="tok-1"]') as HTMLElement
+  fireEvent.click(within(row).getByRole('button', { name: '「予約システム連携」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: action }))
+  const dialog = await screen.findByRole(action === '止める' ? 'alertdialog' : 'dialog', { name: new RegExp(`鍵を${action === '止める' ? '止め' : '入れ替え'}ますか`) })
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+})

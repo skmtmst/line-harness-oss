@@ -3,24 +3,35 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React, { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const fx = vi.hoisted(() => ({ role: 'owner', account: 'A', id: 'one', definition: vi.fn(), update: vi.fn() }))
+const fx = vi.hoisted(() => ({ role: 'owner', account: 'A', id: 'one', definition: vi.fn(), update: vi.fn(), remove: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams(`id=${fx.id}`) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fx.account }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fx.role, canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
-  return { ...actual, api: { ...actual.api, tags: { definition: fx.definition, updateDefinition: fx.update, dependencies: async () => ({ success: true, data: { friendCount: 0 } }) }, tagGroups: { list: async () => ({ success: true, data: [] }) } } }
+  return { ...actual, api: { ...actual.api, tags: { definition: fx.definition, updateDefinition: fx.update, delete: fx.remove, dependencies: async () => ({ success: true, data: { friendCount: 0, referenceCounts: {} } }) }, tagGroups: { list: async () => ({ success: true, data: [] }) } } }
 })
-vi.mock('./edit-form', () => ({ TagEditForm: ({ tag, saving, onSave }: { tag: { name: string }; saving: boolean; onSave: (values: { name: string; actions: []; isStarred: boolean }, apply: boolean) => void }) => {
+vi.mock('./edit-form', () => ({ TagEditForm: ({ tag, saving, onSave, onDelete }: { tag: { name: string }; saving: boolean; onSave: (values: { name: string; actions: []; isStarred: boolean }, apply: boolean) => void; onDelete: () => void }) => {
   const [name, setName] = useState(tag.name)
-  return <><input aria-label="下書き" value={name} disabled={saving} onChange={e => setName(e.target.value)} /><button onClick={() => onSave({ name, actions: [], isStarred: true }, false)}>保存</button></>
+  return <><input aria-label="下書き" value={name} disabled={saving} onChange={e => setName(e.target.value)} /><button onClick={() => onSave({ name, actions: [], isStarred: true }, false)}>保存</button><button onClick={onDelete}>削除を確認</button></>
 } }))
 import TagEdit from './edit'
 const detail = (name: string, version = 1) => ({ success: true, data: { tag: { id: fx.id, name, status: 'active', version }, automation: null } })
 const deferred = () => { let resolve!: (v: unknown) => void; let reject!: (v: unknown) => void; const promise = new Promise<unknown>((a,b) => { resolve=a; reject=b }); return { promise, resolve, reject } }
-beforeEach(() => { fx.role = verifiedStaffRole('owner');fx.account='A';fx.id='one';fx.definition.mockReset();fx.update.mockReset() })
+beforeEach(() => { fx.role = verifiedStaffRole('owner');fx.account='A';fx.id='one';fx.definition.mockReset();fx.update.mockReset();fx.remove.mockReset() })
 afterEach(cleanup)
+it('削除の確認中に対象を切り替えたら元の窓から削除できない', async () => {
+  fx.definition.mockImplementation(async () => detail(`${fx.account}のタグ`))
+  const view = render(<TagEdit />)
+  await screen.findByDisplayValue('Aのタグ')
+  fireEvent.click(screen.getByText('削除を確認'))
+  expect(await screen.findByRole('alertdialog')).toBeTruthy()
+  fx.account = 'B'; fx.id = 'two'; view.rerender(<TagEdit />)
+  await screen.findByDisplayValue('Bのタグ')
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(fx.remove).not.toHaveBeenCalled()
+})
 it('切替先の失敗後も古いタグを編集できない（WEB088）', async () => {
   fx.definition.mockResolvedValueOnce(detail('Aのタグ')).mockRejectedValueOnce(new Error('down'))
   const view=render(<TagEdit />); await screen.findByDisplayValue('Aのタグ')
