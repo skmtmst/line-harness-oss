@@ -713,7 +713,7 @@ describe('一括配信の詳細（xOXuY ⑤ 送った結果）', () => {
       id: 'run-9', title: '1月の限定メニュー', status: 'scheduled', version: 4, scheduledAt: '2026-01-15T02:00:00.000Z',
       targets: [
         { ...check('a1', '銀座店', 6120), status: 'sent', totalCount: 6120, successCount: 6118, version: 3, retryableCount: 0, stopped: false, broadcastId: 'b1' },
-        { ...check('a3', '名古屋店', 460), status: 'failed', totalCount: 460, successCount: 0, version: 5, retryableCount: 460, stopped: false, broadcastId: 'b3' },
+        { ...check('a3', '名古屋店', 460), status: 'failed', totalCount: 460, successCount: 0, version: 5, retryableCount: 460, retryableToken: 'token-a3', stopped: false, broadcastId: 'b3' },
       ],
     } })
     hq.retry.mockResolvedValue({ data: {} })
@@ -724,7 +724,7 @@ describe('一括配信の詳細（xOXuY ⑤ 送った結果）', () => {
     expect(within(document.querySelector('[data-design="hq-broadcast-result"]') as HTMLElement).getAllByText('失敗')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: /失敗した店にやり直す/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'やり直す' }))
-    await waitFor(() => expect(hq.retry).toHaveBeenCalledWith('run-9', 'a3', 5))
+    await waitFor(() => expect(hq.retry).toHaveBeenCalledWith('run-9', 'a3', 5, {count:460,token:'token-a3'}))
     expect(hq.retry).toHaveBeenCalledTimes(1)
   })
 
@@ -733,7 +733,7 @@ describe('一括配信の詳細（xOXuY ⑤ 送った結果）', () => {
     hq.get.mockResolvedValue({ data: {
       id: 'run-9', title: '1月の限定メニュー', status: 'scheduled', version: 4, scheduledAt: '2026-01-15T02:00:00.000Z',
       targets: [
-        { ...check('a3', '名古屋店', 460), status: 'failed', totalCount: 460, successCount: 0, version: 5, retryableCount: 460, stopped: false, broadcastId: 'b3',
+        { ...check('a3', '名古屋店', 460), status: 'failed', totalCount: 460, successCount: 0, version: 5, retryableCount: 460, retryableToken: 'token-a3', stopped: false, broadcastId: 'b3',
           failureReasons: [{ code: 'line_busy', label: 'LINEが混雑しています', count: 460, retryable: true }] },
       ],
     } })
@@ -797,7 +797,7 @@ it.each(['競合', '結果不明'])('送信が%sなら窓に理由を残し、�
 it.each(['通信断', '500', '409'])('一括配信の店別やり直しの%sは窓内で止め、閉じた後の読直しで未完了の最新の版だけ送る', async kind => {
  const { ApiError } = await import('@/lib/api')
  params.value = new URLSearchParams('id=run-retry')
- const target = (id: string, version: number, status: string) => ({ ...check(id, id === 'a1' ? '銀座店' : '名古屋店', 10), status, totalCount: 10, successCount: status === 'sent' ? 10 : 0, version, retryableCount: status === 'sent' ? 0 : 10, stopped: false, broadcastId: 'b-' + id })
+ const target = (id: string, version: number, status: string) => ({ ...check(id, id === 'a1' ? '銀座店' : '名古屋店', 10), status, totalCount: 10, successCount: status === 'sent' ? 10 : 0, version, retryableCount: status === 'sent' ? 0 : 10, retryableToken: 'token-' + id, stopped: false, broadcastId: 'b-' + id })
  const run = { id: 'run-retry', title: '結果の確認', status: 'completed', version: 4, scheduledAt: null, targets: [target('a1', 3, 'failed'), target('a3', 5, 'failed')] }
  hq.get.mockResolvedValueOnce({ data: run }).mockResolvedValue({ data: { ...run, version: 5, targets: [target('a1', 4, 'sent'), target('a3', 6, 'failed')] } })
  hq.retry.mockReset().mockResolvedValue({ data: {} }).mockResolvedValueOnce({ data: {} }).mockRejectedValueOnce(kind === '通信断' ? new Error('通信できませんでした。') : new ApiError(Number(kind), '保存を確認できませんでした。'))
@@ -807,14 +807,14 @@ it.each(['通信断', '500', '409'])('一括配信の店別やり直しの%sは�
  fireEvent.click(within(dialog).getByRole('button', { name: 'やり直す' }))
  expect((await within(dialog).findByRole('alert')).textContent).toContain('閉じて最新の状態を確認')
  const retry = within(dialog).getByRole('button', { name: 'もう一度' }); expect(retry.hasAttribute('disabled')).toBe(true)
- fireEvent.click(retry); expect(hq.retry.mock.calls).toEqual([['run-retry', 'a1', 3], ['run-retry', 'a3', 5]])
+ fireEvent.click(retry); expect(hq.retry.mock.calls).toEqual([['run-retry', 'a1', 3, {count:10,token:'token-a1'}], ['run-retry', 'a3', 5, {count:10,token:'token-a3'}]])
  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
  await waitFor(() => expect(hq.get).toHaveBeenCalledTimes(2))
  fireEvent.click(screen.getByRole('button', { name: /失敗した店にやり直す/ }))
  const fresh = await screen.findByRole('dialog', { name: '失敗した店にやり直します' })
  fireEvent.click(within(fresh).getByRole('button', { name: 'やり直す' }))
  await waitFor(() => expect(hq.retry).toHaveBeenCalledTimes(3))
- expect(hq.retry.mock.calls[2]).toEqual(['run-retry', 'a3', 6])
+ expect(hq.retry.mock.calls[2]).toEqual(['run-retry', 'a3', 6, {count:10,token:'token-a3'}])
 })
 
 describe('読み込めない配信の保護', () => {

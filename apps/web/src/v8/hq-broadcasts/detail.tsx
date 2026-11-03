@@ -62,7 +62,7 @@ const ACTIVITY_LABEL: Record<string, string> = {
 }
 type TabKey = 'overview' | 'recipients' | 'activity'
 
-type Ask = { kind: 'send' | 'stop' | 'cancel' | 'retry-all' } | { kind: 'retry'; target: ResultTarget }
+type Ask = { kind: 'send' } | { kind: 'stop' } | { kind: 'cancel' } | { kind: 'retry-all'; targets: ResultTarget[] } | { kind: 'retry'; target: ResultTarget }
 
 function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
@@ -447,14 +447,15 @@ function HqBroadcastDetailBody() {
         await hqBroadcastsApi.cancel(run.id, run.version)
         notifyToast('一括配信を取り消しました')
       } else if (ask.kind === 'retry') {
-        await hqBroadcastsApi.retry(run.id, ask.target.accountId, ask.target.version)
+        if (!ask.target.retryableToken) throw new Error('送る相手を確認できません。読み直してください。')
+        await hqBroadcastsApi.retry(run.id, ask.target.accountId, ask.target.version,{count:ask.target.retryableCount,token:ask.target.retryableToken})
         notifyToast(`${ask.target.accountName}にやり直しています`)
       } else {
-        const targets = run.targets.filter((t) => canRetry(run, t) && !acknowledged.has(t.accountId))
+        const targets = ask.targets.filter((t) => !acknowledged.has(t.accountId))
         const failures: string[] = []
         let conflicted = false
         for (const t of targets) {
-          try { await hqBroadcastsApi.retry(run.id, t.accountId, t.version); acknowledged.add(t.accountId) } catch (cause) {
+          try { if (!t.retryableToken) throw new Error('送る相手を確認できません'); await hqBroadcastsApi.retry(run.id, t.accountId, t.version,{count:t.retryableCount,token:t.retryableToken}); acknowledged.add(t.accountId) } catch (cause) {
             if (cause instanceof ApiError && cause.status === 409) conflicted = true
             failures.push(t.accountName)
           }
@@ -486,7 +487,7 @@ function HqBroadcastDetailBody() {
   else if (!run) body = <DetailLoading />
   else body = run.status === 'prepared'
     ? <PreparedCard run={run} />
-    : <ResultCard run={run} canManage={canManage} onRetry={(t) => setAsk({ kind: 'retry', target: t })} onRetryAll={() => setAsk({ kind: 'retry-all' })} />
+    : <ResultCard run={run} canManage={canManage} onRetry={(t) => setAsk({ kind: 'retry', target: t })} onRetryAll={() => setAsk({ kind: 'retry-all', targets:run.targets.filter(t=>canRetry(run,t)) })} />
 
   const badge = run ? runBadge(run) : null
   /* 全体の状態は送ったあとも scheduled のまま（口の作り）。止める・取り消すは、まだ送っている・予約中の店があるときだけ。 */
@@ -497,8 +498,8 @@ function HqBroadcastDetailBody() {
     send: { title: `${n(totals?.sendStores ?? 0)}店に送ります`, description: `${n(totals?.sendPeople ?? 0)} 人に送ります。送った LINE は取り消せません。`, label: '送る' },
     stop: { title: '一括配信を止めます', description: 'まだ送っていない店・人には送りません。送った LINE は取り消せません。止めたあと、店ごとにやり直せます。', label: '止める' },
     cancel: { title: '一括配信を取り消します', description: '取り消すと、どの店にも送らず、やり直しもできません。送った LINE は取り消せません。', label: '取り消す' },
-    retry: { title: 'この店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。届いた人には二重に送りません。', label: 'やり直す' },
-    'retry-all': { title: '失敗した店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。届いた人には二重に送りません。', label: 'やり直す' },
+    retry: { title: 'この店にやり直します', description: `${n(ask?.kind === 'retry' ? ask.target.retryableCount : 0)}人に送り直します。対象が変わったときは止めてお知らせします。`, label: 'やり直す' },
+    'retry-all': { title: '失敗した店にやり直します', description: `${n(ask?.kind === 'retry-all' ? ask.targets.reduce((sum,t)=>sum+t.retryableCount,0) : 0)}人に送り直します。店ごとに対象を確かめ、変わった店は止めてお知らせします。`, label: 'やり直す' },
   }
 
   /* 店の配信の詳細と同じ頭・数の帯・右の「配信した設定」とスマホ。統括だけの口はアカウント別の内訳（表）とやり直し。 */
