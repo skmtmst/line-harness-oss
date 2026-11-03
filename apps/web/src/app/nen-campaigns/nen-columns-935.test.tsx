@@ -92,7 +92,7 @@ function renderColumns(input: {
         friends={[]}
         testFriendId=""
         onTestFriendChange={noop}
-        accountId={null}
+        accountId="fixture-account"
         loading={false}
         notice={null}
         saving={null}

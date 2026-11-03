@@ -202,8 +202,7 @@ test('v8 の下では Pencil r6dJFy の新しい一覧に切り替わる', async
   expect(host.textContent).toContain('使われていない')
   // 行の中身（名前・状態・数・金額・使う場所・操作）
   expect(host.textContent).toContain('商品を買った')
-  expect(host.textContent).toContain('動いている')
-  expect(host.textContent).toContain('止めている')
+  expect(host.textContent).toMatch(/有効 [\d,]+・下書き [\d,]+・停止中 [\d,]+/)
   // ：使う場所を足す操作は行の「…」に残す。
   const menu = host.querySelector<HTMLButtonElement>('[aria-label="成果地点「商品を買った」の操作"]')
   expect(Array.from(menu!.closest('tr')!.querySelectorAll('td'), cell => cell.textContent)).toContain('¥412,000')
