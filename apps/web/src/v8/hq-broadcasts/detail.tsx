@@ -62,7 +62,8 @@ const ACTIVITY_LABEL: Record<string, string> = {
 }
 type TabKey = 'overview' | 'recipients' | 'activity'
 
-type Ask = { kind: 'send' } | { kind: 'stop' } | { kind: 'cancel' } | { kind: 'retry-all'; runId: string; targets: ResultTarget[] } | { kind: 'retry'; runId: string; target: ResultTarget }
+type RetryTarget = ResultTarget & { confirmedCount: number | null; confirmedToken: string | null }
+type Ask = { kind: 'send' } | { kind: 'stop' } | { kind: 'cancel' } | { kind: 'retry-all'; runId: string; targets: RetryTarget[] } | { kind: 'retry'; runId: string; target: RetryTarget }
 
 function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
@@ -432,6 +433,25 @@ function HqBroadcastDetailBody() {
   retryState.current = { ask, run, canManage, busy, actConflict, loadError, active: retryState.current.active }
   useEffect(() => { retryState.current.active = true; return () => { retryState.current.active = false } }, [])
   useEffect(() => { if (ask) setError(''); setActConflict(false) }, [ask])
+  const openRetry = async (targets: ResultTarget[], all: boolean) => {
+    if (!run || busy) return
+    setBusy(true); setError('')
+    try {
+      const checked = await Promise.all(targets.map(async target => {
+        try {
+          const response = await hqBroadcastsApi.retryPreview(run.id, target.accountId)
+          if (!response.success) throw new Error('preview unavailable')
+          const preview = response.data
+          if (!Number.isSafeInteger(preview.count) || preview.count < 0 || typeof preview.token !== 'string' || !preview.token) throw new Error('invalid preview')
+          return { ...target, confirmedCount: preview.count, confirmedToken: preview.token }
+        } catch { return { ...target, confirmedCount: null, confirmedToken: null } }
+      }))
+      if (!retryState.current.active || !retryState.current.canManage || retryState.current.run?.id !== run.id) return
+      if (all) setAsk({ kind: 'retry-all', runId: run.id, targets: checked })
+      else if (checked[0]) setAsk({ kind: 'retry', runId: run.id, target: checked[0] })
+    } catch (caught) { setError(errorText(caught, '送る相手を確認できませんでした。')) }
+    finally { setBusy(false) }
+  }
   const act = async () => {
     if (!run || !ask || busy || actConflict || loadError) return
     if (ask.kind === 'retry' || ask.kind === 'retry-all') {
@@ -445,6 +465,10 @@ function HqBroadcastDetailBody() {
       if (!state.run) return false
       const currentRun = state.run
       const expected = (ask.kind === 'retry' ? [ask.target] : ask.targets).filter(t => !acknowledged.has(t.accountId))
+      if (expected.some(t => t.confirmedCount === null || !t.confirmedToken) || !Number.isSafeInteger(expected.reduce((sum,t)=>sum+(t.confirmedCount ?? 0),0))) {
+        setError('送る相手を確認できません。閉じてもう一度お試しください。')
+        return false
+      }
       const current = ask.kind === 'retry'
         ? currentRun.targets.filter(t => t.accountId === ask.target.accountId && canRetry(currentRun, t))
         : currentRun.targets.filter(t => canRetry(currentRun, t) && !acknowledged.has(t.accountId))
@@ -470,20 +494,22 @@ function HqBroadcastDetailBody() {
         await hqBroadcastsApi.cancel(run.id, run.version)
         notifyToast('一括配信を取り消しました')
       } else if (ask.kind === 'retry') {
-        await hqBroadcastsApi.retry(run.id, ask.target.accountId, ask.target.version)
+        if (ask.target.confirmedCount === null || !ask.target.confirmedToken) throw new Error('送る相手を確認できません。読み直してください。')
+        await hqBroadcastsApi.retry(run.id, ask.target.accountId, ask.target.version,{count:ask.target.confirmedCount,token:ask.target.confirmedToken})
         notifyToast(`${ask.target.accountName}にやり直しています`)
       } else {
         const targets = ask.targets.filter((t) => !acknowledged.has(t.accountId))
-        const failures: string[] = []
+        const failures: string[] = [], started = ask.targets.filter(t=>acknowledged.has(t.accountId)).map(t=>t.accountName)
         let conflicted = false
         for (const t of targets) {
-          try { await hqBroadcastsApi.retry(run.id, t.accountId, t.version); acknowledged.add(t.accountId) } catch (cause) {
+          try { if (t.confirmedCount === null || !t.confirmedToken) throw new Error('送る相手を確認できません'); await hqBroadcastsApi.retry(run.id, t.accountId, t.version,{count:t.confirmedCount,token:t.confirmedToken}); acknowledged.add(t.accountId); started.push(t.accountName) } catch (cause) {
             if (cause instanceof ApiError && cause.status === 409) conflicted = true
-            failures.push(t.accountName)
+            const current = cause instanceof ApiError && cause.data && typeof cause.data === 'object' ? (cause.data as {currentCount?:unknown}).currentCount : undefined
+            failures.push(`${t.accountName}${typeof current === 'number' && Number.isSafeInteger(current) && current >= 0 ? `（今は ${n(current)} 人）` : ''}`)
           }
         }
         if (failures.length) {
-          const message = `やり直せなかった店があります：${failures.join('・')}。${conflicted ? '閉じて最新の状態を確認してください。' : 'もう一度押すと、未完了の店だけやり直します。'}`
+          const message = `${started.length ? `${started.join('・')}は送り始めました。` : '送り始めた店はありません。'}やり直せなかった店：${failures.join('・')}。`
           if (conflicted) throw new ApiError(409, message)
           throw new Error(message)
         }
@@ -496,7 +522,9 @@ function HqBroadcastDetailBody() {
       const needsReview = !(caught instanceof ApiError) || caught.status === 409 || caught.status >= 500
       setActConflict(needsReview)
       const reason = errorText(caught, '操作できませんでした。')
-      setError(needsReview ? `${reason} 閉じて最新の状態を確認してください。` : reason)
+      const current = ask.kind === 'retry' && caught instanceof ApiError && caught.data && typeof caught.data === 'object' ? (caught.data as {currentCount?:unknown}).currentCount : undefined
+      const countText = typeof current === 'number' && Number.isSafeInteger(current) && current >= 0 ? `今は ${n(current)} 人です。` : ''
+      setError(needsReview ? `${reason} ${countText}閉じて最新の状態を確認してください。` : reason)
       return false
     } finally {
       retryState.current.busy = false
@@ -510,7 +538,7 @@ function HqBroadcastDetailBody() {
   else if (!run) body = <DetailLoading />
   else body = run.status === 'prepared'
     ? <PreparedCard run={run} />
-    : <ResultCard run={run} canManage={canManage} onRetry={(t) => setAsk({ kind: 'retry', runId: run.id, target: { ...t } })} onRetryAll={() => setAsk({ kind: 'retry-all', runId: run.id, targets: run.targets.filter(t => canRetry(run, t)).map(t => ({ ...t })) })} />
+    : <ResultCard run={run} canManage={canManage} onRetry={(t) => void openRetry([t],false)} onRetryAll={() => void openRetry(run.targets.filter(t=>canRetry(run,t)),true)} />
 
   const badge = run ? runBadge(run) : null
   /* 全体の状態は送ったあとも scheduled のまま（口の作り）。止める・取り消すは、まだ送っている・予約中の店があるときだけ。 */
@@ -521,13 +549,14 @@ function HqBroadcastDetailBody() {
     send: { title: `${n(totals?.sendStores ?? 0)}店に送ります`, description: `${n(totals?.sendPeople ?? 0)} 人に送ります。送った LINE は取り消せません。`, label: '送る' },
     stop: { title: '一括配信を止めます', description: 'まだ送っていない店・人には送りません。送った LINE は取り消せません。止めたあと、店ごとにやり直せます。', label: '止める' },
     cancel: { title: '一括配信を取り消します', description: '取り消すと、どの店にも送らず、やり直しもできません。送った LINE は取り消せません。', label: '取り消す' },
-    retry: { title: 'この店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。届いた人には二重に送りません。', label: 'やり直す' },
-    'retry-all': { title: '失敗した店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。届いた人には二重に送りません。', label: 'やり直す' },
+    retry: { title: 'この店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。', label: 'やり直す' },
+    'retry-all': { title: '失敗した店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。', label: 'やり直す' },
   }
   const retryTargets = ask?.kind === 'retry' ? [ask.target] : ask?.kind === 'retry-all' ? ask.targets : []
   const remainingRetryTargets = retryAcknowledged.current.ask === ask ? retryTargets.filter(t => !retryAcknowledged.current.targets.has(t.accountId)) : retryTargets
-  const retryCount = remainingRetryTargets.length > 0 && remainingRetryTargets.every(t => t.status === 'sent' && Number.isSafeInteger(t.retryableCount) && t.retryableCount > 0 && !t.failureReasons?.some(f => f.code === 'before_send_failed'))
-    ? remainingRetryTargets.reduce((sum, t) => sum + t.retryableCount, 0) : null
+  const retryTotal = remainingRetryTargets.reduce((sum, t) => sum + (t.confirmedCount ?? 0), 0)
+  const retryCount = remainingRetryTargets.length > 0 && remainingRetryTargets.every(t => t.confirmedCount !== null && !!t.confirmedToken) && Number.isSafeInteger(retryTotal)
+    ? retryTotal : null
   const retryCountText = retryCount === null ? '人数は送る時に決まります' : `約${n(retryCount)}人に送ります`
 
   /* 店の配信の詳細と同じ頭・数の帯・右の「配信した設定」とスマホ。統括だけの口はアカウント別の内訳（表）とやり直し。 */
@@ -692,8 +721,8 @@ function HqBroadcastDetailBody() {
           busy={busy}
           onConfirm={ask.kind !== 'send' || gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => act() : undefined}
           error={error || undefined}
-          confirmDisabled={actConflict || Boolean(loadError)}
-          confirmDisabledReason="閉じて最新の状態を確認してください。"
+          confirmDisabled={actConflict || Boolean(loadError) || ((ask.kind === 'retry' || ask.kind === 'retry-all') && retryCount === null)}
+          confirmDisabledReason={retryCount === null && (ask.kind === 'retry' || ask.kind === 'retry-all') ? '送る相手を確認できません。閉じてもう一度お試しください。' : '閉じて最新の状態を確認してください。'}
           onSuccess={() => setAsk(null)}
           onCancel={() => { setAsk(null); setError(''); if (actConflict) void load() }}
         >

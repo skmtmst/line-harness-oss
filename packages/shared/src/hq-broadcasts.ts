@@ -18,5 +18,5 @@ export interface HqBroadcastFailure { code:string; label:string; count:number; r
 export type HqBroadcastDraftInput = HqBroadcastInput & { expectedVersion: number };
 export interface HqBroadcastRun {
  id:string;title:string;status:string;version:number;scheduledAt:string|null;
- input:HqBroadcastInput; targets:Array<HqBroadcastPreflight & {failureReasons:HqBroadcastFailure[];status:string;version:number;successCount:number;totalCount:number;openedCount?:number|null;clickedCount?:number|null;reactionCount?:number|null;blockedCount?:number|null;approvalStatus?:string;retryableCount:number;stopped:boolean}>;
+ input:HqBroadcastInput; targets:Array<HqBroadcastPreflight & {failureReasons:HqBroadcastFailure[];status:string;version:number;successCount:number;totalCount:number;openedCount?:number|null;clickedCount?:number|null;reactionCount?:number|null;blockedCount?:number|null;approvalStatus?:string;retryableCount:number;retryableToken?:string;stopped:boolean}>;
 }
