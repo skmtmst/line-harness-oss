@@ -1,5 +1,14 @@
 import { isAccountFeatureEnabled } from '../account-settings.js';
 
+/** 同じ店舗が先頭を占め続けないよう、5分ごとに処理対象の窓を進める。 */
+export function selectMileageAccountBatch(accounts: string[], now: string, limit = 40): string[] {
+  if (accounts.length <= limit) return accounts;
+  const time = Date.parse(now);
+  const slot = Number.isFinite(time) ? Math.floor(time / 300_000) : 0;
+  const start = ((slot * limit) % accounts.length + accounts.length) % accounts.length;
+  return Array.from({ length: limit }, (_, index) => accounts[(start + index) % accounts.length]!);
+}
+
 /** EC は included・依存なし。設定・接続・会員データの同じ判定を全経路で使う。 */
 export async function resolveMileageSource(db: D1Database, accountId: string): Promise<'ec' | 'musubo'> {
   const setting = await db.prepare(`SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'feature.specialized.catalog'`).bind(accountId).first<{ value: string }>();

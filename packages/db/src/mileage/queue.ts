@@ -3,13 +3,7 @@ import { jstNow } from '../utils.js';
 import { type MileageQueueResult, type EngagementEvent, type FollowingMileageReconcileResult } from './types.js';
 import { applyMileageRulesImmediately } from './grants.js';
 import { parsePublishedSnapshot } from './rules.js';
-import { resolveMileageSource } from './source.js';
-
-async function mileageQueueMayRun(db: D1Database, accountId: string | null): Promise<boolean> {
-  if (!accountId) return false;
-  try { return await resolveMileageSource(db, accountId) === 'musubo'; }
-  catch (error) { console.error('mileage_queue_source_unavailable', accountId, error); return false; }
-}
+import { resolveMileageSource, selectMileageAccountBatch } from './source.js';
 
 
 /**
@@ -30,19 +24,24 @@ export async function processPendingMileageEvents(
   db: D1Database,
   options: { limit?: number; now?: string } = {},
 ): Promise<MileageQueueResult> {
-  const limit = Math.min(250, Math.max(1, options.limit ?? 100));
+  const requested = Math.min(250, Math.max(1, options.limit ?? 100));
+  const limit = Math.min(30, requested);
   const now = options.now ?? jstNow();
   // 停滞回収も機能オフ中のアカウントには当てない。OFF中は status も
   // processing_started_at も updated_at も動かさず、再オンで回収する。
   const owners = await db.prepare(`SELECT DISTINCT f.line_account_id FROM mileage_event_queue q
     LEFT JOIN engagement_events e ON e.id = q.engagement_event_id LEFT JOIN friends f ON f.id = e.actor_friend_id
-    WHERE q.status IN ('processing','pending','failed') AND f.line_account_id IS NOT NULL`).bind()
+    WHERE q.status IN ('processing','pending','failed') AND f.line_account_id IS NOT NULL ORDER BY f.line_account_id`).bind()
     .all<{ line_account_id: string }>();
+  const accountBatch = selectMileageAccountBatch(owners.results.map(row => row.line_account_id), now);
+  if (accountBatch.length < owners.results.length) console.warn('mileage_queue_accounts_deferred', { total: owners.results.length, selected: accountBatch.length });
   const eligible: string[] = [];
-  for (const { line_account_id: accountId } of owners.results) {
+  let unreadable = 0;
+  for (const accountId of accountBatch) {
     try { if (await resolveMileageSource(db, accountId) === 'musubo') eligible.push(accountId); }
-    catch (error) { console.error('mileage_queue_source_unavailable', accountId, error); }
+    catch (error) { unreadable++; console.error('mileage_queue_source_unavailable', accountId, error); }
   }
+  if (accountBatch.length && unreadable === accountBatch.length) throw new Error('mileage_queue_all_sources_unavailable');
   if (!eligible.length) return { claimed: 0, processed: 0, failed: 0, granted: 0 };
   const eligibleJson = JSON.stringify(eligible);
   await db.prepare(`UPDATE mileage_event_queue SET status = 'pending', processing_started_at = NULL, updated_at = ?
@@ -61,6 +60,7 @@ export async function processPendingMileageEvents(
         AND f.line_account_id IN (SELECT value FROM json_each(?))
       ORDER BY q.created_at ASC, q.engagement_event_id ASC LIMIT ?`)
       .bind(now, eligibleJson, limit).all<{ engagement_event_id: string; applied_published_snapshot: string | null }>();
+  if (requested > limit && due.results.length === limit) console.warn('mileage_queue_events_deferred', { limit });
 
   const result: MileageQueueResult = { claimed: 0, processed: 0, failed: 0, granted: 0 };
   for (const item of due.results) {
@@ -78,7 +78,7 @@ export async function processPendingMileageEvents(
       && !await isAccountFeatureEnabled(db, owner.line_account_id, 'mileage')) {
       continue;
     }
-    if (!await mileageQueueMayRun(db, owner?.line_account_id ?? null)) continue;
+    if (!owner?.line_account_id || !eligible.includes(owner.line_account_id)) continue;
     const claim = await db
       .prepare(
         `UPDATE mileage_event_queue

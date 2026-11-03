@@ -101,7 +101,61 @@ describe('ECの正本を使うマイル残高', () => {
     expect(fixture.raw.prepare('SELECT status FROM mileage_event_queue WHERE engagement_event_id=?').get(other.id)).toEqual({ status: 'processed' });
     expect(calls).toBeLessThan(120);
   });
-  it('処理直前に管理元が読めなくなったら保留しエラーを記録する', async () => {
+  it('同じ店の待ち行は管理元を店につき一度だけ読み、上限を超える分は次回に残す', async () => {
+    for (let i = 0; i < 100; i++) await enqueueMileageEvent(fixture.db, { friendId: 'f-other', eventType: 'friend_added', source: 'test', sourceEventId: `musubo-bulk-${i}` });
+    let calls = 0, catalogReads = 0;
+    const db = new Proxy(fixture.db, { get(target, key) {
+      if (key === 'prepare') return (sql: string) => { calls++; if (sql.includes('feature.specialized.catalog')) catalogReads++; return target.prepare(sql); };
+      return Reflect.get(target, key);
+    }});
+    const result = await processPendingMileageEvents(db, { limit: 100, now: '2099-01-01' });
+    process.stderr.write(`mileage queue 100-event budget: ${JSON.stringify({ calls, catalogReads, processed: result.processed })}\n`);
+    expect(catalogReads).toBe(1);
+    expect(result.processed).toBeGreaterThan(0);
+    expect(result.processed).toBeLessThan(100);
+    expect(calls).toBeLessThan(800);
+    let totalCalls = calls, totalProcessed = result.processed, rounds = 1;
+    while (totalProcessed < 100 && rounds < 5) {
+      calls = 0;
+      const next = await processPendingMileageEvents(db, { limit: 100, now: '2099-01-01' });
+      totalCalls += calls; totalProcessed += next.processed; rounds++;
+    }
+    expect(totalProcessed).toBe(100);
+    process.stderr.write(`mileage queue 100-event total: ${JSON.stringify({ totalCalls, totalProcessed, rounds })}\n`);
+  });
+  it('300店舗でもDB予算内に抑え、次の実行で後回しの店にも進む', async () => {
+    const event = await enqueueMileageEvent(fixture.db, { friendId: 'f-other', eventType: 'friend_added', source: 'test', sourceEventId: 'last-owner' });
+    const addAccount = fixture.raw.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id) VALUES (?,?,?,?,?,?)");
+    const addFriend = fixture.raw.prepare('INSERT INTO friends(id,line_user_id,display_name,line_account_id,is_following,created_at,updated_at) VALUES (?,?,?,?,1,?,?)');
+    const addConnector = fixture.raw.prepare("INSERT INTO ec_connectors(id,line_account_id,provider,shop_domain,created_at,updated_at) VALUES (?,?,'ec_cube','example.invalid',?,?)");
+    const addEvent = fixture.raw.prepare("INSERT INTO engagement_events(id,program_id,idempotency_key,event_type,source,source_event_id,actor_friend_id,occurred_at,created_at) VALUES (?,'default',?,'friend_added','test',?,?,?,?)");
+    const addQueue = fixture.raw.prepare("INSERT INTO mileage_event_queue(engagement_event_id,status,attempts,available_at,created_at,updated_at) VALUES (?,'pending',0,?,?,?)");
+    for (let i = 0; i < 300; i++) {
+      const id = `a${String(i).padStart(3, '0')}`; addAccount.run(id,id,`channel-${id}`,'s','t',DEFAULT_TENANT_ID);
+      addFriend.run(`f-${id}`,`U-${id}`,id,id,now,now); addConnector.run(`c-${id}`,id,now,now);
+      addEvent.run(`e-${id}`,`key-${id}`,`source-${id}`,`f-${id}`,now,now); addQueue.run(`e-${id}`,now,now,now);
+    }
+    let calls = 0, maxCalls = 0, rounds = 0;
+    const db = new Proxy(fixture.db, { get(target, key) {
+      if (key === 'prepare') return (sql: string) => { if (++calls > 800) throw new Error('DB budget exceeded'); return target.prepare(sql); };
+      return Reflect.get(target, key);
+    }});
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      for (let i = 0; i < 10; i++) {
+        calls = 0;
+        await processPendingMileageEvents(db, { limit: 100, now: new Date(Date.parse('2099-01-01T00:00:00Z') + i * 300_000).toISOString() });
+        maxCalls = Math.max(maxCalls, calls); rounds++;
+        expect(calls).toBeLessThan(800);
+        if ((fixture.raw.prepare('SELECT status FROM mileage_event_queue WHERE engagement_event_id=?').get(event.id) as any).status === 'processed') break;
+      }
+      expect(fixture.raw.prepare('SELECT status FROM mileage_event_queue WHERE engagement_event_id=?').get(event.id)).toEqual({ status: 'processed' });
+      expect(log).toHaveBeenCalled();
+      process.stderr.write(`mileage queue 300-account budget: ${JSON.stringify({ maxCalls, rounds })}\n`);
+    } finally { log.mockRestore(); }
+  });
+  it('管理元が読めない店を保留しエラーを記録する', async () => {
+    await enqueueMileageEvent(fixture.db, { friendId: 'f-nen', eventType: 'friend_added', source: 'test', sourceEventId: 'source-ec' });
     const event = await enqueueMileageEvent(fixture.db, { friendId: 'f-other', eventType: 'friend_added', source: 'test', sourceEventId: 'source-fails-late' });
     let sourceReads = 0;
     const db = new Proxy(fixture.db, { get(target, key) {

@@ -24,6 +24,7 @@ import { stoppedTenantLineAccountSql } from '../../services/tenant-runtime-statu
 import { createAutomationActionExecutors } from '../automations/automation-action-executors/index.js';
 import { featureJobCanRun } from '../../services/feature-enforcement.js';
 import { resolveMileageSource } from '../../services/mileage-ec-source.js';
+import { selectMileageAccountBatch } from '@line-crm/db/src/mileage/source.js';
 import { AutomationActionError, type ActionDefinition } from '../automations/automation-engine/index.js';
 
 export interface MileageRewardDeliveryOptions {
@@ -527,19 +528,24 @@ export async function processDueMileageRewardDeliveries(
   db: D1Database,
   options: Omit<MileageRewardDeliveryOptions, 'now'> & { now: string; limit?: number },
 ): Promise<{ processed: number; succeeded: number; failed: number; recovered: number }> {
-  const limit = Math.min(100, Math.max(1, options.limit ?? 50));
+  const requested = Math.min(100, Math.max(1, options.limit ?? 50));
+  const limit = Math.min(30, requested);
   const leaseCutoff = new Date(
     new Date(options.now).getTime() - STALE_DELIVERY_LEASE_MS,
   ).toISOString();
   const dueWhere = `status = 'delivery_failed' AND next_retry_at IS NOT NULL AND next_retry_at <= ?`;
   const owners = await db.prepare(`SELECT DISTINCT line_account_id FROM mileage_redemptions
-    WHERE status IN ('delivery_failed','delivering','refunded') AND line_account_id IS NOT NULL`).bind()
+    WHERE status IN ('delivery_failed','delivering','refunded') AND line_account_id IS NOT NULL ORDER BY line_account_id`).bind()
     .all<{ line_account_id: string }>();
+  const accountBatch = selectMileageAccountBatch(owners.results.map(row => row.line_account_id), options.now);
+  if (accountBatch.length < owners.results.length) console.warn('mileage_delivery_accounts_deferred', { total: owners.results.length, selected: accountBatch.length });
   const eligible: string[] = [];
-  for (const { line_account_id: accountId } of owners.results) {
+  let unreadable = 0;
+  for (const accountId of accountBatch) {
     try { if (await resolveMileageSource(db, accountId) === 'musubo') eligible.push(accountId); }
-    catch (error) { console.error('mileage_delivery_source_unavailable', accountId, error); }
+    catch (error) { unreadable++; console.error('mileage_delivery_source_unavailable', accountId, error); }
   }
+  if (accountBatch.length && unreadable === accountBatch.length) throw new Error('mileage_delivery_all_sources_unavailable');
   const eligibleJson = JSON.stringify(eligible);
   // ECの交換はテナント停止中でも行を更新しない。
   await db.prepare(`UPDATE mileage_redemptions SET next_retry_at = NULL, failure_code = 'tenant_suspended',
@@ -567,6 +573,7 @@ export async function processDueMileageRewardDeliveries(
   const stalled = remaining > 0
     ? await findEligible("status = 'delivering' AND updated_at < ?", 'updated_at, created_at', leaseCutoff, remaining)
     : { results: [] as { id: string }[] };
+  if (requested > limit && due.results.length + stalled.results.length === limit) console.warn('mileage_delivery_events_deferred', { limit });
   let succeeded = 0;
   let failed = 0;
   for (const owner of offOwners.results) {
