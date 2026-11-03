@@ -692,7 +692,7 @@ describe('V8 コンバージョンの一覧：中身を見る窓', () => {
   ]
   const eventPaths: string[] = []
 
-  async function openDetail(name: string, eventsOk: boolean | 'soft' = true, withoutRevision = false, sharedEvents?: typeof definitionEvents) {
+  async function openDetail(name: string, eventsOk: boolean | 'soft' = true, withoutRevision = false, sharedEvents?: Array<Omit<(typeof definitionEvents)[number], 'approvalRevision'> & { approvalRevision: number | null }>) {
     eventPaths.length = 0
     overrideFetch((url) => {
       if (url.pathname.endsWith('/events')) {
@@ -754,6 +754,23 @@ describe('V8 コンバージョンの一覧：中身を見る窓', () => {
     fireEvent.click(within(screen.getByRole('alertdialog', { name: 'この成果を取り消す' })).getByRole('button', { name: '取り消す' }))
     await flush()
     expect(body).toEqual({ kind: 'reverse', reason: '重複のため', expectedReversalId: null, expectedApprovalStatus: null, expectedCancelled: false, expectedApprovalRevision: 7 })
+  })
+
+  it('移行前の版なしを明示された成果は従来の確認情報で取り消す', async () => {
+    let body: Record<string, unknown> | undefined
+    const legacy = definitionEvents.map(event => ({ ...event, approvalRevision: null }))
+    const dialog = await openDetail('商品を買った', true, false, legacy)
+    overrideFetch((url, init) => {
+      if (url.pathname !== '/api/conversions/events/e1/reversals') return null
+      body = JSON.parse(String(init?.body))
+      return json({ success: true, data: { id: 'rev-1', kind: 'reverse' } })
+    })
+    const row = Array.from(dialog.querySelectorAll('li')).find(item => item.textContent?.includes('佐藤'))!
+    fireEvent.click(within(row).getByRole('button', { name: '取り消す' }))
+    fireEvent.change(screen.getByLabelText('理由'), { target: { value: '重複のため' } })
+    fireEvent.click(within(screen.getByRole('alertdialog', { name: 'この成果を取り消す' })).getByRole('button', { name: '取り消す' }))
+    await flush()
+    expect(body).toEqual({ kind: 'reverse', reason: '重複のため', expectedReversalId: null, expectedApprovalStatus: null, expectedCancelled: false })
   })
 
   it('承認の版が取得できない時は取消を送らない', async () => {

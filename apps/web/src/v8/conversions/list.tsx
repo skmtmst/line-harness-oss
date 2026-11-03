@@ -524,12 +524,12 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   /* 成果の取り消し・戻し。元の行は消さず、理由つきの追記を足す。 */
   const submitReversal = async () => {
     if (!reversalTarget || !reversalScope || !detailTarget || !canEdit || reversalScope.epoch !== stopScope.current.epoch || reversalScope.definitionId !== detailTarget.id) return
-    if (reversalTarget.latestReversalId === undefined || typeof reversalTarget.approvalRevision !== 'number' || !Number.isSafeInteger(reversalTarget.approvalRevision) || reversalTarget.approvalRevision < 1) { setReversalError('確認情報を読み直してから、もう一度お試しください。'); return }
+    if (reversalTarget.latestReversalId === undefined || (reversalTarget.approvalRevision !== null && (typeof reversalTarget.approvalRevision !== 'number' || !Number.isSafeInteger(reversalTarget.approvalRevision) || reversalTarget.approvalRevision < 1))) { setReversalError('確認情報を読み直してから、もう一度お試しください。'); return }
     if (!reversalReason.trim()) { setReversalError('理由を入れてください'); return }
     setReversalBusy(true)
     setReversalError('')
     try {
-      const res = await api.conversions.appendReversal(reversalTarget.id, { kind: reversalKind, reason: reversalReason.trim(), expectedReversalId: reversalTarget.latestReversalId, expectedApprovalStatus: reversalTarget.approvalStatus, expectedCancelled: reversalTarget.cancelled, expectedApprovalRevision: reversalTarget.approvalRevision })
+      const res = await api.conversions.appendReversal(reversalTarget.id, { kind: reversalKind, reason: reversalReason.trim(), expectedReversalId: reversalTarget.latestReversalId, expectedApprovalStatus: reversalTarget.approvalStatus, expectedCancelled: reversalTarget.cancelled, expectedApprovalRevision: reversalTarget.approvalRevision ?? undefined })
       if (stopScope.current.epoch !== reversalScope.epoch) return
       if (!res.success) throw new Error(res.error || '記録できませんでした。時間をおいて、もう一度お試しください。')
       const targetId = reversalScope.definitionId

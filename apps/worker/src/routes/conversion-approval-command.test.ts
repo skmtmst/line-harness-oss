@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { setConversionApproval } from '@line-crm/db';
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
@@ -139,6 +140,30 @@ beforeEach(() => {
 });
 
 describe('PATCH 承認の版契約(N-208)', () => {
+  test('移行前は一覧・両方の承認経路・確認付き取消が従来どおり動き、移行後は版を使う', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    sqlite.raw.exec('ALTER TABLE conversion_events DROP COLUMN approval_revision');
+    seedEvent('ev-1', 'cp-1', 'approved');
+    const events = () => app(owner).request('/api/conversions/definitions/cp-1/events');
+    const before = await events();
+    expect(before.status).toBe(200);
+    const body = await before.json() as { data: { items: Array<{ approvalRevision: number | null }> } };
+    expect(body.data.items[0].approvalRevision).toBeNull();
+    expect((await patch('ev-1', {status:'rejected', expectedStatus:'approved'})).status).toBe(200);
+    expect(await setConversionApproval(sqlite.db, 'ev-1', 'approved')).toBe(true);
+    const cancel = (expectedApprovalStatus: string) => app(owner).request('/api/conversions/events/ev-1/reversals', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({kind:'reverse', reason:'確認済み', expectedReversalId:null, expectedApprovalStatus, expectedCancelled:false, expectedApprovalRevision:123}),
+    });
+    expect((await cancel('rejected')).status).toBe(409);
+    expect((await cancel('approved')).status).toBe(200);
+    sqlite.raw.exec('ALTER TABLE conversion_events ADD COLUMN approval_revision INTEGER NOT NULL DEFAULT 1');
+    expect((await patch('ev-1', {status:'rejected', expectedStatus:'approved'})).status).toBe(200);
+    expect(sqlite.raw.prepare("SELECT approval_revision FROM conversion_events WHERE id='ev-1'").get()).toEqual({approval_revision:2});
+    const after = await (await events()).json() as { data: { items: Array<{ approvalRevision: number | null }> } };
+    expect(after.data.items[0].approvalRevision).toBe(2);
+    expect(warn).toHaveBeenCalledWith('conversion_approval_revision_unavailable');
+    warn.mockRestore();
+  });
   test('承認が変わって戻ったら古い成果取消の確認は効かず、新しい版なら取消できる', async () => {
     seedEvent('ev-1', 'cp-1', 'approved');
     const version=()=>sqlite.raw.prepare("SELECT approval_revision FROM conversion_events WHERE id='ev-1'").get() as {approval_revision:number};

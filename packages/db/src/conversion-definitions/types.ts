@@ -316,7 +316,7 @@ export type ConversionDefinitionEventItem = {
   status: ConversionDefinitionEventStatus;
   /** 生の承認状態。却下理由の列は持たないため null / pending / approved / rejected のみ。 */
   approvalStatus: 'pending' | 'approved' | 'rejected' | null;
-  approvalRevision: number;
+  approvalRevision: number | null;
   /** 取消台帳に取消が入っているか(アフィリエイト調整・取消追記のどちらでも立つ)。 */
   cancelled: boolean;
   /**
@@ -339,7 +339,7 @@ export type DefinitionEventRow = {
   friend_id: string;
   friend_name: string | null;
   approval_status: 'pending' | 'approved' | 'rejected' | null;
-  approval_revision: number;
+  approval_revision: number | null;
   cancelled: number;
   reversed: number;
   latest_reversal_id: string | null;
