@@ -246,6 +246,23 @@ describe('画面内の最終確認（IDEA-06）', () => {
 })
 
 describe('条件が変わったら古い確認を使わない', () => {
+  it('承認方法が異なるアカウントに切り替えても確認を読み直せる', async () => {
+    let finishConfig!: (value: unknown) => void
+    mocks.config.mockImplementation((account: string) => account === 'acc-1'
+      ? Promise.resolve({ success: true, data: { threshold: 5, singleOperator: true } })
+      : new Promise(resolve => { finishConfig = resolve }))
+    mocks.create.mockImplementation(async () => ({ success: true, data: { id: `draft-${mocks.account}`, version: 1 } }))
+    mocks.update.mockImplementation(async (id: string) => ({ success: true, data: { id, version: 2 } }))
+    await render()
+    await click('今すぐ送る', container); await settle(200)
+    mocks.account = 'acc-2'
+    await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign currentStep="confirm" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
+    await settle()
+    await click('今すぐ送る', container); await settle(200)
+    await act(async () => { finishConfig({ success: true, data: { threshold: 1000, singleOperator: false } }) }); await settle(200)
+    expect(mocks.preview).toHaveBeenLastCalledWith('draft-acc-2')
+    expect(button('37 人に送る', dialog()!)).toBeTruthy()
+  })
   it('アカウント切替先で確認窓を開き直すと切替先の下書きを確認する', async () => {
     mocks.create.mockImplementation(async () => ({ success: true, data: { id: `draft-${mocks.account}`, version: 1 } }))
     mocks.update.mockImplementation(async (id: string) => ({ success: true, data: { id, version: 2 } }))

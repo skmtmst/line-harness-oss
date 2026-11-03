@@ -1227,7 +1227,7 @@ export default function BroadcastForm({
   const broadcastRole = useStaffRole()
   const [sendPreview, setSendPreview] = useState<{ state: 'loading' | 'error' | 'ready'; data: SendConfirmationPreview | null; broadcast: ApiBroadcast | null }>({ state: 'loading', data: null, broadcast: null })
   const [previewSeq, setPreviewSeq] = useState(0)
-  useEffect(() => { setConfirmOpen(false); setSendPreview({ state: 'loading', data: null, broadcast: null }) }, [selectedAccountId])
+  useEffect(() => { setConfirmOpen(false); setApprovalConfig(null); setSendPreview({ state: 'loading', data: null, broadcast: null }) }, [selectedAccountId])
   useEffect(() => {
     if (!confirmOpen || needsApprovalSingle || !currentStep) return
     let alive = true
