@@ -4,7 +4,7 @@
  */
 import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import DateField, { formatLabel, parseDate } from './date-field'
 
 afterEach(() => cleanup())
@@ -28,6 +28,7 @@ describe('日付の選択（★管理画面）', () => {
     fireEvent.click(trigger)
     fireEvent.keyDown(screen.getByRole('grid'), { key: 'ArrowRight' })
     fireEvent.keyDown(screen.getByRole('grid'), { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: '確定' }))
     expect(screen.getByTestId('value').textContent).toBe('2026-09-24')
     expect(trigger.textContent).toContain('9/24（木）')
     expect(trigger.title).toBe('2026年9月24日（木）')
@@ -49,13 +50,14 @@ describe('日付の選択（★管理画面）', () => {
     expect(document.activeElement?.getAttribute('aria-label')).toMatch(/^2026年9月23日（水）/)
   })
 
-  it('矢印で動かし Enter で選ぶと、値が替わって閉じる', () => {
+  it('矢印と Enter で選び、確定すると値が替わって閉じる', () => {
     render(<Harness />)
     fireEvent.click(screen.getByRole('button', { name: '配信日' }))
     const grid = screen.getByRole('grid')
     fireEvent.keyDown(grid, { key: 'ArrowRight' })
     fireEvent.keyDown(screen.getByRole('grid'), { key: 'ArrowDown' })
     fireEvent.keyDown(screen.getByRole('grid'), { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: '確定' }))
     expect(screen.getByTestId('value').textContent).toBe('2026-10-01')
     expect(screen.queryByRole('dialog')).toBeNull()
   })
@@ -67,6 +69,7 @@ describe('日付の選択（★管理画面）', () => {
     expect(screen.getByRole('grid').getAttribute('aria-label')).toBe('2026年2月')
     expect(screen.getByRole('grid').getAttribute('data-slide')).toBe('next')
     fireEvent.keyDown(screen.getByRole('grid'), { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: '確定' }))
     expect(screen.getByTestId('value').textContent).toBe('2026-02-28')
   })
 
@@ -89,4 +92,42 @@ describe('日付の選択（★管理画面）', () => {
     expect(screen.getByTestId('value').textContent).toBe('')
     expect(trigger.textContent).toContain('日付を選ぶ')
   })
+})
+
+it('日を選んでも確定まで元の値を保ち、Escでは変更を破棄する', () => {
+  render(<Harness />)
+  fireEvent.click(screen.getByRole('button', { name: '配信日' }))
+  fireEvent.click(screen.getByRole('button', { name: '2026年9月24日（木）' }))
+  expect(screen.getByTestId('value').textContent).toBe('2026-09-23')
+  fireEvent.keyDown(screen.getByRole('grid'), { key: 'Escape' })
+  expect(screen.getByTestId('value').textContent).toBe('2026-09-23')
+  fireEvent.click(screen.getByRole('button', { name: '配信日' }))
+  fireEvent.click(screen.getByRole('button', { name: '2026年9月25日（金）' }))
+  fireEvent.click(screen.getByRole('button', { name: '確定' }))
+  expect(screen.getByTestId('value').textContent).toBe('2026-09-25')
+})
+
+it('窓の外とキャンセルで仮の日付を捨て、再度開くと元の日付を選択する', () => {
+  render(<Harness />)
+  const trigger = screen.getByRole('button', { name: '配信日' })
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('button', { name: '2026年9月24日（木）' }))
+  fireEvent.pointerDown(document.body)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.getByTestId('value').textContent).toBe('2026-09-23')
+  fireEvent.click(trigger)
+  expect(screen.getByRole('button', { name: '2026年9月23日（水）' }).getAttribute('data-selected')).toBe('true')
+  fireEvent.click(screen.getByRole('button', { name: '2026年9月25日（金）' }))
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(screen.getByTestId('value').textContent).toBe('2026-09-23')
+})
+
+it('編集中に外から値が変われば古い仮選択を確定できない', () => {
+  const onChange = vi.fn()
+  const view = render(<DateField value="2026-09-23" onChange={onChange} aria-label="配信日" />)
+  fireEvent.click(screen.getByRole('button', { name: '配信日' }))
+  fireEvent.click(screen.getByRole('button', { name: '2026年9月24日（木）' }))
+  view.rerender(<DateField value="2026-09-25" onChange={onChange} aria-label="配信日" />)
+  expect((screen.getByRole('button', { name: '確定' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: '確定' })); expect(onChange).not.toHaveBeenCalled()
 })

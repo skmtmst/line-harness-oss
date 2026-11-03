@@ -1210,6 +1210,18 @@ describe('R2-18 飲食メニューの説明と登録画像', () => {
 
 describe('V8-B メニューの価格確定', () => {
   const menuPath = '/api/restaurant-test/menus/menu-ginza?account_id=account-1';
+  it('価格の上限は作成と更新の両方で守る', async () => {
+    seedRestaurantFixture();
+    const make = (price: number) => request('/api/restaurant-test/menu?account_id=account-1', { storeId: 'store-ginza', kind: 'course', name: '上限試験', price, status: 'draft' });
+    const tooHighCreate = await make(1000001);
+    expect(tooHighCreate.status).toBe(400);
+    expect((await tooHighCreate.json() as any).error).toContain('1,000,000');
+    expect((await make(1000000)).status).toBe(201);
+    const tooHighUpdate = await requestWithMethod(menuPath, 'PATCH', { price: 1000001 });
+    expect(tooHighUpdate.status).toBe(400);
+    expect((await tooHighUpdate.json() as any).error).toContain('1,000,000');
+    expect((await requestWithMethod(menuPath, 'PATCH', { price: 1000000 })).status).toBe(200);
+  });
   it('権限者の保存で価格を即時確定し、二重承認を受け付けない', async () => {
     seedRestaurantFixture();
     const response = await requestWithMethod(menuPath, 'PATCH', { price: 9900 });

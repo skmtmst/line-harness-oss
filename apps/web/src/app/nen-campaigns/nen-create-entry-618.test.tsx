@@ -269,6 +269,7 @@ describe('NEN新規作成入口（#618）', () => {
     )
     if (!day) throw new Error('未来の日が見つかりません')
     await click(day as HTMLElement)
+    await click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
     // 時刻は文字を入れ、blurで確定する。
     await act(async () => {
       const time = picker.querySelector<HTMLInputElement>('input[type="text"]')!

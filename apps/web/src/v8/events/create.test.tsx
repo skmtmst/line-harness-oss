@@ -70,6 +70,7 @@ it('初期日時は未来で、過去の日付を確認してから保存でき�
   expect(screen.getByLabelText('日付').getAttribute('title')).toContain('2026年11月4日')
   fireEvent.click(screen.getByLabelText('日付'))
   fireEvent.click(screen.getByRole('button',{name:'2026年11月2日（月）'}))
+  fireEvent.click(screen.getByRole('button',{name:'確定'}))
   expect(screen.getByText('開始日時が過去です。日時を確認してください。')).toBeTruthy()
   fireEvent.change(screen.getByLabelText('イベント名'), { target: { value: '体験会' } })
   fireEvent.change(screen.getByLabelText('定員'), { target: { value: '20' } })
@@ -81,5 +82,29 @@ it('初期日時は未来で、過去の日付を確認してから保存でき�
   await waitFor(() => expect(push).toHaveBeenCalled())
   expect(createEvent).toHaveBeenCalledTimes(1)
   expect(createSlots.mock.calls[0][2][0].starts_at).toBe('2026-11-02T05:00:00.000Z')
+ } finally { cleanup(); vi.useRealTimers() }
+})
+
+it('過去日時の公開は確認を取り消すと送らず、確認すれば公開できる', async () => {
+ vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-03T08:00:00Z'))
+ createEvent.mockResolvedValue({id:'past-event',version:1,is_published:1})
+ createSlots.mockImplementation(async (_account, eventId, slots) => ({items:[{...slots[0],id:'past-slot',event_id:eventId,version:1}]}))
+ try {
+  render(<EventsCreate />)
+  fireEvent.click(screen.getByLabelText('日付'))
+  fireEvent.click(screen.getByRole('button',{name:'2026年11月2日（月）'}))
+  fireEvent.click(screen.getByRole('button',{name:'確定'}))
+  fireEvent.change(screen.getByLabelText('イベント名'), { target: { value: '体験会' } })
+  fireEvent.change(screen.getByLabelText('定員'), { target: { value: '20' } })
+  const publish = () => { fireEvent.click(getPageAction({ name:'公開する' })); fireEvent.click(within(screen.getByRole('dialog',{name:'イベントを公開する'})).getByRole('button',{name:'公開する'})) }
+  publish()
+  const first=screen.getByRole('dialog',{name:'過去の日時で保存しますか？'})
+  fireEvent.click(within(first).getByRole('button',{name:'キャンセル'}))
+  expect(createEvent).not.toHaveBeenCalled()
+  await waitFor(() => expect(screen.queryByRole('dialog',{name:'過去の日時で保存しますか？'})).toBeNull())
+  publish()
+  fireEvent.click(within(screen.getByRole('dialog',{name:'過去の日時で保存しますか？'})).getByRole('button',{name:'この日時で保存する'}))
+  await waitFor(() => expect(push).toHaveBeenCalled())
+  expect(createEvent.mock.calls[0][1].is_published).toBe(1)
  } finally { cleanup(); vi.useRealTimers() }
 })

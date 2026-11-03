@@ -16,7 +16,7 @@ import { joinDescribedBy, useFieldContext } from './field-context'
  *
  * - 表示は「2026年9月23日（水）」。暦は6週を常に出す（月によって高さが変わらない）
  * - キーボード：欄で Enter・↓ で開く／矢印で1日・1週／PageUp・PageDown で月／Home・End で週の端／
- *   Enter・Space で選ぶ／Esc で閉じて欄へ戻る
+ *   Enter・Space で仮選択／確定で反映／Esc で破棄して欄へ戻る
  * - 動き：暦は motion-fast で欄の下から出る。月送りは段が 12px 横から薄く入る（motion-base）
  */
 export default function DateField({
@@ -64,6 +64,8 @@ export default function DateField({
   const dialogId = `${fieldId}-calendar`
   const selected = parseDate(value)
   const [open, setOpen] = useState(false)
+  const [draftValue, setDraftValue] = useState(value)
+  const openedValue = useRef(value)
   const [focused, setFocused] = useState<Date>(() => selected ?? today())
   const [slide, setSlide] = useState<'next' | 'prev' | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -98,6 +100,8 @@ export default function DateField({
 
   const openCalendar = () => {
     if (disabled) return
+    openedValue.current = value
+    setDraftValue(value)
     setFocused(selected ?? today())
     setSlide(null)
     setOpen(true)
@@ -127,8 +131,8 @@ export default function DateField({
 
   const choose = (day: Date) => {
     if (isDisabled(day)) return
-    onChange(formatValue(day))
-    close()
+    setDraftValue(formatValue(day))
+    moveTo(day)
   }
 
   const onGridKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -244,7 +248,8 @@ export default function DateField({
               <div role="row" key={week} className={styles.week}>
                 {days.slice(week * 7, week * 7 + 7).map((day) => {
                   const inMonth = day.getMonth() === month.getMonth()
-                  const isSelected = Boolean(selected && sameDay(day, selected))
+                  const draftDate = parseDate(draftValue)
+                  const isSelected = Boolean(draftDate && sameDay(day, draftDate))
                   const isToday = sameDay(day, today())
                   const off = isDisabled(day)
                   return (
@@ -270,7 +275,9 @@ export default function DateField({
           </div>
           <div className={styles.footer}>
             <button type="button" className={styles.today} disabled={isDisabled(today())} onClick={() => choose(today())}>今日</button>
-            <button type="button" className={styles.reset} onClick={() => { onChange(''); close() }}>消す</button>
+            <button type="button" className={styles.reset} onClick={() => setDraftValue('')}>消す</button>
+            <button type="button" className={styles.reset} onClick={close}>キャンセル</button>
+            <button type="button" className={styles.today} disabled={disabled || value !== openedValue.current || Boolean(draftValue && (!parseDate(draftValue) || isDisabled(parseDate(draftValue)!)))} onClick={() => { if (disabled || value !== openedValue.current) return; const day = parseDate(draftValue); if (draftValue && (!day || isDisabled(day))) return; onChange(draftValue); close() }}>確定</button>
           </div>
         </div>
         </MenuPortal>
