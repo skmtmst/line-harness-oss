@@ -162,3 +162,34 @@ test('飲食の値も変更した欄だけ保存し、表示項目の好みで�
   expect(screen.queryByText('席の好み')).toBeNull()
   expect(JSON.parse(localStorage.getItem('chat.friendInfoSections.v4')!).hidden).toContain('fixed:seat_preference')
 })
+
+test('基本の編集は Escape で破棄し、保存しない', () => {
+  render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit sections={[]} />)
+  fireEvent.click(screen.getByRole('button', { name: '編集' }))
+  const name = screen.getByRole('textbox', { name: '名前' })
+  fireEvent.change(name, { target: { value: '未保存の変更' } })
+  fireEvent.keyDown(name, { key: 'Escape' })
+  expect(screen.queryByRole('textbox', { name: '名前' })).toBeNull()
+  expect(screen.getByText('山田花子')).toBeTruthy()
+  expect(api.friendFields.saveForFriend).not.toHaveBeenCalled()
+})
+
+test('編集ボタンの直後に Escape を押しても閉じる', () => {
+  render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit sections={[]} />)
+  fireEvent.click(screen.getByRole('button', { name: '編集' }))
+  expect(document.activeElement).toBe(screen.getByRole('textbox', { name: '名前' }))
+  fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+  expect(screen.queryByRole('textbox', { name: '名前' })).toBeNull()
+})
+
+test('顧客情報の窓の中でも Escape は基本の編集だけを閉じる', () => {
+  const onKey = vi.fn()
+  document.addEventListener('keydown', onKey)
+  render(<div role="dialog" aria-label="顧客情報"><CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit sections={[]} /></div>)
+  fireEvent.click(screen.getByRole('button', { name: '編集' }))
+  fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+  expect(screen.queryByRole('textbox', { name: '名前' })).toBeNull()
+  expect(screen.getByRole('dialog', { name: '顧客情報' })).toBeTruthy()
+  expect(onKey).not.toHaveBeenCalled()
+  document.removeEventListener('keydown', onKey)
+})

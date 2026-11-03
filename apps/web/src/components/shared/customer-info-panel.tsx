@@ -49,6 +49,8 @@ export default function CustomerInfoPanel({
   const [order, setOrder] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
   const [editing, setEditing] = useState(false)
+  const basicSectionRef = useRef<HTMLElement>(null)
+  useEffect(() => { if (editing) basicSectionRef.current?.querySelector<HTMLInputElement>('input:not([disabled]):not([readonly])')?.focus() }, [editing])
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -86,7 +88,15 @@ export default function CustomerInfoPanel({
       <span className={styles.profileName} title={profile.name ?? '名前なし'}>{profile.name ?? '名前なし'}</span>
       <span className={styles.profileDate} title={profile.addedAt}>{profile.addedAt.replace(/(\d+)年(\d+)月(\d+)日に友だち追加/, '$1/$2/$3 追加')}</span>
     </div> : null}
-    {!hidden.includes('names') ? <section className={styles.section} aria-label="基本">
+    {!hidden.includes('names') ? <section ref={basicSectionRef} className={styles.section} aria-label="基本" onKeyDown={event => {
+      if (event.key !== 'Escape' || !editing || saving || event.defaultPrevented || !event.currentTarget.contains(event.target as Node) || (event.target as HTMLElement).closest('[aria-expanded="true"]')) return
+      const innerDialog = (event.target as HTMLElement).closest('[role="dialog"], [role="alertdialog"]')
+      if (innerDialog && event.currentTarget.contains(innerDialog)) return
+      event.preventDefault()
+      event.stopPropagation()
+      setEditing(false)
+      setSaveError('')
+    }}>
       <div className={styles.head}>
         <h3>基本</h3>
         {canEdit && state === 'ready' && !editing ? <Button variant="text" size="inline" actionWording={actionWording} onClick={() => { setDraft(Object.fromEntries(shownFields.map(field => [field.id, field.value ?? '']))); setSaveError(''); setEditing(true) }}>編集</Button> : null}
