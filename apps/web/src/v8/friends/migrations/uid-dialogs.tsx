@@ -1,5 +1,6 @@
 'use client'
 
+import { Undo2 } from 'lucide-react'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 
@@ -174,6 +175,7 @@ export function RollbackConfirmDialog({
       title="この移行を切り戻します"
       description={`反映した ${formatNumber(active.counts.applied)} 件を移行前の紐付けに戻します。移行後に別の変更があった行は切り戻さず、競合として表示します。`}
       confirmLabel="切り戻す"
+      confirmIcon={<Undo2 size={16} aria-hidden="true" />}
       destructive
       busy={busy}
       error={error ?? undefined}
