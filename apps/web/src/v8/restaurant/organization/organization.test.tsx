@@ -5,6 +5,7 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async (importOriginal) => ({ ...await importOriginal<typeof import('next/navigation')>(), useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }) }))
 
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), loginMembers: vi.fn(), linkMembershipLogin: vi.fn(), updateMembership: vi.fn(), listIntakeAddresses: vi.fn(),
@@ -32,6 +33,53 @@ beforeEach(() => {
   fixture.storeGroups.mockResolvedValue({ data: [] })
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
+
+it('店舗の入力後のページ移動を確認する', async () => {
+  render(<OrganizationV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: '店舗を作る' }))
+  fireEvent.change(screen.getByLabelText('店舗名'), { target: { value: '新しい店舗' } })
+  const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+  fireEvent.click(link)
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  link.remove()
+})
+
+it('ユーザーのログイン連携の選択もページ移動の前に確認する', async () => {
+  render(<OrganizationV8 />)
+  const row = (await screen.findByText('試験担当')).closest('[role="row"]') as HTMLElement
+  fireEvent.click(within(row).getByRole('button', { name: '変更' }))
+  await pickEntity('試験担当のログインメンバー', '別のログイン')
+  const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+  fireEvent.click(link)
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  link.remove()
+})
+
+it('店舗の選択窓で確定前の選択もページ移動の前に確認する', async () => {
+  render(<OrganizationV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: 'ユーザーを追加する' }))
+  fireEvent.click(screen.getByRole('button', { name: /^担当店舗/ }))
+  const picker = await screen.findByRole('dialog', { name: '店舗を選ぶ' })
+  fireEvent.click(within(picker).getByRole('radio', { name: '試験店' }))
+  const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+  fireEvent.click(link)
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  link.remove()
+})
+
+it('ユーザー情報とログイン連携の両方を変更しても確認は一度で、編集に戻れば両方を保つ', async () => {
+  render(<OrganizationV8 />)
+  const row = (await screen.findByText('試験担当')).closest('[role="row"]') as HTMLElement
+  fireEvent.click(within(row).getByRole('button', { name: '変更' }))
+  const name = screen.getByLabelText('氏名') as HTMLInputElement
+  fireEvent.change(name, { target: { value: '変更中の名前' } })
+  await pickEntity('試験担当のログインメンバー', '別のログイン')
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+  expect(name.value).toBe('変更中の名前')
+  expect(screen.getByRole('button', { name: 'ログインと連携' }).hasAttribute('disabled')).toBe(false)
+})
 
 it('86: 店が1つしか無い時は選ぶ欄を出さない', async () => {
   render(<OrganizationV8 />)

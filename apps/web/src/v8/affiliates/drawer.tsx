@@ -109,10 +109,15 @@ export default function AffiliateDrawer({
   const settlementFormId = useId()
   const [savingSettlement, setSavingSettlement] = useState(false)
   const [settlementDirty, setSettlementDirty] = useState(false)
+  const [nameDirty, setNameDirty] = useState(false)
+  const [nameSaving, setNameSaving] = useState(false)
+  const [nameReset, setNameReset] = useState(0)
   const depth = useContext(OverlayDepthContext)
   const pendingLeave = useRef<UnsavedLeaveTarget | null>(null)
   const localActions = useRef(new WeakSet<() => void>())
-  const guard = useUnsavedGuard({ dirty: settlementDirty || savingSettlement, busy: savingSettlement, onDiscard: () => {
+  const guard = useUnsavedGuard({ dirty: settlementDirty || nameDirty || savingSettlement || nameSaving, busy: savingSettlement || nameSaving, onDiscard: () => {
+    setNameDirty(false)
+    setNameReset(token => token + 1)
     const target = pendingLeave.current
     if (target?.kind !== 'action' || !localActions.current.has(target.run)) onClose()
   } })
@@ -477,7 +482,7 @@ export default function AffiliateDrawer({
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      <Drawer open title={affiliate.name} description={subLine} width="editor" heightMode="viewport" layout="inset" initialFocus="panel" busy={paymentOpen || savingSettlement} onClose={onClose}
+      <Drawer open title={affiliate.name} description={subLine} width="editor" heightMode="viewport" layout="inset" initialFocus="panel" dirty={settlementDirty || nameDirty} busy={paymentOpen || savingSettlement || nameSaving} onClose={onClose}
         status={<StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill>}
         toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => { if (item.key !== tab) protectLocal(() => { if (settlementDirty) setEditing(false); setTab(item.key) }) } }))} />}
         actions={{ primary: (editing && tab === 'payment' && !readonly ? <Button variant="primary" type="submit" form={settlementFormId} busy={savingSettlement} busyLabel="保存しています">取り決めを保存する</Button> : <Button type="button" variant="primary" disabled={!accountId || settlementState !== 'ready' || !settlement} title={settlement ? undefined : '今回締められる報酬がありません'} onClick={() => setPaymentOpen(true)}>
@@ -490,7 +495,7 @@ export default function AffiliateDrawer({
     menuItems: [...([{ allowed: !readonly, id: 'stop-referral', label: '紹介を止める', tone: 'danger' as const, disabled: !affiliate.isActive, onSelect: () => protectLocal(() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }) }])], primaryAllowed: !readonly, secondaryAllowed: !readonly }}
       >
 <DetailContent>
-<DetailField label="紹介者の名前"><DetailInlineEdit allowed={!(readonly)} value={affiliate.name} label="紹介者の名前を直す" maxLength={100} onSave={async (next) => {
+<DetailField label="紹介者の名前"><DetailInlineEdit allowed={!(readonly)} value={affiliate.name} label="紹介者の名前を直す" maxLength={100} preserveDirtyOnBlur onDirtyChange={setNameDirty} onSavingChange={setNameSaving} resetToken={nameReset} onSave={async (next) => {
           if (!next.trim()) throw new Error('名前を入力してください')
           const response = await api.affiliates.update(affiliate.id, { name: next.trim() })
           if (!response.success) throw new Error('名前を保存できませんでした。もう一度お試しください。')
@@ -503,7 +508,7 @@ export default function AffiliateDrawer({
 
 </DetailContent>
 </Drawer>
-      <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="支払いの取り決め" busy={savingSettlement} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
+      <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="編集内容" busy={savingSettlement || nameSaving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
       {accountId ? (
         <AffiliatePaymentConfirmDialog
           target={paymentOpen ? { id: affiliate.id, name: affiliate.name } : null}

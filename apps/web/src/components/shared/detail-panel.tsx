@@ -162,7 +162,9 @@ export default function DetailPanel({
  * `?key=id` を読み、変えると置き換える（履歴は増やさない）。
  * 戻る・進むでは `popstate` で追う。サーバ描画では読まない。
  */
-export function useDetailPanelUrl(key: string): [string | null, React.Dispatch<React.SetStateAction<string | null>>] {
+export function useDetailPanelUrl(key: string, shouldHold?: () => boolean): [string | null, React.Dispatch<React.SetStateAction<string | null>>] {
+  const shouldHoldRef = useRef(shouldHold)
+  shouldHoldRef.current = shouldHold
   const read = useCallback((): string | null => {
     if (typeof window === 'undefined' || !window.location) return null
     return new URLSearchParams(window.location.search).get(key)
@@ -170,8 +172,8 @@ export function useDetailPanelUrl(key: string): [string | null, React.Dispatch<R
   const location = useListLocation()
   const [current, setCurrent] = React.useState<string | null>(null)
   useEffect(() => {
-    setCurrent(read())
-    const onPopState = () => setCurrent(read())
+    if (!shouldHoldRef.current?.()) setCurrent(read())
+    const onPopState = () => { if (!shouldHoldRef.current?.()) setCurrent(read()) }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [read, location])

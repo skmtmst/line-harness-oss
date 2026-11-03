@@ -1,7 +1,7 @@
 'use client'
-import { scrollMotion } from '@/components/shared/overlay-utils'
+import { OverlayDepthContext, scrollMotion } from '@/components/shared/overlay-utils'
 import ImageUploader from '@/components/shared/image-uploader'
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Check, ShieldCheck } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
@@ -21,6 +21,8 @@ import styles from './dialogs.module.css'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 
 /*
@@ -33,7 +35,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  */
 
 /** 窓の枠。題・右上の×・中身・共通の下の操作。 */
-function Frame({ open, node, width, top, title, busy, onCancel, actions, children }: {
+function Frame({ open, node, width, top, title, busy, onCancel, actions, children, leaveGuarded }: {
   open: boolean
   node?: string
   width: number
@@ -43,6 +45,7 @@ function Frame({ open, node, width, top, title, busy, onCancel, actions, childre
   onCancel: () => void
   actions?: ReactNode
   children: ReactNode
+  leaveGuarded?: boolean
 }) {
   return (
     <Dialog
@@ -52,6 +55,7 @@ function Frame({ open, node, width, top, title, busy, onCancel, actions, childre
       designWidth={width}
       designTop={top}
       busy={busy}
+      dirty={leaveGuarded ? false : undefined}
       onCancel={onCancel}
       layout="account-inset"
       footer={actions ? <DialogActions padding="none">{actions}</DialogActions> : undefined}
@@ -396,6 +400,7 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const secretId = useId()
   const tokenId = useId()
+  const depth = useContext(OverlayDepthContext)
   useInvalidFocus(fieldErrors, { secret: secretId })
 
   const close = () => {
@@ -405,6 +410,9 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
     setError('')
     onClose()
   }
+  const dirty = secret !== '' || token !== ''
+  const guard = useUnsavedGuard({ dirty: dirty || busy, busy, onDiscard: close })
+  const requestClose = () => guard.guarded(() => { if (!dirty) close() })
 
   const save = async (stepUpToken?: string) => {
     const payload: Parameters<typeof api.lineAccounts.update>[1] = {}
@@ -453,9 +461,10 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
         top={200}
         title="資格情報を差し替える"
         busy={busy}
-        onCancel={close}
+        leaveGuarded
+        onCancel={requestClose}
         actions={<>
-          <Button type="button" onClick={close} disabled={busy}>キャンセル</Button>
+          <Button type="button" onClick={requestClose} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => void save()} disabled={busy} busy={busy} busyLabel="保存中…">
             <ShieldCheck size={16} aria-hidden="true" />本人確認して保存
           </Button>
@@ -474,6 +483,7 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
+      <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></OverlayDepthContext.Provider>
     </></SaveErrorScope>
   )
 }
@@ -515,10 +525,13 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const ids = { name: useId(), tz: useId(), login: useId(), liff: useId(), og: useId(), ogDesc: useId(), cap: useId(), warn: useId() }
+  const depth = useContext(OverlayDepthContext)
+  const dirty = name !== account.name || timezone !== initialTimezone || loginChannelId !== (account.loginChannelId ?? '') || liffId !== (account.liffId ?? '') || ogSiteName !== (account.ogSiteName ?? '') || ogDescription !== (account.ogDefaultDescription ?? '') || ogImageUrl !== (account.ogDefaultImageUrl ?? '') || capacity !== (account.friendCapacity == null ? '' : formatNumber(account.friendCapacity)) || warnAt !== (account.capacityWarnAt == null ? '' : formatNumber(account.capacityWarnAt)) || iconUrl !== (account.iconUrl ?? '')
+  const guard = useUnsavedGuard({ dirty: dirty || busy, busy, onDiscard: onClose })
 
 
   const close = () => {
-    if (!busy) onClose()
+    guard.guarded(() => { if (!dirty) onClose() })
   }
 
   /* 保存で落ちた欄は、その欄の真下に理由を出して移る。 */
@@ -591,6 +604,7 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         top={120}
         title="登録の内容を編集する"
         busy={busy}
+        leaveGuarded
         onCancel={close}
         actions={<>
           <Button type="button" onClick={close} disabled={busy}>キャンセル</Button>
@@ -664,6 +678,7 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         <ErrorLine message={error} />
       </Frame>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
+      <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></OverlayDepthContext.Provider>
     </></SaveErrorScope>
   )
 }

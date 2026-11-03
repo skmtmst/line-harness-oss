@@ -3,7 +3,7 @@
 import { canManageRole } from '@/lib/staff-role'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useId, useState, type ReactNode } from 'react'
 import { Send, ShieldCheck } from 'lucide-react'
 import type { StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -19,6 +19,9 @@ import head from './dialog-head.module.css'
 import styles from './member-dialog.module.css'
 import { inviteRequirements } from './member-requirements'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 
 
 /*
@@ -78,6 +81,7 @@ function initial(member: StaffMember | null): MemberDialogValue {
  */
 export default function MemberDialogV8({
   open,
+  active = open,
   session,
   member,
   isSelf,
@@ -87,6 +91,8 @@ export default function MemberDialogV8({
   onCancel,
 }: {
   open: boolean
+  /** 確認窓で一時的に閉じても、入力が残る間は離脱を守る。 */
+  active?: boolean
   /**
    * 開き直しの番号。変わったときだけ中身を初めに戻す。確認の窓を出す間はこの窓を閉じ、
    * 確認で「キャンセル」したら入れた中身のまま戻す（open だけでは戻さない）。
@@ -106,6 +112,11 @@ export default function MemberDialogV8({
   const [localError, setLocalError] = useState('')
   /* 板 ：名前・メールの間違いは欄の下に赤で出し、直すまで送るボタンを押せなくする。 */
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; scope?: string }>({})
+  const depth = useContext(OverlayDepthContext)
+  const dirty = JSON.stringify(value) !== JSON.stringify(initial(member))
+  const guard = useUnsavedGuard({ dirty: active && (dirty || Boolean(busy)), busy: active && busy, onDiscard: onCancel })
+  const close = () => guard.guarded(() => { if (!dirty) onCancel() })
+  useEffect(() => { if (!active) guard.cancelLeave() }, [active, guard.cancelLeave])
 
   useEffect(() => {
     setValue(initial(member))
@@ -147,7 +158,7 @@ export default function MemberDialogV8({
     { value: 'viewer', label: '閲覧のみ（見るだけ）' },
   ]
 
-  return (
+  return (<>
     <Dialog
       open={open}
       title={member ? 'メンバーの権限を変更する' : '権限者を招待'}
@@ -162,10 +173,11 @@ export default function MemberDialogV8({
       designTop={MEMBER_TOP}
       busy={busy}
       error={localError || error || undefined}
-      onCancel={onCancel}
+      dirty={false}
+      onCancel={close}
       footer={
         <DialogActions>
-          <Button type="button" onClick={onCancel} disabled={busy}>キャンセル</Button>
+          <Button type="button" onClick={close} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={submit} disabled={busy || Boolean(fieldErrors.name || fieldErrors.email)} busy={busy} busyLabel="処理中…">
             {member ? null : <Send aria-hidden="true" className={styles.icon} />}
             {member ? '変更を保存する' : '招待メールを送る'}
@@ -227,7 +239,8 @@ export default function MemberDialogV8({
         {note ? <p className={styles.callout}>{note}</p> : null}
       </form>
     </Dialog>
-  )
+    <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={active && guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></OverlayDepthContext.Provider>
+  </>)
 }
 
 const ROLE_WORD: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: '担当者', viewer: '閲覧のみ' }

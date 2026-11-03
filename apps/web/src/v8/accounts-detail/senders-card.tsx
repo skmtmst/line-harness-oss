@@ -14,7 +14,7 @@ import { OptionalBadge } from '@/components/shared/form-controls'
  * 名前は 20 文字まで・「LINE」「ライン」は使えない（サーバーが拒否し、理由をそのまま出す）。
  * 閲覧のみには追加・使わないを出さない。スタッフは自分用だけ、オーナー・管理者は全員用も作れる。
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { ImagePlus, Plus } from 'lucide-react'
 import type { LineSender } from '@line-crm/shared'
 import { lineSenderApi } from '@/lib/api/helpers/gap1'
@@ -31,6 +31,9 @@ import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import type { MediaItem } from '@line-crm/shared'
 import ListState from '@/components/shared/list-state'
 import { RowMenu } from '@/components/shared/row-actions'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './senders-card.module.css'
 
 const NAME_MAX = 20
@@ -58,6 +61,10 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
   const [icon, setIcon] = useState<MediaItem | null>(null)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
+  const depth = useContext(OverlayDepthContext)
+  const dirty = name !== '' || visibility !== 'all' || icon !== null
+  const clearDraft = () => { setAdding(false); setName(''); setVisibility('all'); setIcon(null); setIconPickerOpen(false); setError('') }
+  const guard = useUnsavedGuard({ dirty: adding && (dirty || busy), busy: adding && busy, onDiscard: clearDraft })
 
   const load = useCallback(async () => {
     const generation = accountScope.current.generation
@@ -75,7 +82,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
       setFailed(true)
     }
   }, [accountId])
-  useEffect(() => { setSenders(null); setStopping(null); void load() }, [load])
+  useEffect(() => { setSenders(null); setStopping(null); setAdding(false); setName(''); setVisibility('all'); setIcon(null); setIconPickerOpen(false); void load() }, [load])
 
   const create = async () => {
     const trimmed = name.trim()
@@ -86,6 +93,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
       await lineSenderApi.create(accountId, { name: trimmed, visibility: canManage ? visibility : 'owner_only', ...(icon ? { iconMediaId: icon.id } : {}) }, idempotencyKey)
       setAdding(false)
       setName('')
+      setVisibility('all')
       setIcon(null)
       setIdempotencyKey(crypto.randomUUID())
       await load()
@@ -147,6 +155,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
       )}
       <ConfirmDialog
         open={adding}
+        dirty={dirty}
         title="送り手を追加"
         titleIcon={false}
         description="お客さまの LINE で、メッセージの上に出る名前と顔です"
@@ -155,7 +164,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
         error={error || undefined}
         confirmDisabled={!name.trim() || name.trim().length > NAME_MAX}
         onConfirm={() => create()}
-        onCancel={() => { if (!busy) setAdding(false) }}
+        onCancel={() => { if (!busy) clearDraft() }}
       >
         <div className={styles.iconRow}>
           <button type="button" className={styles.iconTile} onClick={() => setIconPickerOpen(true)} aria-label={icon ? '画像を変える' : '画像を選ぶ'}>
@@ -181,6 +190,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
             options={[{ value: 'all', label: '使える人：全員' }, { value: 'owner_only', label: '使える人：自分だけ' }]} /></SaveErrorField>
         ) : null}
       </ConfirmDialog>
+      <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
       <MediaPickerDialog open={iconPickerOpen} accountId={accountId} kind="image" title="アイコンを選ぶ" onClose={() => setIconPickerOpen(false)} onSelect={(item) => { setIcon(item); setIconPickerOpen(false) }} />
       <ConfirmDialog
         open={stopping !== null && stopping.generation === accountScope.current.generation}

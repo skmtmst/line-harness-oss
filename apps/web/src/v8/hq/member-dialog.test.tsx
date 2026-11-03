@@ -2,8 +2,22 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import MemberDialog from './member-dialog'
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 afterEach(cleanup)
+
+it('招待の入力中はリンクと戻るを確かめ、権限変更の確認中も入力を守る', () => {
+  const close = vi.fn()
+  const { rerender } = render(<><a href="/templates">テンプレート</a><MemberDialog open session={1} member={null} onSubmit={vi.fn()} onCancel={close} /></>)
+  fireEvent.change(screen.getByLabelText('名前'), { target: { value: '担当者' } })
+  fireEvent.click(screen.getByRole('link', { name: 'テンプレート' }))
+  expect(screen.getByText('保存していない変更があります')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+  rerender(<><a href="/templates">テンプレート</a><MemberDialog open={false} active session={1} member={null} onSubmit={vi.fn()} onCancel={close} /></>)
+  fireEvent.popState(window)
+  expect(screen.getByText('保存していない変更があります')).toBeTruthy()
+  expect(close).not.toHaveBeenCalled()
+})
 
 it('統括の招待では全アカウントだけを付与する', () => {
   const submit = vi.fn()

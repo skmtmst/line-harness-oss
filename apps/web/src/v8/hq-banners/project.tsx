@@ -1,6 +1,8 @@
 'use client'
 
-import { scrollMotion } from '@/components/shared/overlay-utils'
+import { OverlayDepthContext, scrollMotion } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard, type UnsavedLeaveTarget } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAttentionStarMotion } from '@/components/shared/use-attention-star-motion'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
@@ -49,7 +51,7 @@ type BannerUsage
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
 import { Archive,ArchiveRestore,Copy,Hourglass,LoaderCircle,Pencil,Send,Sparkles,Star,Upload,X } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { Suspense,useCallback,useEffect,useId,useMemo,useRef,useState } from 'react'
+import { Suspense,useCallback,useContext,useEffect,useId,useMemo,useRef,useState } from 'react'
 import { useDistributionFolders } from '@/v8/hq-templates/public/distribution-accounts/index'
 import { SavedDistributionDialog } from '@/v8/hq-templates/public/saved-distribution-dialog/index'
 import { BANNER_UPLOAD_ACCEPT,BannerConfirmDialogV8,CreateProjectDialogV8,uploadRefusal } from './dialogs'
@@ -94,6 +96,9 @@ function ProjectInner() {
   const [accountsFailed, setAccountsFailed] = useState(false)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [input, setInput] = useState<BannerGenerationInput>(EMPTY_GENERATION_INPUT)
+  const [inputBaseline, setInputBaseline] = useState<BannerGenerationInput>(EMPTY_GENERATION_INPUT)
+  const inputRef = useRef(input)
+  inputRef.current = input
   const [inputTouched, setInputTouched] = useState(false)
   const [filter, setFilter] = useListUrlValue<Filter>('filter', 'all')
   const [selectedImages, setSelectedImages] = useState<string[]>([])
@@ -117,6 +122,7 @@ function ProjectInner() {
   const [modalBusy, setModalBusy] = useState(false)
   const [modalError, setModalError] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+  const [formDirty, setFormDirty] = useState(false)
   const [formBusy, setFormBusy] = useState(false)
   const [formError, setFormError] = useState('')
   const [archiveConfirm, setArchiveConfirm] = useState(false)
@@ -166,6 +172,7 @@ function ProjectInner() {
         setUsage(presetRes.data.usage)
         setEngineReady(presetRes.data.engineReady)
         setInput((cur) => (cur.presetKey ? cur : { ...cur, presetKey: presetRes.data.presets[0]?.key ?? '' }))
+        setInputBaseline((cur) => (cur.presetKey ? cur : { ...cur, presetKey: presetRes.data.presets[0]?.key ?? '' }))
       }
       setStatus('ready')
     } catch (caught) {
@@ -194,8 +201,13 @@ function ProjectInner() {
   // 「同じ設定でもう一度生成」で戻ってきたとき、その画像の条件をパネルへ入れる。
   useEffect(() => {
     if (!fromImageId || status !== 'ready') return
+    const original = inputRef.current
     void api.hqBanners.images.get(fromImageId).then((res) => {
-      if (res.success && res.data.generation) setInput(inputFromGeneration(res.data.generation))
+      if (res.success && res.data.generation && inputRef.current === original) {
+        const loaded = inputFromGeneration(res.data.generation)
+        setInput(loaded)
+        setInputBaseline(loaded)
+      }
     }).catch(() => {
       // 元の画像が無くても、空のパネルから作れる。
     })
@@ -268,12 +280,31 @@ function ProjectInner() {
    */
   const startingRef = useRef(false)
   const [starting, setStarting] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const pendingLeave = useRef<UnsavedLeaveTarget | null>(null)
+  const localActions = useRef(new WeakSet<() => void>())
+  const generationDirty = JSON.stringify(input) !== JSON.stringify(inputBaseline)
+  const guard = useUnsavedGuard({ dirty: generationDirty || formDirty || starting || formBusy, busy: starting || formBusy, onDiscard: () => {
+    const target = pendingLeave.current
+    if (target?.kind !== 'action' || !localActions.current.has(target.run)) setInput(inputBaseline)
+    setFormDirty(false)
+    setFormOpen(false)
+  } })
+  pendingLeave.current = guard.leaveTarget
+  const closeForm = () => {
+    if (formBusy) return
+    if (!formDirty) { setFormOpen(false); return }
+    const close = () => setFormOpen(false)
+    localActions.current.add(close)
+    guard.guarded(close)
+  }
   const startGeneration = async () => {
     if (!project || blockedReason || running || startingRef.current) return
     startingRef.current = true
     setStarting(true)
     setGenerationError('')
     setActionError('')
+    const submittedInput = input
     try {
       const res = await api.hqBanners.projects.createGeneration(project.id, {
         ...input,
@@ -283,6 +314,7 @@ function ProjectInner() {
         freePrompt: input.freePrompt.trim(),
       })
       if (!res.success) throw new Error(res.error)
+      setInputBaseline(submittedInput)
       setGenerations((prev) => [res.data, ...prev])
       void runLoop(res.data)
     } catch (caught) {
@@ -576,7 +608,7 @@ function ProjectInner() {
       <Button onClick={() => void patchProject('お気に入り', { isFavorite: !project.isFavorite })} disabled={busy}>
         <Star aria-hidden="true" className={project.isFavorite ? styles.starOn : styles.icon} />{project.isFavorite ? 'お気に入りから外す' : 'お気に入り'}
       </Button>
-      <Button onClick={() => void duplicate()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
+      <Button onClick={() => guard.guarded(() => { void duplicate() })} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
         <Copy aria-hidden="true" className={styles.icon} />複製
       </Button>
       <Button onClick={() => { setFormError(''); setFormOpen(true) }} disabled={busy}>
@@ -752,6 +784,8 @@ function ProjectInner() {
         project={project}
         busy={formBusy}
         error={formError}
+        onDraftChange={setFormDirty}
+        onRequestClose={closeForm}
         onSubmit={(next) => {
           setFormBusy(true)
           setFormError('')
@@ -763,6 +797,7 @@ function ProjectInner() {
         }}
         onCancel={() => { if (!formBusy) setFormOpen(false) }}
       />
+      <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={starting || formBusy} /></OverlayDepthContext.Provider>
 
       <BannerConfirmDialogV8
         open={archiveConfirm}
@@ -772,12 +807,12 @@ function ProjectInner() {
         tone="primary"
         busy={busy}
         designNode="I0w2e"
-        onConfirm={() => {
-          return patchProject('アーカイブ', { archived: true }).then((updated) => {
+        onConfirm={() => guard.guarded(() => {
+          void patchProject('アーカイブ', { archived: true }).then((updated) => {
             setArchiveConfirm(false)
             if (updated) router.push('/hq/banners')
           })
-        }}
+        })}
         onCancel={() => setArchiveConfirm(false)}
       />
 

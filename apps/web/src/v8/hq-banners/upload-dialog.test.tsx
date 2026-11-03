@@ -2,6 +2,7 @@
 import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { UploadDialogV8 } from './dialogs'
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 const mocks = vi.hoisted(() => { process.env.NEXT_PUBLIC_API_URL ||= 'http://worker.test'; return { list: vi.fn(), upload: vi.fn() } })
 vi.mock('@/lib/api', async importOriginal => {
@@ -18,6 +19,14 @@ beforeEach(() => {
   mocks.upload.mockReset()
 })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
+
+it('画像選択後は画面を離れる前に確かめる', async () => {
+  render(<><a href="/templates">テンプレート</a><UploadDialogV8 open onClose={vi.fn()} onDone={vi.fn()} /></>)
+  await screen.findByLabelText('選択中の入れるプロジェクト：プロジェクト')
+  fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File(['image'], 'sample.png', { type: 'image/png' })] } })
+  fireEvent.click(screen.getByRole('link', { name: 'テンプレート' }))
+  expect(screen.getByText('保存していない変更があります')).toBeTruthy()
+})
 
 it('取込み先は必須で、画像を選ぶまで送らない', async () => {
   render(<UploadDialogV8 open onClose={() => {}} onDone={() => {}} />)

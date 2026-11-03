@@ -365,3 +365,38 @@ it.each(['同じ設定でもう一度生成', '参照画像にする'])('画像�
   if (action === '同じ設定でもう一度生成') expect((host.querySelector('[aria-label="テキスト 1行目"]') as HTMLInputElement).value).toBe(generation.textLines[0])
   else expect(host.querySelector('[aria-label="1を外す"]')).toBeTruthy()
 })
+
+it('生成前の条件を変更したらページ移動前に確かめる', async () => {
+  act(() => root.render(<HqBannerProjectV8 />)); await flush()
+  const line = host.querySelector('[aria-label="テキスト 1行目"]') as HTMLInputElement
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(line), 'value')!.set!.call(line, '春の企画')
+    line.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+  act(() => link.click())
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  link.remove()
+})
+
+it('生成条件と名前を同時に変更して移るときは確認を一つにし、両方を破棄する', async () => {
+  act(() => root.render(<HqBannerProjectV8 />)); await flush()
+  const line = host.querySelector('[aria-label="テキスト 1行目"]') as HTMLInputElement
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(line), 'value')!.set!.call(line, '春の企画')
+    line.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  act(() => buttonNamed('名前と説明を変える')!.click()); await flush()
+  const field = document.querySelector('input[placeholder="例：春の感謝祭 2周年"]') as HTMLInputElement
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), 'value')!.set!.call(field, '別の名前')
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+  act(() => link.click()); await flush()
+  expect(document.querySelectorAll('[role="dialog"][aria-labelledby]').length).toBe(2)
+  act(() => buttonNamed('保存せずに移る')!.click()); await flush()
+  expect(line.value).toBe('')
+  expect(push).toHaveBeenCalledWith('/templates')
+  link.remove()
+})
