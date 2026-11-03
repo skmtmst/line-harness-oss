@@ -189,7 +189,7 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
     ? [{ id: 'ledger', label: '予約台帳で入れる', onSelect: () => router.push('/restaurant-test/reservations') }]
     : channel.status === 'preparing'
       ? channel.receiveMethod === 'direct'
-        ? [{ id: 'start', label: '準備中の案内を見る', onSelect: () => setPreparingChannel(channel) }]
+        ? [{ id: 'start', label: '直接接続の案内を見る', onSelect: () => setPreparingChannel(channel) }]
         : [{ id: 'start', label: '始める（転送の設定のしかた）', onSelect: () => setHowToOpen(true) }]
       : [{ id: 'records', label: '取り込んだ記録を見る', onSelect: () => router.push(`/restaurant-test/reservations?source=${encodeURIComponent(channel.code)}`) }]
 
@@ -286,7 +286,7 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
         <OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: storeId, name: storeName }} />
         <DialogNote>新しいアドレスを発行します。今のアドレスも 90 日は受け取り、その後は使えなくなります。予約サイトの転送先を新しいアドレスへ変えてください。</DialogNote>
       </RsDialog>
-      <RsDialog open={Boolean(preparingChannel)} title="直接接続は準備中です" width={520} top={200} onCancel={() => setPreparingChannel(null)} actions={<Button variant="primary" onClick={() => setPreparingChannel(null)}>わかった</Button>}>
+      <RsDialog open={Boolean(preparingChannel)} title="直接接続はまだつなげません" width={520} top={200} onCancel={() => setPreparingChannel(null)} actions={<Button variant="primary" onClick={() => setPreparingChannel(null)}>わかった</Button>}>
         <DialogNote>{preparingChannel?.name}との直接接続は、安定して予約を取り込めるよう準備しています。開始時期は決まり次第お知らせします。</DialogNote>
       </RsDialog>
       <RsDialog

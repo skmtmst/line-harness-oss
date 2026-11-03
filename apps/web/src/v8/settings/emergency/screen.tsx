@@ -62,7 +62,7 @@ export default function EmergencyScreen({
   const canReadSecurity = Boolean(identity && canManageRole(identity.role))
   const tabs = canReadSecurity ? [...BASE_TABS, SECURITY_TAB] : BASE_TABS
   const tab = useMergedTab(tabs)
-  const hqOrigin = useSearchParams().get('from') === 'hq'
+  const hqOrigin = useSearchParams()?.get('from') === 'hq'
   const [historyDetail, setHistoryDetail] = useState<HistoryDetail>(null)
   const { selectedAccountId } = useAccount()
   const staffRole = effectiveStaffRole(identity)
