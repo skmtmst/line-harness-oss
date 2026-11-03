@@ -8,7 +8,7 @@ import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
-import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRight, Check, Copy, Download, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
@@ -181,6 +181,10 @@ function ReminderDetailV8() {
   const tab = tabFromParam(searchParams.get('tab'))
   const runsStatusParam = searchParams.get('runStatus')
   const { selectedAccount, selectedAccountId } = useAccount()
+  const pauseContext = useRef({ accountId: selectedAccountId, reminderId, generation: 0 })
+  if (pauseContext.current.accountId !== selectedAccountId || pauseContext.current.reminderId !== reminderId) pauseContext.current = { accountId: selectedAccountId, reminderId, generation: pauseContext.current.generation + 1 }
+  const pauseRef = useRef<{ generation: number } | null>(null)
+  const openedPause = pauseRef.current
   const staffRole = useStaffRole()
   const featureAccess = useFeatureAccess('reminders')
   const canManage = featureAccess
@@ -300,11 +304,11 @@ function ReminderDetailV8() {
   }
 
   const runPause = async () => {
-    if (pausing) return
+    if (pausing || !openedPause || pauseRef.current !== openedPause || openedPause.generation !== pauseContext.current.generation) return
     setPausing(true)
     const ok = await setReminderActive(false)
     setPausing(false)
-    if (ok) setConfirmPause(false)
+    if (ok) { pauseRef.current = null; setConfirmPause(false) }
   }
 
   const exportCsv = async () => {
@@ -493,7 +497,7 @@ function ReminderDetailV8() {
           <div className={styles.sideActions}>
             {canManage && !isUnpublishedDraft ? (
               data.reminder.isActive ? (
-                <Button className={styles.sideAction} onClick={() => setConfirmPause(true)}>
+                <Button className={styles.sideAction} onClick={() => { pauseRef.current = { generation: pauseContext.current.generation }; setConfirmPause(true) }}>
                   <Pause size={16} aria-hidden="true" />一時停止する
                 </Button>
               ) : (
@@ -588,16 +592,16 @@ function ReminderDetailV8() {
           ? `送る予定の ${formatNumber(plannedTotal)} 通が送られなくなります（今後24時間の分は数え切れませんでした）。`
           : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)} 通 が送られなくなります。`}
         busy={pausing}
-        onClose={() => { if (!pausing) setConfirmPause(false) }}
+        onClose={() => { if (!pausing) { pauseRef.current = null; setConfirmPause(false) } }}
         actions={(
           <>
-            <Button onClick={() => setConfirmPause(false)} disabled={pausing}>キャンセル</Button>
-            <Button widthReserve="idle" variant="primary" onClick={() => void runPause()} disabled={pausing} busy={pausing} busyLabel="止めています…">
+            <Button onClick={() => { pauseRef.current = null; setConfirmPause(false) }} disabled={pausing}>キャンセル</Button>
+            <Button widthReserve="idle" variant="primary" onClick={() => void runPause()} disabled={pausing || !openedPause || openedPause.generation !== pauseContext.current.generation} busy={pausing} busyLabel="止めています…">
               <Pause size={16} aria-hidden="true" />一時停止する
             </Button>
           </>
         )}
-      />
+      ><OperationTargetSummary accounts={[{ id: '', name: '不明' }]} externalTarget={{ label: '対象件数', name: '1件' }} /></SheetDialog>
 
       <ConfirmDialog
         open={confirmDelete && confirmedDeleteScope === deleteScope}

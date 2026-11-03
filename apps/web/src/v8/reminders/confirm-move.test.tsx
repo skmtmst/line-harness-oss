@@ -92,3 +92,30 @@ it('一括停止の窓は操作先を示し、アカウント切替で閉じて�
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(net.update).not.toHaveBeenCalled()
 })
+
+it('一件の停止窓は所属不明と環境を示し、切替後の古い確認を断る', async () => {
+  const view = render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '一時停止する' }))
+  const dialog = await screen.findByRole('dialog')
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('不明')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+  const button = within(dialog).getByRole('button', { name: '一時停止する' })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+  net.account = 'account-b'; view.rerender(<RemindersList />)
+  net.account = 'account-a'; view.rerender(<RemindersList />)
+  await act(async () => old())
+  expect(net.update).not.toHaveBeenCalled()
+})
+it('確認した一件のリマインダを停止する', async () => {
+  render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '一時停止する' }))
+  const dialog = await screen.findByRole('dialog')
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する' })) })
+  expect(net.update).toHaveBeenCalledWith('r1', { isActive: false })
+})

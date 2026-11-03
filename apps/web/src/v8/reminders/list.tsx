@@ -171,6 +171,8 @@ export default function RemindersListV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  const pauseContext = useRef({ accountId: selectedAccountId, generation: 0 })
+  if (pauseContext.current.accountId !== selectedAccountId) pauseContext.current = { accountId: selectedAccountId, generation: pauseContext.current.generation + 1 }
   const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const role = useStaffRole()
   const canEdit = useFeatureAccess('reminders')
@@ -208,6 +210,8 @@ export default function RemindersListV8() {
   const [bulkPauseAccountId, setBulkPauseAccountId] = useState(selectedAccountId)
   useEffect(() => { setBulkPauseIds(null) }, [selectedAccountId])
   const [pauseTarget, setPauseTarget] = useState<ReminderRow | null>(null)
+  const pauseRef = useRef<{ target: ReminderRow; generation: number } | null>(null)
+  const openedPause = pauseRef.current
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
   const [deleteAccountId, setDeleteAccountId] = useState(selectedAccountId)
   useEffect(() => { setDeleteTarget(null) }, [selectedAccountId])
@@ -382,7 +386,8 @@ export default function RemindersListV8() {
     } finally { stopLock.current = false; if (current()) setStopBusy(false) }
   }
 
-  const runPause = () => pauseTarget ? stopConfirmed([pauseTarget.id], pauseTarget) : undefined
+  const openPause = (target: ReminderRow) => { pauseRef.current = { target, generation: pauseContext.current.generation }; setPauseTarget(target) }
+  const runPause = () => pauseTarget && openedPause && pauseRef.current === openedPause && openedPause.target === pauseTarget && openedPause.generation === pauseContext.current.generation ? stopConfirmed([pauseTarget.id], pauseTarget) : false
 
   const runResume = (row: ReminderRow) => runToggle(row, true)
 
@@ -783,7 +788,7 @@ export default function RemindersListV8() {
             icon: <Pause size={16} aria-hidden="true" />,
             disabledReason: canEdit ? undefined : readonlyReason,
             onSelect: () => {
-                        setPauseTarget(row)
+                        openPause(row)
             },
           }
         : status === 'stopped'
@@ -1179,13 +1184,14 @@ export default function RemindersListV8() {
         description="再開するまで、このリマインダの通知は送られません。"
         confirmLabel="一時停止する"
         busy={stopBusy} error={stopError || undefined}
-        confirmDisabled={!canEdit} confirmLockedReason={moveLockedReason}
-        onSuccess={() => setPauseTarget(null)}
+        confirmDisabled={!canEdit || !openedPause || openedPause.generation !== pauseContext.current.generation} confirmLockedReason={moveLockedReason}
+        onSuccess={() => { pauseRef.current = null; setPauseTarget(null) }}
         onConfirm={() => runPause()}
         onCancel={() => {
-          setPauseTarget(null)
+          pauseRef.current = null; setPauseTarget(null)
               }}
       >
+        <OperationTargetSummary accounts={[{ id: '', name: '不明' }]} externalTarget={{ label: '対象件数', name: '1件' }} />
         {pauseTarget && (
           <Notice tone="warn" icon={<TriangleAlert size={16} aria-hidden="true" />}>
             {pauseTarget.plannedDeliveries != null && pauseTarget.plannedDeliveries > 0
@@ -1229,7 +1235,7 @@ export default function RemindersListV8() {
             {deleteTarget && statusKeyOf(deleteTarget) === 'active' ? (
               <Button
                 onClick={() => {
-                  setPauseTarget(deleteTarget)
+                  openPause(deleteTarget)
                   setDeleteTarget(null)
                 }}
                 disabled={deleting}

@@ -205,6 +205,22 @@ describe('V8 リマインダの詳細', () => {
     expect(document.querySelector('[data-design-node="RwVo5"]')).toBeNull()
   })
 
+  it('停止の窓は所属不明と環境を示し、切替後の古い確認を断る', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    const dialog = document.querySelector('[data-design-node="RwVo5"]')!
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('不明')
+    expect(dialog.textContent).toContain('環境')
+    const button = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === '一時停止する') as HTMLButtonElement
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    state.accountId = 'account-b'; await act(async () => { root.render(<ReminderDetailV8Page />) })
+    state.accountId = 'account-a'; await act(async () => { root.render(<ReminderDetailV8Page />) })
+    await act(async () => old())
+    expect(state.updates).toEqual([])
+  })
+
   it('閲覧のみ：一時停止・編集・複製・削除を置かず、書き出しだけ残す', async () => {
     state.role = 'viewer'
     await render()
