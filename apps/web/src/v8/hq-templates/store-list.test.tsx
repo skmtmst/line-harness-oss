@@ -17,6 +17,14 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/hq/templates',
 }))
 
+const heldFolder = vi.hoisted(() => ({ confirm: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && typeof props.title === 'string' && props.title.includes('フォルダ') && props.onConfirm) heldFolder.confirm = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 import HqStoreList, { type HqStoreListProps } from './store-list'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import type { HqTemplate } from '@/lib/hq-templates-api'
@@ -391,4 +399,23 @@ it('空の種類タブに、ほかの種類の未配布数や通数を混ぜな�
   expect(card).toBeTruthy()
   expect(card?.querySelector('[data-kpi-value]')?.textContent).toContain('0')
   expect(host.textContent).toContain('まだテンプレート')
+})
+
+it('統括ひな形のフォルダ削除窓に対象と環境を出す', async () => {
+  await render()
+  await act(async () => (host.querySelector('[aria-label="フォルダ「お問い合わせ」の操作"]') as HTMLButtonElement).click())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '消す') as HTMLElement).click())
+  const dialog = document.querySelector('[role="alertdialog"]')!
+  expect(dialog.textContent).toContain('統括のフォルダ')
+  expect(dialog.textContent).toContain('環境')
+})
+
+it('統括ひな形フォルダは閉じた確認から削除しない', async () => {
+  const h = await render()
+  await act(async () => (host.querySelector('[aria-label="フォルダ「お問い合わせ」の操作"]') as HTMLButtonElement).click())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '消す') as HTMLElement).click())
+  const previous = heldFolder.confirm!
+  await act(async () => ([...document.querySelectorAll('[role="alertdialog"] button')].find(el => el.textContent === 'キャンセル') as HTMLElement).click())
+  await act(async () => { await previous() })
+  expect(h.onDeleteFolder).not.toHaveBeenCalled()
 })

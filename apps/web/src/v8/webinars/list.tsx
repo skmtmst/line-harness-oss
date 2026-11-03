@@ -32,13 +32,14 @@ import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared';
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import FolderPanel, { CollapsedFolderActions, FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import { FolderDotName, type FolderDotFolder, folderDisplayColor } from '@/components/shared/folder-dot';
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
 import Pagination from '@/components/shared/pagination'
@@ -319,6 +320,9 @@ function WebinarList() {
   const router = useRouter()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId }
+  const renderedAccountScope = accountScope.current
   // 「閲覧のみ」：押せない形にする（隠さない）。
   const role = useStaffRole()
   const featureAccess = useFeatureAccess('webinars')
@@ -375,6 +379,7 @@ function WebinarList() {
   const [folderFormOpen, setFolderFormOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<WebinarFolder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<WebinarFolder | null>(null)
+  const [deletingFolderAccountId, setDeletingFolderAccountId] = useState<string | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
 
@@ -522,7 +527,7 @@ function WebinarList() {
   useEffect(() => { void refreshGrandTotal() }, [refreshGrandTotal])
   useEffect(() => { void refreshFolders() }, [refreshFolders])
   // アカウントを替えたらフォルダは外してページは 1 へ（来た瞬間は URL のまま）。
-  useOnAccountSwitch(selectedAccountId, () => setView({ folder: '', page: '1' }))
+  useOnAccountSwitch(selectedAccountId, () => { setView({ folder: '', page: '1' }); setDeletingFolder(null); setDeletingFolderAccountId(null) })
   useListScrollMemory(!loading && !accountLoading)
 
   const saveFolder = async (name: string, color: string | null) => {
@@ -578,7 +583,7 @@ function WebinarList() {
   }
 
   const removeFolder = async () => {
-    if (!selectedAccountId || !canEdit || !deletingFolder || folderBusy) return
+    if (!selectedAccountId || selectedAccountId !== deletingFolderAccountId || !canEdit || !deletingFolder || folderBusy) return
     setFolderBusy(true)
     setFolderError('')
     try {
@@ -743,12 +748,13 @@ function WebinarList() {
         onEdit: manageable ? () => detailGuard.protect(() => { setFolderError(''); closeDetail(); setEditingFolder(folder) }) : undefined,
         onMoveUp: manageable && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
         onMoveDown: manageable && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
-        onDelete: manageable ? () => detailGuard.protect(() => { setFolderError(''); setDeletingFolder(folder) }) : undefined,
+        onDelete: manageable ? () => detailGuard.protect(() => { if (renderedAccountScope !== accountScope.current) return; setFolderError(''); setDeletingFolderAccountId(selectedAccountId); setDeletingFolder(folder) }) : undefined,
         deleteNote: '削除しても、中のウェビナーは未分類に残ります。',
       }
     }),
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
+  const selectedFolderRow = folderRows.find(row => row.id === selectedFolder && row.onDelete)
   const folderSelect = (
     <SaveErrorField names={["selectedFolder","selected_folder"]}><Select
       aria-label="フォルダ"
@@ -997,7 +1003,7 @@ function WebinarList() {
           <FolderPanelNote>フォルダを消しても、中のウェビナーは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
-      collapsedFolders={foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>{createButton}{folderSelect}</>}
+      collapsedFolders={foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>{createButton}{folderSelect}{selectedFolderRow ? <CollapsedFolderActions row={selectedFolderRow} /> : null}</>}
       toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{wideToolbar}</>}
       pagination={pager}
       overlays={<>
@@ -1047,7 +1053,7 @@ function WebinarList() {
 </DetailContent>
 </DetailPanel>
         <ConfirmDialog
-          open={deletingFolder !== null}
+          open={deletingFolder !== null && deletingFolderAccountId === selectedAccountId}
           title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
           description={`削除しても、中のウェビナーは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder?.count ?? 0} 件です。`}
           confirmLabel="削除する"
@@ -1060,7 +1066,7 @@ function WebinarList() {
             setFolderError('')
           }}
           onConfirm={() => removeFolder()}
-        />
+        >{deletingFolder ? <OperationTargetSummary accounts={[{ id: deletingFolderAccountId ?? '' }]} /> : null}</ConfirmDialog>
       </>}
     >
       {listBody}

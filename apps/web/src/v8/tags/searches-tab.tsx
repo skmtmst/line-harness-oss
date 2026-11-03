@@ -25,6 +25,7 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import InlineEdit from '@/components/shared/inline-edit'
 import { withViewTransition } from '@/components/shared/view-transition';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
@@ -117,6 +118,11 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
   const { value: tags, setValue: setTags } = useListSnapshot<Tag[]>(accountId ?? '', [])
   const { value: conditionLabels, setValue: setConditionLabels } = useListSnapshot<SavedSearchConditionLabels>(accountId ?? '', {})
   const [pendingDelete, setPendingDelete] = useState<SavedSearch | null>(null)
+  const deleteTicket = useRef<object | null>(null)
+  const renderedDeleteTicket = deleteTicket.current
+  const deleteLock = useRef(false)
+  const currentAccount = useRef(accountId)
+  currentAccount.current = accountId
   const [query, setQuery] = useListUrlValue('q', '')
   const [usageFilter, setUsageFilter] = useListUrlValue<SavedSearchUsageFilter>('usageFilter', 'all')
   const [matchFilter, setMatchFilter] = useListUrlValue<'all' | 'matched' | 'zero' | 'unknown'>('matchFilter', 'all')
@@ -180,6 +186,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
 
   /* アカウントが変わったら、前のアカウントの削除確認を閉じる。 */
   useEffect(() => {
+    deleteTicket.current = null
     setPendingDelete(null)
     setError('')
     setRetryOrder(null)
@@ -188,18 +195,25 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
   }, [accountId])
 
   const confirmRemove = async (search: SavedSearch) => {
+    if (!renderedDeleteTicket || renderedDeleteTicket !== deleteTicket.current || deleteLock.current) return false
+    deleteLock.current = true
     setError('')
     try {
-      if (!accountId) return
+      if (!accountId || accountId !== currentAccount.current || search.lineAccountId !== accountId) return false
       await api.savedSearches.delete(search.id, accountId)
+      if (renderedDeleteTicket !== deleteTicket.current || accountId !== currentAccount.current) return false
+      deleteTicket.current = null
       setPendingDelete(null)
       notifyToast(`保存した検索「${search.name}」を削除しました`)
       void load()
       return true
     } catch (reason) {
+      if (renderedDeleteTicket !== deleteTicket.current || accountId !== currentAccount.current) return false
       saveErrors.capture(reason)
       setError(describeApiFailure(reason, '削除'))
       return false
+    } finally {
+      deleteLock.current = false
     }
   }
 
@@ -315,7 +329,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
         dividerBefore: true,
         disabled: deleteDisabled,
         disabledReason: deleteDisabled ? deleteReason : undefined,
-        onSelect: () => { setError(''); setPendingDelete(search) },
+        onSelect: () => { deleteTicket.current = {}; setError(''); setPendingDelete(search) },
       })
     }
     return list
@@ -559,9 +573,9 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
         description="この操作は元に戻せません。使用中の検索は削除できません。"
         confirmLabel="削除する"
         destructive
-        onCancel={() => setPendingDelete(null)}
-        error={error || undefined} onSuccess={() => setPendingDelete(null)} onConfirm={() => pendingDelete ? confirmRemove(pendingDelete) : false}
-      />
+        onCancel={() => { if (!deleteLock.current) { deleteTicket.current = null; setPendingDelete(null) } }}
+        error={error || undefined} onSuccess={() => { deleteTicket.current = null; setPendingDelete(null) }} onConfirm={() => pendingDelete ? confirmRemove(pendingDelete) : false}
+      >{pendingDelete ? <OperationTargetSummary accounts={[{ id: pendingDelete.lineAccountId ?? '' }]} /> : null}</ConfirmDialog>
     </></SaveErrorScope>
   )
 }

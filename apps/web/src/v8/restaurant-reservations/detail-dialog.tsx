@@ -12,13 +12,14 @@ import {seatBoardEntry, withHonorific } from '@line-crm/shared'
  * 閲覧のみ（canWrite=false）には 取り消す・変更する を置かない（閉じるだけ）。動きは BEHAVIOR.md。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Pencil, TriangleAlert, UserRoundX, X } from 'lucide-react'
 import { useStaffRole } from '@/lib/staff-role'
 import { permissionLockReason } from '@/components/shared/permission-lock'
 import {RowActions} from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import {
@@ -78,10 +79,14 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
 }) {
   const role = useStaffRole()
   const permissionReason = role === null ? undefined : permissionLockReason(role, canWrite)
-  const [confirmNoShow, setConfirmNoShow] = useState<string | null>(null)
+  const [confirmNoShow, setConfirmNoShow] = useState<{ id: string; scope: object; ticket: object } | null>(null)
+  const noShowTicket = useRef<object | null>(null)
   const [history, setHistory] = useState<History>({ state: 'loading' })
   const id = reservation?.id ?? ''
   const storeId = reservation?.store_id ?? ''
+  const scope = useRef({ accountId, id, storeId, canWrite, status: reservation?.status })
+  if (scope.current.accountId !== accountId || scope.current.id !== id || scope.current.storeId !== storeId || scope.current.canWrite !== canWrite || scope.current.status !== reservation?.status) { scope.current = { accountId, id, storeId, canWrite, status: reservation?.status }; noShowTicket.current = null }
+  const renderedScope = scope.current
   const phone = reservation?.customer_phone ?? ''
   const lineUid = reservation?.line_uid ?? ''
 
@@ -109,7 +114,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const allergy = reservation.allergy_note?.trim() || ''
   const hasAllergy = Boolean(allergy && allergy !== 'なし' && allergy !== '無し')
 
-  const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'visited')},{id:'no-show',label:'無断にする',disabled:busy,onSelect:()=>canWrite&&reservation.status!=='pending'&&setConfirmNoShow(reservation.id)}]:[]
+  const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'visited')},{id:'no-show',label:'無断にする',disabled:busy,onSelect:()=>{ if (!canWrite || reservation.status==='pending' || renderedScope !== scope.current) return; const ticket = {}; noShowTicket.current = ticket; setConfirmNoShow({ id: reservation.id, scope: renderedScope, ticket }) }}]:[]
   /* 来店・退店・無断は「…」の奥ではなく窓の下に直接置く。訂正だけ「…」に残す。 */
   const quickAttendance=attendanceItems.filter((item)=>item.id==='visit'||item.id==='depart'||item.id==='no-show')
   const undoAttendance=attendanceItems.filter((item)=>item.id==='undo-depart'||item.id==='undo-visit')
@@ -118,7 +123,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const attendance=undoAttendance.length?<RowActions subjectName={reservation.customer_name} menuItems={undoAttendance.map(item => ({...item, lockedReason: permissionReason, disabled: busy || !canWrite}))}/>:null
   const quickButtons=quickAttendance.map(buttonFor)
   const dining=<ReservationDining title="お客さまの食事情報" entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
-  const confirmation = <ConfirmDialog open={canWrite && reservation.status === 'confirmed' && confirmNoShow === reservation.id} title="無断にしますか？" description={`${withHonorific(reservation.customer_name)}・${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}。卓が空いていれば予約を有効に戻せます。送信済みの連絡は取り消せません。`} destructive titleIcon={<TriangleAlert size={20} />} confirmIcon={<UserRoundX size={16} />} confirmVariant="danger" confirmLabel="無断にする" onConfirm={() => { if (canWrite && reservation.status === 'confirmed') onAttendance?.(reservation.id, 'no_show'); setConfirmNoShow(null) }} onCancel={() => setConfirmNoShow(null)} />
+  const confirmation = <ConfirmDialog open={canWrite && reservation.status === 'confirmed' && confirmNoShow?.id === reservation.id && confirmNoShow.scope === renderedScope && confirmNoShow.ticket === noShowTicket.current} title="無断にしますか？" description={`${withHonorific(reservation.customer_name)}・${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}。卓が空いていれば予約を有効に戻せます。送信済みの連絡は取り消せません。`} destructive titleIcon={<TriangleAlert size={20} />} confirmIcon={<UserRoundX size={16} />} confirmVariant="danger" confirmLabel="無断にする" onConfirm={() => { if (renderedScope !== scope.current || !confirmNoShow || confirmNoShow.ticket !== noShowTicket.current) return; noShowTicket.current = null; if (canWrite && reservation.status === 'confirmed') onAttendance?.(reservation.id, 'no_show'); setConfirmNoShow(null) }} onCancel={() => { if (renderedScope === scope.current && confirmNoShow?.ticket === noShowTicket.current) { noShowTicket.current = null; setConfirmNoShow(null) } }}><OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: reservation.store_id, name: reservation.store_name }} /></ConfirmDialog>
   if (inline) return <><DetailPreview title="予約の詳細"
     description={`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}・${table?.code ?? '未配席'}`}
     headerActions={<><Button size="inline" variant="text" aria-label="予約の詳細を閉じる" onClick={onClose}><X size={16} aria-hidden="true" /></Button></>}

@@ -11,9 +11,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const router = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => router, useSearchParams: () => new URLSearchParams('id=s1'), usePathname: () => '/tags/searches/edit' }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc', selectedAccount: { name: '本店' } }) }))
+const account = vi.hoisted(() => ({ id: 'acc' }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.id, selectedAccount: { name: account.id === 'acc' ? '本店' : '別店' } }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+
+const heldDelete = vi.hoisted(() => ({ confirm: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.description.includes('保存した条件だけを削除') && props.onConfirm) heldDelete.confirm = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 
 const net = vi.hoisted(() => ({ detail: vi.fn(), update: vi.fn(), create: vi.fn(), remove: vi.fn(), preview: vi.fn() }))
 vi.mock('@/lib/api', async (original) => {
@@ -50,6 +60,7 @@ const sideCount = () => screen.getByRole('heading', { name: '当てはまる人'
 const deleteButton = () => screen.getByRole('button', { name: '削除する' }) as HTMLButtonElement
 
 beforeEach(() => {
+  account.id = 'acc'
   net.detail.mockResolvedValue({ success: true, data: detail() })
   net.update.mockResolvedValue({ success: true, data: detail() })
   net.create.mockResolvedValue({ success: true, data: { id: 's9' } })
@@ -59,6 +70,31 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+})
+
+it('アカウント切替後は古い確認から削除しない', async () => {
+  const view = render(<SearchEdit />)
+  await screen.findByDisplayValue('VIPかつ未契約')
+  fireEvent.click(deleteButton())
+  await screen.findByRole('alertdialog')
+  const previous = heldDelete.confirm!
+  account.id = 'another'
+  view.rerender(<SearchEdit />)
+  await screen.findByDisplayValue('VIPかつ未契約')
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  await act(async () => { await previous() })
+  expect(net.remove).not.toHaveBeenCalled()
+})
+
+it('キャンセル後は古い確認から削除しない', async () => {
+  render(<SearchEdit />)
+  await screen.findByDisplayValue('VIPかつ未契約')
+  fireEvent.click(deleteButton())
+  const dialog = await screen.findByRole('alertdialog')
+  const previous = heldDelete.confirm!
+  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+  await act(async () => { await previous() })
+  expect(net.remove).not.toHaveBeenCalled()
 })
 
 describe('保存した検索の編集', () => {
@@ -117,6 +153,9 @@ describe('保存した検索の編集', () => {
     fireEvent.click(deleteButton())
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog.textContent).toContain('使っている所が無いことをサーバーで確かめてあります')
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('本店')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
     expect(net.remove).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '削除する' })) })
     expect(net.remove).toHaveBeenCalledWith('s1', 'acc')
