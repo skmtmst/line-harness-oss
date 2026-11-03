@@ -126,12 +126,13 @@ export default function McpLogV8() {
         title={`「${connection?.name ?? ''}」を止めますか？`}
         description="すぐ使えなくなり、次の呼び出しから断ります。止めた人は記録に残ります。もう一度使うときは、接続を作り直します。"
         confirmLabel="止める"
+        confirmIcon={false}
         destructive
         busy={busy}
         error={error || undefined}
         onConfirm={() => void stop()}
         onCancel={() => { if (!busy) setStopOpen(false) }}
-      ><OperationTargetSummary accounts={connection?.accounts?.length ? connection.accounts : [{ id: '' }]} showAccountCount={(connection?.accounts?.length ?? 0) > 1} /></ConfirmDialog></>}
+      ><OperationTargetSummary accounts={connection?.accounts?.length ? connection.accounts : [{ id: '' }]} compactAccounts /></ConfirmDialog></>}
     >
       {load.kind === 'loading' ? <ListState kind="loading" /> : null}
       {failure ? <ListState kind="error" title={failure.title} description={failure.description} onRetry={failure.retryable ? () => void fetchLogs() : undefined} /> : null}

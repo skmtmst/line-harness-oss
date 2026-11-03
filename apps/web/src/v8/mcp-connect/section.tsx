@@ -191,6 +191,7 @@ export default function McpConnectionsSection() {
         title={`「${stopTarget?.name ?? ''}」を止めますか？`}
         description="すぐ使えなくなり、次の呼び出しから断ります。止めた人は記録に残ります。もう一度使うときは、接続を作り直します。"
         confirmLabel="止める"
+        confirmIcon={false}
         confirmDisabled={!permissions.stop}
         confirmLockedReason={permissions.stop ? undefined : permissions.reason}
         destructive
@@ -198,7 +199,7 @@ export default function McpConnectionsSection() {
         error={dialogError || undefined}
         onConfirm={() => void stop()}
         onCancel={() => { if (!busy) setStopTarget(null) }}
-      ><OperationTargetSummary accounts={stopTarget?.accounts?.length ? stopTarget.accounts : [{ id: '' }]} showAccountCount={(stopTarget?.accounts?.length ?? 0) > 1} /></ConfirmDialog>
+      ><OperationTargetSummary accounts={stopTarget?.accounts?.length ? stopTarget.accounts : [{ id: '' }]} compactAccounts /></ConfirmDialog>
       <ConfirmDialog
         open={rotateTarget !== null}
         title={`「${rotateTarget?.name ?? ''}」の鍵を作り直しますか？`}
@@ -210,7 +211,7 @@ export default function McpConnectionsSection() {
         error={dialogError || undefined}
         onConfirm={() => void rotate()}
         onCancel={() => { if (!busy) setRotateTarget(null) }}
-      ><OperationTargetSummary accounts={rotateTarget?.accounts?.length ? rotateTarget.accounts : [{ id: '' }]} showAccountCount={(rotateTarget?.accounts?.length ?? 0) > 1} /></ConfirmDialog>
+      ><OperationTargetSummary accounts={rotateTarget?.accounts?.length ? rotateTarget.accounts : [{ id: '' }]} compactAccounts /></ConfirmDialog>
       {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
     </Card>
   )

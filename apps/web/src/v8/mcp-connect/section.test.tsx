@@ -48,7 +48,9 @@ it.each(['止める', '鍵を作り直す'])('接続一覧で%s前に全アカ�
   fireEvent.click(screen.getByRole('menuitem', { name: action }))
   const dialog = screen.getByRole(action === '止める' ? 'alertdialog' : 'dialog')
   for (const account of MANY_ACCOUNTS) expect(within(dialog).getByText(account.name)).toBeTruthy()
-  expect(within(dialog).getByText('4件')).toBeTruthy()
+  expect(within(dialog).getByText('LINEアカウント（4件）')).toBeTruthy()
+  expect(within(dialog).queryByText('対象アカウント数')).toBeNull()
+  if (action === '止める') expect(within(dialog).getByRole('button', { name: '止める' }).querySelector('.lucide-trash-2')).toBeNull()
   expect(within(dialog).getByText('環境')).toBeTruthy()
 })
 
@@ -58,8 +60,32 @@ it('操作記録から止める前に全アカウントと環境を示す', asyn
   fireEvent.click(await screen.findByRole('menuitem', { name: 'この接続を止める' }))
   const dialog = screen.getByRole('alertdialog')
   for (const account of MANY_ACCOUNTS) expect(within(dialog).getByText(account.name)).toBeTruthy()
-  expect(within(dialog).getByText('4件')).toBeTruthy()
+  expect(within(dialog).getByText('LINEアカウント（4件）')).toBeTruthy()
+  expect(within(dialog).queryByText('対象アカウント数')).toBeNull()
+  expect(within(dialog).getByRole('button', { name: '止める' }).querySelector('.lucide-trash-2')).toBeNull()
   expect(within(dialog).getByText('環境')).toBeTruthy()
+})
+
+it('6件以上の対象は5件と残数を示し、全名を title に残す', async () => {
+  const accounts = [...MANY_ACCOUNTS, { id: 'acc-5', name: '五号店' }, { id: 'acc-6', name: '六号店' }, { id: 'acc-7', name: '七号店' }]
+  apiMock.list.mockResolvedValueOnce({ success: true, data: [{ ...CONNECTION, accounts }] })
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '「Claude（Kenta）」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '鍵を作り直す' }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText('LINEアカウント（7件）')).toBeTruthy()
+  expect(within(dialog).getByText('五号店')).toBeTruthy()
+  expect(within(dialog).queryByText('六号店')).toBeNull()
+  expect(within(dialog).getByText('ほか2件')).toBeTruthy()
+  const full = within(dialog).getByTitle(accounts.map(account => account.name).join('、'))
+  expect(full).toBeTruthy()
+})
+
+it('停止ボタンに削除のゴミ箱を出さない', async () => {
+  await open()
+  fireEvent.click(screen.getByRole('button', { name: '「Claude（Kenta）」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '止める' }))
+  expect(within(screen.getByRole('alertdialog')).getByRole('button', { name: '止める' }).querySelector('.lucide-trash-2')).toBeNull()
 })
 
 it('対象アカウントが分からない時は選択中のアカウントで補わない', async () => {

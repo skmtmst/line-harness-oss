@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { loadLineAccounts } from '@/lib/line-accounts-cache'
 import { DetailContent, DetailFields, DetailSection } from './detail-content'
 import { deployEnvLabel } from '@/lib/deploy-info'
@@ -10,10 +10,11 @@ export type OperationAccountTarget = { id: string; name?: string | null; label?:
 export type OperationStoreTarget = { id: string; name?: string | null }
 
 /** 操作先を呼び出し側から受け取り、現在選択中の別の対象で穴埋めしない。 */
-export default function OperationTargetSummary({ accounts, allAccounts = false, showAccountCount = false, store, externalTarget }: {
+export default function OperationTargetSummary({ accounts, allAccounts = false, showAccountCount = false, compactAccounts = false, store, externalTarget }: {
   accounts: OperationAccountTarget[]
   allAccounts?: boolean
   showAccountCount?: boolean
+  compactAccounts?: boolean
   store?: OperationStoreTarget
   externalTarget?: { label: string; name?: string | null }
 }) {
@@ -30,10 +31,12 @@ export default function OperationTargetSummary({ accounts, allAccounts = false, 
   const version = useRunningVersion()
   const environment = deployEnvLabel(version.detail?.deploy_env)
     ?? (version.statusText === '確認中' ? '確認中' : '確認できません')
+  const accountNames = accounts.map(account => account.name?.trim() || names[account.id] || '名前を確認できません')
   return <DetailContent><DetailSection label="操作の対象"><DetailFields>
     {allAccounts ? <div><dt>LINEアカウント</dt><dd>すべてのLINEアカウント</dd></div> : null}
-    {showAccountCount ? <div><dt>対象アカウント数</dt><dd>{accounts.some(account => !account.id) ? '確認できません' : `${accounts.length}件`}</dd></div> : null}
-    {accounts.map((target, index) => { const account = { ...target, name: target.name?.trim() || names[target.id] }; return <div key={`${account.id}:${index}`}>
+    {showAccountCount && !compactAccounts ? <div><dt>対象アカウント数</dt><dd>{accounts.some(account => !account.id) ? '確認できません' : `${accounts.length}件`}</dd></div> : null}
+    {compactAccounts && accounts.length ? <div><dt>{accounts.length > 1 && accounts.every(account => account.id) ? `LINEアカウント（${accounts.length}件）` : 'LINEアカウント'}</dt><dd title={accountNames.join('、')}>{accountNames.slice(0, 5).map((name, index) => <Fragment key={`${accounts[index].id}:${index}`}>{index ? '、' : ''}<span>{name}</span></Fragment>)}{accountNames.length > 5 ? <>、<span>{`ほか${accountNames.length - 5}件`}</span></> : null}</dd></div> : null}
+    {!compactAccounts && accounts.map((target, index) => { const account = { ...target, name: target.name?.trim() || names[target.id] }; return <div key={`${account.id}:${index}`}>
       <dt>{account.label ?? 'LINEアカウント'}</dt>
       <dd><span className={showAccountCount ? 'block min-w-0 break-all' : 'block min-w-0 truncate'} title={account.name?.trim() ? `${account.name}（${account.id}）` : account.id}>{account.name?.trim() || '名前を確認できません'}</span></dd>
     </div>})}
