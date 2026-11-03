@@ -23,6 +23,8 @@ import {
 import { stoppedTenantLineAccountSql } from '../../services/tenant-runtime-status.js';
 import { createAutomationActionExecutors } from '../automations/automation-action-executors/index.js';
 import { featureJobCanRun } from '../../services/feature-enforcement.js';
+import { resolveMileageSource } from '../../services/mileage-ec-source.js';
+import { selectMileageAccountBatch } from '@line-crm/db/src/mileage/source.js';
 import { AutomationActionError, type ActionDefinition } from '../automations/automation-engine/index.js';
 
 export interface MileageRewardDeliveryOptions {
@@ -197,6 +199,13 @@ export async function deliverMileageReward(
   options: MileageRewardDeliveryOptions = {},
 ): Promise<MileageRewardDeliveryResult> {
   const plan = await getMileageRewardDeliveryPlan(db, redemptionId);
+  let source: 'ec' | 'musubo' | null = null;
+  try { if (plan.redemption.lineAccountId) source = await resolveMileageSource(db, plan.redemption.lineAccountId); } catch { /* 読めない場合も保留 */ }
+  if (source !== 'musubo') return {
+    status: 'delivery_failed', rewardName: plan.rewardName, customerMessage: plan.customerMessage,
+    rewardCode: null, retryAt: plan.redemption.nextRetryAt, failurePolicy: plan.failurePolicy,
+    message: source === 'ec' ? 'マイルはECで管理しています。交換は保留しています。' : 'マイルの管理元を確認できないため保留しています。',
+  };
   // 機能オフ中はclaim・attempt・付与・状態戻しのいずれもしない。
   // 状態は不変のまま残し、再ON後の再試行で再開する。
   if (plan.redemption.lineAccountId && !await featureJobCanRun(db, {
@@ -519,29 +528,40 @@ export async function processDueMileageRewardDeliveries(
   db: D1Database,
   options: Omit<MileageRewardDeliveryOptions, 'now'> & { now: string; limit?: number },
 ): Promise<{ processed: number; succeeded: number; failed: number; recovered: number }> {
-  const limit = Math.min(100, Math.max(1, options.limit ?? 50));
+  const requested = Math.min(100, Math.max(1, options.limit ?? 50));
+  const limit = Math.min(30, requested);
   const leaseCutoff = new Date(
     new Date(options.now).getTime() - STALE_DELIVERY_LEASE_MS,
   ).toISOString();
   const dueWhere = `status = 'delivery_failed' AND next_retry_at IS NOT NULL AND next_retry_at <= ?`;
-  await db.prepare(
-    `UPDATE mileage_redemptions
-        SET next_retry_at = NULL, failure_code = 'tenant_suspended',
-            failure_message = '契約先の利用停止中に再試行時刻を過ぎたため自動送信しませんでした',
-            updated_at = ?
-      WHERE ${dueWhere}
-        AND line_account_id IS NOT NULL
-        AND ${stoppedTenantLineAccountSql('mileage_redemptions.line_account_id')}`,
-  ).bind(options.now, options.now).run();
+  const owners = await db.prepare(`SELECT DISTINCT line_account_id FROM mileage_redemptions
+    WHERE status IN ('delivery_failed','delivering','refunded') AND line_account_id IS NOT NULL ORDER BY line_account_id`).bind()
+    .all<{ line_account_id: string }>();
+  const accountBatch = selectMileageAccountBatch(owners.results.map(row => row.line_account_id), options.now);
+  if (accountBatch.length < owners.results.length) console.warn('mileage_delivery_accounts_deferred', { total: owners.results.length, selected: accountBatch.length });
+  const eligible: string[] = [];
+  let unreadable = 0;
+  for (const accountId of accountBatch) {
+    try { if (await resolveMileageSource(db, accountId) === 'musubo') eligible.push(accountId); }
+    catch (error) { unreadable++; console.error('mileage_delivery_source_unavailable', accountId, error); }
+  }
+  if (accountBatch.length && unreadable === accountBatch.length) throw new Error('mileage_delivery_all_sources_unavailable');
+  const eligibleJson = JSON.stringify(eligible);
+  // ECの交換はテナント停止中でも行を更新しない。
+  await db.prepare(`UPDATE mileage_redemptions SET next_retry_at = NULL, failure_code = 'tenant_suspended',
+      failure_message = '契約先の利用停止中に再試行時刻を過ぎたため自動送信しませんでした', updated_at = ?
+      WHERE ${dueWhere} AND line_account_id IN (SELECT value FROM json_each(?))
+        AND ${stoppedTenantLineAccountSql('mileage_redemptions.line_account_id')}`)
+    .bind(options.now, options.now, eligibleJson).run();
   const mileageOff = accountFeatureOffExclusionSql('mileage_redemptions.line_account_id', 'mileage');
-  // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が
-  // 上限ぶん先頭を占めたまま、後ろに並ぶ動作中アカウントの再試行が進まない。
-  const due = await db.prepare(
-    `SELECT id FROM mileage_redemptions
-      WHERE ${dueWhere} AND NOT ${mileageOff}
-        AND (line_account_id IS NULL OR ${activeTenantLineAccountSql('mileage_redemptions.line_account_id')})
-      ORDER BY next_retry_at, created_at LIMIT ?`,
-  ).bind(options.now, limit).all<{ id: string }>();
+  const findEligible = async (where: string, order: string, date: string, cap: number) => {
+    return db.prepare(`SELECT id FROM mileage_redemptions
+        WHERE ${where} AND NOT ${mileageOff} AND line_account_id IS NOT NULL
+          AND line_account_id IN (SELECT value FROM json_each(?))
+          AND ${activeTenantLineAccountSql('mileage_redemptions.line_account_id')}
+        ORDER BY ${order}, id LIMIT ?`).bind(date, eligibleJson, cap).all<{ id: string }>();
+  };
+  const due = await findEligible(dueWhere, 'next_retry_at, created_at', options.now, limit);
   // 止めた事実は監査に残す。行は読むだけで状態は変えない。
   const offOwners = await db.prepare(
     `SELECT DISTINCT line_account_id FROM mileage_redemptions
@@ -551,13 +571,9 @@ export async function processDueMileageRewardDeliveries(
   // 貸出期限切れの delivering も、機能オフのアカウントは SQL で先に外す。
   const remaining = Math.max(0, limit - due.results.length);
   const stalled = remaining > 0
-    ? await db.prepare(
-      `SELECT id FROM mileage_redemptions
-        WHERE status = 'delivering' AND updated_at < ? AND NOT ${mileageOff}
-          AND (line_account_id IS NULL OR ${activeTenantLineAccountSql('mileage_redemptions.line_account_id')})
-        ORDER BY updated_at, created_at LIMIT ?`,
-    ).bind(leaseCutoff, remaining).all<{ id: string }>()
+    ? await findEligible("status = 'delivering' AND updated_at < ?", 'updated_at, created_at', leaseCutoff, remaining)
     : { results: [] as { id: string }[] };
+  if (requested > limit && due.results.length + stalled.results.length === limit) console.warn('mileage_delivery_events_deferred', { limit });
   let succeeded = 0;
   let failed = 0;
   for (const owner of offOwners.results) {
@@ -592,23 +608,16 @@ export async function processDueMileageRewardDeliveries(
   const recoveryLimit = Math.max(0, limit - due.results.length - stalled.results.length);
   let recovered = 0;
   if (recoveryLimit > 0) {
-    const incomplete = await findIncompleteMileageRefunds(db, { limit: recoveryLimit });
+    const incomplete = await findIncompleteMileageRefunds(db, { limit: recoveryLimit, lineAccountIds: eligible });
     for (const target of incomplete) {
-      if (target.lineAccountId && !await featureJobCanRun(db, { accountId: target.lineAccountId, featureId: 'mileage', job: 'mileage reward delivery retry' })) {
-        continue;
-      }
+      try { if (!target.lineAccountId || await resolveMileageSource(db, target.lineAccountId) !== 'musubo') continue; }
+      catch (error) { console.error('mileage_delivery_source_unavailable', target.lineAccountId, error); continue; }
+      if (target.lineAccountId && !await featureJobCanRun(db, { accountId: target.lineAccountId, featureId: 'mileage', job: 'mileage reward delivery retry' })) continue;
       try {
-        await refundMileageRewardRedemption(db, {
-          redemptionId: target.id,
-          reason: '中断した返却の再開',
-        });
+        await refundMileageRewardRedemption(db, { redemptionId: target.id, reason: '中断した返却の再開' });
         recovered += 1;
       } catch (error) {
-        // 直前に成功へ移っていたら返す必要はない（遅い返却は書かない）。
-        if (error instanceof MileageRewardError && error.code === 'already_delivered') {
-          recovered += 1;
-          continue;
-        }
+        if (error instanceof MileageRewardError && error.code === 'already_delivered') { recovered += 1; continue; }
         failed += 1;
       }
     }

@@ -46,7 +46,8 @@ export interface OfferData {
 interface MileageData {
   programId: string;
   programName: string;
-  available: number;
+  available: number | null;
+  balanceSource?: 'ec' | 'musubo';
   pending: number;
   lifetimeEarned: number;
   spent: number;

@@ -67,6 +67,7 @@ function ruleFixture() {
 
 /* D022: 見本は実APIの形に合わせる（monthChange・rankCounts・expiringMiles30d・nextExpiringAt・measuredAt は必須）。 */
 const friendsOverview = {
+  balanceSource: 'musubo',
   items: [],
   summary: {
     totalMembers: 1,

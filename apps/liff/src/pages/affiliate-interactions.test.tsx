@@ -13,7 +13,7 @@ vi.mock('../components/affiliate-payments.js', () => ({ default: () => null }));
 const affiliate = { id: 'affiliate', name: '会員', code: 'code', commissionRate: 0, isActive: true, friendId: 'friend' };
 const link = { refCode: 'ref', label: 'ご案内', url: 'https://example.test/ref', clickCount: 2, friendAdds: 1, conversions: 1, conversionsPending: 1, conversionsApproved: 0, offerId: 'offer', offerName: '参加済み' };
 const offer = { id: 'offer', name: '参加済み', description: '案内', rewardAmount: 0, rewardMiles: 100, windowDays: null, receptionFrom: null, receptionTo: null, halted: false, totalRemaining: null, monthlyRemaining: null, enrolled: true, refCode: 'ref', url: link.url };
-const wallet = { mileage: { programId: 'program', programName: 'マイル', available: 100, pending: 20, lifetimeEarned: 140, spent: 40 }, insights: { accountCount: 2, rewardedActions: 2, referralMiles: 100, qualityReferralCount: 1, lastEarnedAt: null }, history: [], opportunities: [
+const wallet = { mileage: { programId: 'program', programName: 'マイル', available: 100, balanceSource: 'musubo' as const, pending: 20, lifetimeEarned: 140, spent: 40 }, insights: { accountCount: 2, rewardedActions: 2, referralMiles: 100, qualityReferralCount: 1, lastEarnedAt: null }, history: [], opportunities: [
   { id: 'webinar', type: 'webinar' as const, title: '説明会を見る', description: '動画', rewardMiles: 10, nextRewardMiles: 10, progressPercent: 25, ctaLabel: '視聴する', url: 'https://example.test/watch' },
   { id: 'line', type: 'friend_add' as const, title: 'お店を追加', description: '追加', rewardMiles: 10, nextRewardMiles: 10, progressPercent: 0, ctaLabel: '友だち追加', url: 'https://example.test/add' },
 ] };

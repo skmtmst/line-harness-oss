@@ -47,6 +47,7 @@ const { default: MileagePage } = await import('./page')
 const overview = {
   success: true,
   data: {
+    balanceSource: 'musubo',
     items: [],
     summary: {
       totalMembers: 0,

@@ -352,7 +352,7 @@ export async function buildMembership(db: D1Database, lineAccountId: string | nu
   const ecRankName = typeof snapshot?.ec_member_rank_name === 'string' && snapshot.ec_member_rank_name.trim() ? snapshot.ec_member_rank_name : null;
   const annualMilesYen = num(snapshot?.annual_miles_yen) || (ecRankKey ? 0 : num(snapshot?.purchase_amount));
   const lifetimeMilesYen = Math.max(num(snapshot?.lifetime_miles_yen), num(snapshot?.purchase_amount));
-  const mileBalance = num(snapshot?.mile_balance) || num(snapshot?.point_balance);
+  const mileBalance = num(snapshot?.mile_balance);
   const sortedRanks = rankConfigured ? [...ranks].sort((a, b) => a.annual_threshold_yen - b.annual_threshold_yen) : [];
   const index = ecRankKey ? sortedRanks.findIndex((r) => r.rank_key === ecRankKey) : -1;
   const rank = sortedRanks[index] ?? null;

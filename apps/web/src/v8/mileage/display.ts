@@ -252,7 +252,7 @@ export function isMileageFriendsV6Summary(value: unknown): boolean {
   const summary = value as Partial<MileageFriendsV6Overview['summary']>
   return typeof summary.totalMembers === 'number'
     && typeof summary.withBalanceCount === 'number'
-    && typeof summary.available === 'number'
+    && (typeof summary.available === 'number' || summary.available === null)
     && typeof summary.pending === 'number'
     && typeof summary.monthChange === 'number'
     && Array.isArray(summary.rankCounts)
@@ -263,8 +263,10 @@ export function isMileageFriendsV6Summary(value: unknown): boolean {
 export function isMileageFriendsV6Overview(value: unknown): value is MileageFriendsV6Overview {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<MileageFriendsV6Overview>
-  return Array.isArray(candidate.items)
+  return (candidate.balanceSource === 'ec' || candidate.balanceSource === 'musubo')
+    && Array.isArray(candidate.items)
     && isMileageFriendsV6Summary(candidate.summary)
+    && (candidate.balanceSource === 'ec' || typeof candidate.summary?.available === 'number')
     && !!candidate.pagination
     && typeof candidate.pagination.total === 'number'
     && typeof candidate.pagination.limit === 'number'

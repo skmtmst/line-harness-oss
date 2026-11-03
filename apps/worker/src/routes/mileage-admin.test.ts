@@ -82,6 +82,8 @@ vi.mock('@line-crm/db', () => dbMocks);
 
 const deliveryMocks = { deliverMileageReward: vi.fn() };
 vi.mock('../features/mileage/mileage-reward-delivery.js', () => deliveryMocks);
+const mileageSourceMocks = vi.hoisted(() => ({ resolveMileageSource: vi.fn().mockResolvedValue('musubo') }));
+vi.mock('../services/mileage-ec-source.js', () => mileageSourceMocks);
 
 const adjustmentNotificationMocks = {
   mileageAdjustmentMessage: vi.fn().mockReturnValue('通知本文'),
@@ -447,6 +449,7 @@ describe('mileage admin API', () => {
   });
 
   it('queues a generic authenticated engagement event', async () => {
+    dbMocks.getFriendById.mockResolvedValueOnce({ id: 'friend-1', line_account_id: 'account-1' });
     dbMocks.applyMileageRulesForEvent.mockResolvedValue({ event: { id: 'event-1' }, granted: [], queued: true });
     const response = await call('/api/mileage/events', {
       method: 'POST',
@@ -459,6 +462,15 @@ describe('mileage admin API', () => {
     expect(dbMocks.applyMileageRulesForEvent).toHaveBeenCalledWith(env.DB, expect.objectContaining({
       friendId: 'friend-1', eventType: 'community_lesson_completed', source: 'community',
     }));
+  });
+  it('ECの店へのマイル付与イベントはコード付きで拒否する', async () => {
+    dbMocks.getFriendById.mockResolvedValueOnce({ id: 'friend-1', line_account_id: 'account-1' });
+    dbMocks.applyMileageRulesForEvent.mockResolvedValueOnce({ event: { id: 'event-1' }, queued: true });
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    const response = await call('/api/mileage/events', { method: 'POST', body: JSON.stringify({ friendId: 'friend-1', eventType: 'friend_added', source: 'manual', sourceEventId: 'ec-event' }) });
+    expect(response.status).toBe(409);
+    expect((await response.json() as any).code).toBe('MILEAGE_MANAGED_BY_EC');
+    expect(dbMocks.applyMileageRulesForEvent).not.toHaveBeenCalled();
   });
 
   it('returns a cross-account overview with bounded pagination', async () => {
@@ -721,6 +733,41 @@ describe('mileage admin API', () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: 'ADJUSTMENT_POLICY_REQUIRED' });
     expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  it('EC管理の店では手動の残高調整を拒否する', async () => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    dbMocks.postMileageAdjustment.mockResolvedValue({ entry: { id: 'entry-1' }, balanceBefore: 0, balanceAfter: 100, replayed: false });
+    const response = await call('/api/mileage/adjustments', { method: 'POST', headers: { 'Idempotency-Key': '11111111-2222-4333-8444-555555555555', 'X-Confirm-Irreversible': 'mileage-adjustment' }, body: JSON.stringify({ accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 100, reasonCategory: 'customer_support', reason: '電話対応のお礼' }) });
+    expect(response.status).toBe(409);
+    expect((await response.json() as any).code).toBe('MILEAGE_MANAGED_BY_EC');
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['/api/mileage/adjustment-approvals/req-1/approve', { reason: '確認' }],
+    ['/api/mileage/adjustment-approvals/req-1/reject', { reason: '確認' }],
+    ['/api/mileage/adjustment-approvals/req-1/cancel', {}],
+    ['/api/mileage/entries/entry-1/confirm', { reason: '確認' }],
+    ['/api/mileage/entries/entry-1/void', { reason: '確認' }],
+  ])('ECの保留中の残高変更を操作できない: %s', async (path, body) => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    const response = await call(path, { method: 'POST', headers: { 'X-Confirm-Irreversible': 'mileage-entry-void' }, body: JSON.stringify({ accountId: 'account-1', ...body }) });
+    expect(response.status).toBe(409);
+    expect((await response.json() as any).code).toBe('MILEAGE_MANAGED_BY_EC');
+    expect(dbMocks.approveMileageAdjustmentRequest).not.toHaveBeenCalled();
+    expect(dbMocks.rejectMileageAdjustmentRequest).not.toHaveBeenCalled();
+    expect(dbMocks.cancelMileageAdjustmentRequest).not.toHaveBeenCalled();
+    expect(dbMocks.confirmPendingMileageEntry).not.toHaveBeenCalled();
+    expect(dbMocks.voidMileageLedgerEntry).not.toHaveBeenCalled();
+  });
+
+  it('マイルの管理元を読めなければ承認しない', async () => {
+    mileageSourceMocks.resolveMileageSource.mockRejectedValueOnce(new Error('unreadable'));
+    const response = await call('/api/mileage/adjustment-approvals/req-1/approve', { method: 'POST', body: JSON.stringify({ accountId: 'account-1', reason: '確認' }) });
+    expect(response.status).toBe(503);
+    expect((await response.json() as any).code).toBe('MILEAGE_SOURCE_UNAVAILABLE');
+    expect(dbMocks.approveMileageAdjustmentRequest).not.toHaveBeenCalled();
   });
 
   it('appends a confirmed low-value adjustment with a stable idempotency key', async () => {

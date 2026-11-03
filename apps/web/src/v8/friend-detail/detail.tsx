@@ -248,7 +248,7 @@ function FriendDetailV8Inner() {
       ) : tab === 'actions' ? (
         <ActionsTab friendId={friendId} />
       ) : tab === 'miles' ? (
-        <MilesTab friendId={friendId} />
+        <MilesTab friendId={friendId} balanceSource={data.mileageStatus === 'ready' ? data.mileage?.balanceSource ?? 'musubo' : null} />
       ) : (
         <RichMenuTab />
       )}

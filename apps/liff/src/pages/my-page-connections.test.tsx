@@ -18,7 +18,7 @@ beforeEach(() => {
   vi.mocked(api.liffConfig).mockResolvedValue({ success: true, data: { accountId: 'store', accountName: '人工教室', botBasicId: '' } });
   vi.mocked(api.notificationPreferences).mockResolvedValue({ purposeSpecificEnforcement: false, items: [] } as never);
   vi.mocked(visitStampsApi.cards).mockResolvedValue({ success: true, data: [] });
-  vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [], availableMiles: 20 });
+  vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [], availableMiles: 20, balanceSource: 'musubo' });
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 function Location() { return <p>{useLocation().pathname}</p>; }

@@ -43,6 +43,8 @@ vi.mock('@line-crm/db', () => dbMocks);
 
 const deliveryMocks = { deliverMileageReward: vi.fn() };
 vi.mock('../features/mileage/mileage-reward-delivery.js', () => deliveryMocks);
+const mileageSourceMocks = vi.hoisted(() => ({ resolveMileageSource: vi.fn().mockResolvedValue('musubo'), getEcMileageBalance: vi.fn(), hasHeldMileageRedemption: vi.fn().mockResolvedValue(false) }));
+vi.mock('../services/mileage-ec-source.js', () => mileageSourceMocks);
 
 // 差替済みのヘルパを入口へ接続するため、モック登録後に読み込む。
 const worker = (await import('../index.js')).default;
@@ -300,6 +302,23 @@ describe('POST /api/liff/affiliate/register — idempotency', () => {
 });
 
 describe('GET /api/liff/mileage/me — generic wallet', () => {
+  it('ECの店では顧客にもECの残高を返す', async () => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    mileageSourceMocks.getEcMileageBalance.mockResolvedValueOnce(29);
+    const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice');
+    expect((await res.json() as any).mileage).toMatchObject({ available: 29, balanceSource: 'ec' });
+  });
+  it('EC残高未取得はmusubo残高や0にしない', async () => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    mileageSourceMocks.getEcMileageBalance.mockResolvedValueOnce(null);
+    const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice');
+    expect((await res.json() as any).mileage).toMatchObject({ available: null, balanceSource: 'ec' });
+  });
+  it('取得元を判定できないときはmusubo残高を返さない', async () => {
+    mileageSourceMocks.resolveMileageSource.mockRejectedValueOnce(new Error('unreadable'));
+    const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice');
+    expect(res.status).toBeGreaterThanOrEqual(500);
+  });
   it('returns mileage without requiring affiliate registration', async () => {
     const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice&limit=10');
     expect(res.status).toBe(200);
@@ -359,6 +378,35 @@ describe('GET /api/liff/mileage/me — generic wallet', () => {
 });
 
 describe('LIFF mileage rewards — verified account and real limits', () => {
+  it('EC管理の店には交換可能な使い道を返さない', async () => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    mileageSourceMocks.getEcMileageBalance.mockResolvedValueOnce(29);
+    mileageSourceMocks.hasHeldMileageRedemption.mockResolvedValueOnce(true);
+    const response = await call('/api/liff/mileage/rewards?lineAccessToken=tok-alice');
+    expect(await response.json()).toMatchObject({ balanceSource: 'ec', availableMiles: 29, hasHeldRedemption: true, rewards: [] });
+    expect(mileageSourceMocks.hasHeldMileageRedemption).toHaveBeenCalledWith(DB, 'account-main', expect.any(String));
+    expect(dbMocks.listMileageRewards).not.toHaveBeenCalled();
+  });
+  it('ECで管理する店は交換を拒否して台帳を変更しない', async () => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    const response = await call('/api/liff/mileage/rewards/reward-1/redeem', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': '018f6c6e-7b37-4a2f-8a71-1e1224dbdb93' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(response.status).toBe(409);
+    expect((await response.json() as any).error.code).toBe('MILEAGE_MANAGED_BY_EC');
+    expect(dbMocks.reserveMileageRewardRedemption).not.toHaveBeenCalled();
+  });
+  it('取得元が読めなければ交換を拒否する', async () => {
+    mileageSourceMocks.resolveMileageSource.mockRejectedValueOnce(new Error('unreadable'));
+    const response = await call('/api/liff/mileage/rewards/reward-1/redeem', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': '018f6c6e-7b37-4a2f-8a71-1e1224dbdb93' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(response.status).toBe(503);
+    expect((await response.json() as any).error.code).toBe('MILEAGE_SOURCE_UNAVAILABLE');
+    expect(dbMocks.reserveMileageRewardRedemption).not.toHaveBeenCalled();
+  });
   it('rejects a legacy fallback friend from a different LINE account', async () => {
     dbMocks.getFriendByLineUserIdForAccount.mockResolvedValueOnce({
       ...FRIENDS['U-alice'],

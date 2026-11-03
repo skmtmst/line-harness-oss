@@ -235,6 +235,14 @@ export async function evaluateFriendAddRuleConditions(
 
 // ── 実行 ────────────────────────────────────────────────────────────────────
 
+async function postFriendAddMileage(db: D1Database, input: Parameters<typeof postMileageEntry>[1]): Promise<void> {
+  try { await postMileageEntry(db, input); }
+  catch (error) {
+    if (error instanceof Error && error.message === 'MILEAGE_MANAGED_BY_EC') return;
+    throw error;
+  }
+}
+
 export async function runActions(
   db: D1Database,
   friendId: string,
@@ -302,7 +310,7 @@ export async function runActions(
         // 直接台帳へ1行入れる。付与ルール（/scoring）は「こういう行動をしたら
         // 何マイル」を決めるもので、友だち追加の1回だけの付与はここで足す。
         // idempotencyKey に friend を入れているので、同じ人に二重で入らない。
-        await postMileageEntry(db, {
+        await postFriendAddMileage(db, {
           beneficiaryFriendId: friendId,
           entryType: 'grant',
           amount: action.amount,
@@ -364,7 +372,7 @@ export async function executeStoredFriendAddAction(
     return;
   }
   if (action.kind === 'mile') {
-    await postMileageEntry(db, {
+    await postFriendAddMileage(db, {
       beneficiaryFriendId: input.friendId,
       entryType: 'grant',
       amount: action.amount,

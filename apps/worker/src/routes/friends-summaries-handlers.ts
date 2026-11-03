@@ -5,6 +5,7 @@ import { hydrateDocumentAnswers } from '../features/forms/form-documents/index.j
 import { getFriendSummary } from '@line-crm/db';
 import { getFriendUpcomingItems } from '../features/friends/friend-upcoming-items/index.js';
 import { fail } from '../lib/fail.js';
+import { resolveMileageSource, getEcMileageFriends } from '../services/mileage-ec-source.js';
 import { getFriendById, getFriendWithFirstTrackedLinkName, addTagToFriend, getFriendTags, getFormSubmissionsByFriend, getFormSubmissionsByFriendCursor, countFriendFormSubmissions, enrollFriendInScenario, getMileageSummaryForFriend, getMileageHistoryForFriend, getMileageSelfInsights, getMileageConnectedAccountsForFriend, jstNow, getTagAddedScenarioIdsForAccount } from '@line-crm/db';
 import type { Tag as DbTag } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
@@ -43,7 +44,14 @@ export const get__api_friends_id_mileage_1 = async (c: Context<Env, "/api/friend
       getMileageSelfInsights(c.env.DB, friendId),
       getMileageConnectedAccountsForFriend(c.env.DB, friendId, accountScope.allowedAccountIds),
     ]);
-    return c.json({ success: true, data: buildOffsetListResponse({ summary, history, insights, connections, items: history, total: null, paging: { limit, offset: 0 }, sort: [] }) });
+    const source = friendAccountId ? await resolveMileageSource(c.env.DB, friendAccountId) : 'musubo';
+    const ecFriend = source === 'ec' && friendAccountId
+      ? (await getEcMileageFriends(c.env.DB, { lineAccountId: friendAccountId, friendId, search: '', limit: 1, offset: 0 })).items[0]
+      : null;
+    const visibleSummary = source === 'ec' && friendAccountId
+      ? { ...summary, available: ecFriend?.available ?? null, ecRank: ecFriend?.rank ?? '未設定', balanceSource: 'ec' as const }
+      : { ...summary, balanceSource: 'musubo' as const };
+    return c.json({ success: true, data: buildOffsetListResponse({ summary: visibleSummary, history, insights, connections, items: history, total: null, paging: { limit, offset: 0 }, sort: [] }) });
   } catch (err) {
     throw err;
   }

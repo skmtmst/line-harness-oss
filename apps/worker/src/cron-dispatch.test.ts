@@ -11,6 +11,10 @@ const observed = vi.hoisted(() => ({ jobs: [] as ScheduledJob[], deliveries: [] 
   scheduled: vi.fn(async () => ({results: []})), overdue: vi.fn(async () => []),
   due: vi.fn(async () => ({processed: 0})), executors: vi.fn(() => ({})),
 }));
+const mileagePush = vi.hoisted(() => vi.fn(async () => ({ requestId: 'fixture-request' })));
+vi.mock('./services/line-proxy-send.js', async original => ({
+  ...await original<typeof import('./services/line-proxy-send.js')>(), pushViaHarnessProxy: mileagePush,
+}));
 vi.mock('./services/scheduled-job-isolation.js', async original => ({
   ...await original<typeof import('./services/scheduled-job-isolation.js')>(),
   runIsolatedScheduledJobs: async (jobs: ScheduledJob[]) => { observed.jobs.push(...jobs); return {succeeded: jobs.length, failed: 0}; },
@@ -280,6 +284,37 @@ test('設定済みのCron式は実際のレーンを呼び、通知は重いレ�
     expect(call).toHaveBeenCalledOnce();
     expect(call).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({now:new Date(result.scheduledTime).toISOString(),executors,limit:100}));
   }
+});
+
+test('壊れた店の付与キューが失敗しても別の店の予約済み通知を届ける', async () => {
+  const fixture = createTestD1();
+  const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
+  const { runFrequentHeavyJobs } = await import('./cron/frequent.js');
+  const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('external calls forbidden'));
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    for (const id of ['broken', 'healthy']) {
+      fixture.raw.prepare('INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token) VALUES (?,?,?,?,?)').run(id,id,`c-${id}`,'secret','token');
+      fixture.raw.prepare('INSERT INTO friends(id,line_user_id,display_name,line_account_id,is_following) VALUES (?,?,?,?,1)').run(`f-${id}`,`U-${id}`,id,id);
+    }
+    const event = await actual.enqueueMileageEvent(fixture.db, { friendId: 'f-broken', eventType: 'friend_added', source: 'test', sourceEventId: 'broken-event' });
+    fixture.raw.prepare("INSERT INTO account_settings(id,line_account_id,key,value) VALUES ('bad','broken','feature.specialized.catalog','not-json')").run();
+    fixture.raw.prepare(`INSERT INTO mileage_ledger(id,program_id,beneficiary_friend_id,entry_type,status,amount,reason,source,idempotency_key,occurred_at,created_at)
+      VALUES ('grant','default','f-healthy','grant','available',10,'test','test','grant-key','2026-01-01','2026-01-01')`).run();
+    fixture.raw.prepare(`INSERT INTO mileage_adjustment_notifications(id,line_account_id,friend_id,ledger_entry_id,idempotency_key,message_text,status)
+      VALUES ('notice','healthy','f-healthy','grant','notice-key','付与しました','pending')`).run();
+    processors.processPendingMileageEvents.mockImplementationOnce((db: D1Database) => actual.processPendingMileageEvents(db));
+    await runFrequentHeavyJobs({ scheduledTime: Date.now() } as ScheduledEvent, {
+      DB: fixture.db, LINE_CHANNEL_ACCESS_TOKEN: 'fixture', WORKER_PUBLIC_URL: 'https://example.invalid', DEPLOY_ENV: 'test',
+    } as import('./index.js').Env['Bindings']);
+    const job = observed.jobs.find(item => item.name === 'mileage projection');
+    expect(job).toBeDefined();
+    await expect(job!.run()).rejects.toThrow('mileage_queue_all_sources_unavailable');
+    expect(fixture.raw.prepare('SELECT status FROM mileage_event_queue WHERE engagement_event_id=?').get(event.id)).toEqual({ status: 'pending' });
+    expect(fixture.raw.prepare("SELECT status FROM mileage_adjustment_notifications WHERE id='notice'").get()).toEqual({ status: 'sent' });
+    expect(mileagePush).toHaveBeenCalledOnce();
+    expect(network).not.toHaveBeenCalled();
+  } finally { fixture.raw.close(); }
 });
 
 test.each([
