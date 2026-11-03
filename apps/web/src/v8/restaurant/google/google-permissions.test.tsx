@@ -306,3 +306,29 @@ it('Google投稿の削除窓を閉じた後の古い確定では送らない', a
  await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
  expect(fixture.removePost).not.toHaveBeenCalled()
 })
+
+it.each(['connected', 'pending_location'])('Google接続 %s の窓を開いた後に接続が変わると古い確認では解除しない', async status => {
+ const original = connection(status)
+ const view = render(<SettingsBoard accountId="a" data={original} onChanged={vi.fn()} />)
+ fireEvent.click(screen.getByRole('button', { name: status === 'connected' ? '接続を解除する' : '接続を取り消す' }))
+ const dialog = within(screen.getByRole('alertdialog'))
+ const b = dialog.getByRole('button', { name: status === 'connected' ? '接続を解除する' : '取り消す' })
+ const key = Object.keys(b).find(item => item.startsWith('__reactProps$'))!
+ const held = (b as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ view.rerender(<SettingsBoard accountId="a" data={{...original, connection:{...original.connection, locationName:'locations/other', locationTitle:'別の店'}}} onChanged={vi.fn()} />)
+ view.rerender(<SettingsBoard accountId="a" data={original} onChanged={vi.fn()} />)
+ await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
+ expect(fixture.disconnect).not.toHaveBeenCalled()
+})
+
+it('Google接続解除の窓を閉じた後の古い確定では解除しない', async () => {
+ render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+ fireEvent.click(screen.getByRole('button', { name:'接続を解除する' }))
+ const dialog = within(screen.getByRole('alertdialog'))
+ const b = dialog.getByRole('button', { name:'接続を解除する' })
+ const key = Object.keys(b).find(item => item.startsWith('__reactProps$'))!
+ const held = (b as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ fireEvent.click(dialog.getByRole('button', { name:'キャンセル' }))
+ await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
+ expect(fixture.disconnect).not.toHaveBeenCalled()
+})
