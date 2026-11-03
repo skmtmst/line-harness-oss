@@ -273,3 +273,12 @@ it('Instagram失敗の確認を閲覧のみで開いても、押せない再送�
   expect(notice.textContent).not.toContain('「Instagram へ再送」')
   expect(fixture.retryInstagram).not.toHaveBeenCalled()
 })
+
+it('Googleの審査で公開されなかった投稿を閲覧のみで見た時は、作り直しを管理者に依頼する', async () => {
+  verifiedStaffRole('viewer')
+  fixture.post.mockResolvedValue({ post: post('p-1', { status: 'rejected' }), store: { id: 'store', name: '然カフェ 本店' }, writeEnabled: true, canPublish: true })
+  render(<PostConfirm accountId="acc-1" id="p-1" go={go} />)
+  const notice = await screen.findByText(/Googleの審査で公開されませんでした/)
+  expect(notice.textContent).toContain('管理者に内容の確認を依頼してください')
+  expect(fixture.publishPost).not.toHaveBeenCalled()
+})
