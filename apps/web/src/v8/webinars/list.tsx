@@ -764,7 +764,7 @@ function WebinarList() {
   const selectedFolderRow = folderRows.find(row => row.id === selectedFolder && row.onDelete)
   const folderSelect = (
     <SaveErrorField names={["selectedFolder","selected_folder"]}><Select
-      aria-label="フォルダ"
+      narrowFolderPicker aria-label="フォルダ"
       value={selectedFolder}
       onChange={(value) => { setSelectedFolder(value); setPage(1) }}
       options={[

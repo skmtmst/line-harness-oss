@@ -857,7 +857,7 @@ export default function TagsTab({
         </>}
         collapsedFolders={<>
           {createButton(false)}
-          <SaveErrorField names={["folder"]}><Select aria-label="フォルダ" size="content" value={folder} onChange={(next) => next === '__manage_folders__' ? setManageFoldersOpen(true) : setFolder(next)} options={[...folderSelectOptions, { value: '__manage_folders__', label: 'フォルダを管理' }]} /></SaveErrorField>
+          <SaveErrorField names={["folder"]}><Select narrowFolderPicker aria-label="フォルダ" size="content" value={folder} onChange={(next) => next === '__manage_folders__' ? setManageFoldersOpen(true) : setFolder(next)} options={[...folderSelectOptions, { value: '__manage_folders__', label: 'フォルダを管理' }]} /></SaveErrorField>
         </>}
         toolbar={narrow ? <ListToolbarFrame layout="stacked"><ListToolbarRow>
           {/* 1152（aPeD8）：1段目＝作る・フォルダ・探す・使用状態、2段目＝付け方・よく使う・右端に表示件数。 */}

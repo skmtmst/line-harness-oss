@@ -21,19 +21,24 @@ export interface SelectCreateContext {
   finish: (value: string) => void
 }
 
-export interface SelectCreateAction {
+export type SelectCreateAction = {
   /** ＋行だけの入力・状態の禁止。候補の選択には影響しない。 */
   disabled?: boolean
   /** ＋行だけの権限理由。候補の選択には影響しない。 */
   lockedReason?: string
   /** 一覧の下の行の文（「新しいフォルダを作る」）。 */
   label: string
+} & (
   /** 押した後、同じ板に出す中身（iBuZH）。 */
-  render: (context: SelectCreateContext) => ReactNode
-}
+  | { render: (context: SelectCreateContext) => ReactNode; onSelect?: never }
+  /** 同じ窓の入力ではなく、既存の別の窓を開く操作。 */
+  | { onSelect: () => void; render?: never }
+)
 
 export interface SelectProps {
   'aria-label': string
+  /** 一覧で畳んだフォルダ選択だけが、対応する追加操作を受け取る。 */
+  narrowFolderPicker?: boolean
   className?: string
   defaultOpen?: boolean
   /** 作成欄を開く要求。値を増やすたび、可能なら作成欄を表示する。 */
