@@ -4,7 +4,6 @@ import OperationTargetSummary from '@/components/shared/operation-target-summary
 
 import { DetailContent, DetailField, DetailSection } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
-import FolderSelect from '@/components/shared/folder-select'
 import DetailPanel from '@/components/shared/detail-panel';
 import { useHeldDetail, useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
 import { useStaffRole } from '@/lib/staff-role';
@@ -70,7 +69,8 @@ import { withViewTransition } from '@/components/shared/view-transition';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
-import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs';
+import ScenarioDeleteDialog from './delete-dialog'
+import ScenarioMoveDialog from './move-dialog'
 import { scenarioAccountTargets } from './list-account-targets';
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario';
 import styles from './list.module.css'
@@ -1405,79 +1405,33 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
 </DetailPanel>
         )}
 
-        {/* フォルダ移動の窓。1件でも複数件でも同じ形。 */}
-        <ConfirmDialog
-          open={moveIds !== null}
-          title={
-            moveIds && moveIds.length === 1
-              ? `「${scenarios.find((s) => s.id === moveIds[0])?.name ?? 'シナリオ'}」のフォルダを移動`
-              : `${moveIds?.length ?? 0} 件のシナリオのフォルダを移動`
-          }
-          description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
-          confirmLabel="移動する"
-          confirmDisabled={editDisabled || moveWindowScope.current !== renderedScope}
-          confirmLockedReason={moveWindowScope.current === renderedScope ? editAccess.reason : undefined}
-          confirmDisabledReason={moveWindowScope.current !== renderedScope ? 'LINEアカウントが変わりました。閉じて選び直してください。' : undefined}
-          pendingUndo={pendingMove} onSuccess={() => setMoveIds(null)} onUndone={() => setMoveIds(null)}
-        busyLabel="移動中…" onConfirm={() => runMove()}
-          onCancel={() => setMoveIds(null)}
-        >
-          <OperationTargetSummary accounts={moveAccountTargets.accounts} allAccounts={moveAccountTargets.allAccounts} />
-          <div className={styles.moveBody}>
-            <span className={styles.moveLabel}>移動先のフォルダ</span>
-            <SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
-              aria-label="移動先のフォルダ"
-              size="full"
-              value={moveDraft}
-              disabled={editDisabled || moveWindowScope.current !== renderedScope || Boolean(pendingMove)}
-              lockedReason={moveWindowScope.current === renderedScope ? editAccess.reason : undefined}
-              onChange={(value) => { if (canWriteHere() && moveWindowScope.current === renderedScope) setMoveDraft(value) }}
-              folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
-            /></SaveErrorField>
-          </div>
-        </ConfirmDialog>
+        <ScenarioMoveDialog
+          ids={moveIds}
+          scenarios={scenarios}
+          folders={folders}
+          accountTargets={moveAccountTargets}
+          disabled={editDisabled}
+          sameScope={moveWindowScope.current === renderedScope}
+          lockedReason={editAccess.reason}
+          pending={pendingMove}
+          draft={moveDraft}
+          onDraftChange={(value) => { if (canWriteHere() && moveWindowScope.current === renderedScope) setMoveDraft(value) }}
+          onConfirm={() => runMove()}
+          onClose={() => setMoveIds(null)}
+        />
 
-        {/* 削除の確認窓（今までと同じ本文・同じ判断）。 */}
-        <ConfirmDialog
-          open={deleteTarget !== null}
-          title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
-          description="各通の中身と、購読中の人の進み具合が一緒に消えます。すでに送ったメッセージは友だちの手元に残り、取り消せません。この操作は取り消せません。"
-          confirmLabel="削除する"
-          destructive
+        <ScenarioDeleteDialog
+          target={deleteTarget}
           busy={deleting}
           error={deleteError}
+          disabled={editDisabled}
+          targetStillListed={targetStillListed}
+          sameScope={deleteWindowScope.current === renderedScope}
+          lockedReason={editAccess.reason}
+          countLabel={scenarioCountLabel}
           onConfirm={() => { void runDelete() }}
-          confirmDisabled={editDisabled || !targetStillListed || deleteWindowScope.current !== renderedScope}
-          confirmLockedReason={targetStillListed && deleteWindowScope.current === renderedScope ? editAccess.reason : undefined}
-          confirmDisabledReason={!targetStillListed || deleteWindowScope.current !== renderedScope ? '一覧が変わりました。閉じて選び直してください。' : undefined}
-          onCancel={() => {
-            if (deleting) return
-            setDeleteTarget(null)
-            setDeleteError('')
-          }}
-        >
-          {deleteTarget && (
-            <div className={styles.deleteBody}>
-              <OperationTargetSummary accounts={deleteTarget.lineAccountId === null ? [] : [{ id: deleteTarget.lineAccountId ?? '' }]} allAccounts={deleteTarget.lineAccountId === null} />
-              <MoveReferrersNotice scenarioId={deleteTarget.id} />
-              <p>
-                配信中 {scenarioCountLabel(deleteTarget.subscriberCount)} ／ 通数{' '}
-                {deleteTarget.stepCount === undefined ? '— 読み込めませんでした' : `${deleteTarget.stepCount} 通`}
-              </p>
-              {deleteTarget.lineAccountId === null && (
-                <p className={styles.deleteWarn}>全アカウント共通のシナリオです。すべてのアカウントから消えます。</p>
-              )}
-              <p className={styles.deleteFaint}>
-                回答フォーム・流入経路・計測リンクからの参照は数えられていません。消したあとに参照が外れることがあります。
-              </p>
-              {!targetStillListed && (
-                <SaveErrorField names={["duplicateName","duplicate_name"]}><p className={styles.deleteWarn}>
-                  このシナリオが一覧から外れました（LINEアカウントの切り替えなど）。この窓を閉じて、いまの一覧から選び直してください。
-                </p></SaveErrorField>
-              )}
-            </div>
-          )}
-        </ConfirmDialog>
+          onCancel={() => { if (!deleting) { setDeleteTarget(null); setDeleteError('') } }}
+        />
 
         {/* 複製の窓（★V8 `Al4Ek`：新しい名前・引き継ぐもの・引き継がないもの・停止中で作られる）。題の左に印は置かない（絵どおり）。 */}
         <></>
