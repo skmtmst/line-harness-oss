@@ -23,6 +23,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
   'components/shared/folder-add-dialog.tsx',
+  'components/shared/folder-select.tsx',
   'components/shared/use-inline-detail-guard.tsx',
   'v8/common-vars/list.tsx',
   'v8/account-new/registration-unsaved-guard.tsx',

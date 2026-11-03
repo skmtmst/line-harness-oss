@@ -12,7 +12,7 @@ import Notice from '@/components/shared/notice'
 import { AffixedTextField, TextField } from '@/components/shared/text-field';
 import { Field, RequiredBadge } from '@/components/shared/form-controls';
 import { requiredText } from '@/lib/form-requirement';
-import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select';
+import FolderSelect, { folderById, type FolderDraftGuard, type FolderSelectCreate } from '@/components/shared/folder-select';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { requestUnsavedAction } from '@/lib/unsaved-action';
@@ -190,7 +190,8 @@ export default function FieldEditor({
       || ecFieldPath !== (field.ecFieldPath ?? '')
       || folderId !== (field.folderId ?? '')
     )
-  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving })
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+  const folderDraftGuard = useRef<FolderDraftGuard | null>(null)
 
   /* 入力を変えたら次の作成は別の要求として新しいキーにする（R515）。 */
   const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
@@ -255,7 +256,9 @@ export default function FieldEditor({
     if (mode === 'create' && !/^[a-z][a-z0-9_]{0,31}$/.test(fieldKey.trim())) return failField('key', '差し込みの名前は英小文字で始まる英数字と _ の32文字以内にしてください')
     if (keyOwners.length) return failField('key', 'この差し込みの名前はすでに使われています')
     setValidationTarget(''); setValidationError('')
-    onSubmit(draftValues, idempotencyKeyRef.current)
+    const save = () => onSubmit(draftValues, idempotencyKeyRef.current)
+    if (folderDraftGuard.current) folderDraftGuard.current(save)
+    else save()
   }
 
   const optionRows = options.length >= MIN_OPTION_ROWS ? options : [...options, ...Array(MIN_OPTION_ROWS - options.length).fill('')]
@@ -376,8 +379,8 @@ export default function FieldEditor({
         previewLabel="種類と設定を見る"
         previewTitle="項目の種類と設定"
         preview={aside}
-        footerActions={host ? host.footer(submit, () => guarded(onCancel)) : <>
-          <Button type="button" onClick={() => guarded(onCancel)} disabled={saving}>キャンセル</Button>
+        footerActions={host ? host.footer(submit, () => requestUnsavedAction(onCancel)) : <>
+          <Button type="button" onClick={() => requestUnsavedAction(onCancel)} disabled={saving}>キャンセル</Button>
           <Button
             type="button"
             variant="primary"
@@ -441,6 +444,7 @@ export default function FieldEditor({
               <span className={styles.selectBox}>
                 <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                   aria-label="友だち情報欄のフォルダ"
+                  draftGuardRef={folderDraftGuard}
                   value={folderId}
                   onChange={setFolderId}
                   disabled={locked || saving}
