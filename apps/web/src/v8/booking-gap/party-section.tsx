@@ -54,7 +54,7 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
   const reload = onReload ?? onChanged
   useEffect(() => { setError('') }, [party])
   useEffect(() => { setOpen(false); setBusy(false) }, [accountId, party.groupId])
-  useEffect(() => { setBusy(false) }, [party.version])
+  useEffect(() => { setBusy(false) }, [party.version, membersKey])
   const cancellable = party.members.filter((member) => member.status === 'requested' || member.status === 'confirmed')
   async function cancelAll() {
     if (!accountId || confirmedScope !== targetScope.current || busy || !canOperate || lockedReason || !reason.trim() || cancellable.length === 0) return
