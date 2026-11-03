@@ -169,9 +169,10 @@ export default function DateTimeField({
         ref={triggerRef}
         id={fieldId}
         type="button"
-        className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined].filter(Boolean).join(' ')}
+        className={[dateStyles.field, size === 'compact' ? styles.compactField : undefined, parsed && clearable && !disabled ? styles.clearableField : undefined].filter(Boolean).join(' ')}
         data-size={size}
         data-no-clear={clearable ? undefined : ''}
+        data-clearable={parsed && clearable && !disabled ? '' : undefined}
         disabled={disabled}
         data-invalid={invalid || undefined}
         aria-invalid={invalid || undefined}

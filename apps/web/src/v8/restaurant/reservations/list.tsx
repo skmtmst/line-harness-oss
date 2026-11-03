@@ -103,8 +103,8 @@ export default function ListView({ view, rows, total, tables, page, period, stat
   return (
     <>
       <StatRow fusion>
-        <KpiCard title="予約" value={total} unit="件" detail={`表示中 ${formatNumber(rows.length)}件`} icon={undefined} presentation="band" />
-        <KpiCard title="ご来店人数" value={guests} unit="名" detail={cancelledGuests > 0 ? `取消 ${cancelledGuests}名を除く` : `表示中 ${formatNumber(rows.length)}件`} icon={undefined} presentation="band" />
+        <KpiCard title="予約記録" value={total} unit="件" detail={`取消・押さえを含む・表示中 ${formatNumber(rows.length)}件`} icon={undefined} presentation="band" />
+        <KpiCard title="ご来店人数" value={guests} unit="名" detail={cancelledGuests > 0 ? `表示中の有効な予約・取消 ${cancelledGuests}名を除く` : '表示中の有効な予約'} icon={undefined} presentation="band" />
         <KpiCard title="LINE予約" value={lineCount} unit="件" detail="自社導線" icon={undefined} presentation="band" />
         <KpiCard title="媒体予約" value={mediaCount} unit="件" detail="受信した予約" icon={undefined} presentation="band" />
       </StatRow>
@@ -134,7 +134,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
 </>} trailingToolbar={<>        <span className={styles.dateSpacer} />
         {view === 'list' && onPageSize ? <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => onPageSize(Number(value))} options={PAGE_SIZE_SELECT_OPTIONS} /> : null}
         {canImport ? <Button presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={16} aria-hidden="true" />受信データを試す</Button> : null}
-        {canWrite ? <Button presentation="restaurant" disabled={busy} onClick={onCreate}><Plus size={16} aria-hidden="true" />手動で予約を作る</Button> : null}
+        {canWrite ? <Button presentation="restaurant" aria-label="手動で予約を作る" disabled={busy} onClick={onCreate}><Plus size={16} aria-hidden="true" />手動予約</Button> : null}
       </>} renderBody={body=><DetailColumns asideLayout="detail" variant="restaurant-ledger" asideLabel="予約の詳細を見る" expanded={detailExpanded} onExpandedChange={setDetailExpanded} aside={detail}>
         {tables.length===0 ? <LedgerEmpty noTables canWrite={canWrite} busy={busy} onCreate={onCreate}/> : rows.length===0 ? <LedgerEmpty noTables={false} filtered={status!=='all'||view==='list'&&period!=='all'} canWrite={canWrite} busy={busy} onCreate={onCreate}/> : null}
         {(rows.length===0 && axis!=='month') || axis==='floor' && floorError ? null : body}

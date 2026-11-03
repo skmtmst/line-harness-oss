@@ -153,6 +153,12 @@ describe('お問い合わせ（36-3）', () => {
     await screen.findByText(/送信者：山田 太郎/)
   }
 
+  it('問い合わせのタブは設定メニューと並ぶ内容の中に置く', async () => {
+    await open()
+    const tabs = screen.getByRole('tablist', { name: '問い合わせの表示' })
+    expect(tabs.closest('[data-template-region="content"]')).not.toBeNull()
+  })
+
   it('種類・件名・本文がそろうまで送れず、画像は png と jpeg だけを受け付ける', async () => {
     await open()
     expect(mocks.title).toHaveBeenCalledWith('お問い合わせ')

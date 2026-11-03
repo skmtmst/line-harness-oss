@@ -1141,3 +1141,4 @@
 - [担当者・登録・未保存の保護と利用数の改善](release-log/unreleased/2060-kenta-assignee-registration-guards.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [操作案内と予約・LIFFの改善](release-log/unreleased/2061-kenta-operations-reservations.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [操作案内と予約・配信の改善](release-log/unreleased/2062-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [飲食メニューの説明・画像と使用先](release-log/unreleased/2063-kenta-restaurant-menu-media.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。

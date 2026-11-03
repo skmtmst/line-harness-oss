@@ -23,6 +23,7 @@ export default function HelpTip({
   icon,
   trigger,
   hover = false,
+  placement = 'below',
   children,
 }: {
   /** 読み上げ名（例：「今月の完了率の説明」）。吹き出しとは aria-describedby でつなぐ。 */
@@ -32,6 +33,7 @@ export default function HelpTip({
   /** 印を増やさず、題そのものから説明を開く場合。 */
   trigger?: ReactNode
   hover?: boolean
+  placement?: 'above' | 'below'
   /**
    * 1〜2文の補足。長い説明がある場所への「くわしく」リンクも
    * ここへ一緒に渡す（`<a href="...">くわしく</a>`）。
@@ -56,7 +58,8 @@ export default function HelpTip({
       const tip = tipRef.current?.getBoundingClientRect()
       if (!anchor || !tip) return
       const left = Math.max(12, Math.min(anchor.left, window.innerWidth - tip.width - 12))
-      const top = Math.max(12, Math.min(anchor.bottom + 4, window.innerHeight - tip.height - 12))
+      const preferredTop = placement === 'above' ? anchor.top - tip.height - 4 : anchor.bottom + 4
+      const top = Math.max(12, Math.min(preferredTop, window.innerHeight - tip.height - 12))
       setPosition(previous => previous?.left === left && previous.top === top ? previous : { left, top })
     }
     const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(place) }
@@ -64,7 +67,7 @@ export default function HelpTip({
     window.addEventListener('resize', queue)
     window.addEventListener('scroll', queue, true)
     return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', queue); window.removeEventListener('scroll', queue, true) }
-  }, [open, children])
+  }, [open, children, placement])
 
   // 1つ開くと他は閉じる。開いた側が合図し、違う持ち主だけ閉じる。
   useEffect(() => {

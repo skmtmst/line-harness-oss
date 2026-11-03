@@ -65,16 +65,6 @@ const VIEW_BOARDS = {
 
 type DeliveryView = keyof typeof VIEW_BOARDS
 
-/*
- * 板の頭と中身の余白は共通の器（RestaurantPage）の既定に任せる（数字で渡さない）。
- * 題の大きさだけ、注文履歴と品切れ一括設定は小さい題（絵 OzHLO・h7OeT）。
- */
-const VIEW_HEAD: Record<DeliveryView, { titleSize?: 'sub' }> = {
-  orders: {},
-  history: { titleSize: 'sub' },
-  'sold-out': { titleSize: 'sub' },
-}
-
 const TABS: DeliveryOrderTab[] = ['all', 'new', 'cooking', 'handed_over']
 
 /** 自動で読み直す間（絵の「30秒ごとに自動更新」）。予約一覧と同じ間にする。 */
@@ -840,7 +830,6 @@ function DeliveryInner() {
       boardId={VIEW_BOARDS[view]}
       title={meta.title}
       description={meta.description}
-      titleSize={VIEW_HEAD[view].titleSize}
       picker={picker}
     >
       {role !== null && !canManage ? <ReadOnlyNotice /> : null}

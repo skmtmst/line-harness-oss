@@ -107,7 +107,7 @@ test('CMP-06: 日別実値、欠測、失敗、日付と中央値を守る',()=>
  expect(days[1].state).toBe('failed');expect(days[2].state).toBe('missing');expect(Object.values(days[1].values).every(value=>value===null)).toBe(true);expect(Object.values(days[2].values).every(value=>value===null)).toBe(true);
 });
 test('CMP-06/08: 詳細は可視店の対応実件数だけを返し閲覧権限を守る',async()=>{
- snapshot('a',0);seedGapBooking(d,'requested','requested');d.raw.exec("INSERT INTO chats(id,friend_id,line_account_id,status,created_at,updated_at) VALUES('waiting','f','a','unread','now','now'),('foreign','f2','b','unread','now','now')");
+ snapshot('a',0);seedGapBooking(d,'requested','requested');d.raw.exec("UPDATE friends SET line_account_id='b' WHERE id='f2'; INSERT INTO chats(id,friend_id,line_account_id,status,created_at,updated_at) VALUES('waiting','f','a','unread','now','now'),('foreign','f2','a','unread','now','now')");
  const detail=await read('/api/hq/store-comparison/a?from=2026-10-15&to=2026-10-16',{...gapOwner,readOnly:true});
  expect(detail.attention).toMatchObject({status:'ready',counts:{unhandledChats:1,pendingBookings:1,unpaid:0,connections:0}});expect(detail.attention.details).toBeUndefined();expect(detail.trend[1]).toMatchObject({state:'missing',values:{bookings:null}});
  expect((await gapCall(gapApp(d,[storeComparison]),'/api/hq/store-comparison/b')).status).toBe(404);

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRight, Calculator, CreditCard, Pencil, Settings } from 'lucide-react'
+import { Calculator, CreditCard, Pencil, Settings } from 'lucide-react'
 import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import NumberInput from '@/components/shared/number-field'
@@ -175,7 +175,7 @@ export function MenuPaymentFields({ state, name, price, people, unit, readOnly =
   if (state.status === 'loading') return <p className={styles.minor}>お支払いの設定を読み込んでいます…</p>
   if (state.status === 'error') return <p className={styles.minor}>お支払いの設定を読み込めませんでした。いつもの方法（予約設定 › お支払い）で受けます。</p>
   if (!state.connected) {
-    return <p className={styles.sideCardLink}><CreditCard size={16} aria-hidden="true" className={styles.connectionIcon} />先払いを受けるには<TextLink iconTone="link" href="/booking/menus?tab=payments">お支払いをつなぐ<ArrowRight size={16} aria-hidden="true" /></TextLink></p>
+    return <p className={styles.sideCardLink}><CreditCard size={16} aria-hidden="true" className={styles.connectionIcon} />先払いを受けるには<TextLink iconTone="link" href="/booking/menus?tab=payments">お支払いをつなぐ</TextLink></p>
   }
   const own = state.value !== null
   const effective = state.value ?? state.defaultMode

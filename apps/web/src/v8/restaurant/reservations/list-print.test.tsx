@@ -58,3 +58,13 @@ it('R11: 帯は4枚で未配席は下の1行、行き先は今日の配席', () 
   fireEvent.click(screen.getByRole('button', { name: '今日の配席へ →' }))
   expect(onView).toHaveBeenCalledWith('today')
 })
+
+it('予約記録には取消を含み、来店人数は表示中の有効な予約だけと分かる', () => {
+ const rows = [reservation('live', { status:'confirmed', guest_count: 2 }), reservation('cancelled', { status:'cancelled', guest_count: 3 })]
+ const {container} = render(<ListView view="list" rows={rows as never} total={2} tables={[]} page={1} period="all" status="all"
+   busy={false} canWrite={false} canImport={false} day={new Date()} onDay={vi.fn()} storeId="store" onView={vi.fn()}
+   onPeriod={vi.fn()} onStatus={vi.fn()} onPage={vi.fn()} onImport={vi.fn()} onCreate={vi.fn()} onEdit={vi.fn()} onOpen={vi.fn()} onCancel={vi.fn()} onRestore={vi.fn()} />)
+ const cards = [...container.querySelectorAll('[data-kpi-presentation]')]
+ expect(cards.find(card => card.textContent?.includes('予約記録'))?.textContent).toContain('取消・押さえを含む')
+ expect(cards.find(card => card.textContent?.includes('ご来店人数'))?.textContent).toContain('表示中の有効な予約')
+})

@@ -115,7 +115,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   return (
     <>
       <KpiBand data-restaurant-fusion>
-        <KpiCard title="今日の予約" value={countedBookings.length} unit="件" detail={`${guests}名`} icon={<Inbox size={16} aria-hidden />} presentation="band" />
+        <KpiCard title={isToday ? "今日の予約" : "選んだ日の予約"} value={countedBookings.length} unit="件" detail={`${guests}名`} icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="承認待ち" value={pending.length} unit="件" detail={pendingSources || 'ありません'} valueTone={pending.length > 0 ? 'warning' : 'default'} icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="未配席" value={unseated} unit="件" detail={unseated === 0 ? 'すべて卓に入っています' : '卓の割当が必要'} valueTone={unseated > 0 ? 'warning' : 'default'} icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="押さえ" value={holds.length} unit="枠" detail={holds[0]?.note || holds[0]?.allergy_note || '期限付きの仮押さえ'} icon={<Inbox size={16} aria-hidden />} presentation="band" />

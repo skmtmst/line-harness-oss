@@ -29,6 +29,7 @@
 .colState { width: var(--tpl-ev-ls-col-state); }
 .colMenu { width: var(--tpl-fm-col-menu); }
 .headName { text-align: left; }
+.headNameText { margin-inline-start: var(--space-8); }
 .headWithTip {
   display: inline-flex;
   align-items: center;

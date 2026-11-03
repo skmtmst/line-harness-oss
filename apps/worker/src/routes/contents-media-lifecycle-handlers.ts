@@ -1,3 +1,4 @@
+import { findDirectMediaUsages } from '../features/media/direct-media-usages.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
@@ -270,6 +271,8 @@ export const get__api_media_id_delete_impact_5 = async (c: Context<Env, "/api/me
     const snapshot = await getMediaDeleteImpactSnapshot(c.env.DB, c.req.param('id'), accountId, checkedAt);
     if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
     const { impact, usages } = snapshot;
+    const direct = await findDirectMediaUsages(c.env.DB, existing, accountId);
+    const directReferences = direct.map(row => ({ kind: row.refKind, name: row.name, href: row.href, state: 'available' as const, scannedAt: checkedAt, refKind: row.refKind, refId: row.refId, reference: null }));
     /*
       R34: 版の表が無い環境では版の一覧が読めない。全体を503にせず、
       版なしで続けて「未確認」として返す。
@@ -310,13 +313,16 @@ export const get__api_media_id_delete_impact_5 = async (c: Context<Env, "/api/me
       success: true,
       data: {
         ...verifiedImpact,
+        usageCount: verifiedImpact.usageCount + direct.length,
+        canDelete: verifiedImpact.canDelete && direct.length === 0,
+        recommendedAction: direct.length ? 'review_references' : verifiedImpact.recommendedAction,
         verified,
-        references: verifiedImpact.references.map((reference, index) => ({
+        references: [...verifiedImpact.references.map((reference, index) => ({
           ...reference,
-          refKind: usages[index]?.ref_kind ?? null,
+          refKind: usages[index]?.ref_kind ?? reference.kind,
           refId: usages[index]?.ref_id ?? null,
           reference: states[index] ?? null,
-        })),
+        })), ...directReferences],
         versions: versions.map((version) => ({
           versionNo: Number(version.version_no),
           mimeType: version.mime_type,
@@ -488,11 +494,13 @@ export const delete__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) 
     });
     const snapshot = await getMediaDeleteImpactSnapshot(c.env.DB, id, accountId, checkedAt);
     if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
+    const direct = await findDirectMediaUsages(c.env.DB, existing, accountId);
     // R34: 読み残しがあるときは使われていないと断定できない。確かめられ
     // ないものは消させない（ fail-closed）。読み直しを促す409で返す。
     const verified = (scan.skippedTables ?? []).length === 0;
-    const impact = verified ? snapshot.impact : {
-      ...snapshot.impact,
+    const baseImpact = { ...snapshot.impact, usageCount: snapshot.impact.usageCount + direct.length, references: [...snapshot.impact.references, ...direct.map(row => ({ kind:row.refKind, name:row.name, href:row.href, state:'available' as const, scannedAt:checkedAt }))], canDelete: snapshot.impact.canDelete && direct.length === 0, recommendedAction: direct.length ? 'review_references' as const : snapshot.impact.recommendedAction };
+    const impact = verified ? baseImpact : {
+      ...baseImpact,
       canDelete: false,
       recommendedAction: 'review_references' as const,
     };

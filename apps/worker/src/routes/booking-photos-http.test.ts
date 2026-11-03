@@ -176,6 +176,65 @@ describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
     expect(remove).not.toHaveBeenCalled();
     expect(raw.prepare("SELECT id FROM media WHERE id='p'").get()).toEqual({ id: 'p' });
   });
+  it('自動応答の本文・版と来店スタンプの使用先を店ごとに確認して削除を止める', async () => {
+    raw.exec(`INSERT INTO tenants(id,name) VALUES ('tenant-test','架空');
+      INSERT INTO auto_replies(id,keyword,response_type,response_content,line_account_id,name) VALUES
+        ('reply-a','a','image','https://worker.test/images/photos/p','a','本店の応答'),
+        ('reply-version','v','text','本文なし','a','版の応答'),
+        ('reply-b','b','image','https://worker.test/images/photos/p','b','別店の応答');
+      INSERT INTO auto_reply_versions(id,auto_reply_id,version_number,line_account_id,definition_snapshot,status,created_at)
+        VALUES ('version-a','reply-version',1,'a','{"image":"https://worker.test/media/p/content"}','published','2026-01-01');
+      INSERT INTO visit_stamp_cards(id,tenant_id,name,settings_json) VALUES
+        ('stamp-a','tenant-test','本店カード','{"backgroundImageUrl":"https://worker.test/images/photos/p"}'),
+        ('stamp-b','tenant-test','別店カード','{"backgroundImageUrl":"https://worker.test/images/photos/p"}');
+      INSERT INTO visit_stamp_card_accounts(card_id,line_account_id) VALUES ('stamp-a','a'),('stamp-b','b');`);
+    const env = { DB: db, WORKER_URL:'https://worker.test', IMAGES: { delete: vi.fn() } } as unknown as Env['Bindings'];
+    const impact = await app.request('/api/media/p/delete-impact?accountId=a', {}, env);
+    expect(impact.status).toBe(200);
+    const body = await impact.json() as { data:{ usageCount:number; canDelete:boolean; references:Array<{kind:string;name:string}> } };
+    expect(body.data.canDelete).toBe(false);
+    expect(body.data.references.map(r=>[r.kind,r.name])).toEqual(expect.arrayContaining([['auto_reply','本店の応答'],['auto_reply','版の応答'],['visit_stamp_card','本店カード']]));
+    expect(JSON.stringify(body)).not.toContain('別店');
+    const removed = await app.request('/api/media/p?accountId=a', { method:'DELETE' }, env);
+    expect(removed.status).toBe(409);
+    expect(env.IMAGES.delete).not.toHaveBeenCalled();
+    const replacement = await app.request('/api/media/p/replacement-impact?accountId=a&replacementId=p-more', {}, env);
+    const plan = await replacement.json() as { data:{ canReplace:boolean; canPartiallyReplace:boolean; usageCount:number } };
+    expect(plan.data).toMatchObject({ canReplace:false, canPartiallyReplace:false, usageCount:3 });
+  });
+  it.each(['本文', '過去の版'])('全店共通の自動応答の%sが画像を使えば、店の画像を消せない', async source => {
+    raw.exec(`INSERT INTO auto_replies(id,keyword,response_type,response_content,line_account_id,name) VALUES
+      ('global','global','image',${source === '本文' ? "'https://worker.test/images/photos/p'" : "'本文なし'"},NULL,'全店共通の応答'),
+      ('other-shop','other','image','https://worker.test/images/photos/p','b','別店だけの応答');`);
+    if (source === '過去の版') raw.exec(`INSERT INTO auto_reply_versions(id,auto_reply_id,version_number,line_account_id,definition_snapshot,status,created_at)
+      VALUES ('global-version','global',1,NULL,'{"image":"https://worker.test/media/p/content"}','published','2026-01-01');`);
+    const remove = vi.fn();
+    const env = { DB: db, WORKER_URL:'https://worker.test', IMAGES:{delete:remove} } as unknown as Env['Bindings'];
+    const impact = await app.request('/api/media/p/delete-impact?accountId=a', {}, env);
+    expect(impact.status).toBe(200);
+    const body = await impact.json() as {data:{usageCount:number;canDelete:boolean;references:Array<{name:string}>}};
+    expect(body.data).toMatchObject({ usageCount:1, canDelete:false });
+    expect(body.data.references.map(reference => reference.name)).toContain('全店共通の応答');
+    expect(JSON.stringify(body)).not.toContain('別店だけの応答');
+    expect((await app.request('/api/media/p?accountId=a', {method:'DELETE'}, env)).status).toBe(409);
+    expect(remove).not.toHaveBeenCalled();
+  });
+  it('別店だけの参照を対象店の使用先に混ぜない', async () => {
+    raw.exec(`INSERT INTO auto_replies(id,keyword,response_type,response_content,line_account_id,name)
+      VALUES ('reply-b','b','image','https://worker.test/images/photos/p','b','別店だけ');`);
+    const response = await app.request('/api/media/p/delete-impact?accountId=a', {}, { DB: db } as Env['Bindings']);
+    const body = await response.json() as {data:{usageCount:number;canDelete:boolean}};
+    expect(body.data).toMatchObject({ usageCount:0, canDelete:true });
+    expect(JSON.stringify(body)).not.toContain('別店だけ');
+  });
+  it('追加の使用先を読み取れない時は表示も削除も安全側で止める', async () => {
+    const failingDb = { ...db, prepare(sql: string) { if (sql.includes('FROM auto_replies ar')) throw new Error('offline'); return db.prepare(sql); } } as D1Database;
+    const remove = vi.fn();
+    const env = { DB:failingDb, IMAGES:{delete:remove} } as unknown as Env['Bindings'];
+    expect((await app.request('/api/media/p/delete-impact?accountId=a', {}, env)).status).toBe(503);
+    expect((await app.request('/api/media/p?accountId=a', {method:'DELETE'}, env)).status).toBe(503);
+    expect(remove).not.toHaveBeenCalled();
+  });
   it('LIFFの公開メニュー・担当に写真URLが出て、取り外すと消える', async () => {
     await menuSave('p');
     await request('/api/booking/admin/staff/s/photo', { expectedVersion: 1, mediaId: 'p-more' });
@@ -245,4 +304,68 @@ describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
     expect(await (await app.request('/api/liff/booking/store-photos?liffId=la', {}, env)).json()).toEqual({ success: true, data: [] });
   });
 
+});
+
+it('飲食メニューが使う登録画像は削除できず、影響から編集先へ進める', async () => {
+  raw.exec(`INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','架空組織');
+    INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','架空店','S','a');
+    INSERT INTO rt_menu_items(id,store_id,kind,name,price,image_media_id) VALUES('dish','store','course','架空コース',1000,'p');`);
+  const storageDelete = vi.fn();
+  const bindings = { DB: db, WORKER_URL:'https://worker.test', IMAGES:{ delete:storageDelete } } as unknown as Env['Bindings'];
+  const preview = await app.request('/api/media/p/delete-impact?accountId=a', {}, bindings);
+  expect(preview.status).toBe(200);
+  expect(await preview.json()).toMatchObject({ data:{ canDelete:false, usageCount:1, references:[expect.objectContaining({kind:'restaurant_menu', name:'架空コース', href:'/restaurant-test/menu/edit?id=dish'})] } });
+  const deletion = await app.request('/api/media/p?accountId=a', { method:'DELETE' }, bindings);
+  expect(deletion.status).toBe(409);
+  expect(storageDelete).not.toHaveBeenCalled();
+});
+
+it('飲食メニューと全店共通の自動応答が同じ画像を使う場合、両方の使用先と差替え時の版を守る', async () => {
+  raw.exec(`INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','架空組織');
+    INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','架空店','S','a');
+    INSERT INTO rt_menu_items(id,store_id,kind,name,price,image_media_id) VALUES('dish','store','course','架空コース',1000,'p');
+    INSERT INTO auto_replies(id,keyword,response_type,response_content,line_account_id,name)
+      VALUES('global','global','image','https://worker.test/images/photos/p',NULL,'全店共通の応答');`);
+  const remove = vi.fn();
+  const env = { DB: db, WORKER_URL:'https://worker.test', IMAGES:{delete:remove} } as unknown as Env['Bindings'];
+  const deletionImpact = await app.request('/api/media/p/delete-impact?accountId=a', {}, env);
+  expect(deletionImpact.status).toBe(200);
+  const deleted = await deletionImpact.json() as {data:{canDelete:boolean;usageCount:number;references:Array<{kind:string;name:string}>}};
+  expect(deleted.data).toMatchObject({canDelete:false,usageCount:2});
+  expect(deleted.data.references).toEqual(expect.arrayContaining([
+    expect.objectContaining({kind:'restaurant_menu',name:'架空コース'}),
+    expect.objectContaining({kind:'auto_reply',name:'全店共通の応答'}),
+  ]));
+  expect((await app.request('/api/media/p?accountId=a', {method:'DELETE'}, env)).status).toBe(409);
+  expect(remove).not.toHaveBeenCalled();
+  const getImpact = async () => {
+    const response = await app.request('/api/media/p/replacement-impact?accountId=a&replacementId=p-more', {}, env);
+    expect(response.status).toBe(200);
+    return (await response.json() as {data:{revision:string;usageCount:number;canReplace:boolean;references:Array<{kind:string}>}}).data;
+  };
+  const both = await getImpact();
+  expect(both).toMatchObject({usageCount:2,canReplace:false});
+  expect(both.references.map(ref => ref.kind)).toEqual(expect.arrayContaining(['restaurant_menu','auto_reply']));
+  raw.prepare('UPDATE rt_menu_items SET image_media_id = NULL WHERE id = ?').run('dish');
+  const replyOnly = await getImpact();
+  expect(replyOnly).toMatchObject({usageCount:1,canReplace:false});
+  expect(replyOnly.revision).not.toBe(both.revision);
+  raw.prepare('UPDATE rt_menu_items SET image_media_id = ? WHERE id = ?').run('p','dish');
+  raw.prepare('DELETE FROM auto_replies WHERE id = ?').run('global');
+  const menuOnly = await getImpact();
+  expect(menuOnly).toMatchObject({usageCount:1,canReplace:false});
+  expect(menuOnly.revision).not.toBe(both.revision);
+});
+
+it('飲食メニューの使用先を読み取れない場合、差替え影響を未使用として返さない', async () => {
+  const brokenDb = { ...db, prepare(sql: string) {
+    if (sql.includes('SELECT id FROM rt_menu_items WHERE image_media_id')) {
+      return { bind: () => ({ all: async () => { throw new Error('simulated menu query failure'); } }) } as unknown as D1PreparedStatement;
+    }
+    return db.prepare(sql);
+  } } as D1Database;
+  const env = { DB: brokenDb, WORKER_URL:'https://worker.test' } as Env['Bindings'];
+  const response = await app.request('/api/media/p/replacement-impact?accountId=a&replacementId=p-more', {}, env);
+  expect(response.status).toBe(503);
+  expect(await response.json()).toMatchObject({ success:false, error:'差し替えたときの影響を確認できませんでした' });
 });
