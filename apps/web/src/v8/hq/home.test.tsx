@@ -186,6 +186,7 @@ describe('統括のアカウント', () => {
       .filter((band) => !band.closest('article'))
     expect(bands).toHaveLength(1)
     expect(bands[0].textContent).toContain('期限が切れたトークン 1 件・期限が近い 1 件')
+    expect(bands[0].textContent).toContain('表示中のトークン（接続に問題とは別の数え方）')
   })
 
   it('期限の案内は検索結果とアーカイブの一覧に合わせる', async () => {
