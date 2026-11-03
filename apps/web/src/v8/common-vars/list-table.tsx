@@ -1,6 +1,7 @@
 'use client'
 
 import { stateBadge } from './list-model'
+import { placeholderText } from './model'
 
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { isForbidden } from '@/components/shared/api-error-message'
@@ -170,7 +171,7 @@ export function renderCommonVarList({ accountLoading, activeId, allOnPageSelecte
                             </RowNameLink>
                           </>
                         </div>
-                      } folder={folderDotOf(item)}
+                      } description={placeholderText(item.varKey)} folder={folderDotOf(item)}
                     />
                     <Td className={styles.valueCell} title={displayValue(valueText, 'unconfigured')}>
                       {valueText || <span className={styles.valueEmpty}>{emptyValue('unconfigured')}</span>}

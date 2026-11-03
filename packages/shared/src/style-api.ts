@@ -64,6 +64,7 @@ export type StyleBooking = {
   menuName?: string | null;
   storeId: string | null;
   slotId: string | null;
+  departedAt?: string | null;
   partySize: number;
   price: number;
   visited: boolean;

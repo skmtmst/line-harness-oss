@@ -63,3 +63,15 @@ it.each([10,11])('昼の%d時からの予約でも終端を出し、直前の文
  expect(within(ruler).getByText(`${hour}:00`)).toBeTruthy()
  expect(within(ruler).queryByText('22:00')).toBeNull()
 })
+
+it('当日の数は開始日で数え、退店済みは未配席に数えない',()=>{
+ const prior={...booking,id:'prior',starts_at:'2026-10-30T14:00:00Z',ends_at:'2026-10-30T16:00:00Z'}
+ const completed={...booking,id:'departed',customer_name:'退店済み',departed_at:'2026-10-31T13:00:00Z'}
+ const current={...booking,id:'current',customer_name:'当日の予約'}
+ const linked={...booking,id:'linked',customer_name:'結合済み',table_ids_json:JSON.stringify(['t1'])}
+ const {container}=render(<TodayView {...props} rows={[prior,completed,current,linked] as never}/>)
+ const labels=[...container.querySelectorAll('[data-kpi-label]')]
+ const card=(label:string)=>labels.find(node=>node.textContent?.trim()===label)?.closest('[data-kpi-presentation]')
+ expect(card('今日の予約')?.textContent).toContain('3件')
+ expect(card('未配席')?.textContent).toContain('1件')
+})

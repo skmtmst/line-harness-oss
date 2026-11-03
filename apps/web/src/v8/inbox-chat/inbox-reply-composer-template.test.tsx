@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 const fixture = vi.hoisted(() => ({ picker: {} as { canPick?: boolean; lockedReason?: string; channel?: string }, reason: undefined as string | undefined }))
 vi.mock('@/components/chats/template-picker', () => ({ default: (props: typeof fixture.picker) => { fixture.picker = props; return null } }))
@@ -29,4 +29,9 @@ it('代理の閲覧へ切り替わった理由も、開いている選択窓へ�
   fixture.reason = '代理ログイン（閲覧）中のため変更できません'
   view.rerender(<InboxReplyComposer {...props('owner')} />)
   expect(fixture.picker.lockedReason).toBe(fixture.reason)
+})
+
+it('時刻を指定して送る操作は送信予約と表示する', () => {
+  render(<InboxReplyComposer {...props('owner')} />)
+  expect(screen.getByRole('button', { name: '送信予約' })).toBeTruthy()
 })

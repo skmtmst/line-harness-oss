@@ -5,7 +5,8 @@ import {
 RICH_MENU_MAX_PAGES
 } from '@line-crm/shared'
 import { TAB_COUNT_OPTIONS } from './create-options'
-import { type Group } from './create-types'
+import { type Group, type Page } from './create-types'
+import { isAreaActionConfigured } from '@/components/rich-menus/action-drafts'
 
 
 /** ①で選べる切替タブの数の上限（ページの数。LINE 側の上限より多くしない）。 */
@@ -38,4 +39,39 @@ export function groupFromSeed(seed: HqRichMenuSeed): Group {
       imageR2Key: page.imageR2Key, imageContentType: null, areas: page.areas,
     })),
   }
+}
+
+/** 次の手順へ移る前に、最初の未設定の面を示す。下書き保存は妨げない。 */
+export function firstUnconfiguredArea(pages: Page[]): { pageId: string; areaId: string | null; reason: string } | null {
+  for (const [pageIndex, page] of pages.entries()) {
+    if (page.areas.length === 0) return { pageId: page.id, areaId: null, reason: `タブ${pageIndex + 1}に面が設定されていません。面を追加して動きを設定してください。` }
+    const areaIndex = page.areas.findIndex((area) => !isAreaActionConfigured(area))
+    if (areaIndex >= 0) {
+      const area = page.areas[areaIndex]
+      return { pageId: page.id, areaId: area.id, reason: `タブ${pageIndex + 1}の面${String.fromCharCode(65 + areaIndex)}の動きが未設定です。${area.intent === 'url' ? '正しいURLを入力してください。' : '動きと内容を設定してください。'}` }
+    }
+  }
+  return null
+}
+
+/** 公開確認に、選択した表示先の影響を示す。 */
+export function publishConfirmNoteFor(audience: 'all' | 'none' | 'targeted' | 'tag', conditionEmpty: boolean) {
+  return audience === 'all'
+    ? '個別に指定した人を除く、すべての友だちの既定メニューになります。'
+    : audience === 'none'
+      ? 'この操作だけでは、友だちのトーク画面には出ません。出すには登録後に一覧の「表示先」から操作してください。'
+      : conditionEmpty
+        ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください。'
+        : '条件に当てはまる人の画面に、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。'
+}
+
+/** 公開時に友だちへ反映される範囲を示す。 */
+export function publishEffectNoteFor(audience: 'all' | 'none' | 'targeted' | 'tag', conditionEmpty: boolean) {
+  return audience === 'all'
+    ? '個別に指定した人を除く、すべての友だちのトーク画面に出ます。既定のメニューが入れ替わります。'
+    : audience === 'none'
+      ? 'LINEへの登録だけでは、友だちのトーク画面は変わりません。「表示先」で出す相手を決めてください。'
+      : conditionEmpty
+        ? '公開しても今は誰の画面にも出ません（0人）。条件を1つ以上足してください。'
+        : '条件に当てはまる人の画面は、その人に関係する出来事のタイミングで順次切り替わります。すぐ全員に出るわけではありません。'
 }

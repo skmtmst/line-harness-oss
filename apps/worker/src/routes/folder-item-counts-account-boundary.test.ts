@@ -119,6 +119,25 @@ describe('GET /api/folders の件数(#631) — 実DB結合', () => {
     expect(body.data.find((f) => f.id === 'folder-1')?.itemCount).toBe(5);
   });
 
+  it('成果地点は選択中アカウントと閲覧可能な共通分を一覧と同じように分類する', async () => {
+    const insert = sqlite.prepare(`INSERT INTO conversion_points (id, name, event_type, line_account_id, status)
+      VALUES (?, ?, 'manual', ?, ?)`);
+    insert.run('point-own', '店舗', 'account-a', 'active');
+    insert.run('point-shared', '共通', null, 'draft');
+    insert.run('point-other', '別店舗', 'account-b', 'active');
+    accountAccess.getVisibleLineAccountScope.mockResolvedValue({
+      accounts: [], allowedAccountIds: ['account-a', 'account-b'], canSeeUnassigned: true,
+    });
+    const response = await req('/api/folders?kind=conversion&account_id=account-a');
+    expect(response.status).toBe(200);
+    expect((await response.json() as { unfiledCount: number }).unfiledCount).toBe(2);
+    accountAccess.getVisibleLineAccountScope.mockResolvedValue({
+      accounts: [], allowedAccountIds: ['account-a'], canSeeUnassigned: false,
+    });
+    const restricted = await req('/api/folders?kind=conversion&account_id=account-a');
+    expect((await restricted.json() as { unfiledCount: number }).unfiledCount).toBe(1);
+  });
+
   it('イベントの分類は未使用でも0件を返す', async () => {
     accountAccess.getVisibleLineAccountScope.mockResolvedValue({
       accounts: [], allowedAccountIds: ['account-a'], canSeeUnassigned: false, ids: ['account-a'], isAccountScoped: true,

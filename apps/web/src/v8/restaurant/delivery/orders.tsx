@@ -583,7 +583,7 @@ export default function OrdersBoard({
           <TableStateRow
             colSpan={canManage ? COLUMN_COUNT : COLUMN_COUNT_VIEW_ONLY}
             kind="empty"
-            title="この状態の注文はありません"
+            title={data.tab === 'all' ? '注文はまだありません' : 'この状態の注文はありません'}
             description="新しい注文が届くと、ここに表示されます。"
           />
         ) : (

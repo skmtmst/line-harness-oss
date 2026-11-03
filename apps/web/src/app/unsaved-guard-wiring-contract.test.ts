@@ -255,6 +255,7 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'v8/events/list.tsx': 'イベント一覧の検索・絞り込みであり、保存前の編集入力や書きかけを持たない。',
   'v8/restaurant/line-followup/demo.tsx': 'phaseだけで描く静的な見本。編集状態・保存・API呼出はなく、全操作はaria-hiddenとinertの内側、文字入力はreadOnly。未保存は見本の札であり利用者の下書きではない。',
   'v8/restaurant/common-a/frame.tsx': '取得と店の選択だけを持つ共通の器。未保存の入力を持たず、店の切り替えはrequestUnsavedActionで子の実際の番兵へ委ねる。',
   'v8/mileage/adjust-dialog.tsx': '入力中は共通Dialogの自動dirty検出とuseOverlayDiscardが閉じる操作を止める。確認・完了の段だけdirty=false。adjust-dialog-field-errorsの実描画で入力→閉じるの破棄確認とAPI/close未実行を確かめる。',

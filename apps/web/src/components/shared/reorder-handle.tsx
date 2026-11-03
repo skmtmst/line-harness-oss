@@ -46,6 +46,8 @@ export type ReorderHandleProps = HandleButtonProps & {
    * title と読み上げ（sr-only）で置く。
    */
   disabledReason?: string | null
+  /** 理由を一覧側でまとめて伝える時は行の読み上げを省く。 */
+  announceDisabledReason?: boolean
   /** 理由の文言が無くても動かせない（管理画面 の旧 ReorderGrip の disabled だけが使う）。 */
   locked?: boolean
   /** 権限で動かせない時は図柄を残し、焦点でも理由を読めるようにする。 */
@@ -83,6 +85,7 @@ export default function ReorderHandle({
   ariaLabel,
   onMove,
   disabledReason,
+  announceDisabledReason = true,
   look = 'inline',
   disabledLook = 'hide',
   locked = false,
@@ -130,10 +133,11 @@ export default function ReorderHandle({
         style={look === 'icon' ? { cursor: 'default', background: 'none' } : undefined}
         title={disabledReason ?? undefined}
         data-reorder-disabled=""
+        aria-hidden={announceDisabledReason ? undefined : true}
         ref={slotRef}
       >
         <span aria-hidden="true" style={{ visibility: 'hidden', display: 'inline-flex' }}>{glyph}</span>
-        <span className="sr-only">{`${label}は並び替えできません。${disabledReason ?? ''}`}</span>
+        {announceDisabledReason ? <span className="sr-only">{`${label}は並び替えできません。${disabledReason ?? ''}`}</span> : null}
       </span>
     )
   }

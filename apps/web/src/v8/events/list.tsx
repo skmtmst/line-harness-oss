@@ -72,13 +72,11 @@ const PAGE_SIZES = STANDARD_PAGE_SIZES
 const VIEWER_NOTE = '閲覧のみで見ています。イベントを作る・直す・消す操作はオーナーか管理者に頼んでください。'
 
 /*
- * よく使う絞り込み（絵の選ぶ欄）。並びと「満席の回がある」をここから選ぶ。
- * 札（公開中のみ・承認待ちあり）と同じ口の filter・sort を使う。
+ * よく使う絞り込み（絵の選ぶ欄）。「満席の回がある」をここから選ぶ。
  */
 const SAVED_OPTIONS = [
   { value: '', label: 'よく使う絞り込み' },
   { value: 'full', label: '満席のイベントだけ' },
-  { value: 'sort-name', label: 'イベント名の順に並べる' },
 ]
 
 const STATE_LABEL: Record<EventRowState, string> = {
@@ -402,7 +400,7 @@ export default function EventsListV8() {
     </ManagedFolderPanel>
   )
 
-  const savedValue = filter === 'full' ? 'full' : sort === 'name' ? 'sort-name' : ''
+  const savedValue = filter === 'full' ? 'full' : ''
   const toolbar = (
     <>
 
@@ -439,16 +437,13 @@ export default function EventsListV8() {
                 onChange={(value) => {
                   if (value === 'full') {
                     setFilter('full')
-                  } else if (value === 'sort-name') {
-                    setSort('name')
-                    if (filter === 'full') setFilter('all')
                   } else {
-                    setSort('soon')
                     if (filter === 'full') setFilter('all')
                   }
                 }}
               /></SaveErrorField>
             </div>
+            <SaveErrorField names={["sort"]}><Select aria-label="並び順" size="content" value={sort} options={[{ value: 'soon', label: '開催日順' }, { value: 'name', label: 'イベント名順' }]} onChange={(value) => setSort(value === 'name' ? 'name' : 'soon')} /></SaveErrorField>
             <div className={styles.perPageBox}>
               <SaveErrorField names={["perPage","per_page"]}><Select
                 aria-label="表示件数"

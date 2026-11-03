@@ -63,9 +63,11 @@ export function audienceReason(audience: RichMenuDeleteImpact['currentAudience']
  * 契約も `guaranteedGroupId: null` を返す。候補を並べて、決まらないことを
  * そのまま書く。
  */
-export function nextDisplayText(next: RichMenuDeleteImpact['nextDisplay']): string {
+export function nextDisplayText(next: RichMenuDeleteImpact['nextDisplay'], audience?: RichMenuDeleteImpact['currentAudience']): string {
   if (next.candidates.length === 0) {
-    return 'このメニューを消すと、リッチメニューが出なくなる友だちがいます。'
+    if (audience?.value === 0 && audience.state === 'available') return 'このメニューを表示中の友だちはいません。'
+    if (audience?.value != null && audience.value > 0) return 'このメニューを消すと、リッチメニューが出なくなる友だちがいます。'
+    return 'このメニューを消すと、リッチメニューが出なくなる友だちがいる場合があります。'
   }
   const names = next.candidates.map((c) => c.name).join('・')
   return `友だちごとの条件で決まります。候補は ${names} です。`

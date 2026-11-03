@@ -9,6 +9,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Lock, UserPlus } from 'lucide-react'
 import type { RestaurantCustomerHistory, RestaurantOpeningDay } from '@line-crm/shared'
 import { CreatePage } from '@/components/templates'
+import { usePageCrumbs } from '@/components/shell/page-chrome'
 import { TableChoice } from '@/components/shared/booking-controls'
 import Card from '@/components/shared/card'
 import SegmentedControl from '@/components/shared/segmented'
@@ -97,6 +98,9 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
   /** 保存。成功したら true（台帳へ戻る）。 */
   onSave: (body: Record<string, unknown>) => Promise<boolean>
 }) {
+  const onBackRef = useRef(onBack)
+  onBackRef.current = onBack
+  usePageCrumbs([{ label: '予約台帳', onSelect: () => onBackRef.current() }])
   const { selectedAccountId } = useAccount()
   const legacy = Boolean(accountStyle && accountStyle !== 'restaurant')
   const canConfigure = staffRole === 'owner' || staffRole === 'admin'

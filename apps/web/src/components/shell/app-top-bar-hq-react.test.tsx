@@ -108,6 +108,18 @@ describe('★V8 統括の上の帯', () => {
     delete document.documentElement.dataset.theme
   })
 
+  it('切り替え一覧は統括一覧と同じ友だち数の多い順に並ぶ', async () => {
+    fixture.accounts = [
+      Object.assign({ id: 'a', name: '少ない店', displayName: null }, { stats: { friendCount: 2 } }),
+      Object.assign({ id: 'b', name: '多い店', displayName: null }, { stats: { friendCount: 50 } }),
+      Object.assign({ id: 'c', name: '中くらいの店', displayName: null }, { stats: { friendCount: 10 } }),
+    ]
+    const view = render(<AppTopBar />)
+    fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
+    const rows = await view.findAllByRole('menuitemradio')
+    expect(rows.map(row => row.getAttribute('aria-label'))).toEqual(['多い店', '中くらいの店', '少ない店'])
+  })
+
   it('札は「統括」と統括名、ホームは /hq（自分の名前・ログアウトは左下へ移したので出さない）', async () => {
     const view = render(<AppTopBar />)
     await waitFor(() => expect(view.getAllByText('然 -NEN- 本部').length).toBeGreaterThan(0))

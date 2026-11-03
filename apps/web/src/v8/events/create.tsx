@@ -334,7 +334,7 @@ function EventsCreateV8Inner() {
             id="ev-new-name"
             value={draft.name}
             maxLength={EVENT_NAME_MAX_LENGTH}
-            placeholder="秋のしつけ教室（第1回）"
+            placeholder="例：秋のしつけ教室（第1回）"
             aria-invalid={Boolean(fieldErrors['ev-new-name']) || undefined}
             aria-describedby={fieldErrors['ev-new-name'] ? 'ev-new-name-error' : undefined}
             required
@@ -360,7 +360,7 @@ function EventsCreateV8Inner() {
           <div className={styles.field}><Field label="場所" htmlFor="ev-new-venue"><SaveErrorField names={["venue_name","draft.venue_name"]}><TextField
               id="ev-new-venue"
               value={draft.venue_name ?? ''}
-              placeholder="渋谷ベース 3F"
+              placeholder="例：渋谷ベース 3F"
               onChange={(event) => update('venue_name', event.target.value || null)}
             /></SaveErrorField></Field></div>
           <div className={styles.field}>
@@ -536,7 +536,7 @@ function EventsCreateV8Inner() {
       <Card variant="form" gap="normal" aria-labelledby="ev-new-after-apply">
         <CardHeader size="stacked" titleId="ev-new-after-apply" title="申し込んだ人にすること" />
         <div className={styles.checks}>
-            <ToggleField checked disabled description="日時・場所が届きます" onChange={() => {}} title="申込の受付は、いつも LINE でお知らせします">
+            <ToggleField checked disabled description="申込の受付は、いつも LINE でお知らせします。日時・場所が届きます。" onChange={() => {}}>
               申込を受けたら LINE で知らせる
             </ToggleField>
 

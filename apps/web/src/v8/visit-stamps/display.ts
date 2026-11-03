@@ -191,11 +191,18 @@ export function friendLabel(friend: { displayName?: string | null; metadata?: Re
 
 /** 設定の検査（サーバと同じ境目）。保存の前に、どこを直せばよいかを日本語で返す。 */
 export type StampSettingField = 'name' | 'instructions' | 'receiptBonus' | 'intervalHours' | 'nextCardId' | 'rewards' | 'amountUnit' | 'maxPerVisit'
+export function settingsRangeIssues(s: VisitStampSettings): Partial<Record<'receiptBonus' | 'intervalHours', string>> {
+  const result: Partial<Record<'receiptBonus' | 'intervalHours', string>> = {}
+  if (s.receiptBonus !== undefined && (!Number.isInteger(s.receiptBonus) || s.receiptBonus < 0 || s.receiptBonus > 50)) result.receiptBonus = '受け取りボーナスは0〜50個です。'
+  if (s.stampInterval?.mode === 'hours' && (!Number.isInteger(s.stampInterval.hours) || s.stampInterval.hours! < 1 || s.stampInterval.hours! > 23)) result.intervalHours = '押印の間隔は1〜23時間です。'
+  return result
+}
 export function settingsIssue(name: string, s: VisitStampSettings): { field: StampSettingField; message: string } | null {
   if (!name.trim()) return { field: 'name', message: 'カードの名前を入れてください。' }
   if (s.instructions !== undefined && [...s.instructions].length > 500) return { field: 'instructions', message: '使い方の説明は500字までです。' }
-  if (s.receiptBonus !== undefined && (!Number.isInteger(s.receiptBonus) || s.receiptBonus < 0 || s.receiptBonus > 50)) return { field: 'receiptBonus', message: '受け取りボーナスは0〜50個です。' }
-  if (s.stampInterval?.mode === 'hours' && (!Number.isInteger(s.stampInterval.hours) || s.stampInterval.hours! < 1 || s.stampInterval.hours! > 23)) return { field: 'intervalHours', message: '押印の間隔は1〜23時間です。' }
+  const ranges = settingsRangeIssues(s)
+  if (ranges.receiptBonus) return { field: 'receiptBonus', message: ranges.receiptBonus }
+  if (ranges.intervalHours) return { field: 'intervalHours', message: ranges.intervalHours }
   if (s.completion === 'next_card' && !s.nextCardId) return { field: 'nextCardId', message: '次のカードを選んでください。' }
   if (!s.rewards.length) return { field: 'rewards', message: '特典を1つ以上足してください。' }
   if (s.rewards.some((r) => !r.name.trim() || !Number.isInteger(r.stamps) || r.stamps < 1)) return { field: 'rewards', message: '特典の名前と個数を確かめてください。' }

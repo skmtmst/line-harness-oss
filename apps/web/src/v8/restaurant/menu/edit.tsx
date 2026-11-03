@@ -120,6 +120,7 @@ function MenuEditBody() {
 
   async function save() {
     if (!canEdit || !selectedAccountId || !valid) return
+    if (editing && !dirty) return
     const isCurrent = captureResource()
     if (!isCurrent()) return
     const attempt = mutationContext.current
@@ -207,7 +208,7 @@ function MenuEditBody() {
         dirty={dirty && !busy}
         busy={busy}
         readOnly={!canEdit}
-        title={<span className={styles.title}><span className={styles.titleParent}>メニュー管理 ›</span>{title}</span>}
+        title={title}
         help={<>コースと単品の名前・値段・提供時間・アレルギーと、お支払いの方法を決めます。価格変更は確認して保存すると確定します。</>}
         preview={side}
         previewSurface="plain"
@@ -215,7 +216,7 @@ function MenuEditBody() {
         destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setError(null); setDeleting(true) }} disabled={busy}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => { setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid || (Boolean(editing) && !dirty)} disabledReason={editing && !dirty ? "変更していません" : undefined} onClick={() => { setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
