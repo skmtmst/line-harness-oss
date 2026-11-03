@@ -7,6 +7,9 @@ import type { BroadcastDeliveryLimit } from '@line-crm/shared'
 import { jstCalendar as japanCalendar, jstDate as japanDate } from '@/lib/jst-datetime'
 import { copyBroadcastDraft,copyRecentBroadcast } from './broadcast-copy-draft'
 import { applyBroadcastTemplate } from './broadcast-apply-template'
+import { placeBroadcastTemplate } from './broadcast-place-template'
+import { broadcastAbProblem, B_DRAFT_UNAVAILABLE } from './broadcast-ab-guard'
+import { broadcastAbSendProblem } from './broadcast-ab-send-guard'
 import BroadcastCheckAcknowledgement from './broadcast-check-acknowledgement'
 import { useBroadcastFormError } from './use-broadcast-form-error'
 import { confirmBroadcastMessage } from './broadcast-confirm-action'
@@ -770,22 +773,7 @@ export default function BroadcastForm({
     return { ...bubble, id: item.id }
   }))
   }
-  /*
-   * 選んだテンプレートを置く。吹き出しの口から開いたときはその吹き出しを置き換え、
-   * 作り方の「テンプレート」から開いたときは今の入力を捨てずに末尾へ足す（WEB256・5通まで）。
-   */
-  const placeTemplateBubble = (bubble: BroadcastBubble) => {
-    if (composerTemplateIndex !== null && bubbles[composerTemplateIndex]) {
-      updateBubble(composerTemplateIndex, { ...bubble, id: bubbles[composerTemplateIndex].id }, false)
-      return
-    }
-    const empty = bubbles.length === 1 && bubbles[0]?.type === 'text' && !String(bubbles[0].content.text ?? '').trim()
-    if (!empty && bubbles.length >= MAX_BUBBLES) {
-      setError(`メッセージは${MAX_BUBBLES}通までです。追加する前に、不要なメッセージを削除してください。`)
-      return
-    }
-    setBubbles((items) => empty ? [bubble] : [...items, bubble])
-  }
+  const placeTemplateBubble = (bubble: BroadcastBubble) => placeBroadcastTemplate(bubble, { index: composerTemplateIndex, bubbles, setBubbles, updateBubble, setError })
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
   const applyTemplate = (template: BroadcastTemplateOption) => applyBroadcastTemplate({ placeTemplateBubble, saveErrors, selectedAccountId, selectedAccountIdRef, setComposerBusy, setShowTemplatePicker, setTemplateApplyError, templateApplyLock }, template)
 
@@ -835,7 +823,7 @@ export default function BroadcastForm({
     titleMax: TITLE_MAX,
     audienceProblem: audienceError(targetMode, { scenarioId, tagId, condition }),
     audienceUnselected: targetMode === 'unselected',
-    bubbleProblem: bubblesError(bubbles),
+    bubbleProblem: broadcastAbProblem(bubbles, ab.b, ab.enabled, targetMode === 'all') || bubblesError(bubbles),
     // 監査 R206: ボタンの不備は「保存できませんでした」で済ませない。
     buttonProblem: messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) }),
     sendMode,
@@ -981,14 +969,15 @@ export default function BroadcastForm({
   useEffect(() => {
     if (cleanFingerprintRef.current === null) cleanFingerprintRef.current = formFingerprint
   })
-  const dirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
+  const draftDirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
+  const dirty = draftDirty || ab.b !== null
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
   const queuedAutosave = useRef({ fingerprint: formFingerprint, step: currentStep })
   if (queuedAutosave.current.fingerprint !== formFingerprint) queuedAutosave.current = { fingerprint: formFingerprint, step: currentStep }
   const draftAutosave = useDraftAutosave({
     fingerprint: `${selectedAccountId}:${formFingerprint}`,
-    dirty,
-    enabled: Boolean(selectedAccountId) && !saveConflict.conflict && !validate(),
+    dirty: draftDirty,
+    enabled: Boolean(selectedAccountId) && ab.b === null && !saveConflict.conflict && !validate(),
     paused: saving || testSending || leaveTarget !== null,
     save: async () => {
       if (!selectedAccountId || validate()) return false
@@ -1001,9 +990,9 @@ export default function BroadcastForm({
       return true
     },
   })
-  const draftStatusLabel = draftAutosave.label
+  const draftStatusLabel = ab.b !== null ? 'B案は下書きに保存できません' : draftAutosave.label
 
-  const saveDraftNow = () => saveBroadcastDraft({ cleanFingerprintRef, draftAutosave, formFingerprint, onDraftSaved, persistDraft, rejectValidation, saveErrors, scheduledAtIso, selectedAccountIdRef, setError, setSaving, validate })
+  const saveDraftNow = () => ab.b !== null ? (setError(broadcastAbProblem(bubbles, ab.b, ab.enabled, targetMode === 'all') || B_DRAFT_UNAVAILABLE), Promise.resolve(false)) : saveBroadcastDraft({ cleanFingerprintRef, draftAutosave, formFingerprint, onDraftSaved, persistDraft, rejectValidation, saveErrors, scheduledAtIso, selectedAccountIdRef, setError, setSaving, validate })
 
   /**
    * テスト送信。下書きを作って、そこから自分宛に送る。
@@ -1036,7 +1025,7 @@ export default function BroadcastForm({
    * 形になる。`validate` は保存のときと同じものを使う。
    */
   const openConfirm = () => {
-    const validationError = validate() || sendInputProblem.current
+    const validationError = broadcastAbSendProblem(ab.enabled, audienceCount) || validate() || sendInputProblem.current
     if (validationError) { rejectValidation(validationError); return }
     if (!selectedAccountId) return
     confirmationScope.current = { accountId: selectedAccountId, generation: accountGenerationRef.current }
@@ -1124,7 +1113,12 @@ export default function BroadcastForm({
       })
     : progressSteps
   const inlineBubble = inlineComposer ? bubbles[inlineComposer.index] : null
-  useEffect(() => { setInlineComposer(null); setTemplateSaveIndex(null); setTemplateSaveCreatedId(null); setComposerBusy(false); setTemplateSaveError(''); setTemplateApplyError('') }, [selectedAccountId])
+  const previousComposerAccount = useRef(selectedAccountId)
+  useEffect(() => {
+    if (previousComposerAccount.current === selectedAccountId) return
+    previousComposerAccount.current = selectedAccountId
+    ab.removeB(); setInlineComposer(null); setTemplateSaveIndex(null); setTemplateSaveCreatedId(null); setComposerBusy(false); setTemplateSaveError(''); setTemplateApplyError('')
+  }, [selectedAccountId])
   const inlineHost: TemplateEditHost | undefined = inlineComposer && inlineBubble ? {
     composer: { index: inlineComposer.index, accountId: selectedAccountId },
     accountName: selectedAccount?.name ?? null,
@@ -1208,7 +1202,7 @@ export default function BroadcastForm({
    * （title だけだと指を乗せないと見えない）。最終確認の段の止め方（人数・文字数）は今のまま。
    */
   const nextBlockReason = currentStep ? broadcastNextBlockReason(liveStepProblems, currentStep) : null
-  const confirmBlockReason = liveStepProblems.audience?.message ?? liveStepProblems.schedule?.message ?? (!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : null)
+  const confirmBlockReason = broadcastAbSendProblem(ab.enabled, audienceCount) ?? liveStepProblems.audience?.message ?? liveStepProblems.schedule?.message ?? (!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : null)
   const footerReason = currentStep === 'confirm' ? confirmBlockReason : nextBlockReason
 
   /*
@@ -1272,6 +1266,8 @@ export default function BroadcastForm({
   const visibleConfirmOpen = confirmOpen && confirmationCurrent
   const confirmationFields = <>{confirmationScope.current && <OperationTargetSummary accounts={[{ id: confirmationScope.current.accountId }]} />}{confirmedDeliveryLimit && <Notice tone="info">配信できる候補{formatNumber(confirmedDeliveryLimit.candidateCount)}人から、無作為に最大{formatNumber(confirmedDeliveryLimit.recipientCount)}人へ送ります。確認後に人数を増やしません。</Notice>}<BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} /></>
   const confirmMessage = async () => {
+    const abProblem = broadcastAbSendProblem(ab.enabled, audienceCount)
+    if (abProblem) { setError(abProblem); return }
     if (!renderedConfirmationScope || renderedConfirmationScope !== confirmationScope.current || renderedConfirmationScope.generation !== accountGenerationRef.current) return
     const problem = sendInputProblem.current
     if (problem) { rejectValidation(problem); return Promise.resolve() }
@@ -1469,7 +1465,7 @@ export default function BroadcastForm({
         <>
           <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => requestUnsavedAction(onCancel)}>キャンセル</Button>
           {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => openTestDialog()} busy={testSending} busyLabel="送信中…" widthReserve="idle">{'テストを送る'}</Button>}
-          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (stepProblems().schedule ? void saveDraftNow() : sendMode === 'scheduled' ? openConfirm() : void save())} busy={saving} busyLabel="保存中…" widthReserve="idle">{sendMode === 'scheduled' && !liveStepProblems.schedule ? '配信を予約する' : '下書きを保存する'}</Button>
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (stepProblems().schedule || (ab.b !== null && sendMode !== 'scheduled') ? void saveDraftNow() : sendMode === 'scheduled' ? openConfirm() : void save())} busy={saving} busyLabel="保存中…" widthReserve="idle">{sendMode === 'scheduled' && !liveStepProblems.schedule ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
       )}
       </>
@@ -1480,7 +1476,7 @@ export default function BroadcastForm({
       「保存して移る」は下書きへ保存できたらそのまま移動し、
       保存できないときはこの画面へ戻って直す。
     */}
-    {renderBroadcastConfirmDialogs({ selectedAccountId, canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen: visibleConfirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title })}
+    {renderBroadcastConfirmDialogs({ bDraftUnsupported: ab.b !== null, selectedAccountId, canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen: visibleConfirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title })}
     {renderBroadcastEditorDialogs({ confirmationBlocked, confirmationFields, ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen: visibleConfirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, testTargetAccountId: renderedTestScope?.accountId ?? null, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen: testDialogOpen && testScopeCurrent(), testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks })}
   </div></MessageComposerPage></SaveErrorScope>
 }
