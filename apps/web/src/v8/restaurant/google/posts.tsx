@@ -847,7 +847,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       {post.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。{canSend && writeEnabled ? '「この内容で予約する」を押すと、先にGoogle側の状態を照合してから送信します。' : 'Google側の状態を確認してください。'}</Notice> : null}
       {!writeEnabled ? <Notice tone="warn">この環境ではGoogleへの投稿が許可されていません。内容の確認まではできます。</Notice> : null}
       {writeEnabled && !canPublish ? <Notice tone="warn">Googleへの投稿は店舗管理者以上が行います。この下書きは保存されているので、管理者が確認して投稿できます。</Notice> : null}
-      {post.instagram?.status === 'failed' ? <Notice tone="warn">{`Instagram へは出せませんでした${post.instagram.error ? `（${post.instagram.error}）` : ''}。Google への公開はそのまま残っています。投稿一覧の「…」から「Instagram へ再送」でもう一度送れます。`}</Notice> : null}
+      {post.instagram?.status === 'failed' ? <Notice tone="warn">{`Instagram へは出せませんでした${post.instagram.error ? `（${post.instagram.error}）` : ''}。Google への公開はそのまま残っています。${canSend ? '投稿一覧の「…」から「Instagram へ再送」でもう一度送れます。' : '管理者に確認を依頼してください。'}`}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <dl className={styles.facts}>
         <div className={styles.factRow}><dt className={styles.factKey}>投稿先</dt><dd className={styles.factValue}>{storeName}</dd></div>
