@@ -26,7 +26,20 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          # The PR merge contains both comparison parents. Avoid fetching every
+          # branch and tag in this large repository for a path-only gate.
+          fetch-depth: 500
+
+      - name: Ensure PR comparison history is available
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             ! git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1; then
+            git fetch --no-tags --unshallow origin
+            git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null
+          fi
 
       - name: Protect command-center owned documents
         env:
@@ -278,7 +291,17 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          fetch-depth: 500
+      - name: Ensure PR comparison history is available
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             ! git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1; then
+            git fetch --no-tags --unshallow origin
+            git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null
+          fi
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -644,7 +667,17 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          fetch-depth: 500
+      - name: Ensure PR comparison history is available
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             ! git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1; then
+            git fetch --no-tags --unshallow origin
+            git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null
+          fi
       - name: Decide whether to run the screen guard
         id: scope
         env:
