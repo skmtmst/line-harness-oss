@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api, type SupportMarkAutomationEvent, type SupportMarkAutomationRule } from '@/lib/api'
 import {
@@ -81,7 +82,9 @@ export default function SupportMarkRulesPanel({
   const [saving, setSaving] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
   const [touched, setTouched] = useState(false)
-  const [pendingArchive, setPendingArchive] = useState<SupportMarkAutomationRule | null>(null)
+  const [pendingArchive, setPendingArchive] = useState<{ rule: SupportMarkAutomationRule; accountId: string; markId: string; markName: string; epoch: number } | null>(null)
+  const scope = useRef({ accountId, markId, markName, epoch: 0 })
+  if (scope.current.accountId !== accountId || scope.current.markId !== markId || scope.current.markName !== markName) scope.current = { accountId, markId, markName, epoch: scope.current.epoch + 1 }
 
   /*
     **遅い返事を別のマークへ映さない。**
@@ -213,18 +216,21 @@ export default function SupportMarkRulesPanel({
   }
 
   const archive = async () => {
-    if (!accountId || !pendingArchive) return
+    if (!pendingArchive || pendingArchive.epoch !== scope.current.epoch || pendingArchive.accountId !== accountId || pendingArchive.markId !== markId) return
+    const confirmation = pendingArchive
     setSaving(true)
     setFailure(null)
     try {
       const res = await api.supportMarks.archiveAutomationRule(
-        pendingArchive.id, accountId, pendingArchive.version,
+        confirmation.rule.id, confirmation.accountId, confirmation.rule.version,
       )
+      if (scope.current.epoch !== confirmation.epoch) return false
       if (!res.success) throw new Error('failed')
       setPendingArchive(null)
       void load()
       return true
     } catch (err) {
+      if (scope.current.epoch !== confirmation.epoch) return false
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure) setFailure(failureOf({ status: err instanceof ApiError ? err.status : undefined })) }
@@ -310,7 +316,7 @@ export default function SupportMarkRulesPanel({
                 <span className={rule.isActive ? styles.on : styles.off}>{activeText(rule.isActive)}</span>
                 <span className={styles.rowActions}>
                   <Button onClick={() => openEdit(rule)}>変更</Button>
-                  <Button onClick={() => { setFailure(null); setPendingArchive(rule) }}>停止する</Button>
+                  <Button onClick={() => { setFailure(null); accountId && markId && requestRef.current.accountId === accountId && requestRef.current.markId === markId && setPendingArchive({ rule, accountId, markId, markName, epoch: scope.current.epoch }) }}>停止する</Button>
                 </span>
               </li>
             ))}
@@ -409,11 +415,11 @@ export default function SupportMarkRulesPanel({
       ) : null}
 
       <ConfirmDialog
-        open={pendingArchive !== null}
+        open={pendingArchive !== null && pendingArchive.epoch === scope.current.epoch}
         title="このルールを停止しますか？"
         /* 消去ではない。履歴が残ることを先に言う。 */
         description={
-          `「${pendingArchive?.name ?? ''}」を停止します。`
+          `「${pendingArchive?.rule.name ?? ''}」を停止します。`
           + 'これ以降このルールでマークは変わりません。'
           + 'これまでの変更履歴は監査記録として残ります。'
         }
@@ -422,7 +428,7 @@ export default function SupportMarkRulesPanel({
         busy={saving}
         error={failure?.message} onSuccess={() => setPendingArchive(null)} onConfirm={() => archive()}
         onCancel={() => { if (!saving) setPendingArchive(null) }}
-      />
+      ><OperationTargetSummary accounts={[{ id: pendingArchive?.accountId ?? '' }]} externalTarget={{ label: '対応マーク', name: pendingArchive?.markName }} /></ConfirmDialog>
     </section></SaveErrorScope>
   )
 }
