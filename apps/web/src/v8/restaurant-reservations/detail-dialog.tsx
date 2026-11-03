@@ -106,6 +106,8 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const table = reservation.table_id ? tables.find((t) => t.id === reservation.table_id) ?? null : null
   const course = reservation.course_id ? courses.find((c) => c.id === reservation.course_id) ?? null : null
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
+  const allergy = reservation.allergy_note?.trim() || ''
+  const hasAllergy = Boolean(allergy && allergy !== 'なし' && allergy !== '無し')
 
   const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'visited')},{id:'no-show',label:'無断にする',disabled:busy,onSelect:()=>canWrite&&reservation.status!=='pending'&&setConfirmNoShow(reservation.id)}]:[]
   /* 来店・退店・無断は「…」の奥ではなく窓の下に直接置く。訂正だけ「…」に残す。 */
@@ -115,7 +117,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const buttonFor = (item: typeof attendanceItems[number]) => <Button key={item.id} type="button" disabled={busy || !canWrite} lockedReason={permissionReason ?? (item.id === 'no-show' ? noShowReason : undefined)} onClick={item.onSelect}>{item.label}</Button>
   const attendance=undoAttendance.length?<RowActions subjectName={reservation.customer_name} menuItems={undoAttendance.map(item => ({...item, lockedReason: permissionReason, disabled: busy || !canWrite}))}/>:null
   const quickButtons=quickAttendance.map(buttonFor)
-  const dining=<ReservationDining entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
+  const dining=<ReservationDining title="お客さまの食事情報" entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
   const confirmation = <ConfirmDialog open={canWrite && reservation.status === 'confirmed' && confirmNoShow === reservation.id} title="無断にしますか？" description={`${withHonorific(reservation.customer_name)}・${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}。卓が空いていれば予約を有効に戻せます。送信済みの連絡は取り消せません。`} destructive titleIcon={<TriangleAlert size={20} />} confirmIcon={<UserRoundX size={16} />} confirmVariant="danger" confirmLabel="無断にする" onConfirm={() => { if (canWrite && reservation.status === 'confirmed') onAttendance?.(reservation.id, 'no_show'); setConfirmNoShow(null) }} onCancel={() => setConfirmNoShow(null)} />
   if (inline) return <><DetailPreview title="予約の詳細"
     description={`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}・${table?.code ?? '未配席'}`}
@@ -129,7 +131,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
     <DetailField label="予約元"><ReservationSource value={reservation.source} note={reservation.note} /></DetailField>
     <DetailField label="人数・コース">{`${reservation.guest_count}名・${reservation.course_name ?? '席のみ'}${course?.price ? ` ${polishFormatYen(course.price)}` : ''}`}</DetailField>
     <DetailField label="電話">{maskPhone(reservation.customer_phone) || '電話未登録'}</DetailField>
-    <ReservationDining dense presentation="detail" entry={seatBoardEntry(reservation as unknown as Record<string, unknown>)} />
+    <ReservationDining dense presentation="detail" title="お客さまの食事情報" entry={seatBoardEntry(reservation as unknown as Record<string, unknown>)} />
     <DetailField label="来店"><span title={historyText(history)}>{history.state === 'ready' ? `${polishFormatNumber(history.count)}回` : '—'}</span></DetailField>
   </DetailPreview>{confirmation}</>
 
@@ -164,7 +166,8 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
       <div className={styles.facts}>
         <p className={styles.fact}>{detailWhen(reservation, table)}</p>
         <p className={styles.fact}>{detailCourse(reservation, course)}</p>
-        <p className={`${styles.fact} ${styles.allergy}`}>{`アレルギー：${reservation.allergy_note || emptyValue('none')}`}</p>
+        <p className={styles.fact}>{`電話：${maskPhone(reservation.customer_phone) || '電話未登録'}`}</p>
+        <p className={[styles.fact, hasAllergy && styles.allergy].filter(Boolean).join(' ')}>{`アレルギー：${allergy || emptyValue('none')}`}</p>
         <p className={styles.fact}>{historyText(history)}</p>
         {inactive ? <p className={styles.fact}>{reservation.status === 'no_show' ? '無断で来なかった予約です' : '取り消した予約です'}</p> : null}
       </div>

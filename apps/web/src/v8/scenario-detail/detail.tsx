@@ -387,6 +387,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
   // 同時に開くのは常に片方だけなので、state は stepForm を共有する。
   const renderStepForm = () => (
 <ScenarioStepForm
+        accountName={scenario?.lineAccountId ? (accounts.find((account) => account.id === scenario.lineAccountId)?.name ?? '—（名前を読み込めません）') : undefined}
         editingStepId={editingStepId}
         stepDraft={stepDraft}
         restoreStepDraft={restoreStepDraft}

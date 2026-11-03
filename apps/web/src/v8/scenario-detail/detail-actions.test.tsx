@@ -622,6 +622,14 @@ describe('保存・開始のきっかけ・配信の3つの段', () => {
     expect(calls.update).not.toHaveBeenCalled()
   })
 
+  it.each([['account-a', '本店'], [null, '公式アカウント']] as const)('通の追加パネルは対象アカウント %s の名前を見本へ渡す', async (accountId, expected) => {
+    stubScenario({ lineAccountId: accountId })
+    await render()
+    fireEvent.click(screen.getByRole('button', { name: 'メッセージを追加する' }))
+    const preview = document.querySelector('aside[data-design-node="xfYLn"]') as HTMLElement
+    expect(preview.textContent).toContain(expected)
+  })
+
   it('始まる見込みは取得中と取得後を区別する', async () => {
     let resolve!: (value: ReturnType<typeof ok>) => void
     calls.simulate.mockReturnValue(new Promise(done => { resolve = done }))

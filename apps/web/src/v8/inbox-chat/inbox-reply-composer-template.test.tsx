@@ -35,3 +35,11 @@ it('時刻を指定して送る操作は送信予約と表示する', () => {
   render(<InboxReplyComposer {...props('owner')} />)
   expect(screen.getByRole('button', { name: '送信予約' })).toBeTruthy()
 })
+it('送信の設定は開閉しても同じ名前で、状態を伝える', () => {
+  const view = render(<InboxReplyComposer {...props('owner')} showComposerOptions={false} />)
+  const toggle = screen.getByRole('button', { name: '送信の設定', exact: true })
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  view.rerender(<InboxReplyComposer {...props('owner')} showComposerOptions />)
+  expect(screen.getByRole('button', { name: '送信の設定', exact: true })).toBe(toggle)
+  expect(toggle.getAttribute('aria-expanded')).toBe('true')
+})
