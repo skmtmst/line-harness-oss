@@ -43,3 +43,10 @@ it('送信の設定は開閉しても同じ名前で、状態を伝える', () =
   expect(screen.getByRole('button', { name: '送信の設定', exact: true })).toBe(toggle)
   expect(toggle.getAttribute('aria-expanded')).toBe('true')
 })
+
+it('テンプレートの束の送信確認に送信元と環境を示す', () => {
+  render(<InboxReplyComposer {...props('owner')} pendingPack={{ texts: ['本文'], chatId: 'chat-1', accountId: 'acc-1' }} />)
+  expect(screen.getByText('LINEアカウント')).toBeTruthy()
+  expect(screen.getByText('名前を確認できません')).toBeTruthy()
+  expect(screen.getByText('環境')).toBeTruthy()
+})

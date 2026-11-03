@@ -1184,6 +1184,7 @@ export default function HqBroadcastCreate() {
         sender={sendPreview.data?.sender ?? null}
         bodyHead={sendPreview.data?.firstText ?? ''}
         allRecipients={audience === 'all'}
+        confirmationFields={<OperationTargetSummary accounts={checks && !stale ? checks.filter((item) => !item.excluded && !item.blockedReasons.length).map((item) => ({ id: item.accountId, name: item.accountName })) : [{ id: '' }]} showAccountCount />}
         hidePrimary={approval.state === null && !stale}
         primaryDisabled={sending || stale}
         error={error || undefined}

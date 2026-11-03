@@ -12,6 +12,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 const fixture = vi.hoisted(() => ({
   query: '',
   role: 'owner' as string,
+  accountId: 'account-a',
   replace: vi.fn(),
   push: vi.fn(),
   myStaff: [] as Array<Record<string, unknown>>,
@@ -23,7 +24,7 @@ const fixture = vi.hoisted(() => ({
 const stableRouter = { replace: (...args: unknown[]) => fixture.replace(...args), push: (...args: unknown[]) => fixture.push(...args) }
 vi.mock('next/navigation', () => ({ useRouter: () => stableRouter, useSearchParams: () => new URLSearchParams(fixture.query) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId, selectedAccount: null }) }))
 
 const STAFF = { id: 'bs-1', name: '佐々木 亮太', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 1, is_designation_optional: 0, is_active: 1 }
 
@@ -79,6 +80,7 @@ const memStorage = vi.hoisted(() => {
 vi.stubGlobal('localStorage', memStorage)
 
 beforeEach(() => {
+  fixture.accountId = 'account-a'
   fixture.query = ''
   memStorage.setItem('lh_staff_role', 'owner')
   fixture.role = 'owner'
@@ -172,6 +174,30 @@ describe('役割はサーバーで決める', () => {
 })
 
 describe('勤務とシフト（管理者）', () => {
+  test('この日だけの休憩削除は対象と環境を示し、アカウント変更で閉じる', async () => {
+    fixture.getDates.mockResolvedValue({ version: 'd1', breaks: [{ id: 'br1', work_date: '2099-10-12', start_time: '12:00', end_time: '13:00' }] })
+    const view = render(<StaffShiftsV8 staffId="bs-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: /10\/12.*の休憩を削除/ }))
+    const dialog = screen.getByRole('alertdialog')
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
+    fixture.accountId = 'account-b'
+    view.rerender(<StaffShiftsV8 staffId="bs-1" />)
+    await screen.findByRole('button', { name: /10\/12.*の休憩を削除/ })
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(fixture.putDates).not.toHaveBeenCalled()
+  })
+  test('勤務の削除確認を開いた後のアカウント切替では古い確定口を閉じる', async () => {
+    fixture.getDates.mockResolvedValue({ version: 'd1', breaks: [{ id: 'br1', work_date: '2099-10-12', start_time: '12:00', end_time: '13:00' }] })
+    const view = render(<StaffShiftsV8 staffId="bs-1" />)
+    fireEvent.click(await screen.findByRole('button', { name: /10\/12.*の休憩を削除/ }))
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
+    fixture.accountId = 'account-b'
+    view.rerender(<StaffShiftsV8 staffId="bs-1" />)
+    await screen.findByRole('button', { name: /10\/12.*の休憩を削除/ })
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(fixture.putDates).not.toHaveBeenCalled()
+  })
   test('休憩は月〜金の1行で出し、保存のときは曜日ごとに広げて今のIDを付けて送る', async () => {
     render(<StaffShiftsV8 staffId="bs-1" />)
     expect(await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })).toBeTruthy()

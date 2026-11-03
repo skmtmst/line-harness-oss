@@ -40,6 +40,12 @@ beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true) })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('予約して送るの窓', () => {
+  test('予約確認の中に送信元と環境を示す', () => {
+    render(<Harness onConfirm={() => undefined} />)
+    expect(screen.getByText('LINEアカウント')).toBeTruthy()
+    expect(screen.getByText('名前を確認できません')).toBeTruthy()
+    expect(screen.getByText('環境')).toBeTruthy()
+  })
   test('空の本文・日時では予約できず、理由が1つだけ出る。両方そろうと予約できる', () => {
     const confirm = vi.fn()
     const view = render(<Harness onConfirm={confirm} content="   " />)

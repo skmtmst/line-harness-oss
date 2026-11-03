@@ -115,6 +115,10 @@ it('公開を選んでも確認するまでは送らず、キャンセル後も�
  await fillNewMenu(); await choosePublication()
  fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
  const dialog = await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })
+ expect(dialog.textContent).toContain('LINEアカウント')
+ expect(dialog.textContent).toContain('店舗')
+ expect(dialog.textContent).toContain('渋谷店')
+ expect(dialog.textContent).toContain('環境')
  expect(fixture.createMenu).not.toHaveBeenCalled()
  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
  expect(screen.getByLabelText('保存する状態').textContent).toContain('公開')
@@ -122,6 +126,28 @@ it('公開を選んでも確認するまでは送らず、キャンセル後も�
  fireEvent.click(within(await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })).getByRole('button', { name: '公開して追加する' }))
  await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ status: 'active' })))
  expect(fixture.createMenu).toHaveBeenCalledTimes(1)
+})
+
+it('公開確認中にアカウントを切り替えたら古い確認窓を閉じる', async () => {
+ const view = render(<MenuEditPage />)
+ await fillNewMenu(); await choosePublication()
+ fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+ await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })
+ fixture.account = 'account-2'; view.rerender(<MenuEditPage />)
+ await waitFor(() => expect(screen.queryByRole('dialog', { name: 'このメニューを公開しますか？' })).toBeNull())
+ expect(fixture.createMenu).not.toHaveBeenCalled()
+})
+
+it('旧アカウントの遅い取得で新しいメニューを上書きしない', async () => {
+ nav.params = new URLSearchParams('id=m1')
+ let old!: (value: unknown) => void
+ fixture.snapshot.mockImplementationOnce(() => new Promise(resolve => { old = resolve }))
+   .mockResolvedValueOnce({ data: snapshotOf({ menuItems: [{ ...snapshotOf().menuItems[0], name: '新しい店のメニュー' }] }) })
+ const view = render(<MenuEditPage />)
+ fixture.account = 'account-2'; view.rerender(<MenuEditPage />)
+ await waitFor(() => expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('新しい店のメニュー'))
+ await act(async () => { old({ data: snapshotOf() }) })
+ expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('新しい店のメニュー')
 })
 
 it('保存が失敗しても入力と下書きの選択を残す', async () => {

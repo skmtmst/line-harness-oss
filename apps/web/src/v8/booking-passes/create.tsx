@@ -13,6 +13,7 @@ import { CreatePage } from '@/components/templates/create-page'
 import Button from '@/components/shared/button'
 import Toggle from '@/components/shared/toggle'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { EntityMultiPickerDialog } from '@/components/shared/entity-picker'
 import { loadEntityCandidates } from '@/components/shared/entity-remote-field'
 import type { EntityPickerItem } from '@/components/shared/entity-picker'
@@ -90,6 +91,7 @@ function PassCreateInner() {
   const [menus, setMenus] = useState<EntityPickerItem[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [confirmCreate, setConfirmCreate] = useState(false)
+  const [confirmScope, setConfirmScope] = useState('')
   const [validationBlocked, setValidationBlocked] = useState(false)
   useEffect(() => { setValidationBlocked(false) }, [form])
   const [dirty, setDirty] = useState(false)
@@ -103,7 +105,7 @@ function PassCreateInner() {
   }
   const attempt = currentAttempt.current
   useEffect(() => {
-    setConfirmCreate(false); setBusy(null); setNotice(''); setErrors({})
+    setConfirmCreate(false); setConfirmScope(''); setBusy(null); setNotice(''); setErrors({})
     setOriginal(null); setForm(EMPTY); setDirty(false)
     setLoadState(editId ? 'loading' : 'ready')
     errorsScope.reset()
@@ -162,7 +164,7 @@ function PassCreateInner() {
   }
 
   const submit = async (start: boolean) => {
-    if (!canEdit || busy || !accountId) return
+    if (!canEdit || busy || !accountId || (start && confirmScope !== scope)) return
     const payload = body()
     if (!payload) return
     const signature = JSON.stringify(payload)
@@ -218,7 +220,7 @@ function PassCreateInner() {
     <>
       <Button onClick={() => router.push(PASS_LIST_HREF)} disabled={busy !== null}>キャンセル</Button>
       <Button variant="secondary" onClick={() => void submit(false)} busy={busy === 'draft'} disabled={busy !== null}>下書き保存</Button>
-      <Button variant="primary" onClick={() => { if (body()) setConfirmCreate(true) }} busy={busy === 'create'} disabled={busy !== null}>作る</Button>
+      <Button variant="primary" onClick={() => { if (body()) { setConfirmScope(scope); setConfirmCreate(true) } }} busy={busy === 'create'} disabled={busy !== null}>作る</Button>
     </>
   ) : null
 
@@ -329,7 +331,7 @@ function PassCreateInner() {
         />
       ) : null}
       <ConfirmDialog
-        open={confirmCreate}
+        open={confirmCreate && confirmScope === scope}
         title={`「${form.name.trim()}」の販売を始めますか？`}
         description="始めると、種類・回数・値段・使える予約は変えられません。お客さまに券を付けられるようになります。まだ始めないときは、下書き保存を押してください。"
         confirmLabel="販売を始める"
@@ -337,7 +339,7 @@ function PassCreateInner() {
         cancelLabel={validationBlocked ? "戻って直す" : "キャンセル"} confirmDisabled={validationBlocked} confirmDisabledReason="戻って入力を直してください。"
         error={notice || undefined} onSuccess={() => setConfirmCreate(false)} onConfirm={() => submit(true)}
         onCancel={() => setConfirmCreate(false)}
-      />
+      ><OperationTargetSummary accounts={[{ id: accountId ?? '' }]} /></ConfirmDialog>
       {preparing.dialog}
     </SaveErrorScope>
   )
