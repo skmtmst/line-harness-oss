@@ -927,7 +927,7 @@ export default function FriendsListV8() {
           <col className={styles.colStar} />
           {/* 1152（y2n1z）：顔の丸を外して名前の列を詰め、対応・シナリオの列を狭めてタグ名を全部入れる。 */}
           <col className={narrow ? styles.colNameNarrow : styles.colName} />
-          {displayColumns.map(column => <col key={column.key} className={narrow ? column.key === 'support' ? styles.colSupportNarrow : column.key === 'scenario' ? styles.colScenarioNarrow : column.key === 'latest' ? styles.colLatestNarrow : column.key.startsWith('fixed:') || column.key.startsWith('field:') ? styles.colFieldNarrow : undefined : undefined} />)}
+          {displayColumns.map(column => <col key={column.key} className={narrow ? column.key === 'support' ? styles.colSupportNarrow : column.key === 'scenario' ? styles.colScenarioNarrow : column.key === 'latest' ? styles.colLatestNarrow : column.key.startsWith('fixed:') || column.key.startsWith('field:') ? styles.colFieldNarrow : undefined : column.key === 'tags' ? styles.colTags : undefined} />)}
           <col className={styles.colMenu} />
         </colgroup>
         <thead>
