@@ -1,18 +1,26 @@
 import { getPageAction, findPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import HqAttributes from './attributes'
 import AttributeDistribution from './attribute-distribution'
 import { fieldDefinition, fieldOf } from './attribute-model'
 import type { HqFriendAttributeDetail } from '@line-crm/shared'
-const mocks = vi.hoisted(() => ({ role: 'owner', list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), stats: vi.fn(), accounts: vi.fn(), received: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), result: vi.fn(), context: vi.fn() }))
+const mocks = vi.hoisted(() => ({ role: 'owner', list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), folders: vi.fn(), createFolder: vi.fn(), updateFolder: vi.fn(), deleteFolder: vi.fn(), stats: vi.fn(), accounts: vi.fn(), received: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), result: vi.fn(), context: vi.fn() }))
 vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => ['owner', 'admin'].includes(mocks.role), useStaffRole: () => mocks.role, useStaffIdentity: () => ({ id: 'hq-owner' }), canManageRole: (role: string) => ['owner', 'admin'].includes(role) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/friend-attributes' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { context: mocks.context } }))
-vi.mock('@/lib/hq-friend-attributes-api', () => ({ hqFriendAttributesApi: { list: mocks.list, get: mocks.get, create: mocks.create, update: mocks.update, remove: mocks.remove, listStats: mocks.stats, folders: { list: mocks.folders, create: mocks.createFolder, update: mocks.updateFolder }, accounts: mocks.accounts, receivedVersions: mocks.received, preflight: mocks.preflight, distribute: mocks.distribute, result: mocks.result } }))
+vi.mock('@/lib/hq-friend-attributes-api', () => ({ hqFriendAttributesApi: { list: mocks.list, get: mocks.get, create: mocks.create, update: mocks.update, remove: mocks.remove, listStats: mocks.stats, folders: { list: mocks.folders, create: mocks.createFolder, update: mocks.updateFolder, remove: mocks.deleteFolder }, accounts: mocks.accounts, receivedVersions: mocks.received, preflight: mocks.preflight, distribute: mocks.distribute, result: mocks.result } }))
 vi.mock('./distribution-accounts', () => ({ ALL_ACCOUNTS: 'all', useDistributionFolders: () => ({ folders: [], membership: new Map(), failed: false }), distributionFolderRows: () => [], accountsInFolder: (rows: unknown[]) => rows, DistributionFolderPanel: () => null }))
+const heldFolder = vi.hoisted(() => ({ confirm: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.title === 'フォルダを削除' && props.onConfirm) heldFolder.confirm = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 const field: HqFriendAttributeDetail = { template: { id: 'field-one', name: '愛犬のお名前', description: null, template_type: 'friend_field', folder_id: null, revision: 3, updated_at: '2026-10-08' }, definition: { schemaVersion: 1, field: { name: '愛犬のお名前', fieldKey: 'dog_name', type: 'text', displayOrder: 0 }, folders: [] } }
 const mark: HqFriendAttributeDetail = { template: { id: 'mark-one', name: '未対応', description: null, template_type: 'mark', revision: 4, updated_at: '2026-10-08' }, definition: { schemaVersion: 1, mark: { name: '未対応', color: '#EF4B55', isDefault: true, displayOrder: 0 } } }
 beforeEach(() => {
@@ -169,4 +177,26 @@ it('情報欄のフォルダをその場で作ると、選んだ色を統括のA
   expected.style.backgroundColor = folder.color
   expect(trigger.querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor).toBe(expected.style.backgroundColor)
   delete document.documentElement.dataset.theme
+})
+
+it('統括の情報欄フォルダ削除窓に対象と環境を出す', async () => {
+  mocks.folders.mockResolvedValue([{ id: 'f1', name: '基本情報', revision: 2, color: '#8b5cf6' }])
+  render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「基本情報」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  const dialog = await screen.findByRole('alertdialog')
+  expect(dialog.textContent).toContain('統括のフォルダ')
+  expect(dialog.textContent).toContain('環境')
+})
+
+it('統括情報欄フォルダは閉じた確認から削除しない', async () => {
+  mocks.deleteFolder.mockClear().mockResolvedValue(undefined)
+  mocks.folders.mockResolvedValue([{ id: 'f1', name: '基本情報', revision: 2, color: '#8b5cf6' }])
+  render(<HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「基本情報」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  const previous = heldFolder.confirm!
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'キャンセル' }))
+  await act(async () => { await previous() })
+  expect(mocks.deleteFolder).not.toHaveBeenCalled()
 })

@@ -13,6 +13,7 @@ import ActionMenu,{ type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import EmptyList from '@/components/shared/empty-list'
 import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import FilterChip from '@/components/shared/filter-chip'
@@ -44,7 +45,7 @@ import type { HqTemplate } from '@/lib/hq-templates-api'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import type { HqTemplateFolder,TemplateKind } from '@line-crm/shared'
 import { Archive,Bookmark,Braces,Check,CircleDashed,Copy,FileText,Inbox,Link,Pencil,Plus,Send,Sparkles,Trash2,Unlink,Users } from 'lucide-react'
-import { useMemo,useState,type ReactNode } from 'react'
+import { useMemo,useRef,useState,type ReactNode } from 'react'
 import storeStyles from '../templates/list.module.css'
 import { AttributeTabs,OtherTabPanel,assignmentMethods,cleanupTagCount,cleanupTagIds,matchesTagFilters,unusedTagCount,useAttributeTab,type TagUsageFilter } from './attribute-tabs'
 import attributeStyles from './attribute-tabs.module.css'
@@ -84,6 +85,9 @@ export default function HqStoreList(props: HqStoreListProps) {
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
   const [deletingFolder, setDeletingFolder] = useState<HqTemplateFolder | null>(null)
+  const deleteTicket = useRef<object | null>(null)
+  const renderedDeleteTicket = deleteTicket.current
+  const deleteLock = useRef(false)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
   const [folderNameError, setFolderNameError] = useState('')
@@ -184,7 +188,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       leadingActions: leadingActions(folder.id, folder.name),
       ...(canEdit ? {
         onEdit: () => { setFolderError(''); setFolderNameError(''); setFolderName(folder.name); setFolderColor(folderDisplayColor(folder)); setFolderDialog({ editing: folder }) },
-        onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
+        onDelete: () => { deleteTicket.current = {}; setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
     { kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null, leadingActions: leadingActions('none', '未分類') },
@@ -235,11 +239,14 @@ export default function HqStoreList(props: HqStoreListProps) {
     }
   }
   const removeFolder = async () => {
-    if (!deletingFolder || folderBusy) return
+    if (!deletingFolder || folderBusy || deleteLock.current || !renderedDeleteTicket || renderedDeleteTicket !== deleteTicket.current) return
+    deleteLock.current = true
     setFolderBusy(true)
     setFolderError('')
     try {
       await onDeleteFolder(latestFolder(deletingFolder))
+      if (renderedDeleteTicket !== deleteTicket.current) return
+      deleteTicket.current = null
       setDeletingFolder(null)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
@@ -247,15 +254,17 @@ export default function HqStoreList(props: HqStoreListProps) {
       const failure = describeFolderFailure(caught, 'delete');
 
       if (failure.kind === 'missing') {
+        deleteTicket.current = null
+        setDeletingFolder(null)
         notifyToast(failure.message, { tone: 'error' })
         await onReloadFolders?.().catch(() => undefined)
-        setDeletingFolder(null)
         return
       }
       if (failure.kind === 'conflict') await onReloadFolders?.().catch(() => undefined)
       { if (!fieldFailure)
       setFolderError(failure.message) }
     } finally {
+      deleteLock.current = false
       setFolderBusy(false)
     }
   }
@@ -554,9 +563,9 @@ export default function HqStoreList(props: HqStoreListProps) {
             destructive
             busy={folderBusy}
             error={folderError || undefined}
-            onCancel={() => { if (!folderBusy) setDeletingFolder(null) }}
+            onCancel={() => { if (!folderBusy && !deleteLock.current) { deleteTicket.current = null; setDeletingFolder(null) } }}
             onConfirm={() => removeFolder()}
-          />
+          ><OperationTargetSummary accounts={[]} externalTarget={{ label: '統括のフォルダ', name: deletingFolder?.name }} /></ConfirmDialog>
         </>
       )}
     >
