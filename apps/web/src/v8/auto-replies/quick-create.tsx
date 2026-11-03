@@ -14,6 +14,7 @@ import { Field } from '@/components/shared/form-controls'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { InputFieldFrame, TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
@@ -295,6 +296,7 @@ export default function QuickCreateV8({
         </DialogActions>)}
     >
       <div className={styles.body}>
+        <OperationTargetSummary accounts={[{ id: initialAccountId.current ?? '' }]} />
         {lockedReason ? <ReadOnlyNotice need="feature" /> : null}
         {accountChanged ? <Notice tone="warn">アカウントが切り替わりました。いったん閉じて作り直してください。</Notice> : null}
         <div className={styles.field}>
