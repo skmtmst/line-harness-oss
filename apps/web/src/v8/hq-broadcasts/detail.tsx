@@ -37,6 +37,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 /*
  * ★V8 統括 一括配信の詳細（提案 E-9 `xOXuY`「⑤ 送った結果」）。
@@ -667,6 +668,7 @@ function HqBroadcastDetailBody() {
           onSuccess={() => setAsk(null)}
           onCancel={() => { setAsk(null); setError(''); if (actConflict) void load() }}
         >
+          {ask.kind === 'send' && run ? <OperationTargetSummary accounts={run.targets.filter((target) => !target.excluded).map((target) => ({ id: target.accountId, name: target.accountName }))} showAccountCount /> : null}
           {ask.kind === 'send' && gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}
         </ConfirmDialog>
       ) : null}

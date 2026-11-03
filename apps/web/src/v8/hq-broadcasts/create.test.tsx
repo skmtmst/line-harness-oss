@@ -655,6 +655,18 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
 })
 
 describe('一括配信の詳細（xOXuY ⑤ 送った結果）', () => {
+  it('下書きから送る前に対象アカウントと環境を確認できる', async () => {
+    params.value = new URLSearchParams('id=run-detail')
+    hq.approval.mockResolvedValue({ success: true, data: { approval: { status: 'none', requestedByStaffId: null, requestedAt: null, approverStaffId: null, note: null, decidedByStaffId: null, decidedAt: null, rejectReason: null, confirmedCount: null }, gate: { required: false, recipientCount: 50, threshold: 1000, singleOperator: false, operatorCount: 2 }, viewer: { isApprover: false, canApprove: false, isRequester: false } } })
+    hq.get.mockResolvedValue({ data: { id: 'run-detail', title: '配信', status: 'prepared', version: 1, scheduledAt: null, input: { messageType: 'text', messageContent: '本文' }, targets: [{ ...check('a1', '銀座店', 50), status: 'prepared' }, { ...check('a2', '除外した新宿店', 10), excluded: true, status: 'excluded' }] } })
+    render(<HqBroadcastDetail />)
+    fireEvent.click(await screen.findByRole('button', { name: '1店に送る' }))
+    const dialog = await screen.findByRole('dialog', { name: '1店に送ります' })
+    expect(within(dialog).getByText('銀座店')).toBeTruthy()
+    expect(within(dialog).queryByText('除外した新宿店')).toBeNull()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
+    expect(hq.send).not.toHaveBeenCalled()
+  })
   it('店ごとの結果を出し、失敗した店にやり直す（店の配信の版を付ける）', async () => {
     params.value = new URLSearchParams('id=run-9')
     hq.get.mockResolvedValue({ data: {
