@@ -171,7 +171,7 @@ export function TagEditForm({
         reloadVariant="primary" designNode="xn95q"
         compareBusy={compareBusy}
         onCompare={onCompare}
-        onReload={onReloadLatest}
+        onReload={() => requestUnsavedAction(onReloadLatest)}
       />
     </div>
   ) : null
@@ -224,7 +224,7 @@ export function TagEditForm({
         previewLabel="使用状況を見る"
         previewTitle="使っている所"
         preview={host ? host.preview(values) : side}
-        destructive={host || readOnly ? undefined : <StickyBarAction destructive label="タグを削除する" icon={Trash2} onClick={onDelete} />}
+        destructive={host || readOnly ? undefined : <StickyBarAction destructive label="タグを削除する" icon={Trash2} onClick={() => requestUnsavedAction(onDelete)} />}
         footerActions={(
           <>
             <Button onClick={() => requestUnsavedAction(onCancel)}>キャンセル</Button>
