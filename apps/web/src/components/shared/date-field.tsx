@@ -4,6 +4,8 @@ import { jstDate } from '@/lib/jst-datetime'
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
+import Button from './button'
+import selectStyles from './select-menu.module.css'
 import styles from './date-field.module.css'
 import { joinDescribedBy, useFieldContext } from './field-context'
 
@@ -220,6 +222,7 @@ export default function DateField({
           align="start"
           getAnchor={() => triggerRef.current}
           onClose={() => setOpen(false)}
+          className={selectStyles.surface}
         >
         <div
           id={dialogId}
@@ -285,10 +288,14 @@ export default function DateField({
             ))}
           </div>
           <div className={styles.footer}>
-            <button type="button" className={styles.today} disabled={isDisabled(today())} onClick={() => choose(today())}>今日</button>
-            <button type="button" className={styles.reset} onClick={() => setDraftValue('')}>消す</button>
-            <button type="button" className={styles.reset} onClick={close}>キャンセル</button>
-            <button type="button" className={styles.today} disabled={disabled || value !== openedValue.current || Boolean(draftValue && (!parseDate(draftValue) || isDisabled(parseDate(draftValue)!)))} onClick={() => { if (disabled || value !== openedValue.current) return; const day = parseDate(draftValue); if (draftValue && (!day || isDisabled(day))) return; onChange(draftValue); close() }}>確定</button>
+            <div className={styles.footerGroup}>
+              <Button type="button" size="inline" variant="text" textTone="accent" disabled={isDisabled(today())} onClick={() => choose(today())}>今日</Button>
+              <Button type="button" size="inline" variant="text" textTone="quiet" onClick={() => setDraftValue('')}>消す</Button>
+            </div>
+            <div className={styles.footerGroup}>
+              <Button type="button" size="compact" variant="secondary" onClick={close}>キャンセル</Button>
+              <Button type="button" size="compact" variant="primary" disabled={disabled || value !== openedValue.current || Boolean(draftValue && (!parseDate(draftValue) || isDisabled(parseDate(draftValue)!)))} onClick={() => { if (disabled || value !== openedValue.current) return; const day = parseDate(draftValue); if (draftValue && (!day || isDisabled(day))) return; onChange(draftValue); close() }}>確定</Button>
+            </div>
           </div>
         </div>
         </MenuPortal>

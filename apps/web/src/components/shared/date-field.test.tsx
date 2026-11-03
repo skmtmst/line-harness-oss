@@ -131,3 +131,12 @@ it('編集中に外から値が変われば古い仮選択を確定できない'
   expect((screen.getByRole('button', { name: '確定' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: '確定' })); expect(onChange).not.toHaveBeenCalled()
 })
+
+it('暦の確定は主ボタン、キャンセルは副ボタン、今日と消すは文字操作', () => {
+  render(<Harness />)
+  fireEvent.click(screen.getByRole('button', { name: '配信日' }))
+  expect(screen.getByRole('button', { name: '確定' }).getAttribute('data-variant')).toBe('primary')
+  expect(screen.getByRole('button', { name: 'キャンセル' }).getAttribute('data-variant')).toBe('secondary')
+  expect(screen.getByRole('button', { name: '今日' }).getAttribute('data-variant')).toBe('text')
+  expect(screen.getByRole('button', { name: '消す' }).getAttribute('data-variant')).toBe('text')
+})
