@@ -94,8 +94,9 @@ describe('予約の取消の成功（WEB317）', () => {
     const confirm = Array.from(dialog.querySelectorAll('button')).find(button => button.textContent?.trim() === '予約を取り消す')!
     await act(async () => { confirm.click() })
     expect(await screen.findByText('ほかの人が予約を変えました。読み直してから、もう一度選んでください')).toBeTruthy()
+    expect(dialog.querySelector('[data-save-conflict]')).not.toBeNull()
     expect(Array.from(dialog.querySelectorAll('button')).some(button => button.textContent?.trim() === '予約を取り消す')).toBe(false)
-    await act(async () => { screen.getByRole('button', { name: '読み直す' }).click() })
+    await act(async () => { screen.getByRole('button', { name: '最新を読み込んで続ける' }).click() })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(apiMocks.cancelReservation).toHaveBeenCalledTimes(1)
   })
@@ -106,7 +107,7 @@ describe('予約の取消の成功（WEB317）', () => {
     const open = await screen.findByRole('button', { name: '予約を取り消す…' })
     await act(async () => { open.click() })
     expect(screen.getByText('予約の版を確認できません。読み直してから、もう一度選んでください')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '読み直す' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '最新を読み込んで続ける' })).toBeTruthy()
     expect(apiMocks.cancelReservation).not.toHaveBeenCalled()
   })
 

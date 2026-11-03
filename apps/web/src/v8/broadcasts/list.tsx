@@ -28,7 +28,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { ListPage, ListPagePagination } from '@/components/templates';
 import BroadcastForm from '@/components/broadcasts/broadcast-form-lazy'
-import FolderPanel, { CollapsedFolderActions, FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import { FolderDotName } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { useManagedFolders } from '@/components/shared/managed-folder-panel'
@@ -767,14 +767,6 @@ export default function BroadcastListV8() {
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
-  const selectedFolderActions = folderRows.find(row => row.id === folderFilter && row.onDelete)
-
-  const folderSelectOptions = [
-    { value: '', label: 'フォルダ：すべて' },
-    ...folders.map((f) => ({ value: f.id, label: `フォルダ：${f.name}` })),
-    { value: UNFILED, label: 'フォルダ：未分類' },
-  ]
-
   /** 行の「…」。編集を続ける（下書き・予約）・複製・フォルダへ移す・削除。 */
   const withCurrentEdit = (run: () => void, action: '変更' | '作成' = '変更') => () => {
     if (!canEditBroadcastNow()) { notifyToast(`権限が変わったため、配信の${action}を中止しました。`, { tone: 'error' }); return }
@@ -982,12 +974,6 @@ export default function BroadcastListV8() {
 
   const sortButton = (
 <ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
-  )
-
-  const folderSelect = (
-    <div className={styles.folderSelect}>
-      <SaveErrorField names={["folderFilter","activeId","folder_filter"]}><Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
-    </div>
   )
 
   /* 道具の段：1440 は「探す・配信日 … 保存した検索（この条件を保存するはこの中）」／「札 … 件数・並び」。1152 は作る・フォルダが前に入り、札は選ぶ欄。 */
@@ -1216,7 +1202,6 @@ export default function BroadcastListV8() {
         </KpiBand>
       </>}
       folderNav={error ? undefined : { rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
-      collapsedFolders={error ? undefined : <>{createButton(false)}<Select size="content" aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} />{selectedFolderActions ? <CollapsedFolderActions row={selectedFolderActions} /> : null}</>}
       folders={error ? undefined : (
         <FolderPanel
           createAction={createButton(true)}

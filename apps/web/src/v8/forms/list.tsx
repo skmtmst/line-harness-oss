@@ -28,7 +28,7 @@ import ContextMenu,{ type ContextMenuItem } from '@/components/shared/context-me
 import EmptyList from '@/components/shared/empty-list'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
-import FolderPanel,{ CollapsedFolderActions,FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel,{ FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -882,13 +882,6 @@ export default function FormsListV8() {
     { kind: 'unfiled' as const, id: UNFILED_VALUE, label: '未分類', count: loading || loadError ? null : unfiledCount },
   ]
 
-  const selectedFolderActions = folderRows.find(row => row.id === activeFolderId && row.onDelete)
-
-  const folderSelectOptions = [
-    { value: 'all', label: 'フォルダ：すべて' },
-    ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` })),
-    { value: UNFILED_VALUE, label: 'フォルダ：未分類' },
-  ]
   const selectFolder = (folderId: string) => {
     setActiveFolderId(folderId)
     updateListState({ page: 1 })
@@ -1262,7 +1255,6 @@ export default function FormsListV8() {
           </KpiBand>
         )}
         folderNav={{ rows: folderRows, activeId: activeFolderId, onSelect: selectFolder, createAction: createButton(false) }}
-        collapsedFolders={<>{createButton(false)}<Select size="content" aria-label="フォルダ" value={activeFolderId} onChange={selectFolder} options={folderSelectOptions} />{selectedFolderActions ? <CollapsedFolderActions row={selectedFolderActions} /> : null}</>}
         folders={reviewMode ? undefined : folderPanel}
         toolbar={(
           <>
