@@ -9,6 +9,29 @@ vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import Senders from './senders-card'
 afterEach(() => { cleanup(); vi.resetAllMocks() })
+it('送り手の追加中にページを移るときは入力を確かめる', async () => {
+ net.list.mockResolvedValue({ success: true, data: [] })
+ render(<Senders accountId="account" accountName="確認の店" />)
+ fireEvent.click(await screen.findByRole('button', { name: '送り手を追加' }))
+ fireEvent.change(screen.getByLabelText('名前'), { target: { value: '予約担当' } })
+ const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+ fireEvent.click(link)
+ expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+ link.remove()
+})
+it('送り手の追加を取り消すときは一度だけ確認し、破棄後は空で開く', async () => {
+ net.list.mockResolvedValue({ success: true, data: [] })
+ render(<Senders accountId="account" accountName="確認の店" />)
+ fireEvent.click(await screen.findByRole('button', { name: '送り手を追加' }))
+ fireEvent.change(screen.getByLabelText('名前'), { target: { value: '予約担当' } })
+ fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+ const confirm = await screen.findByRole('dialog', { name: '入力を破棄しますか？' })
+ fireEvent.click(within(confirm).getByRole('button', { name: '破棄する' }))
+ await waitFor(() => expect(screen.queryByRole('dialog', { name: '送り手を追加' })).toBeNull())
+ fireEvent.click(screen.getByRole('button', { name: '送り手を追加' }))
+ expect((screen.getByLabelText('名前') as HTMLInputElement).value).toBe('')
+ expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+})
 it('送り手の409は窓で再送を止め、取消で読み直し、最新の版を確認してから送る', async () => {
  const sender = { id: 'sender', name: '確認用の送り手', status: 'active', visibility: 'all', version: 3, iconUrl: null }
  net.list.mockResolvedValueOnce({ success: true, data: [sender] }).mockResolvedValue({ success: true, data: [{ ...sender, version: 4 }] })

@@ -180,6 +180,7 @@ export type FieldBase = {
   foldersFailed?: boolean
   /** 窓を開いたときに読み込む（フォルダ・最新の候補）。 */
   onOpen?: () => void
+  onClose?: () => void
   /** 候補を読み込んでいる・失敗したときの窓の中身。 */
   listFooter?: ReactNode
   state?: ReactNode

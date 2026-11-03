@@ -1,4 +1,5 @@
 'use client'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 import { useCallback, useState } from 'react'
 import { CircleAlert, RotateCw, SearchX, UserPlus } from 'lucide-react'
@@ -52,7 +53,7 @@ export default function UsersV8() {
    * （板の頭の「← 統合ユーザーへ」は 2026-10-08 に無くした）。
    */
   usePageCrumbs(openedPersonId
-    ? [{ label: 'ホーム', href: '/' }, { label: '友だち', href: '/friends' }, { label: '統合ユーザー', href: '/users', onSelect: () => setOpenedPersonId(null) }]
+    ? [{ label: 'ホーム', href: '/' }, { label: '友だち', href: '/friends' }, { label: '統合ユーザー', href: '/users', onSelect: () => requestUnsavedAction(() => setOpenedPersonId(null)) }]
     : [{ label: 'ホーム', href: '/' }, { label: '友だち', href: '/friends' }])
   const [expanded, setExpanded] = useState<string | null>(null)
 

@@ -400,7 +400,7 @@ export function EntityPickerField(props: SingleField | MultiField) {
   const currentLock = useRef(lockedReason)
   currentLock.current = lockedReason
   useEffect(() => { if (lockedReason && !readOnly && !props.canChangeNow) setOpen(false) }, [lockedReason, readOnly, props.canChangeNow])
-  const close = () => setOpen(false)
+  const close = () => { setOpen(false); props.onClose?.() }
   const pills = props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)
         const folder = item ? folderOf(item, folders) : null

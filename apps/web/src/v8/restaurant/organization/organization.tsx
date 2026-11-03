@@ -18,7 +18,7 @@ import { restaurantTestApi,type RestaurantStore } from '@/lib/restaurant-test-ap
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
 import type { RestaurantLoginMember } from '@line-crm/shared'
 import { Check,Plus } from 'lucide-react'
-import { useCallback,useEffect,useState } from 'react'
+import { useCallback,useContext,useEffect,useState } from 'react'
 import { RestaurantFrame, type RestaurantContext } from '@/v8/restaurant/common-a/public/frame/index'
 import { Panel, StatRow, Status } from '@/v8/restaurant/common-a/public/parts/index'
 import styles from './organization.module.css'
@@ -26,9 +26,13 @@ import StoreGroups from './store-groups'
 
 import { IntakeAddressPanel,LoginConnection,loginSummary,MATRIX,MemberForm,roleLabel,StoreForm,tableDesign } from './organization-forms'
 import { formatNumber } from '@/lib/format'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 
 function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   const saveErrors = useSaveFormErrors()
+  const depth = useContext(OverlayDepthContext)
 
   const { data, store, selectedStoreId, busy, mutate } = ctx
   const { accounts, selectedAccountId } = useAccount()
@@ -39,12 +43,22 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   const [editingStoreId, setEditingStoreId] = useState('')
   const [showMemberForm, setShowMemberForm] = useState(false)
   const [editingMemberId, setEditingMemberId] = useState('')
+  const [storeDirty, setStoreDirty] = useState(false)
+  const [memberDirty, setMemberDirty] = useState(false)
+  const [loginDirty, setLoginDirty] = useState(false)
   const [stopId, setStopId] = useState('')
   const editingMember = members.find((m) => m.id === editingMemberId)
   const editingStore = data.stores.find((s) => s.id === editingStoreId)
   const stopping = members.find((m) => m.id === stopId)
-  const closeStoreDialog = useCallback(() => { setShowStoreForm(false); setEditingStoreId('') }, [])
-  const closeMemberDialog = useCallback(() => { setShowMemberForm(false); setEditingMemberId('') }, [])
+  const closeStoreDialog = useCallback(() => { setShowStoreForm(false); setEditingStoreId(''); setStoreDirty(false) }, [])
+  const closeMemberDialog = useCallback(() => { setShowMemberForm(false); setEditingMemberId(''); setMemberDirty(false); setLoginDirty(false) }, [])
+  const editorOpen = showStoreForm || Boolean(editingStore) || showMemberForm || Boolean(editingMember)
+  const dirty = editorOpen && (storeDirty || memberDirty || loginDirty)
+  const guard = useUnsavedGuard({ dirty: dirty || (editorOpen && busy), busy: editorOpen && busy, onDiscard: () => {
+    setStoreDirty(false); setMemberDirty(false); setLoginDirty(false)
+    closeStoreDialog(); closeMemberDialog()
+  } })
+  const closeEditor = (close: () => void) => guard.guarded(() => { if (!dirty) close() })
   const accountId = selectedAccountId || ''
   const { gate, prompt, cancel } = useStepUpGate()
   const [loginsError,setLoginsError]=useState(false)
@@ -85,12 +99,12 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
       void mutate(
         () => restaurantTestApi.updateStore(accountId, id, { ...body, status: String(form.get('status')) as RestaurantStore['status'] }),
         '店舗情報を更新しました。',
-      ).then((ok) => { if (ok) setEditingStoreId('') })
+      ).then((ok) => { if (ok) closeStoreDialog() })
     } else {
       void mutate(
         () => restaurantTestApi.createStore(accountId, { ...body, timezone: String(form.get('timezone') || 'Asia/Tokyo') }),
         '店舗を追加しました。',
-      ).then((ok) => { if (ok) setShowStoreForm(false) })
+      ).then((ok) => { if (ok) closeStoreDialog() })
     }
   }
 
@@ -105,10 +119,10 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
     }
     if (id) {
       void mutate(() => updateMember(id, body), members.find((m) => m.id === id)?.staff_id ? '所属ユーザーとログイン権限を更新しました。' : '所属ユーザーを更新しました。')
-        .then((ok) => { if (ok) setEditingMemberId('') })
+        .then((ok) => { if (ok) closeMemberDialog() })
     } else {
       void mutate(() => restaurantTestApi.createMembership(accountId, body), '飲食店向けの名簿へ追加しました。この登録だけではログイン権限は変わりません。')
-        .then((ok) => { if (ok) setShowMemberForm(false) })
+        .then((ok) => { if (ok) closeMemberDialog() })
     }
   }
 
@@ -170,6 +184,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           </Panel>
           <Dialog
             open={showStoreForm || editingStore !== undefined}
+            dirty={false}
             busy={busy}
             designNode="vCEKM"
             designWidth={560}
@@ -177,15 +192,16 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
             designHeaderPadding="24px 24px 0"
             designHeaderHeight={50}
             title={editingStore ? `${editingStore.name}を編集` : '店舗を作る'}
-            onCancel={closeStoreDialog}
+            onCancel={() => closeEditor(closeStoreDialog)}
           >
             <StoreForm
               store={editingStore}
               accounts={accounts}
               stores={data.stores}
               busy={busy}
+              onDirtyChange={setStoreDirty}
               onSubmit={submitStore(editingStore ? editingStore.id : null)}
-              onCancel={closeStoreDialog}
+              onCancel={() => closeEditor(closeStoreDialog)}
             />
           </Dialog>
           <StoreGroups key={accountId} accountId={accountId} stores={data.stores} readOnly={readOnly} />
@@ -247,6 +263,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           </Panel>
           <Dialog
             open={showMemberForm || editingMember !== undefined}
+            dirty={false}
             busy={busy}
             designNode="ou60i"
             designWidth={560}
@@ -254,24 +271,27 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
             designHeaderPadding="24px 24px 0"
             designHeaderHeight={50}
             title={editingMember ? `${editingMember.staff_name}を変更` : '飲食店向けユーザーを追加'}
-            onCancel={closeMemberDialog}
+            onCancel={() => closeEditor(closeMemberDialog)}
           >
             <MemberForm
               member={editingMember}
               stores={data.stores}
               busy={busy}
+              onDirtyChange={setMemberDirty}
               onSubmit={submitMember(editingMember ? editingMember.id : null)}
-              onCancel={closeMemberDialog}
+              onCancel={() => closeEditor(closeMemberDialog)}
               login={editingMember ? (
                 <LoginConnection
                   member={editingMember}
                   logins={logins}
                   busy={busy}
+                  onDirtyChange={setLoginDirty}
                   save={(staffId) => void mutate(() => restaurantTestApi.linkMembershipLogin(accountId, editingMember.id, staffId), 'ログインメンバーとの連携を保存しました。')}
                 />
               ) : null}
             />
           </Dialog>
+          <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
           <Dialog
             open={Boolean(stopping)}
             designNode="bMpC5"

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useContext, useEffect, useLayoutEffect, useState } from 'react'
 import DifferencesFilter, { sameKnownValues } from '@/components/shared/differences-filter'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -9,6 +9,9 @@ import { Field } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import type { FriendProfileCandidate } from '@/lib/api'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 export type ProfileCandidateDraft = Record<string, {
   optionIndex: string
@@ -49,6 +52,7 @@ export default function MergedProfileDialog({
   onChange,
   onCancel,
   onSave,
+  onDirtyChange,
 }: {
   open: boolean
   candidates: FriendProfileCandidate[]
@@ -60,24 +64,32 @@ export default function MergedProfileDialog({
   onChange: (next: ProfileCandidateDraft) => void
   onCancel: () => void
   onSave: () => void
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const [differencesOnly, setDifferencesOnly] = useState(true)
   useEffect(() => { if (open) setDifferencesOnly(true) }, [open])
   useEffect(() => { if (error) setDifferencesOnly(false) }, [error])
   const visibleCandidates = candidates.filter((field) => !differencesOnly || !sameKnownValues(field.options.map((option) => option.valuePreview)))
   const selectedCount = selectedProfileCandidateCount(candidates, draft)
-  return (
+  const dirty = selectedCount > 0
+  const depth = useContext(OverlayDepthContext)
+  useLayoutEffect(() => { if (!open) return; onDirtyChange?.(dirty || busy); return () => onDirtyChange?.(false) }, [open, dirty, busy, onDirtyChange])
+  const guard = useUnsavedGuard({ dirty: open && (dirty || busy), busy: open && busy, onDiscard: () => { onDirtyChange?.(false); onCancel() } })
+  const close = () => guard.guarded(() => { if (!dirty) onCancel() })
+  useEffect(() => { if (!open) guard.cancelLeave() }, [open, guard.cancelLeave])
+  return (<>
     <Dialog
       open={open}
       title="統合プロフィールを編集"
       description="項目ごとに採用する値と、その後の更新方法を選びます。画面にはマスク済みの値だけを表示します。"
       busy={busy}
       error={error}
-      onCancel={onCancel}
+      dirty={false}
+      onCancel={close}
       designNode="Hn9eE"
       footer={(
         <DialogActions>
-          <Button type="button" onClick={onCancel} disabled={busy}>キャンセル</Button>
+          <Button type="button" onClick={close} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={onSave} disabled={busy || selectedCount === 0} disabledReason={selectedCount === 0 ? '保存する値を選んでください。' : undefined} busy={busy}>
             {`選んだ${selectedCount}項目を保存`}
           </Button>
@@ -143,5 +155,6 @@ export default function MergedProfileDialog({
         })}
       </div>
     </Dialog>
-  )
+    <OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={open && guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></OverlayDepthContext.Provider>
+  </>)
 }

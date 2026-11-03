@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import MergedProfileDialog, { emptyProfileCandidateDraft } from './merged-profile-dialog'
 import { sameKnownValues } from '@/components/shared/differences-filter'
 import type { FriendProfileCandidate } from '@/lib/api'
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 const candidates: FriendProfileCandidate[] = [
   { fieldKey: 'name', fieldLabel: '本名', options: ['田中 花子', '田中 はなこ'].map((valuePreview, i) => ({ candidateId: `n${i}`, sourceFriendId: `f${i}`, sourceLabel: `候補${i}`, valuePreview, verified: true })) },
   { fieldKey: 'plan', fieldLabel: '会員区分', options: ['一般', '一般'].map((valuePreview, i) => ({ candidateId: `p${i}`, sourceFriendId: `f${i}`, sourceLabel: `候補${i}`, valuePreview, verified: true })) },

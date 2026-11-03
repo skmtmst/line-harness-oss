@@ -22,6 +22,15 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/hq-banners/project.tsx',
+  'v8/restaurant/organization/organization.tsx',
+  'v8/hq-banners/dialogs.tsx',
+  'v8/hq/member-dialog.tsx',
+  'v8/accounts-detail/dialogs.tsx',
+  'v8/accounts-detail/senders-card.tsx',
+  'v8/ec-auto-line/edit-drawer.tsx',
+  'components/merged-person/merged-profile-dialog.tsx',
+  'components/merged-person/merged-delivery-dialog.tsx',
   'v8/analytics/funnel-form.tsx',
   'v8/restaurant/line-followup/followup-board.tsx',
   'v8/events/use-event-absence.tsx',
@@ -50,7 +59,7 @@ const GUARDED = [
   'v8/affiliate-offer-new/create.tsx',
   'v8/affiliates/create.tsx',
   'v8/affiliates/offer-form.tsx',
-  // 支払いの取り決めを保護。名前のその場編集は別途点検する。
+  // 支払いの取り決めと紹介者名を一つの確認で保護する。
   'v8/affiliates/drawer.tsx',
   'app/analytics/reports/new/page.tsx',
   'v8/auto-replies/edit/wizard.tsx',
@@ -161,6 +170,12 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  // 飲食店のフォームと選択中の値は組織画面の番兵へ伝える。
+  'v8/restaurant/organization/organization-forms.tsx': 'v8/restaurant/organization/organization.tsx',
+  // 統合ユーザーの2つの一覧・詳細は子窓の番兵へ委譲し、履歴とパンくずの切替を連携する。
+  'app/users/users-screen.tsx': ['components/merged-person/merged-profile-dialog.tsx', 'components/merged-person/merged-delivery-dialog.tsx'],
+  'v8/friends/merged/merged.tsx': ['components/merged-person/merged-profile-dialog.tsx', 'components/merged-person/merged-delivery-dialog.tsx'],
+  'v8/friends/merged/person.tsx': ['components/merged-person/merged-profile-dialog.tsx', 'components/merged-person/merged-delivery-dialog.tsx'],
   // 共通アクションの編集値は CreatePage に渡し、型の番兵が離脱を守る。
   'v8/automations/common-action-edit.tsx': 'components/templates/create-page.tsx',
   // 入口は保存状態を持たず、カードの入力と画面離脱は実体の番兵へ委ねる。
@@ -255,6 +270,7 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'components/shared/inline-edit.tsx': '共有入力部品であり独立した画面ではない。保存前の値を保持するオプションは呼び出し側へ状態を通知し、紹介者画面では同画面の番兵が守る。他の利用箇所は別途点検する。',
   'v8/events/list.tsx': 'イベント一覧の検索・絞り込みであり、保存前の編集入力や書きかけを持たない。',
   'v8/restaurant/line-followup/demo.tsx': 'phaseだけで描く静的な見本。編集状態・保存・API呼出はなく、全操作はaria-hiddenとinertの内側、文字入力はreadOnly。未保存は見本の札であり利用者の下書きではない。',
   'v8/restaurant/common-a/frame.tsx': '取得と店の選択だけを持つ共通の器。未保存の入力を持たず、店の切り替えはrequestUnsavedActionで子の実際の番兵へ委ねる。',
@@ -263,8 +279,6 @@ const EXEMPTIONS: Record<string, string> = {
     '共有の仮想行表示。structureDirty は列とスクロール領域の寸法キャッシュを再計測する印で、入力の下書きではない。行の表示範囲・実測高さ・フォーカス行を管理するだけで、編集値や保存処理は呼び出し元が持つ。',
   'v8/mileage/ranks.tsx':
     '③-2 第3波：会員ランクのタブ。入力は段を足す・直す小窓（Dialog）の中だけで、窓の保存か［キャンセル］で閉じる。タブ本体は入力を溜めず、数える物・期間は選ぶと即保存する。',
-  'v8/ec-auto-line/edit-drawer.tsx':
-    '③-2 第3波：自動の LINE の編集の引き出し。Drawer に dirty を渡しており、閉じる・Esc・外側押しは共通の離脱の確認（useOverlayDiscard）が止める。画面の遷移は引き出しが開いている間は起きない。',
   'v8/style-dashboard/settings-panels.tsx': '表示を変える引き出し・休みを入れる窓。入力は引き出し・窓の中だけで、閉じると戻る。引き出しは dirty の間、閉じる前に破棄の確認を出す',
   'v8/onboarding/wizard.tsx': '入力は窓の中だけ。閉じる・Esc・背景は共通Dialogの破棄確認を通り、破棄では保存しない。明示的な途中保存と失敗時の入力保持は実Wizardと実Dialogの操作試験で守る',
   'components/friend-fields/edit-tag-page-v4.tsx':
@@ -394,8 +408,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 運営のお問い合わせ（受信箱型）。返信欄は問い合わせごとの下書きで「下書きを保存する」でサーバへ残し、開き直すと読み戻す。起票は窓の中。問い合わせの切り替えが画面内のため、離脱の扱いは元の画面（app/ops/support/page.tsx・未判定）と一緒に決める',
   'v8/restaurant/menu/menu.tsx':
     'app/restaurant-test/v8/menu.tsx と同じ画面の★V8版（MJoJR）。メニューの追加・変更は窓（NkmwU）の中で、閉じると戻る',
-  'v8/restaurant/organization/organization.tsx':
-    'app/restaurant-test/v8/organization.tsx と同じ画面の★V8版（bSp4h）。店舗・ユーザーの追加と変更は窓の中で、ログインとの連携も窓の中の「ログインと連携」で確定する',
   'v8/restaurant/tables/tables.tsx':
     'app/restaurant-test/v8/tables.tsx と同じ画面の★V8版（BERxg）。卓の追加・変更は窓（gBrCz）の中で、閉じると戻る',
   'v8/scenario-first-step/first-step.tsx':

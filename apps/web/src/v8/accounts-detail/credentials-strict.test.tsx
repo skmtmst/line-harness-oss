@@ -11,6 +11,7 @@ import React, { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LineAccount } from '@line-crm/shared'
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 const update = vi.hoisted(() => vi.fn())
 const stepUp = vi.hoisted(() => vi.fn())
