@@ -521,7 +521,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       stats={(
         <KpiBand data-design="KPIs">
           {bandKpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} help={type === 'rich_menu' && kpi.key === 'accounts' ? '配布は各アカウントに下書きを届けることです。LINEへの公開は各アカウントで行います。' : undefined} />
           ))}
         </KpiBand>
       )}
