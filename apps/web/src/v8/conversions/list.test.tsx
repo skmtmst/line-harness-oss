@@ -682,7 +682,7 @@ describe('V8 コンバージョンの一覧：中身を見る窓', () => {
     { id: 'e2', friendId: 'f2', friendName: '鈴木', status: 'pending', approvalStatus: 'pending', cancelled: false, reversed: false, latestReversalId: null, value: null, source: null, sourceEventId: null, createdAt: '2026-09-02T10:00:00.000Z' },
     { id: 'e3', friendId: 'f3', friendName: '高橋', status: 'rejected', approvalStatus: 'rejected', cancelled: false, reversed: false, latestReversalId: null, value: 500, source: null, sourceEventId: null, createdAt: '2026-09-03T10:00:00.000Z' },
     { id: 'e4', friendId: 'f4', friendName: '田中', status: 'cancelled', approvalStatus: null, cancelled: true, reversed: true, latestReversalId: 'reversal-1', value: 800, source: null, sourceEventId: null, createdAt: '2026-09-04T10:00:00.000Z' },
-  ]
+  ].map(event => ({...event, approvalRevision: 7}))
   const ingest = (id: string, result: string, reason: string | null, isTest: boolean) => ({ id, conversionPointId: 'cp-1', result, reason, isTest, sourceEventId: null, friendId: null, payloadShape: null, signatureSha256: null, createdAt: '2026-09-05T10:00:00.000Z' })
   const ingestEvents = [
     ingest('i1', 'rejected', 'signature_mismatch', false),
@@ -692,13 +692,13 @@ describe('V8 コンバージョンの一覧：中身を見る窓', () => {
   ]
   const eventPaths: string[] = []
 
-  async function openDetail(name: string, eventsOk: boolean | 'soft' = true) {
+  async function openDetail(name: string, eventsOk: boolean | 'soft' = true, withoutRevision = false) {
     eventPaths.length = 0
     overrideFetch((url) => {
       if (url.pathname.endsWith('/events')) {
         eventPaths.push(`${url.pathname}?${url.searchParams}`)
         if (eventsOk === 'soft') return json({ success: false, error: 'unavailable' })
-        return eventsOk ? json({ success: true, data: { items: definitionEvents } }) : json({ success: false, error: 'unavailable' }, 503)
+        return eventsOk ? json({ success: true, data: { items: withoutRevision ? definitionEvents.map(({approvalRevision, ...event}) => event) : definitionEvents } }) : json({ success: false, error: 'unavailable' }, 503)
       }
       if (url.pathname.endsWith('/ingest-events')) {
         eventPaths.push(`${url.pathname}?${url.searchParams}`)
@@ -750,7 +750,18 @@ describe('V8 コンバージョンの一覧：中身を見る窓', () => {
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '重複のため' } })
     fireEvent.click(within(screen.getByRole('alertdialog', { name: 'この成果を取り消す' })).getByRole('button', { name: '取り消す' }))
     await flush()
-    expect(body).toEqual({ kind: 'reverse', reason: '重複のため', expectedReversalId: null, expectedApprovalStatus: null, expectedCancelled: false })
+    expect(body).toEqual({ kind: 'reverse', reason: '重複のため', expectedReversalId: null, expectedApprovalStatus: null, expectedCancelled: false, expectedApprovalRevision: 7 })
+  })
+
+  it('承認の版が取得できない時は取消を送らない', async () => {
+    const dialog = await openDetail('商品を買った', true, true)
+    const row = Array.from(dialog.querySelectorAll('li')).find(item => item.textContent?.includes('佐藤'))!
+    fireEvent.click(within(row).getByRole('button', { name: '取り消す' }))
+    fireEvent.change(screen.getByLabelText('理由'), { target: { value: '重複のため' } })
+    fireEvent.click(within(screen.getByRole('alertdialog', { name: 'この成果を取り消す' })).getByRole('button', { name: '取り消す' }))
+    await flush()
+    expect(calls.some(call => call === 'POST /api/conversions/events/e1/reversals')).toBe(false)
+    expect(screen.getByRole('alertdialog').textContent).toContain('確認情報を読み直して')
   })
 
   it('アカウントを戻しても古い成果取消の確認は復活しない', async () => {
