@@ -23,6 +23,7 @@ import type { Dispatch,SetStateAction, ReactNode } from 'react'
 import { BROADCAST_ONLY_CONDITION_AXES,STANDARD_CONDITION_AXES,TYPE_LABELS } from './broadcast-form-model'
 
 type RenderBroadcastConfirmDialogsContext = {
+  bDraftUnsupported: boolean
   canConfirm: boolean
   confirmationBlocked: boolean
   confirmationFields: ReactNode
@@ -79,12 +80,14 @@ type RenderBroadcastConfirmDialogsContext = {
   title: string
 }
 
-export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, selectedAccountId, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
+export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, selectedAccountId, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
   return (<><UnsavedLeaveDialog
       open={leaveTarget !== null}
       subject="配信の変更"
       busy={saving}
       onSave={saveDraftNow}
+      saveDisabled={bDraftUnsupported}
+      error={bDraftUnsupported ? 'B案は下書きに保存できません。' : undefined}
       onConfirm={confirmLeave}
       onCancel={cancelLeave}
     />

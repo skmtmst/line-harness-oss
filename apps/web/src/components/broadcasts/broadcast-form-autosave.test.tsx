@@ -10,7 +10,8 @@
  *      「保存して移る」は保存が通ったときだけ離れる。
  */
 import { setTextControlValue } from '@/test-utils/text-control'
-import React, { act } from 'react'
+import React, { act, StrictMode, Suspense } from 'react'
+import { waitFor } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -65,7 +66,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: testAccount.id, loading: false }),
+  useAccount: () => ({ selectedAccountId: testAccount.id, accounts: [testAccount], loading: false }),
 }))
 
 import BroadcastForm from './broadcast-form'
@@ -81,12 +82,13 @@ async function flush() {
   })
 }
 
-async function renderForm() {
+async function renderForm(strictSuspense = false) {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
   await act(async () => {
-    root.render(<BroadcastForm tags={[]} onSuccess={() => {}} onCancel={onCancelSpy} />)
+    const form = <BroadcastForm tags={[]} onSuccess={() => {}} onCancel={onCancelSpy} />
+    root.render(strictSuspense ? <StrictMode><Suspense fallback={null}>{form}</Suspense></StrictMode> : form)
   })
   await flush()
 }
@@ -185,6 +187,56 @@ describe('一斉配信の下書き自動保存（★管理画面 sTJsh §5）', 
     expect(createApi).toHaveBeenCalledTimes(1)
     expect(onCancelSpy).toHaveBeenCalledTimes(1)
   }, 15000)
+
+  it.each(['リッチメッセージ', 'カルーセル', 'リッチビデオ'])('%s をここで作ると編集画面が開く', async (kind) => {
+    vi.useRealTimers()
+    await renderForm(true)
+    await act(async () => { setValue(titleInput(), '残したい配信名') })
+    const tab = Array.from(container.querySelectorAll('[role="tab"]')).find(el => el.textContent?.trim() === kind) as HTMLElement
+    await act(async () => { tab.click() })
+    await act(async () => { clickButton('ここで作る') })
+    await waitFor(() => expect(document.body.textContent).toContain('この吹き出しに入れる'), { timeout: 10000 })
+    expect(titleInput().value).toBe('残したい配信名')
+  }, 15000)
+
+  it('編集中にアカウントを切り替えると編集画面を閉じる', async () => {
+    vi.useRealTimers()
+    await renderForm(true)
+    const tab = Array.from(container.querySelectorAll('[role="tab"]')).find(el => el.textContent?.trim() === 'リッチメッセージ') as HTMLElement
+    await act(async () => { tab.click(); })
+    await act(async () => { clickButton('ここで作る') })
+    await waitFor(() => expect(document.body.textContent).toContain('この吹き出しに入れる'), { timeout: 10000 })
+    try {
+      testAccount.id = 'acc-2'
+      await act(async () => { root.render(<StrictMode><Suspense fallback={null}><BroadcastForm tags={[]} onSuccess={() => {}} onCancel={onCancelSpy} /></Suspense></StrictMode>) })
+      await waitFor(() => expect(document.body.textContent).not.toContain('この吹き出しに入れる'))
+    } finally { testAccount.id = 'acc-1' }
+  }, 15000)
+
+  it('B案で文字以外の入口は押せず、既存の文字以外は保存前に理由を示す', async () => {
+    await renderForm()
+    const tab = Array.from(container.querySelectorAll('[role="tab"]')).find(el => el.textContent?.trim() === 'リッチメッセージ') as HTMLElement
+    await act(async () => { tab.click() })
+    await act(async () => { clickButton('B 案を追加') })
+    await flush()
+    expect(container.textContent).toContain('B案は今は文字だけ送れます')
+    const bSection = Array.from(container.querySelectorAll('[data-message-composer]'))[0]
+    expect(bSection.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('aria-disabled')).toBe('true')
+    expect((Array.from(bSection.querySelectorAll('button')).find(button => button.textContent?.trim() === 'テンプレートから選ぶ') as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => { clickButton('下書きを保存する') })
+    expect(document.body.textContent).toContain('B案の文字以外は保存されません。文字だけにしてから保存してください')
+    expect(createApi).not.toHaveBeenCalled()
+  })
+
+  it('B案を追加しただけでも離脱前に確認し、保存できないB案を黙って捨てない', async () => {
+    await renderForm()
+    await act(async () => { clickButton('B 案を追加') })
+    await act(async () => { clickButton('キャンセル') })
+    expect(document.body.textContent).toContain('保存していない変更があります')
+    await act(async () => { clickButton('保存して移る') })
+    expect(onCancelSpy).not.toHaveBeenCalled()
+    expect(createApi).not.toHaveBeenCalled()
+  })
 
   it('「保存して移る」で保存に失敗したら画面に留まる', async () => {
     createApi.mockResolvedValue({ success: false, error: '保存できませんでした' })
