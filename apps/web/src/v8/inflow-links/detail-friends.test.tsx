@@ -147,16 +147,16 @@ it('操作の案内はその後のメニューを指す', async () => {
   expect(host.textContent).not.toContain('右上の「…」から')
 })
 
-it('停止中の経路には停止を出さず、再開を選べる', async () => {
+it('停止中の経路はメニューに停止や再開を出さず、帯から再開できる', async () => {
   routeActive = false
   await act(async () => { root.render(<InflowDetailV8 />) }); await settle()
   const menu = host.querySelector<HTMLButtonElement>('button[aria-label^="この経路の操作"]')!
   await act(async () => { menu.click() })
   const menuItems = [...document.querySelectorAll('[role="menuitem"]')].map(node => node.textContent)
   expect(menuItems).not.toContain('受付を止める')
-  expect(menuItems).toContain('受付を再開する')
+  expect(menuItems).not.toContain('受付を再開する')
+  expect([...host.querySelectorAll('button')].some(button => button.textContent?.includes('受付を再開する'))).toBe(true)
   const entries = [...document.querySelectorAll('[role="menuitem"]')]
-  expect(entries.find(node => node.textContent === '受付を再開する')?.querySelector('svg.lucide-play')).toBeTruthy()
   expect(entries.find(node => node.textContent === '別リンクへ送る')?.querySelector('svg.lucide-arrow-right')).toBeTruthy()
 })
 
@@ -164,7 +164,7 @@ it('読み込み中は停止も再開も対象にしない', async () => {
   const { routeMenuState } = await import('./detail')
   expect(routeMenuState(null)).toBeNull()
   expect(routeMenuState({ isActive: true })).toBe('stop')
-  expect(routeMenuState({ isActive: false })).toBe('resume')
+  expect(routeMenuState({ isActive: false })).toBeNull()
 })
 
 it('経路の取得中は再開する操作や案内を出さない', async () => {

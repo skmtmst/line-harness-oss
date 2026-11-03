@@ -110,7 +110,7 @@ it('必須の言葉と返す文が不足すると理由を示して保存を止�
   render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={created} />)
   const button = screen.getByRole('button', { name: '有効にして保存' }) as HTMLButtonElement
   expect(button.disabled).toBe(true)
-  expect(screen.getByText('反応する言葉を1つ以上入れてください')).toBeTruthy()
+  expect(screen.getByText('反応する言葉と返す文を入れてください。')).toBeTruthy()
   fireEvent.change(screen.getByLabelText('追加する言葉'), { target: { value: '営業時間' } })
   fireEvent.keyDown(screen.getByLabelText('追加する言葉'), { key: 'Enter' })
   expect(button.disabled).toBe(true)

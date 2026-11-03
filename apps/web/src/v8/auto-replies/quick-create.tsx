@@ -35,7 +35,7 @@ import { canEditAutoReplyNow } from './write-access'
 
 /* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
 function validateKeywords(keywords: string[]): string | null {
-  return keywords.length > 0 ? null : '反応する言葉を1つ以上入れてください'
+  return keywords.length > 0 ? null : '反応する言葉を1つ以上入れてください。'
 }
 
 const replyRequirement = requiredText('返す文を入れてください。')
@@ -105,7 +105,10 @@ export default function QuickCreateV8({
   useEffect(() => { acknowledgedRef.current = [] }, [accountId])
 
   const saving = phase === 'saving'
-  const missingReason = !accountId ? '上のバーでLINE公式アカウントを選んでください' : validateKeywords(keywords.length || !draft.trim() ? keywords : [draft.trim()]) ?? validateReply(reply)
+  const keywordProblem = validateKeywords(keywords.length || !draft.trim() ? keywords : [draft.trim()])
+  const replyProblem = validateReply(reply)
+  const missingReason = !accountId ? '上のバーでLINE公式アカウントを選んでください'
+    : keywordProblem && replyProblem ? '反応する言葉と返す文を入れてください。' : keywordProblem ?? replyProblem
   const guard = useUnsavedGuard({ dirty: keywords.length > 0 || draft !== '' || reply !== '', busy: saving, onDiscard: onClose })
 
   const addKeyword = (value: string) => {
