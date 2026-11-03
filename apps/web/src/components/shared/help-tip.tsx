@@ -112,11 +112,11 @@ export default function HelpTip({
     <span
       ref={wrapRef}
       onMouseEnter={hover ? () => { window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpenSource(current => current ?? 'automatic') } : undefined}
-      onPointerLeave={hover ? event => { if (event.pointerType !== 'touch') setOpenSource(null) } : undefined}
+      onPointerLeave={hover ? event => { if (event.pointerType !== 'touch') setOpenSource(current => current === 'automatic' ? null : current) } : undefined}
       onFocus={hover ? () => { if (restoringFocus.current) return; window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpenSource(current => current ?? 'automatic') } : undefined}
       className={[styles.wrap, className].filter(Boolean).join(' ')}
       onBlur={(event) => {
-        if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpenSource(null)
+        if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpenSource(current => current === 'automatic' ? null : current)
       }}
     >
       <button
