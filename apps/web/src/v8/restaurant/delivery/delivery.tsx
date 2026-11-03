@@ -130,7 +130,22 @@ function DeliveryInner() {
   const [perPage, setPerPage] = useState(DEFAULT_PAGE_SIZE)
   const [selected, setSelected] = useState<string[]>([])
   const [busyOrderId, setBusyOrderId] = useState<string | null>(null)
-  const [busyService, setBusyService] = useState<DeliveryService | null>(null)
+  const intakeBusy = useRef(new Map<string, { kind: 'stop' | 'resume'; service?: DeliveryService }>())
+  const [intakeJobs, setIntakeJobs] = useState(() => new Map<string, { kind: 'stop' | 'resume'; service?: DeliveryService }>())
+  const intakeStoreId = dataAccountId === selectedAccountId ? data?.store.id ?? null : null
+  const currentIntakeJob = intakeStoreId ? intakeJobs.get(intakeStoreId) : undefined
+  const busyService = currentIntakeJob?.kind === 'resume' ? currentIntakeJob.service ?? null : null
+  const claimIntake = useCallback((storeId: string, job: { kind: 'stop' | 'resume'; service?: DeliveryService }) => {
+    if (intakeBusy.current.has(storeId)) return false
+    intakeBusy.current.set(storeId, job)
+    setIntakeJobs(new Map(intakeBusy.current))
+    return true
+  }, [])
+  const releaseIntake = useCallback((storeId: string, job: { kind: 'stop' | 'resume'; service?: DeliveryService }) => {
+    if (intakeBusy.current.get(storeId) !== job) return
+    intakeBusy.current.delete(storeId)
+    setIntakeJobs(new Map(intakeBusy.current))
+  }, [])
   const [bulkBusy, setBulkBusy] = useState(false)
 
   /* ── 注文の詳細（hjdqV）とキャンセル（dgeTy） ─────────────── */
@@ -173,12 +188,12 @@ function DeliveryInner() {
   const [stopOpen, setStopOpen] = useState(false)
   const [stopSelected, setStopSelected] = useState<DeliveryService[]>([])
   const [stopPreset, setStopPreset] = useState<DeliveryIntakeStopPreset | ''>('')
-  const [stopBusy, setStopBusy] = useState(false)
+  const stopBusy = currentIntakeJob?.kind === 'stop'
   const [stopError, setStopError] = useState<string | null>(null)
 
   const intakeScope = useMemo(() => ({ selectedAccountId, canManage }), [selectedAccountId, canManage])
   const intakeReady = !accountLoading && !loading && !error && dataAccountId === selectedAccountId
-  const intakeAccess: IntakeAccess = { scope: intakeScope, accountId: selectedAccountId, canManage, roleKnown: role !== null, ready: intakeReady, services: data?.services ?? [] }
+  const intakeAccess: IntakeAccess & { storeId: string | null } = { scope: intakeScope, accountId: selectedAccountId, storeId: intakeStoreId, canManage, roleKnown: role !== null, ready: intakeReady && Boolean(intakeStoreId), services: data?.services ?? [] }
   const currentIntake = useRef(intakeAccess)
   useLayoutEffect(() => {
     currentIntake.current = intakeAccess
@@ -195,7 +210,6 @@ function DeliveryInner() {
     setStopPreset('')
     setStopError(null)
   }, [selectedAccountId])
-  const intakeBusy = useRef(false)
   const intakeDisabledReason = intakeReady ? undefined : '注文の状態を読み直してから操作してください。'
   const stoppable = (data?.services ?? []).filter(state => !intakeActionReason(state, 'stop'))
   const bulkStopReason = intakeDisabledReason ?? (stoppable.length ? undefined : '接続済みで受付中のサービスがありません。')
@@ -514,7 +528,7 @@ function DeliveryInner() {
     const reason = service
       ? intakeOperationReason(current, intakeScope, [service], 'stop')
       : intakeContextReason(current, intakeScope)
-    if (reason || intakeBusy.current) { setNotice({ tone: 'warn', text: reason ?? '受付の変更が終わるまでお待ちください。' }); return }
+    if (reason || (current.storeId && intakeBusy.current.has(current.storeId))) { setNotice({ tone: 'warn', text: reason ?? '受付の変更が終わるまでお待ちください。' }); return }
     openedStopScope.current = intakeScope
     setStopScope(intakeScope)
     setStopSelected(service ? [service] : [])
@@ -536,12 +550,13 @@ function DeliveryInner() {
       setStopPreset('')
       return
     }
-    if (!open || selection.problem || !selection.preset || intakeBusy.current) return
+    if (!open || selection.problem || !selection.preset || (current.storeId && intakeBusy.current.has(current.storeId))) return
     const reason = intakeOperationReason(current, openedScope, selection.services, 'stop')
     if (reason) { setStopError(reason); return }
     const accountId = current.accountId!
-    intakeBusy.current = true
-    setStopBusy(true)
+    const storeId = current.storeId!
+    const job = { kind: 'stop' as const }
+    if (!claimIntake(storeId, job)) return
     setStopError(null)
     try {
       const result = await restaurantDeliveryApi.stopIntake(accountId, selection.services, selection.preset)
@@ -557,20 +572,21 @@ function DeliveryInner() {
     } catch (err) {
       if (currentIntake.current.scope === intakeScope) setStopError(errorMessage(err, '受付を停止できませんでした。'))
     } finally {
-      intakeBusy.current = false
-      setStopBusy(false)
+      releaseIntake(storeId, job)
     }
-  }, [intakeScope])
+  }, [intakeScope, claimIntake, releaseIntake])
 
   const resumeService = useCallback(async (service: DeliveryService) => {
     const current = currentIntake.current
     const reason = intakeOperationReason(current, intakeScope, [service], 'resume')
-    if (reason || intakeBusy.current) { setNotice({ tone: 'warn', text: reason ?? '受付の変更が終わるまでお待ちください。' }); return }
-    intakeBusy.current = true
-    setBusyService(service)
+    if (reason || (current.storeId && intakeBusy.current.has(current.storeId))) { setNotice({ tone: 'warn', text: reason ?? '受付の変更が終わるまでお待ちください。' }); return }
+    const accountId = current.accountId!
+    const storeId = current.storeId!
+    const job = { kind: 'resume' as const, service }
+    if (!claimIntake(storeId, job)) return
     setNotice(null)
     try {
-      const result = await restaurantDeliveryApi.resumeIntake(current.accountId!, [service])
+      const result = await restaurantDeliveryApi.resumeIntake(accountId, [service])
       if (currentIntake.current.scope !== intakeScope) return
       await loadOrders(true)
       if (currentIntake.current.scope !== intakeScope) return
@@ -580,10 +596,9 @@ function DeliveryInner() {
     } catch (err) {
       if (currentIntake.current.scope === intakeScope) setNotice({ tone: 'danger', text: errorMessage(err, '受付を再開できませんでした。') })
     } finally {
-      intakeBusy.current = false
-      setBusyService(null)
+      releaseIntake(storeId, job)
     }
-  }, [intakeScope, loadOrders])
+  }, [intakeScope, loadOrders, claimIntake, releaseIntake])
 
   /* ── 品切れの送信 ───────────────────────────────────────── */
   const submitSoldOut = useCallback(async (soldOut: boolean) => {

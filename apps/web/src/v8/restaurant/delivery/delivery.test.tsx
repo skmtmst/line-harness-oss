@@ -1392,11 +1392,12 @@ it('切替先の一覧待ちでは前の店のサービスを表示せず停止�
 
 
 it.each(['success', 'failure'] as const)('停止の%s応答前に切り替えた時は新しい店と知らせに混ぜない', async (outcome) => {
+  fixture.orders.mockImplementation(async (account: string) => ({ ...ordersData([]), store: { id: account, name: account } }))
   let finish!: (value: { stopped: DeliveryService[]; failed: [] }) => void
   let fail!: (error: Error) => void
   fixture.stopIntake.mockImplementationOnce(() => new Promise((resolve, reject) => { finish = resolve; fail = reject }))
   const view = render(<DeliveryPage />)
-  await screen.findByText('#UE-1001')
+  await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByText('受付をまとめて止める'))
   const first = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
   fireEvent.click(first.getByRole('checkbox', { name: /出前館の受付を止める/ }))
@@ -1409,7 +1410,7 @@ it.each(['success', 'failure'] as const)('停止の%s応答前に切り替えた
   view.rerender(<DeliveryPage />)
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   await waitFor(() => expect(fixture.orders).toHaveBeenCalledWith('account-2', { tab: 'new' }))
-  expect((screen.getByRole('button', { name: '受付をまとめて止める' }) as HTMLButtonElement).disabled).toBe(true)
+  expect((screen.getByRole('button', { name: '受付をまとめて止める' }) as HTMLButtonElement).disabled).toBe(false)
   const callsBeforeResponse = fixture.orders.mock.calls.length
   await act(async () => {
     if (outcome === 'success') finish({ stopped: ['demaecan'], failed: [] })
@@ -1446,4 +1447,53 @@ it('停止後の一覧読み直し中に切り替えた時も前の店の成功�
   await act(async () => { finishReload(ordersData([])); await completion })
   expect(screen.queryByText('1件のサービスの受付を停止しました。')).toBeNull()
   expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m')
+})
+
+it('前の店の受付変更が未完了でも別の店を操作でき、元の店の二重操作は止める', async () => {
+  let finishFirst!: (value: { stopped: DeliveryService[]; failed: [] }) => void
+  let finishSecond!: (value: { resumed: DeliveryService[]; failed: [] }) => void
+  fixture.orders.mockImplementation(async (account: string) => ({ ...ordersData([]), store: { id: account, name: account } }))
+  fixture.stopIntake.mockImplementationOnce(() => new Promise(resolve => { finishFirst = resolve }))
+  fixture.resumeIntake.mockImplementationOnce(() => new Promise(resolve => { finishSecond = resolve }))
+  const view = render(<DeliveryPage />)
+  await screen.findByRole('region', { name: '出前館' })
+  fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  const first = within(screen.getByRole('alertdialog'))
+  fireEvent.click(first.getByRole('button', { name: '60分', exact: true }))
+  fireEvent.click(first.getByRole('button', { name: '止める', exact: true }))
+  expect(fixture.stopIntake).toHaveBeenCalledTimes(1)
+  fixture.accountId.value = 'account-2'; view.rerender(<DeliveryPage />)
+  await waitFor(() => expect(fixture.board?.data.store.id).toBe('account-2'))
+  const resume = screen.getByRole('button', { name: 'ロケットナウの受付を再開' }) as HTMLButtonElement
+  expect(resume.disabled).toBe(false)
+  fireEvent.click(resume)
+  expect(fixture.resumeIntake).toHaveBeenCalledExactlyOnceWith('account-2', ['rocketnow'])
+  fixture.accountId.value = 'account-1'; view.rerender(<DeliveryPage />)
+  await waitFor(() => expect(fixture.board?.data.store.id).toBe('account-1'))
+  fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  expect(fixture.stopIntake).toHaveBeenCalledTimes(1)
+  await act(async () => { finishFirst({ stopped: ['demaecan'], failed: [] }); await Promise.resolve() })
+  fixture.accountId.value = 'account-2'; view.rerender(<DeliveryPage />)
+  await waitFor(() => expect(fixture.board?.data.store.id).toBe('account-2'))
+  fireEvent.click(screen.getByRole('button', { name: 'ロケットナウの受付を再開' }))
+  expect(fixture.resumeIntake).toHaveBeenCalledTimes(1)
+  await act(async () => { finishSecond({ resumed: ['rocketnow'], failed: [] }); await Promise.resolve() })
+})
+
+it('別のLINEアカウントでも同じ店の受付変更は同時に始めない', async () => {
+  let finish!: (value: { stopped: DeliveryService[]; failed: [] }) => void
+  fixture.orders.mockImplementation(async () => ({ ...ordersData([]), store: { id: 'shared-store', name: '同じ店' } }))
+  fixture.stopIntake.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const view = render(<DeliveryPage />)
+  await screen.findByRole('region', { name: '出前館' })
+  fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  const first = within(screen.getByRole('alertdialog'))
+  fireEvent.click(first.getByRole('button', { name: '60分', exact: true }))
+  fireEvent.click(first.getByRole('button', { name: '止める', exact: true }))
+  expect(fixture.stopIntake).toHaveBeenCalledTimes(1)
+  fixture.accountId.value = 'account-2'; view.rerender(<DeliveryPage />)
+  await waitFor(() => expect(fixture.orders).toHaveBeenCalledWith('account-2', { tab: 'new' }))
+  fireEvent.click(screen.getByRole('button', { name: 'ロケットナウの受付を再開' }))
+  expect(fixture.resumeIntake).not.toHaveBeenCalled()
+  await act(async () => { finish({ stopped: ['demaecan'], failed: [] }); await Promise.resolve() })
 })
