@@ -153,6 +153,25 @@ describe('V8 流入と計測の一覧', () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 
+  it('経路を止める確認に経路の所属アカウントと環境を示す', async () => {
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/api/entry-routes') return json({ success: true, data: [route({ lineAccountId: 'account-a' })] })
+      if (url.pathname === '/api/line-accounts') return json({ success: true, data: [{ id: 'account-a', name: '本店' }] })
+      return originalFetch(input, init)
+    })
+    await render()
+    await act(async () => buttonByLabel('「夏のInstagram投稿」の操作')!.click())
+    await act(async () => (([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('受付を止める')) ?? querySupplementaryPageAction('受付を止める')) as HTMLElement).click())
+    for (let i = 0; i < 4; i += 1) await act(async () => {})
+    const dialog = document.querySelector('[role="alertdialog"]')
+    expect(dialog?.textContent).toContain('LINEアカウント')
+    expect(dialog?.textContent).toContain('本店')
+    expect(dialog?.textContent).toContain('環境')
+    expect(dialog?.textContent).toContain('受付先のすべてのアカウントは確認できません')
+  })
+
   it('行の「…」から「QRコードを見る」を選ぶと、その経路の QR コードの小窓が開く', async () => {
     await render()
     const more = buttonByLabel('「夏のInstagram投稿」の操作')
