@@ -24,6 +24,7 @@ export default function HelpTip({
   trigger,
   hover = false,
   placement = 'below',
+  reserveSpace = false,
   children,
 }: {
   /** 読み上げ名（例：「今月の完了率の説明」）。吹き出しとは aria-describedby でつなぐ。 */
@@ -34,6 +35,8 @@ export default function HelpTip({
   trigger?: ReactNode
   hover?: boolean
   placement?: 'above' | 'below'
+  /** 開いた説明が次の本文を覆わないよう高さを確保する。 */
+  reserveSpace?: boolean
   /**
    * 1〜2文の補足。長い説明がある場所への「くわしく」リンクも
    * ここへ一緒に渡す（`<a href="...">くわしく</a>`）。
@@ -49,6 +52,7 @@ export default function HelpTip({
   const tipRef = useRef<HTMLSpanElement>(null)
   const restoringFocus = useRef(false)
   const [position, setPosition] = useState<{ left: number; top: number }>()
+  const [reservedHeight, setReservedHeight] = useState(0)
 
   useLayoutEffect(() => {
     if (!open) return
@@ -57,6 +61,7 @@ export default function HelpTip({
       const anchor = buttonRef.current?.getBoundingClientRect()
       const tip = tipRef.current?.getBoundingClientRect()
       if (!anchor || !tip) return
+      if (reserveSpace) setReservedHeight(tip.height + 12)
       const left = Math.max(12, Math.min(anchor.left, window.innerWidth - tip.width - 12))
       const preferredTop = placement === 'above' ? anchor.top - tip.height - 4 : anchor.bottom + 4
       const top = Math.max(12, Math.min(preferredTop, window.innerHeight - tip.height - 12))
@@ -67,7 +72,7 @@ export default function HelpTip({
     window.addEventListener('resize', queue)
     window.addEventListener('scroll', queue, true)
     return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', queue); window.removeEventListener('scroll', queue, true) }
-  }, [open, children, placement])
+  }, [open, children, placement, reserveSpace])
 
   // 1つ開くと他は閉じる。開いた側が合図し、違う持ち主だけ閉じる。
   useEffect(() => {
@@ -111,6 +116,8 @@ export default function HelpTip({
   return (
     <span
       ref={wrapRef}
+      data-help-reserving={reserveSpace && open ? '' : undefined}
+      style={reserveSpace && open ? { marginBottom: reservedHeight, alignSelf: 'flex-start' } : undefined}
       onMouseEnter={hover ? () => { window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpenSource(current => current ?? 'automatic') } : undefined}
       onPointerLeave={hover ? event => { if (event.pointerType !== 'touch') setOpenSource(null) } : undefined}
       onFocus={hover ? () => { if (restoringFocus.current) return; window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpenSource(current => current ?? 'automatic') } : undefined}

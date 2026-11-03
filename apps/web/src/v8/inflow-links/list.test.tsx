@@ -369,6 +369,11 @@ it('D-18: 閲覧者には一覧の削除操作を出さない', async () => {
   expect([...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent?.includes('削除する'))).toBe(false)
 })
 
+it('経路の数は含む範囲を説明する', async () => {
+  await render()
+  expect(host.textContent).toContain('停止中を含むすべての経路')
+})
+
 it('経路の取得中はフォルダ件数を0件と見せず、取得後に本当の件数を出す', async () => {
   const originalFetch = globalThis.fetch
   let complete!: (response: Response) => void

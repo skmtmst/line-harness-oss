@@ -138,6 +138,23 @@ function unmatchedFixture(resolveStatus = 200) {
 }
 
 describe('外部連携 V8', () => {
+  it('受け取り口と受信数を取得できない時はゼロでなく未取得と表示する', async () => {
+    const base = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/api/webhooks/incoming') || url.includes('/interactions')) return json({ success: false, error: 'unavailable' }, 500)
+      return base(input, init)
+    })
+    await render(<WebhooksIncomingV8 />)
+    await waitFor(() => expect(host.textContent).toContain('受け取り口を読み込めませんでした'))
+    expect(host.textContent).toContain('集計を読み込めませんでした')
+    const band = host.querySelector('[data-kpi-strip]')!
+    for (const label of ['受け取り口', '直近30日 受け取った']) {
+      const card = within(band as HTMLElement).getByText(label).closest('[data-kpi-presentation]')
+      expect(card?.textContent).toContain('—')
+    }
+  })
+
   it('届物は値に余り幅を渡し、複数候補の各結び付けと追加読み込みを保つ', async () => {
     const fixture = unmatchedFixture()
     await render(<WebhooksIncomingV8 />)
@@ -546,4 +563,14 @@ it('管理者は実際の受け取り口の中で、受信後の行動を追加�
   expect(posted.find(call => call.url.includes('/config'))?.body).toMatchObject({ expectedVersion: 1,
     actions: [{ refKind: 'tag', refId: 'tag-new', refVersionId: null }],
   })
+})
+
+it('受け取りと見本には送信タブの数を表示しない', async () => {
+  await render(<WebhooksIncomingV8 />)
+  expect(host.textContent).toContain('受け取り口')
+  expect(host.textContent).toContain('直近30日 受け取った')
+  expect(host.textContent).not.toContain('直近30日 送った')
+  await render(<WebhooksSamplesV8 />)
+  expect(host.textContent).toContain('こちらで受け取る（どこから来るか）')
+  expect(host.textContent).not.toContain('直近30日 送った')
 })

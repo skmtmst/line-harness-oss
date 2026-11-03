@@ -21,9 +21,7 @@ import styles from './sheets.module.css'
 import {
 ViewerBand,
 WEBHOOKS_DESCRIPTION,
-WebhookBand,
 WebhookTabs,
-overviewBandCells
 } from './shell'
 import { useSheets } from './use-sheets'
 import { shortDateTime } from './words'
@@ -229,13 +227,6 @@ export default function WebhooksSheetsV8() {
       tabs={<WebhookTabs active="sheets" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {!isOwner ? <ViewerBand /> : null}
-        <WebhookBand
-          cells={overviewBandCells({
-            outgoing: overview.outgoingCount === null ? null : overview.outgoing,
-            incomingCount: overview.incomingCount,
-            summary: overview.summary,
-          })}
-        />
       </>}
       overlays={(
         <Dialog
