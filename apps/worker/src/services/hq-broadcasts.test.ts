@@ -67,6 +67,28 @@ describe('統括の一括配信',()=>{
   await expect(retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1','owner',1,{count:preview.count,token:preview.token})).rejects.toMatchObject({status:409,currentCount:2});
   expect(injected).toBe(true);expect(f.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(child)).toEqual({status:'sent'});
  });
+ it.each(['ledger','audience'] as const)('送信前の確定直前に対象が変わると原子操作を止める (%s)',async kind=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.prepare("UPDATE broadcasts SET status='draft' WHERE id=?").run(child);
+  if(kind==='ledger'){
+   f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('late','U-late','shop1')");
+   f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'friend-shop1','failed','line_http_429')").run(child);
+  }
+  const {previewHqRetry}=await import('./hq-broadcasts.js');
+  const run=await getHqBroadcastRun(f.db,tenant,r.id),preview=await previewHqRetry(f.db,run,'shop1');
+  const batch=f.db.batch.bind(f.db);let injected=false;
+  vi.spyOn(f.db,'batch').mockImplementation(async statements=>{
+   if(!injected&&statements.length===3){injected=true;
+    if(kind==='ledger')f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'late','failed','line_http_429')").run(child);
+    else f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('late','U-late','shop1')");
+   }
+   return batch(statements);
+  });
+  await expect(retryHqBroadcastTarget(f.db,run,'shop1','owner',1,preview)).rejects.toMatchObject({status:409,currentCount:2});
+  expect(injected).toBe(true);expect(f.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(child)).toEqual({status:'draft'});
+  expect(f.raw.prepare('SELECT state FROM broadcast_send_claims WHERE broadcast_id=? ORDER BY friend_id').all(child)).toEqual(kind==='ledger'?[{state:'failed'},{state:'failed'}]:[]);
+ });
  it('停止後の未送信を確認情報と一緒に一括で再送対象に固定する',async()=>{
   const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
   const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;

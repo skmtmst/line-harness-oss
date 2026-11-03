@@ -4,6 +4,7 @@ import { processBroadcastSend, processQueuedBroadcasts, processScheduledBroadcas
 import { prepareHqBroadcast, dispatchHqBroadcast, preflightHqBroadcast, stopHqBroadcast, retryHqBroadcastTarget, getHqBroadcastRun, readHqBroadcastResult, previewHqRetry } from '../../services/hq-broadcasts.js';
 import { countAudience, previewAudience } from './broadcast-preflight.js';
 import { recoverStalledBroadcasts, markBroadcastRecipientsDispatched } from '@line-crm/db';
+import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 
 const calls = vi.hoisted(() => ({ broadcast: vi.fn(async () => ({ requestId: 'all' })),
   multicast: vi.fn(async (_ids: string[], _messages: unknown) => ({ requestId: 'selected' })),
@@ -36,6 +37,25 @@ beforeEach(() => {
 });
 afterEach(() => { f.raw.close(); vi.unstubAllGlobals(); });
 describe('637: 停止者を外して一斉配信を続ける', () => {
+  it('送信直前に台帳を押さえられた宛先だけを一括送信と再試行キーに使う',async()=>{
+    const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-partial',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
+    const sent=await dispatchHqBroadcast(f.db,run,'owner',1),child=sent.targets[0].broadcastId!;await processScheduledBroadcasts(f.db,calls as never);
+    const prepare=f.db.prepare.bind(f.db);let intercepted=false;
+    vi.spyOn(f.db,'prepare').mockImplementation(sql=>{
+      const stmt=prepare(sql);if(intercepted||!sql.includes('SELECT DISTINCT friend_id FROM friend_delivery_consents WHERE state'))return stmt;
+      intercepted=true;
+      return new Proxy(stmt,{get(target,key){if(key==='bind')return (...args:unknown[])=>{
+        const bound=target.bind(...args);return new Proxy(bound,{get(item,prop){if(prop==='all')return async()=>{
+          const result=await item.all();f.raw.prepare("UPDATE broadcast_send_claims SET state='sent' WHERE broadcast_id=? AND friend_id IN ('stopped','unknown')").run(child);return result;
+        };const value=Reflect.get(item,prop);return typeof value==='function'?value.bind(item):value;}});
+      };const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
+    });
+    await processQueuedBroadcasts(f.db,calls as never);
+    expect(intercepted).toBe(true);expect(calls.multicast).toHaveBeenCalledTimes(1);
+    const [ids,messages,,key]=calls.multicast.mock.calls[0] as unknown as [string[],unknown,unknown,string];
+    expect(ids).toEqual(['U-allowed']);
+    expect(key).toBe(await createBroadcastRetryKey(child,'queued-multicast','attempt:1','allowed',JSON.stringify(messages)));
+  });
   it('新しい処理がロック中でも古い版は未送信の人を押さえられない',async()=>{
     seedBroadcast('sending');f.raw.exec("UPDATE broadcasts SET batch_offset=-1,lock_version=2 WHERE id='b'");
     f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state) VALUES('b','allowed','shop',1,'claimed')").run();

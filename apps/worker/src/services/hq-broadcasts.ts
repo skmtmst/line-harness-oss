@@ -152,7 +152,7 @@ export async function previewHqRetry(db:D1Database,run:RunRow,accountId:string) 
   return {count:snapshot.ids.length,token:snapshot.token};
 }
 export class HqRetryConflict extends StampError {
-  constructor(public currentCount:number) { super('送る相手が変わりました。もう一度確かめてください',409); }
+  constructor(public currentCount:number) { super('送る相手が変わりました。もう一度確かめてください。',409); }
 }
 export async function readHqBroadcastResult(db:D1Database,run:RunRow):Promise<HqBroadcastRun> {
   const input=JSON.parse(run.input_json) as HqBroadcastInput,rows=(await db.prepare(`SELECT t.*,b.status AS child_status,b.total_count,b.success_count,b.stopped_at,b.lock_version,b.approval_status,

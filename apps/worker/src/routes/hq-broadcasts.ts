@@ -132,7 +132,7 @@ for(const [suffix,followup] of [['duplicate',false],['followup',true]] as const)
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'));return c.json({success:true,data:await copyHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),a.actorId,await c.req.json(),followup)},201);
 });
 hqBroadcasts.get('/api/hq/broadcasts/:id/targets/:accountId/retry-preview',async c=>{
-  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);
+  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'));
   return c.json({success:true,data:await previewHqRetry(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),c.req.param('accountId'))});
 });
 hqBroadcasts.post('/api/hq/broadcasts/:id/targets/:accountId/retry',requireIrreversibleConfirmation('broadcast-send'),inputJsonBoundary({"expectedVersion":["number"],"confirmedRecipientCount":["number"],"confirmedRecipientToken":["string"]}), async c=>{

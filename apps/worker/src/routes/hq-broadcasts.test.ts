@@ -12,6 +12,11 @@ beforeEach(()=>{f=createTestD1();f.raw.prepare("INSERT INTO line_accounts(id,nam
 });afterEach(()=>{f.raw.close();vi.unstubAllGlobals();});
 const call=(path:string,method='GET',body?:unknown,confirm=false)=>app.request(path,{method,headers:{'Content-Type':'application/json',...(confirm?{'X-Confirm-Irreversible':'broadcast-send'}:{})},...(body?{body:JSON.stringify(body)}:{})},{DB:f.db} as Env['Bindings']);
 describe('統括からの配信API',()=>{
+ it('閲覧専用の担当者は再送プレビューを取得できない',async()=>{
+  const r=await made();actor('owner',true);
+  expect((await call(`/api/hq/broadcasts/${r.id}`)).status).toBe(200);
+  expect((await call(`/api/hq/broadcasts/${r.id}/targets/shop/retry-preview`)).status).toBe(403);
+ });
  it('一覧と詳細を読むだけでは再送用ハッシュを作らない',async()=>{
   const created=await call('/api/hq/broadcasts','POST',{requestId:'retry-list',title:'お知らせ',messageType:'text',messageContent:'本文',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
   const run=(await created.json() as any).data;
@@ -34,7 +39,7 @@ describe('統括からの配信API',()=>{
   f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('second','U-second','shop')");
   f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'second','failed','line_http_429')").run(child);
   const result=await call(`/api/hq/broadcasts/${run.id}/targets/shop/retry`,'POST',{expectedVersion:before.version,confirmedRecipientCount:preview.count,confirmedRecipientToken:preview.token},true);
-  expect(result.status).toBe(409);expect(await result.json()).toMatchObject({success:false,currentCount:2,data:{currentCount:2}});
+  expect(result.status).toBe(409);expect(await result.json()).toMatchObject({success:false,error:'送る相手が変わりました。もう一度確かめてください。',currentCount:2,data:{currentCount:2}});
   expect(f.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(child)).toEqual({status:'sent'});
  });
  it('送信確認を要求し、作った店の配信を店側から変更・削除・再送できない',async()=>{
