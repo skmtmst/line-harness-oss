@@ -409,6 +409,16 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
   const pendingPhotos = photos.filter((photo) => text(photo.status) === 'pending')
   const selectedPendingPhotos = pendingPhotos.filter((photo) => selectedPhotoIds.includes(text(photo.id)))
+  const bulkScope = useRef({ accountId, canEdit })
+  if (bulkScope.current.accountId !== accountId || bulkScope.current.canEdit !== canEdit) bulkScope.current = { accountId, canEdit }
+  const bulkTicket = useRef<{ kind: 'approve' | 'return'; scope: typeof bulkScope.current; signature: string } | null>(null)
+  const bulkBusy = useRef(false)
+  const bulkSignature = JSON.stringify(selectedPendingPhotos.map(photo => [text(photo.id), reviewVersionOf(photo)]))
+  const bulkLive = useRef({ accountId, signature: bulkSignature, canEdit })
+  bulkLive.current = { accountId, signature: bulkSignature, canEdit }
+  const renderedBulkTicket = bulkTicket.current
+  const validBulkTicket = (kind: 'approve' | 'return') => Boolean(renderedBulkTicket && bulkTicket.current === renderedBulkTicket && renderedBulkTicket.kind === kind && renderedBulkTicket.scope === bulkScope.current && renderedBulkTicket.signature === bulkLive.current.signature && bulkLive.current.canEdit && !bulkBusy.current)
+  useEffect(() => () => { bulkTicket.current = null }, [])
   const selectedPhotosAreLowRisk = selectedPendingPhotos.length > 0
     && selectedPendingPhotos.every((photo) => ['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)))
 
@@ -422,7 +432,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
     decision: 'approve' | 'return',
     rejection?: { reasonCode: ReviewReasonCode; reasonNote: string },
   ) => {
-    if (!accountId || selectedPendingPhotos.length === 0) return
+    if (!accountId || selectedPendingPhotos.length === 0 || bulkBusy.current) return
+    bulkBusy.current = true
     const generation = accountGeneration.current
     setBulkReviewing(true)
     try {
@@ -454,6 +465,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         setNotice(`${formatNumber(count)} 枚の審査結果は保存済みです。${formatNumber(failedPhotos.length)} 枚のLINE通知は送れませんでした（通知だけ再送できます）。`)
       }
       setSelectedPhotoIds([])
+      bulkTicket.current = null
       setBulkApproveOpen(false)
       setBulkReturnOpen(false)
       setReasonCode('quality')
@@ -471,6 +483,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         if (decision === 'return') { if (!fieldFailure) setReasonError(message) }
       }
     } finally {
+      bulkBusy.current = false
       setBulkReviewing(false)
     }
   }
@@ -586,7 +599,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
             />
           ) : null}
 
-          <Dialog open={bulkApproveOpen} title={`${formatNumber(selectedPendingPhotos.length)}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => bulkReview('approve')}>
+          <Dialog open={bulkApproveOpen} title={`${formatNumber(selectedPendingPhotos.length)}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => { bulkTicket.current = null; setBulkApproveOpen(false) }} onConfirm={() => validBulkTicket('approve') ? bulkReview('approve') : undefined}>
             <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
             <dl className={styles.bulkSummary}>
               <div><dt>写真</dt><dd>{formatNumber(selectedPendingPhotos.length)}枚</dd></div>
@@ -595,7 +608,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
             </dl>
             <p className={styles.railNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載画面で公開先を選びます。</p>
           </Dialog>
-          <Dialog open={bulkReturnOpen} title={`${formatNumber(selectedPendingPhotos.length)} 枚をまとめて見送り`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて見送り" cancelLabel="審査へ戻る" onCancel={() => { setBulkReturnOpen(false); setReasonError(''); setReasonFieldError('') }} onConfirm={() => {
+          <Dialog open={bulkReturnOpen} title={`${formatNumber(selectedPendingPhotos.length)} 枚をまとめて見送り`} description="選んだ理由と補足は、選択した写真すべてに記録され、投稿者へLINEで届きます。" tone="destructive" busy={bulkReviewing} error={reasonError} confirmLabel="この理由でまとめて見送り" cancelLabel="審査へ戻る" onCancel={() => { bulkTicket.current = null; setBulkReturnOpen(false); setReasonError(''); setReasonFieldError('') }} onConfirm={() => {
+            if (!validBulkTicket('return')) return
             if (reasonCode === 'other' && !reasonNote.trim()) { setReasonFieldError('そのほかの理由を入力してください'); focusFormField('photo-reject-note'); return }
             return bulkReview('return', { reasonCode, reasonNote: reasonNote.trim() })
           }}>
@@ -694,8 +708,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           onPublish={(id) => void preparePublication(id)}
           onLoadMore={() => void loadMore()}
           onRetryLoad={() => void load()}
-          onBulkApprove={() => setBulkApproveOpen(true)}
-          onBulkReturn={() => setBulkReturnOpen(true)}
+          onBulkApprove={() => { bulkTicket.current = { kind: 'approve', scope: bulkScope.current, signature: bulkSignature }; setBulkApproveOpen(true) }}
+          onBulkReturn={() => { bulkTicket.current = { kind: 'return', scope: bulkScope.current, signature: bulkSignature }; setBulkReturnOpen(true) }}
         />
       )}
     </ListPage></SaveErrorScope>
