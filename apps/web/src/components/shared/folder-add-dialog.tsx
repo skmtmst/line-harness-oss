@@ -11,7 +11,7 @@
  */
 
 import { useOptionalAccount } from '@/contexts/account-context'
-import { useContext, useLayoutEffect, useState } from 'react'
+import { useContext, useLayoutEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -101,8 +101,9 @@ export default function FolderAddDialog({
   const guard = useUnsavedGuard({ dirty: dirty || saving, busy: saving, onDiscard: onClose })
   const depth = useContext(OverlayDepthContext)
   const onHoldingChange = useContext(InlineDetailHoldingContext)
-  useLayoutEffect(() => { onHoldingChange?.(dirty || saving) }, [dirty, saving, onHoldingChange])
-  useLayoutEffect(() => () => { onHoldingChange?.(false) }, [onHoldingChange])
+  const source = useRef(Symbol('folder'))
+  useLayoutEffect(() => { onHoldingChange?.(source.current, dirty || saving) }, [dirty, saving, onHoldingChange])
+  useLayoutEffect(() => () => { onHoldingChange?.(source.current, false) }, [onHoldingChange])
 
   const add = async () => {
     if (confirmDisabled || confirmLockedReason) return

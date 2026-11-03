@@ -7,14 +7,25 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 /** 詳細パネルのその場編集と、行送り・履歴・画面移動を一つの確認で守る。 */
-export const InlineDetailHoldingContext = createContext<((holding: boolean) => void) | null>(null)
+export const InlineDetailHoldingContext = createContext<((source: symbol, holding: boolean) => void) | null>(null)
+export function useInlineDetailHoldingState() {
+  const [sources, setSources] = useState<ReadonlySet<symbol>>(() => new Set())
+  const onHoldingChange = useCallback((source: symbol, holding: boolean) => setSources(previous => {
+    if (previous.has(source) === holding) return previous
+    const next = new Set(previous)
+    if (holding) next.add(source); else next.delete(source)
+    return next
+  }), [])
+  return { holding: sources.size > 0, onHoldingChange }
+}
 export function useInlineDetailGuard(key: string) {
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
   const [resetToken, setResetToken] = useState(0)
   const onHoldingChange = useContext(InlineDetailHoldingContext)
-  useLayoutEffect(() => { onHoldingChange?.(dirty || busy) }, [dirty, busy, onHoldingChange])
-  useLayoutEffect(() => () => { onHoldingChange?.(false) }, [onHoldingChange])
+  const source = useRef(Symbol('detail'))
+  useLayoutEffect(() => { onHoldingChange?.(source.current, dirty || busy) }, [dirty, busy, onHoldingChange])
+  useLayoutEffect(() => () => { onHoldingChange?.(source.current, false) }, [onHoldingChange])
   const hold = useRef(false)
   hold.current = dirty || busy
   const [id, setIdRaw] = useDetailPanelUrl(key, () => hold.current)

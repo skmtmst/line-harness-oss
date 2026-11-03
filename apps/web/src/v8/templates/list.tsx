@@ -17,7 +17,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Button from '@/components/shared/button'
 import { type ContextMenuItem } from '@/components/shared/context-menu'
-import { InlineDetailHoldingContext, useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
+import { InlineDetailHoldingContext, useInlineDetailGuard, useInlineDetailHoldingState } from '@/components/shared/use-inline-detail-guard'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
@@ -82,7 +82,7 @@ export default function TemplatesListV8() {
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
   const detailGuard = useInlineDetailGuard('row')
-  const [folderHolding, setFolderHolding] = useState(false)
+  const { holding: folderHolding, onHoldingChange: setFolderHolding } = useInlineDetailHoldingState()
   const { id: activeId, setId: setActiveId } = detailGuard
 
   /*
