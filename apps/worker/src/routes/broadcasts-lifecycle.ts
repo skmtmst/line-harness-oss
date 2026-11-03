@@ -468,7 +468,7 @@ export const post__api_broadcasts_id_stop_3 = async (c: Context<Env, "/api/broad
     }
     return c.json({
       success: false,
-      error: '別の操作が先に入りました。画面を読み直してからやり直してください。',
+      error: '配信の状態が更新されました（自動復旧を含みます）。画面を読み直してからやり直してください。',
       code: 'VERSION_MISMATCH',
     }, 409);
   }
