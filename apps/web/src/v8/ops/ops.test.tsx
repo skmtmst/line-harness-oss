@@ -53,6 +53,8 @@ let host: HTMLDivElement
 /** 役割の応答を止めて「分からない」状態を作る（null のときはすぐ返す）。 */
 let meGate: Promise<void> | null = null
 let releaseMe: (() => void) | null = null
+let tenantAccounts: Array<{ id: string; name: string }> = []
+let tenantStatus = 'active'
 
 beforeEach(() => {
   readOnly = false
@@ -60,6 +62,8 @@ beforeEach(() => {
   calls = []
   meGate = null
   releaseMe = null
+  tenantAccounts = []
+  tenantStatus = 'active'
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -73,7 +77,8 @@ beforeEach(() => {
       return json({ success: true, data: { ...ME, readOnly } })
     }
     if (url.endsWith('/api/ops/members')) return json({ success: true, data: MEMBERS, summary: { members: 2, invited: 0, awaitingTotp: 0, totpEnabled: 2, impersonationsThisMonth: 0, writeImpersonationsThisMonth: 0, piiRevealsThisMonth: 0 } })
-    if (url.includes('/api/ops/tenants/t1')) return json({ success: true, data: { tenant: TENANT, accounts: [], members: [], audit: [] } })
+    if (url.includes('/api/ops/tenants/t1')) return json({ success: true, data: { tenant: { ...TENANT, status: tenantStatus }, accounts: tenantAccounts, members: [], audit: [] } })
+    if (url.includes('/api/ops/tenants/t2')) return json({ success: true, data: { tenant: { ...TENANT, id: 't2', name: '契約先B', status: 'suspended' }, accounts: [], members: [], audit: [] } })
     if (url.includes('/api/ops/tenants')) return json({ success: true, data: [TENANT], summary: { active: 1, trialing: 0, suspended: 0, pastDue: 0 } })
     if (url.endsWith('/api/ops/announcements/preview')) return json({ success: true, data: { tenants: 1, staff: 1, lineLinked: 0, withEmail: 1 } })
     if (url.endsWith('/api/ops/announcements')) {
@@ -111,6 +116,33 @@ describe('運営コンソールの V8 外枠', () => {
 })
 
 describe('閲覧のみには隠さず押せない形＋理由で出す', () => {
+  it('運営メンバー停止は対象者・件数・環境を示し、閉じた確認は実行できない', async () => {
+    await act(async () => { root.render(<OpsMembersV8 />) })
+    await settle()
+    act(() => document.querySelector<HTMLButtonElement>('button[aria-label="見本 次郎のその他操作"]')!.click())
+    act(() => document.querySelector<HTMLElement>('[role="menuitem"]')!.click())
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    expect(dialog.textContent).toContain('見本 次郎')
+    expect(dialog.textContent).toContain('1人')
+    expect(dialog.textContent).toContain('環境')
+    const confirm = buttons('停止する')[0] as HTMLButtonElement
+    const key = Object.keys(confirm).find(k => k.startsWith('__reactProps$'))!
+    const oldClick = (confirm as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    await act(async () => { (buttons('キャンセル')[0] as HTMLButtonElement).click() })
+    await act(async () => { oldClick() })
+    expect(calls.some(c => c.method !== 'GET')).toBe(false)
+  })
+
+  it('運営メンバー停止の確認から対象者の変更を呼ぶ', async () => {
+    await act(async () => { root.render(<OpsMembersV8 />) })
+    await settle()
+    act(() => document.querySelector<HTMLButtonElement>('button[aria-label="見本 次郎のその他操作"]')!.click())
+    act(() => document.querySelector<HTMLElement>('[role="menuitem"]')!.click())
+    await act(async () => { (buttons('停止する')[0] as HTMLButtonElement).click() })
+    await settle()
+    expect(calls.filter(c => c.method !== 'GET').map(c => c.url)).toEqual([expect.stringContaining('ops-2')])
+  })
+
   it('自分の運営アカウントは停止できず、理由を示して送信しない', async () => {
     await act(async () => { root.render(<OpsMembersV8 />) })
     await settle()
@@ -272,6 +304,97 @@ describe('送る・止める前に確かめる', () => {
     await settle()
     expect(text()).toContain('契約先の名前をそのまま入力してください')
     expect(calls.some((c) => c.method !== 'GET' && c.url.includes('/status'))).toBe(false)
+  })
+
+  it('契約先停止の確認に、対象契約先の LINE アカウントと件数と環境を示す', async () => {
+    tenantAccounts = [{ id: 'store-b', name: '店B' }]
+    search = 'id=t1'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    await act(async () => { getPageAction({ name: '停止' }).click() })
+    await settle()
+    const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+    expect(dialog.textContent).toContain('店B')
+    expect(dialog.textContent).toContain('環境')
+    expect(dialog.textContent).toContain('1件')
+  })
+
+  it('契約先を移動したら古い再開の確認では実行できない', async () => {
+    tenantStatus = 'suspended'
+    search = 'id=t1'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    await act(async () => { getPageAction({ name: '再開' }).click() })
+    fireEvent.change(document.querySelector('input[aria-label="理由（4文字以上）"]')!, { target: { value: '確認済みの理由' } })
+    const confirm = buttons('再開する')[0] as HTMLButtonElement
+    const key = Object.keys(confirm).find(k => k.startsWith('__reactProps$'))!
+    const oldClick = (confirm as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    search = 'id=t2'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    const closed = document.querySelector('[role="dialog"], [role="alertdialog"]') === null
+    await act(async () => { oldClick() })
+    expect(calls.some(c => c.method !== 'GET' && c.url.includes('/status'))).toBe(false)
+    expect(closed).toBe(true)
+  })
+
+  it('多数の店舗を短くまとめて件数と残りを示す', async () => {
+    tenantAccounts = Array.from({ length: 6 }, (_, i) => ({ id: `store-${i}`, name: `店舗${i + 1}` }))
+    search = 'id=t1'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    await act(async () => { getPageAction({ name: '停止' }).click() })
+    await settle()
+    const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+    expect(dialog.textContent).toContain('LINEアカウント（6件）')
+    expect(dialog.textContent).toContain('店舗1')
+    expect(dialog.textContent).toContain('ほか')
+    expect(dialog.textContent).not.toContain('店舗6')
+    expect(dialog.textContent).toContain('契約先：契約先A（1件）')
+  })
+
+  it.each([
+    ['停止', 'active', '要確認'],
+    ['アーカイブ', 'active', '要確認'],
+    ['再開', 'suspended', '再開すると'],
+  ])('契約先の%s確認は対象名と操作前の案内を示す', async (action, status, expected) => {
+    tenantStatus = status
+    search = 'id=t1'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    await act(async () => { getPageAction({ name: action }).click() })
+    const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+    expect(dialog.textContent).toContain('契約先：契約先A（1件）')
+    expect(dialog.textContent).toContain(expected)
+    expect(dialog.textContent).not.toContain('失敗：')
+  })
+
+  it('閉じた契約先停止の確認では実行できない', async () => {
+    search = 'id=t1'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    await act(async () => { getPageAction({ name: '停止' }).click() })
+    await settle()
+    fireEvent.change(document.querySelector('input[placeholder="契約先A"]')!, { target: { value: '契約先A' } })
+    fireEvent.change(document.querySelector('input[aria-label="理由（4文字以上）"]')!, { target: { value: '確認済みの理由' } })
+    const confirm = buttons('停止する')[0] as HTMLButtonElement
+    const key = Object.keys(confirm).find(k => k.startsWith('__reactProps$'))!
+    const oldClick = (confirm as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    await act(async () => { (buttons('キャンセル')[0] as HTMLButtonElement).click() })
+    await act(async () => { oldClick() })
+    expect(calls.some(c => c.method !== 'GET' && c.url.includes('/status'))).toBe(false)
+  })
+
+  it('確認した契約先だけに停止を送る', async () => {
+    search = 'id=t1'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    await act(async () => { getPageAction({ name: '停止' }).click() })
+    fireEvent.change(document.querySelector('input[placeholder="契約先A"]')!, { target: { value: '契約先A' } })
+    fireEvent.change(document.querySelector('input[aria-label="理由（4文字以上）"]')!, { target: { value: '確認済みの理由' } })
+    await act(async () => { (buttons('停止する')[0] as HTMLButtonElement).click() })
+    await settle()
+    expect(calls.filter(c => c.method !== 'GET' && c.url.includes('/status')).map(c => c.url)).toEqual([expect.stringContaining('/api/ops/tenants/t1/status')])
   })
 })
 

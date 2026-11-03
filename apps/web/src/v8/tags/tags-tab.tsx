@@ -240,6 +240,10 @@ export default function TagsTab({
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const [restoreTarget, setRestoreTarget] = useState<Tag | null>(null)
+  const restoreAccountVersion = useRef({ accountId, generation: 0 })
+  if (restoreAccountVersion.current.accountId !== accountId) restoreAccountVersion.current = { accountId, generation: restoreAccountVersion.current.generation + 1 }
+  const restoreScopeRef = useRef<{ accountId: string | null; generation: number } | null>(null)
+  const restoreScope = restoreScopeRef.current
   const [restoring, setRestoring] = useState(false)
   const [restoreError, setRestoreError] = useState('')
   const { leavingId, leave } = useRowLeaving()
@@ -523,7 +527,7 @@ export default function TagsTab({
       { id: 'copy', label: '複製して作る', external: false, href: `/tags/new?copy=${tag.id}`, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
-    if (tag.status === 'archived') return [list[0], { id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(tag) } }]
+    if (tag.status === 'archived') return [list[0], { id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { restoreScopeRef.current = { accountId, generation: restoreAccountVersion.current.generation }; setRestoreError(''); setRestoreTarget(tag) } }]
     list.push({
         id: 'archive',
         label: '保管する',
@@ -535,9 +539,9 @@ export default function TagsTab({
   }
 
   const confirmRestore = async () => {
-    if (!restoreTarget || !accountId || restoring) return
+    if (!restoreTarget || !restoreScope?.accountId || restoreScopeRef.current !== restoreScope || restoreScope.generation !== restoreAccountVersion.current.generation || restoring) return
     const tag = restoreTarget
-    const account = accountId
+    const account = restoreScope.accountId
     setRestoring(true)
     setRestoreError('')
     try {
@@ -545,6 +549,7 @@ export default function TagsTab({
       if (loadRequestRef.current.accountId !== account) return
       if (!res.success) throw new Error(res.error)
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, status: 'active', version: res.data.version } : item))
+      restoreScopeRef.current = null
       setRestoreTarget(null)
       notifyToast(`「${tag.name}」を保管から戻しました`)
       await load()
@@ -552,7 +557,7 @@ export default function TagsTab({
       if (loadRequestRef.current.accountId === account) setRestoreError(describeApiFailure(error, '保管から戻す操作', { forbidden: 'この操作はオーナーか管理者に頼んでください。' }))
     } finally { setRestoring(false) }
   }
-  useEffect(() => { setRestoreTarget(null); setRestoreError('') }, [accountId])
+  useEffect(() => { restoreScopeRef.current = null; setRestoreTarget(null); setRestoreError('') }, [accountId])
 
   /* 削除は、利用状況にかかわらず確認してから実行する。 */
   const requestArchive = (tag: Tag) => { setDeleteTarget(tag) }
@@ -949,7 +954,9 @@ export default function TagsTab({
       <ConfirmDialog open={restoreTarget !== null} title={`「${restoreTarget?.name ?? ''}」を保管から戻しますか？`}
         description="同じタグを通常の一覧へ戻します。保管時に付け替えた友だちは、そのまま残ります。"
         confirmLabel="保管から戻す" busy={restoring} error={restoreError}
-        onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
+        onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) { restoreScopeRef.current = null; setRestoreTarget(null) } }}>
+        <OperationTargetSummary accounts={[{ id: restoreScope?.accountId ?? '' }]} externalTarget={{ label: '対象件数', name: restoreTarget ? '1件' : null }} />
+      </ConfirmDialog>
       {deleteTarget && (
         <DeleteTagDialog
           tag={deleteTarget}
