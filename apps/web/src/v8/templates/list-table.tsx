@@ -110,7 +110,7 @@ export function renderTemplateList({ tokenNames, accountLoading, accounts, activ
       data-design-node="susGP"
       icon={<FileText aria-hidden="true" />}
       title={`まだ${sectionWord}がありません`}
-      description="よく送る文を保存しておくと、一斉配信・自動応答・シナリオから選べます。"
+      description="よく使う内容を保存しておくと、一斉配信・自動応答・シナリオから選べます。"
       create={{ label: `最初の${createLabel}を作る`, href: createHref }}
       lockedReason={lockedReason ?? null}
       canCreate={canMutateTemplates}

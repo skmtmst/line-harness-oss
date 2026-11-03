@@ -118,6 +118,15 @@ afterEach(() => {
 })
 
 describe('V8 テンプレートの一覧', () => {
+  it('空の動画・質問にも内容に合う説明を出す', async () => {
+    listTemplates.mockResolvedValue({ success: true, data: [] })
+    await renderList()
+    for (const tab of ['リッチビデオ', '質問']) {
+      await act(async () => { fireEvent.click(screen.getByRole('tab', { name: new RegExp(`^${tab}`) })) })
+      expect(screen.getByText('よく使う内容を保存しておくと、一斉配信・自動応答・シナリオから選べます。')).toBeTruthy()
+    }
+  })
+
   it('差し込みのキーを実名へ置き換えて見せ、一覧の本文は保存値のままにする', async () => {
     listTemplates.mockResolvedValue({ success: true, data: [{ ...used, messageContent: '{{account.name}} {{var.business_hours}} {{field.pet_name}}' }] })
     await renderList()
