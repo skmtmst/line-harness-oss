@@ -43,3 +43,15 @@ test('作成画面のキャンセルは別の作りかけも知らせる', () =>
   expect(message).toContain('ほかの未保存の入力')
   expect(cancel).not.toHaveBeenCalled()
 })
+
+test('画面の入力が未変更でも子の作りかけを確認してからキャンセルする', () => {
+  const cancel = vi.fn()
+  function Child() {
+    const guard = useUnsavedGuard({ dirty: true, subject: '作りかけのフォルダ' })
+    return <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="作りかけのフォルダ" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+  }
+  render(<><div data-page-template="create"><AutoFormLeaveGuard /><input aria-label="名前" /><button onClick={cancel}>キャンセル</button></div><Child /></>)
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('作りかけのフォルダ')
+  expect(cancel).not.toHaveBeenCalled()
+})

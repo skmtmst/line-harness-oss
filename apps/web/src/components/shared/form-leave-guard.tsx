@@ -10,7 +10,6 @@ export function FormLeaveGuard({ dirty, busy }: { dirty: boolean; busy?: boolean
   const guard = useUnsavedGuard({ dirty, busy })
   const marker = useRef<HTMLSpanElement>(null)
   useEffect(() => {
-    if (!dirty && !busy) return
     const frame = marker.current?.closest?.('[data-page-template]')
     let replaying = false
     const onClick = (event: MouseEvent) => {
@@ -51,5 +50,5 @@ export function AutoFormLeaveGuard({ busy }: { busy?: boolean }) {
     window.addEventListener('lh:form-saved', saved)
     return () => { frame.removeEventListener('change', change, true); frame.removeEventListener('input', change, true); frame.removeEventListener('click', click, true); window.removeEventListener('lh:form-saved', saved) }
   })
-  return <><span hidden ref={(element) => { input.ref.current = element?.closest<HTMLElement>('[data-page-template],[data-create-variant]') ?? null }} />{input.dirty ? <FormLeaveGuard dirty busy={busy} /> : null}</>
+  return <><span hidden ref={(element) => { input.ref.current = element?.closest<HTMLElement>('[data-page-template],[data-create-variant]') ?? null }} /><FormLeaveGuard dirty={input.dirty} busy={busy} /></>
 }
