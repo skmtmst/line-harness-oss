@@ -151,7 +151,7 @@ export default function HqHomeV8() {
     const epoch = attentionEpoch.current
     setAttentionCounts(null)
     setAttentionError(null)
-    void import('@/lib/api/helpers/styles').then(({ hqStyleApi }) => hqStyleApi.attention()).then((result) => {
+    void import('@/lib/api/helpers/styles').then(({ hqStyleApi }) => hqStyleApi.attention(attentionKey || reloadKey ? { cache: 'reload' } : undefined)).then((result) => {
       if (cancelled || epoch !== attentionEpoch.current) return
       if (!result.success) { setAttentionError(new Error('attention failed')); return }
       const kinds = ['unhandledChats', 'pendingBookings', 'unpaid', 'connections', 'stoppedDeliveries'] as const

@@ -174,6 +174,7 @@ it('接続情報を更新したら対応件数も取り直す', async () => {
   await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === '更新する')!.click() })
   await act(async () => { await Promise.resolve() })
   expect(attention.mock.calls.length).toBeGreaterThanOrEqual(2)
+  expect(attention).toHaveBeenLastCalledWith({ cache: 'reload' })
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
   expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('0 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
