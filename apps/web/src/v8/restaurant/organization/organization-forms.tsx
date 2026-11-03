@@ -20,7 +20,8 @@ import { ApiError } from '@/lib/api'
 import { restaurantTestApi,type RestaurantIntakeAddress,type RestaurantMembership,type RestaurantStore } from '@/lib/restaurant-test-api'
 import type { RestaurantLoginMember } from '@line-crm/shared'
 import { Check,MailPlus,MessageCircle,Plus,type LucideIcon } from 'lucide-react'
-import { useCallback,useEffect,useState,type FormEvent,type ReactNode } from 'react'
+import { useCallback,useEffect,useLayoutEffect,useState,type FormEvent,type ReactNode } from 'react'
+import { useFormInputDirty } from '@/components/shared/form-input-dirty'
 import { formatStamp, Panel, Status } from '@/v8/restaurant/common-a/public/parts/index'
 import styles from './organization.module.css'
 
@@ -73,7 +74,7 @@ export function DefaultSelect({ name, ariaLabel, defaultValue, options }: {
 }
 
 /** 作ってある物を選ぶ欄（選ぶ窓・）。フォームへは隠し欄で送る。 */
-function PickerInput({ name, label, noun, items, defaultValue, placeholder, icon, required = false, clearable = false }: {
+function PickerInput({ name, label, noun, items, defaultValue, placeholder, icon, required = false, clearable = false, onPickingChange }: {
   name: string
   label: string
   noun: string
@@ -83,20 +84,22 @@ function PickerInput({ name, label, noun, items, defaultValue, placeholder, icon
   icon?: LucideIcon
   required?: boolean
   clearable?: boolean
+  onPickingChange?: (dirty: boolean) => void
 }) {
   const [value, setValue] = useState(defaultValue)
   return <SharedField label={label} required={required}>
     <>
-      <SaveErrorField names={[name]}><EntityPickerField label={label} noun={noun} icon={icon} items={items} value={value} onChange={setValue} placeholder={placeholder} clearable={clearable} /></SaveErrorField>
+      <SaveErrorField names={[name]}><EntityPickerField label={label} noun={noun} icon={icon} items={items} value={value} onChange={setValue} onSelect={id => onPickingChange?.(id !== value)} onClose={() => onPickingChange?.(false)} placeholder={placeholder} clearable={clearable} /></SaveErrorField>
       <input type="hidden" name={name} value={value} />
     </>
   </SharedField>
 }
 
-export function StoreLineAccountSelect({ accounts, stores, currentStore }: {
+export function StoreLineAccountSelect({ accounts, stores, currentStore, onPickingChange }: {
   accounts: AccountWithStats[]
   stores: RestaurantStore[]
   currentStore?: RestaurantStore
+  onPickingChange?: (dirty: boolean) => void
 }) {
   const usedByAccount = new Map(stores.filter((item) => item.line_account_id).map((item) => [item.line_account_id!, item.id]))
   const items: EntityPickerItem[] = accounts.map((account) => {
@@ -113,27 +116,31 @@ export function StoreLineAccountSelect({ accounts, stores, currentStore }: {
   })
   return (
     <div className={styles.fieldWide}>
-      <PickerInput name="lineAccountId" label="LINE公式アカウント" noun="LINE公式アカウント" icon={MessageCircle} items={items} defaultValue={currentStore?.line_account_id || ''} required />
+      <PickerInput name="lineAccountId" label="LINE公式アカウント" noun="LINE公式アカウント" icon={MessageCircle} items={items} defaultValue={currentStore?.line_account_id || ''} onPickingChange={onPickingChange} required />
     </div>
   )
 }
 
 /** 店舗の追加・編集（窓 ）。 */
-export function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel }: {
+export function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel, onDirtyChange }: {
   store?: RestaurantStore
   accounts: AccountWithStats[]
   stores: RestaurantStore[]
   busy: boolean
   onSubmit: (form: FormData) => void
   onCancel: () => void
+  onDirtyChange?: (dirty: boolean) => void
 }) {
+  const formDirty = useFormInputDirty(true)
+  const [picking, setPicking] = useState(false)
+  useLayoutEffect(() => { onDirtyChange?.(formDirty.dirty || picking) }, [formDirty.dirty, picking, onDirtyChange])
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     onSubmit(new FormData(event.currentTarget))
   }
   return (
     <form key={store?.id ?? 'new'} onSubmit={submit} className={styles.form}>
-      <div className={styles.formGrid}>
+      <div className={styles.formGrid} ref={formDirty.ref as React.Ref<HTMLDivElement>} onChangeCapture={formDirty.onChangeCapture} onChange={formDirty.onChange} onClickCapture={formDirty.onClickCapture}>
         <Field label="店舗名" name="name" defaultValue={store?.name} required />
         <Field label="店舗コード" name="code" defaultValue={store?.code} required />
         <Field label="エリア" name="area" defaultValue={store?.area || ''} />
@@ -142,7 +149,7 @@ export function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel }:
         {store ? (
           <SharedField label={<><span className={styles.fieldLabel}>状態</span></>}><DefaultSelect name="status" ariaLabel="状態" defaultValue={store.status} options={[{ value: 'active', label: '有効' }, { value: 'paused', label: '停止中' }, { value: 'archived', label: 'アーカイブ' }]} /></SharedField>
         ) : null}
-        <StoreLineAccountSelect accounts={accounts} stores={stores} currentStore={store} />
+        <StoreLineAccountSelect accounts={accounts} stores={stores} currentStore={store} onPickingChange={setPicking} />
       </div>
       <div className={styles.formActions}>
         <Button type="button" disabled={busy} onClick={onCancel}>キャンセル</Button>
@@ -255,9 +262,10 @@ export function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: 
 }
 
 /** ログインとの連携（窓  の中。今の画面では表の中にあった）。 */
-export function LoginConnection({ member, logins, busy, save }: { member: RestaurantMembership; logins: RestaurantLoginMember[]; busy: boolean; save: (id: string | null) => void }) {
+export function LoginConnection({ member, logins, busy, save, onDirtyChange }: { member: RestaurantMembership; logins: RestaurantLoginMember[]; busy: boolean; save: (id: string | null) => void; onDirtyChange: (dirty: boolean) => void }) {
   const [selected, setSelected] = useState(member.staff_id || '')
   useEffect(() => setSelected(member.staff_id || ''), [member.staff_id])
+  useLayoutEffect(() => { onDirtyChange(selected !== (member.staff_id || '')) }, [selected, member.staff_id, onDirtyChange])
   return (
     <div className={styles.loginBox}>
       <span className={styles.fieldLabel}>ログインとの連携</span>
@@ -273,25 +281,29 @@ export function LoginConnection({ member, logins, busy, save }: { member: Restau
 }
 
 /** ユーザーの追加・変更（窓 ）。 */
-export function MemberForm({ member, stores, busy, onSubmit, onCancel, login }: {
+export function MemberForm({ member, stores, busy, onSubmit, onCancel, login, onDirtyChange }: {
   member?: RestaurantMembership
   stores: RestaurantStore[]
   busy: boolean
   onSubmit: (form: FormData) => void
   onCancel: () => void
   login?: ReactNode
+  onDirtyChange?: (dirty: boolean) => void
 }) {
+  const formDirty = useFormInputDirty(true)
+  const [picking, setPicking] = useState(false)
+  useLayoutEffect(() => { onDirtyChange?.(formDirty.dirty || picking) }, [formDirty.dirty, picking, onDirtyChange])
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     onSubmit(new FormData(event.currentTarget))
   }
   return (
     <form key={member?.id ?? 'new'} onSubmit={submit} className={styles.form}>
-      <div className={`${styles.formGrid} ${styles.memberGrid}`}>
+      <div className={`${styles.formGrid} ${styles.memberGrid}`} ref={formDirty.ref as React.Ref<HTMLDivElement>} onChangeCapture={formDirty.onChangeCapture} onChange={formDirty.onChange} onClickCapture={formDirty.onClickCapture}>
         <Field label="氏名" name="staffName" defaultValue={member?.staff_name} required />
         <Field label="メール" name="email" type="email" defaultValue={member?.email ?? ''} />
         <SharedField label={<><span className={styles.fieldLabel}>役割</span></>}><DefaultSelect name="role" ariaLabel="役割" defaultValue={member?.role ?? 'staff'} options={(['staff', 'store_manager', 'super_admin'] as const).map(value => ({ value, label: roleLabel[value] }))} /></SharedField>
-        <PickerInput name="storeId" label="担当店舗" noun="店舗" items={stores.map((s) => ({ id: s.id, name: s.name, meta: [s.code, s.area].filter(Boolean).join('・') || undefined, keywords: s.code }))} defaultValue={member?.store_id ?? ''} placeholder="全店舗" clearable />
+        <PickerInput name="storeId" label="担当店舗" noun="店舗" items={stores.map((s) => ({ id: s.id, name: s.name, meta: [s.code, s.area].filter(Boolean).join('・') || undefined, keywords: s.code }))} defaultValue={member?.store_id ?? ''} onPickingChange={setPicking} placeholder="全店舗" clearable />
         <Field label="LINE通知UID" name="lineUid" defaultValue={member?.line_uid ?? ''} />
         <Field label="Googleメール" name="googleEmail" type="email" defaultValue={member?.google_email ?? ''} />
       </div>

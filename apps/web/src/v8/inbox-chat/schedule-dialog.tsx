@@ -35,6 +35,7 @@ export type ScheduledRowView = {
 
 export default function ScheduleSendDialog({
   open,
+  accountId,
   onClose,
   content,
   hasImage,
@@ -52,6 +53,7 @@ export default function ScheduleSendDialog({
   now,
 }: {
   open: boolean
+  accountId: string | null
   onClose: () => void
   /** 書く欄の本文（送るもの） */
   content: string
@@ -92,7 +94,7 @@ export default function ScheduleSendDialog({
       confirmDisabled={Boolean(disabledReason)}
       confirmDisabledReason={disabledReason}
     >
-      <OperationTargetSummary accounts={[{ id: '' }]} />
+      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
       <div className={styles.schBox}>
         <p className={styles.schBoxLabel}>送るもの</p>
         <p className={styles.schBoxValue}>

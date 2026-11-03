@@ -42,7 +42,7 @@ function shortDate(iso: string): string {
 
 const FIELD_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
 
-export default function MergedPersonV8({ personId, onClose }: { personId: string; onClose: () => void }) {
+export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { personId: string; onClose: () => void; onDirtyChange?: (dirty: boolean) => void }) {
   usePageTitle('統合ユーザーの詳細')
   const m = useMergedPerson(personId)
   const staffRole = useStaffRole()
@@ -192,6 +192,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
       </DetailColumns></PageContent>
 
       <MergedDeliveryDialog
+        onDirtyChange={onDirtyChange}
         open={m.editing}
         priorities={person.deliveryPriorities}
         revision={person.revision}
@@ -201,6 +202,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
         onSave={m.save}
       />
       <MergedProfileDialog
+        onDirtyChange={onDirtyChange}
         open={m.profileEditing}
         candidates={person.profileCandidates}
         sourceLabels={comparisonSourceLabels(person.linkedFriends.map((friend) => ({ id: friend.friendId, name: friend.displayName, source: friend.lineAccountName })))}

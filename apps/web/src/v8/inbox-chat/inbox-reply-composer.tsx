@@ -373,6 +373,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
         {(
           <ScheduleSendDialog
             open={showSchedulePanel}
+            accountId={selectedAccountId}
             onClose={() => setShowSchedulePanel(false)}
             content={messageContent}
             hasImage={Boolean(pendingImage)}
@@ -422,7 +423,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           onCancel={() => setPendingPack(null)}
           busy={sending}
         >
-          {pendingPack ? <OperationTargetSummary accounts={[{ id: '' }]} /> : null}
+          {pendingPack ? <OperationTargetSummary accounts={[{ id: pendingPack.accountId ?? '' }]} /> : null}
           {pendingPack ? (
             <ol className="max-h-56 space-y-2 overflow-y-auto">
               {pendingPack.texts.map((text, index) => (

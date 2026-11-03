@@ -16,6 +16,8 @@ const routerPush = vi.hoisted(() => vi.fn())
 const remindersDelete = vi.hoisted(() => vi.fn())
 const account = vi.hoisted(() => ({ id: 'account-a' }))
 
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '別店舗' }] }) }))
+
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
@@ -149,7 +151,8 @@ describe('リマインダ一覧の行操作', () => {
     await flush()
     // 削除の確認が出る（確認の窓は body 直下の portal）。行の詳細遷移（router.push）は動かない。
     expect(document.body.textContent).toContain('「予約前のお知らせ」を削除しますか？')
-    expect(document.body.textContent).toContain('名前を確認できません')
+    expect(document.body.textContent).toContain('本店')
+    expect(document.body.textContent).not.toContain('別店舗')
     expect(document.querySelector('[data-design-node="VsSyu"]')?.textContent).toContain('環境')
     expect(routerPush).not.toHaveBeenCalled()
   })

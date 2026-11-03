@@ -2,7 +2,7 @@
 
 import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AutoLineRule } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
@@ -20,6 +20,9 @@ import { ecAutoLineApi } from '@/lib/api/helpers/gap3'
 import { KIND_LABEL, KIND_WHO, WAIT_CHOICES, failureText, ruleText, waitLabel } from './words'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './auto-line.module.css'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 /*
  * ★V8 EC連携「自動の LINE」を編集する右の引き出し（G6-2 `DuGA3`）。
@@ -49,6 +52,10 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
   const kind = rule?.kind
   const tokenNames = useInsertTokenNames(rule ? accountId : null)
   const ruleKey = rule ? `${rule.kind}:${rule.version}` : ''
+  const dirty = Boolean(rule && (wait !== rule.waitMinutes || text !== (ruleText(rule.messages) || DEFAULT_TEXT[rule.kind])))
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: Boolean(rule) && (dirty || busy), busy: Boolean(rule) && busy, onDiscard: onClose })
+  useEffect(() => { guard.cancelLeave() }, [ruleKey, accountId, guard.cancelLeave])
 
   useEffect(() => {
     if (!rule) return
@@ -87,7 +94,7 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
   }
 
   return (
-    <SaveErrorScope errors={errors}><Drawer
+    <SaveErrorScope errors={errors}><><Drawer
       open
       width="editor"
       heightMode="viewport"
@@ -95,7 +102,7 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
       description={KIND_WHO[kind]}
       closeAppearance="box"
       busy={busy}
-      dirty={wait !== rule.waitMinutes || text !== (ruleText(rule.messages) || DEFAULT_TEXT[kind])}
+      dirty={dirty}
       onClose={onClose}
       footer={<div className={styles.footerCenter}>
         <Button onClick={onClose} disabled={busy}>キャンセル</Button>
@@ -141,7 +148,7 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
           </div>
         </div>
       </div>
-    </Drawer></SaveErrorScope>
+    </Drawer><OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></OverlayDepthContext.Provider></></SaveErrorScope>
   )
 }
 
