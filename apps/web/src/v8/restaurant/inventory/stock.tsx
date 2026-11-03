@@ -46,7 +46,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  *
  * 案内の帯 → 左：席と枠の配分（卓とつながる）→ 時間帯ごとの在庫の表 → 開ける時間
  * （先頭に「行を押したとき：その時間帯の配分だけ直す」の箱）、右：選んだ時間帯の卓 → 下の帯
- * （開ける時間と配分を保存）。ほかの担当者が先に保存していたら（409）競合の帯を出し、
+ * （受付時間と配分を保存）。ほかの担当者が先に保存していたら（409）競合の帯を出し、
  * 比べてから保存するか、最新を読み込んで続ける。
  * データの口・送る形は今の画面（app/restaurant-test/v8/inventory.tsx）と同じ。動きは BEHAVIOR.md。
  */
@@ -321,7 +321,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
         }
         throw err
       }
-    }, '開ける時間と配分を保存しました。予約サイトへは書き戻していません。').then((ok) => {
+    }, '受付時間と配分を保存しました。予約サイトへは書き戻していません。').then((ok) => {
       if (ok) { setConflict(null); setDiffOpen(false); setAllocOverride(null); setAllocVersions(null); setRefresh((n) => n + 1) }
     })
   }
@@ -593,7 +593,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
               {conflict ? (
                 <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={() => setDiffOpen(true)}><Check size={16} aria-hidden="true" />比べてから保存</Button>
               ) : (
-                <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy || allocInvalid || (!hoursDraft && rows.length === 0) || (allocOverride === null && !hoursChanged)} disabledReason={allocOverride === null && !hoursChanged ? "変更していません" : undefined} onClick={() => saveAll(false)}><Check size={16} aria-hidden="true" />開ける時間と配分を保存</Button>
+                <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy || allocInvalid || (!hoursDraft && rows.length === 0) || (allocOverride === null && !hoursChanged)} disabledReason={allocOverride === null && !hoursChanged ? "変更していません" : undefined} onClick={() => saveAll(false)}><Check size={16} aria-hidden="true" />受付時間と配分を保存</Button>
               )}
             </>
           )}

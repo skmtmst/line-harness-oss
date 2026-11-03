@@ -261,6 +261,12 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     selectArea('A'); pickIntent('テキストを送る')
     fireEvent.change(screen.getByLabelText('このボタンの送る文'), { target: { value: '予約' } })
     click('次へ：配る先')
+    expect(await screen.findByText(/面Bの動きが未設定です/)).toBeTruthy()
+    for (const letter of ['B', 'C', 'D', 'E', 'F']) {
+      selectArea(letter); pickIntent('テキストを送る')
+      fireEvent.change(screen.getByLabelText('このボタンの送る文'), { target: { value: `案内${letter}` } })
+    }
+    click('次へ：配る先')
     expect(await screen.findByRole('heading', { name: '各アカウントで誰に出すか' })).toBeTruthy()
     expect(screen.getByText('タグが付いた人')).toBeTruthy()
     expect(screen.getByText('トークを開いたとき')).toBeTruthy()
@@ -268,7 +274,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     expect(screen.getByText('各アカウントで決める')).toBeTruthy()
     click('次へ：確かめて配る')
     expect(await screen.findByRole('heading', { name: '確かめる' })).toBeTruthy()
-    expect(screen.getByText('面 B・C・D・E・F の動きが未設定')).toBeTruthy()
+    expect(screen.queryByText(/面 B・C・D・E・F の動きが未設定/)).toBeNull()
     fireEvent.click(screen.getByRole('radio', { name: /新しく作る/ }))
     click('1 アカウントへ配る')
     await waitFor(() => expect(host.onSave).toHaveBeenCalled())

@@ -93,6 +93,7 @@ type Call = { path: string; params: URLSearchParams; method: string }
 let calls: Call[] = []
 let runsResponder: (params: URLSearchParams) => Promise<Response> | Response
 let ruleStatus = 'published'
+let ruleName: string | null = '店頭QRの初回案内'
 let stopped = false
 
 let root: Root
@@ -103,6 +104,7 @@ beforeEach(() => {
   url.set('')
   calls = []
   ruleStatus = 'published'
+  ruleName = '店頭QRの初回案内'
   stopped = false
   pageTitle.mockClear()
   runsResponder = () => json({ success: true, data: { items: [run()], total: 1, nextCursor: null, summary: SUMMARY } })
@@ -121,7 +123,7 @@ beforeEach(() => {
       return json({ success: true, data: null })
     }
     if (target.pathname === '/api/friend-add-rules/rule-shop') {
-      return json({ success: true, data: { rule: { status: stopped ? 'paused' : ruleStatus, version: 3, definition: { resendSuppressionHours: 24 } } } })
+      return json({ success: true, data: { rule: { id: 'rule-shop', accountId: target.searchParams.get('accountId') ?? 'account-a', name: ruleName, status: stopped ? 'paused' : ruleStatus, version: 3, definition: { resendSuppressionHours: 24 } } } })
     }
     return json({ success: true, data: null })
   })
@@ -282,6 +284,72 @@ describe('実行結果の数と状態', () => {
     expect(ruleCalls().length).toBe(rulesBefore + 2)
     expect(host.textContent).toContain('配信を止めました。')
     expect((buttonByText('一時停止する') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+
+  it('複数ルールの結果では止めるルール名を確認に示す', async () => {
+    runsResponder = () => json({ success: true, data: { items: [run(), run({ id: 'run-other', rule: { id: 'rule-other', name: '別の案内', versionId: 'v2', versionNumber: 1 } })], total: 2, nextCursor: null, summary: SUMMARY } })
+    await render()
+    await act(async () => { buttonByText('一時停止する')?.click() })
+    const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+    expect(dialog.textContent).toContain('店頭QRの初回案内')
+    expect(dialog.textContent).not.toContain('別の案内')
+  })
+  it('停止対象のルール名を取得できない時は確認を開始しない', async () => {
+    ruleName = null
+    await render()
+    const button = buttonByText('一時停止する') as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    expect(button.title).toContain('ルール名')
+    expect(stopped).toBe(false)
+  })
+
+
+  it('確認後にルール名が変わったら停止せず読み直しを案内する', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')?.click() })
+    ruleName = '変更後の案内'
+    await act(async () => { buttonByText('止める')?.click() })
+    await settle()
+    expect(stopped).toBe(false)
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('読み直し')
+  })
+
+  it('配信停止の確認に対象アカウントと環境を示す', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')?.click() })
+    const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
+  })
+
+  it('アカウントを切り替えて戻しても古い確認から停止しない', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')?.click() })
+    const button = buttonByText('止める')!
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    account.id = 'account-b'; await render()
+    account.id = 'account-a'; await render()
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(stopped).toBe(false)
+  })
+
+  it('停止前の読み取り中に対象が変わったら停止要求を送らない', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')?.click() })
+    const original = globalThis.fetch
+    let resolve!: (value: Response) => void
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      const target = new URL(String(input))
+      if (target.pathname === '/api/friend-add-rules/rule-shop' && (init?.method ?? 'GET') === 'GET') return new Promise<Response>(done => { resolve = done })
+      return original(input, init)
+    })
+    await act(async () => { buttonByText('止める')?.click() })
+    expect(resolve).toBeTypeOf('function')
+    account.id = 'account-b'; await render()
+    await act(async () => { resolve(json({ success: true, data: { rule: { version: 3 } } })); await Promise.resolve() })
+    expect(stopped).toBe(false)
   })
 })
 

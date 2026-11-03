@@ -321,6 +321,14 @@ afterEach(() => {
 })
 
 describe('kDQHr デリバリー受注', () => {
+  it('注文がないときは選んだ状態に合う案内を出す', async () => {
+    fixture.orders.mockImplementation(async (_account, options) => ({ ...ordersData([]), tab: options.tab }))
+    at('/restaurant-test/delivery?tab=all')
+    render(<DeliveryPage />)
+    expect(await screen.findByText('注文はまだありません')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: /新着/ }))
+    expect(await screen.findByText('この状態の注文はありません')).toBeTruthy()
+  })
   it('注文一覧の板・サービス3枚・新着の操作を出す', async () => {
     render(<DeliveryPage />)
 

@@ -30,6 +30,15 @@ describe('V8-B イベントを作る（d4adD4）', () => {
     expect(getPageAction({ name: '下書きを保存' })).toBeTruthy()
   })
 
+  it('申し込み受付のLINE通知は常に送る理由を見える形で知らせる', async () => {
+    await act(async () => { render(<EventsNew />) })
+    const toggle = screen.getByRole('switch', { name: '申込を受けたら LINE で知らせる' }) as HTMLButtonElement
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    expect(toggle.disabled).toBe(true)
+    const description = document.getElementById(toggle.getAttribute('aria-describedby') ?? '')
+    expect(description?.textContent).toContain('申込の受付は、いつも LINE でお知らせします')
+  })
+
   it('アカウントが無いときは選ぶ案内になり、保存も送信もしない', async () => {
     account.id = null
     await act(async () => { render(<EventsNew />) })

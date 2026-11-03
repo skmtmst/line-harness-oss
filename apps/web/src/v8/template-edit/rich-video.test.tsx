@@ -21,6 +21,12 @@ const draft:RichVideoDraft={name:'動画',folderId:'',originalContentUrl:'https:
 function stored(button=true){return {...richVideoContent({...draft,buttonEnabled:button}),baseUrl:'https://worker.example/images/imagemaps/map'}}
 beforeEach(()=>{vi.clearAllMocks();mocks.role = verifiedStaffRole('owner');mocks.account='a';mocks.get.mockResolvedValue({success:true,data:{id:'r',accountId:'a',name:'動画',messageType:'imagemap',messageContent:JSON.stringify(stored()),publishedVersion:1,draftRevision:0}});mocks.update.mockResolvedValue({success:true,data:{id:'r'}})})
 afterEach(cleanup)
+it('動画のプレビューは配信日時を決めつけない', () => {
+  render(<Editor />)
+  expect(screen.queryByText('配信日 10:00')).toBeNull()
+  expect(screen.getByText('今日')).toBeTruthy()
+})
+
 describe('リッチビデオ編集',()=>{
  it('統括は店を選ばず取り込み、ひな形の口へ保存して配る（Ni0V8）',async()=>{
   mocks.account='';

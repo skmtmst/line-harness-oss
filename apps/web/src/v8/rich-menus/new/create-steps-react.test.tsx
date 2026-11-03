@@ -21,8 +21,9 @@ vi.mock('@/lib/hq-rich-menu-draft-store', () => ({
   writeHqRichMenuDraft: async (key: string, value: unknown) => { hqDraftMemory.set(key, value) },
   clearHqRichMenuDraft: async (key: string) => { hqDraftMemory.delete(key) },
 }))
+const accountState = vi.hoisted(() => ({ id: 'acc-1' }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: ACCOUNT, loading: false }),
+  useAccount: () => ({ selectedAccountId: accountState.id, selectedAccount: { ...ACCOUNT, id: accountState.id }, loading: false }),
 }))
 const push = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({
@@ -111,6 +112,7 @@ function currentStep(): string {
 }
 
 beforeEach(() => {
+  accountState.id = 'acc-1'
   failing = {}
   hqDraftMemory.clear()
   groupBody = GROUP
@@ -179,6 +181,36 @@ describe('リッチメニューを直す：下書きの読み込み', () => {
 })
 
 describe('リッチメニューを作る：面の動きの欄', () => {
+  it('公開確認には保存したメニューのアカウントと環境を出す', async () => {
+    await open('?id=rmg-x&step=publish')
+    await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) })
+    await settle()
+    const dialog = screen.getByRole('dialog', { name: '公開の確認' })
+    expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
+    expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
+  it('表示先を決めない公開確認では、友だちの画面に出ないと示す', async () => {
+    groupBody = { ...GROUP, isDefaultForAll: false, targetingEnabled: false }
+    await open('?id=rmg-x&step=publish')
+    await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) })
+    const dialog = await screen.findByRole('dialog', { name: '公開の確認' })
+    expect(dialog.textContent).toContain('この操作だけでは、友だちのトーク画面には出ません')
+    expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
+  it('確認中にアカウントを切り替えて戻した後、古い公開を送らない', async () => {
+    await open('?id=rmg-x&step=publish')
+    await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) }); await settle()
+    const button = within(screen.getByRole('dialog', { name: '公開の確認' })).getByRole('button', { name: '公開する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    await act(async () => { accountState.id = 'acc-2'; root.render(<RichMenuCreateV8 editGroupId="rmg-x" />) })
+    await act(async () => { accountState.id = 'acc-1'; root.render(<RichMenuCreateV8 editGroupId="rmg-x" />) })
+    await act(async () => { await handler({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+    expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
   it.each([1, 2])('公開前に%d枚目の名前の空いた面を開いて欄の下に理由を出し、入力すると消す', async (pageNumber) => {
     const first = { ...GROUP.pages[0], areas: GROUP.pages[0].areas.map(area => ({ ...area })) }
     const pages = pageNumber === 1 ? [first] : [first, { ...first, id: 'p-next', orderIndex: 1, name: '次のページ', aliasId: 'a-next', areas: [area('next-area', '', 0)] }]

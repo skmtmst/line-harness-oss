@@ -132,6 +132,7 @@ describe('現役V8へ残す旧編集の動き', () => {
   it('取り下げの部分失敗を種類ごとに日本語で知らせ、内部IDを出さず再試行できる', async () => {
     net.unpublish.mockResolvedValueOnce({ success: true, data: { warnings: ['delete alias secret-1: down', 'delete alias secret-2: down', 'delete richmenu private-3', 'default lookup/clear: down', 'unknown detail'] } })
     const dialog = await openUnpublish()
+    expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
     fireEvent.click(within(dialog).getByRole('button', { name: 'LINEから取り下げる' }))
     await within(dialog).findByText(/切り替え設定の一部を取り下げきれていません/)
     const text = dialog.textContent ?? ''

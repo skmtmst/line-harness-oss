@@ -94,7 +94,7 @@ export function SetupTasks({ summary, onOpenStep, heading = false, configureAllo
         <p className={styles.done}>
           {heading ? null : <><CircleCheck aria-hidden="true" className={styles.doneIcon} /><span className={styles.doneText}>{doneText}</span></>}
           <span className={styles.spacer} />
-          <Button variant="text" lockedReason={configureAllowed ? undefined : '中身はオーナーか管理者が見られます'} onClick={() => { if (configureAllowed) onOpenStep(0) }}>済んだ物を見る</Button>
+          <Button variant="text" lockedReason={configureAllowed ? undefined : '中身はオーナーか管理者が見られます'} onClick={() => { if (configureAllowed) onOpenStep(0) }}>設定を確認する</Button>
         </p>
       ) : null}
       {preparing.dialog}
