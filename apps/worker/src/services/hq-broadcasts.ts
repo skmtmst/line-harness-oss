@@ -122,8 +122,8 @@ const retryableWhere = `((s.state='failed' AND s.error_code IN ('line_http_429',
 const availableWhere = `EXISTS(SELECT 1 FROM friends f WHERE f.id=s.friend_id AND f.line_account_id=b.line_account_id
   AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND ${DELIVERY_CONSENT_ALLOWED_SQL})`;
 async function draftAudienceQuery(db:D1Database,broadcastId:string) {
-  const b=await db.prepare('SELECT status,segment_conditions,line_account_id,stopped_at,batch_offset FROM broadcasts WHERE id=?').bind(broadcastId).first<{status:string;segment_conditions:string|null;line_account_id:string|null;stopped_at:string|null;batch_offset:number}>();
-  if(!b||!b.segment_conditions||!(b.status==='draft'||(b.status==='sending'&&b.stopped_at!==null&&b.batch_offset!==-1)))return null;
+  const b=await db.prepare('SELECT status,segment_conditions,line_account_id,stopped_at FROM broadcasts WHERE id=?').bind(broadcastId).first<{status:string;segment_conditions:string|null;line_account_id:string|null;stopped_at:string|null}>();
+  if(!b||!b.segment_conditions||!(b.status==='draft'||(b.status==='sending'&&b.stopped_at!==null)))return null;
   const prior=await db.prepare('SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=? LIMIT 1').bind(broadcastId).first();
   if(prior)return null;
   const query=await scopeStoredBroadcastSegmentQuery(db,buildBroadcastAudienceQuery(JSON.parse(b.segment_conditions)),b.line_account_id);
@@ -192,7 +192,7 @@ export async function retryHqBroadcastTarget(db:D1Database,run:RunRow,accountId:
         return readHqBroadcastResult(db,await getHqBroadcastRun(db,run.tenant_id,run.id));
       }
       const update=db.prepare(`UPDATE broadcasts SET status='scheduled',scheduled_at=?,stopped_at=NULL,stopped_by=NULL,lock_version=lock_version+1,total_count=?
-        WHERE id=? AND (status='draft' OR (status='sending' AND stopped_at IS NOT NULL AND batch_offset<>-1)) AND lock_version=? AND NOT EXISTS(SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=?)
+        WHERE id=? AND (status='draft' OR (status='sending' AND stopped_at IS NOT NULL)) AND lock_version=? AND NOT EXISTS(SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=?)
         AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND status<>'cancelled')
         AND ?=(SELECT COALESCE(json_group_array(friend_id),'[]') FROM (SELECT friend_id FROM (${snapshot.draft.sql}) ORDER BY friend_id))`)
         .bind(new Date().toISOString(),snapshot.ids.length,broadcast.id,version,broadcast.id,run.id,snapshot.json,...snapshot.draft.bindings);
@@ -217,7 +217,7 @@ export async function retryHqBroadcastTarget(db:D1Database,run:RunRow,accountId:
   if(!snapshot.ids.length)throw new StampError('やり直せる一時的な失敗がありません',409);
   const update=db.prepare(`UPDATE broadcasts SET send_attempt_no=send_attempt_no+1,status='sending',sent_at=NULL,stopped_at=NULL,stopped_by=NULL,
     batch_offset=0,batch_lock_at=NULL,lock_version=lock_version+1 WHERE id=? AND lock_version=? AND (status='sent' OR (status='sending' AND stopped_at IS NOT NULL))
-    AND (batch_offset<>-1 OR (status='sent' AND batch_lock_at IS NULL)) AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND status<>'cancelled')
+    AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND status<>'cancelled')
     AND ?=(SELECT COALESCE(json_group_array(friend_id),'[]') FROM (SELECT s.friend_id FROM broadcast_send_claims s JOIN broadcasts b ON b.id=s.broadcast_id WHERE s.broadcast_id=? AND ${retryableWhere} AND ${availableWhere} ORDER BY s.friend_id))`)
     .bind(broadcast.id,version,run.id,snapshot.json,broadcast.id);
   const reopen=db.prepare(`UPDATE broadcast_send_claims SET state='claimed',attempt_no=(SELECT send_attempt_no FROM broadcasts WHERE id=?),dispatched_at=NULL,settled_at=NULL,error_code=NULL,updated_at=datetime('now')

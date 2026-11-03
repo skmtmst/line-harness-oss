@@ -21,13 +21,13 @@ describe('統括の一括配信',()=>{
   const {readHqBroadcastResult}=await import('./hq-broadcasts.js');
   expect((await readHqBroadcastResult(f.db,await getHqBroadcastRun(f.db,tenant,r.id))).targets[0].retryableCount).toBe(2);
  });
- it('停止前の送信処理が動いている間は再送を受け付けない',async()=>{
+ it('停止前の処理が残っていても版を更新して再送できる',async()=>{
   const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
   const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
   f.raw.prepare("UPDATE broadcasts SET status='sending',stopped_at=datetime('now'),batch_offset=-1 WHERE id=?").run(child);
   f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'friend-shop1','failed','stopped_before_dispatch')").run(child);
-  await expect(retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1','owner',1)).rejects.toMatchObject({status:409});
-  expect(f.raw.prepare('SELECT stopped_at,batch_offset FROM broadcasts WHERE id=?').get(child)).toMatchObject({batch_offset:-1});
+  await retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1','owner',1);
+  expect(f.raw.prepare('SELECT stopped_at,batch_offset,lock_version FROM broadcasts WHERE id=?').get(child)).toEqual({stopped_at:null,batch_offset:0,lock_version:2});
  });
  it('人数が同じでも再送対象が変わったら409で止める',async()=>{
   const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});

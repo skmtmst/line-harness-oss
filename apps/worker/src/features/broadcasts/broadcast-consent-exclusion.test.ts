@@ -108,7 +108,7 @@ describe('637: 停止者を外して一斉配信を続ける', () => {
     expect(f.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(child)).toEqual({status:'scheduled'});
     expect(sentIds()).toEqual([]);
   });
-  it('処理中に停止しても古い送信が終わるまで再送を開始しない',async()=>{
+  it('処理中に停止して再送しても古い処理が新しい試行を壊さない',async()=>{
     let entered!:()=>void,release!:()=>void;
     const started=new Promise<void>(resolve=>{entered=resolve}),wait=new Promise<void>(resolve=>{release=resolve});
     calls.multicast.mockImplementationOnce(async()=>{entered();await wait;return {requestId:'mock'};});
@@ -119,9 +119,10 @@ describe('637: 停止者を外して一斉配信を続ける', () => {
     await stopHqBroadcast(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'owner',false,2);
     f.raw.prepare("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('retry','U-retry','shop')").run();
     f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'retry','failed','line_http_429')").run(child);
-    await expect(retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'shop','owner',2)).rejects.toMatchObject({status:409});
+    await retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'shop','owner',2);
     release();await pending;
-    expect(calls.multicast).toHaveBeenCalledTimes(1);
+    await processQueuedBroadcasts(f.db,calls as never);
+    expect(sentIds().sort()).toEqual(['U-allowed','U-retry','U-stopped','U-unknown']);
   });
   it.each([false,true])('即時・名前差し込み=%s: 全員の指定を保ち、停止/不明だけ除き、再実行でも重複しない', async personalized => {
     consent('stopped');consent('stopped','unknown','news');consent('unknown','unknown');
