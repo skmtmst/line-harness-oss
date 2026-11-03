@@ -8,7 +8,7 @@ export async function readAccountAttention(
   detailLimit: 1 | 100 = 100,
 ) {
   const queries: Record<string, string> = {
-    unhandledChats: `SELECT id,'/chats' href FROM chats WHERE line_account_id=? AND status IN('unread','in_progress','on_hold')`,
+    unhandledChats: `SELECT c.id,'/chats' href FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.status IN('unread','in_progress','on_hold')`,
     pendingBookings: `SELECT id,'/booking/bookings' href FROM bookings WHERE line_account_id=? AND status='requested' UNION ALL SELECT id,'/events/bookings' href FROM event_bookings WHERE line_account_id=? AND status='requested' UNION ALL SELECT r.id,'/restaurant-test/reservations' href FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE s.line_account_id=? AND r.status='pending' AND r.hold_expires_at IS NULL`,
     unpaid: `SELECT id FROM booking_payments WHERE line_account_id=? AND status IN('unpaid','pending','failed')`,
     connections: `SELECT id,'/accounts' href FROM line_account_connection_checks c WHERE line_account_id=? AND result IN('failed','mismatched','unconfigured') AND NOT EXISTS(SELECT 1 FROM line_account_connection_checks n WHERE n.line_account_id=c.line_account_id AND n.check_kind=c.check_kind AND n.checked_at>c.checked_at)`,
@@ -27,7 +27,7 @@ export async function readAccountAttention(
     }
     // 件数から開く行き先は、明細の既存の行き先と分けて維持する。
     const targetSql = sql
-      .replace("'/chats' href", "'/chats?status='||status href")
+      .replace("'/chats' href", "'/chats?status='||c.status href")
       .replace("'/booking/bookings' href", "'/booking/bookings?view=list&status=requested' href")
       .replace("'/events/bookings' href", "'/events/bookings?id='||event_id href")
       .replace("'/restaurant-test/reservations' href", "'/restaurant-test/reservations?view=list' href")
