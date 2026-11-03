@@ -769,7 +769,7 @@ export default function ScenarioFirstStepV8() {
             {/* 種類。作れないもの（紹介）も並べたうえで押せなくし、理由を title に出す。 */}
             <div className={styles.kindRow} role="radiogroup" aria-label="送るものの種類">
               {STEP_MESSAGE_KINDS.map((item, index) => [
-                /* 1152 の板は5つ目（カルーセル）のあとで2段目へ折る。広い幅では消える。 */
+                /* 1152 の板は5つ目のあとで2段目へ折る。広い幅では消える。 */
                 index === 5 ? <span key="break" className={styles.kindBreak} aria-hidden="true" /> : null,
                 <button
                   key={item.value}
