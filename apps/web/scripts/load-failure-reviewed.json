@@ -43,7 +43,7 @@
   },
   {
     "filename": "src/app/booking/staff/page.tsx",
-    "fingerprint": "057253e9c2455109",
+    "fingerprint": "b21b4ac505ed53ef",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
@@ -407,7 +407,7 @@
   },
   {
     "filename": "src/v8/mileage/reward-edit.tsx",
-    "fingerprint": "3033c39c854fcff7",
+    "fingerprint": "414a56a609783ec7",
     "disposition": "error-visible",
     "count": 1,
     "reason": "B-246：失敗は保存の知らせへ表示。空配列は完了した工程の記録で、取得データを空にしていない。"
