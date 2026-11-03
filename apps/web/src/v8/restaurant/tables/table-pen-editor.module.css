@@ -1,0 +1,43 @@
+.columns{display:grid;grid-template-columns:1fr 1fr;gap:24px;color:#202124;font-size:13px}
+.col{min-width:0;display:flex;flex-direction:column;gap:16px}
+.col h3{font-size:15px;margin:0 0 2px;font-weight:700}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.two label,.block,.addBox label{display:flex;flex-direction:column;gap:7px;min-width:0}
+.label{font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:8px;min-height:16px}
+.required{font-size:10px;color:#d74336;background:#fff2f1;border-radius:3px;padding:2px 5px}
+.columns input:not([type=checkbox]),.columns select{box-sizing:border-box;width:100%;height:40px;border:1px solid #d7dce1;border-radius:8px;background:#fff;padding:0 12px;font:inherit;color:#202124}
+.columns input[aria-invalid=true]{border-color:#d74336}
+.columns small{color:#d74336}
+.addLine{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:-10px}
+.addLine button{display:inline-flex;gap:4px;align-items:center;border:0;background:none;color:#00833f;font-weight:700;padding:0;cursor:pointer}
+.addLine span,.field p,.footnote{color:#65717d;font-size:11px;margin:0;line-height:1.45}
+.addBox{display:flex;flex-direction:column;gap:8px;padding:12px;background:#f7f9f8;border:1px solid #dae5dc;border-radius:8px}
+.addBox>button{align-self:flex-end;border:0;background:#00833f;color:white;border-radius:6px;padding:8px 14px;cursor:pointer}
+.field{display:flex;flex-direction:column;gap:8px}
+.choiceRow{display:flex;gap:5px;flex-wrap:wrap}
+.choice,.choiceActive{min-height:35px;border:1px solid #d7dce1;border-radius:8px;background:white;padding:0 13px;color:#28313a;font:inherit;cursor:pointer;white-space:nowrap}
+.choiceActive{border-color:#00833f;background:#e9f7ee;color:#00833f;font-weight:700}
+.shapes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.shape,.shapeActive{height:95px;border:1px solid #d7dce1;border-radius:9px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;font:inherit;font-weight:600}
+.shapeActive{border-color:#00833f;background:#f2faf5;color:#00833f}
+.shapeIcon{height:40px;display:flex;align-items:center;justify-content:center}
+.shapeIcon i{display:block;border:2px solid currentColor}
+.rectangle{width:27px;height:27px}.circle{width:29px;height:29px;border-radius:50%}.long{width:42px;height:20px}
+.switchRow{display:flex;align-items:center;gap:8px;color:#00833f;font-weight:700}
+.switchRow input{appearance:none;width:42px;height:25px;border-radius:30px;background:#c9d0d4;position:relative;cursor:pointer}
+.switchRow input:checked{background:#00833f}
+.switchRow input:before{content:'';position:absolute;width:19px;height:19px;top:3px;left:3px;border-radius:50%;background:#fff;transition:transform .2s}
+.switchRow input:checked:before{transform:translateX(17px)}
+.preview{border-radius:9px;background:#f5f6f7;padding:14px;min-height:145px}
+.preview strong{font-size:12px}.preview p{margin:5px 0 0;color:#65717d;font-size:11px}
+.previewCanvas{height:95px;display:flex;align-items:center;justify-content:center}
+.previewTable{position:relative;width:110px;height:45px;border:1px solid #00833f;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;color:#00833f;font-size:11px;font-weight:700}
+.previewTable[data-shape=circle]{width:60px;height:60px;border-radius:50%}
+.previewTable[data-shape=long]{width:125px;height:43px}
+.previewTable[data-shape=long][data-orientation=vertical]{width:43px;height:85px}
+.previewChair{position:absolute;width:16px;height:6px;border-radius:4px;background:#9da3a7}
+.previewChair[data-side=top]{top:-10px;left:calc(var(--offset)*100% - 8px)}
+.previewChair[data-side=bottom]{bottom:-10px;left:calc(var(--offset)*100% - 8px)}
+.previewChair[data-side=left]{left:-10px;top:calc(var(--offset)*100% - 8px);width:6px;height:16px}
+.previewChair[data-side=right]{right:-10px;top:calc(var(--offset)*100% - 8px);width:6px;height:16px}
+@media(max-width:760px){.columns{grid-template-columns:1fr}.col{gap:14px}}
