@@ -61,7 +61,7 @@ retry() {
       echo "[NG] $max 回試しても通りませんでした: $*" >&2
       return 1
     fi
-    echo "  失敗しました（$attempt/$max）。${wait_sec} 秒待って打ち直します。" >&2
+    echo "  失敗しました（${attempt}/${max}）。${wait_sec} 秒待って打ち直します。" >&2
     sleep "$wait_sec"
     attempt=$((attempt + 1))
   done
@@ -88,7 +88,7 @@ echo "クリーンです。"
 SHA="${WORKERS_CI_COMMIT_SHA:-$(git rev-parse HEAD)}"
 VERSION="$(node -p "require('./package.json').version")"
 RELEASED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-echo "配備元: $SHA（version $VERSION）"
+echo "配備元: ${SHA}（version ${VERSION}）"
 echo "モード: $MODE"
 
 if [ "$SKIP_MIGRATE" = "1" ]; then

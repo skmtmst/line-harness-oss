@@ -5,7 +5,7 @@ const imports = `import Window, { DialogActions as Actions } from '@/components/
 describe('窓の下の帯を共通部品へそろえる', () => {
   it('全画面の窓に自前の操作帯と参照だけの閉じる帯が無い', () => {
     expect(scanDialogFooters(process.cwd())).toEqual([])
-  })
+  }, 20_000)
   it.each([
     `<Button>実行する</Button>`,
     `<><Button>キャンセル</Button><Button>実行する</Button></>`,

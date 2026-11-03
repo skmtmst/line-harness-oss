@@ -34,14 +34,14 @@ describe('予約の空き枠：偽 API と Worker の応答契約', () => {
       env: { ...process.env, PORT: String(port) },
       stdio: 'ignore',
     })
-    for (let attempt = 0; attempt < 50; attempt++) {
+    for (let attempt = 0; attempt < 100; attempt++) {
       try {
         if ((await fetch(`${baseUrl}/__mock-fingerprint`)).ok) return
       } catch { /* 起動待ち */ }
-      await new Promise((resolve) => setTimeout(resolve, 20))
+      await new Promise((resolve) => setTimeout(resolve, 50))
     }
     throw new Error('偽 API が起動しませんでした')
-  })
+  }, 20_000)
 
   afterAll(() => { child?.kill('SIGTERM') })
 

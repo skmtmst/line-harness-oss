@@ -462,6 +462,7 @@
 
 ## 反映履歴
 
+- [無料プラン向け本番配備の本人確認ゲート](release-log/unreleased/2073-masato-production-owner-gate.md)
 - [統括・運営メンバー画面の本人パスキー設定と一覧配置](release-log/unreleased/2026-11-03-masato-hq-ops-passkeys-ui.md)
 - [統括メンバーの本人パスキー設定](release-log/unreleased/2026-11-03-masato-hq-passkeys.md)
 - [統括から引き継いだユーザーの一覧表示](release-log/unreleased/2069-masato-hq-inherited-users.md)

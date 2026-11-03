@@ -1,4 +1,4 @@
-import { findDirectMediaUsages } from '../features/media/direct-media-usages.js';
+import { findDirectMediaUsages } from '../features/media/index.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';

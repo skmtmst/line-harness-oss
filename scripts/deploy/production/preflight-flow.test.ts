@@ -5,7 +5,7 @@ import { preflight } from './preflight.js';
 const sha = 'a'.repeat(40), main = 'b'.repeat(40), repository = 'owner/repository';
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 function fixture(failure = '') {
-  for (const [name, value] of Object.entries({ SECURITY_WORKER_NAME: unstable_readConfig({config: 'apps/worker/wrangler.toml'}).name, PAGES_PROJECT_NAME: unstable_readConfig({config: 'apps/worker/wrangler.toml'}).vars.ADMIN_PAGES_PROJECT, NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'synthetic-site-key', OPERATIONS_PAUSED: 'true', GITHUB_REPOSITORY: repository, GITHUB_SHA: main, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main`, GH_TOKEN: 'synthetic-token' })) vi.stubEnv(name, value);
+  for (const [name, value] of Object.entries({ SECURITY_WORKER_NAME: unstable_readConfig({config: 'apps/worker/wrangler.toml'}).name, PAGES_PROJECT_NAME: unstable_readConfig({config: 'apps/worker/wrangler.toml'}).vars.ADMIN_PAGES_PROJECT, NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'synthetic-site-key', OPERATIONS_PAUSED: 'true', GITHUB_REPOSITORY: repository, GITHUB_SHA: main, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main`, GITHUB_RUN_ID: '456', GITHUB_ACTOR: 'skmtmst', GITHUB_TRIGGERING_ACTOR: 'skmtmst', GH_TOKEN: 'synthetic-token' })) vi.stubEnv(name, value);
   vi.spyOn(common, 'command').mockImplementation((_binary, args) => {
     if (args.includes('FETCH_HEAD')) return main;
     if (args.includes('HEAD')) return sha;
@@ -17,7 +17,7 @@ function fixture(failure = '') {
     expect(init?.redirect).toBe('error');
     if (url.hostname === 'api.github.com') {
       if (failure === 'metadata') return new Response('synthetic-provider-secret', { status: 403 });
-      if (url.pathname.endsWith('/environments/production')) return Response.json({ protection_rules: failure === 'reviewers' ? [] : [{ type: 'required_reviewers', reviewers: [{ type: 'User' }] }] });
+      if (url.pathname.endsWith('/actions/runs/456')) return Response.json({ id: 456, repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: main, head_branch: 'main', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-production.yml', actor: { login: failure === 'owner' ? 'collaborator' : 'skmtmst' }, triggering_actor: { login: failure === 'rerun' ? 'collaborator' : 'skmtmst' } });
       if (url.pathname.endsWith('/jobs')) return Response.json({ jobs: [{ conclusion: 'success', steps: [{ name: 'Verify public source revisions', conclusion: failure === 'skipped' ? 'skipped' : 'success' }] }] });
       return Response.json({ repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: failure === 'run-sha' ? main : sha, status: 'completed', conclusion: 'success', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-staging.yml' });
     }
@@ -30,7 +30,7 @@ function fixture(failure = '') {
   return fetcher;
 }
 describe('release preflight uses real orchestration with synthetic metadata', () => {
-  it('verifies the main tree, protected environment, staging run, Worker version/health and Admin version', async () => {
+  it('verifies the main tree, owner dispatch, staging run, Worker version/health and Admin version', async () => {
     const fetcher = fixture();
     await preflight(sha, '123', fetcher);
     expect(fetcher).toHaveBeenCalledTimes(6);
@@ -52,7 +52,7 @@ describe('release preflight uses real orchestration with synthetic metadata', ()
     await expect(preflight(sha, '123', fetcher)).rejects.toThrow('operations_pause_confirmation');
     expect(fetcher).not.toHaveBeenCalled();
   });
-  it.each(['metadata', 'reviewers', 'skipped', 'run-sha', 'public-sha'])('does not accept %s as staging evidence', async failure => {
+  it.each(['metadata', 'owner', 'rerun', 'skipped', 'run-sha', 'public-sha'])('does not accept %s as release evidence', async failure => {
     const fetcher = fixture(failure);
     await expect(preflight(sha, '123', fetcher)).rejects.toThrow();
     expect(vi.mocked(common.command).mock.calls.every(([binary]) => binary === 'git')).toBe(true);

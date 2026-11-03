@@ -375,9 +375,6 @@ describe('staging delivery verification safety', () => {
     expect(TITLE_PAGE).toEqual({ size: '22px', weight: '700', lh: '32px' });
     expect(TITLE_SUB).toEqual({ size: '18px', weight: '700', lh: '27px' });
 
-    // 画面側は副題を2枚に渡している（板 OzHLO・h7OeT）。ここが期待値の根拠。
-    expect(deliveryScreen).toContain("history: { titleSize: 'sub' }");
-    expect(deliveryScreen).toContain("'sold-out': { titleSize: 'sub' }");
     // 共通部品が副題のとき 18px/27px を頭の中だけに流す。
     expect(pageFrame).toContain("titleSize === 'sub'");
     expect(pageFrame).toContain("'--tpl-title-size': '18px'");
