@@ -7,8 +7,7 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 import type { HqMediaRuntime } from './hq-media.js';
 import { resolveHqBroadcastAudience, countHqAudience } from '../features/hq-broadcasts/hq-broadcast-audience/index.js';
 import { hqBroadcastApprovalState } from '../features/hq-broadcasts/hq-broadcast-approval/index.js';
-import { getLineAccountById, getStaffById, getBroadcastById, getRetryableRecipientIds,
-  reopenFailedClaims, closeClaimsForStop } from '@line-crm/db';
+import { getLineAccountById, getStaffById, getBroadcastById, closeClaimsForStop } from '@line-crm/db';
 import type { HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun } from '@line-crm/shared';
 import { requireHqTemplateAuthority } from './hq-templates/contract.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
@@ -17,6 +16,9 @@ import { fetchQuota } from '../features/broadcasts/broadcast-quota-guard/index.j
 import { parseBroadcastMessageParts, buildMessages, unsupportedMessageVariables } from '../features/broadcasts/broadcast-message-set/index.js';
 import { resolveSendCommonVars } from './interpolation-context.js';
 import { isOperationCapabilityStopped } from '@line-crm/db';
+import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
+import { buildBroadcastAudienceQuery } from '../features/broadcasts/broadcast-audience-query.js';
+import { scopeStoredBroadcastSegmentQuery } from './segment-query-scope.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { resolveHqBroadcastMaterials } from '../features/hq-broadcasts/hq-broadcast-materials/index.js';
 export async function hqBroadcastAuthority(db:D1Database,staff:AuthenticatedStaff|undefined, read=false) {
@@ -116,17 +118,40 @@ export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:strin
   const result=await db.batch(ops);if(!result[0].meta.changes)throw new StampError('別の担当者が先に操作しました',409);
   return readHqBroadcastResult(db,await getHqBroadcastRun(db,run.tenant_id,run.id));
 }
+const retryableWhere = `((s.state='failed' AND s.error_code IN ('line_http_429','stopped_before_dispatch')) OR ((b.stopped_at IS NOT NULL OR b.status='sent') AND s.state='claimed' AND s.dispatched_at IS NULL))`;
+const availableWhere = `EXISTS(SELECT 1 FROM friends f WHERE f.id=s.friend_id AND f.line_account_id=b.line_account_id
+  AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND ${DELIVERY_CONSENT_ALLOWED_SQL})`;
+async function draftAudienceQuery(db:D1Database,broadcastId:string) {
+  const b=await db.prepare('SELECT status,segment_conditions,line_account_id,stopped_at,batch_offset FROM broadcasts WHERE id=?').bind(broadcastId).first<{status:string;segment_conditions:string|null;line_account_id:string|null;stopped_at:string|null;batch_offset:number}>();
+  if(!b||!b.segment_conditions||!(b.status==='draft'||(b.status==='sending'&&b.stopped_at!==null&&b.batch_offset!==-1)))return null;
+  const prior=await db.prepare('SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=? LIMIT 1').bind(broadcastId).first();
+  if(prior)return null;
+  const query=await scopeStoredBroadcastSegmentQuery(db,buildBroadcastAudienceQuery(JSON.parse(b.segment_conditions)),b.line_account_id);
+  return {sql:`SELECT q.id AS friend_id FROM (${query.sql}) q WHERE ${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.','q.')}`,bindings:query.bindings};
+}
+async function retrySnapshot(db:D1Database,broadcastId:string) {
+  const draft=await draftAudienceQuery(db,broadcastId);
+  const rows=draft
+    ? await db.prepare(`${draft.sql} ORDER BY q.id`).bind(...draft.bindings).all<{friend_id:string}>()
+    : await db.prepare(`SELECT s.friend_id FROM broadcast_send_claims s JOIN broadcasts b ON b.id=s.broadcast_id WHERE s.broadcast_id=? AND ${retryableWhere} AND ${availableWhere} ORDER BY s.friend_id`).bind(broadcastId).all<{friend_id:string}>();
+  const ids=rows.results.map(r=>r.friend_id), json=JSON.stringify(ids);
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(json));
+  return {ids,json,token:Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join(''),draft};
+}
+export class HqRetryConflict extends StampError {
+  constructor(public currentCount:number) { super('送る相手が変わりました。もう一度確かめてください',409); }
+}
 export async function readHqBroadcastResult(db:D1Database,run:RunRow):Promise<HqBroadcastRun> {
   const input=JSON.parse(run.input_json) as HqBroadcastInput,rows=(await db.prepare(`SELECT t.*,b.status AS child_status,b.total_count,b.success_count,b.stopped_at,b.lock_version,b.approval_status,
     (SELECT unique_impression FROM broadcast_insights i WHERE i.broadcast_id=b.id AND i.status='ready' ORDER BY fetched_at DESC,rowid DESC LIMIT 1) AS opened_count,
     (SELECT unique_click FROM broadcast_insights i WHERE i.broadcast_id=b.id AND i.status='ready' ORDER BY fetched_at DESC,rowid DESC LIMIT 1) AS clicked_count,
     CASE WHEN b.sent_at IS NULL THEN NULL ELSE (SELECT COUNT(DISTINCT m.friend_id) FROM messages_log m JOIN broadcast_send_claims s ON s.friend_id=m.friend_id AND s.broadcast_id=b.id AND s.state='sent'
-      WHERE m.line_account_id=b.line_account_id AND m.direction='incoming' AND julianday(m.created_at)>=julianday(b.sent_at) AND julianday(m.created_at)<julianday(b.sent_at,'+14 days')) END AS reaction_count,
-    (SELECT COUNT(*) FROM broadcast_send_claims s WHERE s.broadcast_id=b.id AND ((s.state='failed' AND s.error_code IN ('line_http_429','stopped_before_dispatch')) OR (b.stopped_at IS NOT NULL AND s.state='claimed' AND s.dispatched_at IS NULL))) AS retryable_count
-    FROM hq_broadcast_targets t JOIN line_accounts a ON a.id=t.line_account_id AND a.tenant_id=? LEFT JOIN broadcasts b ON b.id=t.broadcast_id WHERE t.run_id=? ORDER BY t.line_account_id`).bind(run.tenant_id,run.id).all<Target & {opened_count:number|null;clicked_count:number|null;reaction_count:number|null;approval_status:string|null;child_status:string|null;total_count:number|null;success_count:number|null;stopped_at:string|null;retryable_count:number;lock_version:number|null}>()).results;
+      WHERE m.line_account_id=b.line_account_id AND m.direction='incoming' AND julianday(m.created_at)>=julianday(b.sent_at) AND julianday(m.created_at)<julianday(b.sent_at,'+14 days')) END AS reaction_count
+    FROM hq_broadcast_targets t JOIN line_accounts a ON a.id=t.line_account_id AND a.tenant_id=? LEFT JOIN broadcasts b ON b.id=t.broadcast_id WHERE t.run_id=? ORDER BY t.line_account_id`).bind(run.tenant_id,run.id).all<Target & {opened_count:number|null;clicked_count:number|null;reaction_count:number|null;approval_status:string|null;child_status:string|null;total_count:number|null;success_count:number|null;stopped_at:string|null;lock_version:number|null}>()).results;
   const failures=(await db.prepare(`SELECT t.line_account_id,s.state,s.error_code,COUNT(*) AS count FROM hq_broadcast_targets t JOIN broadcast_send_claims s ON s.broadcast_id=t.broadcast_id WHERE t.run_id=? AND s.state IN ('failed','unknown') GROUP BY t.line_account_id,s.state,s.error_code`).bind(run.id).all<{line_account_id:string;state:string;error_code:string|null;count:number}>()).results;
   const blocks=await hqBroadcastBlocks(db,run.tenant_id,run.id);
-  return {input,id:run.id,title:input.title,status:run.status,version:run.version,scheduledAt:run.scheduled_at,targets:rows.map(r=>({...(r.preflight_json?JSON.parse(r.preflight_json):{accountId:r.line_account_id,accountName:r.account_name,audienceCount:null,remaining:null,connected:false,paused:false,blockedReasons:[]}),failureReasons:failures.filter(f=>f.line_account_id===r.line_account_id).map(f=>classifyHqFailure(f.state,f.error_code,f.count)).concat(r.child_status==='sent'&&r.total_count===0?[{code:'no_friends',label:'友だちが0人です',count:0,retryable:false}]:r.child_status==='draft'&&run.status==='scheduled'?[{code:'before_send_failed',label:'送信前の確認で止まりました。店舗の送信前確認をやり直してください',count:0,retryable:true}]:[]),excluded:!!r.excluded,broadcastId:r.broadcast_id,status:r.excluded?'excluded':(run.status==='cancelled'?'cancelled':r.child_status==='draft'&&run.status!=='prepared'?'failed':r.child_status??'prepared'),openedCount:r.opened_count,clickedCount:r.clicked_count,reactionCount:r.reaction_count,blockedCount:blocks.blocksByAccount.find(b=>b.accountId===r.line_account_id)?.blockCount??null,approvalStatus:r.approval_status??'none',successCount:r.success_count??0,totalCount:r.total_count??0,version:r.lock_version??1,retryableCount:r.retryable_count,stopped:!!r.stopped_at}))};
+  const snapshots=await Promise.all(rows.map(r=>r.broadcast_id?retrySnapshot(db,r.broadcast_id):null));
+  return {input,id:run.id,title:input.title,status:run.status,version:run.version,scheduledAt:run.scheduled_at,targets:rows.map((r,index)=>({...(r.preflight_json?JSON.parse(r.preflight_json):{accountId:r.line_account_id,accountName:r.account_name,audienceCount:null,remaining:null,connected:false,paused:false,blockedReasons:[]}),failureReasons:failures.filter(f=>f.line_account_id===r.line_account_id).map(f=>classifyHqFailure(f.state,f.error_code,f.count)).concat(r.child_status==='sent'&&r.total_count===0?[{code:'no_friends',label:'友だちが0人です',count:0,retryable:false}]:r.child_status==='draft'&&run.status==='scheduled'?[{code:'before_send_failed',label:'送信前の確認で止まりました。店舗の送信前確認をやり直してください',count:0,retryable:true}]:[]),excluded:!!r.excluded,broadcastId:r.broadcast_id,status:r.excluded?'excluded':(run.status==='cancelled'?'cancelled':r.child_status==='draft'&&run.status!=='prepared'?'failed':r.child_status??'prepared'),openedCount:r.opened_count,clickedCount:r.clicked_count,reactionCount:r.reaction_count,blockedCount:blocks.blocksByAccount.find(b=>b.accountId===r.line_account_id)?.blockCount??null,approvalStatus:r.approval_status??'none',successCount:r.success_count??0,totalCount:r.total_count??0,version:r.lock_version??1,retryableCount:snapshots[index]?.ids.length??0,retryableToken:snapshots[index]?.token,stopped:!!r.stopped_at}))};
 }
 export async function stopHqBroadcast(db:D1Database,run:RunRow,actorId:string,cancel:boolean,version:number) {
   const token=crypto.randomUUID(),ops=[db.prepare(`UPDATE hq_broadcast_runs SET status=?,version=version+1,dispatch_token=? WHERE id=? AND version=? AND status NOT IN ('cancelled')`).bind(cancel?'cancelled':'stopped',token,run.id,version)];
@@ -138,13 +163,47 @@ export async function stopHqBroadcast(db:D1Database,run:RunRow,actorId:string,ca
   for(const t of targets)if(t.broadcast_id)await closeClaimsForStop(db,t.broadcast_id);
   return readHqBroadcastResult(db,await getHqBroadcastRun(db,run.tenant_id,run.id));
 }
-export async function retryHqBroadcastTarget(db:D1Database,run:RunRow,accountId:string,actorId:string,version:number) {
+export async function retryHqBroadcastTarget(db:D1Database,run:RunRow,accountId:string,actorId:string,version:number,confirmation?:{count:number;token:string}) {
   if(run.status==='cancelled')throw new StampError('取り消した配信はやり直せません',409);
   const t=await db.prepare('SELECT broadcast_id FROM hq_broadcast_targets WHERE run_id=? AND line_account_id=? AND excluded=0').bind(run.id,stampId(accountId)).first<{broadcast_id:string|null}>();
   if(!t?.broadcast_id)throw new StampError('店舗の配信が見つかりません',404);
   const broadcast=await getBroadcastById(db,t.broadcast_id);if(!broadcast)throw new StampError('配信が見つかりません',404);
+  if(confirmation) {
+    const snapshot=await retrySnapshot(db,broadcast.id);
+    if(confirmation.count!==snapshot.ids.length||confirmation.token!==snapshot.token)throw new HqRetryConflict(snapshot.ids.length);
+  }
   const check=(await preflightHqBroadcast(db,run)).find(p=>p.accountId===accountId);if(check?.blockedReasons.length)throw new StampError('店舗の送信前確認に問題があります',409);
-  if(broadcast.status==='draft') {
+  const beforeDelivery=confirmation&&broadcast.status==='sending'&&broadcast.stopped_at?await draftAudienceQuery(db,broadcast.id):null;
+  if(broadcast.status==='draft'||beforeDelivery) {
+    if(confirmation) {
+      const snapshot=await retrySnapshot(db,broadcast.id);
+      if(confirmation.count!==snapshot.ids.length||confirmation.token!==snapshot.token||!snapshot.ids.length)throw new HqRetryConflict(snapshot.ids.length);
+      if(!snapshot.draft) {
+        const update=db.prepare(`UPDATE broadcasts SET status='scheduled',scheduled_at=?,stopped_at=NULL,stopped_by=NULL,lock_version=lock_version+1,send_attempt_no=send_attempt_no+1
+          WHERE id=? AND status='draft' AND lock_version=? AND NOT EXISTS(SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=? AND state IN ('sent','unknown','claimed'))
+          AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND status<>'cancelled')
+          AND ?=(SELECT COALESCE(json_group_array(friend_id),'[]') FROM (SELECT s.friend_id FROM broadcast_send_claims s JOIN broadcasts b ON b.id=s.broadcast_id WHERE s.broadcast_id=? AND ${retryableWhere} AND ${availableWhere} ORDER BY s.friend_id))`)
+          .bind(new Date().toISOString(),broadcast.id,version,broadcast.id,run.id,snapshot.json,broadcast.id);
+        const reopen=db.prepare(`UPDATE broadcast_send_claims SET state='claimed',attempt_no=(SELECT send_attempt_no FROM broadcasts WHERE id=?),dispatched_at=NULL,settled_at=NULL,error_code=NULL
+          WHERE broadcast_id=? AND friend_id IN (SELECT value FROM json_each(?))`).bind(broadcast.id,broadcast.id,snapshot.json);
+        try { await db.batch([update,db.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'RETRY_CONFLICT' END)"),reopen]); }
+        catch(error) { if(!(error instanceof Error)||!/(malformed JSON|RETRY_CONFLICT)/i.test(error.message))throw error; throw new HqRetryConflict((await retrySnapshot(db,broadcast.id)).ids.length); }
+        await db.prepare('INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),run.id,accountId,actorId,'retry_before_delivery').run();
+        return readHqBroadcastResult(db,await getHqBroadcastRun(db,run.tenant_id,run.id));
+      }
+      const update=db.prepare(`UPDATE broadcasts SET status='scheduled',scheduled_at=?,stopped_at=NULL,stopped_by=NULL,lock_version=lock_version+1,total_count=?
+        WHERE id=? AND (status='draft' OR (status='sending' AND stopped_at IS NOT NULL AND batch_offset<>-1)) AND lock_version=? AND NOT EXISTS(SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=?)
+        AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND status<>'cancelled')
+        AND ?=(SELECT COALESCE(json_group_array(friend_id),'[]') FROM (SELECT friend_id FROM (${snapshot.draft.sql}) ORDER BY friend_id))`)
+        .bind(new Date().toISOString(),snapshot.ids.length,broadcast.id,version,broadcast.id,run.id,snapshot.json,...snapshot.draft.bindings);
+      const freeze=db.prepare(`INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state)
+        SELECT ?,value,?,COALESCE((SELECT send_attempt_no FROM broadcasts WHERE id=?),1),'claimed' FROM json_each(?)`)
+        .bind(broadcast.id,accountId,broadcast.id,snapshot.json);
+      try { await db.batch([update,db.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'RETRY_CONFLICT' END)"),freeze]); }
+      catch(error) { if(!(error instanceof Error)||!/(malformed JSON|RETRY_CONFLICT)/i.test(error.message))throw error; throw new HqRetryConflict((await retrySnapshot(db,broadcast.id)).ids.length); }
+      await db.prepare('INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),run.id,accountId,actorId,'retry_before_delivery').run();
+      return readHqBroadcastResult(db,await getHqBroadcastRun(db,run.tenant_id,run.id));
+    }
     const prior=await db.prepare(`SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=? AND state IN ('sent','unknown','claimed') LIMIT 1`).bind(broadcast.id).first();
     if(prior)throw new StampError('送達の状態を確認する必要があります',409);
     const changed=await db.prepare(`UPDATE broadcasts SET status='scheduled',scheduled_at=?,stopped_at=NULL,stopped_by=NULL,lock_version=lock_version+1
@@ -153,13 +212,26 @@ export async function retryHqBroadcastTarget(db:D1Database,run:RunRow,accountId:
     await db.prepare('INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),run.id,accountId,actorId,'retry_before_delivery').run();
     return readHqBroadcastResult(db,await getHqBroadcastRun(db,run.tenant_id,run.id));
   }
-  const recipients=await getRetryableRecipientIds(db,broadcast.id);if(!recipients.length)throw new StampError('やり直せる一時的な失敗がありません',409);
-  const changed=await db.prepare(`UPDATE broadcasts SET send_attempt_no=send_attempt_no+1,status='sending',sent_at=NULL,stopped_at=NULL,stopped_by=NULL,
+  const snapshot=await retrySnapshot(db,broadcast.id);
+  if(confirmation&&(confirmation.count!==snapshot.ids.length||confirmation.token!==snapshot.token))throw new HqRetryConflict(snapshot.ids.length);
+  if(!snapshot.ids.length)throw new StampError('やり直せる一時的な失敗がありません',409);
+  const update=db.prepare(`UPDATE broadcasts SET send_attempt_no=send_attempt_no+1,status='sending',sent_at=NULL,stopped_at=NULL,stopped_by=NULL,
     batch_offset=0,batch_lock_at=NULL,lock_version=lock_version+1 WHERE id=? AND lock_version=? AND (status='sent' OR (status='sending' AND stopped_at IS NOT NULL))
-    AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND status<>'cancelled')`).bind(broadcast.id,version,run.id).run();
-  if(!changed.meta.changes)throw new StampError('配信が更新されました。読み直してください',409);
-  const updated=await getBroadcastById(db,broadcast.id);
-  await reopenFailedClaims(db,broadcast.id,updated!.send_attempt_no!);
+    AND (batch_offset<>-1 OR (status='sent' AND batch_lock_at IS NULL)) AND EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND status<>'cancelled')
+    AND ?=(SELECT COALESCE(json_group_array(friend_id),'[]') FROM (SELECT s.friend_id FROM broadcast_send_claims s JOIN broadcasts b ON b.id=s.broadcast_id WHERE s.broadcast_id=? AND ${retryableWhere} AND ${availableWhere} ORDER BY s.friend_id))`)
+    .bind(broadcast.id,version,run.id,snapshot.json,broadcast.id);
+  const reopen=db.prepare(`UPDATE broadcast_send_claims SET state='claimed',attempt_no=(SELECT send_attempt_no FROM broadcasts WHERE id=?),dispatched_at=NULL,settled_at=NULL,error_code=NULL,updated_at=datetime('now')
+    WHERE broadcast_id=? AND friend_id IN (SELECT value FROM json_each(?)) AND EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND lock_version=? AND status='sending' AND stopped_at IS NULL)`)
+    .bind(broadcast.id,broadcast.id,snapshot.json,broadcast.id,version+1);
+  const exclude=db.prepare(`UPDATE broadcast_send_claims SET state='failed',error_code='recipient_unavailable',settled_at=datetime('now')
+    WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NULL AND friend_id NOT IN (SELECT value FROM json_each(?))`)
+    .bind(broadcast.id,snapshot.json);
+  try {
+    await db.batch([update,db.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'RETRY_CONFLICT' END)"),reopen,exclude]);
+  } catch(error) {
+    if(!(error instanceof Error)||!/(malformed JSON|RETRY_CONFLICT)/i.test(error.message))throw error;
+    throw new HqRetryConflict((await retrySnapshot(db,broadcast.id)).ids.length);
+  }
   await db.prepare('INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),run.id,accountId,actorId,'retry_failed').run();
   return readHqBroadcastResult(db,run);
 }
