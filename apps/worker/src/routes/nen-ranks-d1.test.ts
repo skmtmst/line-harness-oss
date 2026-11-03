@@ -212,6 +212,44 @@ describe('DELETE /api/nen/rank-settings/:id', () => {
   const deletion = (id: string, body: unknown, role: 'owner' | 'admin' | 'staff' = 'owner') =>
     json(harness(role), 'DELETE', `/api/nen/rank-settings/${id}`, body);
 
+  it('確認した会員と同じ人数でも入れ替わっていれば削除せず409を返す', async () => {
+    const data=await initial();
+    const source=data.ranks.find((r:any)=>r.key==='platinum');
+    const target=data.ranks.find((r:any)=>r.key==='gold');
+    const confirmedMembers=[{friendId:'friend-a',customerId:'10231'}];
+    sql.prepare("UPDATE nen_ec_member_snapshots SET member_rank_key=CASE friend_id WHEN 'friend-a' THEN 'gold' ELSE 'platinum' END WHERE friend_id IN ('friend-a','friend-b')").run();
+    const result=await deletion(source.id,{accountId:ACCOUNT,replacementRankId:target.id,expectedVersion:data.rules.version,confirmedMembers});
+    expect(result.status).toBe(409);
+    expect(result.body.data.count).toBe(1);
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_rank_settings WHERE id=?').get(source.id)).toEqual({n:1});
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('確認にはブロック中の会員も含め、確かめた会員だけを移す', async () => {
+    const data=await initial(),source=data.ranks.find((r:any)=>r.key==='gold'),target=data.ranks.find((r:any)=>r.key==='regular');
+    sql.prepare("UPDATE nen_ec_member_snapshots SET member_rank_key='gold' WHERE friend_id='friend-b'").run();
+    sql.prepare("UPDATE friends SET is_following=0 WHERE id='friend-b'").run();
+    const preview=await json(harness('owner'),'GET',`/api/nen/rank-settings/${source.id}/delete-preview?accountId=${ACCOUNT}`);
+    expect(preview.body.data).toMatchObject({count:1,members:[{friendId:'friend-b',customerId:'10877'}],version:1});
+    const result=await deletion(source.id,{accountId:ACCOUNT,replacementRankId:target.id,expectedVersion:1,confirmedMembers:preview.body.data.members});
+    expect(result.status).toBe(200);expect(result.body.data.movedMembers).toBe(1);
+  });
+
+  it('確定の直前に会員が入れ替わっても削除せず409を返す', async () => {
+    const data=await initial(),source=data.ranks.find((r:any)=>r.key==='platinum'),target=data.ranks.find((r:any)=>r.key==='gold');
+    const preview=await json(harness('owner'),'GET',`/api/nen/rank-settings/${source.id}/delete-preview?accountId=${ACCOUNT}`);
+    const batch=db.batch.bind(db);let injected=false;
+    const spy=vi.spyOn(db,'batch').mockImplementation(async statements=>{
+      if(!injected){injected=true;sql.prepare("UPDATE nen_ec_member_snapshots SET member_rank_key=CASE friend_id WHEN 'friend-a' THEN 'gold' ELSE 'platinum' END WHERE friend_id IN ('friend-a','friend-b')").run();}
+      return batch(statements);
+    });
+    try{
+      const result=await deletion(source.id,{accountId:ACCOUNT,replacementRankId:target.id,expectedVersion:1,confirmedMembers:preview.body.data.members});
+      expect(injected).toBe(true);expect(result.status).toBe(409);expect(result.body.data.count).toBe(1);
+      expect(sql.prepare('SELECT COUNT(*) AS n FROM nen_rank_settings WHERE id=?').get(source.id)).toEqual({n:1});expect(fetchMock).not.toHaveBeenCalled();
+    }finally{spy.mockRestore();}
+  });
+
   it('会員とタグを移し替え、外部へ送らず次の同期待ちにする', async () => {
     const data = await initial();
     const source = data.ranks.find((r: any) => r.key === 'platinum');

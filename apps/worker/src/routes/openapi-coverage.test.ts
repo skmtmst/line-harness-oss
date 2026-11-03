@@ -823,6 +823,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/nen/members',
   'GET /api/nen/pets',
   'GET /api/nen/rank-settings',
+  'GET /api/nen/rank-settings/{id}/delete-preview',
   'GET /api/nen/rank-settings/member-sync/{operationId}',
   'POST /api/nen/rank-settings/member-sync/{operationId}/retry',
   'DELETE /api/nen/rank-settings/{id}',
