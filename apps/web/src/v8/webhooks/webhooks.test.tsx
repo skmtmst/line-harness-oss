@@ -138,6 +138,23 @@ function unmatchedFixture(resolveStatus = 200) {
 }
 
 describe('外部連携 V8', () => {
+  it('受け取り口と受信数を取得できない時はゼロでなく未取得と表示する', async () => {
+    const base = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/api/webhooks/incoming') || url.includes('/interactions')) return json({ success: false, error: 'unavailable' }, 500)
+      return base(input, init)
+    })
+    await render(<WebhooksIncomingV8 />)
+    await waitFor(() => expect(host.textContent).toContain('受け取り口を読み込めませんでした'))
+    expect(host.textContent).toContain('集計を読み込めませんでした')
+    const band = host.querySelector('[data-kpi-strip]')!
+    for (const label of ['受け取り口', '直近30日 受け取った']) {
+      const card = within(band as HTMLElement).getByText(label).closest('[data-kpi-presentation]')
+      expect(card?.textContent).toContain('—')
+    }
+  })
+
   it('届物は値に余り幅を渡し、複数候補の各結び付けと追加読み込みを保つ', async () => {
     const fixture = unmatchedFixture()
     await render(<WebhooksIncomingV8 />)

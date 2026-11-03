@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { BASIC_FRIEND_FIELDS as FIXED_FRIEND_FIELDS, type FriendField } from '@line-crm/shared'
 import CustomerInfoPanel from './customer-info-panel'
 import { fixedFieldValue } from './fixed-friend-field-values'
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), back: vi.fn() }) }))
 vi.mock('next/link', () => ({default:({children,...props}: React.ComponentProps<'a'>)=><a {...props}>{children}</a>}))
 vi.mock('@/lib/api', async original => ({...await original<typeof import('@/lib/api')>(),api:{friendFields:{saveForFriend:vi.fn()}}}))
 const fields = FIXED_FRIEND_FIELDS.map((spec,index) => ({
@@ -70,6 +71,7 @@ test('基本の編集は取消で送らず、失敗では値を保ち、保存�
   fireEvent.click(screen.getByRole('button',{name:'編集'}))
   fireEvent.change(screen.getByRole('textbox',{name:'名前'}),{target:{value:'変更した名前'}})
   fireEvent.click(screen.getByRole('button',{name:'キャンセル'}))
+  fireEvent.click(screen.getByRole('button',{name:'保存せずに移る'}))
   expect(api.friendFields.saveForFriend).not.toHaveBeenCalled()
   expect(screen.getByText('山田花子')).toBeTruthy()
   fireEvent.click(screen.getByRole('button',{name:'編集'}))
@@ -163,23 +165,25 @@ test('飲食の値も変更した欄だけ保存し、表示項目の好みで�
   expect(JSON.parse(localStorage.getItem('chat.friendInfoSections.v4')!).hidden).toContain('fixed:seat_preference')
 })
 
-test('基本の編集は Escape で破棄し、保存しない', () => {
+test('基本の編集は Escape の確認後に破棄し、保存しない', () => {
   render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit sections={[]} />)
   fireEvent.click(screen.getByRole('button', { name: '編集' }))
   const name = screen.getByRole('textbox', { name: '名前' })
   fireEvent.change(name, { target: { value: '未保存の変更' } })
   fireEvent.keyDown(name, { key: 'Escape' })
+  fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
   expect(screen.queryByRole('textbox', { name: '名前' })).toBeNull()
   expect(screen.getByText('山田花子')).toBeTruthy()
   expect(api.friendFields.saveForFriend).not.toHaveBeenCalled()
 })
 
-test('編集ボタンの直後に Escape を押しても閉じる', () => {
+test('変更がなければ確認なしで閉じ、編集ボタンへ焦点を戻す', () => {
   render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit sections={[]} />)
   fireEvent.click(screen.getByRole('button', { name: '編集' }))
   expect(document.activeElement).toBe(screen.getByRole('textbox', { name: '名前' }))
   fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
   expect(screen.queryByRole('textbox', { name: '名前' })).toBeNull()
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: '編集' }))
 })
 
 test('顧客情報の窓の中でも Escape は基本の編集だけを閉じる', () => {
@@ -192,4 +196,22 @@ test('顧客情報の窓の中でも Escape は基本の編集だけを閉じる
   expect(screen.getByRole('dialog', { name: '顧客情報' })).toBeTruthy()
   expect(onKey).not.toHaveBeenCalled()
   document.removeEventListener('keydown', onKey)
+})
+
+test.each(['Escape', 'キャンセル'])('未保存の基本情報を%sで閉じる時は確認し、破棄後に編集ボタンへ戻る', (action) => {
+  render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit sections={[]} />)
+  fireEvent.click(screen.getByRole('button', { name: '編集' }))
+  const input = screen.getByRole('textbox', { name: '名前' }) as HTMLInputElement
+  fireEvent.change(input, { target: { value: '入力途中' } })
+  if (action === 'Escape') fireEvent.keyDown(input, { key: 'Escape' })
+  else fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(screen.getByText('保存していない変更があります')).toBeTruthy()
+  expect(input.value).toBe('入力途中')
+  fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+  expect(input.value).toBe('入力途中')
+  if (action === 'Escape') fireEvent.keyDown(input, { key: 'Escape' })
+  else fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
+  expect(screen.queryByRole('textbox', { name: '名前' })).toBeNull()
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: '編集' }))
 })
