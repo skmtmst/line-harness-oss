@@ -108,9 +108,9 @@ export async function createMenuDraft({ accountId, audience, chatBarText, defaul
         setError(e instanceof ApiError ? imageUploadErrorText(e) : '登録メディアの画像を読み込めませんでした。もう一度お試しください。') }
       }
     }
+    await reloadGroup(createdId)
     pendingImages.forEach((image) => { if (image?.url) URL.revokeObjectURL(image.url) })
     setPendingImages([])
-    await reloadGroup(createdId)
     return true
   }
 

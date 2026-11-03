@@ -66,6 +66,16 @@ beforeEach(() => {
 afterEach(() => { delete document.documentElement.dataset.theme; cleanup(); vi.useRealTimers(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
 
 describe('Y8SjT2 予約枠・在庫', () => {
+  it('卓と時間帯がないとき右の欄にも次の操作を案内する', async () => {
+    fixture.snapshot.mockResolvedValue({ data: snapshotOf({ tables: [] }) })
+    fixture.inventoryDay.mockResolvedValue({ data: [] })
+    render(<InventoryPage />)
+    await screen.findByText('この日の時間帯がありません')
+    expect(screen.getByText('卓がありません。座席・卓管理で追加してください。')).not.toBeNull()
+    expect(screen.getByText('卓を追加すると、ここに空きと利用状況が出ます。')).not.toBeNull()
+    expect(screen.getByRole('link', { name: '座席・卓管理を開く' }).getAttribute('href')).toContain('/restaurant-test/tables')
+  })
+
   it('配分・在庫の表・いちばん混む時間の卓と「行を押したとき」の箱・開ける時間が出る', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')

@@ -648,6 +648,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
         justStarted={justStarted}
         stats={stats}
         simulation={simulation}
+        simulationRefreshing={simulationRefreshing}
         id={id}
         startedAt={startedAt}
         error={error}
