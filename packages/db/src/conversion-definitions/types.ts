@@ -324,6 +324,7 @@ export type ConversionDefinitionEventItem = {
    * 「取消を戻す」操作の対象になる。
    */
   reversed: boolean;
+  latestReversalId: string | null;
   /** 計測したときの1件あたりの金額(地点の後からの編集に引きずられない控え)。 */
   value: number | null;
   /** どこから届いた成果か。metadata の source / sourceType を写す。 */
@@ -339,6 +340,7 @@ export type DefinitionEventRow = {
   approval_status: 'pending' | 'approved' | 'rejected' | null;
   cancelled: number;
   reversed: number;
+  latest_reversal_id: string | null;
   value_snapshot: number | null;
   metadata: string | null;
   created_at: string;
