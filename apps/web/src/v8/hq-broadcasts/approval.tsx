@@ -8,7 +8,7 @@
  *   - 承認するときは本人確認（step-up：broadcast.approval）。
  *   - 中身・送るアカウントを変えると承認は外れる（口が版を上げて承認を消す）。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BroadcastApprovalState, HqBroadcastRun } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -22,6 +22,7 @@ import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { emptyValue } from '@/components/shared/empty-value'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 export type HqApproval = {
   state: BroadcastApprovalState | null
@@ -214,23 +215,33 @@ export function HqTestSendDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const chosen = accounts.some((account) => account.id === accountId) ? accountId : accounts[0]?.id ?? ''
+  const scope = useRef({ open, chosen, generation: 0 })
+  if (scope.current.open !== open || scope.current.chosen !== chosen) scope.current = { open, chosen, generation: scope.current.generation + 1 }
+  const renderedScope = scope.current
+  const lock = useRef<object | null>(null)
+  useEffect(() => { lock.current = null; setBusy(false); setError('') }, [renderedScope])
   const send = async () => {
-    if (!chosen || busy) return
+    if (!open || !chosen || busy || lock.current || renderedScope !== scope.current) return
+    const ticket = {}; lock.current = ticket
+    const current = () => scope.current === renderedScope && lock.current === ticket
     setBusy(true); setError('')
     try {
       const id = await prepare()
+      if (!current()) return
       if (!id) { setError('先に入れていない所を直してください。'); return }
       const result = (await hqBroadcastsApi.testSend(id, chosen)).data
+      if (!current()) return
       notifyToast(result.failed ? `テストを ${formatNumber(result.sent)} 人に送りました（${formatNumber(result.failed)} 人は送れませんでした）` : `テストを ${formatNumber(result.sent)} 人に送りました`)
       onClose()
     } catch (caught) {
-      setError(errorText(caught, 'テストを送れませんでした。アカウントのテスト送信の宛先を確かめてください。'))
+      if (current()) setError(errorText(caught, 'テストを送れませんでした。アカウントのテスト送信の宛先を確かめてください。'))
     } finally {
-      setBusy(false)
+      if (current()) { lock.current = null; setBusy(false) }
     }
   }
   return (
     <ConfirmDialog
+      key={renderedScope.generation}
       open={open}
       title="テストを送る"
       description="選んだアカウントの「テスト送信の宛先」（1〜5人）に、いまの中身をそのアカウントの名前で送ります。友だち全員には送りません。"
@@ -240,6 +251,7 @@ export function HqTestSendDialog({
       onCancel={() => { if (!busy) { setError(''); onClose() } }}
       onConfirm={chosen ? () => send() : undefined}
     >
+      {chosen && <OperationTargetSummary accounts={[{ id: chosen, name: accounts.find(account => account.id === chosen)?.name }]} />}
       {accounts.length === 0 ? <p className="text-ink-faint text-xs">先に送るアカウントを選んでください。</p> : (
         <HqAccountSelectField label="テストを送るアカウント" accounts={accounts} value={chosen} onChange={setAccountId} disabled={busy} />
       )}

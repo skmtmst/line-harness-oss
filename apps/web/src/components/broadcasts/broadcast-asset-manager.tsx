@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Select from '@/components/shared/select'
 import { AttachmentRow } from '@/components/shared/file-drop'
 import MediaSlot from '@/components/shared/media-slot'
@@ -69,7 +70,12 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
   const { selectedAccountId } = useAccount()
   const scopeKey = `${selectedAccountId ?? ''}:${kind}`
   const scopeRef = useRef(scopeKey)
-  scopeRef.current = scopeKey
+  const scopeGeneration = useRef(0)
+  if (scopeRef.current !== scopeKey) { scopeRef.current = scopeKey; scopeGeneration.current += 1 }
+  const renderedGeneration = scopeGeneration.current
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const deleteLock = useRef(false)
   const loadGeneration = useRef(0)
   const editorGeneration = useRef(0)
   const uploadGeneration = useRef(new Map<string, number>())
@@ -103,10 +109,10 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
    * 開けたままヘッダからアカウントを切り替えられる。切り替わったのに
    * 消し続けると、いま見えていない一覧のものを消すことになる。
    */
-  const [deleteTarget, setDeleteTarget] = useState<{ item: BroadcastMessageAsset; accountId: string | null } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ item: BroadcastMessageAsset; accountId: string | null; generation: number } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-  const accountSwitched = deleteTarget !== null && deleteTarget.accountId !== selectedAccountId
+  const accountSwitched = deleteTarget !== null && (deleteTarget.accountId !== selectedAccountId || deleteTarget.generation !== scopeGeneration.current)
 
   const closeDelete = () => {
     if (deleting) return
@@ -116,7 +122,8 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
 
   const confirmDelete = async () => {
     // 二度押しを受け付けない。切り替わった後も走らせない。
-    if (!deleteTarget || deleting || accountSwitched) return
+    if (!deleteTarget || deleting || deleteLock.current || !alive.current || accountSwitched || deleteTarget.generation !== scopeGeneration.current) return
+    deleteLock.current = true
     setDeleting(true)
     setDeleteError('')
     try {
@@ -124,16 +131,19 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
       // 失敗を握りつぶさない。返事を見ずに一覧を読み直すと、消えていないのに
       // 消えたように見える。
       if (!res.success) throw new Error(res.error)
+      if (deleteTarget.generation !== scopeGeneration.current) return
       setDeleteTarget(null)
       await load()
       onChanged?.()
     } catch (saveFailure) {
+      if (!alive.current || deleteTarget.generation !== scopeGeneration.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       // 生のAPIエラーは出さない。運用者が次に何をすればよいかだけを書く。
       { if (!fieldFailure) setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setDeleting(false)
+      deleteLock.current = false
+      if (alive.current) setDeleting(false)
     }
   }
 
@@ -261,6 +271,7 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
       onConfirm={accountSwitched ? undefined : () => void confirmDelete()}
       onCancel={closeDelete}
     >
+      {deleteTarget ? <OperationTargetSummary accounts={[{ id: deleteTarget.item.lineAccountId ?? '' }]} /> : null}
       <ul className="text-ink-secondary space-y-1.5 text-xs leading-5">
         <li>・止まること: 一斉配信の作成画面から、この{meta.singular}を引用できなくなります。</li>
         {/* 作成画面は選んだ時点で中身を写している（broadcast-form の
@@ -274,13 +285,13 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
     </ConfirmDialog>)
   if (renderLayout) return <SaveErrorScope errors={saveErrors}>{renderLayout({
     items, loadState, reload: load, onEdit: startEdit,
-    onDelete: item => { setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId }) },
+    onDelete: item => { if (renderedGeneration !== scopeGeneration.current) return; setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId, generation: renderedGeneration }) },
     editor, deleteDialog,
   })}</SaveErrorScope>
   return <SaveErrorScope errors={saveErrors}><div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3" data-design-node="FuBeQ"><div className="flex flex-wrap gap-2"><Button onClick={() => { reset(); setShowForm(true) }} variant="primary">{meta.singular}を作る</Button></div><Button href="/broadcasts/new?templatePicker=1">一斉配信で使う</Button></div>
     {editor}
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="rounded-pill bg-accent-soft px-2 py-1 text-micro font-bold text-success">{meta.title}</span><h3 className="mt-3 truncate font-bold text-ink">{item.name}</h3><p className="mt-1 text-xs text-ink-faint">更新 {formatDateTime(item.updatedAt)}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="rounded-control border border-accent-border px-3 py-2 text-sm font-bold text-success">一斉配信で使う</a><button onClick={() => startEdit(item)} className="min-w-24 flex-1 rounded-control border px-3 py-2 text-sm font-bold">編集</button><button onClick={() => { setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId }) }} className="rounded-control border border-status-danger-border px-3 py-2 text-sm font-bold text-status-danger">削除する</button></div></article>)}{loadState === 'loading' && <p role="status">テンプレートを読み込んでいます…</p>}{loadState === 'error' && <div role="alert">テンプレートを読み込めませんでした。<Button onClick={() => load()}>再読み込み</Button></div>}{loadState === 'ready' && items.length === 0 && <div className="col-span-full rounded-card border border-dashed bg-canvas p-12 text-center text-sm text-ink-faint">まだ{meta.singular}テンプレートがありません。「{meta.singular}を作る」から追加してください。</div>}</div>
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="rounded-pill bg-accent-soft px-2 py-1 text-micro font-bold text-success">{meta.title}</span><h3 className="mt-3 truncate font-bold text-ink">{item.name}</h3><p className="mt-1 text-xs text-ink-faint">更新 {formatDateTime(item.updatedAt)}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="rounded-control border border-accent-border px-3 py-2 text-sm font-bold text-success">一斉配信で使う</a><button onClick={() => startEdit(item)} className="min-w-24 flex-1 rounded-control border px-3 py-2 text-sm font-bold">編集</button><button onClick={() => { if (renderedGeneration !== scopeGeneration.current) return; setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId, generation: renderedGeneration }) }} className="rounded-control border border-status-danger-border px-3 py-2 text-sm font-bold text-status-danger">削除する</button></div></article>)}{loadState === 'loading' && <p role="status">テンプレートを読み込んでいます…</p>}{loadState === 'error' && <div role="alert">テンプレートを読み込めませんでした。<Button onClick={() => load()}>再読み込み</Button></div>}{loadState === 'ready' && items.length === 0 && <div className="col-span-full rounded-card border border-dashed bg-canvas p-12 text-center text-sm text-ink-faint">まだ{meta.singular}テンプレートがありません。「{meta.singular}を作る」から追加してください。</div>}</div>
 
     {/*
       取り消せない操作なので `destructive` を付ける。消したテンプレートは

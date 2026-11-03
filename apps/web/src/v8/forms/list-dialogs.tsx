@@ -5,6 +5,7 @@ import type { AccountWithStats } from '@/contexts/account-context';
 
 import Button from '@/components/shared/button';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
+import OperationTargetSummary from '@/components/shared/operation-target-summary';
 import CopyTextButton from '@/components/shared/copy-text-button';
 import DetailPanel from '@/components/shared/detail-panel';
 import Dialog,{ DialogActions } from '@/components/shared/dialog';
@@ -37,6 +38,7 @@ type RenderFormDialogsContext = {
   deleteImpact: FormDeleteImpact | null
   deleteImpactLoading: boolean
   deleteTarget: Form | null
+  deleteAccountId: string | null
   deleting: boolean
   deletingFolder: Folder | null
   deletingFolderCount: number | null
@@ -81,10 +83,11 @@ type RenderFormDialogsContext = {
   stopping: boolean
   stopRevision: number | null
   stopTarget: Form | null
+  stopAccountId: string | null
   visibleForms: Form[]
 }
 
-export function renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget, visibleForms }: RenderFormDialogsContext) {
+export function renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget, deleteAccountId, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget, stopAccountId, visibleForms }: RenderFormDialogsContext) {
   const recommendDelete = deleteImpact?.recommendedAction === 'delete' && deleteImpact.canDelete
   const recommendArchive = deleteImpact?.recommendedAction === 'archive' && deleteImpact.canArchive
   const hasPublishedVersion = Boolean(deleteImpact?.blockers.includes('published'))
@@ -211,6 +214,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
           setStopError('')
         }}
       >
+        {stopTarget ? <OperationTargetSummary accounts={[{ id: stopAccountId ?? '' }]} /> : null}
         {stopImpactLoading ? <p className={styles.dialogNote}>フォームの状態を確認しています。</p> : null}
       </ConfirmDialog>
 
@@ -260,6 +264,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
       >
         {/* 絵は頭（題と×）・説明・2枚のカード・注意の帯・ボタンを 14 ずつで並べる。共通の窓の中身の余白（上下24）を詰める。 */}
         <div className={styles.archiveBody}>
+        {deleteTarget ? <OperationTargetSummary accounts={[{ id: deleteAccountId ?? '' }]} /> : null}
         {hasPublishedVersion && deleteImpact?.form.isActive ? (
           <p className={styles.archiveLead}>配っている URL を開いた人には「受付を終了しました」と出ます。</p>
         ) : null}

@@ -7,6 +7,7 @@ import type { UsageRow } from './words'
 
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary, { type OperationAccountTarget } from '@/components/shared/operation-target-summary'
 import DetailPanel from '@/components/shared/detail-panel'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import DialogChoiceCards from '@/components/shared/dialog-choice-cards'
@@ -33,6 +34,8 @@ import StatusBadge from '@/components/shared/status-badge'
 const PUBLISH_TONE = { live: 'success', changes: 'warning', draft: 'neutral' } as const
 
 type RenderTemplateDialogsContext = {
+  deleteAccounts: OperationAccountTarget[]
+  bulkDeleteAccounts: OperationAccountTarget[]
   activeFolderName: string | null
   activeIndex: number
   activeTemplate: Template | null
@@ -102,7 +105,7 @@ type RenderTemplateDialogsContext = {
   templates: Template[]
 }
 
-export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates }: RenderTemplateDialogsContext) {
+export function renderTemplateDialogs({ deleteAccounts, bulkDeleteAccounts, activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates }: RenderTemplateDialogsContext) {
   return ((
     <>
       {savedMenu}
@@ -159,11 +162,13 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
         危ないボタンは左端、キャンセルは真ん中（V8 の窓の決まり）。
       */}
       <TemplateDeleteDialog
+        targetAccounts={deleteAccounts}
         open={pendingDelete !== null}
         title={`「${pendingDelete?.item.name ?? ''}」を削除しますか？`}
         description={DELETE_UNUSED_DESCRIPTION}
         busy={deleting} error={deleteError}
         confirmDisabled={pendingDelete !== null && pendingDelete.accountId !== selectedAccountId}
+        confirmLockedReason={canMutateTemplates ? undefined : 'テンプレートを変更する権限がありません。'}
         onConfirm={() => confirmDelete()}
         onCancel={() => { if (!deleting) { setPendingDelete(null); setDeleteError('') } }}
       />
@@ -176,6 +181,7 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
         confirmLabel="まとめて削除する"
         destructive
         busy={bulkDeleting}
+        confirmLockedReason={canMutateTemplates ? undefined : 'テンプレートを変更する権限がありません。'}
         error={bulkDeleteError}
         onConfirm={() => runBulkDelete()}
         onCancel={() => {
@@ -183,7 +189,9 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
           setPendingBulkDelete(null)
           setBulkDeleteError('')
         }}
-      />
+      >
+        <OperationTargetSummary accounts={bulkDeleteAccounts} showAccountCount={bulkDeleteAccounts.length > 1} />
+      </ConfirmDialog>
 
       {/*
         削除できない窓（`Z0g3si`：使っている所がある）。

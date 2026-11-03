@@ -60,6 +60,13 @@ export default function TemplateDetailV8() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const { selectedAccountId, accounts } = useAccount()
+  const scope = useRef({ id, accountId: selectedAccountId, generation: 0 })
+  if (scope.current.id !== id || scope.current.accountId !== selectedAccountId) scope.current = { id, accountId: selectedAccountId, generation: scope.current.generation + 1 }
+  const renderedScope = scope.current
+  const loadedScope = useRef<typeof renderedScope | null>(null)
+  const loadSequence = useRef(0)
+  const mounted = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
 
   const [template, setTemplate] = useState<TemplateDetailData | null>(null)
   const [versions, setVersions] = useState<TemplateVersionItem[] | null>(null)
@@ -79,36 +86,50 @@ export default function TemplateDetailV8() {
   const [revertTarget, setRevertTarget] = useState<number | null>(null)
   const [reverting, setReverting] = useState(false)
   const [revertError, setRevertError] = useState('')
-  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [requestedDeleteOpen, setDeleteOpen] = useState(false)
+  const [deleteScope, setDeleteScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const deleteOpen = requestedDeleteOpen && deleteScope?.scope === scope.current
+  const deleteTicket = useRef<object | null>(null)
+  const deleteLock = useRef<object | null>(null)
   const [blockedOpen, setBlockedOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  useEffect(() => {
+    deleteTicket.current = null; deleteLock.current = null
+    setDeleteOpen(false); setDeleting(false); setDeleteError('')
+  }, [renderedScope])
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
   const usageRef = useRef<HTMLDivElement>(null)
 
   /* N-144：編集・公開・削除の口は owner/admin だけ。閲覧のみには押せない操作を置かない（隠す）。 */
   const canMutate = useFeatureAccess('templates')
+  const canMutateRef = useRef(canMutate); canMutateRef.current = canMutate
   usePageTitle(template?.name ?? null)
 
   const loadVersions = useCallback(async () => {
-    if (!id) return
+    if (!id || !mounted.current || renderedScope !== scope.current) return
     setVersionsError('')
     try {
       const res = await api.templates.versions(id)
+      if (!mounted.current || renderedScope !== scope.current) return
       if (res.success) setVersions(res.data)
       else setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
     } catch (saveFailure) {
+      if (!mounted.current || renderedScope !== scope.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
     }
   }
-  }, [id, saveErrors]);
+  }, [id, saveErrors, renderedScope]);
 
 
   const reload = useCallback(async () => {
+    if (!mounted.current || renderedScope !== scope.current) return
+    const sequence = ++loadSequence.current
+    const current = () => mounted.current && renderedScope === scope.current && sequence === loadSequence.current
     setMissing(false)
     setError('')
     setTemplate(null)
@@ -118,20 +139,22 @@ export default function TemplateDetailV8() {
     setLoading(true)
     try {
       const detail = await api.templates.get(id)
-      if (detail.success && isTemplateDetailData(detail.data)) setTemplate(detail.data)
+      if (!current()) return
+      if (detail.success && isTemplateDetailData(detail.data)) { loadedScope.current = renderedScope; setTemplate(detail.data) }
       else if (!detail.success) setError('テンプレートを読み込めませんでした。もう一度お試しください。')
       else setMissing(true)
     } catch (caught) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.status === 404) setMissing(true)
       else { if (!fieldFailure)
  setError('テンプレートを読み込めませんでした。もう一度お試しください。') }
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
-    void loadVersions()
-  }, [id, loadVersions, saveErrors])
+    if (current()) void loadVersions()
+  }, [id, loadVersions, saveErrors, renderedScope])
 
   useEffect(() => {
     if (!id) {
@@ -229,22 +252,28 @@ export default function TemplateDetailV8() {
 
   const remove = useCallback(async () => {
     if (deleting || usageCount > 0 || !template) return
-    setDeleting(true)
+    if (deleteLock.current || !deleteScope || !mounted.current || !canMutateRef.current || deleteScope.scope !== scope.current || deleteScope.ticket !== deleteTicket.current || loadedScope.current !== deleteScope.scope || template.id !== id) return
+    const current = () => mounted.current && canMutateRef.current && deleteScope.scope === scope.current && deleteScope.ticket === deleteTicket.current
+    const lock = {}; deleteLock.current = lock; setDeleting(true)
     setDeleteError('')
     try {
       const res = await api.templates.delete(id)
+      if (!current()) return
       if (!res.success) throw new Error(res.error)
+      deleteTicket.current = null
       setDeleteOpen(false)
       router.push('/templates')
     } catch (saveFailure) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setDeleting(false)
+      if (deleteLock.current === lock) deleteLock.current = null
+      if (mounted.current && deleteScope.scope === scope.current) setDeleting(false)
     }
-  }, [deleting, usageCount, template, id, router, saveErrors])
+  }, [deleting, usageCount, template, id, router, saveErrors, deleteScope])
 
   /*
    * 複製：公開済みの版（いま使っている版）の中身で新しいテンプレートを作る。
@@ -280,10 +309,11 @@ export default function TemplateDetailV8() {
   }, [duplicating, template, inUseVersion, selectedAccountId, router, saveErrors])
 
   const openDelete = useCallback(() => {
+    if (!mounted.current || !canMutateRef.current || renderedScope !== scope.current || loadedScope.current !== renderedScope || !template || template.id !== id || loading) return
     setDeleteError('')
     if (usageCount > 0) setBlockedOpen(true)
-    else setDeleteOpen(true)
-  }, [usageCount])
+    else { const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteOpen(true) }
+  }, [usageCount, renderedScope, template, id, loading])
 
   const showAllAndScroll = useCallback(() => {
     setBlockedOpen(false)
@@ -551,14 +581,17 @@ export default function TemplateDetailV8() {
 
       {/* 使っていないときの削除の確認（V6JFnd）。 */}
       <TemplateDeleteDialog
+        targetAccounts={[{ id: template.accountId ?? '', name: accounts.find(account => account.id === template.accountId)?.name }]}
         open={deleteOpen && usageCount === 0}
         title={`テンプレート「${template.name}」を削除しますか？`}
         description={templateDeleteDescription(usageCount)}
         busy={deleting}
+        confirmLockedReason={canMutate ? undefined : 'テンプレートを変更する権限がありません。'}
         error={deleteError}
         onConfirm={() => remove()}
         onCancel={() => {
-          if (deleting) return
+          if (deleting || !deleteScope || deleteScope.ticket !== deleteTicket.current) return
+          deleteTicket.current = null
           setDeleteOpen(false)
           setDeleteError('')
         }}

@@ -26,6 +26,7 @@ import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { ListPage, ListPagePagination } from '@/components/templates';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Button from '@/components/shared/button'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
@@ -152,9 +153,9 @@ export default function InflowListV8({
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
   const [poolMemberNames, setPoolMemberNames] = useState<Record<string, string[]>>({})
   const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(() => new Set())
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; accountId: string | null } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; accountId: string | null; routeAccountId: string | null } | null>(null)
   const [deleteName, setDeleteName] = useState('')
-  const [stopTarget, setStopTarget] = useState<{ id: string; name: string } | null>(null)
+  const [stopTarget, setStopTarget] = useState<{ id: string; name: string; routeAccountId: string | null } | null>(null)
   const toggleLocks = useRef(new Set<string>())
   const [bulkAction, setBulkAction] = useState<BulkRouteAction | null>(null)
   // 数の帯のマスの「…」。開いているマスの名前。
@@ -483,7 +484,7 @@ export default function InflowListV8({
       }
       if (target && canManageRole(role)) items.push({
         id: 'delete', label: '削除する', tone: 'danger',
-        onSelect: () => { setOpenMenuRefCode(null); setDeleteName(''); setDeleteTarget({ id: target.id, name: target.name, accountId: selectedAccountId }) },
+        onSelect: () => { setOpenMenuRefCode(null); setDeleteName(''); setDeleteTarget({ id: target.id, name: target.name, accountId: selectedAccountId, routeAccountId: target.lineAccountId ?? null }) },
       })
       items.push(row.isActive === false
         ? {
@@ -495,7 +496,7 @@ export default function InflowListV8({
           id: 'stop',
           label: '受付を止める',
           tone: 'danger' as const,
-          onSelect: () => { setOpenMenuRefCode(null); setStopError(''); setStopTarget({ id: row.entryRouteId!, name: row.name }) },
+          onSelect: () => { setOpenMenuRefCode(null); setStopError(''); setStopTarget({ id: row.entryRouteId!, name: row.name, routeAccountId: target?.lineAccountId ?? null }) },
         })
     }
     return items
@@ -915,7 +916,10 @@ export default function InflowListV8({
             if (!stopTarget) return
             return toggleRouteActive(stopTarget.id, false, stopTarget.name, true)
           }}
-        />
+        >
+          <OperationTargetSummary accounts={[{ id: stopTarget?.routeAccountId ?? '', label: '経路の所属LINEアカウント' }]} />
+          <p>受付先のすべてのアカウントは確認できません。リンクの設定や利用時の指定によって変わります。</p>
+        </ConfirmDialog>
         <ConfirmDialog
           open={deleteTarget !== null}
           title={`「${deleteTarget?.name ?? ''}」を削除しますか？`}
@@ -936,6 +940,8 @@ export default function InflowListV8({
             }
           }}
         >
+          <OperationTargetSummary accounts={[{ id: deleteTarget?.routeAccountId ?? '', label: '経路の所属LINEアカウント' }]} />
+          <p>受付先のすべてのアカウントは確認できません。リンクの設定や利用時の指定によって変わります。</p>
           <Field required label={`完全削除するには「${deleteTarget?.name ?? ''}」と入力`}>
             <TextField required value={deleteName} onChange={event => setDeleteName(event.target.value)} autoComplete="off" />
           </Field>

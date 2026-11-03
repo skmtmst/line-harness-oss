@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, CircleDot, Clock3, Download, RefreshCw, TrendingDown, TrendingUp, Undo2, Users, Wallet } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import {
   api,
   type MileageAdjustmentApprovalRequest,
@@ -88,6 +89,11 @@ export default function BalancesTab() {
   const { readonly, narrow, setCount } = useMileageShell()
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const scope = useRef({ id: selectedAccountId, generation: 0 })
+  if (scope.current.id !== selectedAccountId) scope.current = { id: selectedAccountId, generation: scope.current.generation + 1 }
+  const loadedApprovalScope = useRef(-1)
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const latestAccountRef = useRef(selectedAccountId)
   useEffect(() => {
     latestAccountRef.current = selectedAccountId
@@ -109,8 +115,11 @@ export default function BalancesTab() {
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null)
   const [approvalError, setApprovalError] = useState('')
   const [rejectTarget, setRejectTarget] = useState<MileageAdjustmentApprovalRequest | null>(null)
+  const [rejectScope, setRejectScope] = useState<{ id: string; generation: number } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const isOwner = isOwnerRole(useStaffRole())
+  const canDecide = useRef(isOwner && !readonly && overview?.balanceSource !== 'ec')
+  canDecide.current = isOwner && !readonly && overview?.balanceSource !== 'ec'
   const [exportError, setExportError] = useState('')
 
   const chipActive = withBalanceOnly || (pendingOnly && overview?.balanceSource !== 'ec')
@@ -199,6 +208,7 @@ export default function BalancesTab() {
 
 
   const loadApprovals = useCallback(async () => {
+    const requestScope = scope.current.generation
     if (!selectedAccountId) {
       setApprovalRequests(null)
       setApprovalFailed(false)
@@ -206,9 +216,12 @@ export default function BalancesTab() {
     }
     try {
       const response = await api.mileage.adjustmentApprovals(selectedAccountId, 'pending')
+      if (!alive.current || requestScope !== scope.current.generation) return
+      if (response.success) loadedApprovalScope.current = requestScope
       setApprovalRequests(response.success ? response.data : null)
       setApprovalFailed(!response.success)
     } catch {
+      if (!alive.current || requestScope !== scope.current.generation) return
       setApprovalRequests(null)
       setApprovalFailed(true)
     }
@@ -219,7 +232,7 @@ export default function BalancesTab() {
   }, [loadApprovals])
 
   const decideApproval = async (requestId: string, action: 'approve' | 'reject', reason?: string) => {
-    if (readonly || ecSource || !selectedAccountId || approvalBusyId) return
+    if (!alive.current || !canDecide.current || !selectedAccountId || approvalBusyId || loadedApprovalScope.current !== scope.current.generation) return
     setApprovalBusyId(requestId)
     setApprovalError('')
     try {
@@ -360,7 +373,7 @@ export default function BalancesTab() {
               <Button
                 variant="secondary"
                 disabled={approvalBusyId !== null}
-                onClick={() => { setRejectTarget(request); setRejectReason(''); setApprovalError('') }}
+                onClick={() => { if (!selectedAccountId || !canDecide.current || loadedApprovalScope.current !== scope.current.generation) return; setRejectScope({ id: selectedAccountId, generation: scope.current.generation }); setRejectTarget(request); setRejectReason(''); setApprovalError('') }}
               >
                 <Undo2 size={16} aria-hidden="true" /> 差し戻す
               </Button>
@@ -544,7 +557,7 @@ export default function BalancesTab() {
       pagination={footer}
       overlays={
         <Dialog
-          open={rejectTarget !== null}
+          open={rejectTarget !== null && rejectScope?.generation === scope.current.generation}
           title="この変更依頼を差し戻しますか？"
           description={rejectTarget ? `${rejectTarget.friend_display_name ?? rejectTarget.friend_id} への変更は行われず、台帳は変わりません。` : undefined}
           tone="destructive"
@@ -553,8 +566,9 @@ export default function BalancesTab() {
           busy={approvalBusyId !== null}
           error={approvalError || undefined}
           onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
-          onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
+          onConfirm={() => { if (rejectTarget && rejectScope?.generation === scope.current.generation) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
         >
+          {rejectScope ? <OperationTargetSummary accounts={[{ id: rejectScope.id }]} /> : null}
           <Field label="差し戻す理由"><SaveErrorField names={["rejectReason","reject_reason"]}><SharedTextArea
               className={styles.textarea}
               value={rejectReason}

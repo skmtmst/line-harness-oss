@@ -30,3 +30,24 @@ it('点数が空・理由が空なら確定せず、2つの欄が赤くなり、
   expect(document.getElementById('ml-score-reason-error')?.textContent).toBe('理由を入力してください。')
   expect(document.activeElement).toBe(amount)
 })
+it('点数を直す窓に操作するアカウントと環境を表示する', async () => {
+ await act(async () => { root.render(<ScoreAdjustDialog accountId="a" friendId="f" friendName="山田" currentScore={50} highMin={70} normalMin={30} band="normal" onCancel={() => {}} onCompleted={async () => {}} />) })
+ const dialog = document.querySelector('[role="dialog"]')!
+ expect(dialog.textContent).toContain('LINEアカウント')
+ expect(dialog.textContent).toContain('環境')
+})
+it('窓を開いた後のアカウント切替では古い点数変更を送らない', async () => {
+ const { api } = await import('@/lib/api')
+ const adjust = vi.spyOn(api.actionScores, 'adjust').mockResolvedValue({ success: true } as never)
+ const draw = (accountId: string) => <ScoreAdjustDialog accountId={accountId} friendId="f" friendName="山田" currentScore={50} highMin={70} normalMin={30} band="normal" onCancel={() => {}} onCompleted={async () => {}} />
+ await act(async () => { root.render(draw('a')) })
+ fireEvent.change(document.getElementById('ml-score-reason')!, { target: { value: '人工の理由' } })
+ const button = Array.from(document.querySelectorAll('[role="dialog"] button')).find(b => b.textContent?.includes('点減らす'))!
+ const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+ const oldConfirm = (button as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ await act(async () => { root.render(draw('b')) })
+ await act(async () => { root.render(draw('a')) })
+ await act(async () => { await oldConfirm({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+ expect(adjust).not.toHaveBeenCalled()
+ adjust.mockRestore()
+})

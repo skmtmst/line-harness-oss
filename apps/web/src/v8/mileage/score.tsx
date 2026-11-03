@@ -31,6 +31,7 @@ import { csvCell } from '@/lib/presentation'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import { DialogFormRow } from '@/components/shared/dialog-form-row'
 import SegmentedControl from '@/components/shared/segmented'
@@ -155,6 +156,14 @@ export default function ScoreTab() {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId ?? ''
+  const scope = useRef({ id: accountId, generation: 0 })
+  if (scope.current.id !== accountId) scope.current = { id: accountId, generation: scope.current.generation + 1 }
+  const loadedScope = useRef(-1)
+  const friendsLoadedScope = useRef(-1)
+  const readonlyRef = useRef(readonly)
+  readonlyRef.current = readonly
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const latestAccountRef = useRef(accountId)
   useEffect(() => {
     latestAccountRef.current = accountId
@@ -170,6 +179,7 @@ export default function ScoreTab() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [adjustTarget, setAdjustTarget] = useState<FriendsItem | null>(null)
+  const [adjustScope, setAdjustScope] = useState<{ id: string; generation: number } | null>(null)
   const [historyTarget, setHistoryTarget] = useState<FriendsItem | null>(null)
   /* できごとの決めごと。 */
   const [config, setConfig] = useState<ActionScoreRuleConfiguration | null>(null)
@@ -185,6 +195,16 @@ export default function ScoreTab() {
   const [stopConfirm, setStopConfirm] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<ActionScoreRule | null>(null)
   const [publishConfirm, setPublishConfirm] = useState(false)
+  const [confirmScope, setConfirmScope] = useState<{ id: string; generation: number } | null>(null)
+  const openConfirm = (open: () => void) => {
+    if (!accountId || readonlyRef.current || loadedScope.current !== scope.current.generation) return
+    setPublishConfirm(false)
+    setStopConfirm(false)
+    setRemoveTarget(null)
+    setConfirmScope({ id: accountId, generation: scope.current.generation })
+    open()
+  }
+  const canConfirm = () => alive.current && !readonlyRef.current && confirmScope !== null && confirmScope.id === scope.current.id && confirmScope.generation === scope.current.generation
   const [previewOpen, setPreviewOpen] = useState(false)
   const [preview, setPreview] = useState<ActionScoreBandPreview | null>(null)
   const [previewBusy, setPreviewBusy] = useState(false)
@@ -193,6 +213,7 @@ export default function ScoreTab() {
 
   const loadFriends = useCallback(async () => {
     const accountAtRequest = accountId
+    const requestScope = scope.current.generation
     if (!accountAtRequest) {
       setOverview(null)
       setLoading(false)
@@ -209,17 +230,18 @@ export default function ScoreTab() {
         limit: pageSize,
         offset: (page - 1) * pageSize,
       })
-      if (accountAtRequest !== latestAccountRef.current) return
+      if (accountAtRequest !== latestAccountRef.current || requestScope !== scope.current.generation) return
       if (!response.success) throw new Error(response.error)
+      friendsLoadedScope.current = requestScope
       setOverview(response.data)
     } catch (saveFailure) {
-      if (accountAtRequest !== latestAccountRef.current) return
+      if (accountAtRequest !== latestAccountRef.current || requestScope !== scope.current.generation) return
       const fieldFailure = saveErrors.capture(saveFailure)
       setOverview(null)
       { if (!fieldFailure)
       setLoadError(true) }
     } finally {
-      if (accountAtRequest === latestAccountRef.current) setLoading(false)
+      if (accountAtRequest === latestAccountRef.current && requestScope === scope.current.generation) setLoading(false)
     }
   }, [accountId, filter, page, pageSize, search, sort, saveErrors])
 
@@ -247,6 +269,7 @@ export default function ScoreTab() {
 
   const loadRules = useCallback(async () => {
     const accountAtRequest = accountId
+    const requestScope = scope.current.generation
     if (!accountAtRequest) {
       setConfig(null)
       setRulesLoading(false)
@@ -256,17 +279,18 @@ export default function ScoreTab() {
     setRulesError(false)
     try {
       const response = await api.actionScores.rules(accountAtRequest)
-      if (accountAtRequest !== latestAccountRef.current) return
+      if (accountAtRequest !== latestAccountRef.current || requestScope !== scope.current.generation) return
       if (!response.success) throw new Error(response.error)
+      loadedScope.current = requestScope
       setConfig(response.data)
     } catch (saveFailure) {
-      if (accountAtRequest !== latestAccountRef.current) return
+      if (accountAtRequest !== latestAccountRef.current || requestScope !== scope.current.generation) return
       const fieldFailure = saveErrors.capture(saveFailure)
       setConfig(null)
       { if (!fieldFailure)
       setRulesError(true) }
     } finally {
-      if (accountAtRequest === latestAccountRef.current) setRulesLoading(false)
+      if (accountAtRequest === latestAccountRef.current && requestScope === scope.current.generation) setRulesLoading(false)
     }
   }, [accountId, saveErrors])
 
@@ -562,7 +586,7 @@ export default function ScoreTab() {
                         onOpenChange={(next) => setMenuId(next ? item.friendId : null)}
                         items={[
                           /* 閲覧のみの人には「点数を直す」を出さない。 */
-                          ...(readonly ? [] : [{ id: 'adjust', label: '点数を直す', onSelect: () => setAdjustTarget(item) }]),
+                          ...(readonly ? [] : [{ id: 'adjust', label: '点数を直す', onSelect: () => { if (accountId && !readonlyRef.current && friendsLoadedScope.current === scope.current.generation) { setAdjustScope({ id: accountId, generation: scope.current.generation }); setAdjustTarget(item) } } }]),
                           {
                             id: 'friend',
                             label: 'この人を見る',
@@ -645,7 +669,7 @@ export default function ScoreTab() {
                     dividerBefore: true,
                     disabled: rulesBusy,
                     disabledReason: '反映しています',
-                    onSelect: () => setStopConfirm(true),
+                    onSelect: () => openConfirm(() => setStopConfirm(true)),
                   },
                 ]}
               />
@@ -698,7 +722,7 @@ export default function ScoreTab() {
                                 dividerBefore: true,
                                 disabled: rulesBusy || stopped,
                                 disabledReason: stopped ? 'すでに外しています' : '反映しています',
-                                onSelect: () => setRemoveTarget(rule),
+                                onSelect: () => openConfirm(() => setRemoveTarget(rule)),
                               },
                             ]}
                           />
@@ -750,7 +774,7 @@ export default function ScoreTab() {
         </Button>
         <Button href="/mileage/score-rules" title="決めごとの編集画面で保存します">下書きを保存</Button>
         {draftVersionId ? (
-          <Button variant="primary" onClick={() => setPublishConfirm(true)}>
+          <Button variant="primary" onClick={() => openConfirm(() => setPublishConfirm(true))}>
             <Upload size={16} aria-hidden="true" /> スコアのルールを公開
           </Button>
         ) : (
@@ -763,9 +787,9 @@ export default function ScoreTab() {
       toolbar={toolbar}
       pagination={footer}
       overlays={<>
-        {adjustTarget && !readonly ? (
+        {adjustTarget && adjustScope?.generation === scope.current.generation && !readonly ? (
           <ScoreAdjustDialog
-            accountId={accountId}
+            accountId={adjustScope.id}
             friendId={adjustTarget.friendId}
             friendName={adjustTarget.displayName}
             currentScore={adjustTarget.currentScore}
@@ -788,7 +812,7 @@ export default function ScoreTab() {
           />
         ) : null}
         <ConfirmDialog
-          open={publishConfirm}
+          open={publishConfirm && confirmScope?.generation === scope.current.generation}
           title="下書きの決めごとを公開しますか？"
           description="公開すると、いまの点数の分けかたと決めごとが友だちの点数に使われます。取り消せません。"
           confirmLabel="公開する"
@@ -796,10 +820,10 @@ export default function ScoreTab() {
           busy={rulesBusy}
           error={rulesActionError || undefined}
           onCancel={() => { if (!rulesBusy) setPublishConfirm(false) }}
-          onConfirm={() => publishDraft()}
-        />
+          onConfirm={() => { if (canConfirm()) void publishDraft() }}
+        >{confirmScope ? <OperationTargetSummary accounts={[{ id: confirmScope.id }]} /> : null}</ConfirmDialog>
         <ConfirmDialog
-          open={stopConfirm}
+          open={stopConfirm && confirmScope?.generation === scope.current.generation}
           title="公開中のルールを止めますか？"
           description="止めている間は、できごとがあっても点数は動きません。下書きは残ります。"
           confirmLabel="止める"
@@ -807,10 +831,10 @@ export default function ScoreTab() {
           busy={rulesBusy}
           error={rulesActionError || undefined}
           onCancel={() => { if (!rulesBusy) setStopConfirm(false) }}
-          onConfirm={() => stopPublished()}
-        />
+          onConfirm={() => { if (canConfirm()) void stopPublished() }}
+        >{confirmScope ? <OperationTargetSummary accounts={[{ id: confirmScope.id }]} /> : null}</ConfirmDialog>
         <ConfirmDialog
-          open={removeTarget !== null}
+          open={removeTarget !== null && confirmScope?.generation === scope.current.generation}
           title={removeTarget ? `「${removeTarget.name}」を外しますか？` : 'できごとを外しますか？'}
           description="決めごとの一覧から外します（無効にします）。記録そのものは残ります。"
           confirmLabel="外す"
@@ -818,8 +842,8 @@ export default function ScoreTab() {
           busy={rulesBusy}
           error={rulesActionError || undefined}
           onCancel={() => { if (!rulesBusy) setRemoveTarget(null) }}
-          onConfirm={() => { if (removeTarget) void removeRule(removeTarget) }}
-        />
+          onConfirm={() => { if (canConfirm() && removeTarget) void removeRule(removeTarget) }}
+        >{confirmScope ? <OperationTargetSummary accounts={[{ id: confirmScope.id }]} /> : null}</ConfirmDialog>
         <Dialog
           open={previewOpen}
           title="この分けかただと何人入るか"
@@ -880,6 +904,11 @@ export function ScoreAdjustDialog({
 }) {
   const saveErrors = useSaveFormErrors()
 
+  const initialTarget = useRef({ accountId, friendId, changed: false })
+  if (initialTarget.current.accountId !== accountId || initialTarget.current.friendId !== friendId) initialTarget.current.changed = true
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+
   const [direction, setDirection] = useState<'increase' | 'decrease'>('decrease')
   const [amountText, setAmountText] = useState('10')
   const [reason, setReason] = useState('')
@@ -898,6 +927,7 @@ export function ScoreAdjustDialog({
   fields.define('reason', '理由', () => ((FIELD_REQUIREMENTS.reason.check(reason) !== null) ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null), { required: true })
 
   const submit = async () => {
+    if (!alive.current || initialTarget.current.changed) return
     if (fields.submit().length > 0) {
       setError('')
       return
@@ -947,6 +977,7 @@ export function ScoreAdjustDialog({
     >
       {/* 絵 Nv7An：縦に間 14 の1列。ラベルと入れ物の間は 6。 */}
       <div className={styles.dlgBody}>
+        <OperationTargetSummary accounts={[{ id: initialTarget.current.accountId }]} />
         <p className={styles.dlgCaption}>だれの点数を動かしますか</p>
         <div className={styles.dlgPerson}>
           <span className={styles.dlgAvatar} aria-hidden="true">{friendName.slice(0, 1)}</span>

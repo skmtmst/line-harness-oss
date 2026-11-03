@@ -1,4 +1,5 @@
 'use client'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { lineAccountConnectionState } from '@/lib/line-account-state'
 import { requiredText } from '@/lib/form-requirement'
 const accountNameRequirement = requiredText('名前を入力してください。')
@@ -256,6 +257,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
     >
       <div className={head.head}>
         <p className={styles.lead}>一覧から外します。送受信は止まり、友だちと履歴は残ります。あとで「戻す」で戻せます（オーナーのみ）。</p>
+        <OperationTargetSummary accounts={[{ id: account.id, name: account.name }]} />
         <div className={styles.field}><Field label="アーカイブの理由" htmlFor="hq-account-archive-reason"><SaveErrorField names={["reason"]}><TextField
             id="hq-account-archive-reason"
             value={reason}

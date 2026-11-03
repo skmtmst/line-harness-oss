@@ -508,6 +508,8 @@ describe('回答フォームの編集（V8）', () => {
     fireEvent.click(screen.getByRole('button', { name: 'この版を公開' }))
     const dialog = await screen.findByRole('dialog', { name: 'この版を公開する' })
     expect(within(dialog).getByText(/すでに集まった回答（1,284 件）は消えません/)).toBeTruthy()
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'この版を公開' }))
     await waitFor(() => expect(formsPublish).toHaveBeenCalledWith('form-1', 'acc-1', 8))
     expect(formsUpdate).toHaveBeenCalledWith('form-1', 'acc-1', expect.objectContaining({ expectedContentRevision: 7 }))

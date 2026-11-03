@@ -11,6 +11,7 @@ import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button';
 import Dialog from '@/components/shared/dialog';
 import Notice from '@/components/shared/notice';
+import OperationTargetSummary from '@/components/shared/operation-target-summary';
 import HelpTip from '@/components/shared/help-tip';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
 import ListState from '@/components/shared/list-state';
@@ -1074,6 +1075,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       >
         {/* 絵は頭（題と×）・説明・変わること・残ること・ボタンを 14 ずつで並べる。共通の窓の中身の余白（上下24）を詰める。 */}
         <div className={styles.publishBody}>
+          <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} />
           <p className={styles.publishLead}>公開すると、配っている URL を開いた人に新しい内容が出ます。</p>
           <div className={styles.changes}>
             <p className={styles.changesTitle}>

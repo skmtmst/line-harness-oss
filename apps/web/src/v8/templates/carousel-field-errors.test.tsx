@@ -1,19 +1,20 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const calls = vi.hoisted(() => ({ prepare: vi.fn(), put: vi.fn(), complete: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn() }))
+const calls = vi.hoisted(() => ({ prepare: vi.fn(), put: vi.fn(), complete: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), get: vi.fn(), publish: vi.fn() }))
 const staffRole = vi.hoisted(() => ({ value: 'owner' as 'owner' | 'viewer' }))
+const account = vi.hoisted(() => ({ id: 'a-1' }))
 vi.mock('@/lib/api', () => ({ ApiError: class extends Error {}, api: {
   media: { prepareUploads: calls.prepare, completeUpload: calls.complete, detail: calls.detail },
-  templates: { create: calls.create, update: calls.update }, folders: { list: async () => ({ success: true, data: [] }) },
+  templates: { create: calls.create, update: calls.update, get: calls.get, publish: calls.publish }, folders: { list: async () => ({ success: true, data: [] }) },
 } }))
 vi.mock('../contents/media-direct-upload', async (original) => ({
   ...await original<Record<string, unknown>>(), extractMediaMetadata: async () => ({ width: 1040, height: 1040 }), putMediaFile: calls.put,
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a-1', selectedAccount: { name: '店' }, accounts: [] }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.id, selectedAccount: { name: '店' }, accounts: [] }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => staffRole.value }))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({ useActionOptions: () => ({ tags: [], fields: [], marks: [], scenarios: [], vars: [] }) }))
@@ -28,7 +29,7 @@ import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
  * カルーセルの保存で落ちた欄（・オーナーの写真の指摘：「すべてのカードに本文を入力してください」の帯だけだった）。
  * 欄が赤くなり真下に理由、別のカードならそのカードを開いて移り、カードの札に赤い丸が付く。
  */
-beforeEach(() => { staffRole.value = 'owner'; calls.create.mockResolvedValue({ success: true, data: { id: 'template-1' } }) })
+beforeEach(() => { account.id = 'a-1'; staffRole.value = 'owner'; calls.create.mockResolvedValue({ success: true, data: { id: 'template-1' } }) })
 afterEach(() => { cleanup(); forgetStaffIdentity(); vi.resetAllMocks() })
 
 const fillFirst = () => {
@@ -38,6 +39,31 @@ const fillFirst = () => {
 }
 
 describe('カルーセルの欄ごとの誤り', () => {
+  it('使われているカルーセルの公開確認に対象を表示する', async () => {
+    verifiedStaffRole('owner')
+    calls.get.mockResolvedValue({ success: true, data: { accountId: 'a-1', publishedVersion: 0, draftRevision: 1, usedBy: { scenarios: [{ id: 's-1' }] } } })
+    render(<Carousel />)
+    fillFirst()
+    fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
+    const dialog = await screen.findByRole('dialog', { name: 'この内容を公開しますか？' })
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
+  })
+  it('アカウントを切り替えて戻しても古い公開確認では公開しない', async () => {
+    verifiedStaffRole('owner')
+    calls.get.mockResolvedValue({ success: true, data: { accountId: 'a-1', publishedVersion: 0, draftRevision: 1, usedBy: { scenarios: [{ id: 's-1' }] } } })
+    const view = render(<Carousel />)
+    fillFirst()
+    fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
+    const dialog = await screen.findByRole('dialog', { name: 'この内容を公開しますか？' })
+    const button = within(dialog).getByRole('button', { name: '公開する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    account.id = 'a-2'; view.rerender(<Carousel />)
+    account.id = 'a-1'; view.rerender(<Carousel />)
+    await act(async () => { await oldClick({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(calls.publish).not.toHaveBeenCalled()
+  })
   it.each(['shop', 'hq'] as const)('閲覧のみでは順番の絵を灰色と理由で出し、変更を送らない: %s', scope => {
     const onSave = vi.fn()
     verifiedStaffRole('viewer')

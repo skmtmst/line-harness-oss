@@ -7,7 +7,7 @@ import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { loadStaffIdentity, useStaffRole, canManageRole } from '@/lib/staff-role'
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { useCallback, useDeferredValue, useEffect, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { ApiError, api, type FileScanConfig, type FileScanItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -26,6 +26,14 @@ export type FileScanPhase = 'loading' | 'ready' | 'error' | 'forbidden'
 export function useFileScan() {
   const canEdit = canManageRole(useStaffRole())
   const { selectedAccountId } = useAccount()
+  const scope = useRef({ accountId: selectedAccountId, generation: 0 })
+  if (scope.current.accountId !== selectedAccountId) scope.current = { accountId: selectedAccountId, generation: scope.current.generation + 1 }
+  const renderedScope = scope.current
+  const loadedScope = useRef<typeof renderedScope | null>(null)
+  const loadSequence = useRef(0)
+  const mounted = useRef(false)
+  const canEditRef = useRef(canEdit); canEditRef.current = canEdit
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const [phase, setPhase] = useState<FileScanPhase>('loading')
   const [items, setItems] = useState<FileScanItem[]>([])
   const [total, setTotal] = useState(0)
@@ -38,12 +46,18 @@ export function useFileScan() {
   const [actionError, setActionError] = useState('')
   const [actionDone, setActionDone] = useState('')
   const [releaseTarget, setReleaseTarget] = useState<FileScanItem | null>(null)
+  const [releaseScope, setReleaseScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const releaseTicket = useRef<object | null>(null)
+  const releaseLock = useRef(false)
   const [releaseReason, setReleaseReason] = useState('')
   const [releaseBusy, setReleaseBusy] = useState(false)
   /* 監査 D017: 確認窓の中で起きた失敗は窓の中に出す。ページ最上部の帯は
    * 暗転の後ろに隠れて読めないため、ConfirmDialog の error へ渡す。 */
   const [releaseError, setReleaseError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<FileScanItem | null>(null)
+  const [deleteScope, setDeleteScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const deleteTicket = useRef<object | null>(null)
+  const deleteLock = useRef(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [config, setConfig] = useState<FileScanConfig | null>(null)
@@ -53,6 +67,10 @@ export function useFileScan() {
   const [secretRef, setSecretRef] = useState('')
   const [configBusy, setConfigBusy] = useState(false)
   const [stopExternal, setStopExternal] = useState(false)
+  const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const stopTicket = useRef<object | null>(null)
+  const stopLock = useRef<object | null>(null)
+  const configLock = useRef<object | null>(null)
   const [stopError, setStopError] = useState('')
   const configFields = useFormErrors()
   const hasExternalInput = Boolean(provider.trim() || endpoint.trim() || secretRef.trim())
@@ -76,6 +94,9 @@ export function useFileScan() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: configDirty, busy: configBusy })
 
   const load = useCallback(async () => {
+    if (!mounted.current || renderedScope !== scope.current) return
+    const sequence = ++loadSequence.current
+    const current = () => mounted.current && renderedScope === scope.current && sequence === loadSequence.current
     if (!selectedAccountId) {
       setPhase('ready')
       setItems([])
@@ -100,6 +121,7 @@ export function useFileScan() {
         api.fileScan.list(selectedAccountId, { status: 'pending', q: trimmedQuery, limit: 1 }),
         api.fileScan.list(selectedAccountId, { status: 'released', q: trimmedQuery, limit: 1 }),
       ])
+      if (!current()) return
       if (!me.success || !list.success || !configRes.success) {
         setPhase('error')
         return
@@ -114,6 +136,7 @@ export function useFileScan() {
         return
       }
       setItems(list.data.items)
+      loadedScope.current = renderedScope
       setTotal(list.data.total)
       /* 消す・戻すで今のページが空になったら1ページ目へ戻す（監査 R132）。 */
       if (list.data.items.length === 0 && page > 1) setPage(1)
@@ -123,80 +146,97 @@ export function useFileScan() {
       setSecretRef(configRes.data.config?.externalSecretRef ?? '')
       setPhase('ready')
     } catch {
-      setPhase('error')
+      if (current()) setPhase('error')
     }
-  }, [selectedAccountId, statusFilter, deferredQuery, page])
+  }, [selectedAccountId, statusFilter, deferredQuery, page, renderedScope])
+
+  useEffect(() => {
+    releaseTicket.current = null; deleteTicket.current = null; stopTicket.current = null
+    stopLock.current = null; configLock.current = null
+    setReleaseTarget(null); setDeleteTarget(null); setStopExternal(false)
+    setReleaseBusy(false); setDeleteBusy(false); setConfigBusy(false)
+  }, [renderedScope])
 
   useEffect(() => {
     void load()
   }, [load])
 
   async function release() {
-    if (!canEdit) return
-    if (!selectedAccountId || !releaseTarget) return
+    if (!canEditRef.current || !selectedAccountId || !releaseTarget || !releaseScope || releaseScope.scope !== scope.current || releaseScope.ticket !== releaseTicket.current || loadedScope.current !== releaseScope.scope || !mounted.current || releaseLock.current) return
     /* 監査 D018: 必須の理由が空なら送らず、窓の中で理由を促す。 */
     if (!releaseReason.trim()) {
       setReleaseError('理由を入力してください')
       return
     }
-    setReleaseBusy(true)
+    const current = () => mounted.current && canEditRef.current && releaseScope.scope === scope.current && releaseScope.ticket === releaseTicket.current
+    releaseLock.current = true; setReleaseBusy(true)
     setReleaseError('')
     try {
       const res = await api.fileScan.release(releaseTarget.id, selectedAccountId, releaseReason.trim())
+      if (!current()) return
       if (!res.success) {
         setReleaseError('戻せませんでした。通信状態を確認して、もう一度お試しください。')
         return
       }
       setReleaseTarget(null)
+      releaseTicket.current = null
       setReleaseReason('')
       setReleaseError('')
       setActionDone(`${releaseTarget.filename} を使えるように戻しました。`)
       await load()
     } catch (caught) {
+      if (!current()) return
       setReleaseError(caught instanceof ApiError && caught.status === 409
         ? 'しまったファイルだけ戻せます。一覧を読み直してください。'
         : '戻せませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
-      setReleaseBusy(false)
+      releaseLock.current = false
+      if (mounted.current && releaseScope.scope === scope.current) setReleaseBusy(false)
     }
   }
 
   async function remove() {
-    if (!canEdit) return
-    if (!selectedAccountId || !deleteTarget) return
-    setDeleteBusy(true)
+    if (!canEditRef.current || !selectedAccountId || !deleteTarget || !deleteScope || deleteScope.scope !== scope.current || deleteScope.ticket !== deleteTicket.current || loadedScope.current !== deleteScope.scope || !mounted.current || deleteLock.current) return
+    const current = () => mounted.current && canEditRef.current && deleteScope.scope === scope.current && deleteScope.ticket === deleteTicket.current
+    deleteLock.current = true; setDeleteBusy(true)
     setDeleteError('')
     try {
       const res = await api.fileScan.remove(deleteTarget.id, selectedAccountId)
+      if (!current()) return
       if (!res.success) {
         setDeleteError('消せませんでした。通信状態を確認して、もう一度お試しください。')
         return
       }
       setDeleteTarget(null)
+      deleteTicket.current = null
       setDeleteError('')
       setActionDone(`${deleteTarget.filename} を消しました。`)
       await load()
     } catch (caught) {
+      if (!current()) return
       setDeleteError(caught instanceof ApiError && caught.status === 409
         ? 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
         : '消せませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
-      setDeleteBusy(false)
+      deleteLock.current = false
+      if (mounted.current && deleteScope.scope === scope.current) setDeleteBusy(false)
     }
   }
 
   async function saveConfig() {
     if (!canEdit) return
-    if (!selectedAccountId || configBusy || !configDirty) return
+    if (!selectedAccountId || configBusy || configLock.current || !configDirty) return
     setActionError('')
     if (configFields.submit().length > 0) return
-    setConfigBusy(true)
+    const lock = {}; configLock.current = lock; setConfigBusy(true)
+    const current = () => mounted.current && renderedScope === scope.current && configLock.current === lock
     try {
       const res = await api.fileScan.saveConfig(selectedAccountId, {
         externalProvider: provider.trim() || null,
         externalEndpointUrl: endpoint.trim() || null,
         externalSecretRef: secretRef.trim() || null,
       })
+      if (!current()) return
       if (!res.success) {
         setActionError('設定を保存できませんでした。時間をおいて、もう一度お試しください。')
         return
@@ -205,6 +245,7 @@ export function useFileScan() {
       notifySaved('外の検査の設定を保存しました。')
       await load()
     } catch (caught) {
+      if (!current()) return
       const errors = readSaveFieldErrors(caught)
       const count = Object.keys(errors).length
       if (count && configFields.setServerErrors(errors) === count) return
@@ -212,7 +253,7 @@ export function useFileScan() {
         ? describeApiFailure(caught, '設定の保存')
         : '設定を保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
-      setConfigBusy(false)
+      if (current()) { configLock.current = null; setConfigBusy(false) }
     }
   }
 
@@ -221,9 +262,9 @@ export function useFileScan() {
    * 実際に消す。空に保存すると送信は止まる（部分だけの空はAPIが弾く）。
    */
   async function stopExternalConfig() {
-    if (!canEdit) return
-    if (!selectedAccountId) return
-    setConfigBusy(true)
+    if (!canEditRef.current || !selectedAccountId || !stopScope || stopScope.scope !== scope.current || stopScope.ticket !== stopTicket.current || loadedScope.current !== stopScope.scope || !mounted.current || stopLock.current || configLock.current) return
+    const current = () => mounted.current && canEditRef.current && stopScope.scope === scope.current && stopScope.ticket === stopTicket.current
+    const lock = {}; stopLock.current = lock; configLock.current = lock; setConfigBusy(true)
     setStopError('')
     try {
       const res = await api.fileScan.saveConfig(selectedAccountId, {
@@ -231,19 +272,23 @@ export function useFileScan() {
         externalEndpointUrl: null,
         externalSecretRef: null,
       })
+      if (!current()) return
       if (!res.success) {
         setStopError('設定を消せませんでした。')
         return
       }
       setStopExternal(false)
+      stopTicket.current = null
       setStopError('')
       setConfigOpen(false)
       setActionDone('外の検査サービスへの送信を止めました。内蔵の簡易検査は続きます。')
       await load()
     } catch {
+      if (!current()) return
       setStopError('設定を消せませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
-      setConfigBusy(false)
+      if (stopLock.current === lock) stopLock.current = null
+      if (configLock.current === lock) { configLock.current = null; if (mounted.current && stopScope.scope === scope.current) setConfigBusy(false) }
     }
   }
 
@@ -269,6 +314,26 @@ export function useFileScan() {
     setPage(1)
   }
 
+  const canOpen = () => mounted.current && canEditRef.current && Boolean(selectedAccountId) && renderedScope === scope.current && loadedScope.current === renderedScope && phase === 'ready'
+  const changeReleaseTarget = (item: FileScanItem | null) => {
+    if (item) {
+      if (!canOpen()) return
+      const ticket = {}; releaseTicket.current = ticket; setReleaseScope({ scope: renderedScope, ticket }); setReleaseTarget(item)
+    } else if (releaseScope?.ticket === releaseTicket.current) { releaseTicket.current = null; setReleaseTarget(null) }
+  }
+  const changeDeleteTarget = (item: FileScanItem | null) => {
+    if (item) {
+      if (!canOpen()) return
+      const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteTarget(item)
+    } else if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setDeleteTarget(null) }
+  }
+  const changeStopExternal = (open: boolean) => {
+    if (open) {
+      if (!canOpen()) return
+      const ticket = {}; stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket }); setStopExternal(true)
+    } else if (stopScope?.ticket === stopTicket.current) { stopTicket.current = null; setStopExternal(false) }
+  }
+
   return {
     canEdit,
     selectedAccountId,
@@ -283,15 +348,15 @@ export function useFileScan() {
     actionError,
     setActionError,
     actionDone,
-    releaseTarget,
-    setReleaseTarget,
+    releaseTarget: releaseScope?.scope === renderedScope ? releaseTarget : null,
+    setReleaseTarget: changeReleaseTarget,
     releaseReason,
     setReleaseReason,
     releaseBusy,
     releaseError,
     setReleaseError,
-    deleteTarget,
-    setDeleteTarget,
+    deleteTarget: deleteScope?.scope === renderedScope ? deleteTarget : null,
+    setDeleteTarget: changeDeleteTarget,
     deleteBusy,
     deleteError,
     setDeleteError,
@@ -306,8 +371,8 @@ export function useFileScan() {
     configBusy,
     configDirty,
     configFields,
-    stopExternal,
-    setStopExternal,
+    stopExternal: stopScope?.scope === renderedScope && stopExternal,
+    setStopExternal: changeStopExternal,
     stopError,
     setStopError,
     leaveTarget,

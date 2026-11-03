@@ -77,3 +77,22 @@ it('入力中に右上から閉じると破棄確認を出し、保存も閉じ�
   expect(onCancel).not.toHaveBeenCalled()
   expect(adjust).not.toHaveBeenCalled()
 })
+it('マイル変更の窓に対象のLINEアカウントと環境を表示する', async () => {
+ await act(async () => { root.render(<MileageAdjustDialog open accountId="a" friendId="f" friendName="山田" friendRank={null} currentBalance={500} onCancel={() => {}} onCompleted={async () => {}} canConfigurePolicy={false} />) })
+ const dialog = screen.getByRole('dialog')
+ expect(dialog.textContent).toContain('LINEアカウント')
+ expect(dialog.textContent).toContain('環境')
+})
+it('マイル変更の窓を開いた後にアカウントを切り替えて戻した古い確定は送らない', async () => {
+ const draw = (accountId: string) => <MileageAdjustDialog open accountId={accountId} friendId="f" friendName="山田" friendRank={null} currentBalance={500} onCancel={() => {}} onCompleted={async () => {}} canConfigurePolicy={false} />
+ await act(async () => { root.render(draw('a')) })
+ await act(async () => { await Promise.resolve() })
+ await act(async () => { fireEvent.change(screen.getByLabelText('詳しい理由'), { target: { value: '人工の理由' } }) })
+ const b = screen.getByRole('button', { name: /マイル増やす/ })
+ const key = Object.keys(b).find(item => item.startsWith('__reactProps$'))!
+ const oldConfirm = (b as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ await act(async () => { root.render(draw('b')) })
+ await act(async () => { root.render(draw('a')) })
+ await act(async () => { await oldConfirm({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
+ expect(adjust).not.toHaveBeenCalled()
+})

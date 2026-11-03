@@ -11,6 +11,7 @@ import { canEditAutoReplyListNow } from './list-access'
 
 type ToggleAutoReplyContext = {
   listContextKey: string
+  isCurrent?: () => boolean
   load: () => Promise<void>
   pendingToggle: PendingToggle | null
   rules: AutoReply[]
@@ -25,8 +26,8 @@ type ToggleAutoReplyContext = {
   toggleReason: string
 }
 
-export function toggleAutoReply({ listContextKey, load, pendingToggle, rules, saveErrors, selectedAccountId, selectedAccountIdRef, setOptimisticRows, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, toggleReason }: ToggleAutoReplyContext, target = pendingToggle) {
-    if (!canEditAutoReplyListNow() || !target) return
+export function toggleAutoReply({ listContextKey, isCurrent = () => true, load, pendingToggle, rules, saveErrors, selectedAccountId, selectedAccountIdRef, setOptimisticRows, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, toggleReason }: ToggleAutoReplyContext, target = pendingToggle) {
+    if (!isCurrent() || !canEditAutoReplyListNow() || !target) return
     if (target.accountId !== selectedAccountId) {
       setToggleError('アカウントが切り替わりました。操作する自動応答を選び直してください。')
       return
@@ -65,15 +66,16 @@ export function toggleAutoReply({ listContextKey, load, pendingToggle, rules, sa
           ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
           : '自動応答を再開できませんでした。状態を読み直してからお試しください。'
     const reloadIfSameAccount = () => {
-      if (selectedAccountIdRef.current === requestAccountId) void load()
+      if (isCurrent() && selectedAccountIdRef.current === requestAccountId) void load()
     }
     const sendToggle = (targetKind: 'stop' | 'resume', targetReasonOf: (id: string) => string | null, requestKeys = new Map<string, string>()) => {
-      if (!canEditAutoReplyListNow() || selectedAccountIdRef.current !== requestAccountId) return
+      if (!isCurrent() || !canEditAutoReplyListNow() || selectedAccountIdRef.current !== requestAccountId) return
       applyOptimistic(targetKind === 'resume', targetReasonOf)
       void (async () => {
         let failed = 0
         let forbidden = false
         for (const id of ids) {
+          if (!isCurrent()) return
           if (!canEditAutoReplyListNow() || selectedAccountIdRef.current !== requestAccountId) {
             setOptimisticRows(null)
             reloadIfSameAccount()
@@ -84,8 +86,10 @@ export function toggleAutoReply({ listContextKey, load, pendingToggle, rules, sa
             const result = targetKind === 'stop'
               ? await api.autoReplies.stop(id, { reason: targetReasonOf(id) }, requestKeys.get(id)!)
               : await api.autoReplies.update(id, { isActive: true })
+            if (!isCurrent()) return
             if (!result.success) failed += 1
           } catch (error) {
+            if (!isCurrent()) return
             saveErrors.capture(error);
 
             if (error instanceof ApiError && error.status === 403) forbidden = true

@@ -181,7 +181,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
         ) : postsView === 'confirm' && id ? (
           <PostConfirm key={id} accountId={accountId} id={id} go={go} />
         ) : postsView ? (
-          <PostsBoard accountId={accountId} go={go} />
+          <PostsBoard accountId={accountId} go={go} store={data.store.lineAccountId === accountId ? data.store : undefined} googleLocation={data.store.lineAccountId === accountId ? data.connection.locationTitle : undefined} />
         ) : tab === 'performance' ? (
           <PerformanceBoard accountId={accountId} />
         ) : tab === 'profile' && view === 'confirm' && id ? (

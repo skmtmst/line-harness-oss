@@ -22,10 +22,11 @@ vi.mock('./list', async importOriginal => {
   return { ...original, default: (props: React.ComponentProps<typeof original.default>) => { list.edit = props.onEdit; return react.createElement(original.default, props) } }
 })
 const editor = vi.hoisted(() => ({ current: null as React.ComponentProps<typeof import('./dialogs').EditReservationDialog> | null }))
+const cancellation = vi.hoisted(() => ({ current: null as React.ComponentProps<typeof import('./dialogs').CancelReservationDialog> | null }))
 vi.mock('./dialogs', async importOriginal => {
   const original = await importOriginal<typeof import('./dialogs')>()
   const react = await import('react')
-  return { ...original, EditReservationDialog: (props: React.ComponentProps<typeof original.EditReservationDialog>) => { editor.current = props; return react.createElement(original.EditReservationDialog, props) } }
+  return { ...original, EditReservationDialog: (props: React.ComponentProps<typeof original.EditReservationDialog>) => { editor.current = props; return react.createElement(original.EditReservationDialog, props) }, CancelReservationDialog: (props: React.ComponentProps<typeof original.CancelReservationDialog>) => { cancellation.current = props; return react.createElement(original.CancelReservationDialog, props) } }
 })
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
@@ -97,6 +98,20 @@ it('アカウントAからBへ切り替えた描画で編集を閉じ、Aへ戻�
   account.value = 'account-1'
   view.rerender(<TestPage />)
   expect(screen.queryByRole('dialog')).toBeNull()
+})
+it('取消の窓はアカウントを変えた後に復活せず、古い確定口は使えない', async () => {
+  const view = await openEdit()
+  await act(async () => { editor.current!.onCancelReservation('r1') })
+  const oldConfirm = cancellation.current!.onConfirm
+  expect(cancellation.current?.reservation?.id).toBe('r1')
+  account.value = 'account-2'
+  view.rerender(<TestPage />)
+  expect(cancellation.current?.reservation).toBeNull()
+  account.value = 'account-1'
+  view.rerender(<TestPage />)
+  expect(cancellation.current?.reservation).toBeNull()
+  await act(async () => { await oldConfirm('r1') })
+  expect(fixture.updateReservation).not.toHaveBeenCalled()
 })
 it('店舗を切り替えると編集を閉じ、元の店へ戻っても復活しない', async () => {
   await openEdit()

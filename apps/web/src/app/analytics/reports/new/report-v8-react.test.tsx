@@ -612,6 +612,8 @@ it('担当者候補0人でもメール宛先だけで作成でき、1回送信�
   await click(buttonByText('今すぐ1回だけ送る'))
   expect(net.posts).toHaveLength(0)
   const dialog = document.querySelector('[role="dialog"]')!
+  expect(dialog.textContent).toContain('LINEアカウント')
+  expect(dialog.textContent).toContain('環境')
   expect(dialog.textContent).toContain('report@example.com')
   expect(dialog.textContent).toContain('通知方法: メール')
   expect(dialog.textContent).not.toContain('送る間かく')
@@ -620,6 +622,31 @@ it('担当者候補0人でもメール宛先だけで作成でき、1回送信�
   await settle()
   expect(net.posts).toHaveLength(1)
   expect(net.posts[0]).toMatchObject({ sendOnce: true, channels: ['email'], recipients: [{ kind: 'email', email: 'report@example.com' }] })
+})
+
+it('アカウントを往復した後の古い1回送信の確認では送らない', async () => {
+  net.noStaff = true
+  await mount(); await settle()
+  await click(buttonByText('＋ 宛先を足す'))
+  await click(buttonByText('メールだけの宛先を足す'))
+  await act(async () => { fireEvent.change(container.querySelector('input[aria-label="宛先のメールアドレス 1行目"]')!, { target: { value: 'report@example.com' } }) })
+  await click(buttonByText('通知方法：管理画面'))
+  await act(async () => {
+    fireEvent.click(container.querySelector('#report-channels')!)
+    fireEvent.click([...container.querySelectorAll('input[type="checkbox"]')].find(el => el.closest('label')?.textContent?.includes('メールでも送る'))!)
+  })
+  await click(buttonByText('今すぐ1回だけ送る'))
+  const dialog = document.querySelector('[role="dialog"]')!
+  const button = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === 'この宛先へ1回だけ送る')!
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+  for (const accountId of ['account-b', 'account-a']) {
+    fixture.accountId = accountId
+    await act(async () => { root.render(<><AnalyticsReportNewPage /><ToastHost /></>) })
+    await settle()
+  }
+  await act(async () => { await oldClick({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+  expect(net.posts).toHaveLength(0)
 })
 
 it('定期レポート作成の同じイベント内の連打も同期して1要求に止める', async () => {
