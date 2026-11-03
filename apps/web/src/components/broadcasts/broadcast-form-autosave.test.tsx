@@ -69,6 +69,12 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 import BroadcastForm from './broadcast-form'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+
+function UnsavedBubble() {
+  useUnsavedGuard({ dirty: true, subject: '吹き出しの作成内容' })
+  return <p>吹き出しを編集中</p>
+}
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -81,12 +87,12 @@ async function flush() {
   })
 }
 
-async function renderForm() {
+async function renderForm(withBubble = false) {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
   await act(async () => {
-    root.render(<BroadcastForm tags={[]} onSuccess={() => {}} onCancel={onCancelSpy} />)
+    root.render(<><BroadcastForm tags={[]} onSuccess={() => {}} onCancel={onCancelSpy} />{withBubble && <UnsavedBubble />}</>)
   })
   await flush()
 }
@@ -181,6 +187,22 @@ describe('一斉配信の下書き自動保存（★管理画面 sTJsh §5）', 
     expect(document.body.textContent).toContain('保存していない変更があります')
 
     await act(async () => { clickButton('保存して移る') })
+    await flush()
+    expect(createApi).toHaveBeenCalledTimes(1)
+    expect(onCancelSpy).toHaveBeenCalledTimes(1)
+  }, 15000)
+
+  it('配信と吹き出しの同時編集では、配信だけ保存した際に消える内容を知らせる', async () => {
+    createApi.mockResolvedValue({ success: true, data: { id: 'draft-auto', version: 1 } })
+    await renderForm()
+    await act(async () => { setValue(titleInput(), '秋の案内') })
+    await act(async () => { setValue(messageInput(), '本文') })
+    await act(async () => { root.render(<><BroadcastForm tags={[]} onSuccess={() => {}} onCancel={onCancelSpy} /><UnsavedBubble /></>) })
+    await flush()
+    await act(async () => { clickButton('キャンセル') })
+    expect(document.body.textContent).toContain('吹き出しの作成内容は保存されず消えます')
+    expect(onCancelSpy).not.toHaveBeenCalled()
+    await act(async () => { clickButton('配信の変更だけ保存して移る') })
     await flush()
     expect(createApi).toHaveBeenCalledTimes(1)
     expect(onCancelSpy).toHaveBeenCalledTimes(1)

@@ -267,7 +267,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     setSnapshotTaken(true)
   }, [loading, snapshotTaken, name, panels, folderId, tapLimitMode, tapLimitText])
   const dirty = uploading || (savedSnapshot !== null && savedSnapshot !== carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText }))
-  const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing || uploading || Boolean(host?.busy) })
+  const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, subject: 'カルーセルの作成内容', busy: saving || publishing || uploading || Boolean(host?.busy) })
 
   const update = (index: number, patch: Partial<Panel>) => setPanels((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)))
   const moveTo = (from: number, to: number) => {

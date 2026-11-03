@@ -94,6 +94,24 @@ async function clickDialogButton(action: 'confirm' | 'cancel') {
 }
 
 describe('useUnsavedGuard', () => {
+  it('同じ履歴確定が2回呼ばれても、戻るのは1回だけ', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    let confirm = () => {}
+    function Capture() {
+      const guard = useUnsavedGuard({ dirty: true, onDiscard: discard })
+      confirm = guard.confirmLeave
+      return guard.leaveTarget ? <div role="dialog" /> : null
+    }
+    try {
+      await render(<Capture />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await act(async () => { confirm(); confirm() })
+      expect(discard).toHaveBeenCalledTimes(1)
+      expect(back).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+
   it('親子とも未保存の画面内切替も1つの確認で両方を破棄する', async () => {
     const parentDiscard = vi.fn(), childDiscard = vi.fn(), run = vi.fn()
     await render(<><Harness dirty onDiscard={parentDiscard} /><Harness dirty onDiscard={childDiscard} /></>)

@@ -265,7 +265,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const snapshot = useMemo(() => JSON.stringify({ name, folder, imageUrl, pickedMedia, shapeValue, areas }), [name, folder, imageUrl, pickedMedia, shapeValue, areas])
   const [clean, setClean] = useState(() => snapshot)
   const dirty = snapshot !== clean && !saved
-  const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({ dirty, busy: saving || publishing })
+  const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({ dirty, subject: '吹き出しの作成内容', busy: saving || publishing })
 
   const updateArea = (label: string, patch: Partial<AreaDraft>) =>
     setAreas((prev) => ({ ...prev, [label]: { ...(prev[label] ?? emptyAreaDraft()), ...patch } }))

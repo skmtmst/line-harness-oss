@@ -31,7 +31,7 @@ export function useInlineDetailGuard(key: string) {
   const [id, setIdRaw] = useDetailPanelUrl(key, () => hold.current)
   useEffect(() => { if (id === null) { setDirty(false); setBusy(false) } }, [id])
   const depth = useContext(OverlayDepthContext)
-  const guard = useUnsavedGuard({ dirty: dirty || busy, busy, onDiscard: () => {
+  const guard = useUnsavedGuard({ dirty: dirty || busy, busy, subject: '詳細パネルの変更', onDiscard: () => {
     hold.current = false
     setDirty(false)
     setResetToken(value => value + 1)

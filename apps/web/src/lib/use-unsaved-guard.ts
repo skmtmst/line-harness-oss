@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { canonicalNavigationHref } from './canonical-route'
 import { UNSAVED_ACTION_EVENT } from './unsaved-action'
+import { clearUnsavedCohort, historyGuards, selectUnsavedCohort, selectedUnsavedGuards, type HistoryGuard } from './unsaved-guard-registry'
 
 function canonicalLocalUrl(url: URL): URL {
   return new URL(canonicalNavigationHref(`${url.pathname}${url.search}${url.hash}`), url.origin)
@@ -14,16 +15,7 @@ export type UnsavedLeaveTarget =
   | { kind: 'history-back' }
   | { kind: 'action'; run: () => void }
 
-type HistoryGuard = {
-  active: () => boolean
-  busy: () => boolean
-  handles: (destination: URL) => boolean
-  handlesLink: (destination: URL, current: URL, anchor: HTMLAnchorElement) => boolean
-  discard: () => void
-  disarm: () => void
-}
 // 同じ戻る操作を複数の番兵が受けても、復元と確認は1回にまとめる。
-const historyGuards = new Set<HistoryGuard>()
 const handledPopEvents = new WeakSet<Event>()
 let restoringHistory = false
 function onRestoredHistory(event: PopStateEvent) {
@@ -44,6 +36,7 @@ function onRestoredHistory(event: PopStateEvent) {
  */
 export function useUnsavedGuard(options: {
   dirty: boolean
+  subject?: string
   busy?: boolean
   /**
    * 戻る・進むの行き先が「同じ画面の中の移動」かを返す。
@@ -60,7 +53,9 @@ export function useUnsavedGuard(options: {
    */
   onDiscard?: () => void
 }) {
-  const { dirty, busy = false, samePage, handlesLocalLink, onDiscard } = options
+  const { dirty, busy = false, samePage, handlesLocalLink, onDiscard, subject = 'ほかの未保存の入力' } = options
+  const subjectRef = useRef(subject)
+  subjectRef.current = subject
   const router = useRouter()
   const [leaveTarget, setLeaveTarget] = useState<UnsavedLeaveTarget | null>(null)
   const dirtyRef = useRef(dirty)
@@ -81,6 +76,7 @@ export function useUnsavedGuard(options: {
   if (!historyGuardRef.current) historyGuardRef.current = {
     active: () => (dirtyRef.current || busyRef.current) && !disarmedRef.current,
     busy: () => busyRef.current,
+    subject: () => subjectRef.current,
     handles: destination => !samePageRef.current?.(destination),
     handlesLink: (destination, current, anchor) => !(destination.pathname === current.pathname && anchor.hasAttribute('data-row-local-open') && handlesLocalLinkRef.current?.(destination)),
     discard: () => onDiscardRef.current?.(),
@@ -92,6 +88,7 @@ export function useUnsavedGuard(options: {
     historyGuards.add(entry)
     return () => {
       historyGuards.delete(entry)
+      clearUnsavedCohort(entry)
       if (historyGuards.size === 0) {
         window.removeEventListener('popstate', onRestoredHistory)
         restoringHistory = false
@@ -141,7 +138,10 @@ export function useUnsavedGuard(options: {
       event.preventDefault()
       const cohort = [...historyGuards].filter(entry => entry.active() && entry.handlesLink(destination, current, anchor))
       historyCohortRef.current = cohort
-      if (!cohort.some(entry => entry.busy())) setLeaveTarget({ kind: 'link', href: `${destination.pathname}${destination.search}${destination.hash}` })
+      if (!cohort.some(entry => entry.busy())) {
+        selectUnsavedCohort(historyGuardRef.current, cohort, entry => entry.handlesLink(destination, current, anchor))
+        setLeaveTarget({ kind: 'link', href: `${destination.pathname}${destination.search}${destination.hash}` })
+      }
     }
     document.addEventListener('click', onDocumentClick, true)
     return () => document.removeEventListener('click', onDocumentClick, true)
@@ -175,7 +175,10 @@ export function useUnsavedGuard(options: {
       historyCohortRef.current = cohort
       restoringHistory = true
       window.history.go(1)
-      if (!cohort.some(entry => entry.busy())) setLeaveTarget({ kind: 'history-back' })
+      if (!cohort.some(entry => entry.busy())) {
+        selectUnsavedCohort(historyGuardRef.current, cohort, entry => entry.handles(destination))
+        setLeaveTarget({ kind: 'history-back' })
+      }
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -189,7 +192,10 @@ export function useUnsavedGuard(options: {
       const run = (event as CustomEvent<{ run: () => void }>).detail.run
       const cohort = [...historyGuards].filter(entry => entry.active())
       historyCohortRef.current = cohort
-      if (!cohort.some(entry => entry.busy())) setLeaveTarget({ kind: 'action', run })
+      if (!cohort.some(entry => entry.busy())) {
+        selectUnsavedCohort(historyGuardRef.current, cohort, () => true)
+        setLeaveTarget({ kind: 'action', run })
+      }
     }
     window.addEventListener(UNSAVED_ACTION_EVENT, request)
     return () => window.removeEventListener(UNSAVED_ACTION_EVENT, request)
@@ -207,6 +213,13 @@ export function useUnsavedGuard(options: {
     const own = historyGuardRef.current
     const cohort = historyCohortRef.current
     if (leaveTarget.kind === 'history-back' && !cohort) { disarmedRef.current = false; return }
+    // 確認後に別の入力が増えた場合は、黙って破棄せず確認を更新する。
+    if (cohort && selectedUnsavedGuards().some(entry => entry !== own && !cohort.includes(entry))) {
+      historyCohortRef.current = selectedUnsavedGuards()
+      selectUnsavedCohort(historyGuardRef.current, historyCohortRef.current)
+      setLeaveTarget({ ...leaveTarget })
+      return
+    }
     // 自分の保存成功直後は busyRef が古い場合がある。他の入力の保存中は待つ。
     if (busy || cohort?.some(entry => entry !== own && historyGuards.has(entry) && entry.active() && entry.busy())) {
       disarmedRef.current = false
@@ -214,6 +227,7 @@ export function useUnsavedGuard(options: {
       return
     }
     setLeaveTarget(null)
+    clearUnsavedCohort()
     if (leaveTarget.kind === 'history-back') {
       for (const entry of historyCohortRef.current ?? []) {
         if (!historyGuards.has(entry) || (entry !== own && !entry.active())) continue
@@ -245,7 +259,7 @@ export function useUnsavedGuard(options: {
     router.push(leaveTarget.href)
   }, [leaveTarget, busy, router])
 
-  const cancelLeave = useCallback(() => { historyCohortRef.current = null; setLeaveTarget(null) }, [])
+  const cancelLeave = useCallback(() => { historyCohortRef.current = null; clearUnsavedCohort(); setLeaveTarget(null) }, [])
 
   /*
    * リンクではない離れる操作（`<button onClick>` からの router.push や、
@@ -258,7 +272,7 @@ export function useUnsavedGuard(options: {
       action()
       return
     }
-    if (!busy) { historyCohortRef.current = null; setLeaveTarget({ kind: 'action', run: action }) }
+    if (!busy) { historyCohortRef.current = null; clearUnsavedCohort(); setLeaveTarget({ kind: 'action', run: action }) }
   }, [busy])
 
   /*
@@ -267,6 +281,7 @@ export function useUnsavedGuard(options: {
    * もう止めない。画面に留まって dirty が降りたら自動で腕を戻す。
    */
   const disarm = useCallback(() => {
+    clearUnsavedCohort(historyGuardRef.current)
     disarmedRef.current = true
     setLeaveTarget(null)
   }, [])

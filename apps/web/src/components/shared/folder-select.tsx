@@ -228,7 +228,7 @@ function FolderCreationGuard({ busy, onDiscard, actionRef, draftGuardRef }: {
   draftGuardRef?: MutableRefObject<FolderDraftGuard | null>
 }) {
   const [savingParent, setSavingParent] = useState(false)
-  const guard = useUnsavedGuard({ dirty: true, busy, onDiscard })
+  const guard = useUnsavedGuard({ dirty: true, busy, onDiscard, subject: '作りかけのフォルダ' })
   useLayoutEffect(() => {
     actionRef.current = guard.guarded
     if (draftGuardRef) draftGuardRef.current = (action) => {

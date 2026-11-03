@@ -1,5 +1,8 @@
 'use client'
 
+import { requestUnsavedAction } from '@/lib/unsaved-action'
+import { BroadcastLengthNotice } from './broadcast-length-notice'
+
 import type { BroadcastDeliveryLimit } from '@line-crm/shared'
 import { jstCalendar as japanCalendar, jstDate as japanDate } from '@/lib/jst-datetime'
 import { copyBroadcastDraft,copyRecentBroadcast } from './broadcast-copy-draft'
@@ -979,7 +982,7 @@ export default function BroadcastForm({
     if (cleanFingerprintRef.current === null) cleanFingerprintRef.current = formFingerprint
   })
   const dirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
-  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving })
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
   const queuedAutosave = useRef({ fingerprint: formFingerprint, step: currentStep })
   if (queuedAutosave.current.fingerprint !== formFingerprint) queuedAutosave.current = { fingerprint: formFingerprint, step: currentStep }
   const draftAutosave = useDraftAutosave({
@@ -1437,23 +1440,7 @@ export default function BroadcastForm({
 
       <p className="text-xs text-ink-faint">{sendMode === 'scheduled' ? '予約後も配信開始前までは編集・取消できます。' : '「今すぐ送る」で確認の画面を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
     </div>
-    {/*
-      **上限を超えたまま保存・送信させない。**
-
-      本文の欄は `maxLength` で止まるが、下書きやテンプレートから読み込むと
-      上限を超えた本文がそのまま入ることがある。**そのとき保存の口だけが
-      静かに 400 で失敗する**——押した人には「保存中…」が戻るだけで、
-      どの通のどこが長いのか分からない。押す前に、押せない理由を出す。
-
-      右の点検欄（`preflight`）は宛先と本文が決まるまで出ないので、
-      **こちらは常に出す。**
-    */}
-    {shows('message') && lengthNotice.tone === 'error' && (
-      <Notice tone="danger" className="mb-3">
-        <p className="text-danger text-sm font-bold">{lengthNotice.title}</p>
-        <p className="text-danger mt-1 text-xs">{lengthNotice.description}</p>
-      </Notice>
-    )}
+    <BroadcastLengthNotice visible={shows('message')} notice={lengthNotice} />
       </StepContent>
       <BroadcastPreviewRail reviewKey={visualQaAugustCampaign ? 'visual-example' : JSON.stringify([bubbles, ab.hasB, ab.b, messageButtons, selectedAccountId, scheduledDate, scheduledTime, sendMode, effectiveSpreadMinutes])} {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
     </CreateColumns>
@@ -1480,7 +1467,7 @@ export default function BroadcastForm({
         </>
       ) : (
         <>
-          <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
+          <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => requestUnsavedAction(onCancel)}>キャンセル</Button>
           {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => openTestDialog()} busy={testSending} busyLabel="送信中…" widthReserve="idle">{'テストを送る'}</Button>}
           <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (stepProblems().schedule ? void saveDraftNow() : sendMode === 'scheduled' ? openConfirm() : void save())} busy={saving} busyLabel="保存中…" widthReserve="idle">{sendMode === 'scheduled' && !liveStepProblems.schedule ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
