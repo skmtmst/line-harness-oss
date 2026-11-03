@@ -372,7 +372,7 @@
   },
   {
     "filename": "src/v8/webhooks/use-api-tokens.tsx",
-    "fingerprint": "3fe44ad892d4f483",
+    "fingerprint": "ccb27982baad7592",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"

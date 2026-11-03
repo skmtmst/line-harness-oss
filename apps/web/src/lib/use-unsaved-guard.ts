@@ -153,6 +153,7 @@ export function useUnsavedGuard(options: {
    */
   useEffect(() => {
     if (!dirty && !busy) {
+      allowHistoryLeaveRef.current = false
       disarmedRef.current = false
       return
     }
@@ -202,13 +203,20 @@ export function useUnsavedGuard(options: {
    * 画面の入力を初期状態へ戻せるようにするため。
    */
   const confirmLeave = useCallback(() => {
-    if (!leaveTarget || busy) return
-    if (historyCohortRef.current?.some(entry => historyGuards.has(entry) && entry.active() && entry.busy())) return
+    if (!leaveTarget) return
+    const own = historyGuardRef.current
+    const cohort = historyCohortRef.current
+    if (leaveTarget.kind === 'history-back' && !cohort) { disarmedRef.current = false; return }
+    // 自分の保存成功直後は busyRef が古い場合がある。他の入力の保存中は待つ。
+    if (busy || cohort?.some(entry => entry !== own && historyGuards.has(entry) && entry.active() && entry.busy())) {
+      disarmedRef.current = false
+      setLeaveTarget(leaveTarget)
+      return
+    }
     setLeaveTarget(null)
     if (leaveTarget.kind === 'history-back') {
-      const own = historyGuardRef.current
       for (const entry of historyCohortRef.current ?? []) {
-        if (!historyGuards.has(entry) || !entry.active()) continue
+        if (!historyGuards.has(entry) || (entry !== own && !entry.active())) continue
         if (entry !== own) entry.disarm()
         entry.discard()
       }
@@ -217,11 +225,9 @@ export function useUnsavedGuard(options: {
       window.history.back()
       return
     }
-    const cohort = historyCohortRef.current
     if (cohort) {
-      const own = historyGuardRef.current
       for (const entry of cohort) {
-        if (!historyGuards.has(entry) || !entry.active()) continue
+        if (!historyGuards.has(entry) || (entry !== own && !entry.active())) continue
         if (entry !== own) entry.disarm()
         entry.discard()
       }

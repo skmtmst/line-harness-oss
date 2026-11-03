@@ -58,6 +58,7 @@ export default function TagEditV8() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const deleteTargetGeneration = useRef<number | null>(null)
   const [error, setError] = useState('')
   const [tagMissing, setTagMissing] = useState(false)
   usePageTitle(tag?.name ?? 'タグを編集')
@@ -203,7 +204,7 @@ export default function TagEditV8() {
   }
 
   const remove = async () => {
-    if (!tag || deleting) return
+    if (!tag || deleting || !selectedAccountId || deleteTargetGeneration.current !== targetGenerationRef.current) return
     const generation = requestRef.current
     const stillHere = () => targetRef.current === targetKey && requestRef.current === generation
     setDeleting(true)
@@ -261,9 +262,9 @@ export default function TagEditV8() {
         error={error}
         onCancel={() => router.push('/tags')}
         onSave={save}
-        onDelete={() => setDeleteOpen(true)}
+        onDelete={() => { deleteTargetGeneration.current = targetGenerationRef.current; setDeleteOpen(true) }}
       />
-      {deleteOpen ? <DeleteDialog tag={tag} dependencies={dependencies} dependenciesStatus={dependenciesStatus} deleting={deleting} onCancel={() => setDeleteOpen(false)} onDelete={() => void remove()} /> : null}
+      {deleteOpen && deleteTargetGeneration.current === targetGeneration ? <DeleteDialog tag={tag} accountId={selectedAccountId} dependencies={dependencies} dependenciesStatus={dependenciesStatus} deleting={deleting} onCancel={() => setDeleteOpen(false)} onDelete={() => void remove()} /> : null}
       <ConfirmDialog
         open={compareTarget !== null || compareError !== ''}
         title="最新の保存と比べる"

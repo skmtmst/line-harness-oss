@@ -135,6 +135,9 @@ a.way:hover {
   outline: 1px solid var(--color-hairline);
 }
 
+.wayLink { display: block; border-radius: var(--radius-control); }
+.wayIconRow { display: flex; align-items: center; justify-content: space-between; color: var(--color-action); }
+
 .wayIcon {
   width: var(--tpl-tag-ro-icon);
   height: var(--tpl-tag-ro-icon);

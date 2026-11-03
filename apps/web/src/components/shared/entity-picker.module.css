@@ -8,7 +8,7 @@
 .fieldName { flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); font-weight: 600; color: var(--color-ink); }
 .field[data-invalid] .fieldName { color: var(--color-danger); }
 .fieldMeta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro, var(--text-caption)); color: var(--color-ink-secondary); }
-.fieldPlaceholder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-faint); }
+.fieldPlaceholder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--color-placeholder); }
 
 /* 窓の下の文字リンク（作る画面へ）。 */
 .createLink { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); min-width: 0; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-secondary); text-decoration: none; }
