@@ -33,7 +33,7 @@ export default function NameTipHost() {
     observer.current = null
     const el = current.current
     if (el) {
-      if (savedTitle.current !== null) el.setAttribute('title', savedTitle.current)
+      if (savedTitle.current !== null && !el.hasAttribute('title') && isIconOnlyAction(el)) el.setAttribute('title', savedTitle.current)
       if (el.getAttribute('aria-describedby') === id) el.removeAttribute('aria-describedby')
     }
     current.current = null
