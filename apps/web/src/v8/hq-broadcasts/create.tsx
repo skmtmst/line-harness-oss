@@ -23,6 +23,7 @@ import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from '
 import Button from '@/components/shared/button';
 import Checkbox from '@/components/shared/checkbox';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
+import OperationTargetSummary from '@/components/shared/operation-target-summary';
 import SendConfirmDialog, { describeExclusion } from '@/components/shared/send-confirm-dialog';
 import { chatSafetyApi } from '@/lib/api/helpers/gap1';
 import type { SendConfirmationPreview } from '@line-crm/shared';
@@ -1201,6 +1202,10 @@ export default function HqBroadcastCreate() {
         onSuccess={() => setConfirmOpen(false)}
         onCancel={() => setConfirmOpen(false)}
       >
+        <OperationTargetSummary
+          accounts={checks && !stale ? checks.filter((item) => !item.excluded && !item.blockedReasons.length).map((item) => ({ id: item.accountId, name: item.accountName })) : [{ id: '' }]}
+          showAccountCount
+        />
         {gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}
       </ConfirmDialog>
 
