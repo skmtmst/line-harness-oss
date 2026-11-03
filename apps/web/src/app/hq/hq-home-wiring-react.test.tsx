@@ -18,7 +18,7 @@ vi.hoisted(() => {
 })
 
 const mocks = vi.hoisted(() => ({
-  list: vi.fn(), fetchApi: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), folders: vi.fn(), importState: vi.fn(),
+  attention: vi.fn(), list: vi.fn(), fetchApi: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), folders: vi.fn(), importState: vi.fn(),
   role: 'owner', editProps: null as null | Record<string, unknown>,
 }))
 
@@ -28,7 +28,7 @@ vi.mock('next/navigation', async () => ({
 }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children) }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
-vi.mock('@/lib/api/helpers/styles', () => ({ hqStyleApi: { attention: vi.fn(async () => ({ success: true, data: { items: [] } })) } }))
+vi.mock('@/lib/api/helpers/styles', () => ({ hqStyleApi: { attention: mocks.attention } }))
 vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], setSelectedAccountId: mocks.select, refreshAccounts: mocks.refresh }) }))
 vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => mocks.role }))
@@ -76,6 +76,7 @@ const account = (id: string, name: string, revision: number | null = 1) => ({
 beforeEach(() => {
   vi.clearAllMocks()
   window.history.replaceState(null, '', '/hq')
+  mocks.attention.mockReset().mockResolvedValue({ success: true, data: { items: ['a1', 'a2'].map(accountId => ({ accountId, counts: { connections: 1, unhandledChats: 9 } })) } })
   mocks.role = 'owner'
   mocks.editProps = null
   mocks.list.mockResolvedValue({ success: true, data: [account('a1', '銀座店')] })
@@ -341,7 +342,7 @@ describe('統括のアカウント：未知の件数と本当の0件を分ける
     ] })
     await act(async () => { fireEvent.click(retry) })
     await screen.findAllByText('銀座店')
-    expect(values()).toEqual(['2', '2', '0', '2'])
+    await waitFor(() => expect(values()).toEqual(['2', '2', '0', '2']))
     expect(folderCounts('すべて').every(text => text === 'すべて2')).toBe(true)
     expect(folderCounts('未分類').every(text => text === '未分類1')).toBe(true)
     expect(folderCounts('未取得の分類').every(text => text === '未取得の分類1')).toBe(true)
@@ -389,7 +390,7 @@ describe('統括のアカウント：未知の件数と本当の0件を分ける
     render(<HqHomeV8 />)
     await screen.findAllByText('銀座店')
     expect(kpis()).toHaveLength(4)
-    expect(values()).toEqual(['2', '—', '0', '1'])
+    await waitFor(() => expect(values()).toEqual(['2', '—', '0', '2']))
     expect(kpis()[3].textContent).toContain('ほかに未確認 1 件')
     expect(document.querySelectorAll('[data-kpi-zero]')).toHaveLength(1)
     expect(document.querySelectorAll('[data-kpi-detail] [role="note"]')).toHaveLength(4)
@@ -404,25 +405,37 @@ describe('統括のアカウント：未知の件数と本当の0件を分ける
 
 describe('統括の接続問題：分かっている数と未確認を分ける', () => {
   it.each([
-    { statuses: ['warn', 'unknown'], value: '1', detail: 'ほかに未確認 1 件', tab: 2, warning: true },
+    { statuses: ['warn', 'unknown'], value: '3', detail: 'ほかに未確認 1 件', tab: 2, warning: true },
     { statuses: ['ok', 'unknown'], value: '—', detail: '未確認 1 件', tab: 1, warning: false },
-    { statuses: ['warn', 'ok'], value: '1', detail: '', tab: 1, warning: true },
+    { statuses: ['warn', 'ok'], value: '3', detail: '', tab: 1, warning: true },
     { statuses: ['ok', 'ok'], value: '0', detail: '', tab: 0, warning: false },
   ])('$statuses の既知数は $value、要確認は $tab', async ({ statuses, value, detail, tab, warning }) => {
+    mocks.attention.mockResolvedValue({ success: true, data: { items: statuses.map((status, index) => ({ accountId: `a${index}`, counts: { connections: status === 'warn' ? 3 : 0, unhandledChats: 8 } })) } })
     mocks.list.mockResolvedValue({ success: true, data: statuses.map((status, index) => ({
       ...account(`a${index}`, `確認対象${index}`), connection: { status, issues: [] },
     })) })
     render(<HqHomeV8 />)
     await screen.findAllByText('確認対象0')
     const card = [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')][3]
-    expect(card.querySelector('[data-kpi-number]')?.textContent).toBe(value)
+    await waitFor(() => expect(card.querySelector('[data-kpi-number]')?.textContent).toBe(value))
     if (detail) expect(card.textContent).toContain(detail)
     else expect(card.textContent).not.toContain('未確認')
     expect(card.querySelector('[data-kpi-badge="warning"]') !== null).toBe(warning)
     expect(screen.getByRole('button', { name: new RegExp(`要確認.*${tab}`) })).toBeTruthy()
   })
 
+  it('attention の一部が欠けた場合は取れた接続件数と未確認を分ける', async () => {
+    mocks.list.mockResolvedValue({ success: true, data: [account('a1', '取得済み'), { ...account('a2', '未取得'), connection: { status: 'ok' } }] })
+    mocks.attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'a1', counts: { connections: 4, unhandledChats: 9 } }] } })
+    render(<HqHomeV8 />)
+    await screen.findAllByText('取得済み')
+    const card = [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')][3]
+    await waitFor(() => expect(card.querySelector('[data-kpi-number]')?.textContent).toBe('4'))
+    expect(card.textContent).toContain('ほかに未確認 1 件')
+  })
+
   it('停止とアーカイブを要確認の対象へ加えず、未取得の接続は未確認へ数える', async () => {
+    mocks.attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'a1', counts: { connections: 0 } }] } })
     mocks.list.mockResolvedValue({ success: true, data: [
       { ...account('a1', '確認対象'), connection: undefined },
       { ...account('a2', '停止'), isActive: false },
@@ -431,8 +444,8 @@ describe('統括の接続問題：分かっている数と未確認を分ける'
     render(<HqHomeV8 />)
     await screen.findAllByText('確認対象')
     const card = [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')][3]
+    await waitFor(() => expect(card.textContent).toContain('未確認 1 件'))
     expect(card.querySelector('[data-kpi-number]')?.textContent).toBe('—')
-    expect(card.textContent).toContain('未確認 1 件')
     expect(screen.getByRole('button', { name: /要確認.*1/ })).toBeTruthy()
   })
 })

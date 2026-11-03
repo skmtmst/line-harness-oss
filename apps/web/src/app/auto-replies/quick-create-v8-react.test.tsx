@@ -38,7 +38,7 @@ it('空のまま言葉の欄を離れると、直し方を読み上げの帯で�
   render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={vi.fn()} />)
   expect(screen.queryAllByRole('alert')).toHaveLength(0)
   await act(async () => { fireEvent.blur(screen.getByLabelText('追加する言葉')) })
-  expect(screen.getByRole('alert').textContent).toBe('反応する言葉を1つ以上入れてください')
+  expect(screen.getByRole('alert').textContent).toBe('反応する言葉を1つ以上入れてください。')
 })
 
 it('空のまま返す文の欄を離れると、直し方を読み上げの帯で出し、入れると消える', async () => {

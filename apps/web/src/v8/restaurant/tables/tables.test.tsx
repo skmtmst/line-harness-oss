@@ -526,3 +526,10 @@ it('稼働中の卓だけを総席数に数える', async () => {
   const value = document.querySelector('[data-kpi-label][title="総席数"]')?.closest('[data-kpi-presentation]')?.querySelector('[data-kpi-number]')?.textContent
   expect(value).toBe('20')
 })
+
+it('自動配席の説明ではダッシュボードと同じウォークインの言葉を使う', async () => {
+  render(<TablesPage />)
+  await screen.findByText('卓の詳細')
+  expect(screen.getByText(/電話・ウォークインも同じ候補を使います/)).toBeTruthy()
+  expect(screen.queryByText(/直接来店も同じ候補を使います/)).toBeNull()
+})

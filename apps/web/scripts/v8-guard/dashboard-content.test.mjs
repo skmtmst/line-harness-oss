@@ -91,6 +91,7 @@ for (const width of [1152, 1440]) for (const delay of delays) for (const style o
       const previous = await date.getAttribute('title')
       await date.click()
       await page.getByRole('dialog', { name: '日付を選ぶ', exact: true }).getByRole('button', { name: /^\d{4}年/ }).first().click()
+      await page.getByRole('dialog', { name: '日付を選ぶ', exact: true }).getByRole('button', { name: '確定', exact: true }).click()
       assert.notEqual(await date.getAttribute('title'), previous, '別の日付を選んだ')
       assert.equal(await page.locator('main [data-pending][inert]').count(), 0, '日付では初回の待機へ戻らない')
       await waitForNavigationContent(page, pending)

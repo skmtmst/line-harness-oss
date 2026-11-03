@@ -12,7 +12,13 @@ import {seatBoardEntry, withHonorific } from '@line-crm/shared'
  * 閲覧のみ（canWrite=false）には 取り消す・変更する を置かない（閉じるだけ）。動きは BEHAVIOR.md。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import Notice from '@/components/shared/notice'
+import { ApiError } from '@/lib/api'
+import StatusBadge from '@/components/shared/status-badge'
+import { BookingStatus } from '@/components/shared/booking-presentation'
+import { reservationBookingState, reservationStatusLabel } from '@/components/shared/booking-state'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { Pencil, TriangleAlert, UserRoundX, X } from 'lucide-react'
 import { useStaffRole } from '@/lib/staff-role'
 import { permissionLockReason } from '@/components/shared/permission-lock'
@@ -58,8 +64,10 @@ function historyText(history: History): string {
   return `これまでの来店 ${history.count.toLocaleString('ja-JP')} 回${last ? `・前回 ${last}` : ''}`
 }
 
-export default function ReservationDetailDialog({ reservation, accountId, tables, courses, busy, canWrite, onClose, onCancel, onRestore, onEdit, onAttendance, inline = false }: {
-  onAttendance?:(id:string,action:'visited'|'depart'|'undo_departure'|'undo_visit'|'no_show')=>void
+export default function ReservationDetailDialog({ reservation, accountId, tables, courses, busy, canWrite, onClose, onCancel, onRestore, onEdit, onAttendance, onReload, operationScope, inline = false }: {
+  onAttendance?:(id:string,action:'visited'|'depart'|'undo_departure'|'undo_visit'|'no_show')=>unknown
+  onReload?: () => void
+  operationScope?: object
   inline?: boolean
   reservation: RestaurantReservation | null
   accountId: string
@@ -85,6 +93,30 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const phone = reservation?.customer_phone ?? ''
   const lineUid = reservation?.line_uid ?? ''
 
+  const currentScope = useRef({ id, accountId, storeId, operationScope })
+  if (currentScope.current.id !== id || currentScope.current.accountId !== accountId || currentScope.current.storeId !== storeId || currentScope.current.operationScope !== operationScope) currentScope.current = { id, accountId, storeId, operationScope }
+  const scope = currentScope.current
+  const [failure, setFailure] = useState<{ scope: object; error: unknown } | null>(null)
+  const attempt = useRef(0)
+  const working = useRef(false)
+  const active = useRef(true)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
+  const performAttendance = async (action: 'visited' | 'depart' | 'undo_departure' | 'undo_visit' | 'no_show') => {
+    if (!onAttendance || !canWrite || busy || working.current || !active.current || currentScope.current !== scope) return
+    const sequence = ++attempt.current
+    const current = () => active.current && currentScope.current === scope && attempt.current === sequence
+    working.current = true
+    setFailure(null)
+    try {
+      const result = await onAttendance(id, action)
+      if (current() && result && typeof result === 'object' && 'error' in result) setFailure({ scope, error: result.error })
+    } catch (error) {
+      if (current()) setFailure({ scope, error })
+    } finally { working.current = false }
+  }
+  const conflict = failure?.scope === scope && failure.error instanceof ApiError && failure.error.status === 409
+  const failureNotice = failure?.scope === scope ? <Notice tone="danger" role="alert" message={conflict ? 'ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。' : describeApiFailure(failure.error, '来店・退店の記録')} action={onReload ? <Button type="button" variant="secondary" size="compact" onClick={onReload}>読み直す</Button> : undefined} /> : null
+
   /* これまでの来店（来店済みの数と前回）。連絡先が無い予約は数えない。遅い応答は捨てる。 */
   useEffect(() => {
     if (!id) return
@@ -109,16 +141,24 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const allergy = reservation.allergy_note?.trim() || ''
   const hasAllergy = Boolean(allergy && allergy !== 'なし' && allergy !== '無し')
 
-  const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>canWrite&&onAttendance(reservation.id,'visited')},{id:'no-show',label:'無断にする',disabled:busy,onSelect:()=>canWrite&&reservation.status!=='pending'&&setConfirmNoShow(reservation.id)}]:[]
+  const entry = seatBoardEntry(reservation as unknown as Record<string, unknown>)
+  const knownStatus = ['confirmed', 'requested', 'pending', 'no_show', 'completed', 'done', 'cancelled', 'rejected', 'expired', 'visited', 'seated', 'active', 'in_progress', 'late', 'expiring'].includes(reservation.status) || !!entry.arrivedAt || !!entry.departedAt || !!entry.holdExpiresAt
+  const state = reservationBookingState(entry)
+  const currentStatus = knownStatus ? <BookingStatus state={state}>{reservationStatusLabel(entry, state)}</BookingStatus> : <StatusBadge tone="neutral">状態を確認できません</StatusBadge>
+
+  const attendanceItems=onAttendance&&!inactive&&!reservation.hold_expires_at?reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>{void performAttendance('undo_departure')}}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>{void performAttendance('depart')}},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>{void performAttendance('undo_visit')}}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>{void performAttendance('visited')}},{id:'no-show',label:'無断にする',disabled:busy,onSelect:()=>canWrite&&reservation.status!=='pending'&&setConfirmNoShow(reservation.id)}]:[]
   /* 来店・退店・無断は「…」の奥ではなく窓の下に直接置く。訂正だけ「…」に残す。 */
   const quickAttendance=attendanceItems.filter((item)=>item.id==='visit'||item.id==='depart'||item.id==='no-show')
   const undoAttendance=attendanceItems.filter((item)=>item.id==='undo-depart'||item.id==='undo-visit')
   const noShowReason = reservation.status === 'pending' ? '承認してから無断にしてください。' : undefined
   const buttonFor = (item: typeof attendanceItems[number]) => <Button key={item.id} type="button" disabled={busy || !canWrite} lockedReason={permissionReason ?? (item.id === 'no-show' ? noShowReason : undefined)} onClick={item.onSelect}>{item.label}</Button>
-  const attendance=undoAttendance.length?<RowActions subjectName={reservation.customer_name} menuItems={undoAttendance.map(item => ({...item, lockedReason: permissionReason, disabled: busy || !canWrite}))}/>:null
-  const quickButtons=quickAttendance.map(buttonFor)
+  const quickButton = quickAttendance.find(item => item.id === 'visit' || item.id === 'depart')
+  const modalMenu = [
+    ...attendanceItems.filter(item => item !== quickButton).map(item => ({ ...item, lockedReason: permissionReason ?? (item.id === 'no-show' ? noShowReason : undefined), disabled: busy || !canWrite, ...(item.id === 'no-show' ? { tone: 'danger' as const } : {}) })),
+    ...(inactive ? [] : [{ id: 'cancel-reservation', label: '取り消す', tone: 'danger' as const, disabled: busy || !canWrite, lockedReason: permissionReason, onSelect: () => { if (canWrite) onCancel(reservation.id) } }]),
+  ]
   const dining=<ReservationDining title="お客さまの食事情報" entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
-  const confirmation = <ConfirmDialog open={canWrite && reservation.status === 'confirmed' && confirmNoShow === reservation.id} title="無断にしますか？" description={`${withHonorific(reservation.customer_name)}・${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}。卓が空いていれば予約を有効に戻せます。送信済みの連絡は取り消せません。`} destructive titleIcon={<TriangleAlert size={20} />} confirmIcon={<UserRoundX size={16} />} confirmVariant="danger" confirmLabel="無断にする" onConfirm={() => { if (canWrite && reservation.status === 'confirmed') onAttendance?.(reservation.id, 'no_show'); setConfirmNoShow(null) }} onCancel={() => setConfirmNoShow(null)} />
+  const confirmation = <ConfirmDialog open={canWrite && reservation.status === 'confirmed' && confirmNoShow === reservation.id} title="無断にしますか？" description={`${withHonorific(reservation.customer_name)}・${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}。卓が空いていれば予約を有効に戻せます。送信済みの連絡は取り消せません。`} destructive titleIcon={<TriangleAlert size={20} />} confirmIcon={<UserRoundX size={16} />} confirmVariant="danger" confirmLabel="無断にする" onConfirm={() => { if (canWrite && reservation.status === 'confirmed') void performAttendance('no_show'); setConfirmNoShow(null) }} onCancel={() => setConfirmNoShow(null)} />
   if (inline) return <><DetailPreview title="予約の詳細"
     description={`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}・${table?.code ?? '未配席'}`}
     headerActions={<><Button size="inline" variant="text" aria-label="予約の詳細を閉じる" onClick={onClose}><X size={16} aria-hidden="true" /></Button></>}
@@ -127,6 +167,8 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
       secondary: quickAttendance[1] ? buttonFor(quickAttendance[1]) : null,
       menuItems: [...undoAttendance.map(item => ({...item, allowed: canWrite})), {id: 'edit-reservation', label: '内容を変える', allowed: canWrite, disabled: busy, onSelect: () => { if (canWrite) onEdit(reservation.id) }}, ...(!inactive ? [{id: 'change-table', label: '卓を変える', allowed: canWrite, disabled: busy, onSelect: () => { if (canWrite) onEdit(reservation.id) }}] : []), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}],
     }}>
+    {failureNotice}
+    <DetailField label="状態">{currentStatus}</DetailField>
     <DetailField label="お客さま">{withHonorific(reservation.customer_name, 'さま', { space: true })}</DetailField>
     <DetailField label="予約元"><ReservationSource value={reservation.source} note={reservation.note} /></DetailField>
     <DetailField label="人数・コース">{`${reservation.guest_count}名・${reservation.course_name ?? '席のみ'}${course?.price ? ` ${polishFormatYen(course.price)}` : ''}`}</DetailField>
@@ -146,22 +188,20 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
       onCancel={onClose}
       actions={(
         <>
-          {quickButtons}
-          {attendance}
-          <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
+          {modalMenu.length ? <RowActions subjectName={reservation.customer_name} menuItems={modalMenu} /> : null}
+          {quickButton ? buttonFor(quickButton) : null}
           {inactive ? (
-              <Button type="button" disabled={busy || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onRestore(reservation.id) }}>予約を有効に戻す</Button>
-            ) : (
-              <>
-                <Button type="button" disabled={busy || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onCancel(reservation.id) }}>取り消す</Button>
-                <Button type="button" variant="primary" disabled={busy || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onEdit(reservation.id) }}>
-                  <Pencil size={16} aria-hidden="true" />内容を変える
-                </Button>
-              </>
-            )}
+            <Button type="button" variant="primary" disabled={busy || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onRestore(reservation.id) }}>予約を有効に戻す</Button>
+          ) : (
+            <Button type="button" variant="primary" disabled={busy || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onEdit(reservation.id) }}>
+              <Pencil size={16} aria-hidden="true" />内容を変える
+            </Button>
+          )}
         </>
       )}
     >
+      {failureNotice}
+      <DetailField label="状態">{currentStatus}</DetailField>
       {dining}
       <div className={styles.facts}>
         <p className={styles.fact}>{detailWhen(reservation, table)}</p>

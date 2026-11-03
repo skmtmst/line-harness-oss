@@ -168,6 +168,7 @@ async function pickDate(value: string) {
     })
   }
   await click(all('button').find((element) => element.getAttribute('aria-label')?.startsWith(`${y}年${m}月${d}日`))!)
+  await click(Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
 }
 
 /** 友だち・メニュー・担当・日付・時刻を選んで、確認へ進む手前まで進める。 */
