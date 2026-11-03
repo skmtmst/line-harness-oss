@@ -113,6 +113,33 @@ describe('運営コンソールの V8 外枠', () => {
 })
 
 describe('閲覧のみには隠さず押せない形＋理由で出す', () => {
+  it('運営メンバー停止は対象者・件数・環境を示し、閉じた確認は実行できない', async () => {
+    await act(async () => { root.render(<OpsMembersV8 />) })
+    await settle()
+    act(() => document.querySelector<HTMLButtonElement>('button[aria-label="見本 次郎のその他操作"]')!.click())
+    act(() => document.querySelector<HTMLElement>('[role="menuitem"]')!.click())
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    expect(dialog.textContent).toContain('見本 次郎')
+    expect(dialog.textContent).toContain('1人')
+    expect(dialog.textContent).toContain('環境')
+    const confirm = buttons('停止する')[0] as HTMLButtonElement
+    const key = Object.keys(confirm).find(k => k.startsWith('__reactProps$'))!
+    const oldClick = (confirm as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    await act(async () => { (buttons('キャンセル')[0] as HTMLButtonElement).click() })
+    await act(async () => { oldClick() })
+    expect(calls.some(c => c.method !== 'GET')).toBe(false)
+  })
+
+  it('運営メンバー停止の確認から対象者の変更を呼ぶ', async () => {
+    await act(async () => { root.render(<OpsMembersV8 />) })
+    await settle()
+    act(() => document.querySelector<HTMLButtonElement>('button[aria-label="見本 次郎のその他操作"]')!.click())
+    act(() => document.querySelector<HTMLElement>('[role="menuitem"]')!.click())
+    await act(async () => { (buttons('停止する')[0] as HTMLButtonElement).click() })
+    await settle()
+    expect(calls.filter(c => c.method !== 'GET').map(c => c.url)).toEqual([expect.stringContaining('ops-2')])
+  })
+
   it('自分の運営アカウントは停止できず、理由を示して送信しない', async () => {
     await act(async () => { root.render(<OpsMembersV8 />) })
     await settle()
