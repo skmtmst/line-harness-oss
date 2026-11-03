@@ -130,8 +130,9 @@ function MenuEditBody() {
   const title = resolveResourceTitle({ name: editing?.name, loaded: state === 'ready', pendingTitle })
   usePageTitle(title)
   usePageCrumbs([{ label: 'メニュー管理', href: LIST_HREF }])
-  const valid = draft.name.trim() !== '' && draft.price !== '' && Number.isInteger(Number(draft.price)) && Number(draft.price) >= 0 && Number(draft.price) <= 1_000_000
-  const priceError = draft.price === '' ? undefined : Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : Number(draft.price) > 1_000_000 ? '値段は1,000,000円以下で入れてください。' : !Number.isInteger(Number(draft.price)) ? '値段は整数で入れてください。' : undefined
+  const exceedsPriceLimit = (!editing || priceChanged) && Number(draft.price) > 1_000_000
+  const valid = draft.name.trim() !== '' && draft.price !== '' && Number.isInteger(Number(draft.price)) && Number(draft.price) >= 0 && !exceedsPriceLimit
+  const priceError = draft.price === '' ? undefined : Number(draft.price) < 0 ? '値段は0円以上で入れてください。' : exceedsPriceLimit ? '値段は1,000,000円以下で入れてください。' : !Number.isInteger(Number(draft.price)) ? '値段は整数で入れてください。' : undefined
 
   const [confirmationScope, setConfirmationScope] = useState('')
   const confirmationVersion = useRef({ key: contextKey, generation: 0 })
