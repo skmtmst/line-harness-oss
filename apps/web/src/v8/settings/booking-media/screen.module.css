@@ -87,7 +87,9 @@
 }
 
 .url {
-  display: block;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   color: var(--color-action);
   font-size: var(--text-label);

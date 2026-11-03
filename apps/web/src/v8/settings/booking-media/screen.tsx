@@ -142,7 +142,7 @@ export function withSavedVersion(list: MediaRow[], code: string, version: number
 function UrlCell({ url }: { url: string | null }) {
   if (!url) return <EmptyCell />
   return (
-    <TextLink external className={styles.url} href={url}   title={url}>
+    <TextLink external truncate className={styles.url} href={url} title={url}>
       {`${shortUrl(url)}`}
     </TextLink>
   )
