@@ -839,6 +839,7 @@ function DeliveryInner() {
       boardId={VIEW_BOARDS[view]}
       title={meta.title}
       description={meta.description}
+      titleSize={view === 'orders' ? undefined : 'sub'}
       picker={picker}
     >
       {role !== null && !canManage ? <ReadOnlyNotice /> : null}
