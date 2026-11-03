@@ -128,7 +128,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const entryHandled = useRef('')
   const entryHref = (id: string, mode: 'detail' | 'edit') => `${listPath}?item=${encodeURIComponent(id)}&mode=${mode}`
   /* 作る画面にも URL を付ける（H-18）。読み直しても入力が消えないよう mode=create で開き直せる。 */
-  /* 一覧の種別（?type=）は引き継ぎ、再読込で別種別へ落ちない（PR#2042中）。無い時は従来通り付けない。 */
+  /* 一覧の種別（?type=）を引き継ぐ。指定が無い時は種別を付けない。 */
   const inheritedTypeParam = () => new URLSearchParams(location.split('?')[1]?.split('#')[0] ?? '').get('type') ?? ''
   const createHref = () => {
     const query = new URLSearchParams()
@@ -453,7 +453,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     if (params.get('mode') === 'create') {
       if (!canEdit || entryHandled.current === 'create') return
       entryHandled.current = 'create'
-      /* 結果不明の復旧依頼がある再読込では startCreate で依頼・入力を消さない（PR#2042高）。 */
+      /* 結果不明の復旧依頼がある再読込では、依頼と入力を保持する。 */
       if (createAttempt.current) return
       /* H-18原文：子画面の通常入力の一時下書きがあれば initial として戻す。別タブの下書きはタブごと戻す。 */
       const creation = creationScope.current
