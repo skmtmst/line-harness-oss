@@ -448,7 +448,7 @@ function HqBroadcastDetailBody() {
       const current = ask.kind === 'retry'
         ? currentRun.targets.filter(t => t.accountId === ask.target.accountId && canRetry(currentRun, t))
         : currentRun.targets.filter(t => canRetry(currentRun, t) && !acknowledged.has(t.accountId))
-      const key = (targets: ResultTarget[]) => JSON.stringify(targets.map(t => [t.accountId, t.version]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))))
+      const key = (targets: ResultTarget[]) => JSON.stringify(targets.map(t => [t.accountId, t.version, t.status, t.stopped, t.retryableCount, t.failureReasons?.some(f => f.code === 'before_send_failed') ?? false]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))))
       if (currentRun.id !== ask.runId || expected.length === 0 || expected.some(t => !t.accountId) || key(expected) !== key(current)) {
         setActConflict(true)
         setError('対象が変わりました。閉じて最新の状態を確認してください。')
@@ -524,6 +524,11 @@ function HqBroadcastDetailBody() {
     retry: { title: 'この店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。届いた人には二重に送りません。', label: 'やり直す' },
     'retry-all': { title: '失敗した店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。届いた人には二重に送りません。', label: 'やり直す' },
   }
+  const retryTargets = ask?.kind === 'retry' ? [ask.target] : ask?.kind === 'retry-all' ? ask.targets : []
+  const remainingRetryTargets = retryAcknowledged.current.ask === ask ? retryTargets.filter(t => !retryAcknowledged.current.targets.has(t.accountId)) : retryTargets
+  const retryCount = remainingRetryTargets.length > 0 && remainingRetryTargets.every(t => t.status === 'sent' && Number.isSafeInteger(t.retryableCount) && t.retryableCount > 0 && !t.failureReasons?.some(f => f.code === 'before_send_failed'))
+    ? remainingRetryTargets.reduce((sum, t) => sum + t.retryableCount, 0) : null
+  const retryCountText = retryCount === null ? '人数は送る時に決まります' : `約${n(retryCount)}人に送ります`
 
   /* 店の配信の詳細と同じ頭・数の帯・右の「配信した設定」とスマホ。統括だけの口はアカウント別の内訳（表）とやり直し。 */
   const sentTo = run ? run.targets.filter((t) => !t.excluded) : []
@@ -693,7 +698,7 @@ function HqBroadcastDetailBody() {
           onCancel={() => { setAsk(null); setError(''); if (actConflict) void load() }}
         >
           {ask.kind === 'send' && run ? <OperationTargetSummary accounts={run.targets.filter((target) => !target.excluded && target.blockedReasons.length === 0).map((target) => ({ id: target.accountId, name: target.accountName }))} showAccountCount /> : null}
-          {ask.kind === 'retry' || ask.kind === 'retry-all' ? <OperationTargetSummary accounts={(ask.kind === 'retry' ? [ask.target] : ask.targets).map(target => ({ id: target.accountId, name: target.accountName }))} compactAccounts /> : null}
+          {ask.kind === 'retry' || ask.kind === 'retry-all' ? <><OperationTargetSummary accounts={remainingRetryTargets.map(target => ({ id: target.accountId, name: target.accountName }))} compactAccounts /><p>{ask.kind === 'retry-all' ? `${n(remainingRetryTargets.length)}店・${retryCountText}` : retryCountText}</p></> : null}
           {ask.kind === 'send' && gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}
         </ConfirmDialog>
       ) : null}
