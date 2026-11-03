@@ -504,11 +504,15 @@ export default function TemplatesListV8() {
 
   const removeFolder = async () => {
     if (!deletingFolder || folderBusy || folderDeleteLock.current || !renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current || renderedScope !== accountScope.current) return
+    if (deletingFolder.accountId === undefined || (typeof deletingFolder.accountId === 'string' && deletingFolder.accountId !== selectedAccountId)) {
+      setFolderError('フォルダの所有先を確認できません。一覧を読み直してください。')
+      return
+    }
     folderDeleteLock.current = true
     setFolderBusy(true)
     setFolderError('')
     try {
-      const res = await api.folders.delete(deletingFolder.id, selectedAccountId ?? undefined)
+      const res = await api.folders.delete(deletingFolder.id, deletingFolder.accountId ?? undefined)
       if (!res.success) throw new Error(res.error ?? '削除できませんでした。時間をおいて、もう一度お試しください。')
       if (renderedFolderDeleteTicket !== folderDeleteTicket.current || renderedScope !== accountScope.current) return
       folderDeleteTicket.current = null
@@ -1012,7 +1016,7 @@ export default function TemplatesListV8() {
   const blockedRows = blockedUsage ? usageRows(blockedUsage) : []
   const blockedTotal = blockedDelete ? Math.max(blockedDelete.item.usageCount, blockedRows.length) : 0
 
-  const overlays = <Fragment key={renderedScope.generation}>{renderTemplateDialogs({ folderDeleteAccounts: [{ id: selectedAccountId ?? '', name: accounts.find(account => account.id === selectedAccountId)?.name }], cancelFolderDelete, deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates, detailGuard })}{detailGuard.dialog}</Fragment>
+  const overlays = <Fragment key={renderedScope.generation}>{renderTemplateDialogs({ folderDeleteAccounts: deletingFolder?.accountId === null ? [] : [{ id: deletingFolder?.accountId ?? '', name: accounts.find(account => account.id === deletingFolder?.accountId)?.name }], cancelFolderDelete, deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates, detailGuard })}{detailGuard.dialog}</Fragment>
 
   const heading = {
     title: 'テンプレート',

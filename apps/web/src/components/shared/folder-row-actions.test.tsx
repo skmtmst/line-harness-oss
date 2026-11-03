@@ -47,7 +47,8 @@ const folder = (id: string, name: string, order: number): Folder => ({
 })
 const FOLDERS = [folder('f-1', 'キャンペーン', 0), folder('f-2', 'EC・フォロー', 1)]
 
-function Screen({ enabled, onChanged, onDeleted, accountId = 'acc-1', folders = FOLDERS }: { enabled: boolean; onChanged: () => void; onDeleted: (id: string) => void; accountId?: string; folders?: Folder[] }) {
+function Screen({ enabled, onChanged, onDeleted, accountId = 'acc-1', folders: providedFolders }: { enabled: boolean; onChanged: () => void; onDeleted: (id: string) => void; accountId?: string; folders?: Folder[] }) {
+  const folders = providedFolders ?? FOLDERS.map(f => ({ ...f, accountId }))
   const actions = useFolderRowActions({
     kind: 'rich_menu', folders, accountId, enabled, itemLabel: 'リッチメニュー',
     countOf: (id) => (id === 'f-1' ? 2 : 0), onChanged, onDeleted,
@@ -103,6 +104,34 @@ describe('フォルダの「…」（共通）', () => {
     await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('フォルダの所有店'))
     expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('環境')
     expect(document.querySelector('[role="alertdialog"]')?.textContent).not.toContain('選択中の店')
+  })
+
+  it('所有先と選択中のアカウントが異なるフォルダを削除しない', async () => {
+    const folders = [{ ...FOLDERS[0], accountId: 'acc-owner' }]
+    await act(async () => { root.render(<Screen enabled folders={folders} onChanged={() => {}} onDeleted={() => {}} />) })
+    await click(menuButton('キャンペーン'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.trim() === '消す'))
+    await act(async () => { await capturedConfirm.current?.() })
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  it('共通フォルダは選択アカウントを指定せずに削除する', async () => {
+    const folders = [{ ...FOLDERS[0], accountId: null }]
+    await act(async () => { root.render(<Screen enabled folders={folders} onChanged={() => {}} onDeleted={() => {}} />) })
+    await click(menuButton('キャンペーン'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.trim() === '消す'))
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('すべてのLINEアカウント')
+    await act(async () => { await capturedConfirm.current?.() })
+    expect(remove).toHaveBeenCalledWith('f-1', undefined)
+  })
+
+  it('所有先を確認できないフォルダは削除しない', async () => {
+    await act(async () => { root.render(<Screen enabled folders={[FOLDERS[0]]} onChanged={() => {}} onDeleted={() => {}} />) })
+    await click(menuButton('キャンペーン'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.trim() === '消す'))
+    await act(async () => { await capturedConfirm.current?.() })
+    expect(remove).not.toHaveBeenCalled()
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('所有先を確認できません')
   })
 
   it('削除完了直後に古い確定を繰り返しても一度だけ送る', async () => {

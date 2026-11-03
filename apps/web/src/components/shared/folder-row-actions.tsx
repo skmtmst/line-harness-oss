@@ -112,10 +112,18 @@ export function useFolderRowActions({
     if (!sameDialog() || deleting !== latest.current.deleting) return
     if (!canActNow()) { if (usesLivePermission()) setError(interrupted); return }
     if (!deleting || latest.current.busy) return
+    if (deleting.accountId === undefined) {
+      setError('フォルダの所有先を確認できません。一覧を読み直してください。')
+      return
+    }
+    if ('accountId' in deleting && typeof deleting.accountId === 'string' && deleting.accountId !== accountId) {
+      setError('フォルダのアカウントが現在の選択と異なります。一覧を読み直してください。')
+      return
+    }
     changeBusy(true)
     setError('')
     try {
-      const res = await api.folders.delete(deleting.id, accountId ?? undefined)
+      const res = await api.folders.delete(deleting.id, deleting.accountId ?? undefined)
       if (!sameDialog() || deleting !== latest.current.deleting) return
       if (!res.success) throw new Error(res.error)
       dialogEpoch.current = {}
@@ -205,7 +213,7 @@ export function useFolderRowActions({
         onConfirm={() => void remove()}
         confirmLockedReason={livePermission ? permissionReason : undefined}
         confirmDisabled={livePermission ? !actionEnabled && !permissionReason : undefined}
-      >{deleting ? <OperationTargetSummary accounts={[{ id: 'accountId' in deleting && typeof deleting.accountId === 'string' ? deleting.accountId : '' }]} /> : null}</ConfirmDialog>
+      >{deleting ? <OperationTargetSummary allAccounts={deleting.accountId === null} accounts={deleting.accountId === null ? [] : [{ id: deleting.accountId ?? '' }]} /> : null}</ConfirmDialog>
     </>
   ) : null
 

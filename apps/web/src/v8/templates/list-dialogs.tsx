@@ -336,7 +336,7 @@ export function renderTemplateDialogs({ folderDeleteAccounts, cancelFolderDelete
         error={folderError || undefined}
         onCancel={cancelFolderDelete}
         onConfirm={() => removeFolder()}
-      ><OperationTargetSummary accounts={folderDeleteAccounts} /></ConfirmDialog>
+      ><OperationTargetSummary accounts={folderDeleteAccounts} externalTarget={deletingFolder?.accountId === null ? { label: 'フォルダの対象', name: '共通（全アカウント）' } : undefined} /></ConfirmDialog>
 
       {/* 行の詳細パネル。一覧は左に見えたまま。 */}
       {activeTemplate && isTemplateSection ? (

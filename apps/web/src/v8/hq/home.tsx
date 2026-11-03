@@ -809,7 +809,7 @@ export default function HqHomeV8() {
           error={folderError || undefined}
           onConfirm={() => removeFolder(deleteFolder)}
           onCancel={() => { if (!folderSaving && !folderDeleteLock.current) { folderDeleteTicket.current = null; setDeleteFolder(null) } }}
-        ><OperationTargetSummary accounts={[]} externalTarget={{ label: '対象アカウント', name: '全件を確認できません' }} /></ConfirmDialog>
+        ><OperationTargetSummary accounts={[]} externalTarget={{ label: '対象アカウント', name: '未分類へ移るアカウントの名前を確認できません' }} /></ConfirmDialog>
       ) : null}
     </ListPage></SaveErrorScope>
     </KpiValueMotionProvider>

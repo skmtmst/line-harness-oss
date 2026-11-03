@@ -159,7 +159,7 @@ it('統括アカウントのフォルダ削除前に環境と対象の不確実�
   await act(async () => { remove.click() })
   const dialog = document.querySelector('[role="alertdialog"]')!
   expect(dialog.textContent).toContain('環境')
-  expect(dialog.textContent).toContain('全件を確認できません')
+  expect(dialog.textContent).toContain('未分類へ移るアカウントの名前を確認できません')
 })
 
 it('表の対応が要る件数は同じアカウントの対応一覧の5種類を合計する', async () => {

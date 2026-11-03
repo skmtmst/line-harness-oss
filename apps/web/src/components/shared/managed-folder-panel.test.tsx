@@ -15,7 +15,7 @@ vi.hoisted(() => {
 })
 
 const folder = (id: string, name: string, order: number, color: string | null = '#3b82f6'): Folder => ({
-  id, kind: 'scenario', name, parentId: null, displayOrder: order, color, createdAt: '', updatedAt: '', itemCount: order + 2,
+  id, kind: 'scenario', accountId: 'acc-1', name, parentId: null, displayOrder: order, color, createdAt: '', updatedAt: '', itemCount: order + 2,
 } as Folder)
 
 const list = vi.hoisted(() => vi.fn())

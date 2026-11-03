@@ -37,7 +37,7 @@ vi.mock('./confirm-dialog', async original => {
 
 const folders: Folder[] = ['a', 'b'].map((id, index) => ({
   id, kind: 'scenario', name: `フォルダ${id}`, parentId: null, color: null,
-  displayOrder: index, createdAt: '', updatedAt: '', itemCount: 2,
+  displayOrder: index, createdAt: '', updatedAt: '', itemCount: 2, accountId: 'account-a',
 }))
 const reason = '閲覧のみのため、フォルダは変えられません。'
 const onChanged = vi.fn(), onDeleted = vi.fn(), onSelect = vi.fn()
@@ -53,10 +53,11 @@ function Panel({ canWriteNow, enabled = true, accountId = 'account-a', kind = 's
     activeId="all" onSelect={onSelect} allCount={4} itemLabel="シナリオ" controlRef={control} /><LayoutProbe /></>
 }
 function Rows({ canWriteNow, enabled = true, accountId = 'account-a', kind = 'scenario', lockedReason }: Permission) {
-  const actions = useFolderRowActions({ kind, folders, accountId, enabled, canWriteNow,
+  const scopedFolders = folders.map(folder => ({ ...folder, accountId }))
+  const actions = useFolderRowActions({ kind, folders: scopedFolders, accountId, enabled, canWriteNow,
     lockedReason, itemLabel: 'シナリオ', onChanged, onDeleted })
-  captures.row = actions.rowActions(folders[0], 0)
-  return <><FolderPanel rows={folders.map((folder, index) => ({ ...actions.rowActions(folder, index),
+  captures.row = actions.rowActions(scopedFolders[0], 0)
+  return <><FolderPanel rows={scopedFolders.map((folder, index) => ({ ...actions.rowActions(folder, index),
     id: folder.id, label: folder.name, kind: 'folder' as const }))} activeId="all" onSelect={onSelect} />{actions.dialogs}<LayoutProbe /></>
 }
 function ReadPanel() {

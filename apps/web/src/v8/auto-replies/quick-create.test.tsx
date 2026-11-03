@@ -74,6 +74,13 @@ it('書きかけでアカウントを切り替えると確認まで止まる', a
   fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
   expect(change).not.toHaveBeenCalled()
 })
+it('アカウントを切り替えても作成中の対象は元のアカウントを示す', () => {
+  const view = render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={created} />)
+  view.rerender(<QuickCreate accountId="account-2" onClose={vi.fn()} onCreated={created} />)
+  const dialog = screen.getByRole('dialog')
+  expect(dialog.querySelector('[title="account-1"]')).toBeTruthy()
+  expect(dialog.querySelector('[title="account-2"]')).toBeNull()
+})
 it('日本語の変換を確定する Enter では言葉を札にしない（変換が終わった Enter で札にする）', () => {
   render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={created} />)
   const input = screen.getByLabelText('追加する言葉') as HTMLInputElement

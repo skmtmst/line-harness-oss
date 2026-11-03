@@ -44,6 +44,16 @@ it('フォルダ一覧の削除窓は所有アカウントと環境を出す', a
   expect(within(dialog).getByText('環境')).toBeTruthy()
 })
 
+it('選択中と所有先が違うときも削除窓は所有先を示す', async () => {
+  const group = { id: 'g-1', name: '確認用', color: '#123456', accountId: 'owner-other', sortOrder: 0 }
+  render(<TagsTab accountId="acc-1" fixture={{ items: [], groups: [group] }} canEdit narrow={false} csvOpen={false} onCsvClose={() => {}} />)
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ「確認用」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  const dialog = await screen.findByRole('alertdialog')
+  expect(dialog.querySelector('[title="owner-other"]')).toBeTruthy()
+  expect(dialog.querySelector('[title="acc-1"]')).toBeNull()
+})
+
 it('一覧はキャンセルとアカウント切替の後、古い確認で削除しない', async () => {
   const group = { id: 'g-1', name: '確認用', color: '#123456', accountId: 'acc-1', sortOrder: 0 }
   const view = render(<TagsTab accountId="acc-1" fixture={{ items: [], groups: [group] }} canEdit narrow={false} csvOpen={false} onCsvClose={() => {}} />)
