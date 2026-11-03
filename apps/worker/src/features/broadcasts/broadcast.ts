@@ -1183,7 +1183,7 @@ async function processQueuedBroadcastBatches(
      * 途中まで進んだ位置を書き戻してロックを外し、再開でその続きから送る。
      */
     if (await isBroadcastStopped(db, broadcast.id)) {
-      await releaseStopped();
+      await releaseStopped(progressBase+currentOffset);
       return;
     }
     try { await renewLimitedReservation(db,broadcast,friends.length-currentOffset); } catch (error) {
@@ -1456,7 +1456,7 @@ async function processQueuedBroadcastBatches(
   const finished=await db.prepare(`UPDATE broadcasts SET status='sent',sent_at=?,batch_lock_at=NULL,batch_offset=?
     WHERE id=? AND lock_version=? AND batch_offset=-1 AND stopped_at IS NULL`)
     .bind(jstNow(),progressBase+currentOffset,broadcast.id,lockVersion).run();
-  if(!finished.meta.changes)await releaseStopped();
+  if(!finished.meta.changes)await releaseStopped(progressBase+currentOffset);
 }
 
 /*
