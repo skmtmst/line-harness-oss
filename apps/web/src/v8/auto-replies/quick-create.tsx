@@ -273,7 +273,9 @@ export default function QuickCreateV8({
       busy={saving}
       error={saveError || undefined}
       onCancel={onClose}
-      footer={(<DialogActions align="center" leadingAction={<Button {...(!inputsDisabled ? { href: '/auto-replies/edit' } : { type: 'button', disabled: true })} variant="text" lockedReason={lockedReason}>
+      footer={(<div className={styles.actionFooter}>
+        <div className={styles.actionReason} role="status">{!saving && !inputsDisabled ? requiredReason : undefined}</div>
+        <DialogActions align="center" leadingAction={<Button {...(!inputsDisabled ? { href: '/auto-replies/edit' } : { type: 'button', disabled: true })} variant="text" lockedReason={lockedReason}>
             <ListOrdered size={16} aria-hidden="true" />
             詳しく作るへ
           </Button>}>
@@ -286,7 +288,7 @@ export default function QuickCreateV8({
             type="button"
             variant="primary"
             disabled={saving || inputsDisabled || Boolean(requiredReason)}
-            disabledReason={!saving && !inputsDisabled ? requiredReason : undefined}
+            aria-description={!saving && !inputsDisabled ? requiredReason : undefined}
             lockedReason={lockedReason}
             busy={saving}
             busyLabel={phase === 'confirming' ? '有効にしています…' : '保存しています…'}
@@ -298,7 +300,7 @@ export default function QuickCreateV8({
 
           {/* 左の「詳しく作るへ」と釣り合いを取り、キャンセル・保存を窓の真ん中に置く。 */}
 
-        </DialogActions>)}
+        </DialogActions></div>)}
     >
       <div className={styles.body}>
         {lockedReason ? <ReadOnlyNotice need="feature" /> : null}

@@ -134,3 +134,12 @@ it('アカウント切替後は既存の操作停止を保ち、入力不足と�
   expect(screen.queryByText(BOTH)).toBeNull(); expect(screen.getByText('アカウントが切り替わりました。いったん閉じて作り直してください。')).toBeTruthy()
   await act(async () => { fireEvent.click(save()) }); noRequests()
 })
+
+it('入力理由は操作ボタンの並びの外にあり、ボタンは同じ組に置く', () => {
+  render(<QuickCreate accountId="fixture-account" {...callbacks} />)
+  const actions = save().closest('[data-dialog-actions]')!
+  expect(actions.contains(screen.getByText(BOTH))).toBe(false)
+  expect(save().parentElement).toBe(screen.getByRole('button', { name: 'キャンセル' }).parentElement)
+  changeReply('10時からです'); addWord()
+  expect(screen.queryByText(BOTH)).toBeNull()
+})

@@ -153,3 +153,27 @@
 .footerBalance {
   flex: 0 0 var(--tpl-ms-qc-balance-w);
 }
+
+.actionFooter {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.actionReason {
+  min-height: 20px;
+  padding: 0 24px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 20px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+:global(html:root) .actionFooter > :global([data-dialog-actions][data-dialog-action-pair]) {
+  border-top: 0;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+:global(html:root) .actionFooter > :global([data-dialog-actions]) > :global(span:not([data-dialog-action-leading])) {
+  grid-column: 2;
+  flex-wrap: nowrap;
+}
