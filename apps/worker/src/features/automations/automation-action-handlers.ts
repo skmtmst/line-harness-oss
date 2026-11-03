@@ -716,7 +716,7 @@ async function mileageExecutor(context: AutomationActionContext): Promise<void> 
   let source: 'ec' | 'musubo';
   try { source = await resolveMileageSource(context.db, context.lineAccountId); }
   catch { throw new AutomationActionError('MILEAGE_SOURCE_UNAVAILABLE', 'マイルの管理元を確認できませんでした', true); }
-  if (source === 'ec') throw new AutomationActionError('MILEAGE_MANAGED_BY_EC', 'マイルはECで管理しています', false);
+  if (source === 'ec') return;
   const { postMileageEntry } = await import('@line-crm/db');
   await postMileageEntry(context.db, { beneficiaryFriendId: friend.id, entryType: 'grant', amount,
     reason: '設定した処理による付与', source: 'automation', sourceEventId: context.sourceEventId,

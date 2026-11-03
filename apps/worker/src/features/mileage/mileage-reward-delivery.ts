@@ -532,39 +532,28 @@ export async function processDueMileageRewardDeliveries(
     new Date(options.now).getTime() - STALE_DELIVERY_LEASE_MS,
   ).toISOString();
   const dueWhere = `status = 'delivery_failed' AND next_retry_at IS NOT NULL AND next_retry_at <= ?`;
-  const canProcess = async (accountId: string | null): Promise<boolean> => {
-    if (!accountId) return false;
-    try { return await resolveMileageSource(db, accountId) === 'musubo'; } catch { return false; }
-  };
-  // ECの交換はテナント停止中でも行を更新しない。
-  const suspended = await db.prepare(`SELECT id, line_account_id FROM mileage_redemptions
-    WHERE ${dueWhere} AND line_account_id IS NOT NULL
-      AND ${stoppedTenantLineAccountSql('mileage_redemptions.line_account_id')}`).bind(options.now)
-    .all<{ id: string; line_account_id: string | null }>();
-  for (const item of suspended.results) {
-    if (!await canProcess(item.line_account_id)) continue;
-    await db.prepare(`UPDATE mileage_redemptions SET next_retry_at = NULL, failure_code = 'tenant_suspended',
-      failure_message = '契約先の利用停止中に再試行時刻を過ぎたため自動送信しませんでした', updated_at = ?
-      WHERE id = ? AND ${dueWhere}`).bind(options.now, item.id, options.now).run();
+  const owners = await db.prepare(`SELECT DISTINCT line_account_id FROM mileage_redemptions
+    WHERE status IN ('delivery_failed','delivering','refunded') AND line_account_id IS NOT NULL`).bind()
+    .all<{ line_account_id: string }>();
+  const eligible: string[] = [];
+  for (const { line_account_id: accountId } of owners.results) {
+    try { if (await resolveMileageSource(db, accountId) === 'musubo') eligible.push(accountId); }
+    catch (error) { console.error('mileage_delivery_source_unavailable', accountId, error); }
   }
+  const eligibleJson = JSON.stringify(eligible);
+  // ECの交換はテナント停止中でも行を更新しない。
+  await db.prepare(`UPDATE mileage_redemptions SET next_retry_at = NULL, failure_code = 'tenant_suspended',
+      failure_message = '契約先の利用停止中に再試行時刻を過ぎたため自動送信しませんでした', updated_at = ?
+      WHERE ${dueWhere} AND line_account_id IN (SELECT value FROM json_each(?))
+        AND ${stoppedTenantLineAccountSql('mileage_redemptions.line_account_id')}`)
+    .bind(options.now, options.now, eligibleJson).run();
   const mileageOff = accountFeatureOffExclusionSql('mileage_redemptions.line_account_id', 'mileage');
   const findEligible = async (where: string, order: string, date: string, cap: number) => {
-    const selected: { id: string }[] = [];
-    let offset = 0;
-    while (selected.length < cap) {
-      const page = await db.prepare(`SELECT id, line_account_id FROM mileage_redemptions
+    return db.prepare(`SELECT id FROM mileage_redemptions
         WHERE ${where} AND NOT ${mileageOff} AND line_account_id IS NOT NULL
+          AND line_account_id IN (SELECT value FROM json_each(?))
           AND ${activeTenantLineAccountSql('mileage_redemptions.line_account_id')}
-        ORDER BY ${order}, id LIMIT ? OFFSET ?`).bind(date, limit, offset)
-        .all<{ id: string; line_account_id: string | null }>();
-      for (const row of page.results) {
-        if (await canProcess(row.line_account_id)) selected.push(row);
-        if (selected.length >= cap) break;
-      }
-      offset += page.results.length;
-      if (page.results.length < limit) break;
-    }
-    return { results: selected };
+        ORDER BY ${order}, id LIMIT ?`).bind(date, eligibleJson, cap).all<{ id: string }>();
   };
   const due = await findEligible(dueWhere, 'next_retry_at, created_at', options.now, limit);
   // 止めた事実は監査に残す。行は読むだけで状態は変えない。
@@ -612,18 +601,10 @@ export async function processDueMileageRewardDeliveries(
   const recoveryLimit = Math.max(0, limit - due.results.length - stalled.results.length);
   let recovered = 0;
   if (recoveryLimit > 0) {
-    const incomplete: Awaited<ReturnType<typeof findIncompleteMileageRefunds>> = [];
-    let offset = 0;
-    while (incomplete.length < recoveryLimit) {
-      const page = await findIncompleteMileageRefunds(db, { limit, offset });
-      for (const target of page) {
-        if (await canProcess(target.lineAccountId)) incomplete.push(target);
-        if (incomplete.length >= recoveryLimit) break;
-      }
-      offset += page.length;
-      if (page.length < limit) break;
-    }
+    const incomplete = await findIncompleteMileageRefunds(db, { limit: recoveryLimit, lineAccountIds: eligible });
     for (const target of incomplete) {
+      try { if (!target.lineAccountId || await resolveMileageSource(db, target.lineAccountId) !== 'musubo') continue; }
+      catch (error) { console.error('mileage_delivery_source_unavailable', target.lineAccountId, error); continue; }
       if (target.lineAccountId && !await featureJobCanRun(db, { accountId: target.lineAccountId, featureId: 'mileage', job: 'mileage reward delivery retry' })) continue;
       try {
         await refundMileageRewardRedemption(db, { redemptionId: target.id, reason: '中断した返却の再開' });

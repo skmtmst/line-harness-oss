@@ -43,7 +43,7 @@ vi.mock('@line-crm/db', () => dbMocks);
 
 const deliveryMocks = { deliverMileageReward: vi.fn() };
 vi.mock('../features/mileage/mileage-reward-delivery.js', () => deliveryMocks);
-const mileageSourceMocks = vi.hoisted(() => ({ resolveMileageSource: vi.fn().mockResolvedValue('musubo'), getEcMileageBalance: vi.fn() }));
+const mileageSourceMocks = vi.hoisted(() => ({ resolveMileageSource: vi.fn().mockResolvedValue('musubo'), getEcMileageBalance: vi.fn(), hasHeldMileageRedemption: vi.fn().mockResolvedValue(false) }));
 vi.mock('../services/mileage-ec-source.js', () => mileageSourceMocks);
 
 // 差替済みのヘルパを入口へ接続するため、モック登録後に読み込む。
@@ -305,6 +305,7 @@ describe('GET /api/liff/mileage/me — generic wallet', () => {
   it('ECの店では顧客にもECの残高を返す', async () => {
     mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
     mileageSourceMocks.getEcMileageBalance.mockResolvedValueOnce(29);
+    mileageSourceMocks.hasHeldMileageRedemption.mockResolvedValueOnce(true);
     const res = await call('/api/liff/mileage/me?lineAccessToken=tok-alice');
     expect((await res.json() as any).mileage).toMatchObject({ available: 29, balanceSource: 'ec' });
   });
@@ -382,7 +383,8 @@ describe('LIFF mileage rewards — verified account and real limits', () => {
     mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
     mileageSourceMocks.getEcMileageBalance.mockResolvedValueOnce(29);
     const response = await call('/api/liff/mileage/rewards?lineAccessToken=tok-alice');
-    expect(await response.json()).toMatchObject({ balanceSource: 'ec', availableMiles: 29, rewards: [] });
+    expect(await response.json()).toMatchObject({ balanceSource: 'ec', availableMiles: 29, hasHeldRedemption: true, rewards: [] });
+    expect(mileageSourceMocks.hasHeldMileageRedemption).toHaveBeenCalledWith(DB, 'account-main', expect.any(String));
     expect(dbMocks.listMileageRewards).not.toHaveBeenCalled();
   });
   it('ECで管理する店は交換を拒否して台帳を変更しない', async () => {

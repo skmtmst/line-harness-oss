@@ -2,6 +2,12 @@ import { getNenRankSettings } from '@line-crm/db';
 export { resolveMileageSource } from '@line-crm/db/src/mileage/source.js';
 
 type Input = { lineAccountId: string; search: string; friendId?: string; limit: number; offset: number };
+export async function hasHeldMileageRedemption(db: D1Database, accountId: string, friendId: string): Promise<boolean> {
+  const row = await db.prepare(`SELECT 1 AS present FROM mileage_redemptions
+    WHERE line_account_id = ? AND beneficiary_friend_id = ? AND status IN ('reserved','delivering','delivery_failed') LIMIT 1`)
+    .bind(accountId, friendId).first<{ present: number }>();
+  return row?.present === 1;
+}
 export async function getEcMileageBalance(db: D1Database, accountId: string, friendId: string): Promise<number | null> {
   const row = await db.prepare(`SELECT s.mile_balance FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id WHERE f.line_account_id = ? AND f.id = ?`).bind(accountId, friendId).first<{ mile_balance: number }>();
   return row == null ? null : Number(row.mile_balance);

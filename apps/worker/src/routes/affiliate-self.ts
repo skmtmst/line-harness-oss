@@ -2,7 +2,7 @@ import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.j
 import { getCookie, setCookie } from 'hono/cookie';
 import { logger } from '@line-crm/shared/server';
 import { resolveFriendFromLineToken, unresolvedResponse } from '../services/affiliate-self-auth.js';
-import { resolveMileageSource, getEcMileageBalance } from '../services/mileage-ec-source.js';
+import { resolveMileageSource, getEcMileageBalance, hasHeldMileageRedemption } from '../services/mileage-ec-source.js';
 import { customerDownloadEntry } from '../services/download-entrypoints.js';
 import { signDownload, validDownload } from '../services/download-capability.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -145,7 +145,13 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
       return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const source = await resolveMileageSource(c.env.DB, resolved.lineAccountId);
-    if (source === 'ec') return c.json({ success: true, balanceSource: 'ec', availableMiles: await getEcMileageBalance(c.env.DB, resolved.lineAccountId, resolved.friend.id), rewards: [] });
+    if (source === 'ec') {
+      const [availableMiles, hasHeldRedemption] = await Promise.all([
+        getEcMileageBalance(c.env.DB, resolved.lineAccountId, resolved.friend.id),
+        hasHeldMileageRedemption(c.env.DB, resolved.lineAccountId, resolved.friend.id),
+      ]);
+      return c.json({ success: true, balanceSource: 'ec', availableMiles, hasHeldRedemption, rewards: [] });
+    }
     const [rewards, mileage, redemptionCounts] = await Promise.all([
       listMileageRewards(c.env.DB, {
         lineAccountId: resolved.lineAccountId,
