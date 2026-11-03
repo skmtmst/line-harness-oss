@@ -246,6 +246,7 @@ function deleteImpactRows(
   impact: TagDependencies | null,
 ): Array<{ name: string; value: string; result: string }> {
   const refs = impact?.referenceCounts
+  const hasMileage = impact?.mileageImpact.configured ?? ((tag.mileageReward ?? 0) > 0 || (tag.referralMileageReward ?? 0) > 0 || tag.mileageMultiplierBps != null)
   const linked = [
     tag.mileageReward ? `本人+${tag.mileageReward}` : null,
     tag.referralMileageReward ? `紹介者+${tag.referralMileageReward}` : null,
@@ -271,7 +272,7 @@ function deleteImpactRows(
       数が無くても判断はできる。`—` のままにすると「まだ数えている」
       ように見え、いつまでも埋まらない欄になる。
     */
-    { name: '積んだマイル', value: 'そのまま残る', result: '取り消されません' },
+    ...(hasMileage ? [{ name: '積んだマイル', value: 'そのまま残る', result: '取り消されません' }] : []),
   ]
   if (impact?.linkedActions.length) {
     rows.push({ name: '使用中の版', value: impact.linkedActions.map((item) => `${item.state === 'published' ? '公開' : '下書き'} 第${item.version}版`).join('・'), result: impact.linkedActions.some((item) => item.state === 'published') ? '公開している版があるので消せません' : '公開版はありません' })
