@@ -118,6 +118,7 @@ export default function ApprovalsTab() {
   const [detailItem, setDetailItem] = useState<ConversionApprovalItem | null>(null)
   const [truncatedStatuses, setTruncatedStatuses] = useState<ApprovalStatus[]>([])
   const [loadingMore, setLoadingMore] = useState(false)
+  const loadVersion = useRef(0)
   const [bulkConfirm, setBulkConfirm] = useState<BulkConfirmation | null>(null)
   const activeBulkConfirm = useRef<BulkConfirmation | null>(null)
   const [bulkResult, setBulkResult] = useState<BulkResult | null>(null)
@@ -131,6 +132,9 @@ export default function ApprovalsTab() {
 
   /* 承認・却下の後は fresh：操作より前に始まった読み込み（件数用など）を使い回さない（WEB003）。 */
   const loadItems = useCallback(async (options: { fresh?: boolean; preserveSelection?: boolean } = {}) => {
+    if (accountScope.current.id !== accountId) return
+    loadVersion.current += 1
+    setLoadingMore(false)
     setLoadState('loading')
     try {
       const statuses = ['pending', 'approved', 'rejected'] as const
@@ -162,7 +166,10 @@ export default function ApprovalsTab() {
   }, [loadItems, loadHoldDays])
 
   const loadMoreItems = useCallback(async () => {
-    if (loadingMore || truncatedStatuses.length === 0) return
+    if (loadingMore || truncatedStatuses.length === 0 || accountScope.current.id !== accountId) return
+    const scope = accountScope.current
+    const version = loadVersion.current
+    const current = () => mounted.current && accountScope.current === scope && loadVersion.current === version
     setLoadingMore(true)
     try {
       const results = await Promise.all(truncatedStatuses.map(async (value) => {
@@ -170,17 +177,18 @@ export default function ApprovalsTab() {
         const result = await listAllConversionApprovals(value, already, { accountId })
         return { status: value, ...result }
       }))
+      if (!current()) return
       setItems((current) => {
         const seen = new Set(current.map((item) => item.eventId))
         return [...current, ...results.flatMap((result) => result.items).filter((item) => !seen.has(item.eventId))]
       })
       setTruncatedStatuses(results.filter((result) => result.truncated).map((result) => result.status))
     } catch {
-      setActionError('続きを読み込めませんでした。もう一度お試しください。')
+      if (current()) setActionError('続きを読み込めませんでした。もう一度お試しください。')
     } finally {
-      setLoadingMore(false)
+      if (current()) setLoadingMore(false)
     }
-  }, [items, loadingMore, truncatedStatuses])
+  }, [accountId, items, loadingMore, truncatedStatuses])
 
   const decideOne = useCallback(async (eventId: string, expectedStatus: ApprovalStatus, action: BulkOutcome) => {
     if (actioning) return
