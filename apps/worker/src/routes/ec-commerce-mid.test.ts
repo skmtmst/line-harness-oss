@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
 
 const access = vi.hoisted(() => vi.fn());
@@ -71,4 +71,59 @@ describe('点検・中: テスト送信の連打防止', () => {
     expect(second.status).toBe(429);
     await expect(second.json()).resolves.toMatchObject({ success: false });
   });
+});
+
+describe('テスト送信先の確認', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('確認後に宛先が変わったら送信しない', async () => {
+    access.mockResolvedValue(true);
+    const external = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', external);
+    const db = {
+      prepare(sql: string) {
+        const stmt = {
+          bind: (..._values: unknown[]) => stmt,
+          first: async () => sql.includes('account_settings')
+            ? { value: '["new-friend"]' }
+            : { id: 'different-account', channel_access_token: 'test-token' },
+          all: async () => ({ results: [{ id: 'new-friend', line_user_id: 'Ufake' }] }),
+          run: async () => ({ meta: { changes: 1 } }),
+        };
+        return stmt;
+      },
+    } as unknown as D1Database;
+    const res = await app().request('/api/ec-commerce/test-send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventType: 'ec.order.confirmed', accountId: 'different-account', title: 'テスト', introText: '', outroText: '', buttonLabel: '', buttonUrl: '', imageUrl: '', expectedRecipientIds: ['old-friend'] }),
+    }, { DB: db } as Env['Bindings']);
+    expect(res.status).toBe(409);
+    expect(external).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+  it('送信の準備中に宛先が変わったらLINEへ送らない', async () => {
+    access.mockResolvedValue(true);
+    const external = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', external);
+    let reads = 0;
+    const db = {
+      prepare(sql: string) {
+        const stmt = {
+          bind: (..._values: unknown[]) => stmt,
+          first: async () => sql.includes('account_settings')
+            ? { value: ++reads === 1 ? '["first"]' : '["second"]' }
+            : { id: 'another-account', channel_access_token: 'test-token' },
+          all: async () => ({ results: [{ id: reads === 1 ? 'first' : 'second', line_user_id: 'Ufake' }] }),
+          run: async () => ({ meta: { changes: 1 } }),
+        };
+        return stmt;
+      },
+    } as unknown as D1Database;
+    const res = await app().request('/api/ec-commerce/test-send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventType: 'ec.order.confirmed', accountId: 'another-account', title: 'テスト', introText: '', outroText: '', buttonLabel: '', buttonUrl: '', imageUrl: '', expectedRecipientIds: ['first'] }),
+    }, { DB: db } as Env['Bindings']);
+    expect(res.status).toBe(409);
+    expect(external).not.toHaveBeenCalled();
+  });
+
 });
