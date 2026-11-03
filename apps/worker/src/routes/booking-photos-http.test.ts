@@ -356,3 +356,16 @@ it('飲食メニューと全店共通の自動応答が同じ画像を使う場�
   expect(menuOnly).toMatchObject({usageCount:1,canReplace:false});
   expect(menuOnly.revision).not.toBe(both.revision);
 });
+
+it('飲食メニューの使用先を読み取れない場合、差替え影響を未使用として返さない', async () => {
+  const brokenDb = { ...db, prepare(sql: string) {
+    if (sql.includes('SELECT id FROM rt_menu_items WHERE image_media_id')) {
+      return { bind: () => ({ all: async () => { throw new Error('simulated menu query failure'); } }) } as unknown as D1PreparedStatement;
+    }
+    return db.prepare(sql);
+  } } as D1Database;
+  const env = { DB: brokenDb, WORKER_URL:'https://worker.test' } as Env['Bindings'];
+  const response = await app.request('/api/media/p/replacement-impact?accountId=a&replacementId=p-more', {}, env);
+  expect(response.status).toBe(503);
+  expect(await response.json()).toMatchObject({ success:false, error:'差し替えたときの影響を確認できませんでした' });
+});

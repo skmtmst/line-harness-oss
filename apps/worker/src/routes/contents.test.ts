@@ -171,7 +171,7 @@ const del = vi.fn().mockResolvedValue(undefined);
 const head = vi.fn();
 const get = vi.fn();
 const env = {
-  DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) } as unknown as D1Database,
+  DB: { prepare: () => ({ bind: () => ({ first: async () => null, all: async () => ({ results: [] }) }) }) } as unknown as D1Database,
   IMAGES: { put, delete: del, head, get } as unknown as R2Bucket,
   WORKER_URL: 'https://api.example.com',
   CF_ACCOUNT_ID: 'cf-account',
