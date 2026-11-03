@@ -3,6 +3,7 @@ import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 import { processBroadcastSend, processQueuedBroadcasts, processScheduledBroadcasts, guardScheduledBroadcastQuota } from './broadcast.js';
 import { prepareHqBroadcast, dispatchHqBroadcast, preflightHqBroadcast } from '../../services/hq-broadcasts.js';
 import { countAudience, previewAudience } from './broadcast-preflight.js';
+import { recoverStalledBroadcasts } from '@line-crm/db';
 
 const calls = vi.hoisted(() => ({ broadcast: vi.fn(async () => ({ requestId: 'all' })),
   multicast: vi.fn(async (_ids: string[], _messages: unknown) => ({ requestId: 'selected' })),
@@ -35,6 +36,56 @@ beforeEach(() => {
 });
 afterEach(() => { f.raw.close(); vi.unstubAllGlobals(); });
 describe('637: 停止者を外して一斉配信を続ける', () => {
+  it('復旧前の処理と引き継いだ処理が重なっても同じ相手に二重送信しない',async()=>{
+    let entered!:()=>void,release!:()=>void;
+    const started=new Promise<void>(resolve=>{entered=resolve}),wait=new Promise<void>(resolve=>{release=resolve});
+    let enteredNew!:()=>void,releaseNew!:()=>void;
+    const startedNew=new Promise<void>(resolve=>{enteredNew=resolve}),waitNew=new Promise<void>(resolve=>{releaseNew=resolve});
+    calls.multicast.mockImplementationOnce(async()=>{enteredNew();await waitNew;return {requestId:'new'};});
+    const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-generation',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
+    const sent=await dispatchHqBroadcast(f.db,run,'owner',1),child=sent.targets[0].broadcastId!;
+    await processScheduledBroadcasts(f.db,calls as never);
+    const prepare=f.db.prepare.bind(f.db);let intercepted=false;
+    vi.spyOn(f.db,'prepare').mockImplementation(sql=>{
+      const statement=prepare(sql);
+      if(!sql.includes('SELECT DISTINCT friend_id FROM friend_delivery_consents WHERE state')||intercepted)return statement;
+      intercepted=true;
+      return new Proxy(statement,{get(target,prop){
+        if(prop==='bind')return (...args:unknown[])=>{
+          const bound=target.bind(...args);
+          return new Proxy(bound,{get(item,key){
+            if(key==='all')return async()=>{const result=await item.all();entered();await wait;return result;};
+            const value=Reflect.get(item,key);return typeof value==='function'?value.bind(item):value;
+          }});
+        };
+        const value=Reflect.get(target,prop);return typeof value==='function'?value.bind(target):value;
+      }});
+    });
+    const old=processQueuedBroadcasts(f.db,calls as never);await started;
+    let current:Promise<void>|undefined;
+    try {
+      f.raw.prepare("UPDATE broadcasts SET batch_lock_at=datetime('now','-1 hour') WHERE id=?").run(child);
+      await recoverStalledBroadcasts(f.db);
+      current=processQueuedBroadcasts(f.db,calls as never);await startedNew;
+      release();await old;
+      expect(f.raw.prepare('SELECT batch_offset FROM broadcasts WHERE id=?').get(child)).toEqual({batch_offset:-1});
+    } finally {release();releaseNew();await old;await current;}
+    expect(sentIds().sort()).toEqual(['U-allowed','U-stopped','U-unknown']);
+  });
+  it('送信要求の応答待ちで復旧しても同じ相手を送り直さない',async()=>{
+    let entered!:()=>void,release!:()=>void;
+    const started=new Promise<void>(resolve=>{entered=resolve}),wait=new Promise<void>(resolve=>{release=resolve});
+    calls.multicast.mockImplementationOnce(async()=>{entered();await wait;return {requestId:'mock'};});
+    const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-inflight',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
+    const sent=await dispatchHqBroadcast(f.db,run,'owner',1),child=sent.targets[0].broadcastId!;
+    await processScheduledBroadcasts(f.db,calls as never);
+    const old=processQueuedBroadcasts(f.db,calls as never);await started;
+    try {
+      f.raw.prepare("UPDATE broadcasts SET batch_lock_at=datetime('now','-1 hour') WHERE id=?").run(child);
+      await recoverStalledBroadcasts(f.db);await processQueuedBroadcasts(f.db,calls as never);
+    } finally {release();await old;}
+    expect(sentIds().sort()).toEqual(['U-allowed','U-stopped','U-unknown']);
+  });
   it.each([false,true])('即時・名前差し込み=%s: 全員の指定を保ち、停止/不明だけ除き、再実行でも重複しない', async personalized => {
     consent('stopped');consent('stopped','unknown','news');consent('unknown','unknown');
     f.raw.exec("UPDATE friends SET display_name=NULL WHERE id='stopped'");
