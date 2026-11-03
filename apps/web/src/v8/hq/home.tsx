@@ -346,7 +346,7 @@ export default function HqHomeV8() {
       void reloadAfterSave()
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409 && caught.message === '同じ名前のフォルダがあります') {
-        setFolderNameError(caught.message)
+        setFolderNameError('同じ名前のフォルダがあります')
       } else {
         const fieldFailure = saveErrors.capture(caught)
         if (!fieldFailure) setFolderError(describeApiFailure(caught, '保存', { scope: 'hq' }))
@@ -388,7 +388,7 @@ export default function HqHomeV8() {
       void reloadAfterSave()
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409 && caught.message === '同じ名前のフォルダがあります') {
-        setFolderNameError(caught.message)
+        setFolderNameError('同じ名前のフォルダがあります')
       } else {
         const fieldFailure = saveErrors.capture(caught)
         if (!fieldFailure) setFolderError(describeApiFailure(caught, '保存', { scope: 'hq' }))
