@@ -22,6 +22,7 @@ import type { StepMessageKind } from './message-type-tabs'
 import type { MessageKindState } from './message-kind-fields'
 
 export interface StepPreviewProps {
+  accountName?: string
   deliveryMode: DeliveryMode
   offsetDays: number
   /** absolute_time のときの配信時刻 "HH:MM"。 */
@@ -184,6 +185,7 @@ export function renderPreviewBody(body: string): string {
 }
 
 export default function StepPreview({
+  accountName,
   deliveryMode,
   offsetDays,
   deliveryTime,
@@ -226,6 +228,7 @@ export default function StepPreview({
       {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く日時は見える札のまま残す。 */}
       <div className="-mx-4 -mt-4 mb-4">
         <LinePreview
+          accountName={accountName}
           caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={16} strokeWidth={1.8} />{timeMissing ? `時刻を入れると届く日時が出ます（${stepLabel}）` : `${words}に届きます（${stepLabel}）`}</span>}
         >
           {templateName ? (

@@ -292,7 +292,7 @@ nenRanks.put('/api/nen/lifetime-milestones', requireRole('owner', 'admin'), inpu
       id: typeof milestone.id === 'string' ? milestone.id : null,
       thresholdYen: Number(milestone.thresholdYen),
       title: String(milestone.title ?? ''),
-      notifyOnReach: milestone.notifyOnReach !== false,
+      notifyOnReach: milestone.notifyOnReach === undefined ? undefined : milestone.notifyOnReach !== false,
     })), now);
   } catch (error) {
     if (error instanceof NenRankValidationError) return inputError(c, { success: false, error: error.message }, 400, ['milestones']);

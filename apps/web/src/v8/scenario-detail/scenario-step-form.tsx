@@ -37,7 +37,7 @@ export function ScenarioStepForm({
   scenario, setActionTarget, templates, folderAccountId,
   kindState, setKindState, stepBodyRef, setStepTargetOpen,
   tags, stepError, handleSaveStep, stepSaving,
-  closeStepForm, stepFormPreview,
+  closeStepForm, stepFormPreview, accountName,
 }: {
   editingStepId: string | null
   stepDraft: ReturnType<typeof useScenarioDraft>
@@ -60,6 +60,7 @@ export function ScenarioStepForm({
   handleSaveStep: () => Promise<void>
   stepSaving: boolean
   closeStepForm: () => void
+  accountName?: string
   stepFormPreview: { offsetDays: number; offsetHours: number; offsetMinutes: number; }
 }) {
   const tokenNames = useInsertTokenNames(scenario?.lineAccountId ?? null)
@@ -393,6 +394,7 @@ export function ScenarioStepForm({
       */}
       <aside data-design-node="xfYLn" className="min-w-0 space-y-4">
         <StepPreview
+          accountName={accountName}
           deliveryMode={deliveryMode}
           stepOrder={displayOrder}
           offsetDays={stepFormPreview.offsetDays}

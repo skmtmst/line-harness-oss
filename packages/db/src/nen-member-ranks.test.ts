@@ -100,6 +100,15 @@ describe('ensureNenRankDefaults', () => {
     expect((await getNenLifetimeMilestones(db, ACCOUNT)).map((m) => m.threshold_yen)).toEqual([300_000, 600_000, 1_000_000, 2_000_000]);
   });
 
+  it('新しい初期節目は通知オフ、既存の節目は再初期化でも変えない', async () => {
+    await ensureNenRankDefaults(db, ACCOUNT, NOW);
+    const initial = await getNenLifetimeMilestones(db, ACCOUNT);
+    expect(initial.map(row => row.notify_on_reach)).toEqual([0, 0, 0, 0]);
+    sqlite.prepare('UPDATE nen_lifetime_milestones SET notify_on_reach = 1 WHERE id = ?').run(initial[0].id);
+    await ensureNenRankDefaults(db, ACCOUNT, NOW);
+    expect((await getNenLifetimeMilestones(db, ACCOUNT))[0].notify_on_reach).toBe(1);
+  });
+
   it('初期化済みの店が節目を空にした後は再初期化で復活しない', async () => {
     await ensureNenRankDefaults(db, ACCOUNT, NOW);
     sqlite.prepare('DELETE FROM nen_lifetime_milestones WHERE line_account_id = ?').run(ACCOUNT);

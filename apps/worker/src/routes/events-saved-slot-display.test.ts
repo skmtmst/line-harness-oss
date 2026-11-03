@@ -124,3 +124,14 @@ it('枠がないイベントへ別の回を補わず、無効な枠だけでも�
     for (const id of [empty.id, inactive.id]) expect(result.items.find(row => row.id === id)).toMatchObject({ next_slot_starts_at: null, latest_past_slot_starts_at: null, total_capacity: null });
   } finally { fixture.raw.close(); }
 });
+
+it('日時なしで保存した公開イベントは、その公開状態と空の日時を一覧から読み直す', async () => {
+  const fixture = localCatalog();
+  try {
+    const created = await fixture.request('/api/events/admin/events?account_id=account-a', 'POST', { name: '日時なし公開', is_published: 1 });
+    expect(created.status).toBe(201);
+    const { id } = await created.json() as { id: string };
+    const result = await fixture.list();
+    expect(result.items.find(row => row.id === id)).toMatchObject({ is_published: 1, lifecycle_status: 'published', next_slot_starts_at: null, latest_past_slot_starts_at: null });
+  } finally { fixture.raw.close(); }
+});

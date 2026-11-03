@@ -34,7 +34,7 @@ import { usePageTitle } from '@/components/shell/page-chrome';
 import AccountEditModal from '@/components/accounts/account-edit-modal';
 import PlatformNotices from '@/components/hq/platform-notices';
 import { accountIconUrl } from '@/components/hq/account-list';
-import { api, bookingApi, fetchApi } from '@/lib/api';
+import { api, ApiError, bookingApi, fetchApi } from '@/lib/api';
 import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared';
 import { resolveStoreReturnPath } from '@/lib/hq-navigation';
 import { formatNumber } from '@/lib/format';
@@ -111,6 +111,7 @@ export default function HqHomeV8() {
   const [folderColor, setFolderColor] = useState<string | null>(null)
   const [deleteFolder, setDeleteFolder] = useState<(Folder & { itemCount?: number }) | null>(null)
   const [folderError, setFolderError] = useState('')
+  const [folderNameError, setFolderNameError] = useState('')
   const [folderSaving, setFolderSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -320,15 +321,18 @@ export default function HqHomeV8() {
 
   const openFolderDialog = (editing: Folder | null) => {
     setFolderName(editing?.name ?? '')
+    setFolderNameError('')
     setFolderColor(editing ? folderDisplayColor(editing) : DEFAULT_TAG_FOLDER_COLOR)
     setFolderError('')
     setFolderDialog({ editing })
   }
 
+  const folderUnchanged = Boolean(folderDialog?.editing && folderName.trim() === folderDialog.editing.name.trim() && folderColor === folderDisplayColor(folderDialog.editing))
+
   /* フォルダを足す／名前と色を変える（API-17：POST・PATCH /api/line-account-folders）。 */
   const saveFolder = async () => {
     const name = folderName.trim()
-    if (!name || folderSaving || !folderDialog) return
+    if (!name || folderSaving || !folderDialog || folderUnchanged) return
     setFolderSaving(true)
     setFolderError('')
     try {
@@ -341,10 +345,12 @@ export default function HqHomeV8() {
       await loadFolders()
       void reloadAfterSave()
     } catch (caught) {
-      const fieldFailure = saveErrors.capture(caught)
-
-      { if (!fieldFailure)
-      setFolderError(describeApiFailure(caught, '保存', { scope: 'hq' })) }
+      if (caught instanceof ApiError && caught.status === 409 && caught.message === '同じ名前のフォルダがあります') {
+        setFolderNameError(caught.message)
+      } else {
+        const fieldFailure = saveErrors.capture(caught)
+        if (!fieldFailure) setFolderError(describeApiFailure(caught, '保存', { scope: 'hq' }))
+      }
     } finally {
       setFolderSaving(false)
     }
@@ -381,10 +387,12 @@ export default function HqHomeV8() {
       await loadFolders()
       void reloadAfterSave()
     } catch (caught) {
-      const fieldFailure = saveErrors.capture(caught)
-
-      { if (!fieldFailure)
-      setFolderError(describeApiFailure(caught, '保存', { scope: 'hq' })) }
+      if (caught instanceof ApiError && caught.status === 409 && caught.message === '同じ名前のフォルダがあります') {
+        setFolderNameError(caught.message)
+      } else {
+        const fieldFailure = saveErrors.capture(caught)
+        if (!fieldFailure) setFolderError(describeApiFailure(caught, '保存', { scope: 'hq' }))
+      }
     } finally {
       setFolderSaving(false)
     }
@@ -568,6 +576,9 @@ export default function HqHomeV8() {
             const state = statusOf(account)
             const warned = state.tone === 'warn'
             const name = account.displayName || account.name
+            const nameCharacters = Array.from(name)
+            const namePrefix = nameCharacters.slice(0, -6).join('')
+            const nameSuffix = nameCharacters.slice(-6).join('')
             return (
               <Card key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
                 <div className={styles.cardHead}>
@@ -575,7 +586,7 @@ export default function HqHomeV8() {
                   <div className={styles.cardName}>
                     {/* 絵 `JKjsE`：名前の前に左の列（フォルダ）の色の丸。未分類は色の無い輪。 */}
                     <p className={styles.name} title={name}>
-                      <FolderDotName folder={folderDotOf(account)}>{name}</FolderDotName>
+                      <FolderDotName folder={folderDotOf(account)}><span className={styles.middleName} title={name} aria-label={name}><span aria-hidden="true" className={styles.middleNamePrefix}>{namePrefix}</span><span aria-hidden="true" data-hq-name-suffix="">{nameSuffix}</span></span></FolderDotName>
                     </p>
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
                     <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
@@ -721,14 +732,15 @@ export default function HqHomeV8() {
         open={folderDialog !== null}
         title={folderDialog?.editing ? 'フォルダの名前と色を変える' : 'フォルダを追加'}
         description="アカウントは1つのフォルダに入ります。"
-        name={folderName} onNameChange={setFolderName} nameId="hq-account-folder-name" nameLabel="フォルダの名前"
+        name={folderName} nameError={folderNameError} onNameChange={(value) => { setFolderName(value); setFolderNameError('') }} nameId="hq-account-folder-name" nameLabel="フォルダの名前"
         color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS}
         placeholder="例：渋谷エリア" maxLength={100}
         onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
-        designNode="JKjsE" busy={folderSaving} error={folderError || undefined}
+        designNode="JKjsE" busy={folderSaving} disabled={folderSaving} error={folderError || undefined}
         confirmLabel={folderDialog?.editing ? '保存する' : '追加する'} cancelLabel="やめる"
+        confirmDisabled={folderUnchanged}
         onConfirm={() => saveFolder()}
-      />
+      >{folderUnchanged ? <Notice tone="info" compact>名前か色を変えると保存できます。</Notice> : null}</FolderEditorDialog>
 
       {deleteFolder ? (
         <ConfirmDialog

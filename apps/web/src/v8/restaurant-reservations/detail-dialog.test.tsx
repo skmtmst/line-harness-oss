@@ -50,6 +50,17 @@ const openDetail = async () => {
 }
 
 describe('AjZhH 予約台帳 予約の詳細', () => {
+  it.each([[null, 'なし', false], ['なし', 'なし', false], ['えび', 'えび', true]] as const)('予約詳細のアレルギー %s と連絡先を区別する', (allergy, label, warning) => {
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    render(<ReservationDetailDialog reservation={{ ...today[0], allergy_note: allergy }} accountId="account-1" tables={data.tables} courses={data.menuItems}
+      busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} />)
+    const dialog = screen.getByRole('dialog', { name: '鈴木 真理さん・4名' })
+    const allergyLine = within(dialog).getByText(`アレルギー：${label}`)
+    expect(allergyLine.className.includes('allergy')).toBe(warning)
+    expect(dialog.textContent).toContain('電話：090-****-5678')
+    expect(within(dialog).getByText('お客さまの食事情報')).not.toBeNull()
+  })
+
   it('埋込の操作は下のメニュー1つにまとめ、予約元を名前と別の段で読む', async () => {
     const attendance = vi.fn()
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })

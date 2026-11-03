@@ -77,6 +77,15 @@ afterEach(() => {
 })
 
 describe('対応状況の窓は開いた友だちに固定する（WEB125）', () => {
+  it('メモの入力欄に2000文字の上限を設定する', async () => {
+    chatGet.mockImplementation(async (id: string) => chat(id, 'in_progress', 3))
+    await act(async () => root.render(<Support id="friend-a" />))
+    await act(async () => { button('開く')!.click() })
+    await settle()
+    const memo = document.querySelector('textarea[aria-label="メモ"]') as HTMLTextAreaElement
+    expect(memo.maxLength).toBe(2000)
+  })
+
   it('A で開いたまま B に変わると窓を閉じ、A の入力を B へ保存できない', async () => {
     chatGet.mockImplementation(async (id: string) => chat(id, 'in_progress', 3))
     await act(async () => root.render(<Support id="friend-a" />))
