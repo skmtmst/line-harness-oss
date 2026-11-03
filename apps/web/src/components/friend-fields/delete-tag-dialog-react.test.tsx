@@ -48,6 +48,24 @@ afterEach(() => {
 })
 
 describe('タグの保管の窓', () => {
+  it('保管対象のアカウントと環境を表示する', async () => {
+    render(<DeleteTagDialog tag={tag} accountId="acc" onCancel={() => {}} onArchived={() => {}} />)
+    expect(screen.getByText('LINEアカウント')).toBeTruthy()
+    expect(screen.getByText('環境')).toBeTruthy()
+    await waitFor(() => expect(rowValue('参照先')).toBe('なし'))
+  })
+
+  it('アカウントを切り替えたら前の影響結果と確認入力では保管できない', async () => {
+    net.dependencies.mockResolvedValueOnce({ success: true, data: impact() }).mockReturnValueOnce(new Promise(() => {}))
+    const view = render(<DeleteTagDialog tag={tag} accountId="acc" onCancel={() => {}} onArchived={() => {}} />)
+    await waitFor(() => expect(rowValue('参照先')).toBe('なし'))
+    fireEvent.change(confirmInput(), { target: { value: 'VIP' } })
+    expect(archiveButton().disabled).toBe(false)
+    view.rerender(<DeleteTagDialog tag={tag} accountId="other" onCancel={() => {}} onArchived={() => {}} />)
+    expect(confirmInput().value).toBe('')
+    fireEvent.click(archiveButton())
+    expect(net.archive).not.toHaveBeenCalled()
+  })
   // 止まっている理由（footerLead）は、自前の footer を渡す窓では今は描かれていない（報告済み）。ここでは押せないことを見る。
   it('影響を読んでいる間は名前の欄も押し口も止め、参照先は「—」で埋める', async () => {
     net.dependencies.mockReturnValue(new Promise(() => {}))

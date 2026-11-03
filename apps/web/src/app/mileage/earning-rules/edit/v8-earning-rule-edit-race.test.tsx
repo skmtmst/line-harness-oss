@@ -102,3 +102,22 @@ describe('欄で知らせて移る', () => {
     expect(document.activeElement).toBe(name)
   })
 })
+
+it('マイル365日とルール終了日なしを読み込み、保存する', async () => {
+  const { api } = await import('@/lib/api')
+  const saveDraft = vi.spyOn(api.mileage, 'saveEarningRuleDraft').mockRejectedValueOnce(new Error('offline'))
+  const base = rule('rule-a', '架空のルール')
+  const data = { ...base, draft: { ...base.draft, expiresAfterDays: 365 } }
+  await view.render(<V8EarningRuleEdit />)
+  await settle()
+  fixture.pending[fixture.pending.length - 1].resolve(listOf(data))
+  await settle()
+  expect(view.host.querySelector<HTMLInputElement>('input[aria-label="有効期限の日数"]')?.value).toBe('365')
+  const { fireEvent } = await import('@testing-library/react')
+  fireEvent.change(view.host.querySelector<HTMLInputElement>('input[aria-label="付与マイル"]')!, { target: { value: '11' } })
+  await settle()
+  fireEvent.click(Array.from(view.host.querySelectorAll('button')).find((button) => button.textContent?.includes('下書きを保存'))!)
+  await settle()
+  expect(saveDraft).toHaveBeenCalledWith('rule-a', expect.objectContaining({ draft: expect.objectContaining({ expiresAfterDays: 365, validUntil: null }) }))
+  saveDraft.mockRestore()
+})

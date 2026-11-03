@@ -228,6 +228,17 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
 })
 
 describe('統括のテンプレートの詳細（pQ4fH）', () => {
+  it('詳細の削除確認にも統括ひな形と環境を出す', async () => {
+    render(<HqTemplatesV8 type="template" />)
+    fireEvent.click((await screen.findByRole('link', { name: '予約前日のご案内' })).closest('tr')!)
+    await screen.findByRole('heading', { name: '配った先' })
+    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '削除する' }))
+    const confirm = await screen.findByRole('alertdialog')
+    expect(within(confirm).getByText('統括ひな形')).toBeTruthy()
+    expect(within(confirm).getByText('環境')).toBeTruthy()
+    expect(calls.remove).not.toHaveBeenCalled()
+  })
   it('名前を押すと詳細。配った先のアカウント名と［このアカウントへ入る］・［配る］を出す', async () => {
     render(<HqTemplatesV8 type="template" />)
     fireEvent.click((await screen.findByRole('link', { name: '予約前日のご案内' })).closest('tr')!)
@@ -848,7 +859,10 @@ it('未配布ありの1件を消すと数の帯を取り直す（B25）', async 
   const loaded = calls.listStats.mock.calls.length
   fireEvent.click(screen.getByRole('button', { name: /予約前日のご案内.*の操作/ }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '削除する' }))
-  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '削除する' }))
+  const confirm = await screen.findByRole('alertdialog')
+  expect(within(confirm).getByText('統括ひな形')).toBeTruthy()
+  expect(within(confirm).getByText('環境')).toBeTruthy()
+  fireEvent.click(within(confirm).getByRole('button', { name: '削除する' }))
   await waitFor(() => expect(calls.listStats.mock.calls.length).toBeGreaterThan(loaded))
 })
 

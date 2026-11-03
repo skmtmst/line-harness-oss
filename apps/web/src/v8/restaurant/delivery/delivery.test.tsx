@@ -701,8 +701,25 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     const detail = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
     fireEvent.click(await detail.findByRole('button', { name: '注文をキャンセルする' }))
     const confirmation = within(await screen.findByRole('alertdialog', { name: 'この注文をキャンセルしますか？' }))
+    expect(confirmation.getByText('LINEアカウント')).toBeTruthy()
+    expect(confirmation.getByText('店舗')).toBeTruthy()
+    expect(confirmation.getByText('環境')).toBeTruthy()
     fireEvent.click(confirmation.getByRole('button', { name: 'キャンセルする' }))
     await waitFor(() => expect(fixture.cancel).toHaveBeenCalledWith('account-1', 'o1', 'out_of_stock'))
+  })
+
+  it('キャンセル確認中にアカウントを切り替えたら古い窓から送らない', async () => {
+    fixture.orders.mockResolvedValue(ordersData([order('o1', 'UE-1001')], true))
+    at('/restaurant-test/delivery?id=o1')
+    const view = render(<DeliveryPage />)
+    const detail = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
+    fireEvent.click(await detail.findByRole('button', { name: '注文をキャンセルする' }))
+    const confirmation = within(await screen.findByRole('alertdialog', { name: 'この注文をキャンセルしますか？' }))
+    const button = confirmation.getByRole('button', { name: 'キャンセルする' })
+    fixture.accountId.value = 'account-2'
+    view.rerender(<DeliveryPage />)
+    fireEvent.click(button)
+    expect(fixture.cancel).not.toHaveBeenCalled()
   })
 
   it('アカウント切替後に遅れて戻った利用可能フラグを混ぜない', async () => {

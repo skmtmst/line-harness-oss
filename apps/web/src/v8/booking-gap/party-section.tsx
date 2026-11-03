@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import { notifySaved } from '@/components/shared/toast'
@@ -19,6 +20,7 @@ import styles from './party-section.module.css'
 import { formatNumber } from '@/lib/format'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 import { withHonorific } from '@line-crm/shared'
 
 /*
@@ -41,26 +43,32 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
   useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   const preparing = usePreparingDialog()
   const [open, setOpen] = useState(false)
+  const targetScope = useRef({ accountId, groupId: party.groupId, version: party.version })
+  if (targetScope.current.accountId !== accountId || targetScope.current.groupId !== party.groupId || targetScope.current.version !== party.version) targetScope.current = { accountId, groupId: party.groupId, version: party.version }
+  const [confirmedScope, setConfirmedScope] = useState<typeof targetScope.current | null>(null)
   const lockedReason = usePermissionLockReason(permissionAllowed)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const reload = onReload ?? onChanged
   useEffect(() => { setError('') }, [party])
+  useEffect(() => { setOpen(false); setBusy(false) }, [accountId, party.groupId])
+  useEffect(() => { setBusy(false) }, [party.version])
   const cancellable = party.members.filter((member) => member.status === 'requested' || member.status === 'confirmed')
   async function cancelAll() {
-    if (!accountId || busy || !canOperate || lockedReason || !reason.trim() || cancellable.length === 0) return
+    if (!accountId || confirmedScope !== targetScope.current || busy || !canOperate || lockedReason || !reason.trim() || cancellable.length === 0) return
+    const scope = targetScope.current
     setBusy(true); setError('')
     try {
       const response = await bookingAdvancedApi.cancelGroup(accountId, party.groupId, reason.trim(), party.version)
-      if (!active.current) return
+      if (!active.current || scope !== targetScope.current) return
       notifySaved(`${response.data.cancelled} 件の予約を取り消しました`)
       setOpen(false)
       onChanged?.()
     } catch {
-      if (!active.current) return
+      if (!active.current || scope !== targetScope.current) return
       setError(reload ? '取り消せませんでした。入力は残っています。この組を読み直して状態を確認してください。' : '取り消せませんでした。入力は残っています。時間をおいて、もう一度お試しください。')
-    } finally { if (active.current) setBusy(false) }
+    } finally { if (active.current && scope === targetScope.current) setBusy(false) }
   }
 
   return (
@@ -82,11 +90,13 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
       </DataTable>
       <DialogActions padding="none">
         {canRemoveMember && party.members.length > 1 ? <Button variant="secondary" disabled={!canOperate} lockedReason={lockedReason} disabledReason={permissionAllowed ? operationDisabledReason : undefined} onClick={() => preparing.open('この人だけ取り消す')}>この人だけ取り消す</Button> : null}
-        {cancellable.length > 0 ? <Button variant="secondary" disabled={!canOperate} lockedReason={lockedReason} disabledReason={permissionAllowed ? operationDisabledReason : undefined} onClick={() => { if (!accountId) { preparing.open('組をまとめて取り消す'); return }; setReason(''); setError(''); setOpen(true) }}>組をまとめて取り消す</Button> : null}
+        {cancellable.length > 0 ? <Button variant="secondary" disabled={!canOperate} lockedReason={lockedReason} disabledReason={permissionAllowed ? operationDisabledReason : undefined} onClick={() => { if (!accountId) { preparing.open('組をまとめて取り消す'); return }; setConfirmedScope(targetScope.current); setReason(''); setError(''); setOpen(true) }}>組をまとめて取り消す</Button> : null}
       </DialogActions>
-      <Dialog open={open} title="組をまとめて取り消しますか？" titleNote={`${formatNumber(cancellable.length)} 件の予約をまとめて取り消します`} size="small" contentLayout="form" role="alertdialog"
-        busy={busy} error={error || undefined} cancelLabel="キャンセル" onCancel={() => { if (!busy) setOpen(false) }} confirmLabel="まとめて取り消す" confirmLockedReason={lockedReason} confirmDisabled={!canOperate || !reason.trim() || cancellable.length === 0} confirmDisabledReason={!canOperate ? permissionAllowed ? operationDisabledReason : undefined : !reason.trim() ? '取り消す理由を入れてください' : cancellable.length === 0 ? '取り消せる予約がありません' : undefined} onConfirm={() => void cancelAll()}
+      <Dialog open={open && confirmedScope?.accountId === accountId && confirmedScope?.groupId === party.groupId} title="組をまとめて取り消しますか？" titleNote={`${formatNumber(cancellable.length)} 件の予約をまとめて取り消します`} size="small" contentLayout="form" role="alertdialog"
+        busy={busy} error={error || undefined} cancelLabel="キャンセル" onCancel={() => { if (!busy) setOpen(false) }} confirmLabel="まとめて取り消す" confirmLockedReason={lockedReason} confirmDisabled={!canOperate || confirmedScope !== targetScope.current || !reason.trim() || cancellable.length === 0} confirmDisabledReason={!canOperate ? permissionAllowed ? operationDisabledReason : undefined : cancellable.length === 0 ? '取り消せる予約がありません' : confirmedScope !== targetScope.current ? '最新の内容を確認してください' : !reason.trim() ? '取り消す理由を入れてください' : undefined} onConfirm={() => void cancelAll()}
 >
+        <OperationTargetSummary accounts={[{ id: confirmedScope?.accountId ?? '' }]} />
+        {confirmedScope !== targetScope.current && canOperate ? <Notice tone="warn">{cancellable.length === 0 ? '取り消せる予約がなくなりました。' : <>組の内容が更新されました。最新の内容を確認してください。<ul>{cancellable.map(member => <li key={member.bookingId}>{member.label || member.personName}・{member.menuName}・{member.staffName ?? '担当未設定'}・{hm(member.startsAt)}〜{hm(member.endsAt)}</li>)}</ul><Button onClick={() => setConfirmedScope(targetScope.current)}>最新の内容を確認しました</Button></>}</Notice> : null}
         <Field label="取り消す理由" required><TextField aria-label="取り消す理由" value={reason} maxLength={500} onChange={(event) => setReason(event.target.value)} /></Field>
         <p>取り消すと元に戻せません。来店済み・取消済みの予約は変えません。この操作ではLINEを自動送信しません。必要な連絡は受信箱から行ってください。</p>
         {error && reload ? <Button onClick={reload}>この組を読み直す</Button> : null}

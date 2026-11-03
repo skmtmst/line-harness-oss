@@ -2,13 +2,14 @@
 
 import Notice from '@/components/shared/notice'
 import { TAG_ADD_ACTION_LABEL } from '@/components/shared/action-words'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Coins } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { api, type CommonActionResources, type TagDefinitionAction, type TagRetroactivePreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { formatNumber } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
@@ -118,19 +119,27 @@ export function definitionsForSave(actions: LinkedAction[]): TagDefinitionAction
  * previewToken を保存APIへ渡し、サーバー側で対象の再計算と照合する。
  */
 export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSaveWithoutApplying, onSave, referenceState = false }: { values: TagEditorValues; count: number; tagId: string | null; accountId: string | null; onCancel: () => void; onSaveWithoutApplying: () => void; onSave: (previewToken: string) => void; referenceState?: boolean }) {
+  const scopeKey = JSON.stringify([accountId, tagId, values.rewardMiles, values.referralRewardMiles])
+  const scope = useRef({ key: scopeKey })
+  if (scope.current.key !== scopeKey) scope.current = { key: scopeKey }
+  const openedScope = useRef(scope.current)
+  const requestSequence = useRef(0)
+  const isCurrent = () => openedScope.current === scope.current
   const [accepted, setAccepted] = useState(referenceState)
   const [preview, setPreview] = useState<TagRetroactivePreview | null>(null)
   const [previewError, setPreviewError] = useState('')
   const fetchPreview = () => {
-    if (!tagId || !accountId) return
+    if (!tagId || !accountId || !isCurrent()) return
+    const request = ++requestSequence.current
     setPreviewError('')
     void api.tags.retroactivePreview(tagId, accountId, {
       self: values.rewardMiles,
       referrer: values.referralRewardMiles,
     }).then((res) => {
+      if (!isCurrent() || request !== requestSequence.current) return
       if (res.success) setPreview(res.data)
       else setPreviewError(res.error || '対象を再計算できませんでした。時間をおいて、もう一度お試しください。')
-    }).catch(() => setPreviewError('対象を再計算できませんでした。時間をおいて、もう一度お試しください。'))
+    }).catch(() => { if (isCurrent() && request === requestSequence.current) setPreviewError('対象を再計算できませんでした。時間をおいて、もう一度お試しください。') })
   }
 
   useEffect(() => {
@@ -145,15 +154,16 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
   const referralTargets = preview ? preview.referralTargets : Math.min(count, 34)
   const rewardTotal = preview ? preview.selfMiles : selfTargets * values.rewardMiles
   const referralTotal = preview ? preview.referralMiles : referralTargets * values.referralRewardMiles
-  return <Dialog open size="large" tone="destructive" confirmation dirty={false}
+  return <Dialog open={isCurrent()} size="large" tone="destructive" confirmation dirty={false}
     onCancel={onCancel} title={`${selfTargets + referralTargets}人にさかのぼってマイルを積みますか？`}
     titleIcon={<Coins aria-hidden="true" />}
     footer={<DialogActions>
 
-          <Button variant="secondary" type="button" onClick={onSaveWithoutApplying}>反映しないで保存する</Button>
-          <Button variant="primary" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
+          <Button variant="secondary" type="button" onClick={() => { if (isCurrent()) onSaveWithoutApplying() }}>反映しないで保存する</Button>
+          <Button variant="primary" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => { if (isCurrent() && accepted && !loading && !previewError) onSave(preview?.previewToken ?? '') }}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
             </DialogActions>}
   >
+        <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
         <p className="mt-2 text-sm leading-6 text-ink-secondary">「{values.name || 'このタグ'}」の変更を、いまこのタグが付いている人にも適用します。人数はサーバーで再計算した値です。</p>
         <div className="mt-4 overflow-hidden rounded-control border border-hairline">
           <dl className="divide-y divide-hairline text-sm">

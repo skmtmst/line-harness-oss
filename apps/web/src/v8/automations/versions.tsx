@@ -17,6 +17,7 @@ import { useSearchParams } from 'next/navigation'
 import { BookOpen, GitBranch, History, Link2, Pencil, Upload, Zap } from 'lucide-react'
 import { api, ApiError, type CommonActionDetail, type CommonActionStep, type CommonActionSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
 import { DetailPage } from '@/components/templates'
@@ -81,6 +82,10 @@ function VersionsInner() {
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const targetKey = JSON.stringify([id, selectedAccountId])
+  const targetScope = useRef({ key: targetKey })
+  if (targetScope.current.key !== targetKey) targetScope.current = { key: targetKey }
+  const bindingScope = useRef<typeof targetScope.current | null>(null)
   /* 画面のマニュアル（正本表の画面キー）。URL がある時だけ出す。 */
   const manualHref = useManualHref()
   const [detail, setDetail] = useState<CommonActionDetail | null>(null)
@@ -93,6 +98,7 @@ function VersionsInner() {
   const [loadFailure, setLoadFailure] = useState<'missing' | 'forbidden' | 'error' | null>(null)
   const [pendingBindingId, setPendingBindingId] = useState<string | null>(null)
   const [dialogError, setDialogError] = useState('')
+  useEffect(() => { setWorking(''); setPendingBindingId(null); setDialogError('') }, [targetKey])
   const requestSeq = useRef(0)
   const lastTargetKey = useRef('')
 
@@ -175,18 +181,21 @@ function VersionsInner() {
       setError('LINEアカウントを選び直してください。')
       return 'LINEアカウントを選び直してください。'
     }
+    const scope = targetScope.current
     setWorking(key)
     setError('')
     try {
       await task()
+      if (scope !== targetScope.current) return '操作対象が変わりました'
       await load()
       return true
     } catch (caught) {
+      if (scope !== targetScope.current) return '操作対象が変わりました'
       const message = describeApiFailure(caught, '保存')
       setError(message)
       return message
     } finally {
-      setWorking('')
+      if (scope === targetScope.current) setWorking('')
     }
   }
 
@@ -322,7 +331,7 @@ function VersionsInner() {
                     </Td>
                     <ActionCell className={styles.colOps}>
                       {canEdit && binding.hasNewerVersion && published ? (
-                        <Button disabled={Boolean(working)} onClick={() => { setPendingBindingId(binding.id); setDialogError('') }}>
+                        <Button disabled={Boolean(working)} onClick={() => { bindingScope.current = targetScope.current; setPendingBindingId(binding.id); setDialogError('') }}>
                           {`第${published.versionNumber}版へ更新する`}
                         </Button>
                       ) : <EmptyCell />}
@@ -336,25 +345,28 @@ function VersionsInner() {
       {/* 決まり2: 新版の効き目の説明は帯にせず、題の横の「？」へ入れる。 */}
 
       <Dialog
-        open={Boolean(pendingBinding && published)}
+        open={Boolean(pendingBinding && published && bindingScope.current === targetScope.current)}
         title={`この利用先を第${published?.versionNumber ?? ''}版へ更新しますか`}
         description="実行中・待機中の処理は変えず、次に始まる処理から新版を使います。"
         confirmLabel={`第${published?.versionNumber ?? ''}版へ更新`}
         busy={working.startsWith('binding:')}
         onCancel={() => { setPendingBindingId(null); setDialogError('') }}
         onConfirm={() => {
-          if (!pendingBinding || !published || !selectedAccountId) return
+          if (!pendingBinding || !published || !selectedAccountId || bindingScope.current !== targetScope.current) return
+          const scope = targetScope.current
           setDialogError('')
           return run(`binding:${pendingBinding.id}`, () => api.commonActions.updateBinding(detail.id, selectedAccountId, {
             bindingId: pendingBinding.id,
             versionId: published.id,
             expectedVersionId: pendingBinding.versionId,
           })).then((result) => {
+            if (scope !== targetScope.current) return
             if (result === true) { setPendingBindingId(null); setDialogError('') }
             else { setDialogError(result); void load() }
           })
         }}
       >
+        <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} />
         <div className={styles.compare}>
           <section>
             <p className={styles.compareLabel}>現在の版</p>

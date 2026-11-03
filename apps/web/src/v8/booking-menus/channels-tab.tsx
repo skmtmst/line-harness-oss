@@ -3,6 +3,7 @@ import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Card, { CardHeader } from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -139,6 +140,11 @@ export function ConflictDialog({
   onClose: () => void
   onDone: () => void
 }) {
+  const scopeKey = JSON.stringify([accountId, conflict.bookingId])
+  const scope = useRef({ key: scopeKey })
+  if (scope.current.key !== scopeKey) scope.current = { key: scopeKey }
+  const openedScope = useRef(scope.current)
+  const currentScope = openedScope.current === scope.current
   const targets = useMemo(() => staff.filter((s) => s.staffId !== conflict.staffId), [staff, conflict.staffId])
   const [targetId, setTargetId] = useState(targets[0]?.staffId ?? '')
   const [notify, setNotify] = useState(true)
@@ -146,7 +152,8 @@ export function ConflictDialog({
   const [error, setError] = useState('')
   const targetName = targets.find((t) => t.staffId === targetId)?.displayName ?? ''
   const move = async () => {
-    if (!canEdit || busy) return
+    if (!canEdit || busy || openedScope.current !== scope.current) return
+    const requestScope = scope.current
     if (!targetId) {
       setError('移す先のスタッフを選んでください。')
       return
@@ -155,18 +162,20 @@ export function ConflictDialog({
     setError('')
     try {
       await bookingChannelsApi.reassign(accountId, conflict.bookingId, { staffId: targetId, notifyCustomer: notify })
+      if (requestScope !== scope.current) return
       notifyToast(notify ? `${targetName}へ移して知らせました。` : `${targetName}へ移しました。`)
       onDone()
     } catch (e) {
+      if (requestScope !== scope.current) return
       setError(`${describeApiFailure(e, '予約の移動')} 空きを確かめてやり直してください。`)
     } finally {
-      setBusy(false)
+      if (requestScope === scope.current) setBusy(false)
     }
   }
   return (
     <div data-design-node="DFl3Q">
       <Dialog
-        open
+        open={currentScope}
         designNode="DFl3Q"
         designWidth={560}
         designTop={200}
@@ -178,6 +187,7 @@ export function ConflictDialog({
         onConfirm={canEdit ? () => move() : undefined}
         onCancel={onClose}
       >
+        <OperationTargetSummary accounts={[{ id: accountId }]} />
         {conflict.bookings?.length ? (
           <div className={ch.detail}>
             {conflict.bookings.map((booking, index) => (
