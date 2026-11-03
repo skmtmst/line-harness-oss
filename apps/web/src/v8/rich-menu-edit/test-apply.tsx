@@ -46,10 +46,14 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
   const busyRef = useRef(false)
   const generation = useRef(0)
   const mounted = useRef(false)
+  const context = useRef({ groupId, accountId })
+  if (context.current.groupId !== groupId || context.current.accountId !== accountId) context.current = { groupId, accountId }
+  const confirmTicket = useRef<{ context: typeof context.current; applyId: string | null } | null>(null)
+  const renderedTicket = confirmTicket.current
 
   useEffect(() => {
     mounted.current = true
-    return () => { mounted.current = false }
+    return () => { mounted.current = false; confirmTicket.current = null }
   }, [])
 
   const load = useCallback(async () => {
@@ -73,13 +77,14 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
   }, [open, load])
 
   function openConfirm(kind: 'apply' | 'revert') {
+    confirmTicket.current = { context: context.current, applyId: kind === 'revert' ? state?.active?.id ?? null : null }
     keyRef.current = crypto.randomUUID()
     setActionError('')
     setConfirmKind(kind)
   }
 
   async function run() {
-    if (!mounted.current || !confirmKind || busyRef.current) return
+    if (!mounted.current || !confirmKind || busyRef.current || (confirmKind === 'revert' && !renderedTicket?.applyId)) return
     busyRef.current = true
     setBusy(true)
     setActionError('')
@@ -92,11 +97,12 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
         if (!res.success) throw new Error(res.error)
         setNotice('あなたのLINEにこのメニューを出しました。LINEアプリで見え方を確認してください。')
       } else {
-        const res = await api.richMenuGroups.testApplyRevert(groupId, keyRef.current)
+        const res = await api.richMenuGroups.testApplyRevert(groupId, keyRef.current, renderedTicket?.applyId ?? undefined)
         if (request !== generation.current) return
         if (!res.success) throw new Error(res.error)
         setNotice(revertNotice(res.data.userMenuAction))
       }
+      confirmTicket.current = null
       setConfirmKind(null)
       await load()
     } catch (e) {
@@ -118,6 +124,7 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
   const canRevert = active && (active.status === 'applied' || (active.status === 'failed' && active.previousCaptured))
   function close() {
     if (busyRef.current) return
+    confirmTicket.current = null
     setConfirmKind(null)
     setOpen(false)
   }
@@ -144,10 +151,10 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
     <ConfirmDialog open={confirmKind === 'apply'} title="自分のLINEにこのメニューを出しますか？"
       description={`${destination ? `${destination}。` : ''}あなたのトーク画面のメニューだけがこの内容に変わります。ほかの友だちには出ません。「元のメニューに戻す」でいつでも戻せます。`}
       confirmLabel="自分のLINEに適用する" busy={busy} error={actionError || undefined}
-      onConfirm={() => void run()} onCancel={() => { if (!busyRef.current) setConfirmKind(null) }}><OperationTargetSummary accounts={[{ id: accountId }]} /></ConfirmDialog>
+      onConfirm={() => { if (renderedTicket && confirmTicket.current === renderedTicket && renderedTicket.context === context.current) void run() }} onCancel={() => { if (!busyRef.current) { confirmTicket.current = null; setConfirmKind(null) } }}><OperationTargetSummary accounts={[{ id: accountId }]} /></ConfirmDialog>
     <ConfirmDialog open={confirmKind === 'revert'} title="テスト適用を取り消しますか？"
       description={`${destination ? `${destination}。` : ''}あなたのトーク画面のメニューを、適用前の表示へ戻します。適用後に表示が変わっていた場合は上書きしません。テスト用に作ったメニューがあればLINE上から削除します。`}
       confirmLabel="元のメニューに戻す" busy={busy} error={actionError || undefined}
-      onConfirm={() => void run()} onCancel={() => { if (!busyRef.current) setConfirmKind(null) }}><OperationTargetSummary accounts={[{ id: accountId }]} /></ConfirmDialog>
+      onConfirm={() => { if (renderedTicket && confirmTicket.current === renderedTicket && renderedTicket.context === context.current) void run() }} onCancel={() => { if (!busyRef.current) { confirmTicket.current = null; setConfirmKind(null) } }}><OperationTargetSummary accounts={[{ id: accountId }]} /></ConfirmDialog>
   </>
 }
