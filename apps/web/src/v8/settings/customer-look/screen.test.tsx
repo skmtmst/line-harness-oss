@@ -135,3 +135,11 @@ test('閲覧者にも6枚の型と同じ色見本/明朝の欄を残し、native
  expect(screen.getByText('見本：custom')).toBeTruthy();expect(custom.checked).toBe(true)
  fireEvent.click(screen.getByRole('button',{name:'保存する'}));expect(mock.save).not.toHaveBeenCalled()
 })
+
+test.each(['viewer', null] as const)('編集できない%sには型を押す案内を出さない', async role => {
+ mock.role=verifiedStaffRole(role)
+ mock.get.mockResolvedValue({success:true,data:{look:DEFAULT_CUSTOMER_LOOK,version:3}})
+ render(<CustomerLookScreen/>);await screen.findByText('見本：line')
+ expect(screen.queryByText('型を押すと、右の見本がすぐ変わります')).toBeNull()
+ expect(screen.getByText('予約・回答フォームなどに使われるデザインです')).toBeTruthy()
+})
