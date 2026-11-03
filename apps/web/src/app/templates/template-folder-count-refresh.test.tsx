@@ -156,6 +156,28 @@ describe('R195 フォルダ件数の読み直し', () => {
     expect(screen.getByRole('button', { name: '移動先のフォルダ' }).textContent).toContain('営業')
   })
 
+  test('移動先を選ぶ前に別の行を開くと、元の移動操作を引き継がない', async () => {
+    fixture.templatesList.mockResolvedValue({ success: true, data: [TEMPLATE, { ...TEMPLATE, id: 'tpl-2', name: '別のテンプレート' }] })
+    await renderReady()
+    fireEvent.keyDown(within(screen.getByRole('table')).getByText('来店お礼').closest('tr')!, { key: 'Enter' })
+    fireEvent.click(await findDetailMenuItem('フォルダへ移す'))
+    fireEvent.keyDown(within(screen.getByRole('table')).getByText('別のテンプレート').closest('tr')!, { key: 'Enter' })
+    expect(screen.queryByRole('button', { name: '移動する' })).toBeNull()
+    expect(fixture.templatesUpdate).not.toHaveBeenCalled()
+  })
+
+  test('一括移動の窓は移動先を選んでキャンセルすると破棄を確認する', async () => {
+    await renderReady()
+    fireEvent.click(screen.getByRole('checkbox', { name: '「来店お礼」を選択' }))
+    fireEvent.click(screen.getByRole('button', { name: 'フォルダへ移す', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: '移動先のフォルダ' }))
+    fireEvent.click(within(await screen.findByRole('option', { name: /営業/ })).getByRole('button'))
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true }))
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect(screen.getByRole('button', { name: '移動先のフォルダ' }).textContent).toContain('営業')
+  })
+
   test('移動先を選ばず詳細を閉じても移動の窓を開かない', async () => {
     await renderReady()
     fireEvent.keyDown(within(screen.getByRole('table')).getByText('来店お礼').closest('tr')!, { key: 'Enter' })

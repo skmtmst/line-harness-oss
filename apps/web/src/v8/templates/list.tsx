@@ -91,7 +91,7 @@ export default function TemplatesListV8() {
   const [moveError, setMoveError] = useState('')
   const [panelMove, setPanelMove] = useState(false)
   const moveDirty = moveIds !== null && moveDraft !== ''
-  const moveGuard = useUnsavedGuard({ dirty: moveDirty, busy: moving && moveIds !== null, onDiscard: () => {
+  const moveGuard = useUnsavedGuard({ dirty: moveDirty, busy: moving && moveIds !== null, subject: 'フォルダの移動先', onDiscard: () => {
     setMoveIds(null)
     setPanelMove(false)
     setMoveDraft('')

@@ -440,3 +440,15 @@ it('フォルダ名だけが未保存でも画面移動を確認する', async (
   await act(async () => { fireEvent.click(screen.getByRole('link', { name: 'イベントへ' })) })
   expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
 })
+
+it('作成通信中に選択欄が外れたら親の処理中を解除する', async () => {
+  const creating = vi.fn()
+  const view = render(<FolderSelect aria-label="所属フォルダ" folders={FOLDERS} value="" onChange={() => {}} onCreatingChange={creating} onCreate={() => new Promise(() => {})} />)
+  fireEvent.click(screen.getByRole('button', { name: '所属フォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成中' } })
+  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  expect(creating).toHaveBeenLastCalledWith(true)
+  view.unmount()
+  expect(creating).toHaveBeenLastCalledWith(false)
+})
