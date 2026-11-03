@@ -106,6 +106,10 @@ export function monthKeyOf(iso: string | null): string | null {
   return japanCalendar(d).toISOString().slice(0, 7)
 }
 
+export function routeMenuState(route: Pick<EntryRoute, 'isActive'> | null): 'stop' | 'resume' | null {
+  return route ? (route.isActive ? 'stop' : 'resume') : null
+}
+
 function InflowDetailContent() {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
@@ -386,7 +390,7 @@ function InflowDetailContent() {
   }
 
   const afterMenuItems: ActionMenuItem[] = [
-    ...(route?.isActive ? [{ id: 'stop', label: '受付を止める', onSelect: () => openDelete('stop') }] : [{ id: 'resume', label: '受付を再開する', icon: <Play size={16} aria-hidden="true" />, onSelect: () => void reopenRoute() }]),
+    ...(routeMenuState(route) === 'stop' ? [{ id: 'stop', label: '受付を止める', onSelect: () => openDelete('stop') }] : routeMenuState(route) === 'resume' ? [{ id: 'resume', label: '受付を再開する', icon: <Play size={16} aria-hidden="true" />, onSelect: () => void reopenRoute() }] : []),
     { id: 'redirect', label: '別リンクへ送る', icon: <ArrowRight size={16} aria-hidden="true" />, onSelect: () => openDelete('redirect') },
     ...(canPermanentlyDelete ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: () => openDelete('delete') }] : []),
   ]

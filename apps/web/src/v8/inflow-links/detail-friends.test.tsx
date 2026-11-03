@@ -159,3 +159,29 @@ it('停止中の経路には停止を出さず、再開を選べる', async () =
   expect(entries.find(node => node.textContent === '受付を再開する')?.querySelector('svg.lucide-play')).toBeTruthy()
   expect(entries.find(node => node.textContent === '別リンクへ送る')?.querySelector('svg.lucide-arrow-right')).toBeTruthy()
 })
+
+it('読み込み中は停止も再開も対象にしない', async () => {
+  const { routeMenuState } = await import('./detail')
+  expect(routeMenuState(null)).toBeNull()
+  expect(routeMenuState({ isActive: true })).toBe('stop')
+  expect(routeMenuState({ isActive: false })).toBe('resume')
+})
+
+it('経路の取得中は再開する操作や案内を出さない', async () => {
+  vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+    const url = new URL(String(input))
+    if (url.pathname === '/api/entry-routes/er-a') return new Promise<Response>(() => {})
+    return Promise.resolve(json({ success: true, data: [] }))
+  })
+  await act(async () => { root.render(<InflowDetailV8 />) }); await settle()
+  expect(host.textContent).not.toContain('受付を再開する')
+  expect(host.querySelector('button[aria-label^="この経路の操作"]')).toBeNull()
+})
+
+it('受付を止めると削除には共通メニューの印を付ける', async () => {
+  await act(async () => { root.render(<InflowDetailV8 />) }); await settle()
+  await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label^="この経路の操作"]')!.click() })
+  const entries = [...document.querySelectorAll('[role="menuitem"]')]
+  expect(entries.find(node => node.textContent === '受付を止める')?.querySelector('svg.lucide-pause')).toBeTruthy()
+  expect(entries.find(node => node.textContent === '削除する')?.querySelector('svg.lucide-trash-2')).toBeTruthy()
+})

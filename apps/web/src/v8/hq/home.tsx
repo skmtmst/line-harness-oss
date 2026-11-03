@@ -302,6 +302,9 @@ export default function HqHomeV8() {
     unconfirmed: sum.unconfirmed + (statusOf(account).label === '未確認' ? 1 : 0),
   }), { friends: 0, messages: 0, warnings: 0, unconfirmed: 0 }), [currentAccounts])
 
+  const connectionTotal = attentionCounts && currentAccounts.every(account => attentionCounts[account.id] !== undefined)
+    ? currentAccounts.reduce((sum, account) => sum + attentionCounts[account.id]!, 0) : null
+
   /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
   const folderCounts = useMemo(() => {
@@ -528,7 +531,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
+        <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={loadError || attentionError ? '読み込めませんでした' : connectionTotal === null ? '接続の問題を確認できません' : null} valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">
@@ -667,7 +670,7 @@ export default function HqHomeV8() {
             <Th>アカウント</Th>
             <Th>LINE接続</Th>
             <Th>お支払い</Th>
-            <Th>対応が要る</Th>
+            <Th>接続の問題</Th>
             <Th>友だち</Th>
             <Th>今月の配信</Th>
             <Th className="sr-only">操作</Th>

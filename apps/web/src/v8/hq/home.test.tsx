@@ -102,7 +102,7 @@ beforeEach(() => {
   document.body.appendChild(container)
   root = createRoot(container)
   attention.mockReset()
-  attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { connections: 0, unhandledChats: 5 } }] } })
+  attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { connections: 2, unhandledChats: 5 } }] } })
   accounts.mockResolvedValue({ success: true, data: [warnedAccount] })
   checkConnection.mockReset()
   checkConnection.mockResolvedValue({ success: true, data: {} })
@@ -131,7 +131,7 @@ it('表の対応が要る件数は同じアカウントの接続問題だけを�
   await render()
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
   const row = container.querySelector('tbody tr')!
-  expect(row.children[3].textContent).toContain('0 件')
+  expect(row.children[3].textContent).toContain('2 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
 })
 
@@ -544,7 +544,7 @@ describe('アーカイブから戻す入口の権限表示', () => {
 it('表の対応件数はほかの問題を混ぜず接続の問題だけを数える', async () => {
   await render()
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
-  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('0 件')
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('2 件')
 })
 
 it('接続の件数が取得できないとき不明とし、再読込できる', async () => {
@@ -556,4 +556,21 @@ it('接続の件数が取得できないとき不明とし、再読込できる'
   attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { connections: 2 } }] } })
   await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === 'もう一度読み込む')!.click() })
   expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('2 件')
+})
+
+it('接続の問題の帯と表は同じ接続件数を出す', async () => {
+  await render()
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  const band = [...container.querySelectorAll('[data-kpi-presentation]')].find(el => el.textContent?.includes('接続に問題'))
+  expect(band?.textContent).toMatch(/2\s*件/)
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('2 件')
+  expect(container.querySelector('thead')!.textContent).toContain('接続の問題')
+})
+
+it('接続の問題を取得できないとき、帯も不明として0件にしない', async () => {
+  attention.mockRejectedValue(new Error('offline'))
+  await render()
+  const band = [...container.querySelectorAll('[data-kpi-presentation]')].find(el => el.textContent?.includes('接続に問題'))
+  expect(band?.textContent).toContain('読み込めませんでした')
+  expect(band?.textContent).not.toMatch(/0\s*件/)
 })
