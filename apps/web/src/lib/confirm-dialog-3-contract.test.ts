@@ -219,16 +219,16 @@ describe('一斉配信の素材テンプレートの削除', () => {
   it('二度押しを止め、失敗を握りつぶさない', () => {
     const body = fnBody(code(src), 'const confirmDelete')
     expect(body, '二度押し・切替後を止めていない').toContain(
-      'if (!deleteTarget || deleting || accountSwitched) return',
+      'if (!deleteTarget || deleting || deleteLock.current || !alive.current || accountSwitched || deleteTarget.generation !== scopeGeneration.current) return',
     )
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
-    expect(body, '処理中の印を戻していない').toMatch(/finally\s*\{\s*setDeleting\(false\)/)
+    expect(body, '処理中の印を戻していない').toMatch(/finally\s*\{\s*deleteLock\.current = false\s*if \(alive\.current\) setDeleting\(false\)/)
     expect(body, '生のAPIエラーを出している').not.toMatch(/setDeleteError\(e\b/)
   })
 
   it('押した時点の対象とアカウントを窓に固定する', () => {
     expect(code(src), '押した時点の対象を掴んでいない').toContain(
-      'setDeleteTarget({ item, accountId: selectedAccountId })',
+      'setDeleteTarget({ item, accountId: selectedAccountId, generation: renderedGeneration })',
     )
     const dialog = confirmDialogWith(src, 'を削除しますか')
     expect(dialog, 'destructive が無い').toContain('destructive')

@@ -23,7 +23,7 @@ function fnBody(src: string, decl: string): string {
 }
 
 function dialog(src: string): string {
-  const open = src.indexOf('open={deleteTarget !== null}')
+  const open = src.indexOf('open={deleteTarget !== null && renderedDeleteScope?.generation === accountScope.current.generation}')
   const from = src.lastIndexOf('<ConfirmDialog', open)
   if (from < 0) throw new Error('<ConfirmDialog が見つかりません')
   const pairedTo = src.indexOf('</ConfirmDialog>', from)
@@ -42,7 +42,7 @@ describe('一斉配信一覧の削除確認', () => {
 
   it('削除の処理が二度押しを受け付けない', () => {
     const body = fnBody(PAGE, 'const handleDelete = async ()')
-    expect(body, '押している間の二度押しを止めていない').toContain('if (!deleteTarget || deleting) return')
+    expect(body, '押している間の二度押しを止めていない').toContain('if (!deleteTarget || deleting || !renderedDeleteScope || renderedDeleteScope !== deleteScope.current || renderedDeleteScope.generation !== accountScope.current.generation) return')
     expect(body).toContain('setDeleting(true)')
     expect(body, '処理中の印を必ず戻していない').toMatch(/finally\s*\{[\s\S]*setDeleting\(false\)/)
   })
@@ -107,7 +107,8 @@ describe('一斉配信一覧の削除確認', () => {
     // 行内操作の独立は共通Trの動きの試験で守る。削除の入口は確認だけ。
     expect(PAGE).toContain("onSelect: () => requestDelete(broadcast)")
     const body = fnBody(PAGE, 'const requestDelete = (broadcast: ApiBroadcast) =>')
-    expect(body).toContain('setDeleteTarget(broadcast)')
+    expect(body).toContain('deleteScope.current = { generation: accountScope.current.generation }')
+    expect(body).toContain('setDeleteTarget({ ...broadcast })')
     expect(body).not.toContain('api.broadcasts.delete')
   })
 })
