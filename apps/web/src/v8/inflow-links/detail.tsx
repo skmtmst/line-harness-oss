@@ -27,6 +27,7 @@ import Card from '@/components/shared/card'
 import SegmentedControl from '@/components/shared/segmented'
 import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Disclosure from '@/components/shared/disclosure'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -389,6 +390,7 @@ function InflowDetailContent() {
     { id: 'redirect', label: '別リンクへ送る', onSelect: () => openDelete('redirect') },
     ...(canPermanentlyDelete ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: () => openDelete('delete') }] : []),
   ]
+  const afterMenuLabels = afterMenuItems.map((item) => item.label).join('・')
 
   if (!selectedId) {
     return (
@@ -497,7 +499,7 @@ function InflowDetailContent() {
               {readonly ? null : (
                 <div className={styles.menuBox}>
                   <RowMenu
-                    label={`この経路の操作（${route.isActive ? '受付を止める' : '受付を再開する'}・別リンクへ送る・削除する）`}
+                    label={`この経路の操作（${afterMenuLabels}）`}
                     menuLabel="この経路の操作"
                     items={afterMenuItems}
                     open={afterMenuOpen}
@@ -509,7 +511,7 @@ function InflowDetailContent() {
             <p className={styles.afterNote}>
               {readonly
                 ? 'クリックから友だち追加・フォーム・購入までの人数です'
-                : `「その後」の「…」から：${route.isActive ? '受付を止める' : '受付を再開する'}・別リンクへ送る・削除する`}
+                : `「その後」の「…」から：${afterMenuLabels}`}
             </p>
             {funnel ? (
               <>
@@ -749,6 +751,8 @@ function InflowDetailContent() {
           onCancel={() => { if (!deleting) setDeleteOpen(false) }}
         >
           <div className={styles.deleteBody}>
+            <OperationTargetSummary accounts={[{ id: '', label: '受付先アカウント' }]} />
+            <p>受付先の全アカウントは確認できません。</p>
             <Notice tone="warn" role="alert" message="削除すると、次のことが起きます">
               <ul className={styles.deleteEffects}>
                 <li>貼り付けたURL・QRコード：このURLを置いた投稿や広告から開けなくなります（差し替えが必要）</li>

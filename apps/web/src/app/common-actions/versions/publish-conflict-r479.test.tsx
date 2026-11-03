@@ -17,6 +17,9 @@ const net = vi.hoisted(() => ({
   publishResult: 'conflict' as 'ok' | 'conflict' | 'revision',
   getCount: 0,
   publishCount: 0,
+  withBinding: false,
+  account: 'account-1',
+  updateBinding: vi.fn(),
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -40,7 +43,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         publishedAt: '2026-09-28T00:00:00.000Z',
       },
     ],
-    bindings: [],
+    bindings: net.withBinding ? [{ id: 'binding-1', consumerType: 'scenario', consumerId: 'sc1', consumerPath: '人工シナリオ', versionId: 'v0', versionNumber: 0, latestVersionNumber: 1, hasNewerVersion: true, runningCount: 0, waitingCount: 0, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '' }] : [],
   })
   const summary = {
     id: 'action-1', name: 'テストアクション', description: null, status: 'draft' as const,
@@ -59,6 +62,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
           return { success: true, data: detail() }
         },
         list: async () => ({ success: true, data: [summary] }),
+        updateBinding: net.updateBinding,
         publish: async () => {
           net.publishCount += 1
           if (net.publishResult === 'ok') {
@@ -92,7 +96,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: net.account, loading: false }),
 }))
 vi.mock('@/components/automations/use-common-action-permission', () => ({
   useCanManageCommonActions: () => true,
@@ -132,6 +136,9 @@ beforeEach(() => {
   net.getCount = 0
   net.publishCount = 0
   net.publishResult = 'conflict'
+  net.withBinding = false
+  net.account = 'account-1'
+  net.updateBinding.mockReset()
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -156,6 +163,26 @@ async function renderAndPublish() {
   })
   await flush()
 }
+
+it('利用先の版切替で対象アカウントと環境を示す', async () => {
+  net.withBinding = true
+  await act(async () => { root.render(<VersionsPage />) }); await flush()
+  await act(async () => { findButton('第1版へ更新する')!.click() }); await flush()
+  const dialog = document.querySelector('[role="dialog"]')
+  expect(dialog?.textContent).toContain('LINEアカウント')
+  expect(dialog?.textContent).toContain('環境')
+})
+
+it('版切替の確認中にアカウントを変えたら古い確定は送らない', async () => {
+  net.withBinding = true
+  await act(async () => { root.render(<VersionsPage />) }); await flush()
+  await act(async () => { findButton('第1版へ更新する')!.click() }); await flush()
+  const confirm = findButton('第1版へ更新')!
+  net.account = 'account-2'
+  await act(async () => { root.render(<VersionsPage />) })
+  await act(async () => { confirm.click() })
+  expect(net.updateBinding).not.toHaveBeenCalled()
+})
 
 describe('公開が 409 で止まったときの知らせ（監査 R479）', () => {
   it('reference_updated でも読み直しのあと理由と次の操作が残る', async () => {

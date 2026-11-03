@@ -44,8 +44,10 @@ export function useSetupWizard(accountId: string | null, state: StyleState | nul
     setOpened(null)
     if (setupParam !== null) {
       const next = new URLSearchParams(params.toString())
+      const returnToAccounts = next.get('setupReturn') === 'accounts'
       next.delete('setup')
-      router.replace(next.size ? `/?${next.toString()}` : '/')
+      next.delete('setupReturn')
+      router.replace(returnToAccounts ? '/accounts' : next.size ? `/?${next.toString()}` : '/')
     }
     if (changed) onChanged()
   }

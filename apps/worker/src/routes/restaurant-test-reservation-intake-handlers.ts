@@ -253,7 +253,7 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
     ).first<{
       id: string; store_id: string; customer_name: string; customer_phone: string | null;
       guest_count: number; starts_at: string; ends_at: string; table_id: string | null;
-      course_id: string | null; status: string; allergy_note: string | null; note: string | null; hold_expires_at: string | null; customer_version: number;
+      course_id: string | null; status: string; allergy_note: string | null; note: string | null; cancel_reason: string | null; hold_expires_at: string | null; customer_version: number;
     }>();
   if (!current) return c.json({ success: false, error: '予約が見つかりません' }, 404);
   if (!await storeBelongsTo(c, organization.id, current.store_id)) return c.json({success:false,error:'この店舗を操作する権限がありません'},403);
@@ -277,6 +277,7 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
     status: current.status,
     allergy_note: current.allergy_note,
     note: current.note,
+    cancel_reason: current.cancel_reason,
   };
   if (has('customerName')) {
     const value = typeof body.customerName === 'string' ? body.customerName.trim() : '';
@@ -352,6 +353,12 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
   if (has('note')) {
     next.note = typeof body.note === 'string' && body.note.trim() ? body.note.trim() : null;
   }
+  if (has('cancellationReason')) {
+    if (next.status !== 'cancelled' || typeof body.cancellationReason !== 'string' || !body.cancellationReason.trim()) {
+      return inputError(c, { success: false, error: '取消理由を確認してください' }, 400, ['cancellationReason']);
+    }
+    next.cancel_reason = body.cancellationReason.trim();
+  }
 
   const changesSlot=next.table_id!==current.table_id||next.guest_count!==current.guest_count||next.starts_at!==current.starts_at||next.ends_at!==current.ends_at||(!reservationSlotActive(current.status)&&reservationSlotActive(next.status));
   if(changesSlot && next.table_id && reservationSlotActive(next.status)) {
@@ -367,10 +374,10 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
   const db = dbFor(c.env, current.store_id);
   const update = db.prepare(`UPDATE rt_reservations SET
     customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
-    table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, customer_version=customer_version+1, updated_at = datetime('now')
+    table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, cancel_reason = ?, customer_version=customer_version+1, updated_at = datetime('now')
     WHERE id = ? AND customer_version = ?`).bind(
       next.customer_name, next.customer_phone, next.guest_count, next.starts_at, next.ends_at,
-      next.table_id, next.course_id, next.status, next.allergy_note, next.note, current.id, Number(body.expectedVersion),
+      next.table_id, next.course_id, next.status, next.allergy_note, next.note, next.cancel_reason, current.id, Number(body.expectedVersion),
     );
   const statements = [update];
   if ((current.status === 'no_show' && next.status !== 'no_show') || (next.status === 'cancelled' && ['visited', 'seated'].includes(current.status))) {

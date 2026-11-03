@@ -43,3 +43,15 @@ it('失敗は保持せず、認証世代が違う取得も共有しない', asyn
   await Promise.all([a, b])
   expect(attentionCalls()).toHaveLength(4)
 })
+
+it('手動の読み直しは取得中の古い応答に相乗りしない', async () => {
+  let answer!: (res: Response) => void
+  const fetch = vi.fn().mockImplementationOnce(() => new Promise<Response>(resolve => { answer = resolve }))
+    .mockImplementation(() => Promise.resolve(ok()))
+  vi.stubGlobal('fetch', fetch)
+  const old = hqStyleApi.attention()
+  const fresh = hqStyleApi.attention({ cache: 'reload' })
+  expect(fetch).toHaveBeenCalledTimes(2)
+  answer(ok())
+  await Promise.all([old, fresh])
+})

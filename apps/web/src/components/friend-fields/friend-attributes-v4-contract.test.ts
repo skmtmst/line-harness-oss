@@ -22,7 +22,7 @@ const markList = () => read('v8/tags/marks-tab.tsx') + read('components/friend-f
 describe('タグ V4 の禁止の見張り', () => {
   it('タグ編集の遡及付与は初期OFFで専用確認を通す', () => {
     const editor = tagEditor()
-    expect(editor).toContain('<Dialog open size="large"')
+    expect(editor).toContain('<Dialog open={isCurrent()} size="large"')
     expect(editor).toContain('titleIcon={<Coins aria-hidden="true" />')
     expect(editor).not.toContain('max-w-[670px] -translate-y-7')
   })

@@ -212,6 +212,8 @@ describe('監査 R89: 状態変更の後は集計・カレンダーも更新す�
     const complete = await screen.findByRole('button', { name: '取り消す' })
     fireEvent.click(complete)
     const dialog = await screen.findByRole('alertdialog', {name: 'この予約を「キャンセル」にしますか？'})
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'キャンセル' }).find((button) => button.getAttribute('data-dialog-action') === 'danger')!)
     await waitFor(() => {
       expect(fixture.decideRequest).toHaveBeenCalledWith('account-a', 'b-req', 'cancel')

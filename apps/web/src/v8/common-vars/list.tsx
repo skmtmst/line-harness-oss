@@ -15,7 +15,10 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Braces,CalendarClock,Link2,Pause,Plus,TriangleAlert } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { Suspense,useCallback,useEffect,useMemo,useRef,useState } from 'react'
+import { Suspense,useCallback,useContext,useEffect,useMemo,useRef,useState,type SetStateAction } from 'react'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { classifyApiFailure,permissionDeniedMessage } from '@/components/shared/api-error-message'
@@ -261,7 +264,14 @@ function CommonVarsListInner() {
   statusAccount.current = selectedAccountId
   const renderedStatusWindow = statusWindow.current
   /* 右から出る詳細パネル。URL に今の行を残す（`?row=`）。 */
-  const [activeId, setActiveId] = useDetailPanelUrl('row')
+  const [nameDirty, setNameDirty] = useState(false)
+  const [nameSaving, setNameSaving] = useState(false)
+  const [nameReset, setNameReset] = useState(0)
+  const holdDetail = useRef(false)
+  const guardRef = useRef<ReturnType<typeof useUnsavedGuard> | null>(null)
+  const protect = useCallback((action: () => void) => { if (guardRef.current) guardRef.current.guarded(action); else action() }, [])
+  const [activeId, setActiveIdRaw] = useDetailPanelUrl('row', () => holdDetail.current)
+  const setActiveId = useCallback((next: SetStateAction<string | null>) => protect(() => setActiveIdRaw(next)), [protect, setActiveIdRaw])
   /* パネルを開いている1件の止める・再開は、窓ではなくパネルの中で聞く。 */
   const [panelStatus, setPanelStatus] = useState(false)
   /* 右クリックされた行（「…」と同じ項目を出す）。 */
@@ -563,6 +573,22 @@ function CommonVarsListInner() {
     return () => { batchRequestRef.current.generation += 1 }
   }, [selectedAccountId])
 
+  const hasChanges = nameDirty || Boolean(statusTarget && statusReason) || Boolean(deleteTarget && deleteReason) || Boolean(deleteTargets.length && batchReason)
+  const savingChanges = nameSaving || statusBusy || deleteBusy || deleting
+  holdDetail.current = hasChanges || savingChanges
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: hasChanges || savingChanges, busy: savingChanges, onDiscard: () => {
+    holdDetail.current = false
+    setNameDirty(false); setNameReset(value => value + 1)
+    if (statusTarget) closeStatusDialog()
+    if (deleteTarget) resetDeleteState()
+    if (deleteTargets.length) {
+      batchRequestRef.current = { accountId: selectedAccountId, generation: batchRequestRef.current.generation + 1 }
+      setDeleteTargets([]); setBatchReason(''); setDeleteBatchError('')
+    }
+  } })
+  guardRef.current = guard
+
   /* 行の「…」の中身。右クリックでも同じものを出す。 */
   const rowMenuItems = (item: CommonVar): ActionMenuItem[] => {
     const stopped = (item.status ?? 'active') === 'stopped'
@@ -578,24 +604,24 @@ function CommonVarsListInner() {
       {
         id: 'edit',
         label: '編集',
-        onSelect: () => withViewTransition(() => router.push(`/contents/vars/edit?id=${item.id}`)),
+        onSelect: () => protect(() => withViewTransition(() => router.push(`/contents/vars/edit?id=${item.id}`))),
       },
       stopped ? {
         id: 'resume',
         label: '再開する',
-        onSelect: () => openStatusDialog(item, 'resume'),
+        onSelect: () => protect(() => openStatusDialog(item, 'resume')),
       } : {
         id: 'stop',
         label: '止める',
         icon: <Pause size={16} aria-hidden="true" />,
-        onSelect: () => openStatusDialog(item, 'stop'),
+        onSelect: () => protect(() => openStatusDialog(item, 'stop')),
       },
       {
         id: 'delete',
         label: '削除する',
         tone: 'danger',
         dividerBefore: true,
-        onSelect: () => void openDelete(item),
+        onSelect: () => protect(() => { void openDelete(item) }),
       },
     ]
   }
@@ -836,7 +862,7 @@ function CommonVarsListInner() {
     ungrouped: folderFilter === UNGROUPED,
   })
 
-  const overlays = renderCommonVarDialogs({ activeIndex, activeItem, activeStopped, applyStatus, batchReason, batchRequestRef, canWrite, closeDelete, closeStatusDialog, confirmDirectDelete, confirmReplacement, confirmStopInstead, current, deleteBatchError, deleteBusy, deleteChoice, deleteError, deleteImpact, deletePhase, deleteReason, deleteTarget, deleteTargets, deleting, folderDotOf, items, openDelete, openStatusDialog, panelStatus, removeSelected, renameVar, replacementCandidates, replacementId, replacementImpact, replacementPhase, router, selectedAccountId, selectReplacement, setActiveId, setBatchReason, setDeleteBatchError, setDeleteChoice, setDeleteReason, setDeleteTargets, setPanelStatus, setStatusError, setStatusReason, setTypedKey, setUsageExpanded, statusAction, statusBusy, statusError, statusReason, statusScheduled, statusTarget, typedKey, usageExpanded })
+  const overlays = <>{renderCommonVarDialogs({ activeIndex, activeItem, activeStopped, applyStatus, batchReason, batchRequestRef, canWrite, closeDelete, closeStatusDialog, confirmDirectDelete, confirmReplacement, confirmStopInstead, current, deleteBatchError, deleteBusy, deleteChoice, deleteError, deleteImpact, deletePhase, deleteReason, deleteTarget, deleteTargets, deleting, folderDotOf, items, openDelete, openStatusDialog, panelStatus, removeSelected, renameVar, replacementCandidates, replacementId, replacementImpact, replacementPhase, router, selectedAccountId, selectReplacement, setActiveId, setBatchReason, setDeleteBatchError, setDeleteChoice, setDeleteReason, setDeleteTargets, setPanelStatus, setStatusError, setStatusReason, setTypedKey, setUsageExpanded, statusAction, statusBusy, statusError, statusReason, statusScheduled, statusTarget, typedKey, usageExpanded, nameSaving, nameReset, setNameDirty, setNameSaving, protect })}<OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={savingChanges} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></>
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage

@@ -67,12 +67,10 @@ it('?kind=connections で来たら種類を接続の異常に絞る', async () =
   }
 })
 
-it('LINEアカウントへの接続リンクは対象アカウントの詳細を開く', async () => {
-  fixture.attention.mockResolvedValue({ success: true, data: { items: [{
-    accountId: 'account-a', name: '本店', counts: { connections: 1 },
-    details: { connections: [{ id: 'check', href: '/line-accounts/account-a' }] },
-  }] } })
+it('接続の行き先は他のアカウントの指定を使わない', async () => {
+  fixture.attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'account-a', name: '本店', counts: { connections: 1 }, details: { connections: [{ id: 'check', href: '/line-accounts?accountId=other' }] } }] } })
   render(<AttentionPage />)
   fireEvent.click(await screen.findByRole('button', { name: '本店の接続の異常 1件を開く' }))
+  expect(fixture.select).toHaveBeenCalledWith('account-a')
   expect(fixture.push).toHaveBeenCalledWith('/accounts/detail?id=account-a')
 })

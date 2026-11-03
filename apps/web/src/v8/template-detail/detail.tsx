@@ -17,6 +17,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { TemplateDeleteDialog } from '@/v8/templates/public/delete-dialog/index'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import DialogUsageTable from '@/components/shared/dialog-usage-table'
@@ -81,6 +82,7 @@ export default function TemplateDetailV8() {
   /** 「比べる」で開く差分。'draft' はいまの版と下書き、数字はその版といまの版。 */
   const [compareTarget, setCompareTarget] = useState<'draft' | number | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
+  const [publishScope, setPublishScope] = useState<typeof renderedScope | null>(null)
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState('')
   const [revertTarget, setRevertTarget] = useState<number | null>(null)
@@ -97,6 +99,7 @@ export default function TemplateDetailV8() {
   useEffect(() => {
     deleteTicket.current = null; deleteLock.current = null
     setDeleteOpen(false); setDeleting(false); setDeleteError('')
+    setPublishOpen(false); setPublishing(false); setPublishError(''); setPublishScope(null)
   }, [renderedScope])
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState('')
@@ -200,7 +203,8 @@ export default function TemplateDetailV8() {
   const nextVersionNumber = (template?.publishedVersion ?? 0) + 1
 
   const doPublish = useCallback(async () => {
-    if (publishing || !template) return
+    if (publishing || !template || !mounted.current || !canMutateRef.current || publishScope !== scope.current || loadedScope.current !== publishScope || template.id !== id) return
+    const current = () => mounted.current && publishScope === scope.current
     setPublishing(true)
     setPublishError('')
     try {
@@ -208,10 +212,12 @@ export default function TemplateDetailV8() {
         expectedVersion: template.publishedVersion ?? 0,
         expectedDraftRevision: template.draftRevision ?? 0,
       })
+      if (!current()) return
       if (!res.success) throw new Error(res.error)
       setPublishOpen(false)
       await reload()
     } catch (caught) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.status === 409) {
@@ -223,9 +229,9 @@ export default function TemplateDetailV8() {
         setPublishError('公開できませんでした。状態を読み直してから、もう一度お試しください。') }
       }
     } finally {
-      setPublishing(false)
+      if (current()) setPublishing(false)
     }
-  }, [id, publishing, template, reload, saveErrors])
+  }, [id, publishing, template, reload, saveErrors, publishScope])
 
   const doRevert = useCallback(async () => {
     if (reverting || revertTarget === null || !template) return
@@ -439,7 +445,7 @@ export default function TemplateDetailV8() {
         {template.hasDraft ? (
           <Notice tone="warn" role="status" heading={template.publishedVersion > 0 ? '未公開の変更があります' : 'まだ公開していません'} icon={<CircleAlert size={16} aria-hidden="true" />} action={canMutate ? <>
             {inUseVersion ? <Button variant="secondary" onClick={() => setCompareTarget((current) => current === 'draft' ? null : 'draft')} aria-pressed={compareTarget === 'draft'} icon={<GitCompare aria-hidden="true" />}>比べる</Button> : null}
-            <Button variant="primary" onClick={() => { setPublishError(''); setPublishOpen(true) }} icon={<Upload aria-hidden="true" />}>公開する</Button>
+            <Button variant="primary" onClick={() => { if (loadedScope.current !== scope.current || template.id !== id) return; setPublishScope(scope.current); setPublishError(''); setPublishOpen(true) }} icon={<Upload aria-hidden="true" />}>公開する</Button>
           </> : undefined}>{publishDraftText}</Notice>
         ) : null}
         {compareTarget === 'draft' ? compareBox : null}
@@ -519,7 +525,7 @@ export default function TemplateDetailV8() {
 
       {/* 公開の確かめ（cuR8I）：反映される所と変わるところを見せてから公開する。 */}
       <Dialog
-        open={publishOpen}
+        open={publishOpen && publishScope === scope.current}
         designNode="cuR8I"
         designWidth={640}
         designTop={226}
@@ -540,6 +546,7 @@ export default function TemplateDetailV8() {
             </Button>
           </DialogActions>)}
       >
+        <OperationTargetSummary accounts={[{ id: template.accountId ?? '', name: accounts.find(account => account.id === template.accountId)?.name }]} />
         <div className={styles.dialogBody}>
           {usageCount > 0 ? (
             <div className={styles.dialogList}>

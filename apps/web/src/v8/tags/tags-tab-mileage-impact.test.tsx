@@ -7,6 +7,8 @@ import type { TagDependencies, TagDeleteImpactReferences } from '@/lib/api'
 
 const net = vi.hoisted(() => ({ dependencies: vi.fn(), archive: vi.fn(), remove: vi.fn(), unexpectedFetch: vi.fn() }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }] })) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async load => ({ ...await load<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('@/lib/api', async load => {
@@ -17,6 +19,7 @@ vi.mock('@/lib/api', async load => {
 import TagsList from './list'
 import { flushListUrlState } from '@/components/shared/list-url-state'
 
+const historyMessage = '保管しても、過去の履歴は残ります。'
 const tag: Tag = { id: 'tag-1', name: '確認用タグ', color: '#000000', friendCount: 1, createdAt: '2026-01-01T00:00:00.000Z', status: 'active', version: 3, lineAccountId: 'account-a', mileageReward: 0, referralMileageReward: 0, mileageMultiplierBps: null }
 const refs = Object.fromEntries(['broadcasts','forms','scenarios','autoReplies','savedSearches','automations','commonActions','richMenus','templates','webinars','reminders','entryRoutes','trackedLinks','bookingMenus','affiliateOffers','events','analyticsFunnels','friendAddSettings'].map(key => [key, 0])) as TagDeleteImpactReferences
 function impact(values: Partial<TagDependencies['mileageImpact']> = {}, blocked?: 'affiliateOffers' | 'broadcasts'): TagDependencies {
@@ -49,6 +52,8 @@ function verify(dialog: HTMLElement, mileage: boolean) {
   const rows = [...dialog.querySelectorAll('dl > div')]
   expect(rows.filter(row => row.querySelector('dt')?.textContent === '積んだマイル')).toHaveLength(mileage ? 1 : 0)
   if (mileage) expect(rows.find(row => row.querySelector('dt')?.textContent === '積んだマイル')?.textContent).toContain('そのまま残る取り消されません')
+  expect(dialog.textContent?.split(historyMessage)).toHaveLength(2)
+  expect(dialog.textContent).not.toContain('過去のマイル履歴と配信ログは残ります')
   expect(dialog.textContent).not.toMatch(/履歴(?:は|が)0|一度も付与/)
   expect((within(dialog).getByRole('button', { name: 'このタグを保管する' }) as HTMLButtonElement).disabled).toBe(true)
 }

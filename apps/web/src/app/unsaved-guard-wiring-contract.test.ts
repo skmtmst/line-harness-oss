@@ -22,6 +22,9 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'components/shared/use-inline-detail-guard.tsx',
+  'v8/common-vars/list.tsx',
+  'v8/account-new/registration-unsaved-guard.tsx',
   'v8/hq-banners/project.tsx',
   'v8/restaurant/organization/organization.tsx',
   'v8/hq-banners/dialogs.tsx',
@@ -170,6 +173,11 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  // タブ枠は子の名前編集を保持し、確認は子の共通ガードが担当する。
+  'v8/tags/list.tsx': 'components/shared/use-inline-detail-guard.tsx',
+  'v8/common-vars/list-dialogs.tsx': 'v8/common-vars/list.tsx',
+  // 再開画面のスタイル・メニューは共通の登録状態が離脱を守る。
+  'v8/account-new/resume-style.tsx': 'v8/account-new/registration-unsaved-guard.tsx',
   // 飲食店のフォームと選択中の値は組織画面の番兵へ伝える。
   'v8/restaurant/organization/organization-forms.tsx': 'v8/restaurant/organization/organization.tsx',
   // 統合ユーザーの2つの一覧・詳細は子窓の番兵へ委譲し、履歴とパンくずの切替を連携する。
@@ -270,8 +278,9 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'components/shared/managed-folder-panel.tsx': '共通フォルダ列は追加窓を開く操作を既存の未保存確認へ委ねる。名前・色の入力は子窓が持ち、各呼び出し元での画面離脱は別途確認する。',
   'components/shared/inline-edit.tsx': '共有入力部品であり独立した画面ではない。保存前の値を保持するオプションは呼び出し側へ状態を通知し、紹介者画面では同画面の番兵が守る。他の利用箇所は別途点検する。',
-  'v8/events/list.tsx': 'イベント一覧の検索・絞り込みであり、保存前の編集入力や書きかけを持たない。',
+  'v8/events/list.tsx': 'イベント詳細の名前は use-inline-detail-guard.tsx が保護する。検索・絞り込みは表示条件で、その他の窓は別途確認する。',
   'v8/restaurant/line-followup/demo.tsx': 'phaseだけで描く静的な見本。編集状態・保存・API呼出はなく、全操作はaria-hiddenとinertの内側、文字入力はreadOnly。未保存は見本の札であり利用者の下書きではない。',
   'v8/restaurant/common-a/frame.tsx': '取得と店の選択だけを持つ共通の器。未保存の入力を持たず、店の切り替えはrequestUnsavedActionで子の実際の番兵へ委ねる。',
   'v8/mileage/adjust-dialog.tsx': '入力中は共通Dialogの自動dirty検出とuseOverlayDiscardが閉じる操作を止める。確認・完了の段だけdirty=false。adjust-dialog-field-errorsの実描画で入力→閉じるの破棄確認とAPI/close未実行を確かめる。',
@@ -350,13 +359,13 @@ const EXEMPTIONS: Record<string, string> = {
   'v8/conversions/list.tsx':
     '★V8 のコンバージョンの一覧（r6dJFy）。探す欄・絞り込み・件数表示は一覧上の操作で下書きを持たない。止める小窓の理由欄は閉じると戻る小窓内の入力',
   'v8/scenarios/list.tsx':
-    '★V8 のシナリオ一覧（axFrW）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。複製窓の名前欄は閉じると戻るダイアログ内の入力',
+    '詳細のシナリオ名は use-inline-detail-guard.tsx が保護する。複製やフォルダの窓は別途確認する。',
   'v8/auto-replies/list.tsx':
     '★V8 の自動応答一覧（uE9gf）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。止める窓の理由欄は閉じると戻るダイアログ内の入力',
   'v8/forms/list.tsx':
-    '★V8 の回答フォーム一覧（I3L41O）。一覧上の操作（受付を止める・複製・削除・フォルダ移動）は押した直後に確認窓か即時保存で確定し、作る操作は下書きを作って編集画面へ渡すため、この画面に残る下書きを持たない。複製・名前の入力は閉じると戻る右のパネル・窓の中だけ',
+    '詳細のフォーム名は use-inline-detail-guard.tsx が保護する。複製やフォルダの窓は別途確認する。',
   'v8/webinars/list.tsx':
-    '★V8 のウェビナー一覧（UyUMw）。一覧と絞り込みが中心で、フォルダの追加・変更・削除とアーカイブは押した直後に確認窓か即時保存で確定する。フォルダ名の入力は閉じると戻る窓の中だけなので、この画面に残る下書きを持たない',
+    '詳細のウェビナー名は use-inline-detail-guard.tsx が保護する。フォルダ名の窓は別途確認する。',
   'v8/webhooks/incoming.tsx':
     '★V8 外部連携・こちらで受け取る（gW0F2）。作る窓・合言葉窓・試す窓の入力は閉じると戻る窓の中だけで、保存は窓の中の「作る」「更新する」で確定する。一覧上の操作（動かす・止める・結び付ける・確認した・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない',
   'v8/webhooks/outgoing.tsx':
@@ -367,7 +376,7 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 分析のファネル。選ぶ欄は見る条件で、結果から対象者を作って友だち一覧・配信へ渡すだけ。保存する編集画面ではなく、画面に残る下書きを持たない',
   /* 2026-10-07：src/v8 に一から書いた画面の分類。元の画面ファイルがあるものはその扱いに合わせた。 */
   'v8/account-new/register.tsx':
-    '現役のV8登録ウィザード。dirty 管理は無く、印はコメント中の「未保存」（R523 の照合の説明）だけ。入力は端末の下書きへ随時保存し、閉じる確認は手順内の戻る・あとで続きからで済ませる',
+    '登録の秘密値とスタイル・初期メニューは registration-unsaved-guard.tsx の番兵で保護。前半の非秘密入力は端末に保存されるが、確認項目などほかの一時状態は別途確認する。',
   'v8/reminders/detail.tsx':
     'app/reminders/detail/detail-v8.tsx と同じ画面の★V8版。登録者の基準日は行内の小さな編集で「基準日を保存」で確定する。元の画面と同じ扱い',
   'v8/settings/line-notifications/screen.tsx':
@@ -380,8 +389,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 LINEアカウントの詳細から開く窓（送受信を止める・資格情報の差し替え・アーカイブ・登録の内容を編集）。入力はすべて窓の中で、閉じると戻る',
   'v8/booking-staff/shifts.tsx':
     'app/booking/staff/shifts/staff-detail-v8.tsx と同じ画面の★V8版（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定する。元の画面と同じ扱い',
-  'v8/common-vars/list.tsx':
-    '現役の共通情報一覧。一覧上の操作は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。窓内の理由欄は閉じると戻る',
   'v8/contents/list.tsx':
     'app/contents/list-v8.tsx と同じ一覧の★V8版（O7hUt7）。一覧上の操作は押した直後に確認窓か即時保存で確定し、名前・理由・移し先の入力は閉じると戻る札・窓の中だけ',
   'v8/contents/media-detail-dialog.tsx':
@@ -415,7 +422,7 @@ const EXEMPTIONS: Record<string, string> = {
   'v8/tags/tags-tab.tsx':
     'app/tags/tags-tab-v8.tsx と同じ一覧の★V8版（I1E7Bt）。一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、フォルダの窓は閉じると戻る',
   'v8/templates/list.tsx':
-    '★V8 のテンプレート一覧（v19Ivv）。一覧上の操作（フォルダ移動・複製・削除・まとめて操作）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。種類を選ぶ窓は行き先を選ぶだけ',
+    '詳細のテンプレート名は use-inline-detail-guard.tsx が保護する。種類ごとの窓や移動中の選択は別途確認する。',
   'v8/nen-pets/editor.tsx':
     'app/nen/pets/pet-editor.tsx と同じ窓の★V8版（eLjeQ）。入力はすべて窓の中で、閉じると戻る。番兵の要否は元の窓（未判定）と一緒に決めるため同じ扱い',
 }
