@@ -104,7 +104,7 @@
 }
 
 .chipInput::placeholder {
-  color: var(--color-ink-faint);
+  color: var(--color-placeholder);
 }
 
 .textarea {

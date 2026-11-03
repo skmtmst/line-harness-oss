@@ -32,7 +32,7 @@ describe('V8 オートメーション一覧の状態', () => {
   })
 
   it('未取得の件数を0件として表示しない', () => {
-    expect(PAGE).toContain('value: ready ? items.length : null')
+    expect(PAGE).toMatch(/const currentRules = items\.filter\(\(item\) => item\.status !== 'archived'\)[\s\S]*value: ready \? currentRules\.length : null/)
     // 監査6 #674: 未取得は null のまま MetricValue へ渡し、「—」と0を区別する
     expect(PAGE).toContain('estimatedHoursSaved === null')
     expect(PAGE).toContain('value: summary?.failureCount30d ?? null')

@@ -706,7 +706,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
       <Dialog
         open={adding}
         title="媒体を足す"
-        description="予約を受けないグルメ媒体（口コミ・紹介のサイトなど）を足します。予約メールは取り込みません。足したら行の「…」から URL を入れます。"
+        description="予約を受けないグルメ媒体（口コミ・紹介のサイトなど）を足します。予約メールは取り込みません。予約サイトは、予約メールを取り込むと自動で現れます。足したら行の「…」から URL を入れます。"
         confirmLabel="足す"
         busy={addBusy}
         confirmDisabled={!addName.trim()}

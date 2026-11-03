@@ -45,7 +45,7 @@
 }
 
 .input::placeholder {
-  color: var(--color-ink-faint);
+  color: var(--color-placeholder);
 }
 
 /* 消す×はこちらの「探すのをやめる」と重なるので出さない。 */

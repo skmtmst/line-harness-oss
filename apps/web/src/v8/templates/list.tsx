@@ -17,7 +17,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Button from '@/components/shared/button'
 import { type ContextMenuItem } from '@/components/shared/context-menu'
-import { useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
+import { InlineDetailHoldingContext, useInlineDetailGuard, useInlineDetailHoldingState } from '@/components/shared/use-inline-detail-guard'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
@@ -82,6 +82,7 @@ export default function TemplatesListV8() {
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
   const detailGuard = useInlineDetailGuard('row')
+  const { holding: folderHolding, onHoldingChange: setFolderHolding } = useInlineDetailHoldingState()
   const { id: activeId, setId: setActiveId } = detailGuard
 
   /*
@@ -92,8 +93,8 @@ export default function TemplatesListV8() {
   const knownSections: Section[] = ['message', 'question', 'rich_video', 'card_message', 'rich_message', 'coupon', 'research']
   const requestedSection: Section = knownSections.includes(urlView.tab as Section) ? urlView.tab as Section : 'message'
   const heldSection = useRef(requestedSection)
-  if (!detailGuard.holding) heldSection.current = requestedSection
-  const activeSection = detailGuard.holding ? heldSection.current : requestedSection
+  if (!detailGuard.holding && !folderHolding) heldSection.current = requestedSection
+  const activeSection = detailGuard.holding || folderHolding ? heldSection.current : requestedSection
   /* フォルダの数は、テンプレート以外のタブでは最後の種類を保つ。 */
   const [folderSection, setFolderSection] = useState<FolderCountSection>(() => activeSection === 'question' || activeSection === 'rich_video' ? activeSection : 'message')
   useEffect(() => { if (activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video') setFolderSection(activeSection) }, [activeSection])
@@ -997,7 +998,7 @@ export default function TemplatesListV8() {
   const blockedRows = blockedUsage ? usageRows(blockedUsage) : []
   const blockedTotal = blockedDelete ? Math.max(blockedDelete.item.usageCount, blockedRows.length) : 0
 
-  const overlays = <Fragment key={renderedScope.generation}>{renderTemplateDialogs({ deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates, detailGuard })}{detailGuard.dialog}</Fragment>
+  const overlays = <Fragment key={renderedScope.generation}><InlineDetailHoldingContext.Provider value={setFolderHolding}>{renderTemplateDialogs({ deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates, detailGuard })}</InlineDetailHoldingContext.Provider>{detailGuard.dialog}</Fragment>
 
   const heading = {
     title: 'テンプレート',
