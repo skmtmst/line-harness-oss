@@ -68,6 +68,7 @@ describe('R196 初期値はその欄の形で入れる', () => {
     const day = [...document.querySelectorAll<HTMLButtonElement>('[role="gridcell"] button')].find(el => el.textContent === '6' && !el.hasAttribute('data-outside'))
     expect(day).toBeDefined()
     await act(async () => { day!.click() })
+    await act(async () => { ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="日付を選ぶ"] button')].find(button => button.textContent?.trim() === '確定')!).click() })
     expect(changed).toHaveBeenCalledWith(expect.objectContaining({ defaultValue: '2026-11-06' }))
   })
 

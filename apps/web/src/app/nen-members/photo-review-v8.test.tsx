@@ -176,6 +176,7 @@ describe('投稿 V8', () => {
     const dateTime = await screen.findByRole('dialog', { name: '日時を選ぶ' })
     fireEvent.click(within(dateTime).getByRole('button', { name: '日付' }))
     fireEvent.click(await screen.findByRole('button', { name: '2026年10月15日（木）' }))
+    fireEvent.click(screen.getByRole('button', { name: '確定' }))
     await setTimeControl(within(dateTime).getByRole('combobox', { name: '時刻' }), '00:00')
     fireEvent.click(within(dateTime).getByRole('button', { name: '閉じる' }))
     fireEvent.click(screen.getByRole('button', { name: '版を予約する' }))

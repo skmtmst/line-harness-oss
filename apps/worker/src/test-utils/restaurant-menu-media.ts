@@ -1,3 +1,4 @@
+export { checkRestaurantMenuPrice } from './restaurant-menu-price.js';
 import { expect } from 'vitest';
 import { countMedia, getMedia, getMediaDeleteImpactSnapshot, getMediaReplacementPlan } from '@line-crm/db';
 import { mediaTabCounts } from '../services/tab-counts.js';
