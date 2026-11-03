@@ -692,13 +692,16 @@ describe('V8 コンバージョンの一覧：中身を見る窓', () => {
   ]
   const eventPaths: string[] = []
 
-  async function openDetail(name: string, eventsOk: boolean | 'soft' = true, withoutRevision = false) {
+  async function openDetail(name: string, eventsOk: boolean | 'soft' = true, withoutRevision = false, sharedEvents?: typeof definitionEvents) {
     eventPaths.length = 0
     overrideFetch((url) => {
       if (url.pathname.endsWith('/events')) {
         eventPaths.push(`${url.pathname}?${url.searchParams}`)
         if (eventsOk === 'soft') return json({ success: false, error: 'unavailable' })
-        return eventsOk ? json({ success: true, data: { items: withoutRevision ? definitionEvents.map(({approvalRevision, ...event}) => event) : definitionEvents } }) : json({ success: false, error: 'unavailable' }, 503)
+        if (!eventsOk) return json({ success: false, error: 'unavailable' }, 503)
+        const response=json({ success: true, data: { items: withoutRevision ? definitionEvents.map(({approvalRevision, ...event}) => event) : definitionEvents } })
+        if (sharedEvents) response.json=async()=>({success:true,data:{items:sharedEvents}})
+        return response
       }
       if (url.pathname.endsWith('/ingest-events')) {
         eventPaths.push(`${url.pathname}?${url.searchParams}`)
@@ -762,6 +765,17 @@ describe('V8 コンバージョンの一覧：中身を見る窓', () => {
     await flush()
     expect(calls.some(call => call === 'POST /api/conversions/events/e1/reversals')).toBe(false)
     expect(screen.getByRole('alertdialog').textContent).toContain('確認情報を読み直して')
+  })
+
+  it('確認窓を開いた後に一覧の版が変わっても確認時の版を送る', async () => {
+    const shared=definitionEvents.map(event=>({...event}));let body:Record<string,unknown>|undefined
+    const dialog=await openDetail('商品を買った',true,false,shared)
+    const row=Array.from(dialog.querySelectorAll('li')).find(item=>item.textContent?.includes('佐藤'))!
+    fireEvent.click(within(row).getByRole('button',{name:'取り消す'}));shared[0].approvalRevision=8
+    overrideFetch((url,init)=>{if(url.pathname!=='/api/conversions/events/e1/reversals')return null;body=JSON.parse(String(init?.body));return json({success:false,error:'更新されました'},409)})
+    fireEvent.change(screen.getByLabelText('理由'),{target:{value:'確認済み'}})
+    fireEvent.click(within(screen.getByRole('alertdialog',{name:'この成果を取り消す'})).getByRole('button',{name:'取り消す'}));await flush()
+    expect(body?.expectedApprovalRevision).toBe(7)
   })
 
   it('アカウントを戻しても古い成果取消の確認は復活しない', async () => {
