@@ -368,7 +368,7 @@ function FriendDetailInner() {
         onSelect: () => { setPendingAction({ entryId: item.id, kind: 'void', label: item.reason ?? '' }); setPendingReason(''); setPendingError('') },
       })
     }
-    if (canAdjust && item.notificationStatus === 'failed' && !item.restricted) {
+    if (canAdjust && item.entryType === 'adjustment' && item.notificationStatus === 'failed' && !item.restricted) {
       const retrying = notificationRetryId === item.id
       items.push({
         id: 'retry',

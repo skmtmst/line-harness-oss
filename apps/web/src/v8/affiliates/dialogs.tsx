@@ -197,7 +197,7 @@ export function AffiliatePaymentConfirmDialog({
   const confirmLock = useRef(false)
   const targetId = target?.id
   const session = useRef<{ targetId: string; accountId: string; invalid: boolean } | null>(null)
-  if (session.current && targetId && (session.current.targetId !== targetId || session.current.accountId !== accountId)) session.current.invalid = true
+  const invalidSession = Boolean(session.current && targetId && (session.current.invalid || session.current.targetId !== targetId || session.current.accountId !== accountId))
   const [issueStatement, setIssueStatement] = useState(false)
   const [statementKey, setStatementKey] = useState('')
   // 確定の実行中は×と同じくEscapeでも閉じない。共通の約束（初期フォーカス・
@@ -252,9 +252,10 @@ export function AffiliatePaymentConfirmDialog({
       session.current = null
       return
     }
-    if (session.current?.invalid) {
+    if (session.current && (session.current.invalid || session.current.targetId !== targetId || session.current.accountId !== accountId)) {
+      session.current.invalid = true
       setPhase('error')
-      setError('対象が変わりました。窓を閉じて、もう一度選び直してください。')
+      setError('')
       return
     }
     if (session.current) return
@@ -320,17 +321,19 @@ export function AffiliatePaymentConfirmDialog({
   if (!target) return null
 
   return (
-    <SaveErrorScope errors={saveErrors}><Dialog open title={title} description="確定すると金額が固定され、振込用のデータに入ります。" onCancel={onClose} busy={busy} error={error || undefined} designNode="GqFTV" designWidth={960} footer={(<DialogActions leadingAction={<p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>}>
+    <SaveErrorScope errors={saveErrors}><Dialog open title={title} description="確定すると金額が固定され、振込用のデータに入ります。" onCancel={onClose} busy={busy} error={invalidSession ? undefined : error || undefined} designNode="GqFTV" designWidth={960} footer={(<DialogActions leadingAction={<p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>}>
 
           <>
             <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={16} />キャンセル</Button>
-            {phase === 'ready' && preview ? (<Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
+            {!invalidSession && phase === 'ready' && preview ? (<Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
                 <Check size={16} />{`${yen(preview.amount)} で確定する`}
               </Button>) : null}
           </>
         </DialogActions>)}>
         <div className="space-y-3 px-6 py-5">
-      {phase === 'loading' ? (
+      {invalidSession ? (
+        <Notice tone="warn">アカウントが変わりました。窓を閉じて選び直してください</Notice>
+      ) : phase === 'loading' ? (
         <ListState kind="loading" title="確定する内容を読み込んでいます" />
       ) : phase === 'error' ? (
         <ListState

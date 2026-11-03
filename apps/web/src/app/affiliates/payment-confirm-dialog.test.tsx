@@ -106,7 +106,9 @@ describe('NEXT-22: 明細作成とLINE通知のチェック', () => {
     await screen.findByRole('checkbox')
     view.rerender(<AffiliatePaymentConfirmDialog {...props} accountId="acc-2" target={{ id: 'aff-1', name: '紹介者いち' }} />)
     view.rerender(<AffiliatePaymentConfirmDialog {...props} accountId="acc-1" target={{ id: 'aff-1', name: '紹介者いち' }} />)
-    expect(screen.getByText(/対象が変わりました/)).toBeTruthy()
+    expect(screen.getByText('アカウントが変わりました。窓を閉じて選び直してください')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /もう一度/ })).toBeNull()
+    expect(screen.queryByText(/読み直してから確定/)).toBeNull()
     expect(screen.queryByRole('button', { name: /で確定する/ })).toBeNull()
     expect(fixture.confirmCalls).toBe(0)
   })
@@ -126,9 +128,7 @@ describe('NEXT-22: 明細作成とLINE通知のチェック', () => {
     view.rerender(<AffiliatePaymentConfirmDialog {...props} target={{ id: 'aff-1', name: '紹介者いち' }} />)
     await act(async () => { release({ success: false, error: 'retry' }) })
     const retry = await screen.findByRole('button', { name: /で確定する/ })
-    const key = Object.keys(retry).find(k => k.startsWith('__reactProps$'))!
-    const click = (retry as unknown as Record<string, { onClick: () => void }>)[key].onClick
-    await act(async () => { click(); click() })
+    await act(async () => { fireEvent.click(retry); fireEvent.click(retry) })
     expect(fixture.confirmCalls).toBe(2)
     expect(fixture.confirmKeys).toHaveLength(2)
     expect(fixture.confirmKeys[0]).toBeTruthy()
