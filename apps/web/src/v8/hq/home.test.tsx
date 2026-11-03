@@ -468,6 +468,25 @@ it('フォルダがタグにも返っても札は一つで、アーカイブの�
 
 
 it.each([
+  { archived: true, friends: 0, expected: '—' },
+  { archived: true, friends: 5, expected: '5' },
+  { archived: true, friends: undefined, expected: '—' },
+  { archived: false, friends: 0, expected: '0' },
+])('友だち数をカードと表で同じ基準にする：$archived / $friends', async ({ archived, friends, expected }) => {
+  accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, archivedAt: archived ? '2026-10-01' : null, stats: { ...warnedAccount.stats, friendCount: friends } }] })
+  await render()
+  if (archived) {
+    const filter = [...container.querySelectorAll('button')].find(el => el.textContent?.startsWith('アーカイブ'))!
+    await act(async () => { filter.click() })
+  }
+  const card = container.querySelector('article')!
+  const friendLabel = [...card.querySelectorAll('dt')].find(el => el.textContent === '友だち')!
+  expect(friendLabel.nextElementSibling?.textContent).toBe(expected)
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  expect(container.querySelectorAll('tbody tr td')[4]?.textContent).toBe(expected)
+})
+
+it.each([
   { staffCount: undefined, label: '権限者 —' },
   { staffCount: 0, label: '権限者 0 人' },
 ])('権限者数の未取得と本当の0人をカードと表で分ける：$label', async ({ staffCount, label }) => {
