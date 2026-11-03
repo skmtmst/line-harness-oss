@@ -219,7 +219,7 @@ export default function BalancesTab() {
   }, [loadApprovals])
 
   const decideApproval = async (requestId: string, action: 'approve' | 'reject', reason?: string) => {
-    if (readonly || !selectedAccountId || approvalBusyId) return
+    if (readonly || ecSource || !selectedAccountId || approvalBusyId) return
     setApprovalBusyId(requestId)
     setApprovalError('')
     try {
@@ -341,7 +341,7 @@ export default function BalancesTab() {
   )
 
   /* 承認待ちの板（黄の地）。案内の帯のすぐ下・道具の段の上。 */
-  const approval = ecSource ? null : approvalRequests && approvalRequests.length > 0 ? (
+  const approval = approvalRequests && approvalRequests.length > 0 ? (
     <section className={styles.approval} aria-label="承認待ちのマイル変更">
       <p className={styles.approvalTitle}>{`承認待ちのマイル変更 ${formatNumber(approvalRequests.length)} 件`}</p>
       {approvalError ? <Notice tone="danger" message={approvalError} /> : null}
@@ -355,7 +355,7 @@ export default function BalancesTab() {
               {`${request.reason}・申請 ${request.requested_by_staff_name}（${formatMileageShortDateTime(request.created_at)}）`}
             </span>
           </div>
-          {isOwner && !readonly ? (
+          {isOwner && !readonly && !ecSource ? (
             <>
               <Button
                 variant="secondary"
@@ -373,11 +373,11 @@ export default function BalancesTab() {
               </Button>
             </>
           ) : (
-            <span className={styles.approvalSub}>オーナーが対応します</span>
+            <span className={styles.approvalSub}>{ecSource ? 'EC管理のため保留しています' : 'オーナーが対応します'}</span>
           )}
         </div>
       ))}
-      <p className={styles.approvalNote}>5,000 マイル以上の変更は、申請した人とは別のオーナーが承認するまで付きません。</p>
+      <p className={styles.approvalNote}>{ecSource ? '切り替え前の依頼をそのまま表示しています。' : '5,000 マイル以上の変更は、申請した人とは別のオーナーが承認するまで付きません。'}</p>
     </section>
   ) : approvalFailed ? (
     <section className={styles.approval} aria-label="承認待ちのマイル変更">

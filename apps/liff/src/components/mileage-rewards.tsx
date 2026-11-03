@@ -6,7 +6,7 @@ import ConfirmDialog from './ui/confirm-dialog.js';
 import { FormTextControl } from './forms/controls.js';
 
 export default function MileageRewards({ onChanged }: { onChanged: () => Promise<void> }) {
-  const [data, setData] = useState<{ rewards: Reward[]; availableMiles: number } | null>(null);
+  const [data, setData] = useState<{ rewards: Reward[]; availableMiles: number | null; balanceSource: 'ec' | 'musubo' } | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<Reward | null>(null);
@@ -20,7 +20,7 @@ export default function MileageRewards({ onChanged }: { onChanged: () => Promise
   useEffect(() => {
     let alive = true;
     setFailed(false);
-    affiliateSelfApi.rewards().then(r => { if (alive) setData(r); }).catch(() => { if (alive) setFailed(true); });
+    affiliateSelfApi.rewards().then(r => { if (r.balanceSource !== 'ec' && r.balanceSource !== 'musubo') throw new Error('source unavailable'); if (alive) setData(r); }).catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
   }, [reload]);
   async function redeem() {
@@ -39,14 +39,14 @@ export default function MileageRewards({ onChanged }: { onChanged: () => Promise
   }
   return <section aria-label="マイルを使う" className="space-y-3">
     <h2 className="text-sm font-bold text-ink">マイルを使う</h2>
-    {failed ? <><p role="alert" className="text-sm text-danger">使い道を読み込めませんでした</p><Button variant="secondary" onClick={() => setReload(n => n + 1)}>もう一度読み込む</Button></> : <Button variant="secondary" disabled={!data} onClick={() => { setOpen(true); setError(''); }}>使い道を選ぶ</Button>}
+    {failed ? <><p role="alert" className="text-sm text-danger">使い道を読み込めませんでした</p><Button variant="secondary" onClick={() => setReload(n => n + 1)}>もう一度読み込む</Button></> : data?.balanceSource === 'ec' ? <p className="text-sm">マイルはECで管理しています</p> : data?.balanceSource === 'musubo' ? <Button variant="secondary" onClick={() => { setOpen(true); setError(''); }}>使い道を選ぶ</Button> : null}
     {error && !picked && <p role="alert" className="text-sm text-danger">{error}</p>}
     {result && <Card className="space-y-2 p-4">
       <p role="status">{result.status === 'succeeded' ? `${result.rewardName}に交換しました` : result.message || '交換を受け付けました。特典のお届けを確認しています。'}</p>
       {result.customerMessage && <p>{result.customerMessage}</p>}
       {result.rewardCode && <p className="break-all">交換コード：{result.rewardCode}</p>}
     </Card>}
-    <ConfirmDialog open={open && !picked} title="マイルの使い道を選ぶ" description={`使えるマイル：${data?.availableMiles.toLocaleString() ?? '—'}`} cancelLabel="閉じる" onCancel={() => setOpen(false)}>
+    <ConfirmDialog open={open && !picked} title="マイルの使い道を選ぶ" description={`使えるマイル：${data?.availableMiles?.toLocaleString() ?? '—'}`} cancelLabel="閉じる" onCancel={() => setOpen(false)}>
       <label className="mt-3 block text-sm">名前で探す<FormTextControl block={{ id: 'reward-search', kind: 'input', type: 'text', name: 'reward-search', label: '名前で探す' }} value={query} onChange={setQuery} /></label>
       <ul className="mt-3 max-h-80 space-y-3 overflow-y-auto">
         {data?.rewards.filter(r => r.name.includes(query)).map(reward => <li key={reward.id}>

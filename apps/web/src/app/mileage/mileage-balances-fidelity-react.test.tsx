@@ -186,7 +186,9 @@ describe('残高の絵合わせ（板 `CJlf4`）', () => {
     expect(text).toContain('プラチナ')
     expect(container.querySelector('tbody tr td:nth-child(2)')?.getAttribute('data-cell-collapse')).toBeNull()
     expect(text).toContain('29')
-    expect(text).not.toContain('承認待ちのマイル変更')
+    expect(text).toContain('承認待ちのマイル変更')
+    expect(text).toContain('EC管理のため保留しています')
+    expect([...container.querySelectorAll('button')].some((button) => button.textContent?.includes('承認する') || button.textContent?.includes('差し戻す'))).toBe(false)
     expect(text).not.toContain('直近30日 増えた')
   })
 

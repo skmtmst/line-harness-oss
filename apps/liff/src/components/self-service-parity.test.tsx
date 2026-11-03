@@ -16,7 +16,7 @@ const reward = { id: 'r1', name: '割引券', description: '500円引き', image
 const bank = { bankCode: '0001', bankName: '銀行', branchCode: '123', branchName: '支店', accountType: 'ordinary' as const, accountLast4: '5678', accountHolderName: 'タナカ', version: 7 };
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [reward, { ...reward, id: 'r2', name: '品切れ', canRedeem: false, unavailableReason: '在庫切れです' }], availableMiles: 150 });
+  vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [reward, { ...reward, id: 'r2', name: '品切れ', canRedeem: false, unavailableReason: '在庫切れです' }], availableMiles: 150, balanceSource: 'musubo' });
   vi.mocked(affiliateSelfApi.bank).mockResolvedValue(bank);
   vi.mocked(affiliateSelfApi.statements).mockResolvedValue([]);
   vi.mocked(affiliateSelfApi.download).mockResolvedValue(undefined);
@@ -24,6 +24,12 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('お客さまの交換と振込先', () => {
+  it('ECで管理する店は交換ボタンを出さず案内する', async () => {
+    vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [], availableMiles: 0, balanceSource: 'ec' } as never);
+    render(<MileageRewards onChanged={async () => {}} />);
+    expect(await screen.findByText('マイルはECで管理しています')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '使い道を選ぶ' })).toBeNull();
+  });
   it('交換を確認し、通信失敗の再送は同じキー。202は交換受付として扱う', async () => {
     vi.mocked(affiliateSelfApi.redeem).mockRejectedValueOnce(new Error('通信が切れました')).mockResolvedValueOnce({ status: 'delivery_failed', rewardName: '割引券', customerMessage: '', rewardCode: null, message: '交換を受け付けました' });
     const onChanged = vi.fn().mockResolvedValue(undefined);
@@ -114,4 +120,36 @@ it.each([true, false])('マイル画面への交換の配線を守り、登録�
   expect(await screen.findByRole('region', { name: 'マイルを使う' })).toBeTruthy();
   if (registered) expect(await screen.findByRole('button', { name: '振込先を編集する' })).toBeTruthy();
   else expect(screen.queryByRole('region', { name: '振込先と支払明細' })).toBeNull();
+});
+
+it('EC残高が未取得でも顧客画面を開き、交換を表示しない', async () => {
+  vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [], availableMiles: null, balanceSource: 'ec' });
+  vi.stubGlobal('fetch', vi.fn(async input => {
+    const path = new URL(String(input), 'https://example.test').pathname;
+    if (path.endsWith('/liff/config')) return new Response('{"success":true,"data":{}}');
+    if (path.endsWith('/affiliate/me')) return new Response('{}', { status: 404 });
+    return new Response(JSON.stringify({ mileage: { available: null, balanceSource: 'ec', lifetimeEarned: 10, spent: 0, pending: 0 }, insights: { accountCount: 1 }, opportunities: [], history: [] }));
+  }));
+  render(<Affiliate />);
+  expect(await screen.findByText('マイルはECで管理しています')).toBeTruthy();
+  expect(screen.getByRole('region', { name: '貯まったマイル' }).textContent).toContain('—');
+  expect(screen.queryByRole('button', { name: '使い道を選ぶ' })).toBeNull();
+  expect(screen.queryByText('お友だちを紹介してマイルをもらう')).toBeNull();
+  expect(screen.getByRole('button', { name: '紹介者になる' })).toBeTruthy();
+});
+
+it('EC管理中は紹介案件のマイル報酬を約束せず、現金報酬は表示する', async () => {
+  vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [], availableMiles: 29, balanceSource: 'ec' });
+  vi.stubGlobal('fetch', vi.fn(async input => {
+    const path = new URL(String(input), 'https://example.test').pathname;
+    if (path.endsWith('/liff/config')) return new Response('{"success":true,"data":{}}');
+    if (path.endsWith('/affiliate/me')) return new Response(JSON.stringify({ affiliate: { id: 'a1', isActive: true }, links: [] }));
+    if (path.endsWith('/affiliate/offers')) return new Response(JSON.stringify({ offers: [{ id: 'o1', name: '紹介案件', description: null, rewardAmount: 1000, rewardMiles: 300, enrolled: false, halted: false }] }));
+    return new Response(JSON.stringify({ mileage: { available: 29, balanceSource: 'ec', lifetimeEarned: 10, spent: 0, pending: 75 }, insights: { accountCount: 1 }, opportunities: [], history: [] }));
+  }));
+  render(<Affiliate />);
+  expect(await screen.findByText('紹介案件・リンクを発行する')).toBeTruthy();
+  expect(screen.queryByText(/\+300マイル/)).toBeNull();
+  expect(screen.queryByText(/成果の確認後に入ります/)).toBeNull();
+  expect(screen.getByText(/1件.*1,000/)).toBeTruthy();
 });

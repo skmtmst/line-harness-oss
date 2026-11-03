@@ -84,8 +84,10 @@ function MileageInner() {
 
   return (
     <MileageShell.Provider value={shell}>
-      {tab === 'earning-rules' ? <EarningRulesTab key={tab} /> : null}
-      {tab === 'rewards' ? <RewardsTab key={tab} /> : null}
+      {tab === 'earning-rules' || tab === 'rewards' ? !accountLoading && !selectedAccountId ? <MileageFrame><ListState kind="empty" title="LINEアカウントを選択してください" /></MileageFrame>
+        : currentSource === 'error' ? <MileageFrame><ListState kind="error" title="残高の設定元を読み込めませんでした" onRetry={() => setSourceRetry((value) => value + 1)} /></MileageFrame>
+        : currentSource === null ? <MileageFrame><ListState kind="loading" title="残高の設定元を確認しています" /></MileageFrame>
+        : tab === 'earning-rules' ? <EarningRulesTab key={tab} /> : <RewardsTab key={tab} /> : null}
       {tab === 'balances' ? <BalancesTab key={tab} /> : null}
       {tab === 'history' ? !accountLoading && !selectedAccountId ? <MileageFrame><ListState kind="empty" title="LINEアカウントを選択してください" /></MileageFrame> : currentSource === 'ec' || currentSource === 'musubo' ? <HistoryTab key={tab} />
         : currentSource === 'error' ? <MileageFrame><ListState kind="error" title="残高の設定元を読み込めませんでした" onRetry={() => setSourceRetry((value) => value + 1)} /></MileageFrame>

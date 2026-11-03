@@ -216,6 +216,7 @@ function baseHandler(url: URL) {
     })
   }
   if (url.pathname === '/api/mileage/redemptions') {
+    if (balanceSource === 'ec' && url.searchParams.get('status') === 'reserved') return response({ success: true, data: { items: [{ id: 'held-1', rewardName: '保留の特典', status: 'reserved', updatedAt: '2026-11-03' }], pagination: { total: 1, limit: 20, offset: 0 } } })
     return response({ success: true, data: { items: [], pagination: { total: 0, limit: 20, offset: 0 } } })
   }
   if (url.pathname === '/api/mileage/adjustment-approvals' || url.pathname === '/api/mileage/adjustments/approvals') {
@@ -396,6 +397,22 @@ test('EC が正の店では musubo の会員ランクを出さず EC と同期�
   await eventually(() => expect(host.textContent).toContain('ECと同期'))
   expect(host.textContent).not.toContain('ランクを足す')
   expect(host.textContent).not.toContain('動かす')
+})
+
+test.each(['earning-rules', 'rewards'])('ECの%sは説明を出し作成を出さない', async (tab) => {
+  document.documentElement.dataset.theme = 'v8'; balanceSource = 'ec'; query = `tab=${tab}`
+  await act(async () => root.render(<MileagePage />))
+  await eventually(() => expect(host.textContent).toContain('マイルはECで管理しています'))
+  expect(host.querySelector('a[href="/mileage/earning-rules/new"]')).toBeNull()
+  expect(host.querySelector('a[href^="/mileage/rewards/edit"]')).toBeNull()
+})
+
+test('EC切替前の予約中の交換はそのまま一覧で確認できる', async () => {
+  document.documentElement.dataset.theme = 'v8'; balanceSource = 'ec'; query = 'tab=rewards'
+  await act(async () => root.render(<MileagePage />))
+  await eventually(() => expect(host.textContent).toContain('保留の特典'))
+  expect(host.textContent).toContain('保留中の交換 1 件')
+  expect(host.textContent).not.toContain('もう一度届ける')
 })
 
 test.each(['history', 'ranks'])('アカウント未選択の%sは選択案内を出す', async (tab) => {

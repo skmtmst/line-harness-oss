@@ -161,7 +161,7 @@ export default function MyPage() {
   // マイル。制度の無い店は出さない。
   useEffect(() => {
     affiliateSelfApi.rewards().then((r) => {
-      setMiles({ kind: 'value', text: r.availableMiles.toLocaleString('ja-JP') });
+      setMiles({ kind: 'value', text: r.availableMiles == null ? '—' : r.availableMiles.toLocaleString('ja-JP') });
     }).catch((e) => {
       logFailure('mypage-miles', e);
       setMiles({ kind: 'error' });

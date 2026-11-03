@@ -159,7 +159,8 @@ const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 export default function EarningRulesTab() {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
-  const { readonly, narrow, setCount } = useMileageShell()
+  const { readonly: roleReadonly, narrow, setCount, balanceSource } = useMileageShell()
+  const readonly = roleReadonly || balanceSource === 'ec'
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountScope = useRef({ id: selectedAccountId, generation: 0 })
   if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
