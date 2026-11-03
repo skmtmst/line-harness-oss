@@ -385,7 +385,7 @@ function InflowDetailContent() {
   }
 
   const afterMenuItems: ActionMenuItem[] = [
-    { id: 'stop', label: '受付を止める', onSelect: () => openDelete('stop') },
+    ...(route?.isActive ? [{ id: 'stop', label: '受付を止める', onSelect: () => openDelete('stop') }] : [{ id: 'resume', label: '受付を再開する', onSelect: () => void reopenRoute() }]),
     { id: 'redirect', label: '別リンクへ送る', onSelect: () => openDelete('redirect') },
     ...(canPermanentlyDelete ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: () => openDelete('delete') }] : []),
   ]
@@ -497,7 +497,7 @@ function InflowDetailContent() {
               {readonly ? null : (
                 <div className={styles.menuBox}>
                   <RowMenu
-                    label="この経路の操作（受付を止める・別リンクへ送る・削除する）"
+                    label={`この経路の操作（${route.isActive ? '受付を止める' : '受付を再開する'}・別リンクへ送る・削除する）`}
                     menuLabel="この経路の操作"
                     items={afterMenuItems}
                     open={afterMenuOpen}
@@ -509,7 +509,7 @@ function InflowDetailContent() {
             <p className={styles.afterNote}>
               {readonly
                 ? 'クリックから友だち追加・フォーム・購入までの人数です'
-                : '右上の「…」から：受付を止める・別リンクへ送る・削除する'}
+                : `「その後」の「…」から：${route.isActive ? '受付を止める' : '受付を再開する'}・別リンクへ送る・削除する`}
             </p>
             {funnel ? (
               <>
