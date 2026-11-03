@@ -236,6 +236,7 @@ describe('V8 メッセージを作る・編集', () => {
     await flush()
     expect((screen.getByLabelText('本文') as HTMLTextAreaElement).value).toBe('{{name}}')
     expect(screen.getByText('8 / 5,000')).toBeTruthy()
+    expect(screen.getByText('文字数は差し込み記号を含みます。実際の文字数は受け取る人ごとに変わります。')).toBeTruthy()
   })
 
   it('読んだ版で保存し、成功後の版を次の保存に使う', async () => {
