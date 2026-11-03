@@ -1,5 +1,5 @@
 import { getNenRankSettings } from '@line-crm/db';
-export { resolveMileageSource } from '@line-crm/db/src/mileage/source.js';
+export { resolveMileageSource } from '@line-crm/db/src/mileage/index.js';
 
 type Input = { lineAccountId: string; search: string; friendId?: string; limit: number; offset: number };
 export async function hasHeldMileageRedemption(db: D1Database, accountId: string, friendId: string): Promise<boolean> {

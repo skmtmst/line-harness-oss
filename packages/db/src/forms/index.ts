@@ -1,4 +1,5 @@
 // Public entry point. Implementation is organized by responsibility.
+export { validRestaurantCoursesSql } from './course-guard.js';
 export type { FormSubmitClaimStatus, FormSubmitClaim } from '../form-submit-claim-types.js';
 export type { FormSubmission, FormDestinationWriteStatus } from '../form-submission-types.js';
 export {

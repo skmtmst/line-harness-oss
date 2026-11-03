@@ -24,7 +24,7 @@ import { stoppedTenantLineAccountSql } from '../../services/tenant-runtime-statu
 import { createAutomationActionExecutors } from '../automations/automation-action-executors/index.js';
 import { featureJobCanRun } from '../../services/feature-enforcement.js';
 import { resolveMileageSource } from '../../services/mileage-ec-source.js';
-import { selectMileageAccountBatch } from '@line-crm/db/src/mileage/source.js';
+import { selectMileageAccountBatch } from '@line-crm/db/src/mileage/index.js';
 import { AutomationActionError, type ActionDefinition } from '../automations/automation-engine/index.js';
 
 export interface MileageRewardDeliveryOptions {
