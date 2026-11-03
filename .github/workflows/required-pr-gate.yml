@@ -316,6 +316,12 @@ jobs:
       # Dependencies were built above; standalone package hooks remain enabled locally.
       - name: Test the setup CLI
         run: pnpm --config.enable-pre-post-scripts=false --filter create-line-harness test
+      - name: Install ripgrep for repository audits
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ripgrep
+          fi
       - run: pnpm test:scripts
       - name: Ratchet code quality against the PR base
         env:
