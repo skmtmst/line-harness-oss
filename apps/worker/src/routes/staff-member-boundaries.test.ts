@@ -5,6 +5,7 @@ import { getLineAccountListStats } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { staff } from './staff.js';
+import { access } from './access.js';
 
 let testDb: ReturnType<typeof createTestD1>;
 
@@ -19,6 +20,7 @@ function request(actorId: string, path: string, method = 'GET') {
     await next();
   });
   app.route('/', staff);
+  app.route('/', access);
   return app.request(path, { method }, { DB: testDb.db } as Env['Bindings']);
 }
 
@@ -64,15 +66,60 @@ describe('HQ and account member boundaries', () => {
     expect(body.data.find((member) => member.id === 'hq-admin')).toMatchObject({ role: 'admin', canManageInAccount: false });
   });
 
-  it('counts only the creator and explicitly assigned account members', async () => {
+  it('counts all HQ users and explicitly assigned account members without duplicates', async () => {
     const stats = await getLineAccountListStats(testDb.db, ['account-a', 'account-b', 'account-c']);
     expect(stats['account-a']?.staffCount).toBe(3);
-    expect(stats['account-b']?.staffCount).toBe(2);
-    expect(stats['account-c']?.staffCount).toBe(1);
+    expect(stats['account-b']?.staffCount).toBe(3);
+    expect(stats['account-c']?.staffCount).toBe(2);
     const response = await request('hq-owner', '/api/staff?lineAccountId=account-c');
     expect(response.status).toBe(200);
     const body = await response.json() as { data: Array<{ id: string }> };
-    expect(body.data.map((member) => member.id)).toEqual(['hq-owner']);
+    expect(body.data.map((member) => member.id).sort()).toEqual(['hq-admin', 'hq-owner']);
+  });
+
+  it('inherits HQ users into a new account without membership rows, preserving roles and status', async () => {
+    const insert = testDb.raw.prepare(`INSERT INTO staff_members
+      (id,name,role,access_level,api_key,account_scope,tenant_id,is_active,invite_status,totp_enabled_at,totp_secret_enc)
+      VALUES (?,?,?,?,?,'all',?,?,?,?,?)`);
+    insert.run('hq-staff', '統括スタッフ', 'staff', 'full', 'key-staff', DEFAULT_TENANT_ID, 1, 'active', null, null);
+    insert.run('hq-viewer', '統括閲覧', 'staff', 'read_only', 'key-viewer', DEFAULT_TENANT_ID, 1, 'active', null, null);
+    insert.run('hq-suspended', '停止中', 'admin', 'full', 'key-suspended', DEFAULT_TENANT_ID, 0, 'active', null, null);
+    insert.run('hq-invited', '招待中', 'admin', 'full', 'key-invited', DEFAULT_TENANT_ID, 0, 'pending_email', null, null);
+    insert.run('foreign-hq', '別統括', 'admin', 'full', 'key-foreign', 'other-tenant', 1, 'active', null, null);
+    testDb.raw.prepare(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id)
+      VALUES ('new-account','new-channel','新規','token','secret',?)`).run(DEFAULT_TENANT_ID);
+    testDb.raw.prepare(`UPDATE staff_members SET totp_enabled_at='2026-11-03T00:00:00Z',totp_secret_enc='enc' WHERE id='hq-owner'`).run();
+    const response = await request('hq-owner', '/api/staff?lineAccountId=new-account');
+    expect(response.status).toBe(200);
+    const { data } = await response.json() as { data: Array<{id: string; role: string; canManageInAccount: boolean; isActive: boolean}> };
+    expect(data.map(row => row.id).sort()).toEqual(['hq-admin','hq-invited','hq-owner','hq-staff','hq-suspended','hq-viewer']);
+    expect(data.find(row => row.id === 'hq-admin')).toMatchObject({role:'admin',canManageInAccount:false});
+    expect(data.find(row => row.id === 'hq-staff')).toMatchObject({role:'staff',canManageInAccount:false});
+    expect(data.find(row => row.id === 'hq-viewer')).toMatchObject({role:'viewer',canManageInAccount:false});
+    expect(data.find(row => row.id === 'hq-suspended')?.isActive).toBe(false);
+    const accessResponse = await request('hq-owner', '/api/access/users?lineAccountId=new-account');
+    expect(accessResponse.status).toBe(200);
+    const accessData = await accessResponse.json() as {data:{items:Array<{id:string;roleBundle:string}>;summary:{active:number;mfaEnabled:number;invited:number}}};
+    expect(accessData.data.summary).toMatchObject({active:4,mfaEnabled:1,invited:1});
+    expect(accessData.data.items.find(row=>row.id==='hq-staff')?.roleBundle).toBe('operations');
+    expect(accessData.data.items.find(row=>row.id==='hq-viewer')?.roleBundle).toBe('view_only');
+    expect(accessData.data.items.map(row=>row.id).sort()).toEqual(data.map(row=>row.id).sort());
+    const stats = await getLineAccountListStats(testDb.db, ['new-account']);
+    expect(stats['new-account']?.staffCount).toBe(4);
+    expect(testDb.raw.prepare('SELECT COUNT(*) n FROM line_account_hq_admin_memberships WHERE line_account_id=?').get('new-account')).toMatchObject({n:0});
+  });
+
+  it('reflects HQ additions and removals in existing accounts immediately', async () => {
+    testDb.raw.prepare(`INSERT INTO staff_members(id,name,role,api_key,account_scope,tenant_id)
+      VALUES ('added','追加した管理者','admin','key-added','all',?)`).run(DEFAULT_TENANT_ID);
+    const before = await request('hq-owner','/api/staff?lineAccountId=account-c');
+    expect((await before.json() as {data:Array<{id:string}>}).data.some(row=>row.id==='added')).toBe(true);
+    testDb.raw.prepare(`UPDATE staff_members SET account_scope='accounts' WHERE id='added'`).run();
+    const after = await request('hq-owner','/api/staff?lineAccountId=account-c');
+    expect((await after.json() as {data:Array<{id:string}>}).data.some(row=>row.id==='added')).toBe(false);
+    const accessResponse = await request('hq-owner','/api/access/users?lineAccountId=account-c');
+    expect((await accessResponse.json() as {data:{items:Array<{id:string}>}}).data.items.some(row=>row.id==='added')).toBe(false);
+    expect((await getLineAccountListStats(testDb.db,['account-c']))['account-c']?.staffCount).toBe(2);
   });
 
   it('does not expose other account or HQ members by list or ID', async () => {

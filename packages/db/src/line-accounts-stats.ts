@@ -95,14 +95,10 @@ export async function getLineAccountListStats(
          SELECT requested.line_account_id, staff.id AS staff_id
            FROM requested_accounts requested
            INNER JOIN line_accounts account ON account.id = requested.line_account_id
-           INNER JOIN line_account_hq_admin_memberships membership
-             ON membership.line_account_id = requested.line_account_id
            INNER JOIN staff_members staff
-             ON staff.id = membership.staff_id
-            AND staff.is_active = 1
+             ON staff.is_active = 1
             AND staff.invite_status = 'active'
             AND staff.account_scope = 'all'
-            AND staff.role IN ('owner', 'admin')
             AND COALESCE(staff.tenant_id, '${DEFAULT_TENANT_ID}') =
                 COALESCE(account.tenant_id, '${DEFAULT_TENANT_ID}')
          UNION
