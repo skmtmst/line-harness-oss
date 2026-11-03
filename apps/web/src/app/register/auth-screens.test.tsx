@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CONTACT_URL, LEGAL_LINKS, PUBLIC_AUTH_PATHS } from '@/lib/auth-email'
 import AuthCard from '@/components/auth/auth-card'
@@ -94,9 +93,9 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
   })
 
   it('ログイン前の問い合わせ先は公開サイトに向け、ログイン必須の統括窓口へ送らない', () => {
-    const markup = renderToStaticMarkup(createElement(AuthCard, {
-      title: 'ログイン', description: 'テスト', children: null, step: { current: 1, total: 2 },
-    }))
+    const markup = renderToStaticMarkup(
+      <AuthCard title="ログイン" description="テスト" step={{ current: 1, total: 2 }}>{null}</AuthCard>,
+    )
     expect(markup).toContain(`href="${CONTACT_URL}"`)
     expect(markup).toContain('>お問い合わせ</a>')
     expect(markup).not.toContain('href="/hq/support"')
