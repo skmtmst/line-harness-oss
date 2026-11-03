@@ -279,6 +279,8 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   const [stopReason, setStopReason] = useState('')
   /* 中身を見る窓・編集の窓・取消の窓（今の画面と同じ窓）。 */
   const [detailTarget, setDetailTarget] = useState<ConversionDefinitionListItem | null>(null)
+  const detailTargetRef = useRef(detailTarget)
+  detailTargetRef.current = detailTarget
   const [editTarget, setEditTarget] = useState<ConversionDefinitionListItem | null>(null)
   const [editForm, setEditForm] = useState<EditForm | null>(null)
   const [editSaving, setEditSaving] = useState(false)
@@ -294,8 +296,10 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   const [ingestError, setIngestError] = useState('')
   const [ingestEvents, setIngestEvents] = useState<ConversionIngestionEvent[]>([])
   const [definitionEvents, setDefinitionEvents] = useState<ConversionDefinitionEvent[]>([])
+  const [eventsSource, setEventsSource] = useState<{ id: string; epoch: number } | null>(null)
   const [eventsFailed, setEventsFailed] = useState(false)
   const [reversalTarget, setReversalTarget] = useState<ConversionDefinitionEvent | null>(null)
+  const [reversalScope, setReversalScope] = useState<{ epoch: number; definitionId: string; lineAccountId: string | null } | null>(null)
   const [reversalKind, setReversalKind] = useState<'reverse' | 'restore'>('reverse')
   const [reversalReason, setReversalReason] = useState('')
   const [reversalBusy, setReversalBusy] = useState(false)
@@ -387,24 +391,30 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
 
   useEffect(() => { void load() }, [load])
 
-  /* 中身を見る窓を開いたら、成果1件ずつの記録と受信履歴も読む。 */
+  /* 中身と同じ成果地点から来た応答だけを、取消の対象にする。 */
   useEffect(() => {
+    let active = true
     setIngestEvents([])
     setDefinitionEvents([])
+    setEventsSource(null)
     setEventsFailed(false)
-    if (!detailTarget) return
+    if (!detailTarget) return () => { active = false }
     const id = detailTarget.id
+    const epoch = stopScope.current.epoch
     void api.conversions.definitionEvents(id, 10)
       .then((response) => {
-        if (response.success) setDefinitionEvents(response.data.items)
+        if (!active || stopScope.current.epoch !== epoch) return
+        if (response.success) { setDefinitionEvents(response.data.items); setEventsSource({ id, epoch }) }
         else setEventsFailed(true)
       })
-      .catch(() => setEventsFailed(true))
-    if (detailTarget.measureMethod !== 'webhook') return
-    void api.conversions.ingestionEvents(id, 5)
-      .then((response) => { if (response.success) setIngestEvents(response.data.items) })
-      .catch(() => undefined)
-  }, [detailTarget])
+      .catch(() => { if (active && stopScope.current.epoch === epoch) setEventsFailed(true) })
+    if (detailTarget.measureMethod === 'webhook') {
+      void api.conversions.ingestionEvents(id, 5)
+        .then((response) => { if (active && stopScope.current.epoch === epoch && response.success) setIngestEvents(response.data.items) })
+        .catch(() => undefined)
+    }
+    return () => { active = false }
+  }, [detailTarget, accountId, canEdit])
 
   /* 鍵の平文は、見せた相手が変わったら消す（別の行に見せない）。 */
   useEffect(() => {
@@ -503,6 +513,8 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   }
 
   const openReversal = (event: ConversionDefinitionEvent, kind: 'reverse' | 'restore') => {
+    if (!canEdit || !detailTarget || eventsSource?.id !== detailTarget.id || eventsSource.epoch !== stopScope.current.epoch || !definitionEvents.includes(event)) return
+    setReversalScope({ epoch: stopScope.current.epoch, definitionId: detailTarget.id, lineAccountId: detailTarget.lineAccountId })
     setReversalTarget(event)
     setReversalKind(kind)
     setReversalReason('')
@@ -511,28 +523,31 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
 
   /* 成果の取り消し・戻し。元の行は消さず、理由つきの追記を足す。 */
   const submitReversal = async () => {
-    if (!reversalTarget || !detailTarget) return
+    if (!reversalTarget || !reversalScope || !detailTarget || !canEdit || reversalScope.epoch !== stopScope.current.epoch || reversalScope.definitionId !== detailTarget.id) return
+    if (reversalTarget.latestReversalId === undefined) { setReversalError('確認情報を読み直してから、もう一度お試しください。'); return }
     if (!reversalReason.trim()) { setReversalError('理由を入れてください'); return }
     setReversalBusy(true)
     setReversalError('')
     try {
-      const res = await api.conversions.appendReversal(reversalTarget.id, { kind: reversalKind, reason: reversalReason.trim() })
+      const res = await api.conversions.appendReversal(reversalTarget.id, { kind: reversalKind, reason: reversalReason.trim(), expectedReversalId: reversalTarget.latestReversalId, expectedApprovalStatus: reversalTarget.approvalStatus, expectedCancelled: reversalTarget.cancelled })
+      if (stopScope.current.epoch !== reversalScope.epoch) return
       if (!res.success) throw new Error(res.error || '記録できませんでした。時間をおいて、もう一度お試しください。')
-      const targetId = detailTarget.id
+      const targetId = reversalScope.definitionId
       setReversalTarget(null)
       setReversalReason('')
       void api.conversions.definitionEvents(targetId, 10)
-        .then((ev) => { if (ev.success) setDefinitionEvents(ev.data.items) })
+        .then((ev) => { if (stopScope.current.epoch === reversalScope.epoch && detailTargetRef.current?.id === targetId && ev.success) setDefinitionEvents(ev.data.items) })
         .catch(() => undefined)
       void api.conversions
         .definitions({ ...definitionRange(30), lineAccountId: accountId ?? undefined })
         .then((list) => {
-          if (!list.success) return
+          if (!list.success || stopScope.current.epoch !== reversalScope.epoch) return
           const fresh = list.data.items.find((item) => item.id === targetId)
           if (fresh) setDetailTarget((current) => (current && current.id === targetId ? { ...current, ...fresh } : current))
         })
         .catch(() => undefined)
     } catch (err) {
+      if (stopScope.current.epoch !== reversalScope.epoch) return
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
@@ -1261,13 +1276,14 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
           ingestError={ingestError}
           issuedSecret={issuedSecret}
           ingestEvents={ingestEvents}
-          definitionEvents={definitionEvents}
+          definitionEvents={eventsSource?.id === detailTarget?.id && eventsSource?.epoch === stopScope.current.epoch ? definitionEvents : []}
           eventsFailed={eventsFailed}
           canReverse={canEdit}
           openReversal={openReversal}
         />
         <ConversionReversalDialog
-          reversalTarget={reversalTarget}
+          reversalTarget={reversalScope?.epoch === stopScope.current.epoch && reversalScope?.definitionId === detailTarget?.id ? reversalTarget : null}
+          account={{ id: reversalScope?.lineAccountId ?? '', name: reversalScope?.lineAccountId ? accounts.find(account => account.id === reversalScope.lineAccountId)?.name : '不明' }}
           reversalKind={reversalKind}
           reversalBusy={reversalBusy}
           reversalError={reversalError}

@@ -142,6 +142,7 @@ export type ConversionDefinitionEvent = {
    * 別に持ち、「取消を戻す」操作の対象はこの印が立つ行だけ。
    */
   reversed: boolean
+  latestReversalId?: string | null
   value: number | null
   source: string | null
   sourceEventId: string | null

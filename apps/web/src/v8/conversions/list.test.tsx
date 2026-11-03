@@ -678,10 +678,10 @@ describe('V8 コンバージョンの一覧：止める・差し替える・削�
 
 describe('V8 コンバージョンの一覧：中身を見る窓', () => {
   const definitionEvents = [
-    { id: 'e1', friendId: 'f1', friendName: '佐藤', status: 'confirmed', approvalStatus: null, cancelled: false, reversed: false, value: 1200, source: null, sourceEventId: null, createdAt: '2026-09-01T10:00:00.000Z' },
-    { id: 'e2', friendId: 'f2', friendName: '鈴木', status: 'pending', approvalStatus: 'pending', cancelled: false, reversed: false, value: null, source: null, sourceEventId: null, createdAt: '2026-09-02T10:00:00.000Z' },
-    { id: 'e3', friendId: 'f3', friendName: '高橋', status: 'rejected', approvalStatus: 'rejected', cancelled: false, reversed: false, value: 500, source: null, sourceEventId: null, createdAt: '2026-09-03T10:00:00.000Z' },
-    { id: 'e4', friendId: 'f4', friendName: '田中', status: 'cancelled', approvalStatus: null, cancelled: true, reversed: true, value: 800, source: null, sourceEventId: null, createdAt: '2026-09-04T10:00:00.000Z' },
+    { id: 'e1', friendId: 'f1', friendName: '佐藤', status: 'confirmed', approvalStatus: null, cancelled: false, reversed: false, latestReversalId: null, value: 1200, source: null, sourceEventId: null, createdAt: '2026-09-01T10:00:00.000Z' },
+    { id: 'e2', friendId: 'f2', friendName: '鈴木', status: 'pending', approvalStatus: 'pending', cancelled: false, reversed: false, latestReversalId: null, value: null, source: null, sourceEventId: null, createdAt: '2026-09-02T10:00:00.000Z' },
+    { id: 'e3', friendId: 'f3', friendName: '高橋', status: 'rejected', approvalStatus: 'rejected', cancelled: false, reversed: false, latestReversalId: null, value: 500, source: null, sourceEventId: null, createdAt: '2026-09-03T10:00:00.000Z' },
+    { id: 'e4', friendId: 'f4', friendName: '田中', status: 'cancelled', approvalStatus: null, cancelled: true, reversed: true, latestReversalId: 'reversal-1', value: 800, source: null, sourceEventId: null, createdAt: '2026-09-04T10:00:00.000Z' },
   ]
   const ingest = (id: string, result: string, reason: string | null, isTest: boolean) => ({ id, conversionPointId: 'cp-1', result, reason, isTest, sourceEventId: null, friendId: null, payloadShape: null, signatureSha256: null, createdAt: '2026-09-05T10:00:00.000Z' })
   const ingestEvents = [
@@ -713,6 +713,55 @@ describe('V8 コンバージョンの一覧：中身を見る窓', () => {
     await flush()
     return screen.getByRole('dialog', { name })
   }
+
+  it('成果取消の確認に友だち・対象アカウント・環境を表示する', async () => {
+    const dialog = await openDetail('商品を買った')
+    const row = Array.from(dialog.querySelectorAll('li')).find((item) => item.textContent?.includes('佐藤'))!
+    fireEvent.click(within(row).getByRole('button', { name: '取り消す' }))
+    const confirm = screen.getByRole('alertdialog', { name: 'この成果を取り消す' })
+    expect(confirm.textContent).toContain('佐藤')
+    expect(confirm.textContent).toContain('本店')
+    expect(confirm.textContent).toContain('環境')
+  })
+
+  it('アカウント変更後の古い成果取消は送らない', async () => {
+    const dialog = await openDetail('商品を買った')
+    const row = Array.from(dialog.querySelectorAll('li')).find((item) => item.textContent?.includes('佐藤'))!
+    fireEvent.click(within(row).getByRole('button', { name: '取り消す' }))
+    fireEvent.change(screen.getByLabelText('理由'), { target: { value: '重複のため' } })
+    await act(async () => { root.render(<ConversionListV8 accountId="account-b" />) })
+    await flush()
+    const stale = screen.queryByRole('alertdialog', { name: 'この成果を取り消す' })
+    if (stale) fireEvent.click(within(stale).getByRole('button', { name: '取り消す' }))
+    await flush()
+    expect(calls.some(call => call === 'POST /api/conversions/events/e1/reversals')).toBe(false)
+  })
+
+  it('確認した成果と履歴の版を指定して取り消す', async () => {
+    let body: unknown
+    const dialog = await openDetail('商品を買った')
+    overrideFetch((url, init) => {
+      if (url.pathname !== '/api/conversions/events/e1/reversals') return null
+      body = JSON.parse(String(init?.body))
+      return json({ success: true, data: { id: 'rev-1', kind: 'reverse' } })
+    })
+    const row = Array.from(dialog.querySelectorAll('li')).find((item) => item.textContent?.includes('佐藤'))!
+    fireEvent.click(within(row).getByRole('button', { name: '取り消す' }))
+    fireEvent.change(screen.getByLabelText('理由'), { target: { value: '重複のため' } })
+    fireEvent.click(within(screen.getByRole('alertdialog', { name: 'この成果を取り消す' })).getByRole('button', { name: '取り消す' }))
+    await flush()
+    expect(body).toEqual({ kind: 'reverse', reason: '重複のため', expectedReversalId: null, expectedApprovalStatus: null, expectedCancelled: false })
+  })
+
+  it('アカウントを戻しても古い成果取消の確認は復活しない', async () => {
+    const dialog = await openDetail('商品を買った')
+    const row = Array.from(dialog.querySelectorAll('li')).find((item) => item.textContent?.includes('佐藤'))!
+    fireEvent.click(within(row).getByRole('button', { name: '取り消す' }))
+    await act(async () => { root.render(<ConversionListV8 accountId="account-b" />) })
+    await act(async () => { root.render(<ConversionListV8 accountId="account-a" />) })
+    await flush()
+    expect(screen.queryByRole('alertdialog', { name: 'この成果を取り消す' })).toBeNull()
+  })
 
   it('成果1件ずつの状態と金額なしを業務の言葉で出す', async () => {
     const dialog = await openDetail('商品を買った')
