@@ -368,3 +368,8 @@ it('D-18: 閲覧者には一覧の削除操作を出さない', async () => {
   await act(async () => buttonByLabel('「夏のInstagram投稿」の操作')!.click())
   expect([...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent?.includes('削除する'))).toBe(false)
 })
+
+it('経路の数は含む範囲を説明する', async () => {
+  await render()
+  expect(host.textContent).toContain('停止中を含むすべての経路')
+})
