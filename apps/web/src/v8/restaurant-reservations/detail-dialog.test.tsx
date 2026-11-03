@@ -198,7 +198,8 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     const props = { reservation: today[0], tables: data.tables, courses: data.menuItems, busy: false, canWrite: true, onClose: () => {}, onCancel: () => {}, onRestore: () => {}, onEdit: () => {}, onAttendance: attendance }
     const view = render(<ReservationDetailDialog {...props} accountId="account-1" />)
-    fireEvent.click(screen.getByRole('button', { name: '無断にする' }))
+    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     expect(screen.getByRole('alertdialog', { name: '無断にしますか？' })).toBeTruthy()
     const oldConfirm = held.confirm!
     view.rerender(<ReservationDetailDialog {...props} accountId="account-2" />)
@@ -213,10 +214,12 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     render(<ReservationDetailDialog reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
       busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
-    fireEvent.click(screen.getByRole('button', { name: '無断にする' }))
+    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     const oldConfirm = held.confirm!
     fireEvent.click(within(screen.getByRole('alertdialog', { name: '無断にしますか？' })).getByRole('button', { name: 'キャンセル' }))
-    fireEvent.click(screen.getByRole('button', { name: '無断にする' }))
+    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     oldConfirm()
     expect(attendance).not.toHaveBeenCalled()
     expect(screen.getByRole('alertdialog', { name: '無断にしますか？' })).toBeTruthy()
@@ -226,14 +229,16 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     const props = { reservation: today[0], accountId: 'account-1', tables: data.tables, courses: data.menuItems, busy: false, canWrite: true, onClose: () => {}, onCancel: () => {}, onRestore: () => {}, onEdit: () => {}, onAttendance: attendance }
     const view = render(<ReservationDetailDialog {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: '無断にする' }))
+    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     const oldConfirm = held.confirm!
     view.rerender(<ReservationDetailDialog {...props} canWrite={false} />)
     view.rerender(<ReservationDetailDialog {...props} />)
     oldConfirm()
     expect(screen.queryByRole('alertdialog', { name: '無断にしますか？' })).toBeNull()
     expect(attendance).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '無断にする' }))
+    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     const oldStatusConfirm = held.confirm!
     view.rerender(<ReservationDetailDialog {...props} reservation={{ ...today[0], status: 'pending' }} />)
     view.rerender(<ReservationDetailDialog {...props} />)
