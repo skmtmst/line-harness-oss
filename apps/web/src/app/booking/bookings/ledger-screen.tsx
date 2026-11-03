@@ -150,10 +150,8 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
     setError,
     loadError,
     decideTarget,
-    setDecideTarget,
     deciding,
     decideError,
-    setDecideError,
     csvBusy,
     canOperate,
     setDetailId,
@@ -170,7 +168,8 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
     load,
     downloadLedgerCsv,
     calendarStatus,
-    runDecide,
+    confirmDecide,
+    cancelDecide,
     handleDecide,
     kpi,
     menuCounts,
@@ -241,8 +240,8 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
         destructive={decideTarget?.action === 'reject' || decideTarget?.action === 'cancel' || decideTarget?.action === 'no_show'}
         busy={deciding}
         error={decideError || undefined}
-        onCancel={() => { setDecideTarget(null); setDecideError('') }}
-        onConfirm={() => { if (decideTarget && decideTarget.accountId === selectedAccountId) void runDecide(decideTarget.id, decideTarget.action) }}
+        onCancel={() => cancelDecide(decideTarget)}
+        onConfirm={() => confirmDecide(decideTarget)}
       ><OperationTargetSummary accounts={[{ id: decideTarget?.accountId ?? '' }]} /></ConfirmDialog>
     </>
   )
