@@ -154,3 +154,9 @@ describe('V8 オートメーションの見本（c7dxp）', () => {
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it('見本にはルールの実行数ではなく見本の一覧を表示する', async () => {
+  await render()
+  expect(host.querySelector('[aria-label="ルールの数の帯"]')).toBeNull()
+  expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(8)
+})
