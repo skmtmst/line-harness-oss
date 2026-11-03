@@ -51,7 +51,7 @@ test('確認した組の予約集合と各版が変わったら一件も取り�
  expect(fetch).not.toHaveBeenCalled();
 });
 
-test('確認後に来店を記録して元に戻した予約も古い確認では組取消しない',async()=>{
+test('確認後に来店を記録して解除した予約も古い確認では組取消しない',async()=>{
  const created=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'group-aba');
  const data=(await created.json() as any).data;expect(created.status).toBe(201);
  const bookingId=data.bookings[0].id;

@@ -257,7 +257,6 @@ const D11 = { iso: T1, date: '2026-11-02', start: '10:00', end: '11:00' };
 const D12 = { iso: T2, date: '2026-11-02', start: '11:00', end: '12:00' };
 const D13 = { iso: T3, date: '2026-11-02', start: '12:00', end: '13:00' };
 const DSOON = { iso: T_SOON, date: '2026-10-20', start: '19:00', end: '20:00' };
-
 describe('F6 本人日時変更・取消（mock局所）', () => {
   let sqlite: Database.Database;
   let db: D1Database;
@@ -311,7 +310,6 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
         ('friend-b', 'U-b-1', '本人B', 'account-b', 1);
     `);
     db = asD1(sqlite);
-
     // 管理者 fixture 用は staff あり。本人リクエスト用は staff 無し。
     // staff 無しで本人操作が通ることが、公開認証経路（authMiddleware が
     // /api/liff/ を外す＋idToken 検証）の証拠になる。
@@ -324,7 +322,6 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     selfApp = new Hono<Env>();
     selfApp.route('/', booking);
     env = { DB: db };
-
     // LIFF の id_token 検証と Google provider だけ通す。ほかは落とす。
     mockFetch();
   });
