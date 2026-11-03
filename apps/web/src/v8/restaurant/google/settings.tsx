@@ -6,6 +6,7 @@ import { Link2, RefreshCw } from 'lucide-react'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
@@ -144,17 +145,17 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
             </Button>
           </div>
         )}
-        <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason} open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} error={actionError || undefined} onSuccess={() => setConfirmDisconnect(false)} onConfirm={() => disconnect()} onCancel={() => setConfirmDisconnect(false)} />
+        <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason} open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} error={actionError || undefined} onSuccess={() => setConfirmDisconnect(false)} onConfirm={() => disconnect()} onCancel={() => setConfirmDisconnect(false)}><OperationTargetSummary accounts={[{ id: accountId }]} store={data.store} externalTarget={{ label: 'Googleの店舗', name: connection.locationTitle }} /></ConfirmDialog>
         <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason}
           open={confirmSwitch}
           title="接続する店舗を切り替えますか？"
-          description={`「${previousTitle ?? ''}」から切り替えます。これまでに取り込んだ口コミ・返信の下書き・プロフィール・投稿・数値は消え、戻せません。新しい店舗の分はこのあと取り込み直します。`}
+          description={`「${previousTitle ?? ''}」から「${data.candidates.find(candidate => candidate.locationName === selectedLocation)?.locationTitle ?? '確認できない店舗'}」へ切り替えます。これまでに取り込んだ口コミ・返信の下書き・プロフィール・投稿・数値は消え、戻せません。新しい店舗の分はこのあと取り込み直します。`}
           confirmLabel="切り替える"
           destructive
           busy={busy}
           error={actionError || undefined} onSuccess={() => setConfirmSwitch(false)} onConfirm={() => selectLocation(true)}
           onCancel={() => setConfirmSwitch(false)}
-        />
+        ><OperationTargetSummary accounts={[{ id: accountId }]} store={data.store} externalTarget={{ label: '切り替え先のGoogleの店舗', name: data.candidates.find(candidate => candidate.locationName === selectedLocation)?.locationTitle }} /></ConfirmDialog>
       </div></SaveErrorScope>
     )
   }
@@ -188,7 +189,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         error={actionError}
         onConfirm={() => disconnect()}
         onCancel={() => setConfirmDisconnect(false)}
-      />
+      ><OperationTargetSummary accounts={[{ id: accountId }]} store={data.store} externalTarget={{ label: 'Googleの店舗', name: connection.locationTitle }} /></ConfirmDialog>
     </></SaveErrorScope>
   )
 }

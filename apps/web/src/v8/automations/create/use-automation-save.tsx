@@ -52,7 +52,7 @@ export function useAutomationSave({
   saveRunningRef: RefObject<boolean>
   saving: boolean
   blockedReason: string | null
-  validate: () => string | null
+  validate: (forPublish?: boolean) => string | null
   setSaving: Dispatch<SetStateAction<boolean>>
   name: string
   draftEventType: "datetime" | "friend_add" | "tag_change" | "message_received" | "form_submitted" | "link_clicked" | "calendar_booked" | "daily" | "weekly" | "ec.order.confirmed"
@@ -166,7 +166,7 @@ export function useAutomationSave({
     /* 比べてから保存：競合の版を承知の上で上書きする。 */
     const forcedVersion = force ? conflict?.serverVersionId : undefined
     setConflict(null)
-    const invalid = validate()
+    const invalid = validate(activate)
     if (invalid) {
       setNotice('')
       return

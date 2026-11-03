@@ -1,3 +1,5 @@
+import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
+
 /**
  * 友だち数の上限と警告値を検証する。
  *
@@ -72,4 +74,38 @@ export function validateLoginChannelPair(
       : 'loginChannelId must be provided when loginChannelSecret is set';
   }
   return null;
+}
+
+export type ConnectBody = {
+  style?: unknown;
+  tagIds?: unknown; staffIds?: unknown; parentLineAccountId?: unknown; liffId?: unknown;
+  name?: unknown;
+  channelId?: unknown;
+  channelSecret?: unknown;
+  loginChannelId?: unknown;
+  loginChannelSecret?: unknown;
+  importFriends?: unknown;
+};
+
+export function readConnectBody(body: ConnectBody):
+  | { ok: true; value: { importFriends: boolean; style?: AccountStyle; name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
+  | { ok: false; error: string } {
+  if (body.importFriends !== undefined && typeof body.importFriends !== 'boolean') return { ok: false, error: '友だちの引き継ぎはtrueまたはfalseで指定してください' };
+  if (body.style !== undefined && !ACCOUNT_STYLES.includes(body.style as AccountStyle)) return { ok: false, error: 'invalid_style' };
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
+  const channelSecret = typeof body.channelSecret === 'string' ? body.channelSecret.trim() : '';
+  const loginChannelId = typeof body.loginChannelId === 'string' ? body.loginChannelId.trim() : '';
+  const loginChannelSecret = typeof body.loginChannelSecret === 'string' ? body.loginChannelSecret.trim() : '';
+  if (name.length > 40) return { ok: false, error: '表示名は40文字以内で入力してください' };
+  if (!/^\d+$/.test(channelId)) return { ok: false, error: 'Messaging APIのチャネルIDは半角数字で入力してください' };
+  if (!channelSecret) return { ok: false, error: 'Messaging APIのチャネルシークレットを入力してください' };
+  if (!/^\d+$/.test(loginChannelId)) return { ok: false, error: 'LINE LoginのチャネルIDは半角数字で入力してください' };
+  if (!loginChannelSecret) return { ok: false, error: 'LINE Loginのチャネルシークレットを入力してください' };
+  const id=(v:unknown):v is string=>typeof v==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(v);
+  if (Array.isArray(body.tagIds) && body.tagIds.length > 30) return { ok: false, error: '登録前のタグは30件以内で指定してください' };
+  for(const value of [body.tagIds,body.staffIds]) if(value!==undefined && (!Array.isArray(value)||value.length>50||value.some(v=>!id(v))||new Set(value).size!==value.length)) return {ok:false,error:'タグ・担当者の指定を確認してください'};
+  if(body.parentLineAccountId!==undefined && body.parentLineAccountId!==null && !id(body.parentLineAccountId)) return {ok:false,error:'親アカウントを確認してください'};
+  if(body.liffId!==undefined && (typeof body.liffId!=='string'||!/^\d+-[A-Za-z0-9_-]+$/.test(body.liffId))) return {ok:false,error:'LIFF IDを確認してください'};
+  return { ok: true, value: { importFriends: body.importFriends !== false, style: body.style as AccountStyle | undefined, name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:(body.tagIds ?? []) as string[],staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
 }

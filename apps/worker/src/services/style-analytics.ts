@@ -14,6 +14,7 @@ import {
   civilDate,
   addDate,
   eligible,
+  cancelled,
   readWindow,
 } from './style-analytics-core.js';
 import { styleRows } from './style-booking-rows.js';
@@ -146,7 +147,7 @@ export async function styleSnapshot(
   };
   metrics.newBookings = countMetric(
     rows.filter(
-      (r) => instant(r.requestedAt) >= from && instant(r.requestedAt) < to,
+      (r) => !cancelled(r) && instant(r.requestedAt) >= from && instant(r.requestedAt) < to,
     ).length,
     '予約が入った日が期間内の予約',
   );
@@ -332,7 +333,7 @@ export async function styleSnapshot(
     previous,
     items: selected,
     newBookings: rows.filter(
-      (r) => instant(r.requestedAt) >= from && instant(r.requestedAt) < to,
+      (r) => !cancelled(r) && instant(r.requestedAt) >= from && instant(r.requestedAt) < to,
     ),
     resultId,
     people: personMetrics(rows, from, to, now, settings).people,

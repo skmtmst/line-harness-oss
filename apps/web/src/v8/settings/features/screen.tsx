@@ -49,7 +49,7 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
   if (created === null || inUse === null) {
     return (
       <span className={styles.usage} title={category.inUse.reason ?? category.created.reason ?? '利用状況はまだ分かりません'}>
-        利用数は未取得
+        —
         {onRetry && <button type="button" onClick={onRetry} aria-label="利用数を読み直す">もう一度読み込む</button>}
       </span>
     )

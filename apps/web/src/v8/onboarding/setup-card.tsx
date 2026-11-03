@@ -49,8 +49,8 @@ export function SetupWarningBands({ data, configureAllowed = true, role }: { dat
       {warnings.map((warning) => {
         const button = tiles.find((tile) => tile.feature === warning.feature)?.label ?? featureName(warning.feature)
         return (
-          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button lockedReason={permissionLockReason(role, configureAllowed, 'manager')} onClick={() => { if (configureAllowed) preparing.open(FEATURES[warning.feature]!.preparing!) }}>決まりを入れる</Button> : <Button lockedReason={permissionLockReason(role, configureAllowed, 'manager')} href={featureHref(warning.feature, warning.href, data.state.style)}>決まりを入れる</Button>}>
-            {`リッチメニューに「${button}」のボタンがありますが、${featureName(warning.feature)}の決まりがまだです。お客さまには「${PREPARING_WORD}」と出ています。`}
+          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button lockedReason={permissionLockReason(role, configureAllowed, 'manager')} onClick={() => { if (configureAllowed) preparing.open(FEATURES[warning.feature]!.preparing!) }}>{`${featureName(warning.feature)}を設定する`}</Button> : <Button lockedReason={permissionLockReason(role, configureAllowed, 'manager')} href={featureHref(warning.feature, warning.href, data.state.style)}>{`${featureName(warning.feature)}を設定する`}</Button>}>
+            {`リッチメニューに「${button}」のボタンがありますが、${featureName(warning.feature)}がまだ設定されていません。お客さまには「${PREPARING_WORD}」と出ています。`}
           </Notice>
         )
       })}
@@ -94,7 +94,7 @@ export function SetupTasks({ summary, onOpenStep, heading = false, configureAllo
         <p className={styles.done}>
           {heading ? null : <><CircleCheck aria-hidden="true" className={styles.doneIcon} /><span className={styles.doneText}>{doneText}</span></>}
           <span className={styles.spacer} />
-          <Button variant="text" lockedReason={configureAllowed ? undefined : '中身はオーナーか管理者が見られます'} onClick={() => { if (configureAllowed) onOpenStep(0) }}>済んだ物を見る</Button>
+          <Button variant="text" lockedReason={configureAllowed ? undefined : '中身はオーナーか管理者が見られます'} onClick={() => { if (configureAllowed) onOpenStep(0) }}>設定を確認する</Button>
         </p>
       ) : null}
       {preparing.dialog}

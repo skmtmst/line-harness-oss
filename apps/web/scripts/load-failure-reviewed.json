@@ -155,14 +155,14 @@
   },
   {
     "filename": "src/v8/events/list.tsx",
-    "fingerprint": "0a0a4fee9d22af11",
+    "fingerprint": "831a69396fa62b42",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
     "filename": "src/v8/form-responses/responses.tsx",
-    "fingerprint": "961efaa09d2b754f",
+    "fingerprint": "f546d4e99d8454fc",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
@@ -246,7 +246,7 @@
   },
   {
     "filename": "src/v8/mileage/earning-rules.tsx",
-    "fingerprint": "c6033b1e32690f94",
+    "fingerprint": "c790d914ee326a55",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
@@ -351,7 +351,7 @@
   },
   {
     "filename": "src/v8/settings/line-notifications/screen.tsx",
-    "fingerprint": "3f8202380445f277",
+    "fingerprint": "fedae9f3306b61d1",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"

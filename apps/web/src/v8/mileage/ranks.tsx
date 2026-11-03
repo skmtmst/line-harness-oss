@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RankProgram, RankTier } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
 import HelpTip from '@/components/shared/help-tip'
@@ -79,6 +80,14 @@ type Preview = { byTier: Array<{ tierId: string; name: string; count: number }>;
 export default function RanksTab() {
   const { readonly, narrow } = useMileageShell()
   const { selectedAccountId: accountId, selectedAccount, accounts } = useAccountContext()
+  const scope = useRef({ id: accountId, generation: 0 })
+  if (scope.current.id !== accountId) scope.current = { id: accountId, generation: scope.current.generation + 1 }
+  const loadedScope = useRef(-1)
+  const readonlyRef = useRef(readonly)
+  readonlyRef.current = readonly
+  const alive = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const [operationAccount, setOperationAccount] = useState<{ id: string; generation: number } | null>(null)
   const accountName = (selectedAccount?.id === accountId ? selectedAccount.name : accounts?.find(account => account.id === accountId)?.name)?.trim() || "店名未取得"
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState<unknown>(null)
@@ -96,26 +105,30 @@ export default function RanksTab() {
   const [sample, setSample] = useState<'up' | 'down'>('up')
   const [menuIndex, setMenuIndex] = useState<number | null>(null)
 
+  const renderScope = scope.current.generation
   const load = useCallback(async () => {
-    if (!accountId) return
+    if (!accountId || accountId !== scope.current.id || renderScope !== scope.current.generation) return
     const request=++loadEpoch.current
+    const requestScope = renderScope
     setStatus('loading');setProgramAccountId(null);setPreview(null)
     try {
       const response = await memberRanksApi.program(accountId)
       if(request!==loadEpoch.current)return
       if (!response.success) throw new Error('program_failed')
-      setProgram(response.data);setProgramAccountId(accountId)
+      if (requestScope !== scope.current.generation) return
+      setProgram(response.data);setProgramAccountId(accountId);loadedScope.current = requestScope
       setStatus('ready')
       const counts = await memberRanksApi.preview(accountId).catch(() => null)
-      if(request===loadEpoch.current)setPreview(counts && counts.success ? counts.data : null)
+      if(request===loadEpoch.current && requestScope===scope.current.generation)setPreview(counts && counts.success ? counts.data : null)
     } catch (reason) {
-      if(request!==loadEpoch.current)return
+      if(request!==loadEpoch.current || requestScope!==scope.current.generation)return
       setError(reason)
       setStatus('error')
     }
-  }, [accountId])
+  }, [accountId, renderScope])
 
   useEffect(() => { void load();return()=>{loadEpoch.current++} }, [load])
+  useEffect(() => { setDeleteId(null); setConfirm(null); setOperationAccount(null) }, [accountId])
 
   const tiers = useMemo(() => program?.tiers ?? [], [program])
   const editingIndex = edit?.id ? tiers.findIndex(tier => tier.id === edit.id) : -1
@@ -123,22 +136,25 @@ export default function RanksTab() {
 
   const run = async (doing: string, action: () => Promise<{ success: boolean }>, done: string) => {
     if (mutation.current || reviewRequired || readonly || status !== 'ready') return false
+    const operationScope = scope.current.generation
     mutation.current = true
     setBusy(true)
     setNotice('')
     try {
       const response = await action()
+      if (!alive.current || operationScope !== scope.current.generation) return false
       if (!response.success) throw new Error('failed')
       notifySaved(done)
       void load()
       return true
     } catch (reason) {
+      if (!alive.current || operationScope !== scope.current.generation) return false
       setNotice(failureText(reason, doing))
       const needsReview = !(reason instanceof ApiError) || reason.status === 409 || reason.status >= 500
       setReviewRequired(needsReview)
       return false
     } finally {
-      mutation.current = false; setBusy(false)
+      mutation.current = false; if (alive.current) setBusy(false)
     }
   }
 
@@ -195,7 +211,7 @@ export default function RanksTab() {
                       onOpenChange={(next) => setMenuIndex(next ? index : null)}
                       items={[
                         { id: 'edit', label: '編集する', disabled: busy || reviewRequired, disabledReason: '最新のランクを確認してください。', onSelect: () => { setNotice(''); setEdit({ id: tier.id, tier }) } },
-                        ...(index === 0 || tiers.length <= 2 ? [] : [{ id: 'delete', label: '削除する', disabled: busy || reviewRequired, disabledReason: '最新のランクを確認してください。', onSelect: () => { setNotice(''); setReviewRequired(false); setDeleteId(tier.id) } }]),
+                        ...(index === 0 || tiers.length <= 2 ? [] : [{ id: 'delete', label: '削除する', disabled: busy || reviewRequired, disabledReason: '最新のランクを確認してください。', onSelect: () => { if (!accountId || loadedScope.current !== scope.current.generation || readonlyRef.current) return; setOperationAccount({ id: accountId, generation: scope.current.generation }); setNotice(''); setReviewRequired(false); setDeleteId(tier.id) } }]),
                       ]}
                     />
                   </span>
@@ -242,8 +258,8 @@ export default function RanksTab() {
               <StatusBadge tone={program?.status === 'active' ? 'success' : 'neutral'}>{activeLabel}</StatusBadge>
               {readonly || !program || tiers.length === 0 ? null : (
                 program.status === 'active'
-                  ? <Button variant="secondary" onClick={() => { setNotice(''); setConfirm('stop') }} disabled={busy || reviewRequired}>止める</Button>
-                  : <Button variant="primary" onClick={() => { setNotice(''); setConfirm('activate') }} disabled={busy || reviewRequired}>動かす</Button>
+                  ? <Button variant="secondary" onClick={() => { if (!accountId || loadedScope.current !== scope.current.generation || readonlyRef.current) return; setOperationAccount({ id: accountId, generation: scope.current.generation }); setNotice(''); setConfirm('stop') }} disabled={busy || reviewRequired}>止める</Button>
+                  : <Button variant="primary" onClick={() => { if (!accountId || loadedScope.current !== scope.current.generation || readonlyRef.current) return; setOperationAccount({ id: accountId, generation: scope.current.generation }); setNotice(''); setConfirm('activate') }} disabled={busy || reviewRequired}>動かす</Button>
               )}
             </span>
           </div>
@@ -298,24 +314,24 @@ export default function RanksTab() {
         />
       ) : null}
       <ConfirmDialog
-        open={deleteId !== null}
+        open={deleteId !== null && operationAccount?.generation === scope.current.generation}
         title={deleteId !== null ? `「${tiers.find(tier => tier.id === deleteId)?.name ?? ''}」を削除しますか？` : ''}
         description="その段にいた人は、1 つ下の段になります。段を保存するといったん止まります。"
         confirmLabel="削除する"
         destructive
         busy={busy}
         confirmDisabled={reviewRequired} confirmDisabledReason="閉じて最新の段を読み直し、消す段を選び直してください。"
-        error={notice || undefined} onSuccess={() => setDeleteId(null)} onConfirm={() => deleteId !== null ? saveTiers(tiers.filter(tier => tier.id !== deleteId)) : undefined}
+        error={notice || undefined} onSuccess={() => setDeleteId(null)} onConfirm={() => deleteId !== null && operationAccount?.generation === scope.current.generation && !readonlyRef.current ? saveTiers(tiers.filter(tier => tier.id !== deleteId)) : undefined}
         onCancel={() => { setDeleteId(null); closeReviewed() }}
-      />
+      >{operationAccount ? <OperationTargetSummary accounts={[{ id: operationAccount.id }]} /> : null}</ConfirmDialog>
       <Dialog
-        open={confirm !== null}
+        open={confirm !== null && operationAccount?.generation === scope.current.generation}
         title={confirm === 'activate' ? '会員ランクを動かしますか？' : '会員ランクを止めますか？'}
         confirmLabel={confirm === 'activate' ? '動かす' : '止める'}
         busy={busy}
         confirmRetry={Boolean(notice)}
         onConfirm={() => {
-          if (!accountId || !program) return
+          if (!accountId || !program || operationAccount?.generation !== scope.current.generation || readonlyRef.current) return
           const action = confirm === 'activate'
             ? () => memberRanksApi.activate(accountId, program.version, crypto.randomUUID())
             : () => memberRanksApi.stop(accountId, program.version)
@@ -324,6 +340,7 @@ export default function RanksTab() {
         error={notice || undefined} confirmDisabled={reviewRequired} confirmDisabledReason="閉じて最新のランクを確認してください。"
         onCancel={() => { setConfirm(null); closeReviewed() }}
       >
+        {operationAccount ? <OperationTargetSummary accounts={[{ id: operationAccount.id }]} /> : null}
         <div className={styles.dialogBody}>
           {confirm === 'activate' ? (
             <>

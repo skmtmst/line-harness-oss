@@ -83,7 +83,8 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
     if (!overview) return
     downloadCsv(csvFileName("友だち分析"), [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])
   }
-  useRegisterExport(exportCsv, !daysShown)
+  const exportReason = state.loading ? '集計結果を読み込んでいます。' : state.error || overview?.stateReason || (overview ? METRIC_STATE_TEXT[overview.state] : '集計結果を確認できません。')
+  useRegisterExport(exportCsv, !daysShown, exportReason)
 
   if (!state.data || !overview) {
     return <ListPageSection>

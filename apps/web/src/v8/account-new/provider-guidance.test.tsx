@@ -96,6 +96,7 @@ it('確認前・確認成功・模擬保存後も、所属の手動確認を読�
   expect(screen.getByText('両方のチャネルの認証結果を確認します。')).toBeTruthy()
   expect(document.body.textContent).not.toMatch(unsupportedClaim)
   expect(calls.check).not.toHaveBeenCalled(); expect(calls.connect).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await waitFor(() => expect((screen.getByRole('button', { name: '登録する' }) as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 })
   expectManualGuidance(); expect(document.body.textContent).not.toMatch(unsupportedClaim)
@@ -111,10 +112,44 @@ it.each([1, 4])('段%sの認証が失敗した画面でも手動確認を示し�
   if (order === 1) connection.verification!.tokenOk = false
   else connection.verification!.loginOk = false
   calls.check.mockResolvedValue({ success: true, data: connection })
-  confirmation(); fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
+  confirmation();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
+  fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await screen.findByRole('button', { name: 'もう一度確かめる' }, { timeout: 5000 })
   expectManualGuidance(); expect(document.body.textContent).not.toMatch(unsupportedClaim)
   const register = screen.queryByRole('button', { name: '登録する' }) as HTMLButtonElement | null
   expect(register === null || register.disabled).toBe(true)
+  expect(calls.connect).not.toHaveBeenCalled()
+})
+
+it('接続情報の必須欄が空の間は次へを止め、入力する内容を示す', () => {
+  render(<AccountRegisterV8 />)
+  fireEvent.click(screen.getByRole('radio', { name: 'はい、あります' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'いいえ、引き継ぎません' }))
+  fireEvent.click(screen.getByRole('radio', { name: '使っていません' }))
+  fireEvent.click(screen.getByRole('button', { name: '次へ', exact: true }))
+  const next = () => screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
+  expect(next().disabled).toBe(true)
+  expect(screen.getByText('チャネルIDとチャネルシークレットを入力してください。')).toBeTruthy()
+  fireEvent.change(document.getElementById('v8-channel-id')!, { target: { value: '1234567890' } })
+  expect(next().disabled).toBe(true)
+  fireEvent.change(document.getElementById('v8-channel-secret')!, { target: { value: 'a'.repeat(32) } })
+  expect(next().disabled).toBe(false)
+  fireEvent.click(next())
+  expect(next().disabled).toBe(true)
+  expect(screen.getByText('プロバイダーIDを入力してください。')).toBeTruthy()
+  expect(calls.check).not.toHaveBeenCalled()
+  expect(calls.connect).not.toHaveBeenCalled()
+})
+
+it('接続確認の通信失敗を操作内容より先に表示し、再確認できる', async () => {
+  calls.check.mockRejectedValueOnce(new Error('offline'))
+  confirmation()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
+  fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
+  const notice = await screen.findByText(/接続の確認結果を確認できませんでした/)
+  const card = screen.getByRole('region', { name: '接続確認' })
+  expect(notice.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'もう一度確かめる' })).toBeTruthy()
   expect(calls.connect).not.toHaveBeenCalled()
 })

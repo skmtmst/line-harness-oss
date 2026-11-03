@@ -64,7 +64,7 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
     // 日付はほかの日付の欄と同じ「2026年9月15日（火）」の書き方で見せる。
     const shown = field.type === 'checkbox' ? (value === '1' ? 'はい' : 'いいえ') : ymd ? formatDateLabel(new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))) : (value || emptyValue('unconfigured'))
     // EC が正本の値は、年齢と同じ灰色の読むだけの欄にする。
-    return <SaveErrorField names={["shown"]}><TextField id={id} value={field.type === 'checkbox' || value ? shown : ''} placeholder="未設定" readOnly disabled={!!field.ecIsMaster} aria-readonly="true" aria-label={`${field.name}の値`} title={shown} /></SaveErrorField>
+    return <SaveErrorField names={["shown"]}><TextField id={id} value={field.type === 'checkbox' || value ? shown : ''} placeholder="（未設定）" readOnly disabled={!!field.ecIsMaster} aria-readonly="true" aria-label={`${field.name}の値`} title={shown} /></SaveErrorField>
   }
   if (field.type === 'select') {
     return (
@@ -84,11 +84,11 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
     )
   }
   if (field.type === 'date') {
-    return <SaveErrorField names={["value"]}><DateField id={id} value={value} onChange={onChange} aria-labelledby={`${id}-label`} placeholder="未設定" /></SaveErrorField>
+    return <SaveErrorField names={["value"]}><DateField id={id} value={value} onChange={onChange} aria-labelledby={`${id}-label`} placeholder="（未設定）" /></SaveErrorField>
   }
-  if (computed) return <TextField id={id} value={value} disabled readOnly aria-readonly="true" placeholder="未設定" />
+  if (computed) return <TextField id={id} value={value} disabled readOnly aria-readonly="true" placeholder="（未設定）" />
   const inputType = field.type === 'number' ? 'number' : field.type === 'url' ? 'url' : field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'
-  return <SaveErrorField names={["value"]}><TextField id={id} type={inputType} value={value} readOnly={readOnly} disabled={!!field.ecIsMaster} aria-readonly={readOnly || undefined} placeholder="未設定" onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
+  return <SaveErrorField names={["value"]}><TextField id={id} type={inputType} value={value} readOnly={readOnly} disabled={!!field.ecIsMaster} aria-readonly={readOnly || undefined} placeholder="（未設定）" onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
 }
 
 export default function InfoTab({ friendId, group, data, perms }: {
@@ -224,10 +224,11 @@ export default function InfoTab({ friendId, group, data, perms }: {
           {perms.saveFields ? (
             <div className={styles.saveBar}>
               {data.saveError ? <p className={styles.saveNote}><span className={styles.danger} role="alert">{data.saveError}</span></p>
-                : data.saveNotice ? <p className={styles.saveNote}><span className={styles.success} role="status">{data.saveNotice}</span></p> : null}
+                : data.saveNotice ? <p className={styles.saveNote}><span className={styles.success} role="status">{data.saveNotice}</span></p>
+                : !dirty && !data.saving ? <p className={styles.saveNote}>変更した項目はありません。</p> : null}
               <div className={styles.saveActions}>
                 <Button variant="secondary" onClick={resetValues} disabled={data.saving || !dirty}>キャンセル</Button>
-                <Button variant="primary" onClick={() => void data.saveFields()} disabled={data.saving} busy={data.saving} busyLabel="保存中…">保存する</Button>
+                <Button variant="primary" onClick={() => void data.saveFields()} disabled={data.saving || !dirty} busy={data.saving} busyLabel="保存中…">保存する</Button>
               </div>
             </div>
           ) : (

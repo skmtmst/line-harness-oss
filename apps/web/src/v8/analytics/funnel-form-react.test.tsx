@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-li
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ create: vi.fn(), version: vi.fn(), get: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }))
 vi.mock('@/lib/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/api')>()), api: {
   conversions: { definitions: async () => ({ success: true, data: { items: [{ id: 'point-1', name: '購入' }] } }) },
   tags: { list: async () => ({ success: true, data: [] }) },
@@ -88,7 +89,41 @@ it('新版の保存後も編集を保ち、続けて保存すると新しい版�
   ], segment: null, comparisonGroups: [], expectedVersionNumber: 1 }} onCancel={() => {}} onCreated={done} />)
   fireEvent.click(screen.getByRole('button', { name: '新版として保存する' }))
   await waitFor(() => expect(done).toHaveBeenCalledOnce())
+  await waitFor(() => expect((screen.getByRole('button', { name: '新版として保存する' }) as HTMLButtonElement).disabled).toBe(false))
   expect((screen.getByLabelText('名前', { exact: true }) as HTMLInputElement).value).toBe('編集中')
+  const anchor = document.createElement('a'); anchor.href = '/templates'; document.body.appendChild(anchor)
+  const navigation = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+  anchor.dispatchEvent(navigation)
+  expect(navigation.defaultPrevented).toBe(false)
+  anchor.remove()
   fireEvent.click(screen.getByRole('button', { name: '新版として保存する' }))
   await waitFor(() => expect(net.version).toHaveBeenLastCalledWith('account-1', 'fn1', expect.objectContaining({ expectedVersionNumber: 2 })))
+})
+
+it('変更を保存した後は離脱確認を残さない', async () => {
+  net.version.mockResolvedValue({ success: true, data: { id: 'v2', versionNumber: 2 } })
+  render(<FunnelFormV8 accountId="account-1" edit={{ funnelId: 'fn1', name: '編集前', windowDays: '30', steps: [
+    { label: '入口', kind: 'friend_add', value: '', match: {} },
+    { label: '購入', kind: 'purchase', value: '', match: {} },
+  ], segment: null, comparisonGroups: [], expectedVersionNumber: 1 }} onCancel={() => {}} onCreated={() => {}} />)
+  fireEvent.change(screen.getByLabelText('名前', { exact: true }), { target: { value: '編集後' } })
+  fireEvent.click(screen.getByRole('button', { name: '新版として保存する' }))
+  await waitFor(() => expect(net.version).toHaveBeenCalledOnce())
+  await waitFor(() => expect(screen.getByRole('button', { name: '新版として保存する' }).hasAttribute('disabled')).toBe(false))
+  const anchor = document.createElement('a'); anchor.href = '/templates'; document.body.appendChild(anchor)
+  const navigation = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })
+  anchor.dispatchEvent(navigation)
+  expect(navigation.defaultPrevented).toBe(false)
+  anchor.remove()
+})
+
+it('保存中は入力の変更を受け付けない', async () => {
+  net.create.mockReturnValue(new Promise(() => {}))
+  render(<FunnelFormV8 accountId="account-1" presetConversion={{ id: 'point-1', name: '購入' }} onCancel={() => {}} onCreated={() => {}} />)
+  fireEvent.change(screen.getByLabelText('名前', { exact: true }), { target: { value: '購入まで' } })
+  fireEvent.change(screen.getByLabelText('段1の名前'), { target: { value: '友だち追加' } })
+  fireEvent.click(screen.getByRole('button', { name: '作る', exact: true }))
+  await waitFor(() => expect(net.create).toHaveBeenCalledOnce())
+  const input = screen.getByLabelText('名前', { exact: true })
+  expect(input.closest('[inert]')).not.toBeNull()
 })

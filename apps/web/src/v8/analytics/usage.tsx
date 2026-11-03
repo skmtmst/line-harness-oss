@@ -31,6 +31,12 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 
 type Category = AnalyticsUsageOverview['data']['categories'][number]
+function ResourceCount({ item, name }: { item: Category; name: 'created' | 'inUse' | 'unused' }) {
+  return <><MetricText metric={item[name]} />{item.key === 'friend_attributes' ?
+    item.breakdown?.length ? item.breakdown.map(part => <div key={part.key} className={styles.caption}>{`${part.label} ${metricText(part[name])}`}</div>)
+      : <div className={styles.caption}>内訳 —（未取得）</div> : null}</>
+}
+
 
 /* ── app/analytics/analytics-usage.ts から写した判定（文言も同じ）。 ── */
 function summarizeMenuFeatures(settings: { features: Record<string, boolean>; specializedFeatureKeys?: string[] }): { enabled: number; total: number } {
@@ -81,12 +87,16 @@ export default function UsageV8({ accountId }: { accountId: string }) {
   const exportUsage = () => {
     if (!overview) return
     downloadCsv(csvFileName("使われ方"), [
-      ['機能', '作成', '利用中', '未使用', '最終利用', '気づいたこと', '参照の状態'],
-      ...overview.categories.map((item) => [item.label, shownValue(item.created), shownValue(item.inUse), shownValue(item.unused), item.lastUsedAt.value, usageObservation(item).text, referenceHealthText(item.brokenReferences)]),
+      ['機能', '作成', '利用中', '未使用', '最終利用', '気づいたこと', '参照の状態', 'タグ作成', 'タグ利用中', 'タグ未使用', '友だち情報欄作成（保管を除く）', '友だち情報欄利用中', '友だち情報欄未使用'],
+      ...overview.categories.map((item) => [item.label, shownValue(item.created), shownValue(item.inUse), shownValue(item.unused), item.lastUsedAt.value, usageObservation(item).text, referenceHealthText(item.brokenReferences), ...(['tags', 'fields'] as const).flatMap(key => {
+        const part = item.breakdown?.find(entry => entry.key === key)
+        return part ? [shownValue(part.created), shownValue(part.inUse), shownValue(part.unused)] : [null, null, null]
+      })]),
     ])
   }
   const exportDisabled = !overview || overview.categories.length === 0
-  useRegisterExport(exportUsage, exportDisabled)
+  const exportReason = state.loading ? '集計結果を読み込んでいます。' : state.error || '書き出せる機能の集計はありません。'
+  useRegisterExport(exportUsage, exportDisabled, exportReason)
 
   if (!state.data || !overview) {
     return <div className={styles.body} data-gap="tab">
@@ -132,10 +142,10 @@ export default function UsageV8({ accountId }: { accountId: string }) {
             </thead>
             <tbody>
             {overview.categories.map((item) => <Tr key={item.key}>
-              <Td grow title={`${usageObservation(item).text} ／ ${referenceHealthText(item.brokenReferences)}`}><TruncatedText value={item.label} /></Td>
-              <Td align="right"><MetricText metric={item.created} /></Td>
-              <Td align="right"><MetricText metric={item.inUse} /></Td>
-              <Td align="right"><MetricText metric={item.unused} /></Td>
+              <Td grow title={`${usageObservation(item).text} ／ ${referenceHealthText(item.brokenReferences)}`}><TruncatedText value={item.label} />{item.key === 'friend_attributes' && item.breakdown?.length ? <div className={styles.caption}>保管を除く</div> : null}</Td>
+              <Td align="right"><ResourceCount item={item} name="created" /></Td>
+              <Td align="right"><ResourceCount item={item} name="inUse" /></Td>
+              <Td align="right"><ResourceCount item={item} name="unused" /></Td>
               <Td><span className={item.lastUsedAt.value === null ? styles.faint : undefined} title={item.lastUsedAt.reason ?? undefined}>{shortWhen(item.lastUsedAt.value)}</span></Td>
               {/* 行の右端は「…」1つ（B-253・絵 N8ZrUl）。中身を見る・片づけるはその中。 */}
               <ActionCell><RowMenu label={`${item.label}の操作`} items={[{ id: 'detail', label: '中身を見る', href: item.href }, ...(canTidyUsage(item) ? [{ id: 'tidy', label: '片づける', href: item.href }] : [])]} /></ActionCell>

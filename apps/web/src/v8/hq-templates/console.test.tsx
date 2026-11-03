@@ -1198,6 +1198,8 @@ it('クーポンの空の割引額と未完成期間をそのまま復元し、�
   fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
   fireEvent.change(await screen.findByLabelText('テンプレート名'), { target: { value: '架空の未完成特典' } })
   fireEvent.change(screen.getByLabelText('クーポン名'), { target: { value: '架空の特典' } })
+  fireEvent.click(screen.getByLabelText('クーポンタイプ'))
+  fireEvent.click(screen.getByRole('button', { name: '割引', exact: true }))
   fireEvent.change(screen.getByLabelText('割引額'), { target: { value: '500' } })
   fireEvent.change(screen.getByLabelText('割引額'), { target: { value: '' } })
   view.unmount()

@@ -73,6 +73,7 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs';
+import { scenarioAccountTargets } from './list-account-targets';
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -188,6 +189,7 @@ export default function ScenariosListV8() {
 
   /* まとめて/1件のフォルダ移動の窓。 */
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
+  const [moveAccountTargets, setMoveAccountTargets] = useState<{ accounts: Array<{ id: string }>; allAccounts: boolean }>({ accounts: [], allAccounts: false })
   const moveConfirmed = useRef(new Map<string, string | null>())
   const [pendingMove, setPendingMove] = useState<ConfirmedUndoHandle | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
@@ -206,6 +208,7 @@ export default function ScenariosListV8() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。開いている行のID。 */
   const [pendingStop, setPendingStop] = useState<string[] | null>(null)
+  const [stopAccountTargets, setStopAccountTargets] = useState<{ accounts: Array<{ id: string }>; allAccounts: boolean }>({ accounts: [], allAccounts: false })
   const toggleBusyRef = useRef(false)
   const [panelId, setPanelId] = useDetailPanelUrl('scenario')
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
@@ -247,6 +250,9 @@ export default function ScenariosListV8() {
   const renderedMoveWindow = moveWindow.current
   const deleteWindowScope = useRef(scope.current)
   const moveWindowScope = useRef(scope.current)
+  const stopWindowScope = useRef(scope.current)
+  const stopWindow = useRef<object>({})
+  const renderedStopWindow = stopWindow.current
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
 
   /* アカウントを切り替えたときだけフォルダの絞り込みを外す（最初の描画では URL の値を残す）。 */
@@ -567,10 +573,10 @@ export default function ScenariosListV8() {
   useEffect(() => { setStopError('') }, [pendingStop])
   const runConfirmedStop = async () => {
     const ids = pendingStop
-    if (!ids?.length || !requireWrite('publish') || toggleBusyRef.current) return
+    if (!ids?.length || stopWindow.current !== renderedStopWindow || stopWindowScope.current !== renderedScope || !requireWrite('publish') || toggleBusyRef.current) return
     if (confirmedStops.current.ids !== ids) confirmedStops.current = { ids, done: new Set() }
     const attempt = confirmedStops.current
-    const current = () => currentScope() && confirmedStops.current === attempt
+    const current = () => currentScope() && stopWindow.current === renderedStopWindow && confirmedStops.current === attempt
     toggleBusyRef.current = true; setStopBusy(true); setStopError('')
     try {
       for (const id of ids) {
@@ -599,6 +605,7 @@ export default function ScenariosListV8() {
   const openMove = (ids: string[]) => {
     if (!requireWrite()) return
     if (ids.length === 0) return
+    setMoveAccountTargets(scenarioAccountTargets(ids, [...selectionRows, ...scenarios]))
     moveWindow.current = {}; moveWindowScope.current = renderedScope
     setMoveDraft('')
     moveConfirmed.current = new Map()
@@ -1172,7 +1179,7 @@ export default function ScenariosListV8() {
               disabled={!publishAccess.allowed || !scenarioList.loaded || stoppableIds.length === 0}
               lockedReason={publishAccess.reason}
               disabledReason={publishAccess.allowed && stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
-              onClick={() => { if (requireWrite('publish')) setPendingStop(stoppableIds) }}
+              onClick={() => { if (requireWrite('publish')) { stopWindow.current = {}; stopWindowScope.current = renderedScope; setStopAccountTargets(scenarioAccountTargets(stoppableIds, [...selectionRows, ...scenarios])); setPendingStop(stoppableIds) } }}
             >
               <Square size={16} aria-hidden="true" />
               止める
@@ -1316,7 +1323,7 @@ export default function ScenariosListV8() {
       headingSize="regular"
       title="シナリオ配信"
       explanationKey="scenarios"
-      explanation="作っただけでは送られません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます（配信を始める方法・3手順）。"
+      explanation="作っただけでは送られません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます。"
 
       help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
       stats={<>
@@ -1413,6 +1420,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
         busyLabel="移動中…" onConfirm={() => runMove()}
           onCancel={() => setMoveIds(null)}
         >
+          <OperationTargetSummary accounts={moveAccountTargets.accounts} allAccounts={moveAccountTargets.allAccounts} />
           <div className={styles.moveBody}>
             <span className={styles.moveLabel}>移動先のフォルダ</span>
             <SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
@@ -1448,6 +1456,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
         >
           {deleteTarget && (
             <div className={styles.deleteBody}>
+              <OperationTargetSummary accounts={deleteTarget.lineAccountId === null ? [] : [{ id: deleteTarget.lineAccountId ?? '' }]} allAccounts={deleteTarget.lineAccountId === null} />
               <MoveReferrersNotice scenarioId={deleteTarget.id} />
               <p>
                 配信中 {scenarioCountLabel(deleteTarget.subscriberCount)} ／ 通数{' '}
@@ -1472,7 +1481,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
         <></>
       </>}
       folders={<>
-        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded} confirmLockedReason={publishAccess.reason} onCancel={() => setPendingStop(null)} busy={stopBusy} error={stopError || undefined} onSuccess={() => setPendingStop(null)} onConfirm={() => runConfirmedStop()} ><OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} /></ConfirmDialog>
+        <ConfirmDialog open={pendingStop !== null && stopWindowScope.current === renderedScope} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded} confirmLockedReason={publishAccess.reason} onCancel={() => { stopWindow.current = {}; setPendingStop(null) }} busy={stopBusy} error={stopError || undefined} onSuccess={() => { stopWindow.current = {}; setPendingStop(null) }} onConfirm={() => runConfirmedStop()} ><OperationTargetSummary accounts={stopAccountTargets.accounts} allAccounts={stopAccountTargets.allAccounts} /></ConfirmDialog>
         {folderPanel}
       </>}
       collapsedFolders={<>{createButton(false)}{folderSelect}</>}

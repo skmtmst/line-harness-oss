@@ -9,7 +9,7 @@ vi.hoisted(() => {
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
 })
 
-const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), updateTable: vi.fn(), updateReservation: vi.fn(), saveTableLayout: vi.fn() }))
+const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), deleteTable: vi.fn(), updateTable: vi.fn(), updateReservation: vi.fn(), saveTableLayout: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const floorApi = vi.hoisted(() => ({ floors: vi.fn() }))
 const assignmentApi = vi.hoisted(() => ({ getTables: vi.fn(), saveTables: vi.fn() }))
@@ -24,6 +24,7 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRo
 
 import TablesPage from './tables'
 import { pickMoveTarget } from './move'
+import { ApiError } from '@/lib/api/transport/errors'
 import { at, reservation, snapshotOf, store, tables } from '../booking-kit/test-data'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
@@ -45,7 +46,7 @@ beforeEach(() => {
   assignmentApi.saveTables.mockImplementation(async (_account, _store, input) => ({ success: true, data: { ...assignment, ...input, version: 5 } }))
   floorApi.floors.mockResolvedValue({ success: true, data: [] })
   fixture.snapshot.mockResolvedValue({ data: snapshotOf({ reservations: upcoming }) })
-  for (const fn of [fixture.createTable, fixture.updateTable, fixture.updateReservation, fixture.saveTableLayout]) fn.mockResolvedValue({ success: true })
+  for (const fn of [fixture.createTable, fixture.deleteTable, fixture.updateTable, fixture.updateReservation, fixture.saveTableLayout]) fn.mockResolvedValue({ success: true })
 })
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
@@ -59,9 +60,12 @@ describe('BERxg 座席・卓管理', () => {
     const footer = frame.querySelector(':scope > [data-template-region="footer"]')!
     expect(body.querySelectorAll('tbody > tr')).toHaveLength(tables.filter(table => table.is_active).length)
     expect(body.querySelector('[data-shared-part="sticky-bar"]')).toBeNull()
-    expect(footer.contains(screen.getByRole('button', { name: /保存する/ }))).toBe(true)
+    const save = screen.getByRole('button', { name: /保存する/ }) as HTMLButtonElement
+    expect(footer.contains(save)).toBe(true)
+    expect(save.disabled).toBe(true)
     fireEvent.click(screen.getByRole('radio', { name: /ランダム/ }))
-    fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
     await waitFor(() => expect(assignmentApi.saveTables).toHaveBeenCalledWith('account-1', 'store-1', expect.objectContaining({ method: 'random', expectedVersion: 4 })))
   })
 
@@ -125,6 +129,29 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true }))
     expect(fixture.updateTable).not.toHaveBeenCalled()
     expect(fixture.updateReservation).not.toHaveBeenCalled()
+  })
+
+  it('卓を名前と復元不可の確認を経て削除する', async () => {
+    render(<TablesPage />)
+    const row = (await screen.findByText('T3 · 窓側4人卓')).closest('li')!
+    fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    expect(screen.getByText('T3・窓側4人卓')).toBeTruthy()
+    expect(screen.getByText(/元に戻せません/)).toBeTruthy()
+    expect(fixture.deleteTable).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+    await waitFor(() => expect(fixture.deleteTable).toHaveBeenCalledWith('account-1', 't3'))
+  })
+
+  it('参照中の卓は確認窓に理由を出して残す', async () => {
+    fixture.deleteTable.mockRejectedValueOnce(new ApiError(409, '予約で使われている卓は削除できません。停止してください', 'resource_in_use'))
+    render(<TablesPage />)
+    const row = (await screen.findByText('T3 · 窓側4人卓')).closest('li')!
+    fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+    expect(await screen.findByText(/予約で使われている卓は削除できません/)).toBeTruthy()
+    expect(screen.getByText('T3・窓側4人卓')).toBeTruthy()
   })
 
   it('止めるときは先の予約を出し、入る卓へ移し、入らない予約は未配席にしてから止める', async () => {
@@ -332,4 +359,38 @@ describe('卓の停止で移す予約と残す来店履歴', () => {
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     expect(fixture.updateTable).not.toHaveBeenCalled()
   })
+})
+
+it.each([400, 409, 500])('卓の追加が%sで失敗したら窓の中に理由を出し、入力を残したまま再試行できる', async (status) => {
+  fixture.createTable.mockRejectedValueOnce(new ApiError(status)).mockResolvedValueOnce({ success: true })
+  render(<TablesPage />)
+  await screen.findByText('卓の詳細')
+  fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
+  const dialog = document.querySelector('[data-design-node="gBrCz"]') as HTMLElement
+  fireEvent.change(within(dialog).getByLabelText('卓番'), { target: { value: 'K1' } })
+  fireEvent.change(within(dialog).getByLabelText('表示名'), { target: { value: '試験卓' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: /^追加する$/ }))
+  await waitFor(() => expect(within(dialog).getByRole('alert').textContent?.trim()).toBeTruthy())
+  expect((within(dialog).getByLabelText('卓番') as HTMLInputElement).value).toBe('K1')
+  expect((within(dialog).getByLabelText('表示名') as HTMLInputElement).value).toBe('試験卓')
+  fireEvent.click(within(dialog).getByRole('button', { name: /^追加する$/ }))
+  await waitFor(() => expect(document.querySelector('[data-design-node="gBrCz"]')).toBeNull())
+  expect(fixture.createTable).toHaveBeenCalledTimes(2)
+})
+
+it('停止中の卓は総席数と結合可能な組に含めない', async () => {
+  fixture.snapshot.mockResolvedValue({ data: snapshotOf({ tables: tables.map(table => ({ ...table, is_active: 0 })) }) })
+  render(<TablesPage />)
+  await screen.findByText('卓の詳細')
+  const value = (label: string) => document.querySelector(`[data-kpi-label][title="${label}"]`)?.closest('[data-kpi-presentation]')?.querySelector('[data-kpi-number]')?.textContent
+  expect(value('総席数')).toBe('0')
+  expect(value('結合可能')).toBe('0')
+})
+
+it('稼働中の卓だけを総席数に数える', async () => {
+  fixture.snapshot.mockResolvedValue({ data: snapshotOf({ tables }) })
+  render(<TablesPage />)
+  await screen.findByText('卓の詳細')
+  const value = document.querySelector('[data-kpi-label][title="総席数"]')?.closest('[data-kpi-presentation]')?.querySelector('[data-kpi-number]')?.textContent
+  expect(value).toBe('20')
 })

@@ -86,7 +86,7 @@ const friendsOverview = {
 /*
  * 通信の差し替え。呼ばれた口を全部残す。公開の返事だけ試験ごとに変える。
  */
-function stubFetch(options: { publish: () => Response }) {
+function stubFetch(options: { publish: () => Response; draftOnly?: boolean }) {
   const calls: Call[] = []
   globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
     const url = String(input)
@@ -102,7 +102,7 @@ function stubFetch(options: { publish: () => Response }) {
       return new Response(JSON.stringify({
         success: true,
         data: {
-          items: [ruleFixture()],
+          items: [{ ...ruleFixture(), ...(options.draftOnly ? { publishedVersion: null } : {}) }],
           pagination: { total: 1, limit: 20, offset: 0 },
           unassignedLegacyCount: 0,
           measuredAt: '2026-09-10T00:00:00.000Z',
@@ -242,6 +242,16 @@ async function settle(ticks = 6) {
 }
 
 describe('たまる決めごとの公開確認(本物のReact)', () => {
+  it('下書き削除の確認に操作先と環境を示す', async () => {
+    stubFetch({ publish: () => { throw new Error('公開しない') }, draftOnly: true })
+    await renderPage()
+    await act(async () => { (await waitForRowMenuButton()).click() })
+    const item = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(node => node.textContent?.trim() === 'この決めごとを削除する')
+    expect(item).toBeTruthy()
+    await act(async () => { item!.click() })
+    expect(dialog()?.textContent).toContain('LINEアカウント')
+    expect(dialog()?.textContent).toContain('環境')
+  })
   it('公開版の中身で現在の版と反映した日を読める', async () => {
     stubFetch({ publish: () => { throw new Error('この操作では公開しない') } })
     await renderPage()
@@ -269,6 +279,9 @@ describe('たまる決めごとの公開確認(本物のReact)', () => {
     await settle()
     expect(net.publishes()).toHaveLength(0)
     expect(dialog()).not.toBeNull()
+    expect(dialog()?.textContent).toContain('LINEアカウント')
+    expect(dialog()?.textContent).toContain('環境')
+    expect(dialog()?.textContent).toContain('公式A')
 
     // 確定で1回だけ送る。いまの下書き版と取消不可の確認・冪等キーを添える。
     await act(async () => { dialogConfirm()?.click() })

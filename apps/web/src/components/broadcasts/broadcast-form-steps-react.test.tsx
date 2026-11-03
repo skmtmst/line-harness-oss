@@ -90,6 +90,7 @@ describe('配信名の字数（設計 zZ9fA）', () => {
     await render({ filled: false })
     expect(container.textContent).toContain(`0 / ${TITLE_MAX}文字`)
     const title = container.querySelector('input[placeholder="例：8月キャンペーンのお知らせ"]') as HTMLInputElement
+    expect(title.maxLength).toBe(TITLE_MAX)
     await act(async () => { setTextControlValue(title, '秋の案内') })
     expect(container.textContent).toContain(`4 / ${TITLE_MAX}文字`)
   })

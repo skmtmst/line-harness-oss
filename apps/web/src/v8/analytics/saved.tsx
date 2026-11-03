@@ -16,9 +16,10 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import { api, type AnalyticsReportRun, type AnalyticsReportSchedule, type RecentOneTimeReport, type SavedAnalyticsSnapshot, type SavedAnalyticsSummary } from '@/lib/api'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { formatNumber } from '@/lib/format'
 import { StatePill, shortDateTime, shortDay } from './common'
-import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport } from './parts'
+import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterExport, CsvExportButton } from './parts'
 import styles from './analytics.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
@@ -119,6 +120,14 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   const [savedReload, setSavedReload] = useState(0)
   const [snapshotReload, setSnapshotReload] = useState(0)
   const [archiveTarget, setArchiveTarget] = useState<AnalyticsReportSchedule | null>(null)
+  const [archiveAccount, setArchiveAccount] = useState('')
+  const archiveWindow = useRef<object>({})
+  const archiveWindowAccount = useRef(accountId)
+  if (archiveWindowAccount.current !== accountId) archiveWindow.current = {}
+  archiveWindowAccount.current = accountId
+  const renderedArchiveWindow = archiveWindow.current
+  const currentAccount = useRef(accountId)
+  currentAccount.current = accountId
   const [archiveError, setArchiveError] = useState('')
   const [archiveReviewRequired, setArchiveReviewRequired] = useState(false)
   const [historyExpanded, setHistoryExpanded] = useState(false)
@@ -254,7 +263,9 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
     ])
   }
   const exportDisabled = visibleItems.length === 0
-  useRegisterExport(exportSaved, exportDisabled)
+  const exportReason = loading ? '保存した分析を読み込んでいます。' : error ? '保存した分析を読み込めないため書き出せません。' : (query.trim() ? '条件に合う分析がありません。' : '保存した分析はまだありません。')
+  const snapshotExportReason = snapshotLoading ? '結果の履歴を読み込んでいます。' : snapshotError ? '結果の履歴を読み込めないため書き出せません。' : '保存された結果はありません。'
+  useRegisterExport(exportSaved, exportDisabled, exportReason)
   const failed = error ? '読み込めませんでした' : null
   const crossCount = items.filter((item) => item.kind === 'cross').length
 
@@ -274,7 +285,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       {loading ? <ListState kind="loading" title="保存した分析を読み込んでいます" />
         : error && items.length === 0 ? <ListState kind="error" title="保存した分析を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setSavedReload((n) => n + 1)} />
         : items.length === 0 ? <ListState kind="empty" title="保存した分析はまだありません" description="クロス分析かファネルを集計し、その結果を保存してください。" />
-        : <DetailColumns presentation="analysis" variant="analysis-history" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={<DetailPreview titleId="saved-history-title" title={selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'} description={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${formatNumber(schedules.filter(schedule => schedule.savedAnalysisIds.includes(selected.id)).length)}件`}` : undefined} actions={{ primary: (selected ? <Button variant="primary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={16} aria-hidden="true"/>内容を変える</Button> : null), secondary: (selected ? <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={16} aria-hidden="true"/>CSVで書き出す</Button> : null), primaryAllowed: canManage }}>
+        : <DetailColumns presentation="analysis" variant="analysis-history" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={<DetailPreview titleId="saved-history-title" title={selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'} description={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${formatNumber(schedules.filter(schedule => schedule.savedAnalysisIds.includes(selected.id)).length)}件`}` : undefined} actions={{ primary: (selected ? <Button variant="primary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={16} aria-hidden="true"/>内容を変える</Button> : null), secondary: (selected ? <CsvExportButton variant="secondary" disabled={snapshots.length === 0} disabledReason={snapshotExportReason} onClick={exportSnapshots}><Download size={16} aria-hidden="true"/>CSVで書き出す</CsvExportButton> : null), primaryAllowed: canManage }}>
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
             {snapshotError ? <Notice tone="danger" className={styles.captionNoticePlacement} >結果の履歴を読み込めませんでした。<Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</Button></Notice> : null}
             {snapshotLoading ? <p data-card-footer className={styles.caption}>結果を読み込んでいます</p>
@@ -331,7 +342,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <Td><TruncatedText value={schedule.isOneTime ? '1回だけ' : cadenceLabel(schedule)} /></Td>
             <Td><TruncatedText value={schedule.status === 'paused' ? emptyValue('unknown') : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')} /></Td>
             <Td><span><StatePill tone={schedule.status === 'active' ? 'ok' : 'neutral'}>{REPORT_STATUS_LABELS[schedule.status]}</StatePill></span></Td>
-            <ActionCell>{canManage && !schedule.isOneTime ? <ScheduleMenu schedule={schedule} busy={scheduleBusyId === schedule.id} onPause={() => void changeScheduleStatus(schedule, 'paused')} onResume={() => void changeScheduleStatus(schedule, 'active')} onArchive={() => { setArchiveError(''); setArchiveReviewRequired(false); setArchiveTarget(schedule) }} /> : null}</ActionCell>
+            <ActionCell>{canManage && !schedule.isOneTime ? <ScheduleMenu schedule={schedule} busy={scheduleBusyId === schedule.id} onPause={() => void changeScheduleStatus(schedule, 'paused')} onResume={() => void changeScheduleStatus(schedule, 'active')} onArchive={() => { archiveWindow.current = {}; setArchiveAccount(accountId); setArchiveError(''); setArchiveReviewRequired(false); setArchiveTarget(schedule) }} /> : null}</ActionCell>
           </Tr>)}</tbody>
         </DataTable></Card>}
 
@@ -345,15 +356,15 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       </section> : null}
     </div>
     <ConfirmDialog
-      open={archiveTarget !== null}
+      open={archiveTarget !== null && archiveAccount === accountId}
       title="定期レポートをしまいますか"
       description={archiveTarget ? `「${archiveTarget.name}」をしまうと、一覧から消えて今後の送信も止まります。` : ''}
       confirmLabel="しまう"
       destructive
       busy={archiveTarget !== null && scheduleBusyId === archiveTarget.id}
-      error={archiveError || undefined} confirmDisabled={archiveReviewRequired} confirmDisabledReason="閉じて最新の定期レポートを確認してください。" onSuccess={() => setArchiveTarget(null)} onConfirm={() => archiveTarget ? changeScheduleStatus(archiveTarget, 'archived') : undefined}
-      onCancel={() => { setArchiveTarget(null); setArchiveError(''); if (archiveReviewRequired) reloadSchedules(); setArchiveReviewRequired(false) }}
-    />
+      error={archiveError || undefined} confirmDisabled={archiveReviewRequired} confirmDisabledReason="閉じて最新の定期レポートを確認してください。" onSuccess={() => { archiveWindow.current = {}; setArchiveTarget(null) }} onConfirm={() => archiveTarget && schedulesAlive.current && renderedArchiveWindow === archiveWindow.current && currentAccount.current === accountId ? changeScheduleStatus(archiveTarget, 'archived') : undefined}
+      onCancel={() => { archiveWindow.current = {}; setArchiveTarget(null); setArchiveError(''); if (archiveReviewRequired) reloadSchedules(); setArchiveReviewRequired(false) }}
+    ><OperationTargetSummary accounts={[{ id: archiveAccount }]} /></ConfirmDialog>
     <Dialog open={openSnapshot !== null} title="この時点の結果" description={openSnapshot ? `${formatAnalyticsDate(openSnapshot.periodFrom)}〜${formatAnalyticsDate(openSnapshot.periodTo)}・データ締切 ${formatAnalyticsDateTime(openSnapshot.dataCutoffAt)}・${SAVED_STATE_LABELS[openSnapshot.state]}` : undefined} confirmLabel="閉じる" onConfirm={() => setOpenSnapshot(null)} onCancel={() => setOpenSnapshot(null)}>
       {openSnapshot ? (() => {
         const rows = summarizeSnapshotResult(openSnapshot.result)

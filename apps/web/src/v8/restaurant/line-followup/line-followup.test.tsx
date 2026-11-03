@@ -61,6 +61,7 @@ describe('フォームと権限',()=>{
 })
 describe('テストと公開・承認',()=>{
  async function open(){await ready();fireEvent.click(within(card('reservation_created')).getByRole('button',{name:'試す・送り始める'}));await screen.findByRole('dialog')}
+ it('試し送信と開始の確認に操作先と環境を表示する',async()=>{await open();const dialog=screen.getByRole('dialog');expect(dialog.textContent).toContain('LINEアカウント');expect(dialog.textContent).toContain('店舗');expect(dialog.textContent).toContain('環境')})
  it('本人のテスト成功後だけ、同じ指紋で公開と承認を呼ぶ',async()=>{await open();fireEvent.click(screen.getByRole('button',{name:'自分の LINE で試す'}));await screen.findByRole('button',{name:'この内容で送り始める'});expect(f.start).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'この内容で送り始める'}));await waitFor(()=>expect(f.start).toHaveBeenCalledWith('a','s','reservation_created',1,'tested-hash'))})
  it.each(['山田','山田さん','山田さま','山田様'])('テスト成功の宛先%sの敬称を重ねない',async recipientName=>{
   f.test.mockResolvedValue({recipientName,recipientKind:'self',contentHash:'tested-hash',versionId:'tested-version',sent:1,replayed:false})

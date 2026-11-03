@@ -145,6 +145,7 @@ interface ChatItem {
   body: string;
   mine?: boolean;
   failed?: boolean;
+  commentPosition?: { sessionStartAt: number; atSeconds: number };
   ctaCard?: WebinarCtaCard;
 }
 
@@ -550,6 +551,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
     } else {
       return;
     }
+    if (retry?.commentPosition) ({ sessionStartAt, atSeconds } = retry.commentPosition);
     const text = retry?.body ?? input.trim();
     if (!text) return;
     const key = retry?.key ?? `u-${crypto.randomUUID()}`;
@@ -557,17 +559,17 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
     setCommentBusy(true);
     if (!retry || input.trim() === text) setInput('');
     setChat(prev => retry ? prev.map(item => item.key === key ? { ...item, failed: false } : item)
-      : [...prev, { key, authorName: 'あなた', body: text, mine: true }]);
+      : [...prev, { key, authorName: 'あなた', body: text, mine: true, commentPosition: { sessionStartAt, atSeconds } }]);
     try {
       await apiPost(`/api/liff/webinars/${encodeURIComponent(slug)}/comments`, {
         sessionStartAt,
         atSeconds,
         body: text,
+        requestId: key,
       }, ctx);
     } catch (err) {
       clientLogger.warn("webinar_main_warn");
       setChat(prev => prev.map(item => item.key === key ? { ...item, failed: true } : item));
-      setInput(current => current === '' ? text : current);
     } finally {
       commentInFlight.current = false;
       setCommentBusy(false);
@@ -704,7 +706,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
                 <span className={item.mine ? 'font-medium text-night-mine' : 'font-medium text-gray-400'}>
                   {item.authorName}
                 </span>{' '}
-                <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送れませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
+                <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送信結果を確認できませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
               </div>
             ))}
           </div>
@@ -955,7 +957,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
               <span data-liff-comment-author className={item.mine ? 'font-medium text-night-mine' : 'text-night-body'}>
                 {item.authorName}
               </span>{' '}
-              <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送れませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
+              <span className="text-night-body">{`\u3000${item.body}`}</span>{item.failed && <><span>（送信結果を確認できませんでした）</span><Button variant="nightText" type="button" disabled={commentBusy} onClick={() => void sendComment(item)}>再送する</Button></>}
             </div>
           ),
         )}
@@ -1052,13 +1054,6 @@ export function FormSheet({
   const idemKeyRef = useRef<{ defId: string; key: FormIdempotencyKey } | null>(null);
   const startedRef = useRef(false);
   const completedFieldsRef = useRef(new Set<string>());
-  const bookingRedirectTimerRef = useRef<number | null>(null);
-
-  useEffect(() => () => {
-    if (bookingRedirectTimerRef.current !== null) {
-      window.clearTimeout(bookingRedirectTimerRef.current);
-    }
-  }, []);
 
   const hasValue = (value: string | string[] | undefined) =>
     Array.isArray(value) ? value.length > 0 : typeof value === 'string' && value.trim() !== '';
@@ -1163,16 +1158,6 @@ export function FormSheet({
       }
       onFunnelEvent('submit_success');
       onSubmitted(def);
-      const bookingUrl = def.onSubmitMessageContent?.match(/https?:\/\/[^\s]+/)?.[0] ?? null;
-      if (bookingUrl) {
-        // フォーム送信後にもう一度ボタンを押させると、予約画面へ進む前に
-        // 離脱しやすい。同一の in-app browser で予約画面へ自動遷移し、
-        // 完了画面のボタンは自動遷移できなかった場合のフォールバックにする。
-        bookingRedirectTimerRef.current = window.setTimeout(
-          () => window.location.assign(bookingUrl),
-          900,
-        );
-      }
     } catch {
       onFunnelEvent('submit_error');
       setError('送信に失敗しました。通信環境をご確認ください。');
@@ -1184,19 +1169,13 @@ export function FormSheet({
     'w-full min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-base text-gray-900';
   const todayJst = jstDate();
   const meetingDateOptions = buildMeetingDateOptions(todayJst);
-
-  const completionUrl = sheet.phase === 'done'
-    ? sheet.def.onSubmitMessageContent?.match(/https?:\/\/[^\s]+/)?.[0] ?? null
-    : null;
-
-  const openCompletionUrl = () => {
-    if (!completionUrl) return;
-    if (bookingRedirectTimerRef.current !== null) {
-      window.clearTimeout(bookingRedirectTimerRef.current);
-      bookingRedirectTimerRef.current = null;
-    }
-    window.location.assign(completionUrl);
-  };
+  const rawCompletionMessage = sheet.phase === 'done' ? sheet.def.onSubmitMessageContent?.trim() : '';
+  let structuredMessage = false;
+  if (rawCompletionMessage?.startsWith('[')) {
+    try { structuredMessage = Array.isArray(JSON.parse(rawCompletionMessage)); } catch { /* 通常の文章として表示する。 */ }
+  }
+  const completionMessage = rawCompletionMessage && (structuredMessage || rawCompletionMessage.startsWith('{') || /\{\{|\}\}/.test(rawCompletionMessage))
+    ? '送信後のご案内は、配信元にお問い合わせください。' : rawCompletionMessage;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -1222,22 +1201,20 @@ export function FormSheet({
           <div className="py-6 text-center">
             <p className="text-2xl">🎉</p>
             <p className="mt-2 text-lg font-bold">回答を送信しました</p>
-            <p className="mt-1 text-sm text-gray-500">
-              予約画面へ移動しています。空いている15分枠を1つ選んでください。
-            </p>
-            {completionUrl && (
-              <button
-                onClick={openCompletionUrl}
-                className="mt-5 w-full rounded-full bg-[#06C755] px-6 py-3 font-bold text-white active:opacity-80"
-              >
-                予約画面をすぐ開く
-              </button>
+            {completionMessage && (
+              <p className="mt-3 whitespace-pre-wrap break-words text-sm text-gray-700">
+                {completionMessage.split(/(https?:\/\/[^\s<>"'、。！？」』）】〉》]+)/g).map((part, index) =>
+                  /^https?:\/\//.test(part)
+                    ? <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">{part}</a>
+                    : part,
+                )}
+              </p>
             )}
             <button
               onClick={onClose}
               className="mt-4 rounded-full border border-gray-300 px-8 py-2.5 font-bold text-gray-600 active:opacity-80"
             >
-              あとで予約する
+              閉じる
             </button>
           </div>
         )}
@@ -1423,12 +1400,9 @@ export function FormSheet({
                 {submitting
                   ? '送信中...'
                   : canSubmit
-                    ? '回答を送信して相談日時を選ぶ'
+                    ? '回答を送信する'
                     : `あと${remainingRequiredCount}項目を選択`}
               </button>
-              <p className="mt-2 text-center text-xs text-gray-500">
-                送信後、空いている15分枠を選べます
-              </p>
             </div>
           </div>
         )}

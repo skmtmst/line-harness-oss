@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { type SegmentCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
@@ -386,6 +387,7 @@ export function ScenarioDetailDialogs({
         }}
       >
         <div className={styles.stopBody}>
+          <OperationTargetSummary accounts={scenario?.lineAccountId === null ? [] : [{ id: scenario?.lineAccountId ?? '' }]} allAccounts={scenario?.lineAccountId === null} />
           <p className={styles.stopDesc}>止めても、途中の人の記録は残ります。再開すると止めたところから続きを送ります。</p>
           <dl className={styles.stopRow}>
             <dt>いま途中の人</dt>
@@ -464,9 +466,9 @@ export function ScenarioDetailDialogs({
 
       <ConfirmDialog
         open={deleteStepTarget !== null}
-        title={deleteStepTarget ? `${deleteStepTarget.stepOrder} 通目を削除しますか？` : 'この通を削除しますか？'}
+        title={deleteStepTarget ? `${sortedSteps.findIndex((step) => step.id === deleteStepTarget.id) + 1} 通目を削除しますか？` : 'この通を削除しますか？'}
         description={deleteStepTarget
-          ? `${deleteStepTarget.stepOrder} 通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
+          ? `${sortedSteps.findIndex((step) => step.id === deleteStepTarget.id) + 1} 通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
           : ''}
         confirmLabel="この通を削除する"
         destructive
@@ -478,7 +480,7 @@ export function ScenarioDetailDialogs({
           setDeleteStepTarget(null)
           setDeleteStepError('')
         }}
-      />
+      ><OperationTargetSummary accounts={scenario?.lineAccountId === null ? [] : [{ id: scenario?.lineAccountId ?? '' }]} allAccounts={scenario?.lineAccountId === null} /></ConfirmDialog>
 
       <ConfirmDialog
         open={deleteScenarioOpen && scenario !== null}
@@ -504,6 +506,7 @@ export function ScenarioDetailDialogs({
           setDeleteScenarioError('')
         }}
       >
+        <OperationTargetSummary accounts={scenario?.lineAccountId === null ? [] : [{ id: scenario?.lineAccountId ?? '' }]} allAccounts={scenario?.lineAccountId === null} />
         {/* R250: 終了後の移動先にされていると、削除で参照元の設定が変わる。件数が取れたときだけ出す。 */}
         <div className="text-ink-secondary mt-3 space-y-2 text-sm">
           <MoveReferrersNotice scenarioId={id} />
@@ -596,6 +599,7 @@ export function ScenarioDetailDialogs({
           ).map((row) => ({
             id: row.id,
             stepOrder: row.stepOrder,
+            displayOrder: sortedSteps.findIndex((step) => step.id === row.id) + 1,
             timing: formatScheduleLabel(deliveryMode, row),
             kind:
               (row.templateId ? templates.find((t) => t.id === row.templateId)?.name : null) ??

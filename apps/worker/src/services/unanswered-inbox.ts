@@ -1,3 +1,4 @@
+import { assigneeFilter } from './chat-assignees.js';
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
@@ -115,8 +116,9 @@ function queryFilters(opts: UnansweredInboxOptions, includeSearch: boolean): {
     bindings.push(opts.status);
   }
   if (opts.operatorId) {
-    conditions.push('c.operator_id = ?');
-    bindings.push(opts.operatorId);
+    const filter = assigneeFilter('c', opts.operatorId);
+    conditions.push(filter.sql);
+    bindings.push(...filter.binds);
   }
   if (opts.minWaitMinutes && opts.minWaitMinutes > 0) {
     conditions.push('julianday(c.last_customer_message_at) <= julianday(?)');

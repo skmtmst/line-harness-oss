@@ -894,6 +894,7 @@ export default function RemindersListV8() {
         <span className="sr-only" role="status" aria-live="polite">
           {moveNotice}
         </span>
+        {reorderDisabledReason ? <span className="sr-only" data-reorder-reason>{reorderDisabledReason}</span> : null}
         <div className={styles.tableWrap}>
           <DataTable>
             <colgroup>
@@ -964,8 +965,8 @@ export default function RemindersListV8() {
                       {...reorder.handleProps(row.id)}
                       title={reorder.blocked ? undefined : '上下に動かして並び替え'}
                     >
-                      {/* 動かせない時（閲覧のみ・別の並び・絞り込み中）はつまみを出さず、理由を title と読み上げで言う。 */}
-                      <ReorderHandle label={row.name} {...reorder.handle(row.id)}>
+                      {/* 動かせない時（閲覧のみ・別の並び・絞り込み中）はつまみを出さず、理由は一覧の前で一度だけ読み上げる。 */}
+                      <ReorderHandle label={row.name} {...reorder.handle(row.id)} announceDisabledReason={false}>
                         <span aria-hidden>⠿</span>
                       </ReorderHandle>
                     </Td>

@@ -24,7 +24,8 @@ export default function HistoryTable({ items, readonly, menuId, setMenuId, openP
       <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
         <thead>
           <TableHeadRow data-table-layout="columns">
-            <Th grow>いつ・だれに</Th>
+            <Th grow>だれに</Th>
+            <Th className={styles.colReact}>日時</Th>
             <Th align="right" className={styles.colDelta}>増減</Th>
             <Th className={styles.colWhy}>なぜ</Th>
             <Th align="right" className={styles.colAfter}>{ecSource ? 'musuboの残高' : '残高'}</Th>
@@ -49,9 +50,9 @@ export default function HistoryTable({ items, readonly, menuId, setMenuId, openP
                 }} data-row-id={item.id}
               >
                 <Td grow><FolderDotName>
-                  <span  title={`${viewName(item)}・${formatMileageShortDateTime(item.occurredAt)}`}>{viewName(item)}</span>
-
+                  <span title={viewName(item)}>{viewName(item)}</span>
                 </FolderDotName></Td>
+                <Td className={styles.colReact}><time dateTime={item.occurredAt}>{formatMileageShortDateTime(item.occurredAt)}</time></Td>
                 <Td align="right" className={styles.colDelta}><span className={styles.cellMain}>{formatMileageChange(item.amount)}</span></Td>
                 <Td className={styles.colWhy}>
                   <span

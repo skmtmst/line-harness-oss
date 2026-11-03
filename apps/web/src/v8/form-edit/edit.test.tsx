@@ -378,6 +378,14 @@ describe('回答フォームの編集（V8）', () => {
     expect(rowOf('背景の画像')).toContain('未設定')
   })
 
+  it('削除されたメニューは選び直す案内を出して入力を残す', async () => {
+    formsUpdate.mockRejectedValueOnce(new ApiError(409, 'コースが見つかりません', 'restaurant_course_unavailable'))
+    await render('id=form-1')
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    expect(await screen.findByText(/メニューを選び直してください/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '比べてから保存' })).toBeNull()
+  })
+
   it('競合が残っていてもstaffに変わると保存と比較の入口を隠す', async () => {
     formsUpdate.mockRejectedValue(new ApiError(409, 'conflict', 'VERSION_CONFLICT', { updatedAt: '' }))
     formsGet.mockResolvedValueOnce({ success: true, data: structuredClone(formData) })

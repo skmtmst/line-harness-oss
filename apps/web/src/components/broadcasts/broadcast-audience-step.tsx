@@ -179,7 +179,7 @@ export function BroadcastAudienceStep({ audienceDisplayCount, audienceNotice, co
           <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><SaveErrorField names={["excludeTagId","exclude_tag_id"]}><EntitySelect kind="tag" aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]} size="full" /></SaveErrorField></label>
           <div className={styles.exclusion}>
             <Checkbox checked={false} onCheckedChange={() => {}} disabled aria-describedby={recentExclusionNoteId}>この1週間に送った人を除く</Checkbox>
-            <small id={recentExclusionNoteId}>最近送った人を除く機能は、まだ使えません</small>
+            <small id={recentExclusionNoteId}>現在、最近送った人を除外できません</small>
           </div>
           <div className={styles.audienceCount} aria-live="polite"><span><Send size={16} aria-hidden /> この条件で送る人数</span><strong className={audienceDisplayCount === 0 ? 'text-danger' : preflightStatus === 'error' ? 'text-warning' : ''}>{audienceDisplayCount !== null ? `${formatNumber(audienceDisplayCount)}人` : preflightStatus === 'loading' ? '数えています…' : '—人'}</strong></div>
           {audienceDisplayCount === 0 ? <Notice tone="warn" role="alert">この条件に当てはまる友だちがいません。条件を変えてください</Notice> : preflightStatus === 'error' ? <Notice tone="warn" action={<Button size="compact" onClick={() => void runPreflight()}>もう一度数える</Button>}>人数を数えられませんでした。送る前にもう一度数えてください</Notice> : preflightStatus === 'idle' ? <p className="text-xs text-ink-faint">対象とメッセージを入力すると人数を数えます</p> : null}

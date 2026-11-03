@@ -1,19 +1,16 @@
 'use client'
-
+import { useListNavigationRouter } from '@/components/shared/list-navigation'
 import { useMenuMediaScope } from './use-menu-media-scope'
-
 import { useMenuShapeDraft } from './use-menu-shape-draft'
-
 import { publishMenuNow } from './create-publish-actions'
 import { reloadMenuGroup } from './create-reload-group'
 import { seedMenuShape } from './create-seed-shape'
 import { applyMenuTabCount,requestMenuTabCount } from './create-tab-actions'
-
 import { renderAudienceStep,renderHqAudienceStep } from './create-audience-step'
 import { renderButtonsStep } from './create-buttons-step'
 import { hydrateMenuDraft } from './create-hydration'
 import { getSlotImage,renderSingleImageSlot,renderTabSlot } from './create-image-slots'
-import { groupFromSeed } from './create-model'
+import { firstUnconfiguredArea, groupFromSeed, publishConfirmNoteFor, publishEffectNoteFor } from './create-model'
 import { renderMenuLinePreview,renderPreviewRail } from './create-preview-rail'
 import { renderHqPublishStep,renderPublishStep } from './create-publish-step'
 import { createMenuDraft,persistMenuDraft,saveMenuDraft } from './create-save-actions'
@@ -49,6 +46,7 @@ isForbiddenOrRateLimited,
 loadFailureNotice } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
@@ -119,6 +117,7 @@ function stepFromParam(key: string | null): StepKey | null {
  * （/rich-menus/edit の V8）。読み込むまでは手順の中身を出さず、すべての手順へ戻れる。
  */
 export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: string; host?: RichMenuCreateHost } = {}) {
+  const router = useListNavigationRouter()
   const saveErrors = useSaveFormErrors()
   usePageTitle(host ? 'リッチメニュー' : 'リッチメニューを作る')
   /*
@@ -209,6 +208,10 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /* 状態 */
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [discardingDraft, setDiscardingDraft] = useState(false)
+  const [discardDraftError, setDiscardDraftError] = useState('')
+  const [discardUnknown, setDiscardUnknown] = useState(false)
+  const discardDraftLock = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   /*
@@ -225,12 +228,20 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false)
 
   const accountId = selectedAccount?.id ?? null
-  useEffect(() => { setPublishConfirmOpen(false); setPriorityOpen(false) }, [accountId, group?.id])
+  const publishScopeKey = JSON.stringify([accountId, group?.id])
+  const publishScope = useRef({ key: publishScopeKey })
+  if (publishScope.current.key !== publishScopeKey) publishScope.current = { key: publishScopeKey }
+  const [publishTarget, setPublishTarget] = useState<{ accountId: string; name: string | null; scope: object } | null>(null)
+  const publishAlive = useRef(true)
+  useEffect(() => { publishAlive.current = true; return () => { publishAlive.current = false } }, [])
+  useEffect(() => { setPublishConfirmOpen(false); setPublishTarget(null); setPriorityOpen(false) }, [accountId, group?.id])
   candidateAccountRef.current = accountId
   useMenuMediaScope(accountId, Boolean(host), setPendingImages, setMediaPickerOpen)
   const aggregateOnly = staffRole === 'staff' || staffRole === 'viewer'
   const storeCanOperate = useFeatureAccess('richMenus')
   const canOperate = host ? host.canOperate : storeCanOperate
+  const canOperateRef = useRef(canOperate)
+  canOperateRef.current = canOperate
 
   /* ---------- 署名（未保存の検知） ---------- */
 
@@ -322,9 +333,10 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   const publishDirty = JSON.stringify(publishPlan) !== JSON.stringify(publishBaseline)
   const dirty = baselineSignature !== null && (signatureNow() !== baselineSignature || publishDirty)
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
-    dirty,
-    busy: saving || publishing,
+  const createdDraft = !host && !editGroupId && !done && group?.status === 'draft' ? group : null
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({
+    dirty: dirty || Boolean(createdDraft),
+    busy: saving || publishing || discardingDraft,
   })
 
   function confirmLeaveAndDiscard() {
@@ -333,6 +345,33 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setPublishBaseline(DEFAULT_PUBLISH_PLAN)
     setEndEnabled(false)
     confirmLeave()
+  }
+
+  async function discardCreatedDraft() {
+    if (!createdDraft || discardDraftLock.current) return
+    if (createdDraft.accountId !== candidateAccountRef.current) {
+      setDiscardDraftError('作成したアカウントに戻してから、下書きを消してください。')
+      return
+    }
+    discardDraftLock.current = true
+    setDiscardingDraft(true)
+    setDiscardDraftError('')
+    try {
+      const response = await api.richMenuGroups.delete(createdDraft.id, createdDraft.version)
+      if (createdDraft.accountId !== candidateAccountRef.current) return
+      if (!response.success) throw new Error(response.error)
+      confirmLeaveAndDiscard()
+    } catch (cause) {
+      setDiscardUnknown(!(cause instanceof ApiError && (cause.code === 'rich_menu_delete_blocked' || cause.status === 409)))
+      setDiscardDraftError(cause instanceof ApiError && cause.code === 'rich_menu_delete_blocked'
+        ? '公開状態や使われている場所を確認してから、一覧で削除してください。'
+        : cause instanceof ApiError && cause.status === 409
+        ? '下書きの状態が変わったため消せません。編集を続けて最新の状態を確かめてください。'
+        : '下書きの削除結果を確認できません。一覧で下書きが残っているか確認してください。移動すると未保存の変更は失われます。')
+    } finally {
+      discardDraftLock.current = false
+      setDiscardingDraft(false)
+    }
   }
 
   /* ---------- 読み込み ---------- */
@@ -564,6 +603,13 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   async function goNext() {
     const idx = STEP_KEYS.indexOf(step)
     if (idx >= STEP_KEYS.length - 1) return
+    const missing = step === 'buttons' ? firstUnconfiguredArea(pages) : null
+    if (missing) {
+      setActivePageId(missing.pageId)
+      setSelectedAreaId(missing.areaId)
+      setError(missing.reason)
+      return
+    }
     const ok = await saveDraft()
     if (!ok) return
     const next = STEP_KEYS[idx + 1]
@@ -985,7 +1031,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       void scheduleSubmit(input)
       return
     }
-    setError(null); setPublishConfirmOpen(true)
+    if (!group || !accountId || group.accountId !== accountId || !canOperateRef.current) return
+    setError(null); setPublishTarget({ accountId: group.accountId, name: selectedAccount?.id === group.accountId ? selectedAccount.name : null, scope: publishScope.current }); setPublishConfirmOpen(true)
   }
 
   /* ---------- 派生値 ---------- */
@@ -1070,20 +1117,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       : conditionEmpty
         ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください'
         : '保存するとLINEに登録され、条件に当てはまる人の画面に出来事のタイミングで順次出ます'
-  const publishEffectNote = audience === 'all'
-    ? '個別に指定した人を除く、すべての友だちのトーク画面に出ます。既定のメニューが入れ替わります。'
-    : audience === 'none'
-      ? 'LINEへの登録だけでは、友だちのトーク画面は変わりません。「表示先」で出す相手を決めてください。'
-      : conditionEmpty
-        ? '公開しても今は誰の画面にも出ません（0人）。条件を1つ以上足してください。'
-        : '条件に当てはまる人の画面は、その人に関係する出来事のタイミングで順次切り替わります。すぐ全員に出るわけではありません。'
-  const publishConfirmNote = audience === 'all'
-    ? '個別に指定した人を除く、すべての友だちの既定メニューになります。'
-    : audience === 'none'
-      ? 'この操作だけでは、友だちのトーク画面には出ません。出すには登録後に一覧の「表示先」から操作してください。'
-      : conditionEmpty
-        ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください。'
-        : '条件に当てはまる人の画面に、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。'
+  const publishEffectNote = publishEffectNoteFor(audience, conditionEmpty)
+  const publishConfirmNote = publishConfirmNoteFor(audience, conditionEmpty)
   /*
    * 面の数：作成前は選んだ面の分けかたの数、作成後は全ページの面の合計。
    * 作成前の面はまだ動きが未設定（0設定済み）なので、分けかたの枚数だけ数える。
@@ -1365,7 +1400,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <p>手順②で画像の上から面を選び、押したときの動きを設定します。公開前に「LINEでの見え方」と実際のスマートフォンで確認してください。</p>
         </div>
       </Dialog>
-      <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力" onConfirm={confirmLeaveAndDiscard} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力"
+        title={discardUnknown ? '下書きの確認' : createdDraft ? '下書きをどうしますか？' : undefined}
+        description={discardUnknown ? discardDraftError : createdDraft ? '保存された下書きがあります。残すか、消して移るか選んでください。' : undefined}
+        saveLabel={discardUnknown ? '一覧で確認する' : createdDraft ? '下書きを残して移る' : undefined}
+        discardLabel={createdDraft ? '下書きを消して移る' : undefined}
+        discardDisabled={discardUnknown}
+        busy={saving || discardingDraft} error={discardUnknown ? undefined : discardDraftError}
+        onSave={discardUnknown ? async () => true : createdDraft ? async () => !dirty || await saveDraft() : undefined}
+        onSavedLeave={discardUnknown ? () => { disarm(); router.push('/rich-menus') } : confirmLeave} onConfirm={createdDraft ? () => void discardCreatedDraft() : confirmLeaveAndDiscard}
+        onCancel={() => { setDiscardDraftError(''); setDiscardUnknown(false); cancelLeave() }} />
       <Dialog open={priorityOpen} title="出す順番" description="一覧で上にあるメニューが優先されます。1がいちばん先です。"
         confirmLabel="順番を変える" onConfirm={() => {
           setTargetingPriority(Math.max(0, (parseInt(priorityInput, 10) || 1) - 1))
@@ -1374,14 +1418,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         <Field label="出す順番" htmlFor="rm-edit-priority"><NumberInput numericText id="rm-edit-priority" inputMode="numeric" min={1} step={1} unit="番目" value={priorityInput} onChange={event => setPriorityInput(event.target.value)} /></Field>
       </Dialog>
       <ConfirmDialog
-        open={publishConfirmOpen}
+        open={publishConfirmOpen && publishTarget?.scope === publishScope.current}
         title="公開の確認"
         description={publishConfirmNote}
         confirmLabel="公開する"
         busy={publishing || saving}
-        error={error || undefined} onSuccess={() => setPublishConfirmOpen(false)} onConfirm={() => handlePublish()}
+        error={error || undefined} onSuccess={() => setPublishConfirmOpen(false)} onConfirm={() => { if (publishAlive.current && publishTarget?.scope === publishScope.current && canOperateRef.current) return handlePublish() }}
         onCancel={() => setPublishConfirmOpen(false)}
-      />
+      >
+        {publishTarget ? <OperationTargetSummary accounts={[{ id: publishTarget.accountId, name: publishTarget.name }]} /> : null}
+      </ConfirmDialog>
 
       {/* ★V8 `r8dGXT`「違いを比べる」の窓。最新と入力中の設定の要約を比べる。 */}
       <Dialog

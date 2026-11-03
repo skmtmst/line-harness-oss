@@ -69,7 +69,10 @@ describe('tenant-scoped dashboard aggregations', () => {
 
     expectScoped(queries, "c.status = 'unread'");
     expectScoped(queries, "c.status = 'in_progress'");
-    expectScoped(queries, 'GROUP BY c.operator_id');
+    expectScoped(queries, 'GROUP BY COALESCE(');
+    const unread = queries.find(({ sql }) => sql.includes('GROUP BY COALESCE('));
+    expect(unread?.sql).toContain('c.assignee_staff_id');
+    expect(unread?.sql).toContain('c.operator_id');
     expectScoped(queries, "direction = 'incoming'");
     expectScoped(queries, 'first_replied_at IS NOT NULL');
   });
@@ -82,11 +85,12 @@ describe('tenant-scoped dashboard aggregations', () => {
       const statement = originalPrepare(sql) as D1PreparedStatement & {
         all: <T>() => Promise<D1Result<T>>;
       };
-      if (sql.includes('GROUP BY c.operator_id')) {
+      if (sql.includes('GROUP BY COALESCE(') && sql.includes('AS unread')) {
         statement.all = async <T>() => ({
           results: [
             { operator_id: null, operator_name: null, unread: 2 },
             { operator_id: 'operator-1', operator_name: 'Kenta', unread: 3 },
+            { operator_id: 'staff:staff-2', operator_name: '担当', unread: 4 },
           ] as T[],
           success: true,
           meta: {},
@@ -100,6 +104,7 @@ describe('tenant-scoped dashboard aggregations', () => {
     expect(stats.assigneeUnread).toEqual([
       { operatorId: null, operatorName: null, unread: 2 },
       { operatorId: 'operator-1', operatorName: 'Kenta', unread: 3 },
+      { operatorId: 'staff:staff-2', operatorName: '担当', unread: 4 },
     ]);
   });
 

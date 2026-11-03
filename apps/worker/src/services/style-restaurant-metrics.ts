@@ -3,11 +3,11 @@ import type { StyleMetric } from '@line-crm/shared';
 import { closuresForRange, closureAffectsTable } from './restaurant-closures.js';
 import { restaurantRotation } from './restaurant-rotation.js';
 
-import { DAY, instant, addDate, eligible, countMetric, ratio, missing } from './style-analytics-core.js';
+import { instant, addDate, eligible, countMetric, ratio, missing } from './style-analytics-core.js';
 
 import type { StyleAnalyticsContext } from './style-analytics-context.js';
 export async function restaurantMetrics(context:StyleAnalyticsContext) {
-  const {db,account,query,now,window,from,to,timeZone,rows,raw,style,staffId,settings,metrics,analytics,period}=context;
+  const {db,account,query,now,window,from,to,rows,style,metrics,analytics,period}=context;
   if (style === 'restaurant') {
     const stores = (
       await db
@@ -108,18 +108,8 @@ export async function restaurantMetrics(context:StyleAnalyticsContext) {
       '媒体の枠を閉じる未対応',
     );
     metrics.unseated = countMetric(
-      rows
-        .filter(
-          (r) =>
-            eligible(r) &&
-            instant(r.startsAt) >= now &&
-            instant(r.startsAt) < now + 7 * DAY,
-        )
-        .filter(
-          (r) =>
-            !raw.find((p) => p.id === r.id && p.storeId === r.storeId)?.slotId,
-        ).length,
-      '今日から7日の未配席',
+      period(from, to).filter((r) => eligible(r) && r.status !== 'no_show' && !r.departedAt && !r.slotId).length,
+      '選択期間に始まる予約のうち、取消・無断・押さえ・退店済みを除く未配席',
     );
     metrics.attention.value =
       (metrics.attention.value ?? 0) +

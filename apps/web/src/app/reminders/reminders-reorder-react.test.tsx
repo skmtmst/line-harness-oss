@@ -213,7 +213,9 @@ describe('リマインダ一覧の並び替え', () => {
     expect(host.querySelector('td[draggable="true"]')).toBeNull()
     const disabled = host.querySelector<HTMLElement>('[data-reorder-disabled]')
     expect(disabled?.getAttribute('title')).toBe('並びを「自分で並べた順」にすると動かせます')
-    expect(disabled?.textContent).toContain('並びを「自分で並べた順」にすると動かせます')
+    expect(disabled?.textContent).not.toContain('並び替えできません')
+    expect(host.querySelectorAll('[data-reorder-reason]')).toHaveLength(1)
+    expect(host.querySelector('[data-reorder-reason]')?.textContent).toBe('並びを「自分で並べた順」にすると動かせます')
     // 上下キーを押しても保存しない（直す前はここで次の送信順のまま保存していた）。
     const cell = host.querySelector<HTMLElement>('tr[data-reorder-id="c"] td')!
     key(cell, 'ArrowDown')

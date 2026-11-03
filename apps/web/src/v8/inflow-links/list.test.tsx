@@ -110,6 +110,22 @@ const buttonByLabel = (label: string) =>
 const rowOf = (refCode: string) => host.querySelector(`[data-row-id="${ROUTES.find(row => row.refCode === refCode)?.id ?? refCode}"]`)
 
 describe('V8 流入と計測の一覧', () => {
+  it('未分類が0件でもフォルダから選んで空の一覧を見られる', async () => {
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/api/entry-routes') return json({ success: true, data: ROUTES.filter(row => row.genre) })
+      if (url.pathname === '/api/analytics/ref-summary') return json({ success: true, data: { ...SUMMARY, routes: [] } })
+      return originalFetch(input, init)
+    })
+    await render()
+    const folder = [...host.querySelectorAll('button')].find(button => (button.textContent ?? '').includes('未分類'))
+    expect(folder).toBeTruthy()
+    await act(async () => { folder!.click() })
+    expect(host.textContent).not.toContain('夏のInstagram投稿')
+    expect(host.textContent).toContain('未分類')
+  })
+
   it('受付を止める時だけ確認し、再開は押した直後に反映する', async () => {
     const originalFetch = globalThis.fetch
     const updates: Array<{ url: string; active: boolean }> = []
@@ -293,4 +309,43 @@ it.each(['/api/entry-route-genres','/api/scenarios','/api/message-templates','/a
  for(let i=0;i<8;i++)await act(async()=>{})
  expect(host.querySelector('[data-list-state="error"]')).toBeNull()
  expect(reads).toBeGreaterThanOrEqual(2)
+})
+
+
+it('D-18: 一覧から名前確認の後に削除し、失敗時は窓と入力を残す', async () => {
+  const originalFetch = globalThis.fetch
+  const requests: RequestInit[] = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).includes('/api/entry-routes/er-1') && init?.method === 'DELETE') {
+      requests.push(init)
+      return new Response(JSON.stringify({success:false,code:'ENTRY_ROUTE_IN_USE',error:'利用履歴があるため削除できません'}), {status:409,headers:{'Content-Type':'application/json'}})
+    }
+    return originalFetch(input, init)
+  })
+  await render()
+  await act(async () => buttonByLabel('「夏のInstagram投稿」の操作')!.click())
+  const action = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('削除する')) as HTMLElement
+  expect(action).toBeTruthy()
+  await act(async () => action.click())
+  const dialog = document.querySelector('[role="alertdialog"]')!
+  expect(dialog.textContent).toContain('利用履歴がない経路だけ')
+  expect(dialog.querySelector('[data-required-badge]')?.textContent).toBe('必須')
+  const confirm = [...dialog.querySelectorAll('button')].find(el => el.textContent?.includes('削除する')) as HTMLButtonElement
+  expect(confirm.disabled).toBe(true)
+  const input = dialog.querySelector('input')!
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input, '夏のInstagram投稿'); input.dispatchEvent(new Event('input',{bubbles:true})) })
+  expect(confirm.disabled).toBe(false)
+  await act(async () => confirm.click())
+  expect(requests).toHaveLength(1)
+  expect(JSON.parse(String(requests[0].body))).toEqual({confirmationName:'夏のInstagram投稿'})
+  expect(dialog.textContent).toContain('利用履歴があるため削除できません')
+  expect(input.value).toBe('夏のInstagram投稿')
+  expect(rowOf('summer-ig')).toBeTruthy()
+})
+
+it('D-18: 閲覧者には一覧の削除操作を出さない', async () => {
+  role.value = 'viewer'
+  await render()
+  await act(async () => buttonByLabel('「夏のInstagram投稿」の操作')!.click())
+  expect([...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent?.includes('削除する'))).toBe(false)
 })

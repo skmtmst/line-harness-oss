@@ -1,4 +1,6 @@
 'use client'
+
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { ListPageStats } from '@/components/templates/list-page'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -329,7 +331,8 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       ['合計', ...cols.map((column) => colTotals.get(column.key) ?? 0), grandTotal],
     ])
   }
-  useRegisterExport(exportCross, !crossResult)
+  const exportReason = fieldsLoading ? '友だち情報欄を読み込んでいます。' : fieldsError || error || (loading ? (crossQueue?.state === 'running' ? '集計しています。' : '集計の完了を待っています。') : crossRunId ? (crossAutoStopped ? '集計結果をもう一度確認してください。' : '集計の完了を待っています。') : '集計してから書き出してください。')
+  useRegisterExport(exportCross, !crossResult, exportReason)
 
   const openAudience = async (to: 'friends' | 'broadcast') => {
     if (!picked || !crossResultId) return
@@ -384,7 +387,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
         </ListToolbarEnd>
       </ListToolbarRow></ListToolbarFrame>
       {sameAxis ? <p className={styles.warnText}>たてとよこに同じ軸は選べません</p> : null}
-      <AggregationStatus state={error ? { kind: 'failed', reason: error } : crossRunId || loading ? { kind: 'running', startedAt } : crossResult ? { kind: 'complete', dataAt: crossResult.dataCutoffAt } : { kind: 'empty' }} onRun={() => crossRunId ? recheckCross() : void runCross()} disabled={!crossStorageRestored || sameAxis} />
+      <AggregationStatus state={error ? { kind: 'failed', reason: error } : crossRunId || loading ? { kind: 'running', startedAt } : crossResult ? { kind: 'complete', dataAt: crossResult.dataCutoffAt } : { kind: 'empty' }} onRun={() => requestUnsavedAction(() => { if (crossRunId) recheckCross(); else void runCross() })} disabled={!crossStorageRestored || sameAxis} />
       {crossResult?.stateReason ? <p className={styles.warnText}>{crossResult.stateReason}</p> : null}
 
       {loading ? <div className={styles.waitBox} role="status">
@@ -434,8 +437,8 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
           <aside className={styles.funnelSide} data-w="cross" aria-labelledby="cross-picked-title">
             <h2 id="cross-picked-title" className={styles.hoursTitle}>{picked ? `${picked.rowLabel} × ${picked.columnLabel}（${formatNumber(picked.value)}${unit}${unit === '回' ? `・${formatNumber(picked.uniqueFriends)} 人` : ''}）` : 'マスを選んでください'}</h2>
             {picked && canManage ? <>
-              <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('friends')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Users size={16} aria-hidden="true" />対象者を開く</Button></span>
-              <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('broadcast')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={16} aria-hidden="true" />この対象者へ配信を作る</Button></span>
+              <span><Button variant="secondary" disabled={audienceBusy} onClick={() => requestUnsavedAction(() => void openAudience('friends'))} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Users size={16} aria-hidden="true" />対象者を開く</Button></span>
+              <span><Button variant="secondary" disabled={audienceBusy} onClick={() => requestUnsavedAction(() => void openAudience('broadcast'))} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={16} aria-hidden="true" />この対象者へ配信を作る</Button></span>
             </> : picked ? <p className={styles.caption}>結果の保存と対象者づくりは、統括・管理者だけが行えます。</p> : null}
             {readings.length > 0 ? <>
               <h3 className={styles.compareTitle}>この表から読めること</h3>

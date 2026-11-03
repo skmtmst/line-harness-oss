@@ -99,13 +99,17 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const [editor, setEditor] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof Draft, string>>>({})
-  const editorRef = useRef<HTMLDivElement>(null)
+  const [editorError, setEditorError] = useState('')
+  const editorRef = useRef<HTMLFormElement>(null)
   const [showPlacement, setShowPlacement] = useState(false)
+  const [deleteId, setDeleteId] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const [stopId, setStopId] = useState('')
   const [stopError, setStopError] = useState('')
   const [moveMode, setMoveMode] = useState<MoveMode>('move')
   useEffect(()=>{if(addRequest>0)openNew()},[addRequest]) // eslint-disable-line react-hooks/exhaustive-deps
   const editing = editor && editor !== 'new' ? rows.find((row) => row.id === editor) ?? null : null
+  const deleting = rows.find((row) => row.id === deleteId)
   const stopping = rows.find((row) => row.id === stopId)
   const now = Date.now()
   /* この卓に入っている、これから先の予約（取消・無断キャンセル・来店済みは除く）。 */
@@ -117,12 +121,14 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     : []), [data.reservations, stopping, now])
 
   const openNew = () => {
+    setEditorError('')
     setDraft({ code: '', label: '', seatType: 'table', minCapacity: '1', maxCapacity: '2', floorX: '', floorY: '', joinGroup: '',floorId:floors[0]?.id??'floor-'+store?.id })
     setFieldErrors({})
     setShowPlacement(false)
     setEditor('new')
   }
   const openEdit = (table: RestaurantTable) => {
+    setEditorError('')
     setDraft({
       code: table.code, label: table.label, seatType: table.seat_type,
       minCapacity: String(table.min_capacity), maxCapacity: String(table.max_capacity),
@@ -133,8 +139,25 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     setEditor(table.id)
   }
 
+  const changeCapacity = (field: 'minCapacity' | 'maxCapacity', value: string) => {
+    if (!draft) return
+    const next = { ...draft, [field]: value }
+    setDraft(next)
+    setFieldErrors((current) => {
+      const errors = { ...current }
+      const min = Number(next.minCapacity), max = Number(next.maxCapacity)
+      // 保存時に表示済みの人数の理由だけを現在値で見直す。
+      if (current.minCapacity && Number.isInteger(min) && min >= 1) delete errors.minCapacity
+      if (current.maxCapacity && Number.isInteger(max) && max >= min && max >= 1) delete errors.maxCapacity
+      return errors
+    })
+  }
+
   const save = async () => {
-    if (!draft || !selectedAccountId) return
+    if (!draft) return
+    setEditorError('')
+    if (!selectedAccountId) { setEditorError('LINEアカウントを選んでから、もう一度お試しください。'); return }
+    if (!editing && !store) { setEditorError('店舗を選んでから、もう一度お試しください。'); return }
     const errors: Partial<Record<keyof Draft, string>> = {}
     if ((b244Requirements.draft_code.check(draft.code) !== null)) errors.code = '卓番を入れてください。'
     if ((b244Requirements.draft_label.check(draft.label) !== null)) errors.label = '表示名を入れてください。'
@@ -165,9 +188,9 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       joinGroup: draft.joinGroup.trim() || null,
     }
     const ok = editing
-      ? await mutate(() => restaurantTestApi.updateTable(selectedAccountId, editing.id, body), '卓を更新しました。')
+      ? await mutate(() => restaurantTestApi.updateTable(selectedAccountId, editing.id, body), '卓を更新しました。', setEditorError)
       : store
-        ? await mutate(() => restaurantTestApi.createTable(selectedAccountId, { storeId: store.id, ...body }), '卓を追加しました。')
+        ? await mutate(() => restaurantTestApi.createTable(selectedAccountId, { storeId: store.id, ...body }), '卓を追加しました。', setEditorError)
         : false
     if (ok) setEditor(null)
   }
@@ -224,7 +247,8 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     )
   }
 
-  const groups = new Set(rows.filter((item) => item.join_group).map((item) => item.join_group))
+  const activeRows = rows.filter((item) => item.is_active)
+  const groups = new Set(activeRows.filter((item) => item.join_group).map((item) => item.join_group))
   const placementFields = draft ? (
     <>
       <div className={styles.pair}>
@@ -247,7 +271,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     <SaveErrorScope errors={saveErrors}><>
       <StatRow fusion>
         <KpiCard title="卓数" value={rows.length} unit="卓" detail="稼働・停止を含む" icon={<Inbox size={16} aria-hidden />} presentation="band" />
-        <KpiCard title="総席数" value={rows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="席" detail="最大収容人数" icon={<Inbox size={16} aria-hidden />} presentation="band" />
+        <KpiCard title="総席数" value={activeRows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="席" detail="稼働中の最大収容人数" icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="結合可能" value={groups.size} unit="組" detail="結合グループ" icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={<Inbox size={16} aria-hidden />} presentation="band" />
       </StatRow>
@@ -261,6 +285,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
                 </div>
                 <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} /></span>
                 <TableRowActions table={item} canEdit={canEdit} busy={busy} onEdit={openEdit} onResume={resume}
+                  onDelete={(table) => { setDeleteError(''); setDeleteId(table.id) }}
                   onStop={(table) => { setStopError(''); setMoveMode('move'); setStopId(table.id) }} />
               </li>
             ))}
@@ -275,30 +300,43 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         <Panel fusion title="結合のルール" description="結合グループ"><p className={styles.ruleText}>同じ結合グループの卓は全卓を一緒に確保します。配置と結合グループは卓の変更から設定できます。</p></Panel>
         <Panel fusion title="卓を止めるとき"><p className={styles.ruleText}>先の予約を同じ人数が入る別の卓へ自動で移すか、未配席に戻します。お客さまへの通知はこの画面からは送りません。</p></Panel>
       </div>
+      <RsDialog open={Boolean(deleting)} title="この卓を削除しますか？" width={480} top={300} busy={busy}
+        onCancel={() => setDeleteId('')} actions={<>
+          <Button disabled={busy} onClick={() => setDeleteId('')}>キャンセル</Button>
+          <Button variant="danger" disabled={busy} onClick={() => {
+            if (!selectedAccountId || !deleting) return
+            setDeleteError('')
+            void mutate(async () => {
+              try { await restaurantTestApi.deleteTable(selectedAccountId, deleting.id) }
+              catch (error) { setDeleteError(japaneseDetailOf(error) || '削除できませんでした。'); throw new QuietError() }
+            }, '卓を削除しました。').then((ok) => { if (ok) setDeleteId('') })
+          }}>削除する</Button>
+        </>}>
+        <p>{deleting?.code}・{deleting?.label}</p>
+        <DialogNote>予約や設定で使われていない卓だけ削除できます。元に戻せません。</DialogNote>
+        {deleteError ? <Notice tone="danger">{deleteError}</Notice> : null}
+      </RsDialog>
       <RsDialog
         open={editor !== null && draft !== null}
         title={editing ? `卓「${editing.code}・${editing.label}」を変更` : '新しい卓'}
+        actionsPlacement="footer"
         width={520}
         top={200}
         busy={busy}
         designNode="gBrCz"
         onCancel={() => setEditor(null)}
-        noValidate
-        onSubmit={() => void save()}
         actions={(
           <>
-            <Button presentation="restaurant" type="button" variant="text" size="inline" aria-expanded={showPlacement} onClick={() => setShowPlacement((open) => !open)}>
-              {showPlacement ? '配置・結合グループを閉じる' : '配置・結合グループ'}
-            </Button>
             <Button presentation="restaurant" type="button" onClick={() => setEditor(null)} disabled={busy}>キャンセル</Button>
-            <Button presentation="restaurant" type="submit" variant="primary" disabled={busy}>
+            <Button presentation="restaurant" type="submit" form="rs-table-editor" variant="primary" disabled={busy}>
               {editing ? <Check size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}{editing ? '保存する' : '追加する'}
             </Button>
           </>
         )}
       >
         {draft ? (
-          <div ref={editorRef} className={styles.editorFields}>
+          <form id="rs-table-editor" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
+            {editorError ? <Notice tone="danger" role="alert">{editorError}</Notice> : null}
             <div className={styles.pair}>
               <Field label="卓番" htmlFor="rs-table-code" error={fieldErrors.code} requirement={b244Requirements.draft_code}>
                 <SaveErrorField names={["code","draft.code"]}><TextField id="rs-table-code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} /></SaveErrorField>
@@ -312,15 +350,18 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
             </DialogField>
             <div className={styles.pair}>
               <Field label="最小人数" htmlFor="rs-table-min" error={fieldErrors.minCapacity} requirement={b244Requirements.draft_min_capacity}>
-                <SaveErrorField names={["minCapacity","draft.minCapacity","min_capacity","draft.min_capacity"]}><NumberInput id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => setDraft({ ...draft, minCapacity: event.target.value })} /></SaveErrorField>
+                <SaveErrorField names={["minCapacity","draft.minCapacity","min_capacity","draft.min_capacity"]}><NumberInput id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => changeCapacity('minCapacity', event.target.value)} /></SaveErrorField>
               </Field>
               <Field label="最大人数" htmlFor="rs-table-max" error={fieldErrors.maxCapacity} requirement={b244Requirements.draft_max_capacity}>
-                <SaveErrorField names={["maxCapacity","draft.maxCapacity","max_capacity","draft.max_capacity"]}><NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => setDraft({ ...draft, maxCapacity: event.target.value })} /></SaveErrorField>
+                <SaveErrorField names={["maxCapacity","draft.maxCapacity","max_capacity","draft.max_capacity"]}><NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => changeCapacity('maxCapacity', event.target.value)} /></SaveErrorField>
               </Field>
             </div>
+            <Button presentation="restaurant" type="button" aria-expanded={showPlacement} onClick={() => setShowPlacement((open) => !open)}>
+              {showPlacement ? '配置・結合グループを閉じる' : '配置・結合グループ'}
+            </Button>
             {showPlacement ? placementFields : null}
             <DialogNote>{editing ? '人数を変えると、予約枠・在庫の総数も変わります。' : '卓を足すと、予約枠・在庫の総数も増えます。'}</DialogNote>
-          </div>
+          </form>
         ) : null}
       </RsDialog>
       <RsDialog

@@ -109,10 +109,10 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
                 <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
                 <div className={styles.checkBody}>
                   <p className={styles.checkName}>{`面 ${missingRows.map((row) => row.letter).join('・')} の動きが未設定`}</p>
-                  <p className={styles.checkNote}>押しても何も起きません。②で決めます</p>
+                  <p className={styles.checkNote}>押しても何も起きません。「ボタンの動き」で設定します</p>
                 </div>
                 <span className={styles.checkAction}>
-                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('buttons')}>②で決める</Button>
+                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('buttons')}>ボタンの動きを設定する</Button>
                 </span>
               </li>
             ) : null}
@@ -291,10 +291,10 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
                 <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
                 <div className={styles.checkBody}>
                   <p className={styles.checkName}>{label}</p>
-                  <p className={styles.checkNote}>押しても何も起きません。②で決めます</p>
+                  <p className={styles.checkNote}>押しても何も起きません。「ボタンの動き」で設定します</p>
                 </div>
                 <span className={styles.checkAction}>
-                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => { setActivePageId(page.id); setSelectedAreaId(unset[0]?.id ?? null); goToStep('buttons') }}>②で決める</Button>
+                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => { setActivePageId(page.id); setSelectedAreaId(unset[0]?.id ?? null); goToStep('buttons') }}>ボタンの動きを設定する</Button>
                 </span>
               </li>
             })}
@@ -381,7 +381,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
                   aria-describedby={!endEnabled ? 'rich-menu-end-note' : undefined} disabled={!endEnabled}
                 /></SaveErrorField></Field>
               </span>
-              <span>に終わり、</span>
+              <span>{publishPlan.endsAt ? 'に終わり、' : '終わる日時を選ぶと、'}</span>
               <Field label="終わったらどうする" labelHidden optional={false}><SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
                 aria-label="終わったらどうする"
                 aria-describedby={!endEnabled ? 'rich-menu-end-note' : undefined}
@@ -452,7 +452,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
                       ? `スマホの実機で確認済みです${checks.device.at ? `（${formatDateTime(checks.device.at)}）` : ''}。`
                       : '管理画面の見本だけでは公開できません。スマホで見た担当者が押します'}
                     {!host && group && (canManageRole(staffRole))
-                      ? <RichMenuTestApply key={`${accountId}:${group.id}`} groupId={group.id} /> : null}
+                      ? <RichMenuTestApply key={`${accountId}:${group.id}`} groupId={group.id} accountId={group.accountId ?? ''} /> : null}
                   </p>
                 </div>
                 <span className={styles.checkAction}>

@@ -218,6 +218,8 @@ describe('行の削除の窓（xxKtW）', () => {
     expect(deleteImpact).toHaveBeenCalledTimes(1)
     expect(deleteImpact).toHaveBeenCalledWith('v-notice', 'account-a')
     expect(deleteDialog().textContent).toContain('「臨時のお知らせ」を削除しますか？')
+    expect(deleteDialog().textContent).toContain('LINEアカウント')
+    expect(deleteDialog().textContent).toContain('環境')
     expect(deleteDialog().querySelector('[data-detail-value]')?.textContent).toBe('臨時のお知らせ')
   })
 
@@ -243,6 +245,24 @@ describe('行の削除の窓（xxKtW）', () => {
     await click(button('このまま削除'))
     expect(deleteVar).toHaveBeenCalledWith('v-notice', 'account-a', '期間が終わったため')
     expect(listVars.mock.calls.length).toBe(listCalls + 1)
+    expect(document.querySelector('[data-design-node="xxKtW"]')).toBeNull()
+  })
+
+  it('アカウント切替後に古い確定を保持しても削除しない', async () => {
+    await render()
+    await openRowDelete('臨時のお知らせ')
+    const dialog = deleteDialog()
+    await type(inputByPlaceholder('店舗情報の変更のため', dialog), '期間が終わったため')
+    await type(inputByPlaceholder('{{var.temp_notice}}', dialog), '{{var.temp_notice}}')
+    const target = button('このまま削除', dialog)
+    const key = Object.keys(target).find(item => item.startsWith('__reactProps$'))!
+    const handler = (target as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    account.id = 'account-b'
+    await render()
+    account.id = 'account-a'
+    await render()
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: target, target }) })
+    expect(deleteVar).not.toHaveBeenCalled()
     expect(document.querySelector('[data-design-node="xxKtW"]')).toBeNull()
   })
 
@@ -362,6 +382,20 @@ function confirmDialog(): HTMLElement {
 }
 
 describe('まとめて削除の確認', () => {
+  it('アカウントを切り替えて戻しても古い一括確定では削除しない', async () => {
+    await render()
+    await selectRows('問い合わせ先', '臨時のお知らせ')
+    await click(button('選択した共通情報を削除'))
+    await type(inputByPlaceholder('店舗情報の変更のため', confirmDialog()), '整理のため')
+    const target = button('削除する', confirmDialog())
+    const key = Object.keys(target).find(item => item.startsWith('__reactProps$'))!
+    const handler = (target as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    account.id = 'account-b'; await render()
+    account.id = 'account-a'; await render()
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: target, target }) })
+    expect(deleteVar).not.toHaveBeenCalled()
+  })
+
   it('使用先を確かめてから共通の確認窓を開き、消えるもの・残るもの・戻せないことを伝える', async () => {
     const nativeConfirm = vi.spyOn(window, 'confirm')
     await render()
@@ -386,6 +420,7 @@ describe('まとめて削除の確認', () => {
     await render()
     await selectRows('問い合わせ先', '臨時のお知らせ')
     await click(button('選択した共通情報を削除'))
+    expect(confirmDialog().textContent).toContain('LINEアカウント')
     await type(inputByPlaceholder('店舗情報の変更のため', confirmDialog()), '整理のため')
     const listCalls = listVars.mock.calls.length
     await click(button('削除する', confirmDialog()))
@@ -451,7 +486,7 @@ describe('まとめて削除の確認', () => {
     listVars.mockResolvedValue({ success: true, data: many })
     await render()
     await click(byLabel('このページの共通情報をすべて選ぶ'))
-    await click(button('21件すべてを選ぶ'))
+    await click(button('条件に合う21件すべてを選ぶ'))
     await click(button('選択した共通情報を削除'))
     expect(deleteImpact).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('一度に削除できるのは20 件までです。フォルダや検索で絞り込んで分けて削除してください。')

@@ -8,6 +8,7 @@ import {
   getAutomationDraft,
   listAutomationDraftResources,
   listAutomationTemplates,
+  publishAutomationDraft,
   updateAutomationDraft,
 } from './automation-drafts';
 
@@ -124,6 +125,24 @@ describe('オートメーションの見本と下書き', () => {
       id: created.id,
       lineAccountId: 'account-2',
     })).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it.each(['trigger', 'action'] as const)('未選択タグを下書き保存できるが公開は拒否する（%s）', async (missing) => {
+    const created = await createAutomationDraftFromTemplate(testDb.db, {
+      templateKey: 'received-message-tag', lineAccountId: 'account-1', operationKey: `missing-${missing}`,
+    });
+    const updated = await updateAutomationDraft(testDb.db, {
+      id: created.id, lineAccountId: 'account-1', expectedDraftVersionId: created.draftVersionId,
+      name: '途中の下書き', eventType: missing === 'trigger' ? 'tag_change' : 'friend_add',
+      triggerConfig: missing === 'trigger' ? { tagId: '', action: 'add' } : {},
+      actions: [{ id: 'step-1', type: 'add_tag', params: { tagId: missing === 'action' ? '' : 'tag-1' }, onFailure: 'stop' }],
+    });
+    const draft = await getAutomationDraft(testDb.db, { id: created.id, lineAccountId: 'account-1' });
+    expect(draft.draftVersionId).toBe(updated.draftVersionId);
+    await expect(publishAutomationDraft(testDb.db, {
+      id: created.id, lineAccountId: 'account-1', expectedDraftVersionId: updated.draftVersionId, activate: true,
+    })).rejects.toMatchObject({ field: missing === 'trigger' ? 'triggerTagId' : 'actions.0.tagId' });
+    expect(testDb.raw.prepare('SELECT status FROM automation_definitions WHERE id = ?').get(created.id)).toEqual({ status: 'draft' });
   });
 
   it('同じアカウントの資源だけを下書きへ保存する', async () => {

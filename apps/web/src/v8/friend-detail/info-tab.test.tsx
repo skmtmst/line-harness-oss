@@ -32,7 +32,7 @@ test('空の氏名欄と編集用アレルギーに値や未設定行を重ね�
  const data={fields,values:{name:'',allergy:''},fieldsStatus:'ready',fieldFolders:[],fieldFoldersStatus:'ready',hiddenPersonalCount:0,warnings:[],setValues:vi.fn(),saving:false};
  render(<InfoTab friendId="f" group="all" data={data as never} perms={{canEditField:()=>true,saveFields:true} as never}/>);
  const name=screen.getByLabelText('名前') as HTMLInputElement;
- expect(name.value).toBe('');expect(name.placeholder).toBe('未設定');
+ expect(name.value).toBe('');expect(name.placeholder).toBe('（未設定）');
  const allergy=screen.getByText('アレルギー').closest('label')!.parentElement!;
  expect(within(allergy).queryByText('未設定')).toBeNull();
  expect(within(allergy).getByRole('button',{name:'選んで足す'})).toBeTruthy();
@@ -44,7 +44,29 @@ test('閲覧のみの空の日付は架空の値を入れず、アレルギー�
  const data={fields,values:{anniversary:'',allergy:''},fieldsStatus:'ready',fieldFolders:[],fieldFoldersStatus:'ready',hiddenPersonalCount:0,warnings:[],setValues:vi.fn()};
  render(<InfoTab friendId="f" group="all" data={data as never} perms={{canEditField:()=>false} as never}/>);
  const date=screen.getByRole('textbox',{name:'記念日の値'}) as HTMLInputElement;
- expect(date.value).toBe('');expect(date.placeholder).toBe('未設定');expect(date.readOnly).toBe(true);
+ expect(date.value).toBe('');expect(date.placeholder).toBe('（未設定）');expect(date.readOnly).toBe(true);
  const allergy=screen.getByText('アレルギー').closest('label')!.parentElement!;
  expect(within(allergy).getByText('未設定')).toBeTruthy();expect(within(allergy).queryByRole('button')).toBeNull();
+})
+
+
+test('空の情報欄は実際の値を入れず、未設定と分かる例示を出す', () => {
+ const fields=[{id:'pet',name:'ペット',type:'text',value:null,status:'active'}];
+ const data={fields,values:{pet:''},fieldsStatus:'ready',fieldFolders:[],fieldFoldersStatus:'ready',hiddenPersonalCount:0,warnings:[],setValues:vi.fn(),saving:false};
+ render(<InfoTab friendId="f" group="all" data={data as never} perms={{canEditField:()=>true,saveFields:true} as never}/>);
+ const input=screen.getByLabelText('ペット') as HTMLInputElement;
+ expect(input.value).toBe(''); expect(input.placeholder).toBe('（未設定）'); expect(data.setValues).not.toHaveBeenCalled();
+})
+
+test('A-34: 変更がないと保存できず、入力変更と元に戻す操作に連動する', () => {
+ const fields=[{id:'pet',name:'ペットの名前',type:'text',folderId:null,value:'もも',status:'active'}];
+ const data={fields,values:{pet:'もも'},fieldsStatus:'ready',fieldFolders:[],fieldFoldersStatus:'ready',hiddenPersonalCount:0,warnings:[],setValues:vi.fn(),saving:false,saveFields:vi.fn()};
+ const props={friendId:'f',group:'all',data:data as never,perms:{canEditField:()=>true,saveFields:true,manage:true} as never};
+ const view=render(<InfoTab {...props}/>);
+ const save=screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement;
+ expect(save.disabled).toBe(true); fireEvent.click(save); expect(data.saveFields).not.toHaveBeenCalled();
+ expect(screen.getByText('変更した項目はありません。')).toBeTruthy();
+ view.rerender(<InfoTab {...props} data={{...data,values:{pet:'こむぎ'}} as never}/>);
+ expect(save.disabled).toBe(false);
+ view.rerender(<InfoTab {...props}/>); expect(save.disabled).toBe(true);
 })

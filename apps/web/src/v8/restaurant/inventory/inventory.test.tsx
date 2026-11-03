@@ -18,7 +18,7 @@ const fixture = vi.hoisted(() => ({
 const fetchApi = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/inventory', useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/inventory', useSearchParams: () => new URLSearchParams(window.location.search) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
@@ -76,11 +76,20 @@ describe('Y8SjT2 予約枠・在庫', () => {
     expect(board.textContent).toContain('休み（定休日）・お客さまの画面に出ません')
   })
 
+  it('変更前の配分と開ける時間は保存できず、変更後は保存できる', async () => {
+    render(<InventoryPage />)
+    await screen.findByText('19:00 の卓')
+    const save = screen.getByRole('button', { name: /受付時間と配分を保存/ }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
+    expect(save.disabled).toBe(false)
+  })
+
   it('下の帯の保存は、配分（全部の時間帯）と開ける時間を今の口へ送る', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
     fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
-    fireEvent.click(screen.getByRole('button', { name: /開ける時間と配分を保存/ }))
+    fireEvent.click(screen.getByRole('button', { name: /受付時間と配分を保存/ }))
     await waitFor(() => expect(fixture.saveOpeningHours).toHaveBeenCalled())
     expect(fixture.saveInventoryAllocation).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', otaCapacity: 7, slots: [{ id: 's17', expectedVersion: 3 }, { id: 's19', expectedVersion: 3 }] }))
     expect(fixture.saveOpeningHours).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', expectedVersion: 4 }))
@@ -90,7 +99,8 @@ describe('Y8SjT2 予約枠・在庫', () => {
     fixture.saveInventoryAllocation.mockRejectedValue(new ApiError(409, 'conflict'))
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    fireEvent.click(screen.getByRole('button', { name: /開ける時間と配分を保存/ }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
+    fireEvent.click(screen.getByRole('button', { name: /受付時間と配分を保存/ }))
     const band = await screen.findByRole('alert')
     expect(band.textContent).toContain('中川さんが 14:02 に予約枠・在庫を保存しました')
     expect(screen.getByRole('button', { name: /比べてから保存/ })).not.toBeNull()
@@ -156,7 +166,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     }
     const controls = [
       ...screen.getAllByRole('switch'),
-      screen.getByRole('button', { name: /開ける時間と配分を保存/ }),
+      screen.getByRole('button', { name: /受付時間と配分を保存/ }),
       screen.getAllByRole('button', { name: '＋ 時間帯を足す' })[0],
       screen.getByRole('button', { name: '火曜日の1つ目の時間帯を外す' }),
       screen.getByRole('button', { name: 'この時間帯だけ保存' }),
@@ -189,7 +199,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     role.value = verifiedStaffRole(null)
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    const save = screen.getByRole('button', { name: /開ける時間と配分を保存/ }) as HTMLButtonElement
+    const save = screen.getByRole('button', { name: /受付時間と配分を保存/ }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
     expect(save.hasAttribute('data-permission-locked')).toBe(false)
     for (const control of screen.getAllByRole('switch')) {
@@ -267,4 +277,28 @@ describe('予約枠・在庫の切り替え', () => {
     const inner = screen.getByRole('group', { name: '予約枠・在庫の切り替え' })
     expect(within(inner).getAllByRole('button')).toHaveLength(4)
   })
+})
+
+it('指定された店舗が先頭でなくても、その店舗の営業時間だけを開く', async () => {
+  window.history.replaceState(null, '', '/restaurant-test/inventory?storeId=store-2#rs-hours-title')
+  fixture.snapshot.mockResolvedValue({ data: snapshotOf({ stores: [{...snapshotOf().stores[0], id:'store-1',name:'先頭店'}, {...snapshotOf().stores[0], id:'store-2',name:'対象店'}] }) })
+  render(<InventoryPage />)
+  await waitFor(() => expect(fixture.openingHours).toHaveBeenCalledWith('account-1','store-2'))
+  expect(fixture.openingHours).not.toHaveBeenCalledWith('account-1','store-1')
+})
+it('指定店が見つからなければ別の店を開かない', async () => {
+  window.history.replaceState(null, '', '/restaurant-test/inventory?storeId=unknown#rs-hours-title')
+  render(<InventoryPage />)
+  await screen.findByText('指定された店舗を確認できません')
+  expect(fixture.openingHours).not.toHaveBeenCalled()
+})
+
+it('営業時間への案内は対象へ一度移動し、店の指定を残して目印を消す', async () => {
+  const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
+  window.history.replaceState(null, '', '/restaurant-test/inventory?storeId=store-1#rs-hours-title')
+  render(<InventoryPage />)
+  await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: 'start' }))
+  expect(window.location.search).toBe('?storeId=store-1')
+  expect(window.location.hash).toBe('')
+  scroll.mockRestore()
 })

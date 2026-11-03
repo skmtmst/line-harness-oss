@@ -1,6 +1,9 @@
 'use client'
 import { describeApiFailure } from '@/components/shared/api-error-message'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 
 import type { Folder } from '@line-crm/shared'
@@ -71,6 +74,21 @@ export default function MediaUploadDialog({
   const [folderId, setFolderId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const pendingFiles = entries.some(entry => entry.state !== 'done')
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: open && (pendingFiles || busy), busy: open && busy, onDiscard: onClose })
+  const current = useRef({ open, accountId, busy, target: guard.leaveTarget })
+  current.current = { open, accountId, busy, target: guard.leaveTarget }
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  useEffect(() => { if (!open) guard.cancelLeave() }, [open, guard.cancelLeave])
+  useEffect(() => { guard.cancelLeave() }, [accountId, guard.cancelLeave])
+  const discardAndLeave = () => {
+    const target = guard.leaveTarget
+    if (!alive.current || !current.current.open || current.current.accountId !== accountId || current.current.busy || !target || current.current.target !== target) return
+    current.current.target = null
+    guard.disarm(); guard.confirmLeave()
+  }
 
 
   useEffect(() => {
@@ -87,6 +105,12 @@ export default function MediaUploadDialog({
   )
   const errorCount = entries.filter((entry) => entry.state === 'error').length
   const doneCount = entries.filter((entry) => entry.state === 'done').length
+  const allDone = entries.length > 0 && doneCount === entries.length
+  const uploadPercent = entries.length === 0 ? 0 : entries.reduce((sum, entry) => {
+    if (entry.state === 'done') return sum + 100
+    if (entry.state === 'uploading' || entry.state === 'verifying') return sum + Math.min(99, Math.max(0, entry.progress))
+    return sum
+  }, 0) / entries.length
   /*
     全体の進みは実測だけ出す。登録を押す前（すべて登録待ち）は棒を出さない。
     一度でも登録を実行した（完了か、登録中の失敗がある）ときだけ
@@ -193,14 +217,14 @@ export default function MediaUploadDialog({
 
   if (!open) return null
 
-  return <Dialog open={open} title="ファイルを入れる" onCancel={onClose} busy={busy} error={error || undefined} designNode="eXAJP" designWidth={720} footer={(<DialogActions leadingAction={<p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
-            {errorCount > 0 ? `${formatNumber(errorCount)}件は登録できません` : `${entries.length}件を選択中`}
+  return <><Dialog contentLayout="form" open={open} dirty={pendingFiles} title="ファイルを入れる" onCancel={onClose} busy={busy} error={error || undefined} designNode="eXAJP" designWidth={720} footer={(<DialogActions leadingAction={<p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
+            {errorCount > 0 ? `${formatNumber(errorCount)}件は登録できません` : allDone ? `${formatNumber(doneCount)}件を登録しました` : `${entries.length}件を選択中`}
           </p>}>
 
           <>
-            <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
+            {allDone && !busy ? <Button type="button" variant="primary" onClick={onClose}>完了</Button> : <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
               {`${formatNumber(readyCount)}件を登録する`}
-            </Button>
+            </Button>}
           </>
         </DialogActions>)}>{}
         <div className="space-y-4 p-6">
@@ -236,8 +260,8 @@ export default function MediaUploadDialog({
               <Progress
                 state="active"
                 title="登録しています"
-                percent={entries.length > 0 ? (doneCount / entries.length) * 100 : 0}
-                countText={`${formatNumber(doneCount)} / ${formatNumber(entries.length)} 件`}
+                percent={uploadPercent}
+                countText={`${formatNumber(doneCount)} / ${formatNumber(entries.length)} 件完了`}
                 className="mb-3"
               />
             ) : attempted ? (
@@ -327,5 +351,5 @@ export default function MediaUploadDialog({
             onChange={setFolderId}
           /></SaveErrorField></Field></div>
         </div>
-  </Dialog>
+  </Dialog><OverlayDepthContext.Provider value={depth + 1}><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="選択したファイル" busy={busy} onConfirm={discardAndLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></>
 }

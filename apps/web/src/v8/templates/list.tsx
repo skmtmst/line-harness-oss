@@ -3,7 +3,7 @@
 import { isRichVideoTemplate } from './list-model'
 
 import { renderTemplateDialogs } from './list-dialogs'
-import { ChipKey,FolderCountSection,PAGE_SIZE_OPTIONS,PendingDelete,SAVED_FILTER_OPTIONS,Section,Template,latestContentOf,normalizeTemplateSearchText } from './list-model'
+import { ChipKey,FolderCountSection,PAGE_SIZE_OPTIONS,PendingDelete,SAVED_FILTER_OPTIONS,Section,Template,latestContentOf, hasMultipleMessages,normalizeTemplateSearchText } from './list-model'
 import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { renderTemplateList } from './list-table'
 
@@ -74,20 +74,22 @@ export default function TemplatesListV8() {
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
-  const [activeSection, setActiveSection] = useState<Section>('message')
-  /* フォルダの数を数えるタブの種類。カルーセル・リッチメッセージのタブでは前のテンプレートのタブのまま。 */
-  const [folderSection, setFolderSection] = useState<FolderCountSection>('message')
+  /*
+   * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
+   * テンプレートを開いて「戻る」と同じ一覧に戻る。
+   */
+  const [urlView, setUrlView] = useListUrlState({ q: '', folder: 'all', chips: '', view: '', size: '20', page: '1', tab: 'message' })
+  const knownSections: Section[] = ['message', 'question', 'rich_video', 'card_message', 'rich_message', 'coupon', 'research']
+  const activeSection: Section = knownSections.includes(urlView.tab as Section) ? urlView.tab as Section : 'message'
+  /* フォルダの数は、テンプレート以外のタブでは最後の種類を保つ。 */
+  const [folderSection, setFolderSection] = useState<FolderCountSection>(() => activeSection === 'question' || activeSection === 'rich_video' ? activeSection : 'message')
+  useEffect(() => { if (activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video') setFolderSection(activeSection) }, [activeSection])
   /* 古いタブの答えが後から届いても数を上書きしない。 */
   const folderRequestRef = useRef(0)
   const [templates, setTemplates] = useState<Template[]>([])
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
   const [failure, setFailure] = useState<TemplatesFailure | null>(null)
-  /*
-   * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
-   * テンプレートを開いて「戻る」と同じ一覧に戻る。
-   */
-  const [urlView, setUrlView] = useListUrlState({ q: '', folder: 'all', chips: '', view: '', size: '20', page: '1' })
   const templateQuery = urlView.q
   const setTemplateQuery = useCallback((next: string) => setUrlView({ q: next, page: '1' }), [setUrlView])
   const chips = useMemo<Record<ChipKey, boolean>>(() => {
@@ -323,9 +325,9 @@ export default function TemplatesListV8() {
     if (selectedCategory === 'unfiled' && t.folderId !== null) return []
     if (selectedCategory !== 'all' && selectedCategory !== 'unfiled' && t.folderId !== selectedCategory) return []
     if (chips.unused && t.usageCount !== 0) return []
-    if (chips.single && (t.question !== null || t.messageType === 'carousel')) return []
+    if (chips.single && hasMultipleMessages(t)) return []
     const content = latestContentOf(t)
-    if (chips.multiple && t.messageType !== 'carousel' && !content.includes('\n\n')) return []
+    if (chips.multiple && !hasMultipleMessages(t)) return []
     if (chips.variables && !content.includes('{{')) return []
     if (savedFilter === 'used' && !(t.usageCount > 0)) return []
     if (savedFilter === 'draft-changes' && !(t.hasDraft && t.publishedAt != null)) return []
@@ -817,7 +819,7 @@ export default function TemplatesListV8() {
     <div role="group" aria-label="中身で絞り込む" className={styles.chipGroup}>
       <SegmentedControl aria-label="メッセージの数" value={chips.single ? 'single' : chips.multiple ? 'multiple' : 'all'}
         onChange={value => setChips(current => ({ ...current, single: value === 'single', multiple: value === 'multiple' }))}
-        options={[{ value: 'all', label: 'すべて' }, { value: 'single', label: '1通のみ' }, { value: 'multiple', label: '複数通' }]} />
+        options={[{ value: 'all', label: 'すべて' }, { value: 'single', label: '1通のみ' }, ...(tabItems.some(hasMultipleMessages) ? [{ value: 'multiple', label: '複数通' }] : [])]} />
       <FilterChip selected={chips.variables} onChange={() => toggleChip('variables')} title="名前や情報を差し込むテンプレート" icon={<Braces size={16} aria-hidden="true" />}>
         差し込みあり
       </FilterChip>
@@ -908,9 +910,8 @@ export default function TemplatesListV8() {
 
   const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
   const switchSection = (next: Section) => {
-    setActiveSection(next)
+    setUrlView({ tab: next, page: '1' })
     if (next === 'message' || next === 'question' || next === 'rich_video') setFolderSection(next)
-    setPage(1)
     setSelectedIds(new Set())
   }
 

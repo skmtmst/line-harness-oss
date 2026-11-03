@@ -583,7 +583,7 @@ export default function OrdersBoard({
           <TableStateRow
             colSpan={canManage ? COLUMN_COUNT : COLUMN_COUNT_VIEW_ONLY}
             kind="empty"
-            title="この状態の注文はありません"
+            title={data.tab === 'all' ? '注文はまだありません' : 'この状態の注文はありません'}
             description="新しい注文が届くと、ここに表示されます。"
           />
         ) : (
@@ -610,7 +610,7 @@ export default function OrdersBoard({
 
       {/* 閲覧のみの人は選べないので、まとめての帯は出さない。選んだ数の帯は共通の一括バー。 */}
       {canManage ? (
-        <BulkBar count={checkedCount} unit="件">
+        <BulkBar count={checkedCount} unit="件" onClear={() => onToggleSelectAll(false)}>
           <Button variant="primary" busy={bulkBusy} busyLabel="受付中…" disabled={bulkBusy} onClick={onBulkAccept}>
             まとめて受け付ける
           </Button>

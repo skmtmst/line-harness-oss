@@ -32,6 +32,16 @@ beforeEach(()=>{clearToastsForTest();
 })
 afterEach(cleanup)
 
+it('統括の情報は変更前も保存の場所と押せない理由が分かり、変更後に保存できる', async () => {
+  render(<HqSettingsV8 />)
+  await loaded()
+  const save = screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  expect(screen.getAllByText('変更していません').length).toBeGreaterThan(0)
+  fireEvent.change(field('会社名（正式）'), { target: { value: '新しい会社名' } })
+  await waitFor(() => expect(save.disabled).toBe(false))
+})
+
 describe('会社と連絡先の画面の動き',()=>{
   it('郵便番号と電話は文字数でなく入力形式の見本で案内する',async()=>{
     await renderCard()
@@ -162,18 +172,18 @@ describe('会社と連絡先の画面の動き',()=>{
 })
 
 
-it('統括の2つの設定は変更時だけ1本の帯を出し、取消で両方を元へ戻す', async () => {
+it('統括の2つの設定は1本の帯で操作し、取消で両方を元へ戻す', async () => {
   render(<HqSettingsV8 />)
   await loaded()
   await waitFor(() => expect(field('統括名').value).toBe('統括の名前'))
   expect(field('統括名').closest('[data-form-requirement]')?.getAttribute('data-form-requirement')).toBe('required')
-  expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+  expect((screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.change(field('統括名'), { target: { value: '新しい統括名' } })
   fireEvent.change(field('担当者名'), { target: { value: '別の担当' } })
   expect(screen.getAllByRole('button', { name: '保存する' })).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: '変更を取り消す' }))
   expect(screen.queryByRole('button', { name: '保存せずに移る' })).toBeNull()
-  await waitFor(() => expect(screen.queryByRole('button', { name: '保存する' })).toBeNull())
+  await waitFor(() => expect((screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(true))
   expect(field('統括名').value).toBe('統括の名前')
   expect(field('担当者名').value).toBe(values.contactName)
   expect(mocks.save).not.toHaveBeenCalled()
@@ -194,7 +204,7 @@ it('統括名の保存後に会社の保存が失敗しても、未保存の入�
   fireEvent.click(screen.getByRole('button', { name: '保存する' }))
   await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(2))
   expect(mocks.nameSave).toHaveBeenCalledOnce()
-  await waitFor(() => expect(screen.queryByRole('button', { name: '保存する' })).toBeNull())
+  await waitFor(() => expect((screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(true))
 })
 
 

@@ -15,7 +15,7 @@ export default function Step4Template({ templateKey, onOpen }: {
   onOpen: () => void
 }) {
   return (
-    <CreateStepColumns data-design-node="X0pGdw" previewTitle="あとから変えられます" preview={(
+    <CreateStepColumns data-design-node="X0pGdw" previewTitle="あとから変えられます" previewLabel="変更できる設定を見る" preview={(
         <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="あとから変えられます">
         <h2 className={styles.asideH2}>あとから変えられます</h2>
         <p className={styles.asideP}>選んだ使い方でダッシュボードの並びが決まります。</p>

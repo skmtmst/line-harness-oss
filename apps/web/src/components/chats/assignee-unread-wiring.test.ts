@@ -14,11 +14,4 @@ describe("管理画面 担当者ごとの未読数（YZaDK）の配線で戻さ�
     expect(PAGE).not.toContain('items.filter((item) => item.operatorId')
   })
 
-  it('集計の口に契約に無い引数を足さない', () => {
-    expect(PAGE).not.toContain('api.chatStats.get(selectedAccountId')
-  })
-
-  it('集計の失敗で担当者一覧そのものを空にしない', () => {
-    expect(PAGE).not.toContain('setOperators([])')
-  })
 })

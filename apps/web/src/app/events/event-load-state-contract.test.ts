@@ -35,7 +35,7 @@ describe('V8 イベント・申込者一覧の状態', () => {
       // 前のアカウント・前の絞り込みの応答が、次の一覧に混ざらないこと。
       if (name === 'イベント') {
         expect(body).toContain('loadRequestRef')
-        expect(body).toContain('if (requestId !== loadRequestRef.current) return')
+        expect(body).toContain('if (requestId !== loadRequestRef.current || accountScope.current !== scope) return')
       } else {
         expect(body).toContain('useBookingRequests(operationScope)')
         expect(body).toContain('if (!request.isCurrent()) return')

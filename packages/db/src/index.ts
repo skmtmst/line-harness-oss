@@ -328,7 +328,7 @@ export type {
   ActionScoreRuleBundle, ActionScoreRuleConfiguration, ActionScoreRuleOperation, ActionScoreRuleSetStatus, ActionScoreRuleVersion,
 } from './action-score-rules';
 export {
-  createTemplate, deleteTemplate, getAssociableTemplate, getSendableTemplate, getTemplateById, getTemplateFolderCounts,
+  createTemplate, deleteTemplate, deleteCreatedTemplateDraft, getAssociableTemplate, getSendableTemplate, getTemplateById, getTemplateFolderCounts,
   getTemplateSectionRows, getTemplateSendCounts, getTemplateUsage, getTemplates, getTemplatesWithUsageCount, hasTemplateDraft, isTemplateAssociable,
   isTemplateSendable, publishTemplate, publishedVersionStatement, saveTemplateDraft, templateDraftFingerprint, updateTemplate,
 } from './templates';
@@ -1314,3 +1314,5 @@ export {
 
 export { prepareMonthlyContract, getMonthlyContractRow, findMonthlyContractReplay, setMonthlyServiceState, listMonthlyContracts, monthlyEntitlementAccess, prepareMonthlyEventApplication, recordMonthlyEventApplication, MonthlyLedgerError } from './booking-monthly/index.js';
 export type { MonthlyScope, MonthlyContractSnapshot, MonthlyContractRow, MonthlyEventApplication } from './booking-monthly/index.js';
+
+export { validRestaurantCoursesSql } from './forms/course-guard.js';

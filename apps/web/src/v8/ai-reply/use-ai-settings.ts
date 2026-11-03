@@ -18,25 +18,33 @@ export function useAiSettings(accountId: string | null) {
   const [settings, setSettings] = useState<AiSettings | null>(null)
   const [status, setStatus] = useState<AiSettingsStatus>('loading')
   const generation = useRef(0)
+  const accountScope = useRef({ accountId })
+  if (accountScope.current.accountId !== accountId) accountScope.current = { accountId }
+  const [loadedScope, setLoadedScope] = useState<object | null>(null)
 
   const load = useCallback(async () => {
     const mine = ++generation.current
-    if (!accountId) { setSettings(null); setStatus('ready'); return }
+    const scope = accountScope.current
+    if (!accountId) { setSettings(null); setStatus('ready'); setLoadedScope(scope); return }
     setStatus('loading')
     try {
       const res = await aiReplyApi.settings(accountId)
-      if (mine !== generation.current) return
+      if (mine !== generation.current || accountScope.current !== scope) return
       setSettings(res.data)
       setStatus('ready')
+      setLoadedScope(scope)
     } catch {
-      if (mine !== generation.current) return
+      if (mine !== generation.current || accountScope.current !== scope) return
       setSettings(null)
       setStatus('error')
+      setLoadedScope(scope)
     }
   }, [accountId])
 
   useEffect(() => { void load() }, [load])
 
-  const mode = settings?.mode ?? 'off'
-  return { settings, setSettings, status, reload: load, mode, role, impersonating, permissions: aiPermissions(role, impersonating, mode) }
+  const currentSettings = loadedScope === accountScope.current ? settings : null
+  const currentStatus = loadedScope === accountScope.current ? status : 'loading'
+  const mode = currentSettings?.mode ?? 'off'
+  return { settings: currentSettings, setSettings, status: currentStatus, reload: load, mode, role, impersonating, permissions: aiPermissions(role, impersonating, mode) }
 }

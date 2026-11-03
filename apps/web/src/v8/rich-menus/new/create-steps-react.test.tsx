@@ -15,11 +15,13 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const accountState = vi.hoisted(() => ({ id: 'acc-1' }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: ACCOUNT, loading: false }),
+  useAccount: () => ({ selectedAccountId: accountState.id, selectedAccount: { ...ACCOUNT, id: accountState.id }, loading: false }),
 }))
+const push = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useRouter: () => ({ push, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(window.location.search),
   usePathname: () => '/rich-menus/new',
 }))
@@ -77,6 +79,7 @@ function stubFetch() {
       groupBody = { ...GROUP, ...(groupBody as typeof GROUP), ...body, id: GROUP.id, pages: GROUP.pages }
       return { ok: true, status: 200, json: async () => ({ success: true, data: groupBody }) }
     }
+    if (parsed.pathname === '/api/rich-menu-groups/rmg-x' && init?.method === 'DELETE') { writes.push({method:'DELETE',body:{expectedVersion:parsed.searchParams.get('expectedVersion')}}); return {ok:true,status:200,json:async()=>({success:true,data:null})} }
     if (parsed.pathname === '/api/rich-menu-groups/rmg-x') return { ok: true, status: 200, json: async () => ({ success: true, data: groupBody }) }
     if (parsed.pathname === '/api/rich-menu-groups') return { ok: true, status: 200, json: async () => ({ success: true, data: { items: [], total: 0, page: 1, limit: 200 } }) }
     return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
@@ -103,6 +106,7 @@ function currentStep(): string {
 }
 
 beforeEach(() => {
+  accountState.id = 'acc-1'
   failing = {}
   groupBody = GROUP
   stubFetch()
@@ -170,6 +174,36 @@ describe('リッチメニューを直す：下書きの読み込み', () => {
 })
 
 describe('リッチメニューを作る：面の動きの欄', () => {
+  it('公開確認には保存したメニューのアカウントと環境を出す', async () => {
+    await open('?id=rmg-x&step=publish')
+    await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) })
+    await settle()
+    const dialog = screen.getByRole('dialog', { name: '公開の確認' })
+    expect(dialog.textContent).toContain('LINEアカウント'); expect(dialog.textContent).toContain('環境')
+    expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
+  it('表示先を決めない公開確認では、友だちの画面に出ないと示す', async () => {
+    groupBody = { ...GROUP, isDefaultForAll: false, targetingEnabled: false }
+    await open('?id=rmg-x&step=publish')
+    await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) })
+    const dialog = await screen.findByRole('dialog', { name: '公開の確認' })
+    expect(dialog.textContent).toContain('この操作だけでは、友だちのトーク画面には出ません')
+    expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
+  it('確認中にアカウントを切り替えて戻した後、古い公開を送らない', async () => {
+    await open('?id=rmg-x&step=publish')
+    await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) }); await settle()
+    const button = within(screen.getByRole('dialog', { name: '公開の確認' })).getByRole('button', { name: '公開する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    await act(async () => { accountState.id = 'acc-2'; root.render(<RichMenuCreateV8 editGroupId="rmg-x" />) })
+    await act(async () => { accountState.id = 'acc-1'; root.render(<RichMenuCreateV8 editGroupId="rmg-x" />) })
+    await act(async () => { await handler({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:button, target:button }) })
+    expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
   it.each([1, 2])('公開前に%d枚目の名前の空いた面を開いて欄の下に理由を出し、入力すると消す', async (pageNumber) => {
     const first = { ...GROUP.pages[0], areas: GROUP.pages[0].areas.map(area => ({ ...area })) }
     const pages = pageNumber === 1 ? [first] : [first, { ...first, id: 'p-next', orderIndex: 1, name: '次のページ', aliasId: 'a-next', areas: [area('next-area', '', 0)] }]
@@ -193,6 +227,30 @@ describe('リッチメニューを作る：面の動きの欄', () => {
     await settle()
     expect(screen.queryByRole('alertdialog', { name: '公開の確認' }) ?? screen.queryByRole('dialog', { name: '公開の確認' })).not.toBeNull()
     expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
+  it.each(['not-a-url', ''])('不正なURLまたは未設定の面があると次の手順へ進まない: %s', async (uri) => {
+    groupBody = { ...GROUP, pages: [{ ...GROUP.pages[0], areas: [area('a-1', '予約する', 0), { ...area('a-2', '会員証', 833), actionData: { uri } }] }] }
+    await open('?id=rmg-x&step=buttons')
+    await act(async () => { fireEvent.click(getPageAction({ name: '次へ：誰に出すか', exact: true })) })
+    await settle()
+    expect(currentStep()).toContain('ボタンの動き')
+    expect(screen.getByText(/面.*設定/)).toBeTruthy()
+  })
+
+  it('面が一つもないタブが残っていると次の手順へ進まない', async () => {
+    groupBody = { ...GROUP, pages: [...GROUP.pages, { ...GROUP.pages[0], id: 'empty-page', name: '次のページ', areas: [] }] }
+    await open('?id=rmg-x&step=buttons')
+    await act(async () => { fireEvent.click(getPageAction({ name: '次へ：誰に出すか', exact: true })) })
+    await settle()
+    expect(currentStep()).toContain('ボタンの動き')
+    expect(screen.getByText(/面.*設定/)).toBeTruthy()
+  })
+
+  it('テキストが入った面には未設定ではなくテキストを送ると表示する', async () => {
+    groupBody = { ...GROUP, pages: [{ ...GROUP.pages[0], areas: [{ ...area('a-1', '予約する', 0), intent: 'text', actionType: 'message', actionData: { text: '架空メッセージ' } }] }] }
+    await open('?id=rmg-x&step=buttons')
+    expect(screen.getAllByText('テキストを送る').length).toBeGreaterThan(0)
   })
 
   it('選んだ面だけの動きの欄を開き、面の名前を出す。別の面を選ぶと欄が入れ替わる', async () => {
@@ -224,6 +282,14 @@ describe('リッチメニューを作る：候補の読み込み', () => {
 })
 
 describe('リッチメニューを作る：選ぶ札と終わりの欄', () => {
+  it('未設定の面から、画面に表示された手順名で設定画面に戻れる', async () => {
+    groupBody = { ...GROUP, pages: [{ ...GROUP.pages[0], areas: [{ ...GROUP.pages[0].areas[0], actionData: { uri: '' } }] }] }
+    await open('?id=rmg-x&step=publish')
+    expect(screen.getByText('押しても何も起きません。「ボタンの動き」で設定します')).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'ボタンの動きを設定する' })) })
+    expect(currentStep()).toContain('ボタンの動き')
+  })
+
   it('出す相手は共通の選ぶ札（fieldset と legend）で選ぶ', async () => {
     await open('?id=rmg-x&step=audience')
     const group = screen.getByRole('group', { name: '出す相手' })
@@ -238,6 +304,7 @@ describe('リッチメニューを作る：選ぶ札と終わりの欄', () => {
     expect(new Set((within(timing).getAllByRole('radio') as HTMLInputElement[]).map((radio) => radio.name))).toEqual(new Set(['timing']))
     const ends = () => screen.getByLabelText('終わる日時') as HTMLInputElement
     expect(ends().disabled).toBe(true)
+    expect(screen.getByText('終わる日時を選ぶと、')).toBeTruthy()
     expect(screen.getByText('「終わりを決める」をオンにすると設定できます').id).toBe(ends().getAttribute('aria-describedby'))
     await act(async () => { fireEvent.click(screen.getByRole('switch', { name: '終わりを決める' })) })
     expect(ends().disabled).toBe(false)
@@ -266,6 +333,69 @@ describe('リッチメニューの出す相手は明示的に決める', () => {
     await open('?step=audience', { host: makeHqHost() })
     expect((screen.getByRole('radio', { name: /^決めない/ }) as HTMLInputElement).checked).toBe(true)
     expect((screen.getByRole('radio', { name: /^全員/ }) as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('手順を進めるまでは入力だけで下書きを作らない', async () => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 2100)) })
+    expect(writes).toHaveLength(0)
+  })
+
+  it('手順を進めて保存した下書きは、キャンセル時に残すか消すか確かめる', async () => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き', exact: true })) })
+    await settle()
+    const leave = vi.fn()
+    await act(async () => { requestUnsavedAction(leave) })
+    expect(leave).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '下書きを残して移る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '下書きを消して移る' })).toBeTruthy()
+  })
+
+  it.each(['keep','delete'] as const)('保存済み下書きの%sを選んで移る', async (choice) => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き', exact: true })) })
+    await settle()
+    const leave = vi.fn()
+    await act(async () => { requestUnsavedAction(leave) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: choice === 'keep' ? '下書きを残して移る' : '下書きを消して移る' })) })
+    await settle()
+    expect(leave).toHaveBeenCalledOnce()
+    const deletion = writes.find(write => write.method === 'DELETE')
+    if (choice === 'keep') expect(deletion).toBeUndefined()
+    else expect(deletion?.body).toEqual({expectedVersion:'1'})
+  })
+
+  it('保存した下書きの削除に失敗したら、理由を出して画面に残る', async () => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き', exact: true })) })
+    await settle()
+    failing['/api/rich-menu-groups/rmg-x'] = 1
+    const leave = vi.fn()
+    await act(async () => { requestUnsavedAction(leave) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを消して移る' })) })
+    await settle()
+    expect(leave).not.toHaveBeenCalled()
+    expect(screen.getByText(/下書きの削除結果を確認できません/)).toBeTruthy()
+  })
+
+  it('削除結果が不明なら一覧で確認する操作を案内する', async () => {
+    await open('')
+    fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけ' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き', exact: true })) })
+    await settle()
+    failing['/api/rich-menu-groups/rmg-x'] = 1
+    await act(async () => { requestUnsavedAction(vi.fn()) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを消して移る' })) })
+    await settle()
+    expect(screen.getByText(/削除結果を確認できません/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '下書きを残して移る' })).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '一覧で確認する' })) })
+    expect(push).toHaveBeenCalledWith('/rich-menus')
   })
 
   it('初めの下書き保存と手順の保存でも全員の既定にしない', async () => {

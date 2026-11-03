@@ -25,6 +25,7 @@ import { formatNumber } from '@/lib/format';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
@@ -190,6 +191,12 @@ function FriendAddList() {
   const kind: FriendAddRuleKind = searchParams.get('kind') === 'returning' ? 'returning' : 'first_time'
   const requestedDeleteId = searchParams.get('delete')
 
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const loadedScope = useRef(-1)
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
+  const [deleteScope, setDeleteScope] = useState<{ id: string; name?: string; generation: number } | null>(null)
   const [data, setData] = useState<FriendAddRuleListData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -220,6 +227,7 @@ function FriendAddList() {
 
   /* 窓の状態。 */
   const [stopTarget, setStopTarget] = useState<FriendAddRule | null>(null)
+  const [stopScope, setStopScope] = useState<{ id: string; name?: string; generation: number } | null>(null)
   const [stopBusy, setStopBusy] = useState(false)
   const [stopError, setStopError] = useState('')
   const [fallbackStop, setFallbackStop] = useState(false)
@@ -229,6 +237,7 @@ function FriendAddList() {
 
   const load = useCallback(async () => {
     const requestId = ++requestSequence.current
+    const generation = accountScope.current.generation
     if (!selectedAccountId) {
       setData(null)
       setLoading(false)
@@ -246,16 +255,17 @@ function FriendAddList() {
         status: statusFilter || undefined,
         highlightId: statusFilter === 'draft' ? highlightedId ?? undefined : undefined,
       })
-      if (requestId !== requestSequence.current) return
+      if (requestId !== requestSequence.current || generation !== accountScope.current.generation) return
       if (!response.success) {
         setError(response.error)
         setErrorStatus(null)
         setData(null)
         return
       }
+      loadedScope.current = generation
       setData(response.data)
     } catch (caught) {
-      if (requestId !== requestSequence.current) return
+      if (requestId !== requestSequence.current || generation !== accountScope.current.generation) return
       const fieldFailure = saveErrors.capture(caught)
       // 権限・対象なし・重複を「通信を確認して」にまとめない。
       const failure = describeFriendAddFailure(caught, '友だち追加時の配信', 'load')
@@ -266,7 +276,7 @@ function FriendAddList() {
       setErrorStatus(failure.status)
       setData(null)
     } finally {
-      if (requestId === requestSequence.current) setLoading(false)
+      if (requestId === requestSequence.current && generation === accountScope.current.generation) setLoading(false)
     }
   }, [appliedSearch, cursor, folder, kind, perPage, selectedAccountId, statusFilter, highlightedId])
 
@@ -283,12 +293,19 @@ function FriendAddList() {
     return () => clearTimeout(timer)
   }, [search, resetCursor])
 
+  useEffect(() => { setDeleteTarget(null); setDeleteScope(null); setStopTarget(null); setStopScope(null); setStopBusy(false); setStopError('') }, [selectedAccountId])
+  const openDeleteTarget = (item: FriendAddRule) => {
+    if (!selectedAccountId || item.accountId !== selectedAccountId || loadedScope.current !== accountScope.current.generation || !canEditRef.current) return
+    setDeleteScope({ id: item.accountId, name: accounts.find(account => account.id === item.accountId)?.name, generation: accountScope.current.generation })
+    setDeleteTarget(item)
+  }
+
   // `?delete=<id>` で開いたときは、その設定の削除の確かめを出す（管理画面 と同じ口）。
   useEffect(() => {
     if (!requestedDeleteId || !data) return
     const found = data.items.find((item) => item.id === requestedDeleteId && !item.isFallback)
-    if (found) setDeleteTarget(found)
-  }, [data, requestedDeleteId])
+    if (found) openDeleteTarget(found)
+  }, [data, requestedDeleteId, selectedAccountId, canEdit])
 
   const clearHighlight = () => {
     setHighlightedId(null)
@@ -435,11 +452,13 @@ function FriendAddList() {
 
   /* ===== 一時停止 ===== */
   const runStop = async () => {
-    if (!selectedAccountId || !stopTarget || stopBusy) return
+    if (!stopScope || stopScope.generation !== accountScope.current.generation || !canEditRef.current || !stopTarget || stopBusy) return
+    const generation = stopScope.generation
     setStopBusy(true)
     setStopError('')
     try {
-      const response = await api.friendAddRules.stop(selectedAccountId, stopTarget.id, stopTarget.version)
+      const response = await api.friendAddRules.stop(stopScope.id, stopTarget.id, stopTarget.version)
+      if (generation !== accountScope.current.generation) return
       if (!response.success) {
         setStopError('止められませんでした。状態を読み直してから、もう一度お試しください。')
         void load()
@@ -448,12 +467,13 @@ function FriendAddList() {
       setStopTarget(null)
       await load()
     } catch (saveFailure) {
+      if (generation !== accountScope.current.generation) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setStopError('止められませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setStopBusy(false)
+      if (generation === accountScope.current.generation) setStopBusy(false)
     }
   }
 
@@ -465,11 +485,11 @@ function FriendAddList() {
     if (requestedDeleteId) samePageUrl.replace(`/friend-add-settings?kind=${kind}`)
   }
   const runDelete = async () => {
-    if (!selectedAccountId || !deleteTarget || deleteBusy) return
+    if (!deleteScope || deleteScope.generation !== accountScope.current.generation || !canEditRef.current || !deleteTarget || deleteBusy) return
     setDeleteBusy(true)
     setDeleteError('')
     try {
-      const response = await api.friendAddRules.archive(selectedAccountId, deleteTarget.id)
+      const response = await api.friendAddRules.archive(deleteScope.id, deleteTarget.id)
       if (!response.success) {
         setDeleteError('保管できませんでした。設定を確認してください。')
         return
@@ -535,7 +555,9 @@ function FriendAddList() {
                 label: '止める',
                 icon: <Pause size={16} />,
                 onSelect: () => {
+                  if (!selectedAccountId || rule.accountId !== selectedAccountId || loadedScope.current !== accountScope.current.generation) return
                   setStopError('')
+                  setStopScope({ id: rule.accountId, name: accounts.find(account => account.id === rule.accountId)?.name, generation: accountScope.current.generation })
                   setStopTarget(rule)
                 },
               })
@@ -555,7 +577,7 @@ function FriendAddList() {
             dividerBefore: true,
             onSelect: () => {
               setDeleteError('')
-              setDeleteTarget(rule)
+              openDeleteTarget(rule)
             },
           }),
         ]),
@@ -891,7 +913,7 @@ function FriendAddList() {
         </ConfirmDialog>
         {/* 通常の設定の一時停止の確かめ。 */}
         <ConfirmDialog
-          open={stopTarget !== null}
+          open={stopTarget !== null && stopScope?.generation === accountScope.current.generation}
           title={stopTarget ? `「${stopTarget.name}」を止める` : ''}
           description="止めると、この流入リンクから来た人にはいちばん下の「経路が分からなかった人」の案内が動きます。"
           confirmLabel="止める"
@@ -903,10 +925,12 @@ function FriendAddList() {
             setStopTarget(null)
             setStopError('')
           }}
-        />
+        >
+          {stopScope ? <OperationTargetSummary accounts={[{ id: stopScope.id, name: stopScope.name }]} /> : null}
+        </ConfirmDialog>
         {/* 削除の確かめ（v7 と同じ文）。受け皿には削除を出さない。 */}
         <ConfirmDialog
-          open={deleteTarget !== null}
+          open={deleteTarget !== null && deleteScope?.generation === accountScope.current.generation}
           designNode="Q3qP1r"
           title={deleteTarget ? `「${deleteTarget.name}」を保管しますか？` : ''}
           description="保管すると、このリンクから追加された人には「経路が分からなかった人」の共通あいさつが動きます。過去の実行履歴は監査記録として残り、保管から戻すと、下書きとして再び編集できます。"
@@ -916,7 +940,9 @@ function FriendAddList() {
           error={deleteError}
           onConfirm={() => runDelete()}
           onCancel={closeDelete}
-        />
+        >
+          {deleteScope ? <OperationTargetSummary accounts={[{ id: deleteScope.id, name: deleteScope.name }]} /> : null}
+        </ConfirmDialog>
         <FolderEditorDialog open={folderDialogOpen} title={editingFolder ? 'フォルダを直す' : 'フォルダを追加'}
           description="設定を分けてしまう箱です。"
           name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} maxLength={50}

@@ -35,7 +35,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
   const frame=requestAnimationFrame(()=>{next=requestAnimationFrame(()=>{saveErrors.capture(failure.error);if(fieldFailure.current===failure)fieldFailure.current=null})})
   return ()=>{cancelAnimationFrame(frame);cancelAnimationFrame(next)}
  },[editor,formEditor,saveErrors.capture])
- function revealFieldFailure(){if(!permission.current)return;const failure=fieldFailure.current;if(failure){if(failure.row)setEditor(failure.row);else setFormEditor(true)}}
+ function revealFieldFailure(){if(!permission.current)return;const failure=fieldFailure.current;if(failure){if(failure.row)openEditor(failure.row);else openFormEditor()}}
  function rememberFieldFailure(error:unknown,row?:FollowupCardModel){
   const names=Object.keys(readSaveFieldErrors(error))
   if(!fieldFailure.current&&names.some(name=>errorFields.includes(name)&&(row?/^(timing|messageBubbles)/.test(name):!/^(timing|messageBubbles)/.test(name))))fieldFailure.current={error,row}
@@ -52,7 +52,10 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
  const changed=rows.filter(row=>rowContentKey(row)!==rowContentKey(savedRows.find(saved=>saved.trigger===row.trigger)!))
  const formChanged=!!form&&!!snapshot&&(JSON.stringify(form)!==JSON.stringify(snapshot.form.definition)||!!snapshot.formError&&formEditor===false&&formRepairAccepted)
  const dirty=changed.length>0||formChanged
- const guard=useUnsavedGuard({dirty,busy,onDiscard:()=>{if(snapshot)install(snapshot)}})
+ const editingFollowup=editor!==null||formEditor
+ const guard=useUnsavedGuard({dirty:editingFollowup?false:dirty,busy:editingFollowup?false:busy,onDiscard:()=>{if(snapshot)install(snapshot)}})
+ function openEditor(row:FollowupCardModel){guard.cancelLeave();setEditor(row)}
+ function openFormEditor(){guard.cancelLeave();setFormEditor(true)}
  const update=(row:FollowupCardModel)=>setRows(current=>current.map(item=>item.trigger===row.trigger?row:item))
  function assertCurrent(){if(!alive.current||!permission.current)throw new Error('操作する権限を確認してください。読み直してからお試しください')}
  async function save(){
@@ -103,19 +106,19 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
   {role==='viewer'&&<ReadOnlyNotice/>}
   <Notice tone="info">主要な送り方をかんたんに作れます。<Button variant="text" size="inline" textTone="accent" href="/reminders">リマインダ</Button>・<Button variant="text" size="inline" textTone="accent" href="/automations">オートメーション</Button>でも細かく設定できます。</Notice>
   {error&&<Notice tone="danger" action={<Button variant="secondary" disabled={busy} onClick={()=>guard.guarded(()=>void load().catch(()=>{}))}>読み直す</Button>}>{error}</Notice>}
-  {snapshot.formError&&<Notice tone="warn" action={<Button variant="secondary" disabled={!canManage||busy} lockedReason={lockedReason} onClick={()=>setFormEditor(true)}>予約フォームを直す</Button>}>{snapshot.formError}</Notice>}
+  {snapshot.formError&&<Notice tone="warn" action={<Button variant="secondary" disabled={!canManage||busy} lockedReason={lockedReason} onClick={openFormEditor}>予約フォームを直す</Button>}>{snapshot.formError}</Notice>}
   {snapshot.page.template?.sending_status==='pending'&&<Notice tone="info" action={<Button href="/restaurant-test/approvals">承認の状況を見る →</Button>}>以前の送り方は承認を待っています。新しい送り方を保存した後は、この画面でテスト送信と承認を進めてください。</Notice>}
   {snapshot.page.setup?.notUsing&&<Notice tone="info">この店では、今は使わないと設定しています。送り方をオンにして保存すると、この設定は外れます。</Notice>}
   </NoticeStack>
   <ListPageCards columns={4} narrowColumns={2} inset="parent">
    <Card as="article" padding="default" gap="tight" layout="vertical" aria-label="予約の回答フォーム">
     <div className={styles.head}><h2>予約の回答フォーム</h2></div>
-    <div className={styles.timing}><p>リッチメニューの「予約」で開く</p><Button variant="text" size="inline" textTone="accent" disabled={!canManage||busy} lockedReason={lockedReason} onClick={()=>setFormEditor(true)}>変える</Button></div>
+    <div className={styles.timing}><p>リッチメニューの「予約」で開く</p><Button variant="text" size="inline" textTone="accent" disabled={!canManage||busy} lockedReason={lockedReason} onClick={openFormEditor}>変える</Button></div>
     <div className={styles.sample}><ReservationFormSample definition={form} storeName={storeName} compact/></div>
    </Card>
    {rows.map(row=><Card as="article" key={row.trigger} padding="default" gap="tight" layout="vertical" aria-label={FOLLOWUP_NAMES[row.trigger]}>
-    <div className={styles.head}><h2>{FOLLOWUP_NAMES[row.trigger]}</h2><Toggle label={`${FOLLOWUP_NAMES[row.trigger]}を使う`} checked={row.enabled} disabled={!canManage||busy||!row.enabled&&!row.editable} lockedReason={lockedReason} onChange={enabled=>{if(!enabled)update({...row,enabled:false});else if(row.editable)setEditor({...row,enabled:true})}}/></div>
-    <div className={styles.timing}><p title={followupTimingLabel(row.trigger,row.timing)}>{followupTimingLabel(row.trigger,row.timing)}</p><Button variant="text" size="inline" textTone="accent" disabled={!canManage||busy||!row.editable} lockedReason={lockedReason} disabledReason={!row.editable?'詳細画面で変更できます':undefined} onClick={()=>setEditor(row)}>変える</Button></div>
+    <div className={styles.head}><h2>{FOLLOWUP_NAMES[row.trigger]}</h2><Toggle label={`${FOLLOWUP_NAMES[row.trigger]}を使う`} checked={row.enabled} disabled={!canManage||busy||!row.enabled&&!row.editable} lockedReason={lockedReason} onChange={enabled=>{if(!enabled)update({...row,enabled:false});else if(row.editable)openEditor({...row,enabled:true})}}/></div>
+    <div className={styles.timing}><p title={followupTimingLabel(row.trigger,row.timing)}>{followupTimingLabel(row.trigger,row.timing)}</p><Button variant="text" size="inline" textTone="accent" disabled={!canManage||busy||!row.editable} lockedReason={lockedReason} disabledReason={!row.editable?'詳細画面で変更できます':undefined} onClick={()=>openEditor(row)}>変える</Button></div>
     <StatusBadge help={row.enabled&&!row.sending?row.reason??undefined:undefined} tone={row.enabled&&row.sending?'success':'neutral'}>{rowContentKey(row)!==rowContentKey(savedRows.find(saved=>saved.trigger===row.trigger)!)?'未保存':!row.enabled?'止めています':row.sending?'送っています':!row.editable?'中身を確認してください':'準備済み・送信停止中'}</StatusBadge>
     <div className={styles.sample} data-muted={!row.enabled||undefined}>{row.bubbles.length?<FollowupMessageSample bubbles={row.bubbles} storeName={storeName} compact/>:<p className={styles.support}>詳細で中身を確認してから試してください。</p>}</div>
     {row.detailPath&&<div className={styles.row}><Button variant="text" size="inline" textTone="accent" href={row.detailPath}>詳しく設定する →</Button><Button variant="text" size="inline" textTone="accent" disabled={!canManage||busy||dirty||!row.enabled||!row.targetId} lockedReason={lockedReason} disabledReason={dirty?'先に変更を保存してください':!row.enabled||!row.targetId?'送り方をオンにして保存してください':undefined} onClick={()=>setTest(row.trigger)}>試す・送り始める</Button></div>}
@@ -123,13 +126,13 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
    </Card>)}
   </ListPageCards>
   <StickyBar status={`オン ${selectedOn}つ・変更 ${changed.length+(formChanged?1:0)}件`} actions={<><Button variant="secondary" disabled={!canManage||busy||dirty||selectedOn>0} lockedReason={lockedReason} disabledReason={dirty?'先に変更を保存してください':selectedOn>0?'オンの送り方を止めて保存してから選べます':undefined} onClick={()=>setNotUsing(true)}>今は使わない</Button><Button variant="secondary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} onClick={()=>install(snapshot)}>元に戻す</Button><Button variant="primary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} busy={busy} onClick={()=>void save()}>保存して作る</Button></>}/>
-  {editor&&<FollowupEditor key={editor.trigger} row={editor} accountId={accountId} storeName={storeName} onCancel={()=>{saveErrors.reset();setEditor(null)}} onConfirm={row=>{if(permission.current){update(row);setEditor(null)}}}/>}
-  {formEditor&&<ReservationFormEditor definition={form} storeName={storeName} onCancel={()=>{saveErrors.reset();setFormEditor(false)}} onConfirm={next=>{if(permission.current){setForm(next);setFormRepairAccepted(true);setFormEditor(false)}}}/>}
+  {editor&&<FollowupEditor key={editor.trigger} row={editor} accountId={accountId} storeName={storeName} pageDirty={dirty} pageBusy={busy} onDiscardPage={()=>{install(snapshot);saveErrors.reset();setEditor(null)}} onCancel={()=>{saveErrors.reset();setEditor(null)}} onConfirm={row=>{if(permission.current){update(row);setEditor(null)}}}/>}
+  {formEditor&&<ReservationFormEditor definition={form} storeName={storeName} pageDirty={dirty} pageBusy={busy} onDiscardPage={()=>{install(snapshot);saveErrors.reset();setFormEditor(false)}} onCancel={()=>{saveErrors.reset();setFormEditor(false)}} onConfirm={next=>{if(permission.current){setForm(next);setFormRepairAccepted(true);setFormEditor(false)}}}/>}
   {testRow&&<TestStartDialog key={testRow.trigger} row={testRow} accountId={accountId} storeId={storeId} storeName={storeName} recipient={snapshot.board.testRecipient} canManage={canManage} lockedReason={lockedReason} onCancel={()=>{setTest(null);void load().catch(()=>{})}} onStarted={load}/>}
   {notUsing&&<Dialog open title="今は使わないと設定しますか" description="この店の『LINE来店フォローを確認する』を済みにします。送り方はすべてオフのままです。" confirmLabel="今は使わない" onCancel={()=>setNotUsing(false)} onConfirm={()=>void decideNotUsing()} busy={busy}/>}
   {progress&&!editor&&!formEditor&&<Dialog open title={busy?'保存しています…':'保存の結果'} busy={busy} onCancel={()=>setProgress(null)}>
    <div className={styles.stack}><Notice tone="info">作った場所と保存できた内容を確認してください。まだ送っていません。テスト送信と承認のあと送り始めます。</Notice><ul className={styles.list}>{progress.map(item=><li key={item.key}><strong>{item.name}</strong> <StatusBadge tone={item.state==='done'?'success':item.state==='failed'?'danger':'neutral'}>{item.state==='done'?'保存しました':item.state==='failed'?'保存できませんでした':'保存待ち'}</StatusBadge>{item.description&&<p>{item.description}</p>}</li>)}</ul></div>
   </Dialog>}
-  <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="LINE来店フォローの変更" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy}/>
+  <UnsavedLeaveDialog open={!editingFollowup&&guard.leaveTarget !== null} subject="LINE来店フォローの変更" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy}/>
  </div></SaveErrorScope>
 }

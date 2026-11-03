@@ -210,6 +210,7 @@ export interface UpdateFormInput {
 export type UpdateFormResult =
   | { kind: 'updated'; form: Form }
   | { kind: 'not_found' }
+  | { kind: 'restaurant_course_unavailable' }
   | { kind: 'conflict'; form: Form };
 
 /**

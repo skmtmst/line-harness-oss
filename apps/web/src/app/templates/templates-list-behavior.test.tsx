@@ -136,6 +136,27 @@ async function openRowMenuAndDelete(name: string) {
 }
 
 describe('種類のタブ', () => {
+  it('種類をURLに残し、読み直しと戻る操作で同じタブを開く', async () => {
+    const view = await renderList()
+    fireEvent.click(screen.getByRole('tab', { name: /^質問/ }))
+    flushListUrlState()
+    expect(new URLSearchParams(window.location.search).get('tab')).toBe('question')
+    view.unmount()
+    await renderList()
+    expect(screen.getByRole('tab', { name: /^質問/ }).getAttribute('aria-selected')).toBe('true')
+    act(() => { window.history.replaceState(null, '', '/templates?tab=rich_video'); window.dispatchEvent(new PopStateEvent('popstate')) })
+    expect(screen.getByRole('tab', { name: /^リッチビデオ/ }).getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('素材の種類を開き直し、不明な種類はメッセージに戻す', async () => {
+    window.history.replaceState(null, '', '/templates?tab=coupon')
+    await renderList()
+    expect(screen.getByRole('tab', { name: /^クーポン/ }).getAttribute('aria-selected')).toBe('true')
+    expect(fixture.assetsList).toHaveBeenCalledWith({ accountId: 'account-a', kind: 'coupon' })
+    act(() => { window.history.replaceState(null, '', '/templates?tab=unknown'); window.dispatchEvent(new PopStateEvent('popstate')) })
+    expect(screen.getByRole('tab', { name: /^メッセージ/ }).getAttribute('aria-selected')).toBe('true')
+  })
+
   it('カルーセル・リッチメッセージ・クーポン・リサーチのタブは、その種類の中身を選んでいるアカウントで読む', async () => {
     await renderList()
     const kinds: Array<[string, string]> = [['カルーセル', 'card_message'], ['リッチメッセージ', 'rich_message'], ['クーポン', 'coupon'], ['リサーチ', 'research']]
@@ -304,7 +325,7 @@ describe('種類と数の書き方', () => {
       success: true,
       data: [
         row('tpl-single', '1通だけ', { messageContent: 'こんにちは' }),
-        row('tpl-multi', '2通に分かれる', { messageContent: '1通目\n\n2通目' }),
+        row('tpl-multi', '2通に分かれる', { messageBubbles: [{ id: '1', type: 'text', content: { text: '1通目' } }, { id: '2', type: 'text', content: { text: '2通目' } }] }),
         row('tpl-var', '名前を入れる', { messageContent: '{{name}}さん、こんにちは' }),
       ],
     })

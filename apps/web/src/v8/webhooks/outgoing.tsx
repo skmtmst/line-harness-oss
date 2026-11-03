@@ -31,6 +31,7 @@ import Pagination from '@/components/shared/pagination'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import ContextMenu from '@/components/shared/context-menu'
@@ -133,15 +134,15 @@ export default function WebhooksOutgoingV8() {
   const togglingRef = useRef<Set<string>>(new Set())
   const [togglingIds, setTogglingIds] = useState<string[]>([])
 
-  const [testTarget, setTestTarget] = useState<OutgoingWebhookOverview | null>(null)
+  const [testTarget, setTestTarget] = useState<{ item: OutgoingWebhookOverview; accountId: string; scope: object } | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [testNotice, setTestNotice] = useState<string | null>(null)
 
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; accountId: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; accountId: string; scope: object } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const [rotateTarget, setRotateTarget] = useState<{ id: string; name: string; activate: boolean; accountId: string } | null>(null)
+  const [rotateTarget, setRotateTarget] = useState<{ id: string; name: string; activate: boolean; accountId: string; scope: object } | null>(null)
   const [rotateSecret, setRotateSecret] = useState('')
   const [rotateError, setRotateError] = useState('')
   const [rotating, setRotating] = useState(false)
@@ -185,6 +186,11 @@ export default function WebhooksOutgoingV8() {
   // アカウントを替えたらページは 1 へ（来た瞬間は URL のまま）。
   useOnAccountSwitch(selectedAccountId, () => {
     setPage(1)
+    setTestTarget(null)
+    setTestingId(null)
+    setTestNotice(null)
+    setDeleting(false)
+    setRotating(false)
     setOptimisticActive({})
     togglingRef.current.clear()
     setTogglingIds([])
@@ -262,14 +268,13 @@ export default function WebhooksOutgoingV8() {
   }
 
   /* ===== 試しに送る ===== */
-  const runTest = async (item: OutgoingWebhookOverview) => {
-    const accountId = selectedAccountId
-    if (!accountId || testingId !== null) return
+  const runTest = async (item: OutgoingWebhookOverview, accountId: string, scope: object) => {
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== scope || testingId !== null) return
     setTestingId(item.id)
     setTestNotice(null)
     try {
       const response = await api.webhooks.outgoing.test(item.id, accountId)
-      if (accountRef.current !== accountId) return
+      if (accountRef.current !== accountId || accountScopeRef.current !== scope) return
       if (!response.success) throw new Error(response.error)
       if (response.data.delivered) {
         const status = response.data.responseStatus
@@ -280,13 +285,13 @@ export default function WebhooksOutgoingV8() {
       }
       return true
     } catch (saveFailure) {
-      if (accountRef.current !== accountId) return
+      if (accountRef.current !== accountId || accountScopeRef.current !== scope) return
       const fieldFailure = saveErrors.capture(saveFailure)
       { if (!fieldFailure)
       setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`) }
       return false
     } finally {
-      setTestingId(null)
+      if (accountScopeRef.current === scope) setTestingId(null)
     }
   }
 
@@ -299,13 +304,13 @@ export default function WebhooksOutgoingV8() {
       return
     }
     setDeleteError('')
-    setDeleteTarget({ id: item.id, name: item.name, accountId })
+    setDeleteTarget({ id: item.id, name: item.name, accountId, scope: accountScopeRef.current })
   }
   const runDelete = async () => {
     if (!canManageWebhooksNow(true)) { setDeleteError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     if (!deleteTarget || deleting) return
     const accountId = deleteTarget.accountId
-    if (accountId !== selectedAccountId || loadedAccountId !== accountId) {
+    if (accountId !== selectedAccountId || loadedAccountId !== accountId || deleteTarget.scope !== accountScopeRef.current) {
       setDeleteError('LINEアカウントが切り替わりました。削除する送り先を選び直してください。')
       return
     }
@@ -314,11 +319,11 @@ export default function WebhooksOutgoingV8() {
     try {
       const res = await api.webhooks.outgoing.delete(deleteTarget.id, accountId)
       if (!res.success) throw new Error(res.error)
-      if (accountRef.current !== accountId) return
+      if (accountRef.current !== accountId || accountScopeRef.current !== deleteTarget.scope) return
       setDeleteTarget(null)
       await reload()
     } catch (caught) {
-      if (accountRef.current !== accountId) return
+      if (accountRef.current !== accountId || accountScopeRef.current !== deleteTarget.scope) return
       const fieldFailure = saveErrors.capture(caught);
 
       const forbidden = caught instanceof ApiError && caught.status === 403
@@ -327,7 +332,7 @@ export default function WebhooksOutgoingV8() {
         ? permissionDeniedMessage('store')
         : 'この送り先を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setDeleting(false)
+      if (accountScopeRef.current === deleteTarget.scope) setDeleting(false)
     }
   }
 
@@ -339,7 +344,7 @@ export default function WebhooksOutgoingV8() {
     setRotateError('')
     const accountId = selectedAccountId
     if (!rotateTarget) return
-    if (!accountId || loadedAccountId !== accountId || rotateTarget.accountId !== accountId) {
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || rotateTarget.accountId !== accountId || rotateTarget.scope !== accountScopeRef.current) {
       setRotateTarget(null)
       setRotateSecret('')
       setError('LINEアカウントが切り替わりました。対象を選び直してください。')
@@ -356,7 +361,7 @@ export default function WebhooksOutgoingV8() {
         { secret: rotateSecret, isActive: rotateTarget.activate || undefined },
         stepUpToken,
       )
-      if (accountRef.current !== accountId) return
+      if (accountRef.current !== accountId || accountScopeRef.current !== rotateTarget.scope) return
       if (!res.success) {
         setRotateError(res.error)
         return
@@ -365,10 +370,11 @@ export default function WebhooksOutgoingV8() {
       setRotateSecret('')
       void reload()
     } catch (caught) {
+      if (accountRef.current !== accountId || accountScopeRef.current !== rotateTarget.scope) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: async (token) => { if (canContinue() && accountRef.current === accountId) return runRotate(token); setRotateError('権限やLINEアカウントが変わったため中止しました。') } });
+        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: async (token) => { if (canContinue() && accountRef.current === accountId && accountScopeRef.current === rotateTarget.scope) return runRotate(token); setRotateError('権限やLINEアカウントが変わったため中止しました。') } });
 
         return
       }
@@ -378,7 +384,7 @@ export default function WebhooksOutgoingV8() {
         scope: 'store',
       })) }
     } finally {
-      setRotating(false)
+      if (accountScopeRef.current === rotateTarget.scope) setRotating(false)
     }
   }
 
@@ -411,7 +417,7 @@ export default function WebhooksOutgoingV8() {
           setMenuId(null)
           setRotateError('')
           setRotateSecret('')
-          setRotateTarget({ id: item.id, name: item.name, activate: isHttpsUrl(item.url) && !item.hasSecret, accountId: selectedAccountId ?? '' })
+          setRotateTarget({ id: item.id, name: item.name, activate: isHttpsUrl(item.url) && !item.hasSecret, accountId: selectedAccountId ?? '', scope: accountScopeRef.current })
         },
       })
     }
@@ -420,7 +426,7 @@ export default function WebhooksOutgoingV8() {
       label: '試しに送る',
       disabled: !item.isActive,
       disabledReason: !item.isActive ? '止めている送り先には試し送信できません' : undefined,
-      onSelect: () => { setMenuId(null); setTestNotice(''); setTestTarget(item) },
+      onSelect: () => { setMenuId(null); setTestNotice(''); if (selectedAccountId && loadedAccountId === selectedAccountId) setTestTarget({ item, accountId: selectedAccountId, scope: accountScopeRef.current }) },
     })
     {
       items.push({ id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => { setMenuId(null); askDelete(item) } })
@@ -765,20 +771,20 @@ export default function WebhooksOutgoingV8() {
       overlays={<>
         {folderMove.overlays}
         <ConfirmDialog
-          open={testTarget !== null}
+          open={testTarget !== null && testTarget.scope === accountScopeRef.current}
           title="試し送信をします"
-          description={testTarget ? `「${testTarget.name}」へ、試し用のデータを1回だけ送ります。実際の連携先へ届きます。` : ''}
+          description={testTarget ? `「${testTarget.item.name}」へ、試し用のデータを1回だけ送ります。実際の連携先へ届きます。` : ''}
           confirmLabel="この送り先へ送る"
           cancelLabel="キャンセル"
           busy={testingId !== null}
-          error={testNotice || undefined} onSuccess={() => setTestTarget(null)} onConfirm={() => testTarget ? runTest(testTarget) : undefined}
+          error={testNotice || undefined} onSuccess={() => setTestTarget(null)} onConfirm={() => testTarget ? runTest(testTarget.item, testTarget.accountId, testTarget.scope) : undefined}
           onCancel={() => setTestTarget(null)}
         >
           {testTarget ? (
-            <div className={styles.urlBox}>
+            <><OperationTargetSummary accounts={[{ id: testTarget.accountId }]} /><div className={styles.urlBox}>
               <p className={styles.urlLabel}>送り先のURL</p>
-              <code className={styles.urlValue}>{testTarget.url}</code>
-            </div>
+              <code className={styles.urlValue}>{testTarget.item.url}</code>
+            </div></>
           ) : null}
         </ConfirmDialog>
         <ConfirmDialog
@@ -797,7 +803,9 @@ export default function WebhooksOutgoingV8() {
             setDeleteTarget(null)
             setDeleteError('')
           }}
-        />
+        >
+          {deleteTarget ? <OperationTargetSummary accounts={[{ id: deleteTarget.accountId }]} /> : null}
+        </ConfirmDialog>
         <Dialog
           open={rotateTarget !== null}
           busy={rotating}
@@ -810,6 +818,7 @@ export default function WebhooksOutgoingV8() {
           confirmDisabled={!ownership.allowed}
           confirmLockedReason={ownership.reason}
         >
+          {rotateTarget ? <OperationTargetSummary accounts={[{ id: rotateTarget.accountId }]} /> : null}
           <div className={styles.secretRow}>
             <SaveErrorField names={["rotateSecret","secret","rotate_secret"]}><TextField
               value={rotateSecret}

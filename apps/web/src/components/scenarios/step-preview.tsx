@@ -84,9 +84,7 @@ function formatJst(date: Date): string {
  *   時刻で指定 … 購読開始の日から N日後の、決めた時刻
  *   経過時間   … 購読開始から N日と M時間後
  *
- * 時刻で指定は、**その日の配信時刻をもう過ぎていれば翌日**になる
- * （worker の computeNextDeliveryAt と同じ扱い）。0日後を選んだのに
- * 過去の時刻を出すと、実際の配信とずれて見える。
+ * 時刻で指定した日時が過去なら、実際の配信と同じく現在時刻にする。
  */
 export function computeDeliveryAt(
   start: Date,
@@ -109,7 +107,7 @@ export function computeDeliveryAt(
     const m = Number.isFinite(parts[1]) ? (parts[1] as number) : 0
     at.setDate(at.getDate() + offsetDays)
     at.setHours(h, m, 0, 0)
-    if (at.getTime() < start.getTime()) at.setDate(at.getDate() + 1)
+    if (at.getTime() < start.getTime()) return new Date(start.getTime())
     return at
   }
   at.setDate(at.getDate() + offsetDays)
@@ -178,24 +176,6 @@ function scheduleWords(
   return parts.length === 0 ? 'すぐに' : `${parts.join('と')}後`
 }
 
-/**
- * その日の配信時刻を過ぎていて、翌日送りになったか。
- *
- * 「当日の10:00」と書いてあるのに日付が翌日になると、設定を間違えたのかと
- * 疑うことになる。理由をその場に出す。
- */
-function rolledToNextDay(
-  start: Date,
-  at: Date,
-  mode: DeliveryMode,
-  offsetDays: number,
-): boolean {
-  if (mode !== 'absolute_time') return false
-  const expected = new Date(start.getTime())
-  expected.setDate(expected.getDate() + offsetDays)
-  return at.getDate() !== expected.getDate() || at.getMonth() !== expected.getMonth()
-}
-
 /** 実際の友だち情報を作らず、LINEプレビューだけ安全な例へ置き換える。 */
 export function renderPreviewBody(body: string): string {
   return body
@@ -235,8 +215,8 @@ export default function StepPreview({
     offsetHours,
     offsetMinutes,
   )
-  const words = scheduleWords(deliveryMode, offsetDays, deliveryTime, offsetHours, offsetMinutes)
-  const rolled = !timeMissing && rolledToNextDay(start, at, deliveryMode, offsetDays)
+  const immediate = !timeMissing && deliveryMode === 'absolute_time' && at.getTime() === start.getTime()
+  const words = immediate ? 'すぐ' : scheduleWords(deliveryMode, offsetDays, deliveryTime, offsetHours, offsetMinutes)
 
   return (
     <aside
@@ -392,14 +372,9 @@ export default function StepPreview({
         )}
       </div>
 
-      {/*
-        「当日の10:00」と書いてあるのに日付が翌日になると、設定を間違えたのかと
-        疑うことになる。理由をその場に出す。
-      */}
-      {rolled && (
+      {immediate && (
         <Notice tone="warn" className="mt-2">
-          いまはもう {deliveryTime} を過ぎているため、翌日になります。
-          購読開始が {deliveryTime} より前なら、その日のうちに届きます。
+          設定した時刻を過ぎているため、すぐに送ります。
         </Notice>
       )}
 

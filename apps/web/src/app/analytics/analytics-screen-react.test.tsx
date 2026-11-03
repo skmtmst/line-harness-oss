@@ -339,7 +339,8 @@ describe('友だちの増減は、集計できていない値を0と書かない
 
     // 数の欄は題のすぐ後ろ。集計待ちの 0 を数として出さない。
     for (const title of ['増えた', '減った', '差し引き']) expect(kpi(title).startsWith(`${title}—`)).toBe(true)
-    expect(count(host.textContent ?? '', '日別集計の初回更新を待っています')).toBe(1)
+    expect(count(host.querySelector('[data-design-part="notice"]')?.textContent ?? '', '日別集計の初回更新を待っています')).toBe(1)
+    expect(host.querySelector('button[aria-description="日別集計の初回更新を待っています"]')).toBeTruthy()
     const chart = host.querySelector('[aria-labelledby="friends-daily-title"] [role="status"]')
     expect(chart?.textContent).toContain('集計を待っています')
     expect(chart?.textContent).toContain('日ごとの集計は数分ごとに自動で更新されます')

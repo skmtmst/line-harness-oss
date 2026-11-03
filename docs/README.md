@@ -465,6 +465,7 @@
 - [配信枠の確認の修正](release-log/unreleased/2053-kenta-operations-quota.md)
 - [履歴と数の単位の表示修正](release-log/unreleased/2056-kenta-review-wording.md)
 - [使い方デモと管理画面の操作の修正](release-log/unreleased/2057-kenta-demo-operations.md)
+- [予約と会員ランクの操作の修正](release-log/unreleased/2058-kenta-reservations-ranks.md)
 - [SNS連携の設定表示と接続](release-log/unreleased/2010-masato-sns-settings-access.md)
 - [リッチメニューを作る画像欄の箱の大きさ](release-log/unreleased/1984-kenta-muse-media-drop.md)
 - [飲食店3画面の共通タブ整理](release-log/unreleased/1972-kenta-muse-ledger-tabs.md)
@@ -1131,3 +1132,12 @@
 - [振替券・空き待ちと入力表示の改善](release-log/unreleased/2034-kenta-train-1031r.md) — 反映履歴、確認 2026-11-01。
 
 - [予約案内・クーポンと入力理由の改善](release-log/unreleased/2035-kenta-train-1031s.md) — 反映履歴、確認 2026-11-01。
+
+- [電話予約・卓とメニューの削除・下書き保存](release-log/unreleased/2059-kenta-telephone-delete-draft.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+
+- [飲食の卓・メニューの参照](engineering/restaurant-resource-references.md) — 削除時の参照確認（説明、確認日：2026-11-03）。
+- [LINE通知の運用上の騒音を減らす](release-log/unreleased/2037-masato-operation-alert-line-noise.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [通知量の警告](release-log/unreleased/2039-masato-operation-alert-quota.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [担当者・登録・未保存の保護と利用数の改善](release-log/unreleased/2060-kenta-assignee-registration-guards.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [操作案内と予約・LIFFの改善](release-log/unreleased/2061-kenta-operations-reservations.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [操作案内と予約・配信の改善](release-log/unreleased/2062-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。

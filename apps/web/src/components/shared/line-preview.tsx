@@ -9,6 +9,7 @@ import HelpTip from './help-tip'
 import FlexPreview from '@/components/flex-preview'
 import { fillPreviewSample, previewSampleNote } from './preview-sample'
 import styles from './line-preview.module.css'
+import TruncatedText from './truncated-text'
 
 export interface LinePreviewProps {
   /** 狭い選択窓ではスマホを列の内側に収める。省略時は正本の幅のまま。 */
@@ -145,7 +146,7 @@ export function LinePreviewMessage({ accountName, avatar, time, children, direct
   return <div className={styles.messageRow} data-density={density}>
     <span className={styles.senderAvatar}>{avatar}</span>
     <div className={styles.senderBody}>
-      <span className={styles.senderName}>{accountName}</span>
+      <TruncatedText value={accountName} className={styles.senderName} />
       <div className={styles.bubbleRow}>
         {bare ? children : <div className={styles.bubble}>
           <svg className={styles.tail} viewBox="0 0 10 8" aria-hidden="true"><path d="M8 0 0 6 10 8Z" fill="currentColor" /></svg>

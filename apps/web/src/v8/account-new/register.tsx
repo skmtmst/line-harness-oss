@@ -39,7 +39,7 @@ import Step4Template from './step4-template'
 import RegistrationStyleDialog from './registration-style-dialog'
 import Step5Completion from './step5-completion'
 import RegistrationSession from './registration-session'
-import { registrationStorageKey } from './registration-storage'
+import { registrationImportChoiceKey, registrationStorageKey } from './registration-storage'
 import { REGISTRATION_STYLE_KEY, useRegistrationStyle } from './use-registration-style'
 import styles from './register.module.css'
 import { qrToDataURL } from '@/lib/qr-image'
@@ -62,6 +62,9 @@ const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string;
   { number: 4, label: '使い方を選ぶ', node: 'X0pGdw', lead: 'いちばん近い使い方を選びます。あとから変えられます。' },
   { number: 5, label: '完了', node: 'Plmq1', lead: 'いまの友だちを引き継いでいます。終わると完了です。' },
 ]
+
+const PROVIDER_CONFIRMATION_LABEL = 'LINE Developersで同じプロバイダーにあることを確かめた'
+const PROVIDER_CONFIRMATION_REASON = '接続の確認と登録の前に、このチェックで確認してください。'
 
 type BusyAction = 'check' | 'save' | null
 interface FormState {
@@ -101,7 +104,12 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const [currentStep, setCurrentStep] = useState<StepNumber>(1)
   const [sub, setSub] = useState(1)
   const [form, setForm] = useState<FormState>(emptyForm)
+  const [importFriendsExplicit, setImportFriendsExplicit] = useState(false)
+  const importFriendsExplicitRef = useRef(false)
   const [acks, setAcks] = useState<Record<string, boolean>>({})
+  const [providerConfirmed, setProviderConfirmed] = useState(false)
+  const [providerRevision, setProviderRevision] = useState(0)
+  const providerGuard = useRef({ active: true, confirmed: false, revision: 0 })
   const [connection, setConnection] = useState<LineAccountConnectData | null>(null)
   const [importState, setImportState] = useState<FollowerImportState | null>(null)
   const [busyAction, setBusyAction] = useState<BusyAction>(null)
@@ -129,6 +137,38 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const importProgressRef = useRef('')
   const stepPanelRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    const guard = providerGuard.current
+    guard.active = true
+    return () => { guard.active = false; guard.confirmed = false }
+  }, [])
+
+  const providerConfirmationIsCurrent = () => {
+    const guard = providerGuard.current
+    return guard.active && guard.confirmed && guard.revision === providerRevision
+  }
+  const requireProviderConfirmation = () => {
+    if (providerConfirmationIsCurrent()) return true
+    if (providerGuard.current.active) setError(PROVIDER_CONFIRMATION_REASON)
+    return false
+  }
+  const changeProviderConfirmation = (next: boolean) => {
+    const guard = providerGuard.current
+    if (!guard.active || (next && guard.revision !== providerRevision)) return
+    if (!next) {
+      guard.revision += 1
+      setProviderRevision(guard.revision)
+      setConnection(null)
+      setCheckCursor(0)
+      setCheckRunning(false)
+      setCheckAttempted(false)
+      setStepUp(null)
+    }
+    guard.confirmed = next
+    setProviderConfirmed(next)
+    setError('')
+  }
+
   const checkRows = toV06CheckRows(connection, { running: checkRunning, cursor: checkCursor })
   const rowsOk = allV06RowsOk(checkRows)
   const checkNotice = checkErrorText(checkStage(connection, checkRunning), checkRows)
@@ -143,6 +183,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const answerPrecheck = (key: PrecheckKey, value: string) => {
     const answers = { ...precheck, [key]: value } as PrecheckAnswers
     setPrecheck(answers)
+    if (key === 'q2' && !importFriendsExplicitRef.current) setForm(previous => ({ ...previous, importFriends: value === 'yes' }))
     setError('')
     if (key !== precheckAt || precheckBlocked(key, answers, acks)) return
     const nextAt = precheckNext(key, answers)
@@ -181,6 +222,8 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       return null } })()
     setDraftReady(true)
     if (!draft) return
+    importFriendsExplicitRef.current = draft.importFriendsExplicit === true
+    setImportFriendsExplicit(importFriendsExplicitRef.current)
     setForm((current) => ({
       ...current, name: draft.name, channelId: draft.channelId, providerId: draft.providerId, loginChannelId: draft.loginChannelId, lineId: draft.lineId,
       tagIds: draft.tagIds, parentId: draft.parentId, staffIds: draft.staffIds, liffId: draft.liffId, importFriends: draft.importFriends,
@@ -201,10 +244,11 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       name: form.name, channelId: form.channelId, providerId: form.providerId, loginChannelId: form.loginChannelId,
       lineId: form.lineId, tagIds: form.tagIds, parentId: form.parentId, staffIds: form.staffIds, liffId: form.liffId,
       importFriends: form.importFriends,
+      importFriendsExplicit,
     }
     try { window.localStorage.setItem(draftKey, JSON.stringify(draft)) } catch (saveFailure) {
       saveErrors.capture(saveFailure) /* 書けなくても入力は続ける。 */ }
-  }, [draftReady, draftKey, createdId, currentStep, sub, accountMethod, precheck, precheckAt, form.name, form.channelId, form.providerId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, saveErrors])
+  }, [draftReady, draftKey, createdId, currentStep, sub, accountMethod, precheck, precheckAt, form.name, form.channelId, form.providerId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, importFriendsExplicit, saveErrors])
 
   /* ③-1：応答が返ったあと、5行を1行ずつ送る。止まった行（error）が出たらそこで終わる。 */
   useEffect(() => {
@@ -328,6 +372,8 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   }, [currentStep, connection, importRunning, noticeDialog])
 
   const update = (key: keyof FormState, value: string | string[] | boolean) => {
+    if (key === 'importFriends') { importFriendsExplicitRef.current = true; setImportFriendsExplicit(true) }
+    if (key === 'channelId' || key === 'channelSecret' || key === 'providerId' || key === 'loginChannelId' || key === 'loginChannelSecret') changeProviderConfirmation(false)
     setForm((current) => ({ ...current, [key]: value } as FormState))
     setFieldErrors((current) => {
       const next = { ...current }
@@ -392,6 +438,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
     channelSecret: form.channelSecret,
     loginChannelId: form.loginChannelId.trim(),
     loginChannelSecret: form.loginChannelSecret,
+    importFriends: form.importFriends,
     tagIds: form.tagIds, staffIds: form.staffIds, parentLineAccountId: form.parentId || null,
     ...(form.liffId.trim() ? { liffId: form.liffId.trim() } : {}),
   })
@@ -410,6 +457,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
 
   // ③-1「接続を確かめる」：4項目でLINEへ問い合わせ、5行を1行ずつ送る。
   const runCheck = async () => {
+    if (!requireProviderConfirmation()) return
     const nextErrors = channelErrors(form)
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors((current) => ({ ...current, ...nextErrors }))
@@ -428,6 +476,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
     setError('')
     try {
       const response = await api.lineAccounts.connectCheck(input())
+      if (!providerConfirmationIsCurrent()) return
       if (!response.success) {
         setCheckRunning(false)
         setError(response.error)
@@ -439,6 +488,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       if (response.data.basicId) setForm((current) => ({ ...current, lineId: response.data.basicId ?? current.lineId }))
       // 止まった行は③の一覧が赤で示し、下の帯が「どこを直すか」を言う。同じ文を重ねない。
     } catch (saveFailure) {
+      if (!providerConfirmationIsCurrent()) return
       setCheckRunning(false)
       const fieldFailure = saveErrors.capture(saveFailure)
       /* 「時間をおいて」の一文に畳むと、権限不足の人が待ち続け、混み合いの人が連打する。
@@ -452,6 +502,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   }
 
   const save = async (stepUpToken?: string) => {
+    if (!requireProviderConfirmation()) return
     if (!rowsOk || busyLock.current) {
       setError('5つの確認がすべて通ってから登録してください。')
       return
@@ -475,8 +526,12 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
         setError(response.error)
         return
       }
+      providerGuard.current.active = false
+      providerGuard.current.confirmed = false
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
+      const choiceKey = registrationImportChoiceKey(resumeKey, response.data.id ?? '')
+      try { if (choiceKey) localStorage.setItem(choiceKey, String(form.importFriends)) } catch (failure) { saveErrors.capture(failure) }
       try { if (response.data.id && resumeKey) sessionStorage.setItem(resumeKey, response.data.id) } catch (failure) { saveErrors.capture(failure) }
       // v07：登録できたら③の2つめ（友だち追加のためし）へ進む。
       setCurrentStep(3)
@@ -485,7 +540,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       const fieldFailure = saveErrors.capture(caught)
       // LINEの接続は大事な操作。本人確認を求められたら窓を立ててやり直す。
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
+        if (providerConfirmationIsCurrent()) setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
         return
       }
       // R523: 応答が無い失敗は「未保存」と断定しない。
@@ -620,10 +675,16 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const busy = Boolean(busyAction) || registrationStyle.busy
   // 登録したあとは戻らない（③の2つめから先）。
   const canBack = !createdId && (currentStep > 1 || sub > 1 || (currentStep === 1 && precheckBack(precheckAt, precheck) !== null))
+  const missingConnectionReason = currentStep !== 2 ? null
+    : sub === 1 && (!form.channelId.trim() || !form.channelSecret.trim()) ? 'チャネルIDとチャネルシークレットを入力してください。'
+    : sub === 2 && !form.providerId.trim() ? 'プロバイダーIDを入力してください。'
+    : sub === 4 && (!form.loginChannelId.trim() || !form.loginChannelSecret.trim()) ? 'LINEログインのチャネルIDとチャネルシークレットを入力してください。'
+    : null
   const nextBlocked = (currentStep === 1 && precheckBlocked(precheckAt, precheck, acks))
+    || Boolean(missingConnectionReason)
     || (currentStep === 2 && sub === 3 && !allAcked(WEBHOOK_ACKS, acks))
     || (currentStep === 2 && sub === 4 && !allAcked(LOGIN_ACKS, acks))
-    || (currentStep === 3 && sub === 1 && !rowsOk)
+    || (currentStep === 3 && sub === 1 && (!rowsOk || !providerConfirmed))
     || (currentStep === 3 && sub === 2 && (receipt.status !== 'confirmed' || receiptRequestFailed || receiptChecking))
   // v07 Fqy29／Lwxyh：②の中だけ「次のステップへ」と行き先を名前で書いた「戻る」。ほかの段は「次へ」「戻る」。
   const backLabel = currentStep === 3 && sub === 1 ? 'LINEログインへ戻る'
@@ -657,6 +718,16 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       />
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
         <StepContent elementRef={stepPanelRef} step={currentStep * 10 + sub}>
+          {recoveredAccountId ? (
+            <Notice
+              tone="warn"
+              message={error || '保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。'}
+              action={<Button href={`/accounts/detail?id=${encodeURIComponent(recoveredAccountId)}`}>登録したアカウントを見る</Button>}
+              onClose={() => { setError(''); setRecoveredAccountId('') }}
+            />
+          ) : error ? (
+            <Notice tone="danger" message={error} onClose={() => setError('')} />
+          ) : null}
           {currentStep === 1 && (
             <Step1Precheck
               badge={badge}
@@ -689,7 +760,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
           )}
 
           {currentStep === 3 && sub === 1 && (
-            <CreateStepColumns data-design-node="Lwxyh" previewTitle="ここで登録します" preview={(
+            <CreateStepColumns data-design-node="Lwxyh" previewTitle="ここで登録します" previewLabel="登録内容を見る" preview={(
                 <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ここで登録します">
                 <h2 className={styles.asideH2}>ここで登録します</h2>
                 <p className={styles.asideP}>5つの確認がすべて通るまで、アカウントは作られません。</p>
@@ -699,7 +770,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続確認">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>接続確認</h2>
-                <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p></Notice>
+                <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p><Checkbox required checked={providerConfirmed} onCheckedChange={changeProviderConfirmation}>{PROVIDER_CONFIRMATION_LABEL}</Checkbox></Notice>
                 <ul className={styles.checkList}>
                   {checkRows.map((row) => (
                     <li key={row.key} className={styles.checkRow} data-phase={row.phase}>
@@ -721,14 +792,14 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
                   </Notice>
                 )}
                 <Card surface="inset" contentPadding="var(--polish-space-card)">
-                  <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><Checkbox checked={form.importFriends} onCheckedChange={(next) => update('importFriends', next)} description="登録のあと、いまの友だちを musubo に引き継ぎます（数分かかります）">いまの友だちの引き継ぎ</Checkbox></SaveErrorField>
+                  <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><Checkbox checked={form.importFriends} onCheckedChange={(next) => update('importFriends', next)} description="チェックすると、登録後にいまの友だちを musubo に引き継ぎます（数分かかります）">いまの友だちの引き継ぎ</Checkbox></SaveErrorField>
                 </Card>
               </Card>
             </CreateStepColumns>
           )}
 
           {currentStep === 3 && sub === 2 && connection && (
-            <CreateStepColumns data-design-node="Lwxyh" previewTitle="ためしに友だち追加" preview={(
+            <CreateStepColumns data-design-node="Lwxyh" previewTitle="ためしに友だち追加" previewLabel="友だち追加の方法を見る" preview={(
                 <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ためしに友だち追加">
                 <h2 className={styles.asideH2}>ためしに友だち追加</h2>
                 <p className={styles.asideP}>まだ友だちでなければ、スマホの LINE で QR を読み取って追加してください。</p>
@@ -803,16 +874,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
             <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} restaurant={templateKey === 'restaurant'} onRefresh={() => void refreshImport()} refreshing={importRefreshing} />
           )}
 
-          {recoveredAccountId ? (
-            <Notice
-              tone="warn"
-              message={error || '保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。'}
-              action={<Button href={`/accounts/detail?id=${encodeURIComponent(recoveredAccountId)}`}>登録したアカウントを見る</Button>}
-              onClose={() => { setError(''); setRecoveredAccountId('') }}
-            />
-          ) : error ? (
-            <Notice tone="danger" message={error} onClose={() => setError('')} />
-          ) : null}
+
         </StepContent>
         <StickyBar presentation="account-registration" actions={currentStep === 5 ? <>
             {importAttention ? <Button type="button" variant="primary" busy={importRefreshing} busyLabel="確認中…" onClick={() => void refreshImport()}>状態を再確認</Button> : null}
@@ -822,12 +884,12 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
             <Button type="button" onClick={() => void finishStyle('skip')} disabled={busy || registrationStyle.version === null} busy={registrationStyle.busy} busyLabel="保存しています…">あとで設定する</Button>
           </> : currentStep === 3 && sub === 1 && !rowsOk ? <>
             <Button type="button" disabled={busy || !canBack} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
-            <Button type="button" variant="primary" disabled={busy || checkRunning} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={16} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>
+            <Button type="button" variant="primary" disabled={busy || checkRunning || !providerConfirmed} disabledReason={!providerConfirmed ? PROVIDER_CONFIRMATION_REASON : undefined} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={16} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>
           </> : <>
             {canBack
               ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
-            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
+            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" variant="primary" disabled={busy || nextBlocked} disabledReason={currentStep === 3 && sub === 1 && !providerConfirmed ? PROVIDER_CONFIRMATION_REASON : missingConnectionReason} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
           </>} />
       </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />

@@ -66,7 +66,8 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   const live = useMemo(() => rows.filter((item) => !INACTIVE_STATUSES.includes(item.status)), [rows])
   const shown = useMemo(() => (source === 'all' ? live : live.filter((item) => item.source === source)), [live, source])
   const bookings = useMemo(() => shown.filter((item) => !isHold(item)), [shown])
-  const holds = useMemo(() => shown.filter(isHold), [shown])
+  const countedBookings = useMemo(() => bookings.filter((item) => sameDay(new Date(item.starts_at), day)), [bookings, day])
+  const holds = useMemo(() => shown.filter((item) => isHold(item) && sameDay(new Date(item.starts_at), day)), [shown, day])
 
   const entries = useMemo(() => shown.map(row => seatBoardEntry(row as unknown as Record<string,unknown>)), [shown])
 
@@ -88,7 +89,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   }, [bookings, later, isToday, day, source])
   const nextOtherDay = next ? !sameDay(new Date(next.starts_at), day) : false
 
-  const pending = bookings.filter((item) => item.status === 'pending')
+  const pending = countedBookings.filter((item) => item.status === 'pending')
   const allergies = bookings.filter((item) => item.allergy_note).sort((a, b) => a.starts_at.localeCompare(b.starts_at))
   const tableById = new Map(tables.map((table) => [table.id, table]))
 
@@ -104,17 +105,17 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   }, [shown])
   const freeAtPeak = peak < 0 ? [] : columns.filter((table) => table.is_active && !shown.some((item) => !item.departed_at && seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(table.id) && minutesOf(item.starts_at) <= peak && minutesOf(item.ends_at) > peak))
 
-  const guests = bookings.reduce((sum, item) => sum + item.guest_count, 0)
-  const lineCount = bookings.filter((item) => item.source === 'line').length
-  const phoneCount = bookings.filter((item) => item.source === 'phone' || item.source === 'manual').length
-  const mediaCount = bookings.length - lineCount - phoneCount
-  const unseated = bookings.filter((item) => !item.table_id).length
+  const guests = countedBookings.reduce((sum, item) => sum + item.guest_count, 0)
+  const lineCount = countedBookings.filter((item) => item.source === 'line').length
+  const phoneCount = countedBookings.filter((item) => item.source === 'phone' || item.source === 'manual').length
+  const mediaCount = countedBookings.length - lineCount - phoneCount
+  const unseated = countedBookings.filter((item) => !item.departed_at && seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.length === 0).length
   const pendingSources = [...new Set(pending.map((item) => sourceName(item.source)))].join('・')
 
   return (
     <>
       <KpiBand data-restaurant-fusion>
-        <KpiCard title="今日の予約" value={bookings.length} unit="件" detail={`${guests}名`} icon={<Inbox size={16} aria-hidden />} presentation="band" />
+        <KpiCard title="今日の予約" value={countedBookings.length} unit="件" detail={`${guests}名`} icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="承認待ち" value={pending.length} unit="件" detail={pendingSources || 'ありません'} valueTone={pending.length > 0 ? 'warning' : 'default'} icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="未配席" value={unseated} unit="件" detail={unseated === 0 ? 'すべて卓に入っています' : '卓の割当が必要'} valueTone={unseated > 0 ? 'warning' : 'default'} icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="押さえ" value={holds.length} unit="枠" detail={holds[0]?.note || holds[0]?.allergy_note || '期限付きの仮押さえ'} icon={<Inbox size={16} aria-hidden />} presentation="band" />
@@ -148,7 +149,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
         </div>
         <div className={styles.side}>
           <Card frame="raised" layout="vertical" padding="roomy" gap="11px" aria-labelledby="rs-next-title">
-            <SectionHeader description={isToday?'いま':'選んだ日の次の予約'} title={<span id="rs-next-title">次の予約</span>}/>
+            <SectionHeader description={nextOtherDay ? '次の日以降の予約' : isToday ? '今日これからの予約' : '選んだ日の次の予約'} title={<span id="rs-next-title">次の予約</span>}/>
             {next ? (
               <>
                 <div className={styles.nextBox}>
@@ -185,7 +186,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
           </Card>
           <Card frame="raised" layout="vertical" padding="roomy" className={styles.sideCard} aria-labelledby="rs-break-title">
             <SectionHeader title={<span id="rs-break-title">{`${dayShort(day)}の内訳`}</span>}/>
-            <p className={styles.sideText}>{`予約 ${formatNumber(bookings.length)}件・${guests}名`}{' ／ '}{`LINE ${lineCount}・媒体 ${mediaCount}・電話 ${phoneCount}`}{' ／ '}{`押さえ ${holds.length}枠`}</p>
+            <p className={styles.sideText}>{`予約 ${formatNumber(countedBookings.length)}件・${guests}名`}{' ／ '}{`LINE ${lineCount}・媒体 ${mediaCount}・電話 ${phoneCount}`}{' ／ '}{`押さえ ${holds.length}枠`}</p>
           </Card>
           <Card frame="raised" layout="vertical" padding="roomy" className={styles.sideCard} aria-labelledby="rs-links-title">
             <SectionHeader title={<span id="rs-links-title">つながる先</span>}/>

@@ -244,7 +244,7 @@ export default function SoldOutBoard({
           </tbody></DataTable></Card>
 
           {canManage ? (
-            <BulkBar count={checkedCount} unit="品">
+            <BulkBar count={checkedCount} unit="品" onClear={() => onToggleAll(false)}>
               <Button variant="danger-outline" disabled={!canSubmit} busy={busy} busyLabel="送信中…" onClick={() => onSubmit(true)}>
                 <Ban size={16} aria-hidden="true" />選んだ商品を品切れにする
               </Button>
@@ -264,7 +264,11 @@ export default function SoldOutBoard({
       ) : null}
 
       {!loading && !error && items.length === 0 ? (
-        <ListState kind="empty" title="あてはまる商品がありません" />
+        total === 0 ? (
+          <ListState kind="empty" title="商品がまだありません" description="メニュー管理で商品を作ると表示されます。" action={<Button href="/restaurant-test/menu">メニュー管理を開く</Button>} />
+        ) : (
+          <ListState kind="empty" title="あてはまる商品がありません" description="条件を変えて、もう一度お試しください。" />
+        )
       ) : null}
     </>
   )

@@ -111,16 +111,14 @@ describe('リッチメニュー編集の確認窓', () => {
     // 「LINEから取り下げ」で戻せるので destructive は付けない。
     expect(dialog).toContain('onCancel')
     expect(dialog, '処理中を窓に渡していない').toContain('busy={publishing || saving}')
-    expect(dialog, 'まだ友だちに出ないことを書いていない').toContain('audience')
+    expect(dialog, '対象に応じた説明を窓に渡していない').toContain('description={publishConfirmNote}')
   })
 
   it('LINE取り下げは二度押しを止め、失敗を握りつぶさない', () => {
     const body = fnBody(code(detail), 'const unpublish = async')
-    expect(body, '二度押しを止めていない').toContain(
-      'if (unpublishing) return',
-    )
+    expect(body, '二度押しを止めていない').toMatch(/if\s*\([^\n]*\bunpublishing\) return/)
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error')
-    expect(body, '処理中の印を戻していない').toMatch(/finally\s*\{\s*setUnpublishing\(false\)/)
+    expect(body, '同じ対象の処理中の印を戻していない').toMatch(/finally\s*\{\s*if \(alive\.current && generation === scope\.current\.generation\) setUnpublishing\(false\)/)
     expect(body, 'alert へ戻っている').not.toContain('alert(')
 
     const dialog = confirmDialogWith(detail, 'unpublishOpen')
@@ -182,14 +180,14 @@ describe('共通情報編集の削除', () => {
   it('二度押しを止め、409は使用先を読み直す', () => {
     const body = fnBody(code(src), 'const remove = async')
     expect(body, '二度押し・切替後を止めていない').toContain(
-      'if (!deleteTarget || deleting || deleteAccountSwitched) return',
+      'if (!deleteTarget || deleting || deleteAccountSwitched || latestAccountRef.current !== deleteTarget.accountId || deleteWindow.current !== deleteTarget.window) return',
     )
     expect(body, '使用先を読めていないのに消せる').toContain(
       "if (deletePhase !== 'ready' || !deleteImpact?.canDelete) return",
     )
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '409を読み直していない').toContain('api.commonVars.deleteImpact(')
-    expect(body, '処理中の印を戻していない').toMatch(/finally\s*\{\s*setDeleting\(false\)/)
+    expect(body, '同じアカウントと窓では処理中の印を戻していない').toContain('if (latestAccountRef.current === deleteTarget.accountId && deleteWindow.current === deleteTarget.window) setDeleting(false)')
     expect(body, '生のAPIエラーを出している').not.toMatch(/setDeleteError\(e\b/)
   })
 

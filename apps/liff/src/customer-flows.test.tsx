@@ -164,6 +164,7 @@ it('サロンの指名と指名料を保持し、選んだ担当だけで次へ�
   ] });
   mount('salon');
   fireEvent.click(await screen.findByRole('button', { name: /人工メニュー/ }));
+  await vi.waitFor(() => expect(screen.getByRole('button', { name: '担当を選ぶ' }).isConnected).toBe(true));
   fireEvent.click(screen.getByRole('button', { name: '担当を選ぶ' }));
   expect(await screen.findByRole('button', { name: /指名なし（指名料なし）/ })).toBeTruthy();
   fireEvent.click(await screen.findByRole('button', { name: /人工担当.*指名料/ }));

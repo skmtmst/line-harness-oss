@@ -37,7 +37,7 @@ it('管理者の中身を見る操作は既存の設定の一覧を開く', () =
 it('閲覧だけでは警告の変更操作も灰色と理由にする', () => {
   const source = data(); source.warnings = [{ feature: 'booking', areaId: 'booking', groupId: 'menu', customerState: 'preparing', href: '/booking/menus' }]
   render(<SetupWarningBands data={source} configureAllowed={false} role="viewer" />)
-  const button = screen.getByRole('button', { name: '決まりを入れる' })
+  const button = screen.getByRole('button', { name: '予約を設定する' })
   expect(button.getAttribute('aria-disabled')).toBe('true')
   expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toContain('閲覧のみ')
 })
@@ -53,4 +53,11 @@ it('取得の失敗を未設定にせず、同じ欄から読み直せる', () =
   expect(screen.getByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button'))
   expect(retry).toHaveBeenCalledTimes(1)
+})
+
+it('設定の確認を開く操作は、押した先の設定内容を示す', () => {
+  const onOpenStep = vi.fn()
+  render(<SetupTasks summary={setupSummary(data())!} role="admin" onOpenStep={onOpenStep} />)
+  fireEvent.click(screen.getByRole('button', { name: '設定を確認する' }))
+  expect(onOpenStep).toHaveBeenCalledWith(0)
 })

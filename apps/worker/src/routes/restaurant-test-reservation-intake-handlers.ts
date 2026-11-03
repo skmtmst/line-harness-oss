@@ -1,3 +1,4 @@
+import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { RESERVATION_FILTER_STATUSES } from './restaurant-reservation-filter.js';
@@ -109,6 +110,10 @@ export const post__api_restaurant_test_reservations_manual_3 = async (c: Context
   if (!storeId || !await storeBelongsTo(c, organization.id, storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
   const checked = validateInboundReservation({ ...body, externalId: `manual-${crypto.randomUUID()}` });
   if (!checked.ok) return inputError(c, { success: false, error: checked.error, field: checked.field }, 400, []);
+  if (body.source === 'phone') {
+    const failure = await phoneIntakeFailure(dbFor(c.env, storeId), storeId, checked.value.startsAt);
+    if (failure) return c.json({ success: false, code: failure, error: failure }, 409);
+  }
   await expireRestaurantHolds(dbFor(c.env, storeId), undefined, storeId);
   const lockKey = `reservation:${storeId}`;
   const lockOwner = crypto.randomUUID();
@@ -308,6 +313,8 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
     if (!RESERVATION_FILTER_STATUSES.includes(value)) {
       return inputError(c, { success: false, error: '状態の指定が正しくありません' }, 400, ["status"]);
     }
+    if(value==='no_show' && current.status==='pending')return c.json({success:false,error:'承認してから無断にしてください',code:'approval_required'},409);
+    if(value==='no_show' && (['visited','seated'].includes(current.status) || await dbFor(c.env,current.store_id).prepare("SELECT 1 FROM rt_seat_visit_marks WHERE reservation_id=? AND kind='visited' AND undone_at IS NULL LIMIT 1").bind(current.id).first()))return c.json({success:false,error:'来店済みの予約は無断にできません',code:'already_arrived'},409);
     if(value!==current.status&&['visited','seated'].includes(value))return inputError(c,{success:false,error:'来店の記録は来店・退店の操作から保存してください'},409,['status']);
     next.status = value;
   }
@@ -357,13 +364,22 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
     )) {
     return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため変更できません' }, 409);
   }
-  const savedUpdate = await dbFor(c.env, current.store_id).prepare(`UPDATE rt_reservations SET
+  const db = dbFor(c.env, current.store_id);
+  const update = db.prepare(`UPDATE rt_reservations SET
     customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
     table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, customer_version=customer_version+1, updated_at = datetime('now')
     WHERE id = ? AND customer_version = ?`).bind(
       next.customer_name, next.customer_phone, next.guest_count, next.starts_at, next.ends_at,
       next.table_id, next.course_id, next.status, next.allergy_note, next.note, current.id, Number(body.expectedVersion),
-    ).run();
+    );
+  const statements = [update];
+  if ((current.status === 'no_show' && next.status !== 'no_show') || (next.status === 'cancelled' && ['visited', 'seated'].includes(current.status))) {
+    statements.push(db.prepare(`UPDATE rt_seat_visit_marks SET undone_at=?, undone_by=?, undone_request_id=?, result_version=?
+      WHERE reservation_id=? AND kind=? AND undone_at IS NULL AND changes()=1`).bind(
+      new Date().toISOString(), c.get('staff')?.id ?? null, crypto.randomUUID(), current.customer_version + 1, current.id, current.status === 'no_show' ? 'no_show' : 'visited',
+    ));
+  }
+  const [savedUpdate] = await db.batch(statements);
   if (!savedUpdate.meta.changes) return c.json({success:false,error:"ほかの人が変更しました。最新を読み込んでください",code:"version_conflict"},409);
   await applyReservationInventoryChange(
     dbFor(c.env, current.store_id), current.store_id,

@@ -262,3 +262,19 @@ test(': 保存者の監査を書けなければフォームの編集も戻す',a
  const before=formRow();expect((await put({name:'残ってはいけない',expectedContentRevision:before.content_revision})).status).toBe(500);
  expect(formRow()).toEqual(before);
 });
+
+test('フォーム保存直前にコースが削除された場合はコード付き409で内容を残す', async () => {
+  sqlite.raw.exec("INSERT INTO rt_organizations(id,account_id,name) VALUES('org','acc-1','店舗'); INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','店舗','S','acc-1'); INSERT INTO rt_menu_items(id,store_id,kind,name,price) VALUES('course','store','course','検証',1000)");
+  const layout = {version:2,header:[],sections:[{id:'main',name:'予約',blocks:[{id:'booking',kind:'input',type:'booking',name:'booking',label:'予約',required:true,booking:{kind:'seats',storeId:'store',courseId:'course',menuId:''}}]}],options:{}};
+  const prepare = sqlite.db.prepare.bind(sqlite.db);
+  const spy = vi.spyOn(sqlite.db,'prepare').mockImplementation((sql) => {
+    if (sql.includes('UPDATE forms') && sql.includes('content_revision = content_revision + 1')) sqlite.raw.prepare("DELETE FROM rt_menu_items WHERE id='course'").run();
+    return prepare(sql);
+  });
+  try {
+    const response = await put({name:'更新',layout,expectedContentRevision:formRow().content_revision});
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({code:'restaurant_course_unavailable'});
+    expect(formRow().name).toBe('元の名前');
+  } finally { spy.mockRestore(); }
+});

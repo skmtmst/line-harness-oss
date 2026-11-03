@@ -13,6 +13,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import StatusBadge from '@/components/shared/status-badge'
 import { GOOGLE_CONNECTION_STATUS, INSTAGRAM_CONNECTION_STATUS } from '@/lib/status-labels'
 import { RowActions } from '@/components/shared/row-actions'
@@ -74,11 +75,16 @@ export default function SnsSettingsPage() {
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const loadVersion = useRef(0)
   const [confirm, setConfirm] = useState<'instagram' | null>(null)
+  const [confirmAccountId, setConfirmAccountId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
 
   const returnedAccountId = searchParams.get('account_id')
   const accountId = returnedAccountId && accounts.some((account) => account.id === returnedAccountId) ? returnedAccountId : selectedAccountId
+  const accountScope = useRef({ id: accountId })
+  if (accountScope.current.id !== accountId) accountScope.current = { id: accountId }
+  const renderedAccountScope = accountScope.current
+  const confirmScope = useRef(accountScope.current)
   const flash = FLASH[searchParams.get('instagram') ?? ''] ?? null
   const googleFlash = GOOGLE_FLASH[searchParams.get('google') ?? ''] ?? (searchParams.has('google') ? { tone: 'danger' as const, text: 'Googleとの接続に失敗しました。もう一度お試しください。' } : null)
 
@@ -154,7 +160,7 @@ export default function SnsSettingsPage() {
   }
 
   const runDisconnect = async () => {
-    if (!accountId) return
+    if (!accountId || confirmAccountId !== accountId || renderedAccountScope !== accountScope.current || confirmScope.current !== renderedAccountScope || loadedAccountId !== accountId) return
     setBusy(true)
     setActionError('')
     try {
@@ -237,7 +243,7 @@ export default function SnsSettingsPage() {
             {igStatus ? <StatusBadge tone={igStatus.tone} size="compact">{igStatus.label}</StatusBadge> : null}
             {(igState === 'connected' || igState === 'expired') && canManage ? (
               <RowActions menuAppearance="box" menuSize="row" subjectName="Instagram の連携"
-                destructiveItem={{ id: 'disconnect', label: '接続を解除する', onSelect: () => { setActionError(''); setConfirm('instagram') } }} />
+                destructiveItem={{ id: 'disconnect', label: '接続を解除する', onSelect: () => { setActionError(''); confirmScope.current = accountScope.current; setConfirmAccountId(accountId); setConfirm('instagram') } }} />
             ) : null}
           </div>
           {!accountId ? (
@@ -288,7 +294,7 @@ export default function SnsSettingsPage() {
       </div>
 
       <ConfirmDialog
-        open={confirm === 'instagram'}
+        open={confirm === 'instagram' && confirmAccountId === accountId && accountId !== null && confirmScope.current === accountScope.current}
         destructive
         title="Instagram の接続を解除しますか？"
         description="解除すると、Googleビジネスの投稿を Instagram へ同時に出せなくなります。あとでもう一度つなぎ直せます。"
@@ -296,7 +302,7 @@ export default function SnsSettingsPage() {
         busy={busy}
         error={actionError || undefined} onSuccess={() => setConfirm(null)} onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
-      />
+      ><OperationTargetSummary accounts={[{ id: confirmAccountId ?? '' }]} /></ConfirmDialog>
     </PageFrame></SaveErrorScope>
   )
 }

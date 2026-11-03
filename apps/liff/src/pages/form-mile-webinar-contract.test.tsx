@@ -87,3 +87,15 @@ it('紹介画面に旧い箱の名前を戻さない', () => {
   expect(readFileSync(join(import.meta.dirname, 'affiliate.tsx'), 'utf8')).not.toContain('af-');
   expect(readFileSync(join(import.meta.dirname, 'form.tsx'), 'utf8')).not.toContain('bg-ground');
 });
+
+it('選んだメニューが消えたとき、入力を残して選び直して再送できる', async () => {
+  vi.mocked(api.submitForm).mockResolvedValueOnce({status:409,body:{success:false,code:'restaurant_course_unavailable'}});
+  await open();
+  fireEvent.change(screen.getByRole('textbox',{name:/お名前/}),{target:{value:'利用者'}});
+  fireEvent.click(screen.getByRole('button',{name:'送信する'}));
+  expect(await screen.findByText(/メニューを選び直してください/)).toBeTruthy();
+  expect((screen.getByRole('textbox',{name:/お名前/}) as HTMLInputElement).value).toBe('利用者');
+  fireEvent.click(screen.getByRole('button',{name:'送信する'}));
+  expect(await screen.findByRole('button',{name:'LINEに戻る'})).toBeTruthy();
+  expect(vi.mocked(api.submitForm).mock.calls[1][2]).not.toBe(vi.mocked(api.submitForm).mock.calls[0][2]);
+});

@@ -1,4 +1,6 @@
 'use client'
+import { useAccountStyle } from '@/hooks/use-account-style'
+import { usePermissionAccess } from '@/lib/use-feature-access'
 
 /*
  * ★V8 予約台帳（板 `l9NlC0` 今日・`xzCK6` 今日 1152・`Z3FoM` 一覧・ 電話の予約を入れる）。
@@ -18,9 +20,9 @@ import { useAccount } from '@/contexts/account-context'
 import { restaurantTestApi,type ReservationQuery,type RestaurantClosure,type RestaurantReservation } from '@/lib/restaurant-test-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { Lock,Phone } from 'lucide-react'
-import { useCallback,useEffect,useMemo,useState,type ReactNode } from 'react'
+import { useCallback,useEffect,useMemo,useRef,useState,type ReactNode } from 'react'
 import { ReservationDetailDialog } from '@/v8/restaurant-reservations/index'
-import { RestaurantShell, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { QuietError, RestaurantShell, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import { KIND_LABEL, dayTitle, scopeText } from '@/v8/restaurant/closures/public/format/index'
 import { CancelReservationDialog,EditReservationDialog,InboundTrialDialog,type ReservationPatch } from './dialogs'
 import { dayRange,monthRange,sameDay,toYmd,weekRange,type LedgerView } from './format'
@@ -29,6 +31,7 @@ import PhoneReservation from './phone'
 import styles from './reservations.module.css'
 import TodayView,{ type PhonePreset } from './today'
 import SeatWaitlistDialog from './waitlist'
+import { isReservationInputError } from './edit-save-result'
 
 /** 予約を変えられる役割か（口は owner・admin・staff。閲覧のみは 403）。読めるまでは出す（最後の守りは口の 403）。 */
 function canWriteRole(role: string | null | undefined): boolean {
@@ -93,6 +96,8 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const canWrite = canWriteRole(role)
   const canImport = canManageRole(role)
   const accountId = selectedAccountId || ''
+  const accountStyle = useAccountStyle(selectedAccountId)
+  const canUseAlternateBooking = usePermissionAccess('/booking/bookings')
   const storeId = store?.id || ''
   const tables = useMemo(() => data.tables.filter((t) => !store || t.store_id === store.id), [data.tables, store])
   const menuItems = useMemo(() => data.menuItems.filter((m) => !store || m.store_id === store.id), [data.menuItems, store])
@@ -101,7 +106,19 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const [todayRows, setTodayRows] = useState<RestaurantReservation[] | null>(null)
   /* その日（今日の見方は選んだ日・ほかの見方は今日）の臨時休業・貸切。日の読み出しの口に入っている。 */
   const [dayClosures, setDayClosures] = useState<{ day: string; closures: RestaurantClosure[] } | null>(null)
-  const [openId, setOpenId] = useState('')
+  const [editTarget, setEditTarget] = useState<{ id: string; accountId: string; storeId: string; sequence: number } | null>(null)
+  const editSequence = useRef(0)
+  const editContext = useRef({ target: editTarget, accountId, storeId })
+  editContext.current = { target: editTarget, accountId, storeId }
+  const setOpenId = useCallback((id: string) => {
+    const target = id ? { id, accountId, storeId, sequence: ++editSequence.current } : null
+    editContext.current = { target, accountId, storeId }
+    setEditTarget(target)
+  }, [accountId, storeId])
+  const openId = editTarget?.accountId === accountId && editTarget.storeId === storeId ? editTarget.id : ''
+  useEffect(() => {
+    if (editTarget && (editTarget.accountId !== accountId || editTarget.storeId !== storeId)) setOpenId('')
+  }, [accountId, storeId, editTarget, setOpenId])
   const [detailId, setDetailId] = useState('')
   useEffect(()=>{const id=new URLSearchParams(window.location.search).get('id');if(id)setDetailId(id)},[])
   const [cancelId, setCancelId] = useState('')
@@ -149,24 +166,42 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     return scoped
   }, [data.reservations, store, view, day, todayRows])
 
-  const save = useCallback(async (action: () => Promise<unknown>, success: string) => {
-    const ok = await mutate(action, success)
+  const save = useCallback(async (action: () => Promise<unknown>, success: string, onCommitted?: () => boolean) => {
+    const ok = await mutate(action, success, onCommitted ? { onCommitted } : undefined)
     /* 失敗時は取り直す（競合 409 の古い表示で残さない）。 */
     if (!ok) void reload()
     return ok
   }, [mutate, reload])
 
-  const attendance=(id:string,action:'visited'|'depart'|'undo_departure'|'undo_visit')=>{
+  const attendance=(id:string,action:'visited'|'depart'|'undo_departure'|'undo_visit'|'no_show')=>{
     const row=rows.find(r=>r.id===id)??data.reservations.find(r=>r.id===id);if(!row)return;
-    void save(async()=>{const result=await restaurantTestApi.attendance(accountId,id,{action,expectedVersion:row.customer_version??1,requestId:crypto.randomUUID()});if(action==='visited')notifyToast(result.data.stamp.status==='recorded'?`来店スタンプ ${result.data.stamp.count} 個を確認しました。`:'スタンプは会計待ち・停止中・未連携の場合には増えません。');return result},action==='visited'?'来店にしました。':action==='depart'?'退店にしました。卓が空きました。':'来店・退店の記録を訂正しました。');
+    void save(async()=>{const result=await restaurantTestApi.attendance(accountId,id,{action,expectedVersion:row.customer_version??1,requestId:crypto.randomUUID()});if(action==='visited')notifyToast(result.data.stamp.status==='recorded'?`来店スタンプ ${result.data.stamp.count} 個を確認しました。`:'スタンプは会計待ち・停止中・未連携の場合には増えません。');return result},action==='visited'?'来店にしました。':action==='depart'?'退店にしました。卓が空きました。':action==='no_show'?'無断にしました。':'来店・退店の記録を訂正しました。');
   }
-  const opened = rows.find((r) => r.id === openId) ?? data.reservations.find((r) => r.id === openId) ?? null
+  const restoreReservation=(id:string)=>{
+    const target=rows.find(r=>r.id===id)??data.reservations.find(r=>r.id===id);
+    return restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:target?.customer_version??1});
+  }
+  const dayOpened = rows.find((r) => r.id === openId)
+  const snapshotOpened = data.reservations.find((r) => r.id === openId)
+  const currentOpened = dayOpened && snapshotOpened
+    ? (dayOpened.customer_version ?? 1) >= (snapshotOpened.customer_version ?? 1) ? dayOpened : snapshotOpened
+    : dayOpened ?? snapshotOpened ?? null
+  const lastOpened = useRef<{ sequence: number; reservation: RestaurantReservation; seenInDay: boolean } | null>(null)
+  if (currentOpened && editTarget && openId) {
+    const seenInDay = (lastOpened.current?.sequence === editTarget.sequence && lastOpened.current.seenInDay) || (view === 'today' && !!todayRows?.some((r) => r.id === openId))
+    lastOpened.current = { sequence: editTarget.sequence, reservation: currentOpened, seenInDay }
+  }
+  const previousOpened = openId && editTarget && lastOpened.current?.sequence === editTarget.sequence ? lastOpened.current : null
+  const opened = currentOpened ?? previousOpened?.reservation ?? null
+  const missing = !!previousOpened && (view === 'today'
+    ? todayRows !== null && previousOpened.seenInDay && !todayRows.some((r) => r.id === openId)
+    : !currentOpened)
   const detailed = rows.find((r) => r.id === detailId) ?? data.reservations.find((r) => r.id === detailId) ?? null
   const cancelling = rows.find((r) => r.id === cancelId) ?? data.reservations.find((r) => r.id === cancelId) ?? null
 
   if (phone) {
     return (
-      <PhoneReservation
+      <PhoneReservation accountStyle={accountStyle.stale ? null : accountStyle.data?.style ?? null} staffRole={role} canUseAlternateBooking={canUseAlternateBooking}
         tableDefinition={ctx.tableDefinition}
         storeId={storeId}
         storeName={store?.name || ''}
@@ -180,7 +215,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           : restaurantTestApi.createReservation(accountId, body).then((res) => {
             if (body.notifyLine && !res.data.lineNotice.sent) setLineWarning('予約は保存しました。LINE の確認は送れていません。友だちの連携と送信の状態を確かめてください。')
             return res
-          })), body.kind === 'hold' ? '枠を押さえました。期限になると解除します。' : '台帳に入れました。').then((ok) => { if (ok) onPhone(null); return ok })}
+          })), body.kind === 'hold' ? '枠を押さえました。期限になると解除します。' : '台帳に入れました。', () => { if (editContext.current.accountId !== accountId || editContext.current.storeId !== storeId) return false; onPhone(null); return true })}
       />
     )
   }
@@ -217,7 +252,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onDetail={id=>{const r=rows.find(r=>r.id===id);if(r?.hold_expires_at)setOpenId(id);else setDetailId(id)}}
         />
       ) : (
-        <ListView pageSize={pageSize} onPageSize={(next) => { onPageSize(next); onPage(1) }} selectedId={detailId==='closed'?undefined:(detailed??rows[0])?.id} onEdit={setOpenId} onView={onView} day={day} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:rows.find(r=>r.id===id)?.customer_version??1}),'予約を有効に戻しました。')}}/>}
+        <ListView pageSize={pageSize} onPageSize={(next) => { onPageSize(next); onPage(1) }} selectedId={detailId==='closed'?undefined:(detailed??rows[0])?.id} onEdit={setOpenId} onView={onView} day={day} onDay={onDay} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restoreReservation(id),'予約を有効に戻しました。')}}/>}
           view={view}
           rows={rows}
           total={total}
@@ -235,7 +270,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onCreate={() => onPhone({})}
           onOpen={setDetailId}
           onCancel={setCancelId}
-          onRestore={(id) => { void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), '予約を有効に戻しました。') }}
+          onRestore={(id) => { void save(() => restoreReservation(id), '予約を有効に戻しました。') }}
         />
       )}
       <ReservationDetailDialog
@@ -249,24 +284,36 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         onClose={() => setDetailId('')}
         onCancel={(id) => { setDetailId(''); setCancelId(id) }}
         onRestore={(id) => {
-          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), '予約を有効に戻しました。').then((ok) => { if (ok) setDetailId('') })
+          void save(() => restoreReservation(id), '予約を有効に戻しました。').then((ok) => { if (ok) setDetailId('') })
         }}
         onEdit={(id) => { setDetailId(''); setOpenId(id) }}
       />
       <EditReservationDialog
+        key={editTarget?.sequence ?? 0}
         reservation={opened}
+        missing={missing}
         tables={tables}
         courses={menuItems}
         busy={busy}
         canWrite={canWrite}
         onClose={() => setOpenId('')}
-        onSave={(patch: ReservationPatch) => {
-          if (!opened) return
-          void save(() => restaurantTestApi.updateReservation(accountId, opened.id, {...patch, expectedVersion: opened.customer_version ?? 1}), '予約を変更しました。').then((ok) => { if (ok) setOpenId('') })
+        onSave={async (patch: ReservationPatch) => {
+          const target = editTarget
+          const current = () => editContext.current.target === target && editContext.current.accountId === accountId && editContext.current.storeId === storeId
+          if (!opened || !target || !current()) return { saved: false }
+          const saved = await mutate(async () => {
+            const result = await restaurantTestApi.updateReservation(accountId, opened.id, patch)
+            if (!current()) throw new QuietError()
+            return result
+          }, '予約を変更しました。', { rethrow: (error) => !current() || isReservationInputError(error) })
+          if (!current()) return { saved: false }
+          if (saved) setOpenId('')
+          else void reload()
+          return { saved }
         }}
         onCancelReservation={(id) => { setOpenId(''); setCancelId(id) }}
         onRestore={(id) => {
-          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), '予約を有効に戻しました。').then((ok) => { if (ok) setOpenId('') })
+          void save(() => restoreReservation(id), '予約を有効に戻しました。').then((ok) => { if (ok) setOpenId('') })
         }}
       />
       <CancelReservationDialog

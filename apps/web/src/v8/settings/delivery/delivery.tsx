@@ -10,6 +10,7 @@ import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
@@ -42,7 +43,7 @@ import styles from './delivery.module.css'
  *
  * 承認された範囲は「ボタンは押せない状態で用意し、回答が来た会社から中身をつなぐ」。
  * Uber Eats は受け口がつながったので `ready` を true にし、ログインの経路を実際に動かす。
- * 出前館・ロケットナウは返事待ちのため false のまま（押せないボタン＋待ちの案内）。
+ * 出前館・ロケットナウは受付開始前のため、申し込みの操作を表示しない。
  *
  * Uber Eats の流れ：
  *  1. ［Uber Eats にログインしてつなぐ］→ `POST …/ubereats/connect/start` →返った認可URLへ移動。
@@ -111,6 +112,10 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   const [busy, setBusy] = useState<BusyState | null>(null)
   /** 解除を確かめる窓（`kJLks`）で外そうとしている会社 */
   const [disconnecting, setDisconnecting] = useState<DeliveryService | null>(null)
+  const [scopeStore, setScopeStore] = useState<{ accountId: string; id: string; name: string } | null>(null)
+  const disconnectWindow = useRef<object>({})
+  const disconnectAccount = useRef(selectedAccountId)
+  const renderedDisconnectWindow = disconnectWindow.current
   const [disconnectError, setDisconnectError] = useState('')
   const [disconnectBlocked, setDisconnectBlocked] = useState(false)
   /** つなぐお店を選ぶ窓（`X5d8UF`）。各社のログインから戻ったときに開く。 */
@@ -164,11 +169,13 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
 
   /** LINE公式アカウントを替えたら、前の店の表示・窓・遅い応答を持ち越さない。 */
   useEffect(() => {
+    disconnectWindow.current = {}
     loadRequestRef.current += 1
     operationRequestRef.current += 1
     operationLockRef.current = false
     autoPickedRef.current = false
     setServices(initialServicesRef.current)
+    setScopeStore(null)
     setBusy(null)
     setDisconnecting(null)
     setDisconnectError('')
@@ -176,11 +183,13 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     setPicking(null)
     setPickedStoreId('')
     setUberPendingStore(false)
+    return () => { disconnectWindow.current = {} }
   }, [selectedAccountId])
 
   /** 権限を失った後に、開始済みの変更結果や確認窓を残さない。 */
   useEffect(() => {
     if (canManage) return
+    disconnectWindow.current = {}
     loadRequestRef.current += 1
     operationRequestRef.current += 1
     operationLockRef.current = false
@@ -204,10 +213,12 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     try {
       const data = await restaurantDeliveryApi.ubereatsConnection(accountId)
       if (stale()) return
+      setScopeStore(data.store?.id && data.store.name ? { accountId, id: data.store.id, name: data.store.name } : null)
       setUberPendingStore(data.connection.status === 'pending_store')
       patch('uber', uberPatch(data, uberReturn))
     } catch {
       if (stale()) return
+      setScopeStore(null)
       // 読めなかっただけなので、出ている状態はそのまま残し、つなぐ操作も止めない。
       patch('uber', {
         stateNote: 'いまの接続の状態を読み取れませんでした。少し待ってから画面を開き直してください。',
@@ -379,9 +390,10 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
 
   /** 確認窓で確定した1回だけ解除し、明示的な解除済み応答だけを成功として扱う。 */
   const disconnect = useCallback(async () => {
-    if (!disconnecting || !canManage) return
+    if (!disconnecting || !canManage || !canManageRef.current || disconnectWindow.current !== renderedDisconnectWindow || accountRef.current !== disconnectAccount.current) return
     if (disconnecting.id !== 'uber') {
       const name = disconnecting.name
+      disconnectWindow.current = {}
       setDisconnecting(null)
       preparing.open(`${name}の連携の解除`)
       return
@@ -400,6 +412,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       }
       patch(service.id, uberConnectionPatch(response.connection))
       setUberPendingStore(false)
+      disconnectWindow.current = {}
       setDisconnecting(null)
       setDisconnectError('')
       setDisconnectBlocked(false)
@@ -436,7 +449,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     } finally {
       finishOperation(request, accountId)
     }
-  }, [beginOperation, canManage, disconnecting, finishOperation, operationIsCurrent, patch, preparing, selectedAccountId])
+  }, [beginOperation, canManage, disconnecting, finishOperation, operationIsCurrent, patch, preparing, selectedAccountId, renderedDisconnectWindow])
 
   return (
     <>
@@ -452,13 +465,13 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           help={`デリバリーサービスへの接続を設定します。Uber Eats の注文の取り込みと注文ごとの操作は、連携の利用準備が整った店舗では受注画面に表示されます。営業状態の変更・メニューの同期はまだ利用できません。${
             anyConnected
               ? 'つながっているサービスの状態をここに出します。お店での入力はありません。うまくいっていない時は musubo が原因を確認し、必要な手続きを行います。'
-              : 'お店での入力はありません。Uber Eats は「ログインしてつなぐ」を押して Uber Eats の画面で許可するだけ、出前館とロケットナウは「連携を申し込む」を押すだけです。鍵・接続先アドレス・通知の設定は、すべて musubo 側で行います。'
+              : 'お店での入力はありません。Uber Eats は連携できる場合、「ログインしてつなぐ」から Uber Eats の画面で許可します。出前館とロケットナウは今は申し込めません。Uber Eats の連携状況をご確認ください。鍵・接続先アドレス・通知の設定は、すべて musubo 側で行います。'
           }`}
         />
         <div className={styles.body}>
           {services.map((service) => {
             const state = STATUS[service.status]
-            const connectable = service.connect !== 'login' || service.ready
+            const connectable = service.ready
             const serviceBusy = busy?.serviceId === service.id
             return (
               /* 角丸・線・影は共通の Card に任せる。中の間と余白だけ承認案 v03 の寸法で足す。 */
@@ -496,9 +509,11 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                 )}
 
                 <div className={styles.actions}>
-                  {service.status === 'disconnected' ? (
+                  {service.status === 'disconnected' && service.connect === 'apply' && !connectable ? (
+                    <p className={styles.note}>今は申し込めません。Uber Eats の連携状況をご確認ください。</p>
+                  ) : service.status === 'disconnected' ? (
                     <Button
-                      variant="primary"
+                      variant={service.connect === 'apply' && !connectable ? 'secondary' : 'primary'}
                       lockedReason={permissionReason}
                       disabled={!canManage || !connectable || busy !== null}
                       title={connectable ? undefined : WAITING}
@@ -553,7 +568,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                         lockedReason={permissionReason}
                         disabled={!canManage || busy !== null || service.connectionDisconnectBlocked}
                         title={service.connectionDisconnectBlocked ? '結果の確認が終わるまで操作できません' : undefined}
-                        onClick={() => { if (!canManage) return; setDisconnectError(''); setDisconnectBlocked(false); setDisconnecting(service) }}
+                        onClick={() => { if (!canManage) return; disconnectWindow.current = {}; disconnectAccount.current = selectedAccountId; setDisconnectError(''); setDisconnectBlocked(false); setDisconnecting(service) }}
                       >
                         連携を解除する
                       </Button>
@@ -569,7 +584,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
 
       {/* 解除を確かめる窓（`kJLks`）。幅480は共通の small。 */}
       <Dialog
-        open={disconnecting !== null}
+        open={disconnecting !== null && disconnectAccount.current === selectedAccountId}
         size="small"
         confirmation
         footerDivider
@@ -583,8 +598,9 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         confirmDisabledReason={disconnectBlocked ? '解除結果の確認が必要です' : undefined}
         error={disconnectError}
         onConfirm={disconnect}
-        onCancel={() => { setDisconnectError(''); setDisconnectBlocked(false); setDisconnecting(null) }}
+        onCancel={() => { disconnectWindow.current = {}; setDisconnectError(''); setDisconnectBlocked(false); setDisconnecting(null) }}
       >
+        <OperationTargetSummary accounts={[{ id: disconnectAccount.current ?? '' }]} store={disconnecting?.id === 'uber' ? { id: scopeStore?.accountId === disconnectAccount.current ? scopeStore.id : '', name: scopeStore?.accountId === disconnectAccount.current ? scopeStore.name : null } : undefined} externalTarget={{ label: '連携先のお店', name: disconnecting?.storeName }} />
         <p className={styles.note}>
           もう一度つなぐときは、この画面の「{disconnecting ? connectLabel(disconnecting) : ''}」からやり直してください。鍵を調べたり入力したりする必要はありません。
         </p>

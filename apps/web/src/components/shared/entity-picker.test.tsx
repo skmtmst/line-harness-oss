@@ -101,7 +101,9 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
 
   it('消された候補を指していたら、見つからないと出して選び直させる', () => {
     render(<Single initial="gone" />)
-    expect(screen.getByText('見つかりません')).toBeTruthy()
+    expect(screen.getByText('現在は選べません')).toBeTruthy()
+    expect(screen.getByText('選び直してください。')).toBeTruthy()
+    expect(screen.queryByText(/消されたか/)).toBeNull()
     expect(screen.getByRole('button', { name: '回答フォーム：変える' }).getAttribute('aria-invalid')).toBe('true')
   })
 })

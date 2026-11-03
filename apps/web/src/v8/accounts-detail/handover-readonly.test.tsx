@@ -56,6 +56,9 @@ vi.mock('@/components/shell/page-chrome', () => ({
 }))
 
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/lib/use-running-version', () => ({
+  useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }),
+}))
 import HandoverV8 from './handover'
 
 
@@ -140,6 +143,37 @@ async function renderV8() {
   await act(async () => { root.render(<HandoverV8 />) })
   await flush()
 }
+
+it('本実行の前に移し元と移し先と環境を確認できる', async () => {
+  handoversGet.mockResolvedValue({ success: true, data: handoverDetail({ unresolvedReviews: 0 }) })
+  await renderV8()
+  const button = [...document.querySelectorAll('button')].find((el) => el.textContent?.includes('本実行する'))
+  expect(button).toBeTruthy()
+  await act(async () => { button?.click() })
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')
+  expect(dialog?.textContent).toContain('移し元のLINEアカウント')
+  expect(dialog?.textContent).toContain('然-NEN-TEST')
+  expect(dialog?.textContent).toContain('移し先のLINEアカウント')
+  expect(dialog?.textContent).toContain('然-NEN-本店')
+  expect(dialog?.textContent).toContain('検証環境')
+  expect(handoversExecute).not.toHaveBeenCalled()
+})
+
+it.each([
+  ['引き継ぎをやめる', 'previewed', null],
+  ['切り戻す', 'completed', '2099-01-01T00:00:00.000Z'],
+])('%s の前にも両アカウントと環境を確認できる', async (label, status, rollbackDeadline) => {
+  handoversGet.mockResolvedValue({ success: true, data: handoverDetail({ unresolvedReviews: 0, status, rollbackDeadline }) })
+  await renderV8()
+  const button = [...document.querySelectorAll('button')].find((el) => el.textContent?.includes(label))
+  expect(button).toBeTruthy()
+  await act(async () => { button?.click() })
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')
+  expect(dialog?.textContent).toContain('移し元のLINEアカウント')
+  expect(dialog?.textContent).toContain('移し先のLINEアカウント')
+  expect(dialog?.textContent).toContain('検証環境')
+  expect(handoversExecute).not.toHaveBeenCalled()
+})
 
 
 it('WEB-136: 役割の確認待ちに乗り換えの実行・取消・判断の変更を出さない', async () => {

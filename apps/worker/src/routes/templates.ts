@@ -7,7 +7,7 @@ import { validateTapExtraReferences } from '../services/tap-extras.js';
 import { tapExtrasError } from '@line-crm/shared';
 import { Hono } from 'hono';
 import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
-import { getTemplatesWithUsageCount, getTemplateSendCounts, getTemplateFolderCounts, getTemplateById, getTemplateUsage, createTemplate, updateTemplate, saveTemplateDraft, publishTemplate, hasTemplateDraft, deleteTemplate, getCarouselTapTotals, getFolderById, listTemplateVersions, revertTemplateToVersion, listBroadcastReferences, listTemplateReferences, getBroadcastDeleteBlockers, getPinnedReminderDeleteBlockers, MediaReferenceAccountError } from '@line-crm/db';
+import { getTemplatesWithUsageCount, getTemplateSendCounts, getTemplateFolderCounts, getTemplateById, getTemplateUsage, createTemplate, updateTemplate, saveTemplateDraft, publishTemplate, hasTemplateDraft, deleteTemplate, deleteCreatedTemplateDraft, getCarouselTapTotals, getFolderById, listTemplateVersions, revertTemplateToVersion, listBroadcastReferences, listTemplateReferences, getBroadcastDeleteBlockers, getPinnedReminderDeleteBlockers, MediaReferenceAccountError } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess } from '../middleware/role-guard.js';
@@ -286,6 +286,7 @@ templates.get('/api/templates', async (c) => {
        * 送信の候補選びは `messageContent`（公開版）だけを見る決まりは変えない。
        */
       draftMessageContent: t.draft_message_content ?? null,
+      draftMessageBubbles: t.draft_message_bubbles_json ? JSON.parse(t.draft_message_bubbles_json) : null,
       question: questionValue(t.question_json),
       questionStatus: t.question_status,
       folderId: t.folder_id ?? null,
@@ -939,6 +940,13 @@ templates.delete('/api/templates/:id', requireDeliveryAccess('templates'), async
     )) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
+    const expectedDraftRevision = c.req.query('expectedDraftRevision');
+    if (expectedDraftRevision !== undefined && (!/^\d+$/.test(expectedDraftRevision) || !Number.isSafeInteger(Number(expectedDraftRevision)))) {
+      return inputError(c, { success: false, error: '下書きの版が正しくありません' }, 400, ['expectedDraftRevision']);
+    }
+    if (expectedDraftRevision !== undefined && (Number(existing.published_version ?? 0) !== 0 || Number(existing.draft_revision ?? 0) !== Number(expectedDraftRevision))) {
+      return c.json({ success: false, error: '下書きの状態が変わったため消せません。読み直して確認してください。', code: 'DRAFT_CHANGED' }, 409);
+    }
     // ON DELETE SET NULL や本文の控えがあっても、参照中の設定を運用者に知らせず
     // 切ることはしない。すべての利用先を先に差し替えてもらう。
     const usage = await usageWithVersions(c.env.DB, id, existing.line_account_id);
@@ -977,7 +985,9 @@ templates.delete('/api/templates/:id', requireDeliveryAccess('templates'), async
         blockers,
       }, 409);
     }
-    await deleteTemplate(c.env.DB, id);
+    if (expectedDraftRevision !== undefined) {
+      if (!await deleteCreatedTemplateDraft(c.env.DB, id, Number(expectedDraftRevision))) return c.json({ success: false, error: '下書きの状態が変わったため消せません。読み直して確認してください。', code: 'DRAFT_CHANGED' }, 409);
+    } else await deleteTemplate(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
     throw err;

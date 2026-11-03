@@ -57,7 +57,9 @@ describe('はじめにやること（Bdfxm）', () => {
       [{ feature: 'stamps', areaId: 'E', groupId: 'g', href: '/visit-stamps', customerState: 'preparing' }],
       [{ target_id: 'a1', kind: 'automation', is_sample: 1, status: 'draft', draftRevision: 'd' }],
     )
-    expect(summary.rows.map((row) => row.title)).toEqual(['来店スタンプの決まりを入れる', 'Stripe をつなぐ', '入ったお知らせを動かす', 'お店の写真とロゴを入れる'])
+    expect(summary.rows.map((row) => row.title)).toEqual(['来店スタンプを設定する', 'Stripe をつなぐ', '入ったお知らせを動かす', 'お店の写真とロゴを入れる'])
+    expect(summary.rows.find(row => row.key === 'payment')?.badge.label).toBe('未設定')
+    expect(summary.rows.find(row => row.key === 'images')?.badge.label).toBe('見本')
     expect(summary.rows[0].action.href).toBe('/visit-stamps')
     expect(summary.rows[1].action.href).toBe('/booking/menus?tab=payments')
     expect(summary.done).toBe(3)

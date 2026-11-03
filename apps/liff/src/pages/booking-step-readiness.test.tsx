@@ -31,8 +31,10 @@ it('読込・失敗の間は進む帯を隠し、回復して選ぶと次の段�
   const previous = choice.closest('.liff-step');
   expect(previous).toBeTruthy();
   fireEvent.click(choice);
-  fireEvent.click(await screen.findByRole('button', { name: '担当を選ぶ' }));
+  await vi.waitFor(() => expect(screen.getByRole('button', { name: '担当を選ぶ' }).isConnected).toBe(true));
+  fireEvent.click(screen.getByRole('button', { name: '担当を選ぶ' }));
   expect(screen.queryByRole('button', { name: '日時を選ぶ' })).toBeNull();
+  await vi.waitFor(() => expect(api.staffOf).toHaveBeenCalled());
   await act(async () => { loadStaff({ staff: [staff] }); });
   const person = await screen.findByRole('button', { name: /担当A/ });
   expect(person.closest('.liff-step')).not.toBe(previous);

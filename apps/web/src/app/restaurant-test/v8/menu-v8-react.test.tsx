@@ -52,9 +52,9 @@ describe('MJoJR メニュー管理のV8', () => {
       expect(board.textContent).toContain(label)
     }
     expect(board.textContent).not.toContain('要承認')
-    expect(board.textContent).not.toContain('「…」の中身')
+    expect(board.textContent).not.toContain('参照中のメニューは削除できません')
     fireEvent.click(screen.getByRole('button', { name: 'メニュー一覧の説明' }))
-    expect(await screen.findByText(/「…」の中身/)).toBeTruthy()
+    expect(await screen.findByText(/参照中のメニューは削除できません/)).toBeTruthy()
     expect(board.textContent).toContain('秋の鹿肉コース')
     expect(board.textContent).toContain('ランチ・ディナー')
   })
@@ -63,6 +63,16 @@ describe('MJoJR メニュー管理のV8', () => {
     render(<MenuV8 />)
     await screen.findByText('メニュー一覧')
     expect(screen.getAllByRole('button', { name: '再開' })).toHaveLength(1)
+  })
+
+  it('変更のない編集は保存せず理由を知らせる', async () => {
+    render(<MenuEditV8 />)
+    await screen.findByDisplayValue('秋の鹿肉コース')
+    const save = screen.getByRole('button', { name: '保存する' })
+    expect(save.hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText('変更していません')).toBeTruthy()
+    fireEvent.click(save)
+    expect(fixture.updateMenu).not.toHaveBeenCalled()
   })
 
   it('編集ページ（mauOC）で変えた名前が今の口へ届く', async () => {

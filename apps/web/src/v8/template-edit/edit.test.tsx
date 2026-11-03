@@ -13,7 +13,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-const templatesApi = vi.hoisted(() => ({ get: vi.fn(), create: vi.fn(), update: vi.fn(), publish: vi.fn() }))
+const templatesApi = vi.hoisted(() => ({ get: vi.fn(), create: vi.fn(), update: vi.fn(), publish: vi.fn(), delete: vi.fn() }))
 const assetsCreate = vi.hoisted(() => vi.fn())
 const assetsPublish = vi.hoisted(() => vi.fn())
 const assetsList = vi.hoisted(() => vi.fn())
@@ -315,6 +315,76 @@ describe('V8 テンプレートの下書き自動保存（一斉配信と同じ�
     expect(templatesApi.create).toHaveBeenCalledTimes(1)
   })
 
+  it('自動で作った下書きは変更が保存済みでもキャンセル時に確認する', async () => {
+    templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-auto', publishedVersion: 0, draftRevision: 1 } })
+    await mount()
+    type(screen.getByLabelText('テンプレート名'), '案内')
+    type(screen.getByLabelText('本文'), 'こんにちは')
+    await wait(2100)
+    await flush()
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
+    expect(screen.getByRole('button', { name: '下書きを残して移る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '下書きを消して移る' })).toBeTruthy()
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('下書きを残す選択では削除せずに移る', async () => {
+    templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-auto', publishedVersion: 0, draftRevision: 1 } })
+    await mount()
+    type(screen.getByLabelText('テンプレート名'), '案内')
+    type(screen.getByLabelText('本文'), 'こんにちは')
+    await wait(2100); await flush()
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを残して移る' })) })
+    await flush()
+    expect(templatesApi.delete).not.toHaveBeenCalled()
+    expect(push).toHaveBeenCalled()
+  })
+
+  it('下書きを消すときは作成した版を指定する', async () => {
+    templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-auto', publishedVersion: 0, draftRevision: 1 } })
+    templatesApi.delete.mockResolvedValue({ success: true, data: null })
+    await mount()
+    type(screen.getByLabelText('テンプレート名'), '案内')
+    type(screen.getByLabelText('本文'), 'こんにちは')
+    await wait(2100); await flush()
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを消して移る' })) })
+    await flush()
+    expect(templatesApi.delete).toHaveBeenCalledWith('template-auto', 1)
+    expect(push).toHaveBeenCalled()
+  })
+
+  it('削除結果が不明なら一覧で確認する操作を案内する', async () => {
+    templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-auto', publishedVersion: 0, draftRevision: 1 } })
+    templatesApi.delete.mockRejectedValue(new Error('通信断'))
+    await mount()
+    type(screen.getByLabelText('テンプレート名'), '案内')
+    type(screen.getByLabelText('本文'), 'こんにちは')
+    await wait(2100); await flush()
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを消して移る' })) })
+    await flush()
+    expect(screen.getByText(/削除結果を確認できません/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '下書きを残して移る' })).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '一覧で確認する' })) })
+    expect(push).toHaveBeenCalledWith('/templates')
+  })
+
+  it('下書きの版が変わったら消さずに理由を表示して移らない', async () => {
+    templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-auto', publishedVersion: 0, draftRevision: 1 } })
+    templatesApi.delete.mockRejectedValue(new ApiError(409, '版が変わりました'))
+    await mount()
+    type(screen.getByLabelText('テンプレート名'), '案内')
+    type(screen.getByLabelText('本文'), 'こんにちは')
+    await wait(2100); await flush()
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを消して移る' })) })
+    await flush()
+    expect(screen.getByText(/下書きの状態が変わったため消せません/)).toBeTruthy()
+    expect(push).not.toHaveBeenCalled()
+  })
+
   it('名前が空のうちは送らず、帯は「まだ保存していません」のまま', async () => {
     await mount()
     type(screen.getByLabelText('本文'), 'こんにちは')
@@ -350,11 +420,21 @@ describe('V8 テンプレートの下書き自動保存（一斉配信と同じ�
 })
 
 describe('V8 クーポン・リサーチを作る', () => {
+  it('新規の種類は表示なしで、割引を選ぶと金額を入力できる', async () => {
+    await mount('kind=coupon')
+    expect(screen.getByLabelText('クーポンタイプ').textContent).toContain('種類の表示なし')
+    expect(screen.queryByLabelText('割引額')).toBeNull()
+    fireEvent.click(screen.getByLabelText('クーポンタイプ'))
+    fireEvent.click(screen.getByRole('button', { name: '割引', exact: true }))
+    expect(screen.getByLabelText('割引額')).toBeTruthy()
+  })
   it('クーポン：期間が無ければ保存の口を呼ばない', async () => {
     await mount('kind=coupon')
     expect(document.querySelector('[data-design-node="S6FEuB"]')).toBeTruthy()
     type(screen.getByLabelText('テンプレート名'), '夏の20%オフ')
     type(screen.getByLabelText('クーポン名'), '夏の20%オフ')
+    fireEvent.click(screen.getByLabelText('クーポンタイプ'))
+    fireEvent.click(screen.getByRole('button', { name: '割引', exact: true }))
     type(screen.getByLabelText('割引額'), '500')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await flush()
@@ -503,6 +583,7 @@ describe('V8 メッセージを作る：フォルダ・読み込めないとき�
     const tracking = screen.getByRole('switch', { name: 'https://example.com/bookingを短縮して数える（いつもオン）' }) as HTMLButtonElement
     expect(tracking.getAttribute('aria-checked')).toBe('true')
     expect(tracking.disabled).toBe(true)
+    expect(tracking.parentElement?.textContent).toContain('短縮して数える（いつもオン・変更できません）')
     const preview = host.querySelector('[data-template-region="preview"]')!
     expect(preview.textContent).toContain('山田 太郎さん、ご予約はこちら')
     expect(preview.textContent).toContain('値を確認できない差し込みがあります：{{field.unknown_key}}')
@@ -528,11 +609,13 @@ describe('本文URLの案内と下書き', () => {
     expect(checks).toHaveLength(1)
     expect(checks[0].getAttribute('aria-checked')).toBe('true')
     expect(checks[0].disabled).toBe(true)
+    expect(screen.getAllByText('短縮して数える（いつもオン・変更できません）')).toHaveLength(1)
     expect((content as HTMLTextAreaElement).value).toBe(withUrl)
     type(content, 'URLを外してもご予約の本文は残ります。')
     await flush()
     expect(screen.getByText(hintText).closest('[data-design-part="card"]')).toBeNull()
     expect(screen.queryByRole('heading', { name: '本文の中のURL' })).toBeNull()
+    expect(screen.queryByText('短縮して数える（いつもオン・変更できません）')).toBeNull()
     expect((screen.getByLabelText('テンプレート名') as HTMLInputElement).value).toBe('URLを確認した下書き')
     expect(templatesApi.update).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
@@ -540,6 +623,25 @@ describe('本文URLの案内と下書き', () => {
     expect(templatesApi.update).toHaveBeenCalledTimes(1)
     expect(templatesApi.update).toHaveBeenCalledWith('template-1', expect.objectContaining({ name: 'URLを確認した下書き', messageType: 'text', messageContent: 'URLを外してもご予約の本文は残ります。', folderId: null, expectedVersion: 3, expectedDraftRevision: 2 }))
     expect(templatesApi.create).not.toHaveBeenCalled()
+    expect(templatesApi.publish).not.toHaveBeenCalled()
+  })
+
+  it('URLの固定設定を押しても本文を変えず、短縮前の文字列をそのまま保存する', async () => {
+    const messageContent = `ご予約はこちら ${url}?from=message&day=1`
+    templatesApi.get.mockResolvedValue(detail({ messageContent }))
+    templatesApi.update.mockResolvedValue({ success: true, data: { id: 'template-1' } })
+    await mount('id=template-1')
+    const tracking = screen.getByRole('switch', { name: `${url}?from=message&day=1を短縮して数える（いつもオン）` }) as HTMLButtonElement
+    expect(tracking.disabled).toBe(true)
+    expect(tracking.getAttribute('aria-checked')).toBe('true')
+    expect(tracking.parentElement?.textContent).toContain('短縮して数える（いつもオン・変更できません）')
+    fireEvent.click(tracking)
+    expect(templatesApi.update).not.toHaveBeenCalled()
+    expect((screen.getByLabelText('本文') as HTMLTextAreaElement).value).toBe(messageContent)
+    type(screen.getByLabelText('テンプレート名'), 'URLを保つ下書き')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.update).toHaveBeenCalledExactlyOnceWith('template-1', { name: 'URLを保つ下書き', category: 'general', folderId: null, messageType: 'text', messageContent, expectedVersion: 3, expectedDraftRevision: 2 })
     expect(templatesApi.publish).not.toHaveBeenCalled()
   })
 
@@ -579,6 +681,8 @@ describe('V8 テンプレートの公開と送信の違い', () => {
 
   it('リッチメッセージでも注記を出す', async () => {
     await mount('kind=rich_message&visual=1')
+    expect(screen.queryByText('配信日 10:00')).toBeNull()
+    expect(screen.getByText('今日')).toBeTruthy()
     expect(screen.getByRole('button', { name: '保存して公開' })).toBeTruthy()
     expect(screen.getByText(note)).toBeTruthy()
   })

@@ -183,7 +183,7 @@ function propsOf(element: HTMLElement): Record<string, unknown> {
 }
 
 function actionButton(container: HTMLElement, bookingId: string, action: string): HTMLElement {
-  const label = action === 'no_show' ? '無断' : action === 'cancel' ? 'キャンセルにする' : action
+  const label = action === 'no_show' ? '無断' : action === 'cancel' ? 'キャンセルにする' : action === 'reject' ? '断る' : action
   if (action === 'attended') {
     const primary = elements(container).find((element) => (
       element.tagName === 'BUTTON'
@@ -308,6 +308,8 @@ describe('Issue #684 イベント予約の実操作', () => {
     const button = occurrenceActionButton(view.container, 'promote-waitlist')
     await click(button)
     await click(button)
+    expect(view.container.textContent).toContain('LINEアカウント')
+    expect(view.container.textContent).toContain('環境')
     // U: 理由の確認窓が先。理由なしでは送らない。
     expect(apiMocks.promoteOccurrenceWaitlist).toHaveBeenCalledTimes(0)
     await confirmWaitlistDialog(view.container, '空きが出たため順番どおり案内します')
@@ -509,11 +511,23 @@ describe('Issue #684 イベント予約の実操作', () => {
     const view = await mount(<EventBookingsPage />)
     await click(actionButton(view.container, 'booking-1', 'cancel'))
     expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeTruthy()
+    expect(document.body.textContent).toContain('LINEアカウント')
+    expect(document.body.textContent).toContain('環境')
     await act(async () => { rememberStaffIdentity({ ...readStaffIdentity()!, role: 'viewer' }) })
     await flush()
     expect(elements(document.body).some((element) => ['dialog', 'alertdialog'].includes(element.getAttribute('role') ?? ''))).toBe(false)
     await expectPermissionLocked(actionButton(view.container, 'booking-1', 'attended'))
     expect(apiMocks.adminCancelBooking).not.toHaveBeenCalled()
+  })
+
+  it('申込を断る確認に操作先と環境を示す', async () => {
+    const data = await apiMocks.getOccurrenceApplicants()
+    data.applicants[0].status = 'requested'
+    const view = await mount(<EventBookingsPage />)
+    await click(actionButton(view.container, 'booking-1', 'reject'))
+    expect(document.body.textContent).toContain('LINEアカウント')
+    expect(document.body.textContent).toContain('環境')
+    expect(apiMocks.decideBooking).not.toHaveBeenCalled()
   })
 
   it('一斉送信はサーバーで固定した対象を確認してから送り、二重押しでpreviewを増やさない', async () => {
@@ -537,6 +551,8 @@ describe('Issue #684 イベント予約の実操作', () => {
     await flush()
     expect(view.container.textContent).toContain('2 人に送りますか')
     expect(document.querySelector('[role=dialog]:not([data-closing])')).toBeTruthy()
+    expect(view.container.textContent).toContain('LINEアカウント')
+    expect(view.container.textContent).toContain('環境')
     await click(elements(view.container).find((element) => isConfirm(element))!)
     expect(apiMocks.sendOccurrenceBroadcast).toHaveBeenCalledWith('broadcast-snapshot-1')
   })

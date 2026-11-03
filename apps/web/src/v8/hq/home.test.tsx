@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { flushListUrlState } from '@/components/shared/list-url-state'
 /*
@@ -9,6 +11,7 @@ import { flushListUrlState } from '@/components/shared/list-url-state'
  * 未完了・確認失敗なら登録時と同じ進捗画面へ戻す。
  */
 import React, { act } from 'react'
+import { queryByRole } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -21,7 +24,9 @@ const checkConnection = vi.hoisted(() => vi.fn())
 const importState = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const select = vi.hoisted(() => vi.fn())
-const role = vi.hoisted(() => ({ value: 'owner' as string }))
+const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const restoreApi = vi.hoisted(() => vi.fn())
+const restoreCallbacks = vi.hoisted(() => ({ card: [] as Array<() => void>, table: [] as Array<() => void> }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -30,11 +35,29 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     fetchApi: checkConnection,
     api: {
       ...actual.api,
-      lineAccounts: { ...actual.api.lineAccounts, list: accounts, followerImportState: importState },
+      lineAccounts: { ...actual.api.lineAccounts, list: accounts, followerImportState: importState, restore: restoreApi },
       lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })) },
       tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '然 -NEN-' } })) },
     },
   }
+})
+vi.mock('@/components/shared/button', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/button')>()
+  return { ...actual, AccountActionButton: (props: React.ComponentProps<typeof actual.AccountActionButton>) => {
+    if (props.action === 'restore' && props.onClick) {
+      const click = props.onClick
+      restoreCallbacks.card.push(() => click({} as React.MouseEvent<HTMLButtonElement>))
+    }
+    return <actual.AccountActionButton {...props} />
+  } }
+})
+vi.mock('@/components/shared/row-actions', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/row-actions')>()
+  return { ...actual, RowMenu: (props: React.ComponentProps<typeof actual.RowMenu>) => {
+    const restore = props.items.find(item => item.id === 'restore')?.onSelect
+    if (restore) restoreCallbacks.table.push(restore)
+    return <actual.RowMenu {...props} />
+  } }
 })
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children),
@@ -88,12 +111,13 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   flushListUrlState()
+  window.history.replaceState(null, '', '/hq')
   container.remove()
   verifiedStaffRole(null)
 })
 
 async function render() {
-  verifiedStaffRole(role.value === 'owner' ? 'owner' : role.value === 'admin' ? 'admin' : 'viewer')
+  verifiedStaffRole(role.value)
   await act(async () => { root.render(<HqHomeV8 />) })
   await act(async () => { await Promise.resolve() })
 }
@@ -162,6 +186,32 @@ describe('統括のアカウント', () => {
       .filter((band) => !band.closest('article'))
     expect(bands).toHaveLength(1)
     expect(bands[0].textContent).toContain('期限が切れたトークン 1 件・期限が近い 1 件')
+  })
+
+  it('期限の案内は検索結果とアーカイブの一覧に合わせる', async () => {
+    accounts.mockResolvedValue({ success: true, data: [
+      { ...warnedAccount, tokenExpiry: { status: 'expired', label: '期限切れ' } },
+      { ...warnedAccount, id: 'acc-2', name: '二号店', displayName: '二号店', tokenExpiry: { status: 'expiring', label: '期限が近い' } },
+      { ...warnedAccount, id: 'acc-3', archivedAt: '2026-10-01', tokenExpiry: { status: 'expired', label: '期限切れ' } },
+    ] })
+    await render()
+    const search = container.querySelector<HTMLInputElement>('input[placeholder="名前・LINE ID・フォルダで探す"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, '二号店')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise(resolve => setTimeout(resolve, 350))
+    })
+    expect(container.textContent).toContain('期限が近い 1 件')
+    expect(container.textContent).not.toContain('期限が切れたトークン')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, '')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise(resolve => setTimeout(resolve, 350))
+    })
+    const archive = [...container.querySelectorAll('button')].find(el => el.textContent?.startsWith('アーカイブ'))!
+    await act(async () => { archive.click() })
+    expect(container.textContent).not.toContain('期限が切れたトークン')
+    expect(container.textContent).not.toContain('期限が近い 1 件')
   })
 
   it('表の LINE 接続は状態の札に期限の札を添え、素の期限の文字を出さない', async () => {
@@ -323,4 +373,95 @@ it.each([
   const row = container.querySelector('tbody tr')!
   expect(row.textContent).toContain(label)
   expect(row.querySelector('[title*="権限者"]')?.getAttribute('title')).toContain(label)
+})
+
+
+describe('アーカイブから戻す入口の権限表示', () => {
+  beforeEach(() => {
+    restoreCallbacks.card.length = 0
+    restoreCallbacks.table.length = 0
+    restoreApi.mockReset()
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, name: '架空の保管店', displayName: '架空の保管店', archivedAt: '2026-10-01', connection: { status: 'ok', issues: [] } }] })
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ success: true, data: {} })))
+    forgetSessionSnapshot()
+  })
+  afterEach(() => {
+    act(() => { forgetSessionSnapshot() })
+    vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/hq')
+  })
+  const restoredDialog = () => document.querySelector('[role="dialog"]')
+  const restoreControl = () => (queryByRole(document.body, 'button', { name: '戻す' }) ?? queryByRole(document.body, 'menuitem', { name: '戻す' })) as HTMLButtonElement | null
+  const noWrites = () => {
+    expect(restoreApi).not.toHaveBeenCalled()
+    expect(checkConnection.mock.calls.some(([, options]) => options?.method && options.method !== 'GET')).toBe(false)
+    expect(vi.mocked(fetch).mock.calls.some(([, options]) => options?.method && options.method !== 'GET')).toBe(false)
+  }
+  async function openArchived(layout: 'card' | 'table') {
+    await render()
+    const archive = [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.startsWith('アーカイブ'))!
+    expect(archive).toBeTruthy()
+    await act(async () => { archive.click() })
+    await act(async () => { container.querySelector<HTMLButtonElement>(layout === 'card' ? 'button[aria-label="カード"]' : 'button[aria-label="表"]')!.click() })
+    if (layout === 'table') {
+      await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="架空の保管店の操作"]')!.click() })
+    }
+  }
+  for (const layout of ['card', 'table'] as const) {
+    it(`${layout}の管理者にはオーナー限定の理由を示し、窓も変更要求も増やさない`, async () => {
+      role.value = 'admin'
+      await openArchived(layout)
+      const restore = restoreControl()!
+      expect(restore).toBeTruthy()
+      expect(restore.getAttribute('aria-disabled')).toBe('true')
+      expect(restore.hasAttribute('data-permission-locked')).toBe(true)
+      const ids = (restore.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean)
+      expect(ids.map(id => document.getElementById(id)?.textContent)).toEqual([PERMISSION_LOCK_REASON.owner])
+      await act(async () => { restore.focus() })
+      const tips = [...document.querySelectorAll('[role="tooltip"]')]
+      expect(tips).toHaveLength(1)
+      expect(tips[0].textContent).toBe(PERMISSION_LOCK_REASON.owner)
+      await act(async () => { restore.click() })
+      expect(restoredDialog()).toBeNull()
+      await act(async () => { restoreCallbacks[layout].at(-1)!() })
+      expect(restoredDialog()).toBeNull()
+      noWrites()
+    })
+    it(`${layout}のオーナーは従来の本人確認の窓を開ける`, async () => {
+      await openArchived(layout)
+      const restore = restoreControl()!
+      expect(restore).toBeTruthy()
+      expect(restore.getAttribute('aria-disabled')).toBeNull()
+      await act(async () => { restore.click() })
+      expect(restoredDialog()?.textContent).toContain('「架空の保管店」をアーカイブから戻しますか？')
+      expect(restoredDialog()?.textContent).toContain('本人確認して戻す')
+      expect(restoredDialog()?.textContent).toContain('戻した直後は「止まっている」状態です。')
+      noWrites()
+    })
+    it.each(['viewer', 'staff', null, 'read-proxy'] as const)(`${layout}の%sには復元入口を新設しない`, async staffRole => {
+      role.value = staffRole === 'read-proxy' ? 'owner' : staffRole
+      if (staffRole === 'read-proxy') rememberSessionSnapshot({ impersonation: { id: 'archive-read', tenantId: 'fixture-tenant', mode: 'read', piiRevealed: false, startedAt: '' }, unfamiliarAt: null, stepUpMethod: 'none' })
+      await openArchived(layout)
+      expect(restoreControl()).toBeNull()
+      expect(restoreCallbacks[layout]).toHaveLength(0)
+      expect(restoredDialog()).toBeNull()
+      noWrites()
+    })
+    it.each(['admin', 'read-proxy'] as const)(`${layout}の古いオーナー操作は%sへ変わると窓を開かない`, async nextRole => {
+      await openArchived(layout)
+      const oldControl = restoreControl()!
+      const oldCallback = restoreCallbacks[layout].at(-1)!
+      expect(oldControl).toBeTruthy()
+      expect(oldCallback).toBeTypeOf('function')
+      await act(async () => {
+        if (nextRole === 'admin') role.value = verifiedStaffRole('admin')
+        else rememberSessionSnapshot({ impersonation: { id: 'archive-read', tenantId: 'fixture-tenant', mode: 'read', piiRevealed: false, startedAt: '' }, unfamiliarAt: null, stepUpMethod: 'none' })
+        root.render(<HqHomeV8 />)
+      })
+      await act(async () => { oldControl.click(); oldCallback() })
+      expect(restoredDialog()).toBeNull()
+      expect(Boolean(restoreControl())).toBe(nextRole === 'admin')
+      noWrites()
+    })
+  }
 })

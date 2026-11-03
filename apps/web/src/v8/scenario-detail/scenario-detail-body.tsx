@@ -107,6 +107,7 @@ export function ScenarioDetailBody({
   saveErrors: ReturnType<typeof useSaveFormErrors>
 }) {
   const tokenNames = useInsertTokenNames(scenario.lineAccountId)
+  const displayOrder = (order: number) => { const index = sortedSteps.findIndex((step) => step.stepOrder === order); return index < 0 ? '—' : String(index + 1) }
   return (      <div className={styles.body} data-design="Body" data-template-region="body">
         <div className={styles.left}>
           {!canEdit ? (
@@ -237,7 +238,7 @@ export function ScenarioDetailBody({
             <KpiCard title="購読中" value={stats?.activeNow} unit="人" detail="いま途中にいる人" />
             <KpiCard title="読み終えた" value={stats?.completed} unit="人" detail="最後の1通まで届いた人" />
             <KpiCard title="始まる見込み（試算）" value={simulation?.audience.newStartPlanned} unit="人" detail="きっかけが来たら始まる見込み。確定ではない" />
-            <KpiCard title="離脱が多い所" value={null} valueText={biggestDrop ? `${biggestDrop.fromOrder}→${biggestDrop.toOrder}通目` : '—'} unit="" detail={biggestDrop ? `${biggestDrop.fromOrder}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています` : '大きく離れている所はまだありません'} />
+            <KpiCard title="離脱が多い所" value={null} valueText={biggestDrop ? `${displayOrder(biggestDrop.fromOrder)}→${displayOrder(biggestDrop.toOrder)}通目` : '—'} unit="" detail={biggestDrop ? `${displayOrder(biggestDrop.fromOrder)}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています` : '大きく離れている所はまだありません'} />
           </KpiBand>
 
           {/* 最後の1通の後（行）。変える入口はこの行の右。 */}
@@ -278,7 +279,7 @@ export function ScenarioDetailBody({
                           <button
                             type="button"
                             onClick={() => openInsertStep(sortedSteps[index - 1].stepOrder)}
-                            title={`${sortedSteps[index - 1].stepOrder} 通目と${step.stepOrder} 通目のあいだに足します`}
+                            title={`${index} 通目と${index + 1} 通目のあいだに足します`}
                           >
                             ＋ ここに挿入
                           </button>
@@ -291,7 +292,7 @@ export function ScenarioDetailBody({
                       className={isShown ? styles.stepRowSelected : styles.stepRow}
                       onClick={() => setSelectedStepId(step.id)}
                     >
-                      <span className={styles.stepNo}>{`${step.stepOrder} 通目`}</span>
+                      <span className={styles.stepNo}>{`${index + 1} 通目`}</span>
                       <span className={styles.stepWhen}>
                         <span className={styles.stepWhenMain}>{stepWhenLabel(deliveryMode, step, index)}</span>
                         {previewLabels[step.stepOrder] ? (
@@ -324,7 +325,7 @@ export function ScenarioDetailBody({
                           <IconButton
                             type="button"
                             size="row"
-                            aria-label={`${step.stepOrder} 通目を上へ`}
+                            aria-label={`${index + 1} 通目を上へ`}
                             disabled={index === 0}
                             title={reorderMoveReason(index, sortedSteps.length, -1) ?? undefined}
                             onClick={(e) => {
@@ -337,7 +338,7 @@ export function ScenarioDetailBody({
                           <IconButton
                             type="button"
                             size="row"
-                            aria-label={`${step.stepOrder} 通目を下へ`}
+                            aria-label={`${index + 1} 通目を下へ`}
                             disabled={index === sortedSteps.length - 1}
                             title={reorderMoveReason(index, sortedSteps.length, 1) ?? undefined}
                             onClick={(e) => {
@@ -351,8 +352,8 @@ export function ScenarioDetailBody({
                             <RowMenu
                               appearance="plain"
                               size="row"
-                              label={`${step.stepOrder} 通目のその他操作`}
-                              menuLabel={`${step.stepOrder} 通目の操作`}
+                              label={`${index + 1} 通目のその他操作`}
+                              menuLabel={`${index + 1} 通目の操作`}
                               open={stepMenuId === step.id}
                               onOpenChange={(next) => setStepMenuId(next ? step.id : null)}
                               items={[
@@ -361,7 +362,7 @@ export function ScenarioDetailBody({
                                 ...(canTestSend ? [{
                                   id: 'test',
                                   label: 'テスト',
-                                  onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder} 通目` }),
+                                  onSelect: () => setTestSend({ stepId: step.id, label: `${index + 1} 通目` }),
                                 }] : []),
                                 /* この通を送ったあとに動かすアクション。件数を出すのは、設定済みを忘れて二重に足すのを防ぐため。 */
                                 {
@@ -372,7 +373,7 @@ export function ScenarioDetailBody({
                                       hook: 'step_sent',
                                       stepId: step.id,
                                       choiceIndex: null,
-                                      title: `${step.stepOrder} 通目を送ったあと`,
+                                      title: `${index + 1} 通目を送ったあと`,
                                     }),
                                 },
                                 {
@@ -414,7 +415,7 @@ export function ScenarioDetailBody({
             <section className={styles.statPanel}>
               <h2 className={styles.statPanelTitle}>通ごとの数</h2>
               <ol className={styles.statList}>
-                {sortedSteps.map((step) => {
+                {sortedSteps.map((step, index) => {
                   const stat = stats?.steps.find((v) => v.stepOrder === step.stepOrder)
                   const pct = scenarioReachPercent(stat?.reachRate)
                   const reachBarWidth = scenarioReachBarWidth(pct)
@@ -425,7 +426,7 @@ export function ScenarioDetailBody({
                   const audience = describeStepAudience(step.targetCondition, tags)
                   return (
                     <li key={step.id} className={styles.statRow}>
-                      <span className={styles.statNo}>{`${step.stepOrder} 通目`}</span>
+                      <span className={styles.statNo}>{`${index + 1} 通目`}</span>
                       <span className={styles.statAudience} title={audience}>
                         {audience}
                       </span>
@@ -480,7 +481,7 @@ export function ScenarioDetailBody({
         {/* 右の欄：選んだ通のスマホ。 */}
         {!showStepForm && editingStepId === null ? <aside className={styles.right} data-template-region="preview" data-preview-narrow="hidden">
             <LinePreview
-              title={`選んだ通（${shownStep ? `${shownStep.stepOrder}通目` : emptyValue('unknown')}）の見え方`}
+              title={`選んだ通（${shownStep ? `${displayOrder(shownStep.stepOrder)}通目` : emptyValue('unknown')}）の見え方`}
               accountName={startAccountLabel === '全アカウント共通' ? '公式アカウント' : startAccountLabel}
               caption={
                 shownStep

@@ -23,7 +23,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { AnalyticsExportContextV8, type ExportAction } from './parts'
+import { AnalyticsExportContextV8, CsvExportButton, type ExportAction } from './parts'
 import FriendsV8 from './friends'
 import ReactionsV8 from './reactions'
 import RoutesV8 from './routes'
@@ -108,8 +108,10 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
 
   const board = tab === 'friends' ? (readOnly ? 'L4Uov' : narrow ? 'eEhYU' : 'ws9wt') : BOARD[tab]
   const exportReady = exportAction !== null && exportAction.scope === scope && !exportAction.disabled
+  const exportReason = exportReady ? undefined : tab === 'segments' ? 'この見かたではCSVを書き出せません。'
+    : exportAction?.scope === scope ? exportAction.disabledReason : '書き出す集計結果を確認しています。'
   const actions = <>
-    <Button variant="secondary" className={readOnly ? undefined : styles.csvButton} disabled={!exportReady} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
+    <CsvExportButton variant="text" className={readOnly ? undefined : styles.csvButton} disabled={!exportReady} disabledReason={exportReason} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={16} aria-hidden="true" />CSVで書き出す</CsvExportButton>
     {canManage
       ? <Button variant="primary" lockedReason={manageReason} href="/analytics/reports/new"><Plus size={16} aria-hidden="true" />レポートを作る</Button>
       : <Button variant="primary" lockedReason={manageReason} disabled={!manageReason}><Plus size={16} aria-hidden="true" />レポートを作る</Button>}

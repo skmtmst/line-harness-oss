@@ -68,6 +68,9 @@ export default function HqHomeV8() {
   const canManage = !readOnlyImpersonation && (canManageRole(role))
   const manageLockReason = usePermissionLockReason(canManage, 'tenantWide')
   const isOwner = !readOnlyImpersonation && role === 'owner'
+  const restoreLockReason = usePermissionLockReason(isOwner, 'owner')
+  const restoreOwnerRef = useRef(isOwner)
+  restoreOwnerRef.current = isOwner
   const { accounts: shellAccounts, setSelectedAccountId, refreshAccounts } = useAccount()
   const [snapshotAccounts, setAccounts] = useState<AccountWithStats[]>([])
   // 統括カードは独自に一覧を持つため、共通ヘッダーが取得した最新の
@@ -426,6 +429,11 @@ export default function HqHomeV8() {
     </div>
   )
 
+  const openRestore = (account: AccountWithStats) => {
+    if (!restoreOwnerRef.current) return
+    setArchiveTarget({ account, mode: 'restore' })
+  }
+
   const cardActions = (account: AccountWithStats) => (
     <div className={styles.cardButtons}>
       {isArchived(account) ? <>
@@ -433,7 +441,7 @@ export default function HqHomeV8() {
         <Button className={styles.grow} onClick={() => setEditingAccount(account)}>
           <Pencil aria-hidden="true" className={styles.buttonIcon} />登録内容を編集
         </Button>
-        {isOwner ? <AccountActionButton action="restore" onClick={() => setArchiveTarget({ account, mode: 'restore' })} /> : null}
+        {canManage ? <AccountActionButton action="restore" lockedReason={restoreLockReason} disabled={!isOwner} onClick={() => openRestore(account)} /> : null}
       </> : <>
         <AccountActionButton action="enter" className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`} />
         {canManage ? <AccountActionButton action="settings" onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`} /> : null}
@@ -447,7 +455,7 @@ export default function HqHomeV8() {
     const items = isArchived(account)
       ? [
           { id: 'edit-registration', label: '登録内容を編集', onSelect: () => setEditingAccount(account) },
-          ...(isOwner ? [{ id: 'restore', label: '戻す', onSelect: () => setArchiveTarget({ account, mode: 'restore' as const }) }] : []),
+          ...(canManage ? [{ id: 'restore', label: '戻す', lockedReason: restoreLockReason, disabled: !isOwner, onSelect: () => openRestore(account) }] : []),
         ]
       : [
           ...(isOwner ? [{ id: 'billing', label: 'お支払いの設定を開く', onSelect: () => router.push('/hq/billing') }] : []),
@@ -509,7 +517,7 @@ export default function HqHomeV8() {
           /></SaveErrorField>
           </ListToolbarEnd>
         </ListToolbarRow>
-        {tokenExpirySummary(currentAccounts) ? <ListToolbarRow><Notice tone="warn" compact message={tokenExpirySummary(currentAccounts)!} /></ListToolbarRow> : null}
+        {tokenExpirySummary(filtered) ? <ListToolbarRow><Notice tone="warn" compact message={tokenExpirySummary(filtered)!} /></ListToolbarRow> : null}
       </ListToolbarFrame> : null}
   </>
 

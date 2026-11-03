@@ -75,7 +75,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
-import { type Audience, type Bubble, newBubble, errorText, jstIso, splitJst, assetContent, bubblesFromInput, audienceFromInput } from "./create-gap-parts"
+import { type Audience, type Bubble, newBubble, errorText, jstIso, splitJst, assetContent, bubblesFromInput, hasUnsupportedBubbles, audienceFromInput } from "./create-gap-parts"
 import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 /*
  * ★V8 統括 一括配信を作る（・絵 V8.pen の ：① lmWCZ・② AL5vR・③ lLyFR・④ ZU4Ae・⑤ H9eG3n）。
@@ -125,7 +125,7 @@ export default function HqBroadcastCreate() {
   const [step, setStep] = useState<BroadcastStepKey>(urlStep && STEP_SET.has(urlStep) ? urlStep as BroadcastStepKey : 'basic')
   /* 下書きを直すとき（?id=）。保存した下書きは URL に id を残し、読み直しても同じ下書きを開く。 */
   const [draftId, setDraftId] = useState(params.get('id') ?? '')
-  const [draftState, setDraftState] = useState<'none' | 'loading' | 'ready' | 'sent' | 'error'>(params.get('id') ? 'loading' : 'none')
+  const [draftState, setDraftState] = useState<'none' | 'loading' | 'ready' | 'sent' | 'error' | 'unsupported'>(params.get('id') || params.get('copy') ? 'loading' : 'none')
   const [savedAt, setSavedAt] = useState<string | null>(null)
 
   const [stores, setStores] = useState<Store[] | null>(null)
@@ -281,6 +281,7 @@ export default function HqBroadcastCreate() {
     if (!id) return
     // 自分の保存でURLへ記録した下書きを取り直して、編集中の内容を置き換えない。
     if (id === run?.id) return
+    setDraftState('loading')
     let current = true
     void hqBroadcastsApi.get(id)
       .then((res) => {
@@ -288,6 +289,7 @@ export default function HqBroadcastCreate() {
         const draft = res.data
         if (draft.status !== 'prepared') { setDraftState('sent'); return }
         const saved = draft.input
+        if (hasUnsupportedBubbles(saved)) { setDraftState('unsupported'); return }
         setTitle(saved.title ?? '')
         setAccountIds(saved.accountIds)
         if (saved.accountTagIds.length > 0) legacyTags.current = saved.accountTagIds
@@ -308,7 +310,7 @@ export default function HqBroadcastCreate() {
     const copyId = params.get('copy')
     if (!copyId || params.get('id')) return
     let current = true
-    void hqBroadcastsApi.get(copyId).then((res) => { if (current) duplicate(res.data) }).catch(() => { if (current) setError('複製する一括配信を読み込めませんでした。一覧から開き直してください。') })
+    void hqBroadcastsApi.get(copyId).then((res) => { if (!current) return; if (hasUnsupportedBubbles(res.data.input)) { setDraftState('unsupported'); return }; duplicate(res.data); setDraftState('none') }).catch(() => { if (current) setDraftState('error') })
     return () => { current = false }
     // 開いたときに一度だけ写す。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -655,6 +657,7 @@ export default function HqBroadcastCreate() {
    */
   const duplicate = (source: HqBroadcastRun) => {
     const saved = source.input
+    if (hasUnsupportedBubbles(saved)) { setError('この配信には読み込めないメッセージがあるため複製できません。元の内容は変更していません。'); setErrorStep(null); return }
     setMethod('duplicate')
     setCopiedRun(source)
     setTitle(`${saved.title}（コピー）`.slice(0, TITLE_MAX))
@@ -772,6 +775,13 @@ export default function HqBroadcastCreate() {
     )
   }
 
+  if (draftState === 'loading' || (draftState === 'ready' && params.get('id') && params.get('id') !== run?.id)) {
+    return <PageFrame kind="create" boardId="BBRDb"><PageHeading title={<>一括配信を作る</>} /><PageContent><Notice tone="info" role="status">下書きを読み込んでいます…</Notice></PageContent></PageFrame>
+  }
+  if (draftState === 'unsupported' || draftState === 'error') {
+    return <PageFrame kind="create" boardId="BBRDb"><PageHeading title={<>一括配信を作る</>} /><PageContent><Notice tone="danger" role="alert" action={<Link href="/hq/broadcasts">一括配信の一覧へ</Link>}>{draftState === 'unsupported' ? 'この配信には読み込めないメッセージが含まれています。編集・保存・送信はできません。元の内容は変更していません。' : '配信を読み込めませんでした。一括配信の一覧から開き直してください。'}</Notice></PageContent></PageFrame>
+  }
+
   const shows = (key: BroadcastStepKey) => step === key
   const nextLabel = step === 'basic' ? '対象設定へ' : step === 'audience' ? 'メッセージ設定へ' : step === 'message' ? '送信設定へ' : '配信前チェックへ'
 
@@ -843,13 +853,11 @@ export default function HqBroadcastCreate() {
             {error}
           </Notice>
         ) : null}
-        {draftState === 'loading' ? <Notice tone="info" role="status">下書きを読み込んでいます…</Notice> : null}
         {draftState === 'sent' ? (
           <Notice tone="warn" role="alert" action={<Button size="compact" href={`/hq/broadcasts/detail?id=${encodeURIComponent(params.get('id') ?? '')}`}>詳細を見る</Button>}>
             この一括配信はもう送った（予約した）ので直せません。新しく作るときは、送るアカウントと中身を入れてください。
           </Notice>
         ) : null}
-        {draftState === 'error' ? <Notice tone="danger" role="alert" action={<Link href="/hq/broadcasts">一括配信へ →</Link>}>下書きを読み込めませんでした。一括配信の一覧から開き直してください。</Notice> : null}
 
 
             {/* ① 基本設定（lmWCZ） */}
@@ -982,7 +990,7 @@ export default function HqBroadcastCreate() {
                 <div className={formStyles.excludeTag}><span className={formStyles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><SaveErrorField names={["excludeTag","exclude_tag"]}><EntityPickerField label="除くタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={excludeTag} onChange={setExcludeTag} clearable placeholder="（除外なし）" disabled={tagStatus !== 'ready' || chosen.length === 0} /></SaveErrorField></div>
                 <div className={formStyles.exclusion}>
                   <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
-                  <small>最近送った人を除く機能は、まだ使えません</small>
+                  <small>現在、最近送った人を除外できません</small>
                 </div>
                 <div className={formStyles.audienceCount} aria-live="polite"><span><Send size={16} aria-hidden /> この条件で送る人数</span><strong>{peopleLabel}</strong></div>
                 {audience !== 'all' && !totals ? <p className="text-xs text-ink-faint">絞った人数は、最終確認でアカウントごとに数えます</p> : null}
@@ -1001,7 +1009,7 @@ export default function HqBroadcastCreate() {
                   busy={composerBusy} onBusyChange={setComposerBusy}
                   extraTokens={[...STORE_INSERT_CHIPS,...HQ_INSERT_CHIPS]}
                   inserts={(ref, value, change) => <HqInsertRow count={value.length} max={BODY_MAX} onInsert={token=>insertHqToken(ref,value,change,token,BODY_MAX)}/>}
-                  unavailable={{ intro: notYetText('intro'), rich_video: '統括からリッチビデオはまだ送れません。' }}
+                  unavailable={{ question: notYetText('question'), intro: notYetText('intro'), rich_video: '統括からリッチビデオはまだ送れません。' }}
                   onChange={(index, next) => { const item = fromApiBubble(next); if (item) setBubbles((items) => items.map((current, i) => i === index ? { ...current, ...item, id: current.id, ...(current.kind === item.kind ? { media: current.media, previewCard: current.previewCard } : {}) } : current)) }}
                   onMove={(index, direction) => { setBubbles((items) => { const next = [...items]; [next[index], next[index + direction]] = [next[index + direction], next[index]]; return next }); setOpenBubble(index + direction) }}
                   onDelete={(index) => { setBubbles((items) => items.filter((_, i) => i !== index)); setOpenBubble(0) }}

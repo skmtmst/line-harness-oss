@@ -22,7 +22,7 @@ import { formatListRecent, formatListRecentTitle } from '@/lib/format';
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
 import { ArrowUpDown, Bookmark, ListFilter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import ActionMenu from '@/components/shared/action-menu';
 import { ChannelBadge, EmailInboxItem, INBOX_SORT_OPTIONS, InboxSavedView, InboxSort, StatusFilter, buildInboxUrl, formatWaitingDuration, sameYmd } from './inbox-model';
@@ -105,6 +105,28 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
   // 並びは題の横の印から選ぶ。選んだ並びは吹き出しとメニューの ✓ で分かるようにする。
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
   const sortButtonRef = useRef<HTMLButtonElement>(null)
+  const savedSearchRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!savedViewsOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || savedViewMenuId) return
+      setSavedViewsOpen(false)
+      savedSearchRef.current?.querySelector<HTMLButtonElement>('button[aria-expanded]')?.focus()
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      if (savedViewMenuId && event.target instanceof Element && event.target.closest('[data-menu-portal]')) return
+      if (event.target instanceof Node && !savedSearchRef.current?.contains(event.target)) {
+        setSavedViewsOpen(false)
+        setSavedViewMenuId(null)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [savedViewsOpen, savedViewMenuId, setSavedViewsOpen, setSavedViewMenuId])
   const sortLabel = INBOX_SORT_OPTIONS.find((option) => option.value === sortOrder)?.label ?? INBOX_SORT_OPTIONS[0].label
   return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
     {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
@@ -132,7 +154,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           right-0 だと、狭い画面でボタンが左に折り返されたときパネルの
           左側が画面外へ出た。幅も画面の左右16px以内に収める。
         */}
-        <div>
+        <div ref={savedSearchRef}>
           {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
           <IconButton
             variant="plain"
@@ -462,7 +484,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
               // 描くのは見えている行だけ（窓分け）。中身はその時に作る。
               render: () => {
                 const isSelected = selectedChatId === chat.id
-                const operatorName = operators.find((operator) => operator.id === chat.operatorId)?.name ?? null
+                const operatorName = operators.find((operator) => operator.id === chat.operatorId)?.name ?? chat.operatorName ?? (chat.operatorId ? '担当者不明' : null)
                 // 「真の自発（要対応）」= chat.status='unread'。webhook 側で auto_reply に
                 // マッチしなかった incoming のみ unread に設定される。auto_reply trigger
                 // (キーワード "コスト比較" 等) は matched 扱いで unread 化しない。

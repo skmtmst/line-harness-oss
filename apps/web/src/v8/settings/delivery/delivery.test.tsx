@@ -151,11 +151,31 @@ describe('設定 › デリバリー連携', () => {
     const login = button('Uber Eats にログインしてつなぐ')
     expect(login.disabled).toBe(false)
     expect(login.title).toBe('')
-    // 未接続の会社は準備中の案内を開き、申込済みと偽らない。
-    const apply = screen.getAllByRole('button', { name: '連携を申し込む' }) as HTMLButtonElement[]
-    expect(apply).toHaveLength(2)
-    expect(apply.every((one) => !one.disabled)).toBe(true)
+    for (const name of ['出前館', 'ロケットナウ']) {
+      const region = card(name)
+      expect(region.queryByRole('button', { name: '連携を申し込む' })).toBeNull()
+      expect(region.getByText('今は申し込めません。Uber Eats の連携状況をご確認ください。')).toBeTruthy()
+      expect(region.getByText('未接続')).toBeTruthy()
+      expect(region.queryByText('申し込んだ日')).toBeNull()
+    }
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(fixture.connectStart).not.toHaveBeenCalled()
+    expect(fixture.selectStore).not.toHaveBeenCalled()
+    expect(fixture.checkConnection).not.toHaveBeenCalled()
+    expect(fixture.disconnect).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'デリバリー連携の説明' }))
+    expect(screen.getByText(/出前館とロケットナウは今は申し込めません。/)).toBeTruthy()
+    expect(screen.queryByText(/出前館とロケットナウは「連携を申し込む」を押すだけです。/)).toBeNull()
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+  })
+
+  it('Uber の接続を利用できない環境でも利用可能と言い切らず、状態の確認を案内する', () => {
+    render(<DeliverySettingsPage services={[uber({ ready: false }), ...SERVICES.filter(service => service.id !== 'uber')]} />)
+    expect(button('Uber Eats にログインしてつなぐ').disabled).toBe(true)
+    for (const name of ['出前館', 'ロケットナウ']) {
+      expect(card(name).getByText('今は申し込めません。Uber Eats の連携状況をご確認ください。')).toBeTruthy()
+      expect(card(name).queryByText(/ご利用いただけます/)).toBeNull()
+    }
   })
 
   it('つなぐを押すと、サーバが返した Uber のログイン画面へ移る', async () => {
@@ -230,7 +250,7 @@ describe('設定 › デリバリー連携', () => {
     render(<DeliverySettingsPage />)
 
     await expectPermissionLocked(button('Uber Eats にログインしてつなぐ'))
-    for (const control of screen.getAllByRole('button', { name: '連携を申し込む' })) await expectPermissionLocked(control)
+    expect(screen.queryByRole('button', { name: '連携を申し込む' })).toBeNull()
     expect(screen.getByText(PERMISSION_LOCK_SUMMARY.manager)).toBeTruthy()
     expect(screen.queryByText('現在準備中です')).toBeNull()
     expect(fixture.connectStart).not.toHaveBeenCalled()
@@ -360,6 +380,17 @@ describe('設定 › デリバリー連携', () => {
     expect(card('出前館').getByText('申し込み受付中')).toBeTruthy()
   })
 
+  it.each(['admin', null])('本人の役割が%sの時に準備理由と権限理由を取り違えない', (role) => {
+    fixture.role.value = verifiedStaffRole(role)
+    render(<DeliverySettingsPage />)
+    for (const name of ['出前館', 'ロケットナウ']) {
+      const region = card(name)
+      expect(region.queryByRole('button', { name: '連携を申し込む' })).toBeNull()
+      expect(region.getByText('今は申し込めません。Uber Eats の連携状況をご確認ください。')).toBeTruthy()
+    }
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it('未接続の会社への申し込みは準備中を示し、接続や日付を作らない', () => {
     render(<DeliverySettingsPage services={[{ ...uber(), id: 'demaecan', name: '出前館', connect: 'apply' }]} />)
     fireEvent.click(button('連携を申し込む'))
@@ -380,6 +411,11 @@ describe('設定 › デリバリー連携', () => {
     fireEvent.click(button('連携を解除する'))
     // 承認案 `kJLks` のとおり、英字で終わる社名のあとは半角の空きを入れる。
     expect(screen.getByText('Uber Eats の連携を解除しますか')).toBeTruthy()
+    const confirmation = screen.getByRole('alertdialog', { name: 'Uber Eats の連携を解除しますか' })
+    expect(within(confirmation).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(confirmation).getByText('本店')).toBeTruthy()
+    expect(within(confirmation).getByText('渋谷店')).toBeTruthy()
+    expect(within(confirmation).getByText('環境')).toBeTruthy()
     expect(screen.getByText(/^Uber Eats とのつなぎを外します。/)).toBeTruthy()
     expect(fixture.disconnect).not.toHaveBeenCalled()
 
@@ -395,6 +431,21 @@ describe('設定 › デリバリー連携', () => {
     expect(card('Uber Eats').getByText('未接続')).toBeTruthy()
     expect(card('Uber Eats').queryByText('渋谷店')).toBeNull()
     expect(screen.queryByText('現在準備中です')).toBeNull()
+  })
+
+  it('アカウントを切り替えて戻した後の古い解除確定は送らない', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'connected', storeName: '渋谷店' }))
+    const view = render(<DeliverySettingsPage />)
+    await screen.findByText('渋谷店')
+    fireEvent.click(button('連携を解除する'))
+    const target = button('解除する')
+    const key = Object.keys(target).find(item => item.startsWith('__reactProps$'))!
+    const handler = (target as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    fixture.accountId.value = 'acc-2'; view.rerender(<DeliverySettingsPage />)
+    fixture.accountId.value = 'acc-1'; view.rerender(<DeliverySettingsPage />)
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: target, target }) })
+    expect(fixture.disconnect).not.toHaveBeenCalled()
   })
 
   it('DL-3：解除結果が確定しなければ窓と接続表示を保ち、自動で送り直さない', async () => {

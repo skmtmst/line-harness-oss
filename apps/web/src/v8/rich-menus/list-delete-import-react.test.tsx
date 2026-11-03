@@ -245,6 +245,15 @@ describe('削除の影響の読み込み', () => {
     expect(within(dialog).queryByRole('button', { name: '削除する' })).toBeNull()
   })
 
+  test('表示中が確実に0人なら、出なくなる友だちがいると断定しない', async () => {
+    const view = render(<RichMenusListV8 />)
+    await openDelete(view, '秋の下書き')
+    const dialog = await deleteDialog(view, '秋の下書き')
+    await within(dialog).findByText('いま表示している人数：')
+    expect(dialog.textContent).toContain('0 人')
+    expect(dialog.textContent).not.toContain('出なくなる友だちがいます')
+  })
+
   test('4つの影響を出し、取得できた0件は「ありません」、0人は「0 人」と書く', async () => {
     const view = render(<RichMenusListV8 />)
     await openDelete(view, '秋の下書き')

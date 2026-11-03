@@ -86,6 +86,8 @@ afterEach(async () => {
 describe('現役V8の本人LINEでのテスト', () => {
   it('連携済みの本人だけを宛先に示し、確認前と取消では適用しない', async () => {
     const dialog = await confirmApply()
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
     expect(within(dialog).getByText(/宛先: 担当者AのLINE（U\*\*\*1234）/)).toBeTruthy()
     expect(within(dialog).getByText(/ほかの友だちには出ません/)).toBeTruthy()
     expect(net.apply).not.toHaveBeenCalled()
@@ -128,6 +130,8 @@ describe('現役V8の本人LINEでのテスト', () => {
     const panel = await openTest()
     fireEvent.click(within(panel).getByRole('button', { name: '元のメニューに戻す' }))
     const dialog = await screen.findByRole('dialog', { name: 'テスト適用を取り消しますか？' })
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
     expect(within(dialog).getByText(/表示が変わっていた場合は上書きしません/)).toBeTruthy()
     expect(net.revert).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: '元のメニューに戻す' }))
@@ -159,6 +163,18 @@ describe('現役V8の本人LINEでのテスト', () => {
     net.account = { id: 'account-2', name: '店B' }
     await act(async () => { root.render(<RichMenuCreateV8 editGroupId="g1" />) })
     expect(screen.queryByRole('dialog', { name: '自分のLINEにこのメニューを出しますか？' })).toBeNull()
+    expect(net.apply).not.toHaveBeenCalled()
+  })
+  it('店を切り替えて戻しても古い確定から適用しない', async () => {
+    const dialog = await confirmApply()
+    const button = within(dialog).getByRole('button', { name: '自分のLINEに適用する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    net.account = { id: 'account-2', name: '店B' }
+    await act(async () => { root.render(<RichMenuCreateV8 editGroupId="g1" />) })
+    net.account = { id: 'account-1', name: '店A' }
+    await act(async () => { root.render(<RichMenuCreateV8 editGroupId="g1" />) })
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
     expect(net.apply).not.toHaveBeenCalled()
   })
 })

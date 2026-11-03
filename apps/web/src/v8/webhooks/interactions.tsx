@@ -14,6 +14,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Tabs } from '@/components/shared/tabs'
 import { LogEntryCopy } from '@/components/shared/log-entry-details'
@@ -173,6 +174,8 @@ export default function WebhooksInteractionsV8() {
   const { selectedAccountId, accounts } = useAccount()
   const accountRef = useRef(selectedAccountId)
   accountRef.current = selectedAccountId
+  const accountScopeRef = useRef({ accountId: selectedAccountId })
+  if (accountScopeRef.current.accountId !== selectedAccountId) accountScopeRef.current = { accountId: selectedAccountId }
   const generationRef = useRef(0)
   const staffRole = useStaffRole()
   /* 送り直しは統括と管理者（管理画面 と同じ）。確認が終わるまでは出す。 */
@@ -195,7 +198,7 @@ export default function WebhooksInteractionsV8() {
   const [retrying, setRetrying] = useState<string | null>(null)
   const [bulkRetrying, setBulkRetrying] = useState(false)
   const [notice, setNotice] = useState('')
-  const [confirmingRetry, setConfirmingRetry] = useState<WebhookInteraction | null>(null)
+  const [confirmingRetry, setConfirmingRetry] = useState<{ item: WebhookInteraction; accountId: string; scope: object } | null>(null)
 
   const load = useCallback(async () => {
     const accountId = selectedAccountId
@@ -245,14 +248,15 @@ export default function WebhooksInteractionsV8() {
   const rangeLast = data.total === 0 ? 0 : Math.min(data.total, rangeFirst + data.items.length - 1)
 
   const [retryCheckRequired, setRetryCheckRequired] = useState(false)
-  const retry = async (item: WebhookInteraction, confirmed = false) => {
-    const accountId = selectedAccountId
-    if (!accountId || loadedAccountId !== accountId) return
+  const retry = async (item: WebhookInteraction, confirmed = false, target?: { accountId: string; scope: object }) => {
+    const accountId = target?.accountId ?? selectedAccountId
+    const scope = target?.scope ?? accountScopeRef.current
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== scope) return
     setRetrying(item.id)
     setNotice('')
     try {
       const response = await api.webhooks.interactions.retry(item.id, accountId, { confirmed })
-      if (accountRef.current !== accountId) return
+      if (accountRef.current !== accountId || accountScopeRef.current !== scope) return
       if (!response.success) throw new Error(response.error)
       if (response.data.status === 'succeeded') notifyToast(`「${item.webhookName}」へもう一度送り、届いたことを確認しました。`)
       else setNotice(`「${item.webhookName}」へ送り直しましたが、まだ届きませんでした。`)
@@ -260,8 +264,8 @@ export default function WebhooksInteractionsV8() {
       void load()
       return true
     } catch (err) {
-      if (accountRef.current !== accountId) return
-      if (err instanceof ApiError && err.code === 'result_unknown_needs_check') { setConfirmingRetry(item); setNotice('届いたかどうか確認できませんでした。相手先の記録を確認してください。') }
+      if (accountRef.current !== accountId || accountScopeRef.current !== scope) return
+      if (err instanceof ApiError && err.code === 'result_unknown_needs_check') { setConfirmingRetry({ item, accountId, scope }); setNotice('届いたかどうか確認できませんでした。相手先の記録を確認してください。') }
       else if (err instanceof ApiError && err.code === 'webhook_not_found') { setNotice('送り先は削除されています。一覧の表示を最新にしました。'); void load() }
       else if (err instanceof ApiError && err.code === 'auto_retry_scheduled') setNotice('この知らせは自動での送り直しが予定されています。しばらく待っても届かない場合は、連携先の設定を確かめてください。')
       else if (err instanceof ApiError && err.code === 'already_delivered') { setNotice('この知らせは自動の送り直しで届いています。一覧の表示を最新にしました。'); void load() }
@@ -272,7 +276,7 @@ export default function WebhooksInteractionsV8() {
       setRetryCheckRequired(confirmed && (!(err instanceof ApiError) || err.status !== 503))
       return false
     } finally {
-      if (accountRef.current === accountId) setRetrying(null)
+      if (accountRef.current === accountId && accountScopeRef.current === scope) setRetrying(null)
     }
   }
 
@@ -493,7 +497,7 @@ export default function WebhooksInteractionsV8() {
             busy={retrying !== null}
             onClose={() => setSelected(null)}
             onRetry={() => {
-              if (selected.failureReasonCode === 'unknown') { setNotice(''); setRetryCheckRequired(false); setConfirmingRetry(selected) }
+              if (selected.failureReasonCode === 'unknown' && selectedAccountId && loadedAccountId === selectedAccountId) { setNotice(''); setRetryCheckRequired(false); setConfirmingRetry({ item: selected, accountId: selectedAccountId, scope: accountScopeRef.current }) }
               else void retry(selected)
             }}
           />
@@ -501,13 +505,15 @@ export default function WebhooksInteractionsV8() {
         <ConfirmDialog
           open={confirmingRetry !== null}
           title="届いたか確かめてから送り直します"
-          description={confirmingRetry ? `「${confirmingRetry.webhookName}」へ届いたかどうか分かっていません。無条件に送り直すと、届いていた処理を二重に送ることがあります。相手先の記録で同じ処理がないか確かめましたか。` : ''}
+          description={confirmingRetry ? `「${confirmingRetry.item.webhookName}」へ届いたかどうか分かっていません。無条件に送り直すと、届いていた処理を二重に送ることがあります。相手先の記録で同じ処理がないか確かめましたか。` : ''}
           confirmLabel="確かめたので送り直す"
           cancelLabel="まだ確かめていない"
-          busy={retrying === confirmingRetry?.id}
-          error={notice || undefined} confirmDisabled={retryCheckRequired} confirmDisabledReason="閉じて相手先の記録と最新の状態を確認してください。" onSuccess={() => setConfirmingRetry(null)} onConfirm={() => confirmingRetry ? retry(confirmingRetry, true) : undefined}
+          busy={retrying === confirmingRetry?.item.id}
+          error={notice || undefined} confirmDisabled={retryCheckRequired} confirmDisabledReason="閉じて相手先の記録と最新の状態を確認してください。" onSuccess={() => setConfirmingRetry(null)} onConfirm={() => confirmingRetry ? retry(confirmingRetry.item, true, confirmingRetry) : undefined}
           onCancel={() => { setConfirmingRetry(null); setRetryCheckRequired(false) }}
-        />
+        >
+          {confirmingRetry ? <OperationTargetSummary accounts={[{ id: confirmingRetry.accountId }]} /> : null}
+        </ConfirmDialog>
       </>}
     >
       {listBody}

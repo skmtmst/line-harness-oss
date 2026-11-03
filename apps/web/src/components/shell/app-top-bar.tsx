@@ -221,7 +221,7 @@ export default function AppTopBar() {
   }
 
   const options = useMemo(
-    () => accounts.map((a) => ({ id: a.id, label: a.displayName || a.name, iconUrl: a.iconUrl || a.pictureUrl || null, basicId: a.basicId ?? null })),
+    () => [...accounts].sort((a, b) => (b.stats?.friendCount ?? 0) - (a.stats?.friendCount ?? 0)).map((a) => ({ id: a.id, label: a.displayName || a.name, iconUrl: a.iconUrl || a.pictureUrl || null, basicId: a.basicId ?? null })),
     [accounts],
   )
 

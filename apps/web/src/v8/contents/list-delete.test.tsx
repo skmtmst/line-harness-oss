@@ -7,6 +7,8 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -251,6 +253,59 @@ describe('1件ずつの削除確認（YfTfJ）', () => {
     expect(impactCalls('m-1')).toHaveLength(2)
     expect(dialog()?.textContent).toContain('新規登録7日間')
     expect(buttonIn(dialog(), '削除する')).toBeUndefined()
+  })
+})
+
+describe('使用状況に合わせた削除確認の案内', () => {
+  it.each([true, undefined])('確認済みの未使用では外す・差し替える案内を出さず、時刻と削除の門を保つ（verified=%s）', async (verified) => {
+    impacts.set('m-1', { usageCount: 0, canDelete: true, verified })
+    if (verified === undefined) {
+      const original = fetch
+      vi.stubGlobal('fetch', async (...args: Parameters<typeof fetch>) => {
+        const response = await original(...args)
+        if (!String(args[0]).includes('/delete-impact')) return response
+        const payload = await response.json()
+        delete payload.data.verified
+        return json(payload)
+      })
+    }
+    await render()
+    await openDeleteFor('秋の新商品.png')
+    const text = dialog()?.textContent ?? ''
+    expect(text).toContain('どこでも使っていません。')
+    expect(text).not.toContain('使われている場所から外すと削除できます。')
+    expect(text).not.toContain('使用先をまとめて差し替えられます。')
+    expect(text).toContain('時点で、テンプレート・一斉配信・リッチメニュー・シナリオ・コラム・イベント・ウェビナーの7種類を確認しました。')
+    expect(buttonIn(dialog(), '削除する')).toBeDefined()
+    expect(impactCalls('m-1')).toHaveLength(1)
+    expect(impactCalls('m-1')[0].params.get('accountId')).toBe('account-a')
+    expect(deleteCalls()).toHaveLength(0)
+  })
+
+  it('使用中は外す・差し替える案内と使用先を保ち、削除できない', async () => {
+    impacts.set('m-1', { usageCount: 1, canDelete: false, verified: true, references: [{ kind: 'template', name: '秋のごあいさつ', href: '/templates?id=t-1', state: 'available' }] })
+    await render()
+    await openDeleteFor('秋の新商品.png')
+    expect(dialog()?.textContent).toContain('いま 1か所で使われています。')
+    expect(dialog()?.textContent).toContain('使われている場所から外すと削除できます。')
+    expect(dialog()?.textContent).toContain('使用先をまとめて差し替えられます。')
+    expect(dialog()?.textContent).toContain('秋のごあいさつ')
+    expect(buttonIn(dialog(), '別のメディアに差し替える')).toBeDefined()
+    expect(buttonIn(dialog(), '削除する')).toBeUndefined()
+    expect(deleteCalls()).toHaveLength(0)
+  })
+
+  it('未確認の0件は未使用と断定せず、読み直しを残して削除できない', async () => {
+    impacts.set('m-1', { usageCount: 0, canDelete: false, verified: false })
+    await render()
+    await openDeleteFor('秋の新商品.png')
+    expect(dialog()?.textContent).toContain('使われている場所を確かめられませんでした。')
+    expect(dialog()?.textContent).not.toContain('どこでも使っていません。')
+    expect(dialog()?.textContent).toContain('使われている場所から外すと削除できます。')
+    expect(buttonIn(dialog(), 'もう一度読み込む')).toBeDefined()
+    expect(buttonIn(dialog(), '削除する')).toBeUndefined()
+    expect(impactCalls('m-1')).toHaveLength(1)
+    expect(deleteCalls()).toHaveLength(0)
   })
 })
 

@@ -622,7 +622,7 @@ export async function getScenarioRuns(
   );
   const subscriptions = await db.prepare(
     `SELECT fs.id, fs.friend_id, f.display_name, fs.status, fs.current_step_order,
-            fs.started_at, fs.next_delivery_at, fs.updated_at, fs.pause_reason
+            fs.started_at, fs.next_delivery_at, fs.updated_at, fs.pause_reason, fs.published_version_id
        FROM friend_scenarios fs
        JOIN friends f ON f.id = fs.friend_id AND f.line_account_id = ?
       WHERE fs.scenario_id = ?${statusSql}
@@ -630,7 +630,7 @@ export async function getScenarioRuns(
   ).bind(input.lineAccountId, input.scenarioId, ...statusBinds, limit, offset).all<{
     id: string; friend_id: string; display_name: string; status: string;
     current_step_order: number; started_at: string; next_delivery_at: string | null; updated_at: string;
-    pause_reason: string | null;
+    pause_reason: string | null; published_version_id: string | null;
   }>();
   const testSends = await db.prepare(
     `SELECT MIN(ml.id) AS id, ml.friend_id, f.display_name,
@@ -670,6 +670,23 @@ export async function getScenarioRuns(
       WHERE ss.scenario_id = ?
       GROUP BY ss.id, ss.step_order ORDER BY ss.step_order`,
   ).bind(input.scenarioId).all<{ id: string; step_order: number; delivered: number }>();
+  const versionIds = [...new Set((subscriptions.results ?? []).flatMap((row) => row.published_version_id ? [row.published_version_id] : []))];
+  const versionOrders = new Map<string, number[]>();
+  for (let offset = 0; offset < versionIds.length; offset += 90) {
+    const ids = versionIds.slice(offset, offset + 90);
+    const versions = await db.prepare(
+      `SELECT * FROM scenario_versions WHERE scenario_id = ? AND id IN (${ids.map(() => '?').join(',')})`,
+    ).bind(input.scenarioId, ...ids).all<Parameters<typeof parseScenarioVersionSteps>[0]>();
+    for (const version of versions.results ?? []) {
+      versionOrders.set(version.id, parseScenarioVersionSteps(version).map((step) => step.step_order).sort((a, b) => a - b));
+    }
+  }
+  const liveOrders = (stepRows.results ?? []).map((step) => step.step_order);
+  const currentDisplayOrder = (versionId: string | null, order: number) => {
+    const orders = versionId ? versionOrders.get(versionId) : liveOrders;
+    const index = orders?.indexOf(order) ?? -1;
+    return index < 0 ? null : index + 1;
+  };
   const clickRow = await db.prepare(
     `SELECT COALESCE(SUM(click_count), 0) AS total
        FROM tracked_links WHERE scenario_id = ? AND line_account_id = ?`,
@@ -695,6 +712,7 @@ export async function getScenarioRuns(
       friendName: row.display_name,
       status: row.status,
       currentStepOrder: row.current_step_order,
+      currentDisplayOrder: currentDisplayOrder(row.published_version_id, row.current_step_order),
       startedAt: row.started_at,
       nextDeliveryAt: row.next_delivery_at,
       // なぜ止まっているか（432）。画面はこれで「再開」と「失敗を再送」を
@@ -739,6 +757,8 @@ export async function getScenarioRuns(
 export type ScenarioFriendPlanStep = {
   stepId: string;
   stepOrder: number;
+  /** 固定された版の全ての通の中での表示順。保存された順序値とは別。 */
+  displayOrder?: number;
   /** 配信予定。未確定のときは null。 */
   scheduledAt: string | null;
   /**
@@ -946,6 +966,8 @@ export async function simulateFriendPlan(
   const deliverableSteps = steps
     .filter((step) => (step.is_draft ?? 0) === 0)
     .sort((a, b) => a.step_order - b.step_order);
+  const displaySteps = [...steps].sort((a, b) => a.step_order - b.step_order);
+  const displayOrderFor = (order: number) => displaySteps.findIndex((step) => step.step_order === order) + 1;
 
   /*
    * 登録の可否。実行側の enrollFriendInScenario と同じ判定：
@@ -1133,8 +1155,8 @@ export async function simulateFriendPlan(
               scheduledAt,
               outcome: 'branch',
               reason: forward
-                ? `${label}を現在満たしていないため ${jump.step_order}通目へ進みます（配信時に再判定）`
-                : `${label}を現在満たしていないため ${jump.step_order}通目へ戻ります（配信時に再判定）`,
+                ? `${label}を現在満たしていないため ${displayOrderFor(jump.step_order)}通目へ進みます（配信時に再判定）`
+                : `${label}を現在満たしていないため ${displayOrderFor(jump.step_order)}通目へ戻ります（配信時に再判定）`,
               dynamic: true,
             });
             /*
@@ -1271,7 +1293,7 @@ export async function simulateFriendPlan(
           },
     basis,
     start: { state: blocked ? 'blocked' : 'ok', reasons },
-    steps: planSteps,
+    steps: planSteps.map((step) => ({ ...step, displayOrder: displayOrderFor(step.stepOrder) })),
     warnings,
   };
 }

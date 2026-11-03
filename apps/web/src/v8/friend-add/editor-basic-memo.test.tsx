@@ -58,7 +58,6 @@ describe('社内メモの窓は破棄確認を出さず閉じる', () => {
     await act(async () => { dialogClose().click() })
     expect(document.body.textContent).not.toContain('入力を破棄しますか？')
     await waitClosed()
-    await act(async () => { button('作成・編集のその他の操作').click() })
     await act(async () => { button('下書きを保存').click(); await Promise.resolve(); await Promise.resolve() })
     expect(state.saved?.definition?.internalMemo ?? state.saved?.internalMemo).toBe('引き継ぎあり')
   })
