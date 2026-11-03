@@ -158,7 +158,7 @@ export function failedCount(t: Pick<ResultTarget, 'totalCount' | 'successCount'>
 /** やり直せる店：一時的な失敗が残っている、または止める前に送れなかった店。 */
 export function canRetry(run: Pick<HqBroadcastRun, 'status'>, t: ResultTarget): boolean {
   if (run.status === 'cancelled' || t.excluded) return false
-  return t.retryableCount > 0 || (t.status === 'failed' && !!t.broadcastId)
+  return (t.retryableCount > 0 && (t.status === 'sent' || (t.status === 'sending' && t.stopped))) || (t.status === 'failed' && !!t.broadcastId)
 }
 
 /** 一括配信の全体の札（一覧・詳細の頭）。 */

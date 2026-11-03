@@ -32,6 +32,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
 import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, tapExtraSaveError, type TapActionKind } from '@/lib/tap-actions'
 import { TemplateEditFrame, TemplatePublishNote } from './frame'
+import { AssetPublishError, useCouponPersistence } from './use-coupon-persistence'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
@@ -196,6 +197,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const featureAccess = useFeatureAccess('templates')
   const canMutate = host ? !host.readOnly : featureAccess
   const { selectedAccountId, accounts } = useAccount()
+  const persistAsset = useCouponPersistence(selectedAccountId, undefined, 'rich_message')
   usePageTitle(host?.composer ? null : host ? 'テンプレート' : 'リッチメッセージを作る', !host?.composer)
   /*
    * 予約・回答フォーム・予約履歴・来店スタンプの URL に入れる LIFF ID と、中身で選ぶもの。
@@ -265,7 +267,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const snapshot = useMemo(() => JSON.stringify({ name, folder, imageUrl, pickedMedia, shapeValue, areas }), [name, folder, imageUrl, pickedMedia, shapeValue, areas])
   const [clean, setClean] = useState(() => snapshot)
   const dirty = snapshot !== clean && !saved
-  const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({ dirty, busy: saving || publishing })
+  const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({ dirty, subject: '吹き出しの作成内容', busy: saving || publishing })
 
   const updateArea = (label: string, patch: Partial<AreaDraft>) =>
     setAreas((prev) => ({ ...prev, [label]: { ...(prev[label] ?? emptyAreaDraft()), ...patch } }))
@@ -304,7 +306,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     }, { reveal: () => setSelectedLabel(area.label), group: `area-${area.label}` })
   })
 
-  const save = async (): Promise<string | false> => {
+  const save = async (publishAsset = false): Promise<string | false> => {
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (fields.submit().length > 0) { setError(''); return false }
     const built = buildRichPayload({ imageUrl, pickedMedia, shape: shapeDef, areas, liffId })
@@ -312,20 +314,15 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     setSaving(true)
     setError('')
     try {
-      const result = await api.broadcastMessageAssets.create({
-        lineAccountId: selectedAccountId,
-        kind: 'rich_message',
-        name: name.trim(),
-        payload: { ...built.payload, folder },
-      })
-      if (!result.success) {
-        setError(result.error || '保存できませんでした。時間をおいて、もう一度お試しください。')
-        return false
-      }
+      const id = await persistAsset(name.trim(), { ...built.payload, folder }, null, snapshot, publishAsset)
       setSaved(true)
       setClean(snapshot)
-      return result.data.id
+      return id
     } catch (caught) {
+      if (caught instanceof AssetPublishError) {
+        setError(`下書きは保存しましたが、公開を確認できませんでした。${japaneseDetailOf(caught.cause) || 'もう一度公開してください。'}`)
+        return false
+      }
       const extraError = tapExtraSaveError(caught)
       if (extraError) {
         fields.setServerErrors(Object.fromEntries(shapeDef.areas.filter(area => areas[area.label]?.tapExtras).map(area => [`area-${area.label}`, extraError])))
@@ -377,7 +374,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     if (host) { hostSave(true); return }
     setPublishing(true)
     try {
-      const savedId = await save()
+      const savedId = await save(true)
       if (savedId) {
         disarm()
         router.push(createPageReturnHref('/templates', savedId))

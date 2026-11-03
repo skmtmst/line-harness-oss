@@ -116,7 +116,7 @@ function UpdateCardView({ card, historyState }: { card: UpdateCard; historyState
   )
 }
 
-export default function UpdateHistoryV8() {
+export default function UpdateHistoryV8({ hqOrigin = false }: { hqOrigin?: boolean } = {}) {
   usePageTitle('更新履歴')
   usePageCrumbs([{ label: '運用状態', href: '/emergency' }])
   const runningVersion = useRunningVersion()
@@ -209,7 +209,7 @@ export default function UpdateHistoryV8() {
 
       <div className={styles.foot}>
         <p className={styles.footText}>自動で更新した記録は、アップデート履歴で見られます。</p>
-        <Button href="/updates"><History size={16} aria-hidden="true" />アップデート履歴を見る</Button>
+        <Button href={hqOrigin ? '/updates?from=hq' : '/updates'}><History size={16} aria-hidden="true" />アップデート履歴を見る</Button>
       </div>
     </div>
   )

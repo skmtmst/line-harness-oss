@@ -11,6 +11,7 @@ export type ReminderListRow = Awaited<ReturnType<typeof getReminders>>[number] &
 export function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: boolean, timingSummary?: string | null) {
   return {
     id: row.id,
+    lineAccountId: row.line_account_id ?? null,
     name: row.name,
     description: row.description,
     isActive: Boolean(row.is_active),

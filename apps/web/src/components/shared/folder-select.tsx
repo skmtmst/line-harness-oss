@@ -17,7 +17,7 @@
  * 画面ごとに作り方を書かない。各画面は自分の種類のフォルダの受け口を onCreate に渡すだけ。
  */
 import { inputPlaceholder } from './input-placeholder'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import FolderDot from './folder-dot'
 import Select, { type SelectCreateContext, type SelectProps } from './select'
 import { isImeComposing } from './ime'
@@ -26,6 +26,8 @@ import { ApiError, describeSaveFailure } from '@/lib/api'
 import styles from './folder-select.module.css'
 import FolderColorButton from './folder-color-button'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 export { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 
 /** 選べるフォルダ1つ。value は画面が保存に使う値（多くは id。名前で持つ画面は名前）。 */
@@ -37,6 +39,8 @@ export interface FolderSelectFolder {
 }
 
 export type FolderSelectCreate = (name: string, color: string | null) => Promise<FolderSelectFolder>
+
+export type FolderDraftGuard = (action: () => void) => void
 
 export interface FolderSelectProps extends Pick<SelectProps, 'aria-label' | 'label' | 'className' | 'disabled' | 'error' | 'id' | 'name' | 'size' | 'width' | 'defaultOpen' | 'lockedReason'> {
   folders: ReadonlyArray<FolderSelectFolder>
@@ -58,6 +62,10 @@ export interface FolderSelectProps extends Pick<SelectProps, 'aria-label' | 'lab
   createDisabled?: boolean
   /** ＋行だけの権限理由。既存フォルダは選べる。 */
   createLockedReason?: string
+  /** 親の保存で作りかけのフォルダ名を捨てる前にも確認する。 */
+  draftGuardRef?: MutableRefObject<FolderDraftGuard | null>
+  /** 作成中は親の保存を止め、理由を出す。 */
+  onCreatingChange?: (creating: boolean) => void
 }
 
 /** API の答え（{ success, data } / { success: false, error }）を、作れたフォルダか Error に直す。 */
@@ -138,10 +146,30 @@ export default function FolderSelect({
   colors = true,
   createDisabled,
   createLockedReason,
+  draftGuardRef,
+  onCreatingChange,
   ...selectProps
 }: FolderSelectProps) {
   // 作ったフォルダは、画面が一覧を読み直す前でも選べて名前が出るよう、ここでも持つ。
   const [created, setCreated] = useState<FolderSelectFolder[]>([])
+  const [name, setName] = useState('')
+  const [color, setColor] = useState<string>(FOLDER_SELECT_COLORS[0].value)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [openCreateSignal, setOpenCreateSignal] = useState(0)
+  useLayoutEffect(() => {
+    onCreatingChange?.(busy)
+    return () => onCreatingChange?.(false)
+  }, [busy, onCreatingChange])
+  const busyRef = useRef(false)
+  const sessionRef = useRef(0)
+  const guardAction = useRef<FolderDraftGuard | null>(null)
+  const clearDraft = () => {
+    setName('')
+    setColor(FOLDER_SELECT_COLORS[0].value)
+    setError('')
+  }
+  const dirty = name.length > 0 || (colors && color !== FOLDER_SELECT_COLORS[0].value)
   const all = useMemo(() => {
     const known = new Set(folders.map((folder) => folder.value))
     return [...folders, ...created.filter((folder) => !known.has(folder.value))]
@@ -151,8 +179,11 @@ export default function FolderSelect({
     ...all.map((folder) => ({ value: folder.value, label: folder.label, leading: <FolderDot folder={{ name: folder.label, color: folder.color }} /> })),
   ]
   return (
+    <>
+    {(dirty || busy) && <FolderCreationGuard busy={busy} onDiscard={clearDraft} actionRef={guardAction} draftGuardRef={draftGuardRef} />}
     <Select
       {...selectProps}
+      openCreateSignal={openCreateSignal}
       value={value}
       onChange={onChange}
       options={options}
@@ -167,6 +198,10 @@ export default function FolderSelect({
           <FolderCreatePanel
             context={context}
             colors={colors}
+            name={name} setName={setName} color={color} setColor={setColor}
+            busy={busy} setBusy={setBusy} busyRef={busyRef} sessionRef={sessionRef} error={error} setError={setError}
+            onBack={() => { if (guardAction.current) guardAction.current(context.back); else context.back() }}
+            clearDraft={clearDraft}
             onCreate={async (name, color) => {
               const folder = await onCreate(name, color)
               setCreated((current) => [...current.filter((item) => item.value !== folder.value), folder])
@@ -176,42 +211,99 @@ export default function FolderSelect({
         ),
       } : undefined}
     />
+    {busy ? <span className={styles.draftNote} role="status">フォルダを作成しています…</span> : dirty ? (
+      <span className={styles.draftNote}>
+        <span>{name ? '作りかけのフォルダ名があります。' : 'フォルダの色を変更しています。'}</span>{' '}
+        <button type="button" className={styles.draftLink} disabled={selectProps.disabled || !onCreate || createDisabled || Boolean(createLockedReason)} onClick={() => setOpenCreateSignal(value => value + 1)}>フォルダの入力を確認</button>
+      </span>
+    ) : null}
+    </>
   )
+}
+
+function FolderCreationGuard({ busy, onDiscard, actionRef, draftGuardRef }: {
+  busy: boolean
+  onDiscard: () => void
+  actionRef: MutableRefObject<FolderDraftGuard | null>
+  draftGuardRef?: MutableRefObject<FolderDraftGuard | null>
+}) {
+  const [savingParent, setSavingParent] = useState(false)
+  const guard = useUnsavedGuard({ dirty: true, busy, onDiscard, subject: '作りかけのフォルダ' })
+  useLayoutEffect(() => {
+    actionRef.current = guard.guarded
+    if (draftGuardRef) draftGuardRef.current = (action) => {
+      if (busy) return
+      setSavingParent(true)
+      guard.guarded(action)
+    }
+    return () => {
+      actionRef.current = null
+      if (draftGuardRef) draftGuardRef.current = null
+    }
+  }, [actionRef, draftGuardRef, busy, guard.guarded])
+  return <UnsavedLeaveDialog
+    open={guard.leaveTarget !== null}
+    subject="作りかけのフォルダ"
+    busy={busy}
+    description={savingParent ? '作りかけのフォルダを破棄して、画面の内容を保存します。' : undefined}
+    discardLabel={savingParent ? 'フォルダを破棄して保存' : undefined}
+    onConfirm={() => { setSavingParent(false); guard.confirmLeave() }}
+    onCancel={() => { setSavingParent(false); guard.cancelLeave() }}
+  />
 }
 
 function FolderCreatePanel({
   context,
   colors,
-  onCreate,
+  onCreate, name, setName, color, setColor, busy, setBusy, busyRef, sessionRef, error, setError, onBack, clearDraft,
 }: {
   context: SelectCreateContext
   colors: boolean
   onCreate: FolderSelectCreate
+  name: string
+  setName: (value: string) => void
+  color: string
+  setColor: (value: string) => void
+  busy: boolean
+  setBusy: (value: boolean) => void
+  busyRef: MutableRefObject<boolean>
+  sessionRef: MutableRefObject<number>
+  error: string
+  setError: (value: string) => void
+  onBack: () => void
+  clearDraft: () => void
 }) {
-  const [name, setName] = useState('')
-  const [color, setColor] = useState<string>(FOLDER_SELECT_COLORS[0].value)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-  const busyRef = useRef(false)
 
   useEffect(() => {
     inputRef.current?.focus()
+    const session = ++sessionRef.current
+    return () => {
+      if (sessionRef.current === session) sessionRef.current += 1
+      // 送信済みの欄を閉じた後は、戻っても別の作成として扱う。
+      if (busyRef.current) clearDraft()
+    }
+    // この板が開いている間の世代だけを記録する。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const trimmed = name.trim()
   const submit = async () => {
     if (!trimmed || busyRef.current) return
+    const session = sessionRef.current
     busyRef.current = true
     setBusy(true)
     setError('')
     try {
       const folder = await onCreate(trimmed, colors ? color : null)
       context.finish(folder.value)
+      if (session === sessionRef.current) clearDraft()
     } catch (caught) {
       // 入れた名前は残す（もう一度試す・直して作る）。
-      setError(reasonOf(caught))
-      inputRef.current?.focus()
+      if (session === sessionRef.current) {
+        setError(reasonOf(caught))
+        inputRef.current?.focus()
+      }
     } finally {
       busyRef.current = false
       setBusy(false)
@@ -230,7 +322,7 @@ function FolderCreatePanel({
         event.preventDefault()
         event.stopPropagation()
         event.nativeEvent.stopImmediatePropagation()
-        if (!busyRef.current) context.back()
+        if (!busyRef.current) onBack()
       }}
     >
       <div className={styles.heading} aria-hidden="true">新しいフォルダ</div>
@@ -264,7 +356,7 @@ function FolderCreatePanel({
       </div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.actions}>
-        <button type="button" className={styles.cancel} disabled={busy} onClick={context.back}>やめる</button>
+        <button type="button" className={styles.cancel} disabled={busy} onClick={onBack}>やめる</button>
         <button type="button" className={styles.primary} disabled={busy || !trimmed} onClick={() => void submit()}>
           {busy ? '作っています…' : error ? 'もう一度試す' : '作って選ぶ'}
         </button>

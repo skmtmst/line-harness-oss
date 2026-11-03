@@ -90,6 +90,7 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
       data: {
         conversionCost,
         rows: rows.map((row) => ({
+          lineAccountId: accountId,
           sourceLabel: row.sourceLabel,
           adPlatformId: row.adPlatformId,
           entryRouteId: row.entryRouteId,
@@ -116,6 +117,7 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
         }),
         manualEntries: manualEntries.map((entry) => ({
           id: entry.id,
+          lineAccountId: entry.line_account_id,
           sourceLabel: entry.source_label,
           day: entry.day,
           amountMinor: entry.amount_minor,

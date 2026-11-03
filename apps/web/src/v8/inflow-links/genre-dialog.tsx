@@ -6,7 +6,7 @@
  * 作る `api.entryRouteGenres.create(name)`、変える `api.entryRouteGenres.update(id, name)`。
  * 409 は「同じ名前がある」。見た目だけ共通の窓（Dialog）にした。
  */
-import { useId, useState } from 'react'
+import { useContext, useId, useState } from 'react'
 import type { EntryRouteGenre } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
@@ -15,6 +15,9 @@ import { TextField } from '@/components/shared/text-field'
 import { focusField } from './focus-field'
 import { isImeComposing } from '@/components/shared/ime'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 
 export default function GenreDialog({
   genre,
@@ -31,6 +34,8 @@ export default function GenreDialog({
   const [error, setError] = useState('')
   const [nameError, setNameError] = useState('')
   const inputId = useId()
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: name !== (genre?.name ?? '') || submitting, busy: submitting, onDiscard: onClose })
 
   const save = async () => {
     const normalized = name.trim()
@@ -49,6 +54,7 @@ export default function GenreDialog({
         setError(response.error || 'フォルダを保存できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
+      guard.disarm()
       onSaved(response.data, genre?.name ?? null)
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
@@ -91,6 +97,7 @@ export default function GenreDialog({
       />
       </SaveErrorField>
       </Field>
-    </Dialog></SaveErrorScope>
+    </Dialog>
+    <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={submitting} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></SaveErrorScope>
   )
 }

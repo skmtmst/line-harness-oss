@@ -4,6 +4,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, expect, it, vi } from 'vitest'
 
 const create = vi.hoisted(() => vi.fn())
+const list = vi.hoisted(() => vi.fn(async () => ({ success: true, data: [] as unknown[] })))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: {
@@ -13,7 +15,7 @@ vi.mock('@/lib/api', async (original) => {
       summary: async () => ({ success: true, data: null }),
       trackingKey: async () => ({ success: true, data: { trackingKey: 'test-key' } }),
     },
-    measurementSites: { list: async () => ({ success: true, data: [] }), create },
+    measurementSites: { list, create },
   } }
 })
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a' }) }))
@@ -50,4 +52,24 @@ it('サイトの不足欄とサーバーが断ったドメインは、欄で一�
   await waitFor(() => expect(document.activeElement).toBe(domain))
   expect(screen.getAllByRole('alert')).toHaveLength(1)
   expect(screen.getByRole('alert').id).toBe(domain.getAttribute('aria-describedby'))
+})
+
+it('サイトの入力中は移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/inflow-links/site-script')
+  render(<><SiteScript /><a href="/events">イベントへ</a></>)
+  fireEvent.click(await screen.findByRole('button', { name: 'サイトを追加する' }))
+  fireEvent.change(screen.getByLabelText('サイトの名前'), { target: { value: 'ショップ' } })
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})
+
+it('停止理由の入力中は移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/inflow-links/site-script')
+  list.mockResolvedValueOnce({ success: true, data: [{ id: 's1', label: '公式サイト', domains: ['example.com'], status: 'active', stoppedAt: null, stoppedReason: null }] })
+  render(<><SiteScript /><a href="/events">イベントへ</a></>)
+  fireEvent.click(await screen.findByRole('button', { name: '「公式サイト」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '止める' }))
+  fireEvent.change(screen.getByLabelText('止める理由'), { target: { value: 'サイトを閉じたため' } })
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
 })

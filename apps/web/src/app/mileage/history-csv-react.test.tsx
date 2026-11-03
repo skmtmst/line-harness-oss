@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { Blob as NodeBlob } from 'node:buffer'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ account: 'A' as string | null, history: vi.fn() }))
@@ -106,6 +106,7 @@ test('逆転した期間では取得せず、実際の暦で直して種類・�
   fireEvent.keyDown(grid, { key: 'PageDown' })
   const november = await screen.findByRole('grid', { name: '2026年11月' })
   fireEvent.keyDown(november, { key: 'Enter' })
+  fireEvent.click(within(screen.getByRole('dialog', { name: '日付を選ぶ' })).getByRole('button', { name: '確定' }))
   fireEvent.click(screen.getByRole('button', { name: 'この条件で絞る' }))
   await screen.findByText('条件に合う会員')
   expect(mocks.history.mock.calls.find(([query]) => query.limit === 20)?.[0]).toMatchObject({

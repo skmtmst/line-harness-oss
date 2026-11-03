@@ -28,3 +28,9 @@ it('更新の案内は管理画面の /updates への内部リンクで、外部
   expect(guide.getAttribute('target')).toBeNull()
   expect(guide.querySelector('[data-external-icon]')).toBeNull()
 })
+
+it('統括から開いた運用状態では更新履歴にも統括の戻り先を渡す', () => {
+  history.mockResolvedValue({ success: true, data: [] })
+  render(<UpdateHistoryV8 hqOrigin />)
+  expect(screen.getByRole('link', { name: 'アップデート履歴を見る' }).getAttribute('href')).toBe('/updates?from=hq')
+})

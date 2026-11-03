@@ -3,7 +3,10 @@
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { RowNameLink, ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { moveOutgoingWebhookToFolder } from '@/lib/move-to-folder'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Bookmark, LayoutTemplate, Pause, Play, Plus, Send } from 'lucide-react'
@@ -147,6 +150,12 @@ export default function WebhooksOutgoingV8() {
   const [rotateError, setRotateError] = useState('')
   const [rotating, setRotating] = useState(false)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({
+    dirty: rotateTarget !== null && (Boolean(rotateSecret) || rotating),
+    busy: rotateTarget !== null && rotating,
+    onDiscard: () => { setRotateTarget(null); setRotateSecret(''); setStepUp(null) },
+  })
 
   /* フォルダの箱（kind=webhook）。送り先をフォルダへ入れる口はまだ無い（BEHAVIOR.md）。 */
   const loadFolders = async () => {
@@ -831,6 +840,7 @@ export default function WebhooksOutgoingV8() {
             <Button type="button" onClick={() => setRotateSecret(generateSecret())}>自動生成</Button>
           </div>
         </Dialog>
+        <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={rotating} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
         {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
       </>}
     >
