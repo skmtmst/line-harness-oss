@@ -216,6 +216,18 @@ describe('確認の窓に並べるもの', () => {
 })
 
 describe('画面内の最終確認（IDEA-06）', () => {
+  it('A/B有効なら最終段で送信を止め、実際の送信へ進まない', async () => {
+    await render({ step: null })
+    await click('B 案を追加', container)
+    await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign currentStep="confirm" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
+    await settle()
+    expect(button('今すぐ送る', container).disabled).toBe(true)
+    expect(container.textContent).toContain('B案を消すとA案を配信できます')
+    await click('今すぐ送る', container)
+    expect(mocks.confirm).not.toHaveBeenCalled()
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
   it('内訳に対象・除外・配信日時・送信枠・計算時刻を並べる', async () => {
     await render()
     const rows = definitions(container.querySelector('#broadcast-step-confirm details')!)

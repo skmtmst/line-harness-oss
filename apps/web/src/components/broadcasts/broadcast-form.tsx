@@ -6,6 +6,7 @@ import { copyBroadcastDraft,copyRecentBroadcast } from './broadcast-copy-draft'
 import { applyBroadcastTemplate } from './broadcast-apply-template'
 import { placeBroadcastTemplate } from './broadcast-place-template'
 import { broadcastAbProblem, B_DRAFT_UNAVAILABLE } from './broadcast-ab-guard'
+import { broadcastAbSendProblem } from './broadcast-ab-send-guard'
 import BroadcastCheckAcknowledgement from './broadcast-check-acknowledgement'
 import { useBroadcastFormError } from './use-broadcast-form-error'
 import { confirmBroadcastMessage } from './broadcast-confirm-action'
@@ -1021,7 +1022,7 @@ export default function BroadcastForm({
    * 形になる。`validate` は保存のときと同じものを使う。
    */
   const openConfirm = () => {
-    const validationError = validate() || sendInputProblem.current
+    const validationError = broadcastAbSendProblem(ab.enabled, audienceCount) || validate() || sendInputProblem.current
     if (validationError) { rejectValidation(validationError); return }
     if (!selectedAccountId) return
     confirmationScope.current = { accountId: selectedAccountId, generation: accountGenerationRef.current }
@@ -1198,7 +1199,7 @@ export default function BroadcastForm({
    * （title だけだと指を乗せないと見えない）。最終確認の段の止め方（人数・文字数）は今のまま。
    */
   const nextBlockReason = currentStep ? broadcastNextBlockReason(liveStepProblems, currentStep) : null
-  const confirmBlockReason = liveStepProblems.audience?.message ?? liveStepProblems.schedule?.message ?? (!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : null)
+  const confirmBlockReason = broadcastAbSendProblem(ab.enabled, audienceCount) ?? liveStepProblems.audience?.message ?? liveStepProblems.schedule?.message ?? (!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : null)
   const footerReason = currentStep === 'confirm' ? confirmBlockReason : nextBlockReason
 
   /*
@@ -1262,6 +1263,8 @@ export default function BroadcastForm({
   const visibleConfirmOpen = confirmOpen && confirmationCurrent
   const confirmationFields = <>{confirmationScope.current && <OperationTargetSummary accounts={[{ id: confirmationScope.current.accountId }]} />}{confirmedDeliveryLimit && <Notice tone="info">配信できる候補{formatNumber(confirmedDeliveryLimit.candidateCount)}人から、無作為に最大{formatNumber(confirmedDeliveryLimit.recipientCount)}人へ送ります。確認後に人数を増やしません。</Notice>}<BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} /></>
   const confirmMessage = async () => {
+    const abProblem = broadcastAbSendProblem(ab.enabled, audienceCount)
+    if (abProblem) { setError(abProblem); return }
     if (!renderedConfirmationScope || renderedConfirmationScope !== confirmationScope.current || renderedConfirmationScope.generation !== accountGenerationRef.current) return
     const problem = sendInputProblem.current
     if (problem) { rejectValidation(problem); return Promise.resolve() }
