@@ -31,6 +31,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   return {
     ...actual,
     api: {
+      mileage: { friendsV6: async () => ({ success: true, data: { balanceSource: 'musubo' } }) },
       tags: { list: async () => ({ success: true, data: [] }) },
       featureSettings: {
         visibility: async () => ({ success: true, data: { features: {} } }),

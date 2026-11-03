@@ -42,12 +42,12 @@ export function ReservationFacts({items,presentation}:{items:Array<{label:string
  if(presentation==='detail')return <DetailFields>{items.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</DetailFields>
  return <dl className={styles.facts}>{items.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>
 }
-export function ReservationDining({entry,dense=false,presentation}:{entry:ReservationBoardEntry;dense?:boolean;presentation?:'detail'}) {
+export function ReservationDining({entry,dense=false,presentation,title='飲食'}:{entry:ReservationBoardEntry;dense?:boolean;presentation?:'detail';title?:string}) {
  if(dense){
  const facts=<ReservationFacts presentation={presentation} items={[{label:'アレルギー',value:entry.dining?.allergy||entry.currentAllergy?<StatusBadge size="dining" tone="info" surface="white">{entry.dining?.allergy||entry.currentAllergy}</StatusBadge>:'—'},{label:'記念日',value:entry.dining?.anniversary||'—'},...(entry.dining?.seatPreference?[{label:'席の好み',value:entry.dining.seatPreference}]:[]),...(entry.dining?.courseAllergens?.length?[{label:'コースの注意',value:entry.dining.courseAllergens.join('・')}]:[]),...(entry.currentAllergy&&entry.dining?.allergy&&entry.currentAllergy!==entry.dining.allergy?[{label:'今回の注意',value:entry.currentAllergy}]:[])]}/>
- return presentation==='detail'?<DetailSection title="飲食">{facts}</DetailSection>:<div className={styles.denseDining}><strong>飲食（顧客情報と同じ段）</strong>{facts}</div>
+ return presentation==='detail'?<DetailSection title={title}>{facts}</DetailSection>:<div className={styles.denseDining}><strong>飲食（顧客情報と同じ段）</strong>{facts}</div>
  }
- return <div className={styles.dining}><strong>飲食</strong><dl>
+ return <div className={styles.dining}><strong>{title}</strong><dl>
  <div><dt>今回の注意</dt><dd>{entry.currentAllergy?.trim()?entry.currentAllergy:'—'}</dd></div>
  <div><dt>アレルギー</dt><dd>{entry.dining?.allergy?.trim()?entry.dining?.allergy:'—'}</dd></div>
  <div><dt>記念日</dt><dd>{entry.dining?.anniversary?.trim()?entry.dining?.anniversary:'—'}</dd></div>

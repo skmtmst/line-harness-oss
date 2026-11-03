@@ -685,13 +685,13 @@ export default function FriendsListV8() {
 
   const headActions = (
     <>
-      <Button type="button" variant="text" onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}>
+      <Button type="button" variant="primary" onClick={exportCurrentPage} disabled={loadStatus !== 'ready'} disabledReason={loadStatus !== 'ready' ? '一覧の読み込み後に書き出せます' : undefined}>
         <Download size={16} aria-hidden="true" />
         表示中をCSVで書き出す
       </Button>
       {/* 閲覧のみは押せないボタンを置かない。CSV が右端へ寄る（絵 x6QsVz）。 */}
       {canImport ? (
-        <Button variant="primary" href="/friends/migrations">
+        <Button variant="secondary" href="/friends/migrations">
           <Upload size={16} aria-hidden="true" />
           CSVから取り込む
         </Button>

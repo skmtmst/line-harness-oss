@@ -18,6 +18,8 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   usePathname: () => '/mileage',
 }))
 
+let source: 'ec' | 'musubo' | 'invalid' = 'musubo'
+let missingEcBalance = false
 function stubFetch() {
   globalThis.fetch = (async (input: unknown) => {
     const url = String(input)
@@ -64,18 +66,19 @@ function stubFetch() {
       return new Response(JSON.stringify({
         success: true,
         data: {
+          balanceSource: source, ecKnownCount: source === 'ec' ? 1 : undefined,
           items: [{
             friendId: 'friend-1',
             displayName: 'Kenta Kawano',
             pictureUrl: null,
-            rank: 'gold',
+            rank: source === 'ec' ? 'プラチナ' : 'gold',
             rankReason: '',
             rankThreshold: null,
             nextRank: null,
             nextRankThreshold: null,
             milesToNextRank: null,
             monthChange: 428,
-            available: 2340,
+            available: source === 'ec' ? (missingEcBalance ? null : 29) : 2340,
             pending: 128,
             expiringMiles30d: 120,
             nextExpiringAt: null,
@@ -140,6 +143,8 @@ function installWebStorage(): void {
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 beforeEach(() => {
+  source = 'musubo'
+  missingEcBalance = false
   installWebStorage()
   globalThis.localStorage.setItem('lh_selected_account', 'account-1')
   document.documentElement.dataset.theme = 'v8'
@@ -173,6 +178,36 @@ async function waitForRows(): Promise<void> {
 }
 
 describe('残高の絵合わせ（板 `CJlf4`）', () => {
+  it('ECが正の店は残高とランクをECから表示し、musuboの増減操作を出さない', async () => {
+    source = 'ec'
+    await waitForRows()
+    const text = container.textContent ?? ''
+    expect(text).toContain('ECと同期')
+    expect(text).toContain('プラチナ')
+    expect(container.querySelector('tbody tr td:nth-child(2)')?.getAttribute('data-cell-collapse')).toBeNull()
+    expect(text).toContain('29')
+    expect(text).toContain('承認待ちのマイル変更')
+    expect(text).toContain('EC管理のため保留しています')
+    expect([...container.querySelectorAll('button')].some((button) => button.textContent?.includes('承認する') || button.textContent?.includes('差し戻す'))).toBe(false)
+    expect(text).not.toContain('直近30日 増えた')
+  })
+
+  it('EC残高が未取得の友だちを0やmusuboの残高として出さない', async () => {
+    source = 'ec'; missingEcBalance = true
+    await waitForRows()
+    const row = container.querySelector('tbody tr')!
+    expect(row.textContent).not.toContain('2,340')
+    expect(row.textContent).toContain('—')
+  })
+
+  it('取得元を判定できない時は読めないと知らせる', async () => {
+    source = 'invalid'
+    await act(async () => { root.render(<AccountProvider><MileageShell.Provider value={{ tab: 'balances', readonly: false, narrow: false, counts: {}, setCount: () => {} }}><V8BalancesTab /></MileageShell.Provider></AccountProvider>) })
+    for (let i = 0; i < 60 && !container.textContent?.includes('残高を読み込めませんでした'); i++) await act(async () => { await Promise.resolve() })
+    expect(container.textContent).toContain('残高を読み込めませんでした')
+    expect(container.querySelector('tbody tr')).toBeNull()
+  })
+
   it('数の帯は空けて書く（直近30日 増えた・直近30日 減った）', async () => {
     await waitForRows()
     const body = container.textContent ?? ''

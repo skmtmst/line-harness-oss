@@ -46,6 +46,7 @@ function stubFetch() {
       : text.includes('/friends')
         /* D022: 見本は実APIの形に合わせる（monthChange・rankCounts・expiringMiles30d・nextExpiringAt・measuredAt は必須）。 */
         ? {
+          balanceSource: 'musubo',
           items: [],
           summary: {
             totalMembers: 0,

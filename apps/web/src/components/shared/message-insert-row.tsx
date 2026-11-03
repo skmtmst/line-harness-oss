@@ -5,6 +5,7 @@ import { User, IdCard, Braces, Calendar, Ellipsis, Store, Phone, Link } from 'lu
 import styles from './message-insert-row.module.css'
 import { usePermissionLockTip } from './permission-lock-tip'
 import MenuPortal from './menu-portal'
+import HelpTip from './help-tip'
 
 export type MessageInsertKind = 'name' | 'field' | 'var' | 'date' | 'other' | 'store' | 'phone' | 'link'
 const ICONS = { name: User, field: IdCard, var: Braces, date: Calendar, other: Ellipsis, store: Store, phone: Phone, link: Link }
@@ -41,7 +42,7 @@ export default function MessageInsertRow({ children, count, more, readOnly = fal
       {children}
       {more ? narrow ? <MessageInsertButton ref={moreRef} kind="other" label="その他" expanded={open} onClick={() => setOpen(value => !value)} /> : moreFirst ? null : <div className={styles.controls}>{more}</div> : null}
     </div>}
-    {count === undefined ? null : <span data-message-character-count className={styles.count}>{count}</span>}
+    {count === undefined ? null : <span data-message-character-count className={styles.count}>{count}{!readOnly ? <HelpTip label="文字数の数え方">「名前」は8文字として数えます。送るときは友だちの名前に置き換わるため、実際の長さは人によって変わります。</HelpTip> : null}</span>}
     {!readOnly && more && narrow ? <MenuPortal open={open} getAnchor={() => moreRef.current} onClose={() => setOpen(false)}><div className={styles.more} role="group" aria-label="その他の差し込み">{more}</div></MenuPortal> : null}
   </div>
 }

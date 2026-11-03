@@ -129,6 +129,18 @@ describe('来店スタンプ（管理画面）', () => {
     expect(screen.getByRole('tab', { name: '紙のカードの移行' }).textContent).toBe('紙のカードの移行')
   })
 
+  it('確認待ち0件は通常の数表示、1件以上は注意色で出す', async () => {
+    fx.paperRequests.mockResolvedValue({ success: true, data: [] })
+    const view = render(<VisitStampsV8 />)
+    const empty = await screen.findByRole('tab', { name: /紙のカードの移行.*0/ })
+    expect(empty.querySelector('[data-tone="warning"]')).toBeNull()
+    view.unmount()
+    fx.paperRequests.mockResolvedValue({ success: true, data: [{ id: 'p1', friend_id: 'f1', photo_url: '', stamps: 1, status: 'pending' }] })
+    render(<VisitStampsV8 />)
+    const pending = await screen.findByRole('tab', { name: /紙のカードの移行.*1/ })
+    expect(pending.querySelector('[data-tone="warning"]')).not.toBeNull()
+  })
+
   it('確認待ちだけを数え、承認後に数の札を読み直す', async () => {
     fx.paperRequests.mockResolvedValueOnce({ success: true, data: [
       { id: 'p1', friend_id: 'f1', photo_url: '', stamps: 7, status: 'pending' },

@@ -118,11 +118,11 @@ export default function BalancesTab() {
   const [rejectScope, setRejectScope] = useState<{ id: string; generation: number } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const isOwner = isOwnerRole(useStaffRole())
-  const canDecide = useRef(isOwner && !readonly)
-  canDecide.current = isOwner && !readonly
+  const canDecide = useRef(isOwner && !readonly && overview?.balanceSource === 'musubo')
+  canDecide.current = isOwner && !readonly && overview?.balanceSource === 'musubo'
   const [exportError, setExportError] = useState('')
 
-  const chipActive = withBalanceOnly || pendingOnly
+  const chipActive = withBalanceOnly || (pendingOnly && overview?.balanceSource !== 'ec')
 
   const loadOverview = useCallback(async () => {
     const accountAtRequest = selectedAccountId
@@ -134,12 +134,15 @@ export default function BalancesTab() {
     if (chipActive) {
       const items: MileageFriendV6[] = []
       let nextOffset = 0
+      let source: 'ec' | 'musubo' | undefined
       const limit = 100
       for (;;) {
         const res = await api.mileage.friendsV6({ accountId: accountAtRequest, search: search || undefined, limit, offset: nextOffset })
         if (accountAtRequest !== latestAccountRef.current) return
         if (!res.success) throw new Error(res.error)
         if (!isMileageFriendsV6Overview(res.data)) throw new Error('invalid_mileage_overview')
+        if (source && source !== res.data.balanceSource) throw new Error('mileage_source_changed')
+        source = res.data.balanceSource
         if (items.length === 0) setOverview(res.data)
         items.push(...res.data.items)
         const total = res.data.pagination.total
@@ -147,7 +150,7 @@ export default function BalancesTab() {
         nextOffset += limit
       }
       setAllMembers(items)
-      return
+      return source
     }
     const res = await api.mileage.friendsV6({ accountId: accountAtRequest, search: search || undefined, limit: pageSize, offset })
     if (accountAtRequest !== latestAccountRef.current) return
@@ -155,14 +158,15 @@ export default function BalancesTab() {
     if (!isMileageFriendsV6Overview(res.data)) throw new Error('invalid_mileage_overview')
     setOverview(res.data)
     setAllMembers(null)
+    return res.data.balanceSource
   }, [chipActive, offset, pageSize, search, selectedAccountId])
 
   const reloadAll = useCallback(async () => {
     setLoading(true)
     setLoadError(false)
     try {
-      await loadOverview()
-      if (selectedAccountId && latestAccountRef.current === selectedAccountId) {
+      const source = await loadOverview()
+      if (source === 'musubo' && selectedAccountId && latestAccountRef.current === selectedAccountId) {
         const historyRes = await api.mileage.history({
           accountId: selectedAccountId,
           from: dateOnlyDaysAgo(29),
@@ -248,15 +252,16 @@ export default function BalancesTab() {
   }
 
   const summary = overview?.summary ?? null
+  const ecSource = overview?.balanceSource === 'ec'
   const overviewTotal = mileagePaginationTotal(overview)
   const pageMembers = useMemo(() => {
     if (!chipActive) return overview?.items ?? []
     return (allMembers ?? []).filter((member) => {
-      if (withBalanceOnly && member.available <= 0) return false
-      if (pendingOnly && member.pending <= 0) return false
+      if (withBalanceOnly && (member.available ?? 0) <= 0) return false
+      if (pendingOnly && !ecSource && member.pending <= 0) return false
       return true
     })
-  }, [allMembers, chipActive, overview, pendingOnly, withBalanceOnly])
+  }, [allMembers, chipActive, ecSource, overview, pendingOnly, withBalanceOnly])
   /* 札の絞り込み中は手元で頁を切る。そうでなければ口が返した頁そのまま。 */
   const members = useMemo(
     () => (chipActive ? pageMembers.slice(offset, offset + pageSize) : pageMembers),
@@ -270,11 +275,9 @@ export default function BalancesTab() {
         member.displayName,
         member.lineAccount.name,
         member.available,
-        member.pending,
-        member.expiringMiles30d ?? '',
-        member.lastChangedAt ?? '',
+        ...(ecSource ? [member.rank ?? '未設定'] : [member.pending, member.expiringMiles30d ?? '', member.lastChangedAt ?? '']),
       ])
-      const csv = [['友だち', 'LINEアカウント', 'いまの残高', '確定待ち', '30日以内に失効', '最終変動'], ...rows]
+      const csv = [[...(ecSource ? ['友だち', 'LINEアカウント', 'ECの残高', 'ランク'] : ['友だち', 'LINEアカウント', 'いまの残高', '確定待ち', '30日以内に失効', '最終変動'])], ...rows]
         .map((row) => row.map((value) => csvCell(value)).join(','))
         .join('\n')
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
@@ -286,7 +289,7 @@ export default function BalancesTab() {
     } catch {
       setExportError('CSVを書き出せませんでした。もう一度お試しください。')
     }
-  }, [members])
+  }, [members, ecSource])
   const filteredTotal = chipActive ? pageMembers.length : (overviewTotal ?? 0)
   const pageCount = Math.max(1, Math.ceil(filteredTotal / pageSize))
   const currentPage = Math.floor(offset / pageSize) + 1
@@ -325,13 +328,13 @@ export default function BalancesTab() {
         presentation="band"
         title="残高の合計"
         icon={<Wallet size={16} aria-hidden="true" />}
-        value={ready ? summary.available : null}
+        value={ready && (!ecSource || (overview?.ecKnownCount ?? 0) > 0) ? summary.available : null}
         unit=""
         detail={ready
-          ? `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round(summary.available / summary.totalMembers) : 0)} マイル`
+          ? ecSource ? `ECと同期・取得済み ${formatMileageNumber(overview?.ecKnownCount ?? 0)} 人` : `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round((summary.available ?? 0) / summary.totalMembers) : 0)} マイル`
           : emptyValue('unknown')}
       />
-      <KpiCard
+      {!ecSource ? <><KpiCard
         presentation="band"
         title="直近30日 増えた"
         icon={<TrendingUp size={16} aria-hidden="true" />}
@@ -346,7 +349,7 @@ export default function BalancesTab() {
         value={!loading && !loadError ? decreasedMiles ?? 0 : null}
         unit=""
         detail="交換・取り消し"
-      />
+      /></> : null}
     </KpiBand>
   )
 
@@ -365,7 +368,7 @@ export default function BalancesTab() {
               {`${request.reason}・申請 ${request.requested_by_staff_name}（${formatMileageShortDateTime(request.created_at)}）`}
             </span>
           </div>
-          {isOwner && !readonly ? (
+          {canDecide.current ? (
             <>
               <Button
                 variant="secondary"
@@ -383,11 +386,11 @@ export default function BalancesTab() {
               </Button>
             </>
           ) : (
-            <span className={styles.approvalSub}>オーナーが対応します</span>
+            <span className={styles.approvalSub}>{ecSource ? 'EC管理のため保留しています' : overview?.balanceSource !== 'musubo' ? '管理元を確認できていません' : 'オーナーが対応します'}</span>
           )}
         </div>
       ))}
-      <p className={styles.approvalNote}>5,000 マイル以上の変更は、申請した人とは別のオーナーが承認するまで付きません。</p>
+      <p className={styles.approvalNote}>{ecSource ? '切り替え前の依頼をそのまま表示しています。' : '5,000 マイル以上の変更は、申請した人とは別のオーナーが承認するまで付きません。'}</p>
     </section>
   ) : approvalFailed ? (
     <section className={styles.approval} aria-label="承認待ちのマイル変更">
@@ -408,14 +411,14 @@ export default function BalancesTab() {
       >
         {`残高あり ${summary === null ? emptyValue('unknown') : formatMileageNumber(summary.withBalanceCount)}`}
       </FilterChip>
-      <FilterChip
+      {!ecSource ? <FilterChip
         selected={pendingOnly}
         icon={<Clock3 size={16} aria-hidden="true" />}
         onChange={(selected) => { setOffset(0); setPendingOnly(selected) }}
       >
         {/* 件数は全件を読み切ったときだけ確か（読んだ頁の中だけの数と混ぜない）。 */}
         {chipActive ? `確定待ちあり ${formatMileageNumber(pendingCount)}` : '確定待ちあり'}
-      </FilterChip>
+      </FilterChip> : null}
     </div>
   )
 
@@ -436,11 +439,11 @@ export default function BalancesTab() {
         chips={chips}
         trailing={<>
           <SavedSelect
-            value={withBalanceOnly ? 'with-balance' : pendingOnly ? 'pending' : 'default'}
+            value={withBalanceOnly ? 'with-balance' : pendingOnly && !ecSource ? 'pending' : 'default'}
             options={[
               { value: 'default', label: 'よく使う絞り込み' },
               { value: 'with-balance', label: '残高ありのみ' },
-              { value: 'pending', label: '確定待ちありのみ' },
+              ...(!ecSource ? [{ value: 'pending', label: '確定待ちありのみ' }] : []),
             ]}
             onChange={(value) => {
               setOffset(0)
@@ -462,11 +465,11 @@ export default function BalancesTab() {
         <thead>
           <TableHeadRow data-table-layout="columns">
             <Th grow>友だち</Th>
-            <Th collapseAt="narrow" className={styles.colRank} title={summary ? summary.rankCounts.length > 0 ? summary.rankCounts.map(rank => `${rank.rankName} ${formatMileageNumber(rank.friendCount)}名`).join('・') : '公開中のランクなし' : 'ランク別の人数は未取得'}>ランク</Th>
+            <Th collapseAt={ecSource ? undefined : 'narrow'} className={styles.colRank} title={ecSource ? 'ECと同期' : summary ? summary.rankCounts.length > 0 ? summary.rankCounts.map(rank => `${rank.rankName} ${formatMileageNumber(rank.friendCount)}名`).join('・') : '公開中のランクなし' : 'ランク別の人数は未取得'}>ランク</Th>
             <Th align="right" className={styles.colBalance} title="並び順：残高が多い順">いまの残高</Th>
-            <Th align="right" className={styles.colChange}>今月の増減</Th>
-            <Th align="right" className={styles.colBalance} title={`もうすぐ消えるマイル：${summary?.expiringMiles30d == null ? '未取得' : formatMileageNumber(summary.expiringMiles30d)}`}>消える予定</Th>
-            <Th collapseAt="narrow" className={styles.colLast}>最終行動</Th>
+            {!ecSource ? <Th align="right" className={styles.colChange}>今月の増減</Th> : null}
+            {!ecSource ? <Th align="right" className={styles.colBalance} title={`もうすぐ消えるマイル：${summary?.expiringMiles30d == null ? '未取得' : formatMileageNumber(summary.expiringMiles30d)}`}>消える予定</Th> : null}
+            <Th collapseAt="narrow" className={styles.colLast}>{ecSource ? 'EC更新' : '最終行動'}</Th>
             <Th align="right" className={styles.colOpsMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
@@ -489,15 +492,15 @@ export default function BalancesTab() {
                   <span  title={member.displayName}>{member.displayName}</span>
 
                 </FolderDotName></Td>
-                <Td collapseAt="narrow" className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
+                <Td collapseAt={ecSource ? undefined : 'narrow'} className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{ecSource ? member.rank ?? '未設定' : rankLabel(member.rank) ?? '—'}</span></Td>
                 <Td align="right" className={styles.colBalance}>
                   <span className={styles.cellMain}>{formatMileageNumber(member.available)}</span>
-                  {member.pending > 0 ? <span className={styles.cellSub}>{`保留 ${formatMileageNumber(member.pending)}`}</span> : null}
+                  {!ecSource && member.pending > 0 ? <span className={styles.cellSub}>{`保留 ${formatMileageNumber(member.pending)}`}</span> : null}
                 </Td>
-                <Td align="right" className={styles.colChange}><span className={styles.cellMain}>{signed(member.monthChange)}</span></Td>
-                <Td align="right" className={styles.colBalance}><span className={styles.cellMain} title={member.nextExpiringAt ? `次は ${formatMileageDate(member.nextExpiringAt)}` : undefined}>{expiringText(member)}</span></Td>
+                {!ecSource ? <Td align="right" className={styles.colChange}><span className={styles.cellMain}>{signed(member.monthChange)}</span></Td> : null}
+                {!ecSource ? <Td align="right" className={styles.colBalance}><span className={styles.cellMain} title={member.nextExpiringAt ? `次は ${formatMileageDate(member.nextExpiringAt)}` : undefined}>{expiringText(member)}</span></Td> : null}
                 <Td collapseAt="narrow" className={styles.colLast}><span className={styles.cellMain}>{formatMileageMonthDay(member.lastChangedAt)}</span></Td>
-                <Td align="right" className={styles.colOpsMenu}><BalanceRowMenu friendId={member.friendId} friendName={member.displayName} readonly={readonly} /></Td>
+                <Td align="right" className={styles.colOpsMenu}><BalanceRowMenu friendId={member.friendId} friendName={member.displayName} readonly={readonly || ecSource} /></Td>
               </Tr>
             )
           })}
@@ -539,8 +542,8 @@ export default function BalancesTab() {
 
   return (
     <MileageFrame
-      help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。" explanationInset="content"
-      explanation="残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。"
+      help={ecSource ? '残高とランクはECから受け取った情報です。' : '行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。'} explanationInset="content"
+      explanation={ecSource ? 'ECと同期した残高とランクを表示しています。未連携の友だちは残高を確認できません。' : '残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。'}
       actions={<div className={styles.headActions}>
         <Button onClick={() => void reloadAll()} disabled={loading}>
           <RefreshCw size={16} aria-hidden="true" /> 残高を再読み込み
@@ -555,6 +558,7 @@ export default function BalancesTab() {
       overlays={
         <Dialog
           open={rejectTarget !== null && rejectScope?.generation === scope.current.generation}
+          contentLayout="form"
           title="この変更依頼を差し戻しますか？"
           description={rejectTarget ? `${rejectTarget.friend_display_name ?? rejectTarget.friend_id} への変更は行われず、台帳は変わりません。` : undefined}
           tone="destructive"

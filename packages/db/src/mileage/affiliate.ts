@@ -2,6 +2,7 @@ import { dbTableExists } from '../utils.js';
 import { type AffiliateConversionMileageContext, type MileageLedgerEntry } from './types.js';
 import { DEFAULT_MILEAGE_PROGRAM_ID } from './program.js';
 import { recordEngagementEvent, enqueueMileageEvent, postMileageEntry } from './events.js';
+import { resolveMileageSource } from './source.js';
 
 
 /**
@@ -60,6 +61,9 @@ export async function syncAffiliateConversionMileage(
   if (context.approval_status !== status) {
     throw new Error(`Conversion approval status changed while syncing mileage: ${eventId}`);
   }
+
+  // 紹介成果の承認自体は維持し、ECが管理する店の台帳・付与キューは触らない。
+  if (context.beneficiary_line_account_id && await resolveMileageSource(db, context.beneficiary_line_account_id) === 'ec') return;
 
   const programId = context.mileage_program_id ?? DEFAULT_MILEAGE_PROGRAM_ID;
   const decisionVersion = context.approved_at ?? `legacy-${status}`;

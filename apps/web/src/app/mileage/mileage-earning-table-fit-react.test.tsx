@@ -117,6 +117,7 @@ function stubFetch() {
       return new Response(JSON.stringify({
         success: true,
         data: {
+          balanceSource: 'musubo',
           items: [],
           summary: {
             totalMembers: 1,

@@ -127,6 +127,18 @@ it('最初は未確認で、接続確認とフォームからの登録を起動�
   fireEvent.click(checkButton()); submit()
   expect(calls.check).not.toHaveBeenCalled(); expect(calls.connect).not.toHaveBeenCalled()
 })
+it('受信確認後は追加やテスト送信の手順を残さず、次の操作を案内する', async () => {
+  calls.receipt.mockResolvedValue({ success: true, data: { status: 'confirmed', receivedAt: '2026-11-03T00:00:00Z' } })
+  open(); await confirmProviderAndCheck(); submit()
+  await screen.findByText('接続を確認できました')
+  expect(screen.queryByText(/QR を読み取って追加してください/)).toBeNull()
+  expect(screen.queryByText(/LINE トークから「接続テスト」と送ってください/)).toBeNull()
+  expect(screen.queryByText(/変わらない場合は LINE Developers/)).toBeNull()
+  expect(screen.queryByText(/変わらない場合はサポート/)).toBeNull()
+  expect(screen.queryByText('友だち追加できるか確かめます')).toBeNull()
+  expect(screen.getByText('接続確認が完了しました')).toBeTruthy()
+  expect(screen.getAllByText(/「次へ」を押してください/).length).toBeGreaterThan(0)
+})
 it('引き継ぎを選んだ時だけ行う説明と、自然な確認ボタンを出す', () => {
   open()
   expect(screen.getByText('チェックすると、登録後にいまの友だちを musubo に引き継ぎます（数分かかります）')).toBeTruthy()

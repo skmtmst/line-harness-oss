@@ -57,6 +57,7 @@ function memberFixture() {
  * 必ず返す）。欠けた見本は応答検査で弾かれ、検索欄まで届かない。
  */
 const friendsOverview = {
+  balanceSource: 'musubo',
   items: [memberFixture()],
   summary: {
     totalMembers: 1,

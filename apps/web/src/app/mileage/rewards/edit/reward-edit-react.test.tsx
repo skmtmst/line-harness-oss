@@ -49,6 +49,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       commonActions: { ...actual.api.commonActions, resources: f.resources },
       mileage: {
         ...actual.api.mileage,
+        friendsV6: async () => ({ success: true, data: { balanceSource: 'musubo' } }),
         reward: f.reward,
         rewards: f.rewards,
         createReward: f.create,

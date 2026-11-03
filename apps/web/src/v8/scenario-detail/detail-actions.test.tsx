@@ -622,6 +622,28 @@ describe('保存・開始のきっかけ・配信の3つの段', () => {
     expect(calls.update).not.toHaveBeenCalled()
   })
 
+  it.each([['account-a', '本店'], [null, '公式アカウント']] as const)('通の追加パネルは対象アカウント %s の名前を見本へ渡す', async (accountId, expected) => {
+    stubScenario({ lineAccountId: accountId })
+    await render()
+    fireEvent.click(screen.getByRole('button', { name: 'メッセージを追加する' }))
+    const preview = document.querySelector('aside[data-design-node="xfYLn"]') as HTMLElement
+    expect(preview.textContent).toContain(expected)
+  })
+
+  it('始まる見込みは取得中と取得後を区別する', async () => {
+    let resolve!: (value: ReturnType<typeof ok>) => void
+    calls.simulate.mockReturnValue(new Promise(done => { resolve = done }))
+    await render()
+    const label = document.querySelector('[data-kpi-label][title="始まる見込み（試算）"]') as HTMLElement
+    expect(label).not.toBeNull()
+    const card = label.closest('[data-kpi-presentation]') as HTMLElement
+    expect(card.getAttribute('aria-busy')).toBe('true')
+    expect(card.textContent).toContain('試算中')
+    await act(async () => { resolve(ok({ audience: { matched: 140, alreadySubscribed: 10, newStartPlanned: 128, excluded: 2 }, steps: [] })) })
+    await waitFor(() => expect(card.textContent).toContain('128'))
+    expect(card.hasAttribute('aria-busy')).toBe(false)
+  })
+
   it('試算を取り直しているあいだは、開始の確認で古い人数を出さず「試算中」とし、始められない', async () => {
     stubScenario({ isActive: false })
     calls.simulate.mockReturnValue(new Promise(() => {}))

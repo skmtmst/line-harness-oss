@@ -63,6 +63,13 @@ afterEach(() => {
 const buttons = () => [...document.querySelectorAll('button')]
 
 describe('統括のひな形の一覧（店と同じ形）', () => {
+  it('リッチメニューの配布数から、店ごとの公開との違いを確認できる', async () => {
+    await render({ type: 'rich_menu', kind: undefined })
+    const help = host.querySelector<HTMLButtonElement>('button[aria-label="配ったアカウントの説明"]')!
+    expect(help).toBeTruthy()
+    await act(async () => { help.click() })
+    expect(document.getElementById(help.getAttribute('aria-describedby')!)?.textContent).toContain('LINEへの公開は各アカウントで行います')
+  })
   it.each(['template', 'form', 'tag', 'rich_menu'] as const)('フォルダの説明は共通の?へ渡し、%sの固有説明と機能を保つ', async type => {
     await render({ type, kind: type === 'template' ? 'message' : undefined })
     const panel = host.querySelector('aside[aria-label="フォルダ"]')!

@@ -2,6 +2,7 @@ import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.j
 import { getCookie, setCookie } from 'hono/cookie';
 import { logger } from '@line-crm/shared/server';
 import { resolveFriendFromLineToken, unresolvedResponse } from '../services/affiliate-self-auth.js';
+import { resolveMileageSource, getEcMileageBalance, hasHeldMileageRedemption } from '../services/mileage-ec-source.js';
 import { customerDownloadEntry } from '../services/download-entrypoints.js';
 import { signDownload, validDownload } from '../services/download-capability.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -102,6 +103,12 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
       getMileageSelfInsights(c.env.DB, resolved.friend.id),
       getMileageEarningOpportunitiesForFriend(c.env.DB, resolved.friend.id),
     ]);
+    const accountId = resolved.friend.line_account_id;
+    const source = accountId ? await resolveMileageSource(c.env.DB, accountId) : 'musubo';
+    if (source === 'ec' && (!resolved.lineAccountId || resolved.lineAccountId !== accountId)) return fail(c, 404, 'FRIEND_NOT_FOUND');
+    const visibleMileage = source === 'ec' && accountId
+      ? { ...mileage, available: await getEcMileageBalance(c.env.DB, accountId, resolved.friend.id), balanceSource: 'ec' as const }
+      : { ...mileage, balanceSource: 'musubo' as const };
     const browserNonce = getCookie(c, '__Host-lh_cross_account') || crypto.randomUUID();
     setCookie(c, '__Host-lh_cross_account', browserNonce, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 15 * 60 });
     const opportunities = await Promise.all(rawOpportunities.map(async (opportunity) => {
@@ -119,7 +126,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
       const separator = opportunity.url.includes('?') ? '&' : '?';
       return { ...opportunity, url: `${opportunity.url}${separator}crossAccountToken=${encodeURIComponent(token)}` };
     }));
-    return c.json(buildOffsetListResponse({ success: true, mileage, history, insights, opportunities, items: history, total: null, paging: { limit, offset: 0 }, sort: [] }));
+    return c.json(buildOffsetListResponse({ success: true, mileage: visibleMileage, history, insights, opportunities, items: history, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (err) {
     throw err;
   }
@@ -137,6 +144,14 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
       return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
+    const source = await resolveMileageSource(c.env.DB, resolved.lineAccountId);
+    if (source === 'ec') {
+      const [availableMiles, hasHeldRedemption] = await Promise.all([
+        getEcMileageBalance(c.env.DB, resolved.lineAccountId, resolved.friend.id),
+        hasHeldMileageRedemption(c.env.DB, resolved.lineAccountId, resolved.friend.id),
+      ]);
+      return c.json({ success: true, balanceSource: 'ec', availableMiles, hasHeldRedemption, rewards: [] });
+    }
     const [rewards, mileage, redemptionCounts] = await Promise.all([
       listMileageRewards(c.env.DB, {
         lineAccountId: resolved.lineAccountId,
@@ -150,6 +165,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
     ]);
     return c.json({
       success: true,
+      balanceSource: 'musubo',
       availableMiles: mileage.available,
       rewards: rewards.map((reward) => {
         const version = reward.currentVersion;
@@ -201,6 +217,10 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', inputJsonBounda
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
       return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
+    let source: 'ec' | 'musubo';
+    try { source = await resolveMileageSource(c.env.DB, resolved.lineAccountId); }
+    catch { return fail(c, 503, 'MILEAGE_SOURCE_UNAVAILABLE', { code: 'MILEAGE_SOURCE_UNAVAILABLE', error: 'マイルの管理元を確認できませんでした' }); }
+    if (source === 'ec') return fail(c, 409, 'MILEAGE_MANAGED_BY_EC', { code: 'MILEAGE_MANAGED_BY_EC', error: 'マイルはECで管理しています' });
     const rewardId = c.req.param('id');
     const requestFingerprint = await sha256Hex(
       `${resolved.lineAccountId}\n${resolved.friend.id}\n${rewardId}`,

@@ -51,6 +51,12 @@ export function readUiSource(path, encoding = 'utf8') {
     const entry = routes[relative] ? resolve(SRC, 'app', routes[relative]) : resolve(dirname(full), 'page.tsx')
     if (entry !== full && existsSync(entry)) {
       const entrySource = readFileSync(entry, encoding)
+      // 入口が相対 import で直接読む部品は現役。別の @/v8 部品が並んでも本体を読む。
+      const direct = [...entrySource.matchAll(/(?:from\s*|import\s*(?:\(\s*)?)['"](\.[^'"]+)['"]/g)].some(([, spec]) => {
+        const base = resolve(dirname(entry), spec)
+        return [base, `${base}.tsx`, `${base}.ts`, `${base}/index.tsx`].includes(full)
+      })
+      if (direct) return read(full, 0)
       const roots = [...entrySource.matchAll(/from\s*['"](@\/v8\/[^'"]+)['"]/g)]
       const rootFiles = roots.map((match) => {
         const base = resolve(SRC, match[1].slice(2))

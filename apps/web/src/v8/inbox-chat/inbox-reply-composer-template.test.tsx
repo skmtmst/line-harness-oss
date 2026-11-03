@@ -42,3 +42,12 @@ it('テンプレートの束の送信確認に送信元と環境を示す', () =
   expect(screen.getByText('名前を確認できません')).toBeTruthy()
   expect(screen.getByText('環境')).toBeTruthy()
 })
+
+it('送信の設定は開閉しても同じ名前で、状態を伝える', () => {
+  const view = render(<InboxReplyComposer {...props('owner')} showComposerOptions={false} />)
+  const toggle = screen.getByRole('button', { name: '送信の設定', exact: true })
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  view.rerender(<InboxReplyComposer {...props('owner')} showComposerOptions />)
+  expect(screen.getByRole('button', { name: '送信の設定', exact: true })).toBe(toggle)
+  expect(toggle.getAttribute('aria-expanded')).toBe('true')
+})

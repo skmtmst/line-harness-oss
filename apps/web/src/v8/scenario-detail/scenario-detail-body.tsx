@@ -33,7 +33,7 @@ import { describeAfterSend, describeStepAudience } from './scenario-step-audienc
 
 export function ScenarioDetailBody({
   FlexPreview,
-  canEdit, justStarted, stats, simulation,
+  canEdit, justStarted, stats, simulation, simulationRefreshing,
   id, startedAt, error, duplicateRemainder,
   duplicating, handleDuplicate, discardingDuplicate, setDiscardDuplicateError,
   setDiscardDuplicateOpen, editDirty, scenario, triggerHeadline,
@@ -53,6 +53,7 @@ export function ScenarioDetailBody({
   justStarted: boolean
   stats: ScenarioStats | null
   simulation: ScenarioSimulation | null
+  simulationRefreshing: boolean
   id: string
   startedAt: string
   error: string
@@ -237,7 +238,7 @@ export function ScenarioDetailBody({
           <KpiBand data-design="KPIs">
             <KpiCard title="購読中" value={stats?.activeNow} unit="人" detail="いま途中にいる人" />
             <KpiCard title="読み終えた" value={stats?.completed} unit="人" detail="最後の1通まで届いた人" />
-            <KpiCard title="始まる見込み（試算）" value={simulation?.audience.newStartPlanned} unit="人" detail="きっかけが来たら始まる見込み。確定ではない" />
+            <KpiCard title="始まる見込み（試算）" value={simulation?.audience.newStartPlanned} loading={simulationRefreshing} unit="人" detail={simulationRefreshing ? "試算中です" : "きっかけが来たら始まる見込み。確定ではない"} />
             <KpiCard title="離脱が多い所" value={null} valueText={biggestDrop ? `${displayOrder(biggestDrop.fromOrder)}→${displayOrder(biggestDrop.toOrder)}通目` : '—'} unit="" detail={biggestDrop ? `${displayOrder(biggestDrop.fromOrder)}通目で ${formatNumber(biggestDrop.lost)}人（${Math.round(biggestDrop.rate * 100)}%）が離れています` : '大きく離れている所はまだありません'} />
           </KpiBand>
 

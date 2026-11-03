@@ -230,6 +230,34 @@ function countFetches() {
 }
 
 describe('交換配送の二重送信防止(実D1)', () => {
+  it('ECの配送待ちが増えても各行の管理元を読み直さない', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw);
+    const rewardId = await seedWebhookReward(db);
+    const { redemption } = await reserveMileageRewardRedemption(db, { lineAccountId: 'account-1', friendId: 'friend-1', rewardId, idempotencyKey: 'ec-bulk-base', requestFingerprint: 'base' });
+    raw.prepare("INSERT INTO ec_connectors(id,line_account_id,provider,shop_domain,created_at,updated_at) VALUES ('ec','account-1','ec_cube','example.invalid','2026-01-01','2026-01-01')").run();
+    const clone = raw.prepare(`INSERT INTO mileage_redemptions(id,line_account_id,program_id,beneficiary_key,beneficiary_user_id,beneficiary_friend_id,reward_id,reward_version_id,idempotency_key,request_fingerprint,status,next_retry_at,created_at,updated_at)
+      SELECT ?,line_account_id,program_id,beneficiary_key,beneficiary_user_id,beneficiary_friend_id,reward_id,reward_version_id,?,?,'delivery_failed','2020-01-01','2020-01-01','2020-01-01' FROM mileage_redemptions WHERE id=?`);
+    for (let i = 0; i < 300; i++) clone.run(`ec-held-${i}`, `ec-key-${i}`, `ec-fp-${i}`, redemption.id);
+    let calls = 0;
+    const counted = new Proxy(db, { get(target, key) { if (key === 'prepare') return (sql: string) => { if (++calls > 200) throw new Error('DB budget exceeded'); return target.prepare(sql); }; return Reflect.get(target, key); } });
+    await processDueMileageRewardDeliveries(counted, { now: '2026-11-03T00:00:00.000Z', limit: 1 });
+    expect(calls).toBeLessThan(100);
+    expect(raw.prepare("SELECT COUNT(*) AS n FROM mileage_redemptions WHERE status='delivery_failed'").get()).toEqual({ n: 300 });
+  });
+  it('EC管理に切り替わった予約を自動で配送・返却・更新しない', async () => {
+    const { db, raw } = createTestD1();
+    seedAccount(raw);
+    const rewardId = await seedWebhookReward(db);
+    const reserved = await reserveMileageRewardRedemption(db, { lineAccountId: 'account-1', friendId: 'friend-1', rewardId, idempotencyKey: 'ec-held', requestFingerprint: 'fp-held' });
+    raw.prepare("INSERT INTO ec_connectors(id,line_account_id,provider,shop_domain,created_at,updated_at) VALUES ('ec','account-1','ec_cube','example.invalid','2026-01-01','2026-01-01')").run();
+    raw.prepare("UPDATE mileage_redemptions SET status='delivering',updated_at='2020-01-01' WHERE id=?").run(reserved.redemption.id);
+    const before = raw.prepare('SELECT * FROM mileage_redemptions WHERE id=?').get(reserved.redemption.id);
+    const counter = countFetches();
+    await processDueMileageRewardDeliveries(db, { now: new Date().toISOString(), fetch: counter.fetch });
+    expect(counter.count()).toBe(0);
+    expect(raw.prepare('SELECT * FROM mileage_redemptions WHERE id=?').get(reserved.redemption.id)).toEqual(before);
+  });
   it('外部成功直後の確定失敗→回収でも外部送信は1回', async () => {
     const { db, raw } = createTestD1();
     seedAccount(raw);

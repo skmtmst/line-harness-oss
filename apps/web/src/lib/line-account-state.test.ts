@@ -33,5 +33,5 @@ it('帯の下の期限の1行は、接続とは別に数え、0件なら出さ�
     { tokenExpiry: expiry('expired') },
     { tokenExpiry: expiry('expired'), archivedAt: '2026-10-01' },
     { tokenExpiry: expiry('expiring') },
-  ])).toBe('期限が切れたトークン 1 件・期限が近い 1 件')
+  ])).toBe('期限切れ 1 件・期限が近い 1 件')
 })

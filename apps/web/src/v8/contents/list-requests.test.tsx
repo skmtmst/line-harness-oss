@@ -14,6 +14,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+vi.mock('./media-upload-dialog', () => ({ default: ({ open, onComplete }: { open: boolean; onComplete: () => void }) => open ? <button onClick={onComplete}>架空の登録を完了</button> : null }))
+
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
@@ -35,11 +37,13 @@ let calls: string[] = []
 /** 検索語ごとに返事を止めておく口。 */
 let gates = new Map<string, Promise<void>>()
 let failQuery: string | null = null
+let unfiledCount = 0
 
 beforeEach(() => {
   calls = []
   gates = new Map()
   failQuery = null
+  unfiledCount = 0
   document.documentElement.dataset.theme = 'v8'
   window.history.replaceState(null, '', '/contents')
   host = document.createElement('div')
@@ -53,7 +57,7 @@ beforeEach(() => {
     if (url.includes('/api/media/quota')) {
       return json({ success: true, data: { usageBytes: 1, reservedBytes: 0, limitBytes: 100, remainingBytes: 99, usageRate: 0.01, state: 'normal' } })
     }
-    if (url.includes('/api/folders')) return json({ success: true, data: [], unfiledCount: 0 })
+    if (url.includes('/api/folders')) return json({ success: true, data: [], unfiledCount })
     if (url.includes('/api/media?') || url.endsWith('/api/media')) {
       const params = new URL(url, 'http://worker.test').searchParams
       const query = params.get('query') ?? ''
@@ -126,6 +130,27 @@ describe('検索の世代（WEB097）', () => {
     await settle()
     expect(host.textContent).toContain('みかんの結果.jpg')
     expect(host.textContent).not.toContain('読み込めませんでした')
+  })
+})
+
+describe('登録後のフォルダ件数', () => {
+  it('登録直後に未分類の件数を読み直し、同じデータの再読込後と一致する', async () => {
+    await act(async () => root.render(<MediaLibraryListV8 />))
+    await settle()
+    const before = count(isFolders)
+    const open = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('メディアを登録する'))!
+    await act(async () => open.click())
+    unfiledCount = 1
+    const complete = [...host.querySelectorAll('button')].find(button => button.textContent === '架空の登録を完了')!
+    await act(async () => complete.click())
+    await settle()
+    expect(count(isFolders)).toBe(before + 1)
+    expect(host.textContent).toMatch(/未分類\s*1/)
+    await act(async () => root.unmount())
+    root = createRoot(host)
+    await act(async () => root.render(<MediaLibraryListV8 />))
+    await settle()
+    expect(host.textContent).toMatch(/未分類\s*1/)
   })
 })
 

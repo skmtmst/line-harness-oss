@@ -3,12 +3,13 @@ import { jstNow } from '../utils.js';
 import { type MileageQueueResult, type EngagementEvent, type FollowingMileageReconcileResult } from './types.js';
 import { applyMileageRulesImmediately } from './grants.js';
 import { parsePublishedSnapshot } from './rules.js';
+import { resolveMileageSource, selectMileageAccountBatch } from './source.js';
+import { logger } from '@line-crm/shared/server';
 
 
 /**
  * 付与キューの行の持ち主(=イベントの友だちが属するアカウント)が
- * マイル機能オフかをSQL内で判定する式。持ち主不明の旧行は偽になり、
- * 従来どおり進む。
+ * マイル機能オフかをSQL内で判定する式。持ち主不明の行は別途保留する。
  */
 export function mileageOwnerOffSql(eventIdColumn: string): string {
   return `EXISTS (
@@ -24,41 +25,48 @@ export async function processPendingMileageEvents(
   db: D1Database,
   options: { limit?: number; now?: string } = {},
 ): Promise<MileageQueueResult> {
-  const limit = Math.min(250, Math.max(1, options.limit ?? 100));
+  const requested = Math.min(250, Math.max(1, options.limit ?? 100));
+  const limit = Math.min(30, requested);
   const now = options.now ?? jstNow();
   // 停滞回収も機能オフ中のアカウントには当てない。OFF中は status も
   // processing_started_at も updated_at も動かさず、再オンで回収する。
-  await db
-    .prepare(
-      `UPDATE mileage_event_queue
-          SET status = 'pending', processing_started_at = NULL, updated_at = ?
-        WHERE status = 'processing'
-          AND datetime(processing_started_at) < datetime(?, '-10 minutes')
-          AND NOT ${mileageOwnerOffSql('mileage_event_queue.engagement_event_id')}`,
-    )
-    .bind(now, now)
-    .run();
+  const owners = await db.prepare(`SELECT DISTINCT f.line_account_id FROM mileage_event_queue q
+    LEFT JOIN engagement_events e ON e.id = q.engagement_event_id LEFT JOIN friends f ON f.id = e.actor_friend_id
+    WHERE q.status IN ('processing','pending','failed') AND f.line_account_id IS NOT NULL ORDER BY f.line_account_id`).bind()
+    .all<{ line_account_id: string }>();
+  const accountBatch = selectMileageAccountBatch(owners.results.map(row => row.line_account_id), now);
+  if (accountBatch.length < owners.results.length) logger.warn('mileage_queue.accounts_deferred');
+  const eligible: string[] = [];
+  let unreadable = 0;
+  for (const accountId of accountBatch) {
+    try { if (await resolveMileageSource(db, accountId) === 'musubo') eligible.push(accountId); }
+    catch { unreadable++; logger.error('mileage_queue.source_unavailable'); }
+  }
+  if (accountBatch.length && unreadable === accountBatch.length) throw new Error('mileage_queue_all_sources_unavailable');
+  if (!eligible.length) return { claimed: 0, processed: 0, failed: 0, granted: 0 };
+  const eligibleJson = JSON.stringify(eligible);
+  await db.prepare(`UPDATE mileage_event_queue SET status = 'pending', processing_started_at = NULL, updated_at = ?
+    WHERE status = 'processing' AND datetime(processing_started_at) < datetime(?, '-10 minutes')
+      AND NOT ${mileageOwnerOffSql('mileage_event_queue.engagement_event_id')}
+      AND EXISTS (SELECT 1 FROM engagement_events e JOIN friends f ON f.id=e.actor_friend_id
+        WHERE e.id=mileage_event_queue.engagement_event_id AND f.line_account_id IN (SELECT value FROM json_each(?)))`)
+    .bind(now, now, eligibleJson).run();
 
   // 機能オフ中の行は LIMIT を数える前に外す。後で弾くと、オフの古い行が
   // 先頭を占めたままON中の他アカウントが永久に回らない。
-  const due = await db
-    .prepare(
-      `SELECT q.engagement_event_id, q.applied_published_snapshot
-         FROM mileage_event_queue q
-        WHERE q.status IN ('pending','failed')
-          AND q.attempts < 5
-          AND datetime(q.available_at) <= datetime(?)
-          AND NOT ${mileageOwnerOffSql('q.engagement_event_id')}
-        ORDER BY q.created_at ASC, q.engagement_event_id ASC
-        LIMIT ?`,
-    )
-    .bind(now, limit)
-    .all<{ engagement_event_id: string; applied_published_snapshot: string | null }>();
+  const due = await db.prepare(`SELECT q.engagement_event_id, q.applied_published_snapshot
+      FROM mileage_event_queue q LEFT JOIN engagement_events e ON e.id = q.engagement_event_id LEFT JOIN friends f ON f.id = e.actor_friend_id
+      WHERE q.status IN ('pending','failed') AND q.attempts < 5 AND datetime(q.available_at) <= datetime(?)
+        AND NOT ${mileageOwnerOffSql('q.engagement_event_id')}
+        AND f.line_account_id IN (SELECT value FROM json_each(?))
+      ORDER BY q.created_at ASC, q.engagement_event_id ASC LIMIT ?`)
+      .bind(now, eligibleJson, limit).all<{ engagement_event_id: string; applied_published_snapshot: string | null }>();
+  if (requested > limit && due.results.length === limit) logger.warn('mileage_queue.events_deferred');
 
   const result: MileageQueueResult = { claimed: 0, processed: 0, failed: 0, granted: 0 };
   for (const item of due.results) {
     // 機能オフ中はclaim(状態更新)も付与もしない。pendingのまま残し、
-    // 再オンで再開する。持ち主が分からない行は従来どおり進める。
+    // 再オンで再開する。持ち主が分からない行は保留する。
     const owner = await db
       .prepare(
         `SELECT f.line_account_id AS line_account_id
@@ -71,6 +79,7 @@ export async function processPendingMileageEvents(
       && !await isAccountFeatureEnabled(db, owner.line_account_id, 'mileage')) {
       continue;
     }
+    if (!owner?.line_account_id || !eligible.includes(owner.line_account_id)) continue;
     const claim = await db
       .prepare(
         `UPDATE mileage_event_queue

@@ -169,7 +169,7 @@ test('v8 では新しい一覧（FM94M）が出て、管理画面 は出ない',
   // 2026-10-06 入口は新しい一覧（src/v8/common-vars）。板の印は幅で （広い）か （1152）のどちらか。
   expect(host?.querySelector('[data-design-node~="FM94M"],[data-design-node~="XIzkJ"]')).not.toBeNull()
   expect(host?.querySelector('[data-design-node="WuKzU"]')).toBeNull()
-  expect(host?.textContent).toContain('差し込んでいる所')
+  expect(host?.textContent).toContain('使っている所')
   expect(host?.textContent).toContain('問い合わせ先')
   expect(host?.querySelector('[data-page-template="list"] [data-template-region="content"]')?.textContent).toContain('問い合わせ先')
 })

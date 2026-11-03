@@ -227,6 +227,14 @@ describe('保存した開催回の日時表示', () => {
     expect(row().textContent).not.toContain('直近の回')
   })
 
+  it('日時が未設定の公開中イベントは、保存した公開状態を終了にしない', async () => {
+    response({ is_published: 1, lifecycle_status: 'published', next_slot_starts_at: null, latest_past_slot_starts_at: null, total_capacity: null })
+    await render()
+    expect(row().textContent).toContain('日時未設定')
+    expect(row().textContent).toContain('公開中')
+    expect(row().textContent).not.toContain('終了')
+  })
+
   it('時差付きの有効な過去日時は日本時間で表示する', async () => {
     response({ next_slot_starts_at: null, latest_past_slot_starts_at: '2000-11-02T14:00:00+09:00' })
     await render()

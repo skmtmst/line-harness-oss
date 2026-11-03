@@ -91,7 +91,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           type="button"
           onClick={() => setShowComposerOptions((v) => !v)}>
           {(<Settings2 aria-hidden="true" size={16} />)}
-          {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+          送信の設定
         </InboxToolButton>
 
         {/*

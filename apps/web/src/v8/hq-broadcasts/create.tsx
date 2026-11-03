@@ -143,6 +143,7 @@ export default function HqBroadcastCreate() {
   const [method, setMethod] = useState<Method>('new')
   const [title, setTitle] = useState('')
   const [recent, setRecent] = useState<HqBroadcastRun[]>([])
+  const [recentStatus, setRecentStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [basicPicker, setBasicPicker] = useState<'template' | 'duplicate' | null>(null)
   const basicPickerTrigger = useRef<HTMLButtonElement>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<{ item: SourcePickerItem; folders: SourcePickerFolder[] } | null>(null)
@@ -256,6 +257,7 @@ export default function HqBroadcastCreate() {
         setFoldersFailed(!folderList?.success)
         const sent = runs ? runs.data.filter((r) => r.status !== 'prepared') : []
         setRecent(sent.slice(0, 2))
+        setRecentStatus(runs ? 'ready' : 'error')
         if (legacyTags.current.length > 0) {
           const ids = list.filter((s) => s.tags?.some((t) => legacyTags.current.includes(t.id))).map((s) => s.id)
           setAccountIds((prev) => [...new Set([...prev, ...ids])])
@@ -822,6 +824,7 @@ export default function HqBroadcastCreate() {
       <CreatePage step={stepIndex} boardId="BBRDb" dirty={false}
         footerActions={(
           <>
+            {step === 'basic' ? (checking || sending || composerBusy ? <Button disabled>キャンセル</Button> : <Button href="/hq/broadcasts">キャンセル</Button>) : null}
             {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
             <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
             {step !== 'confirm' ? (
@@ -872,7 +875,7 @@ export default function HqBroadcastCreate() {
                     ['template', 'テンプレートを選択', '統括のテンプレートを呼び出して手直しします。', FileText],
                     ['duplicate', '過去の配信を複製', '送った一括配信をそのまま写して作り直します。', Copy],
                   ] as const).map(([value, label, note, Icon]) => (
-                    <RadioCard key={value} name="hq-broadcast-method" value={value} checked={method === value} title={label} note={note} icon={<Icon aria-hidden="true" />} onChange={(next) => setMethod(next as Method)} />
+                    <RadioCard key={value} name="hq-broadcast-method" value={value} checked={method === value} title={label} note={note} icon={<Icon aria-hidden="true" />} disabled={value === 'duplicate' && (recentStatus !== 'ready' || recent.length === 0)} disabledReason={value !== 'duplicate' ? undefined : recentStatus === 'loading' ? '配信履歴を確認しています。' : recentStatus === 'error' ? '配信履歴を確認できません。画面を読み直してください。' : recent.length === 0 ? '複製できる配信がありません。' : undefined} onChange={(next) => setMethod(next as Method)} />
                   ))}
                 </RadioCardGroup></SaveErrorField>
                 {/* EpTBB：①は選ぶボタン／選んだ1行だけ。窓の仮選択は確定するまで反映しない。 */}
@@ -900,7 +903,7 @@ export default function HqBroadcastCreate() {
                         <Button size="compact" onClick={() => duplicate(item)}>複製する</Button>
                       </div>
                     )
-                  }) : <p className="text-xs text-ink-faint">最近の配信はまだありません。</p>}
+                  }) : <p className="text-xs text-ink-faint">{recentStatus === 'loading' ? '配信履歴を読み込んでいます。' : recentStatus === 'error' ? '配信履歴を読み込めませんでした。' : '最近の配信はまだありません。'}</p>}
                 </div>
               </section>
             ) : null}

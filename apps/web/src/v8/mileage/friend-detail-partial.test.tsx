@@ -16,13 +16,16 @@ vi.mock('next/link', () => ({ default: ({ href, children, ...props }: React.Anch
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc', loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 
+const calls = vi.hoisted(() => ({ legacy: vi.fn(), history: vi.fn() }))
 const today = '2026-10-15T03:00:00.000Z'
 let rank: string | null = null
 let rankLoaded = false
+let source: 'ec' | 'musubo' = 'musubo'
+let sourceUnavailable = false
 let pendingBalance = 0
 let historyCount = 340
 let connections: Array<{ accountId: string; accountName: string }> | undefined
-beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(today)); rank = null; rankLoaded = false; connections = undefined; pendingBalance = 0; historyCount = 340 })
+beforeEach(() => { calls.legacy.mockClear(); calls.history.mockClear(); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(today)); rank = null; rankLoaded = false; source = 'musubo'; sourceUnavailable = false; connections = undefined; pendingBalance = 0; historyCount = 340 })
 const entry = (id: string) => ({
   id, entryType: 'grant', status: 'available', amount: 10, reason: '来店', source: 'rule', hasSourceEvent: false,
   sourceReferenceId: null, ruleName: null, mode: 'automatic', executedByStaffName: null, lineAccountId: 'acc',
@@ -37,13 +40,13 @@ vi.mock('@/lib/api', async (importOriginal) => {
       friends: {
         ...actual.api.friends,
         get: async () => ({ success: true, data: { id: 'f1', displayName: '田中', createdAt: '2026-01-01T00:00:00Z' } }),
-        mileage: async () => ({ success: true, data: { summary: { available: 0, pending: pendingBalance, lifetimeEarned: 0, spent: 0 }, history: [], insights: null, connections } }),
+        mileage: async () => { calls.legacy(); return { success: true, data: { summary: { available: 0, pending: pendingBalance, lifetimeEarned: 0, spent: 0 }, history: [], insights: null, connections } } },
       },
       staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'staff' } }) },
       mileage: {
         ...actual.api.mileage,
-        friendsV6: async () => rankLoaded ? ({ success: true, data: { items: [{ friendId: 'f1', rank, rankReason: 'ランクは未公開です', available: 0, pending: pendingBalance, monthChange: 0 } ] } }) : ({ success: false, error: 'x' }),
-        history: async () => ({ success: true, data: { items: Array.from({ length: 100 }, (_, i) => entry(`e${i}`)), summary: { byType: [] }, pagination: { total: historyCount, limit: 100, offset: 0 } } }),
+        friendsV6: async () => sourceUnavailable ? ({ success: false, error: 'source' }) : rankLoaded ? ({ success: true, data: { balanceSource: source, items: [{ friendId: 'f1', rank, rankReason: 'ランクは未公開です', available: source === 'ec' ? 29 : 0, pending: pendingBalance, monthChange: 0 } ] } }) : ({ success: true, data: { balanceSource: 'musubo', items: [] } }),
+        history: async () => { calls.history(); return { success: true, data: { items: Array.from({ length: 100 }, (_, i) => entry(`e${i}`)), summary: { byType: [] }, pagination: { total: historyCount, limit: 100, offset: 0 } } } },
       },
     },
   }
@@ -95,4 +98,21 @@ test('一部取得した明細の0件は取得範囲を示す', async () => {
   render(<FriendDetailV8 />)
   await screen.findByText('最新100 件のうち 0 件が確定待ち')
   expect(screen.queryByText('確定待ちはありません')).toBeNull()
+})
+
+test('ECが正の友だちはEC残高を表示し、musuboの調整を出さない', async () => {
+  source = 'ec'; rankLoaded = true; rank = 'プラチナ'
+  render(<FriendDetailV8 />)
+  expect(await screen.findByText('ECと同期')).toBeTruthy()
+  expect(screen.getByText('29')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /増やす|減らす/ })).toBeNull()
+  expect(calls.legacy).not.toHaveBeenCalled()
+  expect(calls.history).not.toHaveBeenCalled()
+})
+
+test('設定元を確認できないときにmusubo残高へ黙って戻さない', async () => {
+  sourceUnavailable = true
+  render(<FriendDetailV8 />)
+  expect(await screen.findByText('マイル明細を読み込めませんでした')).toBeTruthy()
+  expect(screen.queryByText('使える残高')).toBeNull()
 })

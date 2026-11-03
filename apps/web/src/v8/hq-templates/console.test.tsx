@@ -649,7 +649,7 @@ it('種類を替えると前の種類の行を隠し、遅い前の応答も表�
   expect(screen.queryByRole('link', { name: '動画だけの案内' })).toBeNull()
 })
 
-it('?mode=createの再読込でも結果不明の復旧依頼を消さない（PR#2042高）', async () => {
+it('?mode=createの再読込でも結果不明の復旧依頼を保持する', async () => {
   const { persistCreationAttempt } = await import('@/lib/hq-template-create-attempt')
   persistCreationAttempt(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'template', {
     requestId: 'req-recovery-1',
@@ -661,14 +661,14 @@ it('?mode=createの再読込でも結果不明の復旧依頼を消さない（P
   expect(await screen.findByDisplayValue('人工テスト')).toBeTruthy()
   expect(await screen.findByText(/前回の保存結果がまだ確定していません/)).toBeTruthy()
 })
-it('作る画面のURLは一覧の種別（?type=）を引き継ぐ（PR#2042中）', async () => {
+it('作る画面のURLは一覧の種別（?type=）を引き継ぐ', async () => {
   window.history.replaceState(null, '', '/hq/templates?type=scenario')
   render(<HqTemplatesV8 type="template" />)
   fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
   await waitFor(() => expect(new URLSearchParams(window.location.search).get('mode')).toBe('create'))
   expect(new URLSearchParams(window.location.search).get('type')).toBe('scenario')
 })
-it('結果不明の復旧時は指定したフォルダを表示する（PR#2042再指摘）', async () => {
+it('結果不明の復旧時は指定したフォルダを表示する', async () => {
   const { persistCreationAttempt } = await import('@/lib/hq-template-create-attempt')
   persistCreationAttempt(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'template', {
     requestId: 'req-recovery-folder',

@@ -6,6 +6,7 @@ import MyPage from './my-page.js';
 import { CustomerStyleContext } from '../components/customer-style-scope.js';
 import type { CustomerStyle } from '../lib/customer-style.js';
 import { api } from '../lib/api.js';
+import { affiliateSelfApi } from '../lib/affiliate-self-api.js';
 
 vi.mock('../lib/api.js', () => ({ api: {
   me: vi.fn(), menus: vi.fn().mockResolvedValue({ menus: [] }), bookingPaymentStatus: vi.fn().mockResolvedValue({ payment: null }),
@@ -14,7 +15,7 @@ vi.mock('../lib/api.js', () => ({ api: {
   notificationPreferences: vi.fn().mockResolvedValue({ purposeSpecificEnforcement: false, items: [] }),
   updateNotificationPreference: vi.fn(), startBookingPayment: vi.fn(),
 }, visitStampsApi: { cards: vi.fn().mockResolvedValue({ success: true, data: [] }) } }));
-vi.mock('../lib/affiliate-self-api.js', () => ({ affiliateSelfApi: { rewards: vi.fn().mockResolvedValue({ rewards: [], availableMiles: 20 }) } }));
+vi.mock('../lib/affiliate-self-api.js', () => ({ affiliateSelfApi: { rewards: vi.fn().mockResolvedValue({ rewards: [], availableMiles: 20, balanceSource: 'musubo' }) } }));
 vi.mock('../lib/liff-runtime.js', () => ({ default: { getProfile: async () => ({ displayName: '人工会員' }) } }));
 vi.mock('../lib/user-message.js', async original => ({ ...await original<typeof import('../lib/user-message.js')>(), logFailure: vi.fn() }));
 vi.mock('../components/liff-look-scope.js', () => ({ default: ({ children }: { children: import('react').ReactNode }) => children }));
@@ -25,6 +26,17 @@ function CurrentUrl() { const location = useLocation(); return <p data-testid="u
 function open(style: CustomerStyle) {
   render(<MemoryRouter initialEntries={['/mypage?liffId=store&from=profile']}><CustomerStyleContext.Provider value={style}><MyPage /><CurrentUrl /></CustomerStyleContext.Provider></MemoryRouter>);
 }
+it('ECの残高をマイページに表示する', async () => {
+  vi.mocked(affiliateSelfApi.rewards).mockResolvedValueOnce({ rewards: [], availableMiles: 29, balanceSource: 'ec' });
+  open('ec');
+  expect(await screen.findByText('29')).toBeTruthy();
+});
+it('EC残高未取得は0ではなく未取得の表示を使う', async () => {
+  vi.mocked(affiliateSelfApi.rewards).mockResolvedValueOnce({ rewards: [], availableMiles: null, balanceSource: 'ec' });
+  open('ec');
+  const row = (await screen.findByText('マイル')).closest('li');
+  expect(row?.textContent).toContain('—');
+});
 it.each(['standard', 'salon', 'restaurant', 'consult', 'lesson', 'ec'] as const)('予約なしの%sで既存の案内と予約操作の有無を保つ', async style => {
   open(style);
   await screen.findByText('お知らせごとの受け取りの設定は現在準備中です。');

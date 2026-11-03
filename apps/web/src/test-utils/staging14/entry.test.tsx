@@ -35,8 +35,8 @@ beforeEach(() => {
     if (path === '/api/liff/booking/me') return reply({ upcoming: [{ id: 'b', menu_name: '予約メニュー', staff_name: '担当者', starts_at: '2099-10-20T01:00:00Z', status: 'confirmed', cancel_deadline_at: '2099-10-19T01:00:00Z' }], past: [] })
     if (path === '/api/liff/affiliate/me') return reply({ affiliate: { id: 'a', name: 'fixture', isActive: true }, links: [] })
     if (path === '/api/liff/affiliate/offers') return reply({ offers: [] })
-    if (path === '/api/liff/mileage/me') return reply({ mileage: { programName: 'fixture', available: 150, pending: 0, lifetimeEarned: 150, spent: 0 }, insights: { accountCount: 1, rewardedActions: 0, referralMiles: 0, qualityReferralCount: 0 }, opportunities: [], history: [] })
-    if (path === '/api/liff/mileage/rewards') return reply({ rewards: [{ id: 'r', name: '試験の特典', canRedeem: true, currentVersion: { requiredMiles: 100 } }], availableMiles: 150 })
+    if (path === '/api/liff/mileage/me') return reply({ mileage: { balanceSource: 'musubo', programName: 'fixture', available: 150, pending: 0, lifetimeEarned: 150, spent: 0 }, insights: { accountCount: 1, rewardedActions: 0, referralMiles: 0, qualityReferralCount: 0 }, opportunities: [], history: [] })
+    if (path === '/api/liff/mileage/rewards') return reply({ balanceSource: 'musubo', rewards: [{ id: 'r', name: '試験の特典', canRedeem: true, currentVersion: { requiredMiles: 100 } }], availableMiles: 150 })
     if (path === '/api/liff/mileage/rewards/r/redeem') return failSubmit ? reply({ error: '試験の交換失敗' }, 500) : reply({ status: 'succeeded', rewardName: '試験の特典' })
     if (path === '/api/liff/affiliate/bank') {
       if (options.method === 'PUT') return failSubmit ? reply({ error: '試験の保存失敗' }, 500) : reply({ data: { bankCode: '9999', bankName: '試験銀行', branchCode: '999', branchName: '試験支店', accountType: 'ordinary', accountLast4: '0000', accountHolderName: 'FIXTURE', version: 2 } })

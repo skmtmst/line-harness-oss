@@ -1,7 +1,8 @@
 'use client'
 
 import V8RewardEdit from '@/v8/mileage/reward-edit'
+import EditorSourceGuard from '@/v8/mileage/editor-source-guard'
 
 export default function MileageRewardEditorPage() {
-  return <V8RewardEdit />
+  return <EditorSourceGuard><V8RewardEdit /></EditorSourceGuard>
 }

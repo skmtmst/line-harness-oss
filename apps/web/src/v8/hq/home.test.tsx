@@ -185,7 +185,8 @@ describe('統括のアカウント', () => {
     const bands = [...container.querySelectorAll('[data-design-part="notice"]')]
       .filter((band) => !band.closest('article'))
     expect(bands).toHaveLength(1)
-    expect(bands[0].textContent).toContain('期限が切れたトークン 1 件・期限が近い 1 件')
+    expect(bands[0].textContent).toContain('期限切れ 1 件・期限が近い 1 件')
+    expect(bands[0].textContent).toContain('表示中のLINE接続の期限（接続に問題とは別の数え方）')
   })
 
   it('期限の案内は検索結果とアーカイブの一覧に合わせる', async () => {
@@ -202,7 +203,7 @@ describe('統括のアカウント', () => {
       await new Promise(resolve => setTimeout(resolve, 350))
     })
     expect(container.textContent).toContain('期限が近い 1 件')
-    expect(container.textContent).not.toContain('期限が切れたトークン')
+    expect(container.textContent).not.toContain('期限切れ 1 件')
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, '')
       search.dispatchEvent(new Event('input', { bubbles: true }))
@@ -210,7 +211,7 @@ describe('統括のアカウント', () => {
     })
     const archive = [...container.querySelectorAll('button')].find(el => el.textContent?.startsWith('アーカイブ'))!
     await act(async () => { archive.click() })
-    expect(container.textContent).not.toContain('期限が切れたトークン')
+    expect(container.textContent).not.toContain('期限切れ 1 件')
     expect(container.textContent).not.toContain('期限が近い 1 件')
   })
 
