@@ -238,7 +238,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
             ) : null}
           </>}
         >
-          {statusLabel(active.status)}{'：'}
+          {active.status !== 'expired' ? <>{statusLabel(active.status)}{'：'}</> : null}
           {running ? <>{formatNumber(active.processedCount)} / {active.totalCount == null ? '…' : formatNumber(active.totalCount)}件</> : null}
           {active.status === 'completed' ? <>{formatNumber(active.rowCount ?? 0)} 件（{formatJstDateTime(active.expiresAt)}まで）</> : null}
           {active.status === 'failed' ? active.failureReason ?? '書き出せませんでした' : null}
