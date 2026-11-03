@@ -16,6 +16,7 @@ import OpsMembersPage from './page'
 
 vi.mock('next/navigation',()=>({useRouter:()=>({replace:vi.fn(),push:vi.fn()}),usePathname:()=>'/ops/members'}))
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }))
+vi.mock('@/v8/settings/staff', () => ({ SelfSecurity: () => <section aria-label="自分の設定">パスキーを追加</section> }))
 
 const members = [
   { staffId: 's1', name: 'Kenta Kawano', email: 'kenta@musubo.jp', isActive: true, totpEnabled: true, lineLinked: false, inviteStatus: '', activationState: 'active', invitedAt: null, approvedBy: null, lastLoginAt: '2026-10-02T07:10:00.000+09:00', createdAt: '2026-09-01T00:00:00.000+09:00' },
@@ -59,40 +60,25 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('FvbHW メンバー管理の絵合わせ', () => {
-  it('頭・帯・招待・行が絵どおり', async () => {
+describe('運営メンバー管理の承認済みデザイン', () => {
+  it('検索・状態切替・招待と本人のパスキー設定を一覧の左右に出す', async () => {
     await act(async () => { root.render(<OpsMembersPage />) })
     await settle()
     const body = text()
-    // 見出し下の説明は共通の「？」から読む。説明の欠落と開閉の動きを検査する。
-    const help = host.querySelector<HTMLButtonElement>('button[aria-label="メンバー管理の説明"]')!
-    expect(help).toBeTruthy()
-    expect(help.getAttribute('aria-expanded')).toBe('false')
-    await act(async () => { help.click() })
-    expect(help.getAttribute('aria-expanded')).toBe('true')
-    expect(host.querySelector('[role="note"]')?.textContent).toContain('招待された人はパスワードを設定し')
-    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
-    expect(help.getAttribute('aria-expanded')).toBe('false')
+    expect(host.querySelector('input[aria-label="名前・メールで探す"]')).not.toBeNull()
+    expect(body).toContain('有効')
+    expect(body).toContain('止めた')
+    expect(body).toContain('招待する')
     expect(body).toContain('運営メンバー')
-    expect(body).toContain('運営の情報')
-    expect(body).not.toContain('権限者')
-    expect(body).toContain('有効 2・招待中 1')
-    expect(body).toContain('監査ログに記録')
-    expect(body).not.toContain('未設定 1人')
-    expect(host.querySelector('[title="二段階認証 設定済み 2人 / 3人・未設定 1人"]')).not.toBeNull()
-    // 招待の行
-    expect(body).toContain('招待メールを送る')
-    expect(body).not.toContain('運営メンバーを招待')
-    expect(body).not.toContain('キャンセル')
-    // 行
+    expect(host.querySelector('[aria-label="自分の設定"]')?.textContent).toContain('パスキーを追加')
     expect(body).toContain('Kenta Kawano（自分）')
     expect(body).toContain('10/02 07:10')
-    expect(body).toContain('10/01 22:40')
     expect(body).toContain('二段階認証待ち')
     expect(body).toContain('招待中')
-    const menu = host.querySelector<HTMLButtonElement>('button[aria-label="検証 次郎のその他操作"]') ?? Array.from(host.querySelectorAll<HTMLButtonElement>('button[data-row-menu]')).find(button => !button.disabled)!
-    expect(menu).toBeTruthy()
-    await act(async () => { menu.click() })
-    expect(document.body.textContent).toContain('停止する')
+    expect(body).not.toContain('今月の代理ログイン')
+    const invite = Array.from(host.querySelectorAll('button')).find(button => button.textContent?.includes('招待する'))!
+    await act(async () => { invite.click() })
+    expect(document.body.textContent).toContain('招待する人のメールアドレス')
+    expect(document.body.textContent).toContain('招待メールを送る')
   })
 })
