@@ -2,7 +2,14 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
-const fixture = vi.hoisted(() => ({ allowed: true, account: 'account-a', remove: vi.fn(), crumbs: [] as unknown[] }))
+const fixture = vi.hoisted(() => ({ allowed: true, account: 'account-a', remove: vi.fn(), crumbs: [] as unknown[], confirm: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.onConfirm) fixture.confirm = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 vi.mock('@/lib/use-feature-access', () => ({ usePermissionAccess: () => fixture.allowed }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.account }) }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {}, usePageCrumbs: (crumbs: unknown[]) => { fixture.crumbs = crumbs } }))
@@ -13,7 +20,7 @@ vi.mock('@/lib/api', async original => ({ ...(await original<typeof import('@/li
   deleteStaff: (...args: unknown[]) => fixture.remove(...args),
 } }))
 import StaffPage from './page'
-beforeEach(() => { verifiedStaffRole('owner'); fixture.allowed = true; fixture.account = 'account-a'; fixture.crumbs = []; fixture.remove.mockReset().mockResolvedValue({ ok: true }) })
+beforeEach(() => { verifiedStaffRole('owner'); fixture.allowed = true; fixture.account = 'account-a'; fixture.crumbs = []; fixture.confirm = null; fixture.remove.mockReset().mockResolvedValue({ ok: true }) })
 afterEach(() => { cleanup(); verifiedStaffRole(null) })
 
 it('どのスタッフにもシフト1つとメニュー1つ、編集と最後の削除を保つ', async () => {
@@ -100,4 +107,19 @@ it('スタッフ削除の対象を表示し、アカウント変更後の古い�
   fixture.account = 'account-a'; view.rerender(<StaffPage />)
   oldConfirm({ preventDefault() {}, stopPropagation() {} })
   expect(fixture.remove).not.toHaveBeenCalled()
+})
+
+it('閉じた佐藤の確認を田中の確認中に実行しても削除しない', async () => {
+  render(<StaffPage />)
+  await screen.findByText('佐藤')
+  fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  const oldConfirm = fixture.confirm!
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  fireEvent.click(screen.getByRole('button', { name: '田中のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  await oldConfirm()
+  expect(fixture.remove).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+  await waitFor(() => expect(fixture.remove).toHaveBeenCalledExactlyOnceWith('account-a', 's1'))
 })
