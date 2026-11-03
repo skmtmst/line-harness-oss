@@ -1,4 +1,8 @@
 'use client'
+
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import SegmentedControl from '@/components/shared/segmented'
 import { FOLDER_SELECT_COLORS } from '@/components/shared/folder-select'
 
@@ -44,7 +48,7 @@ import type { HqTemplate } from '@/lib/hq-templates-api'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import type { HqTemplateFolder,TemplateKind } from '@line-crm/shared'
 import { Archive,Bookmark,Braces,Check,CircleDashed,Copy,FileText,Inbox,Link,Pencil,Plus,Send,Sparkles,Trash2,Unlink,Users } from 'lucide-react'
-import { useMemo,useState,type ReactNode } from 'react'
+import { useContext,useMemo,useState,type ReactNode } from 'react'
 import storeStyles from '../templates/list.module.css'
 import { AttributeTabs,OtherTabPanel,assignmentMethods,cleanupTagCount,cleanupTagIds,matchesTagFilters,unusedTagCount,useAttributeTab,type TagUsageFilter } from './attribute-tabs'
 import attributeStyles from './attribute-tabs.module.css'
@@ -85,6 +89,12 @@ export default function HqStoreList(props: HqStoreListProps) {
   const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
   const [deletingFolder, setDeletingFolder] = useState<HqTemplateFolder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const folderGuard = useUnsavedGuard({
+    dirty: folderDialog !== null && (folderName !== (folderDialog.editing?.name ?? '') || folderColor !== (folderDialog.editing ? folderDisplayColor(folderDialog.editing) : FOLDER_SELECT_COLORS[0].value) || folderBusy),
+    busy: folderDialog !== null && folderBusy,
+    onDiscard: () => setFolderDialog(null),
+  })
   const [folderError, setFolderError] = useState('')
   const [folderNameError, setFolderNameError] = useState('')
   /* 送る版（revision）はいつも今の一覧から引く。409 で読み直したあとの2回目の保存が新しい版で通る。 */
@@ -532,6 +542,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       overlays={(
         <>
           {overlays}
+          <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={folderGuard.leaveTarget !== null} busy={folderBusy} onConfirm={folderGuard.confirmLeave} onCancel={folderGuard.cancelLeave} /></OverlayDepthContext.Provider>
           <FolderEditorDialog
             name={folderName} onNameChange={(next) => { setFolderName(next); setFolderNameError('') }} color={folderColor} onColorChange={setFolderColor}
             nameError={folderNameError || undefined}
@@ -542,7 +553,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             error={folderError || undefined}
             confirmLabel={folderDialog?.editing ? '保存する' : '追加する'}
             cancelLabel="やめる"
-            onCancel={() => { if (!folderBusy) setFolderDialog(null) }}
+            onCancel={() => folderGuard.guarded(() => setFolderDialog(null))}
             onConfirm={() => saveFolder()}
           />
           <ConfirmDialog

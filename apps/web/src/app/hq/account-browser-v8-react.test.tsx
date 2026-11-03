@@ -112,3 +112,11 @@ describe('V8 統括のアカウントを探す', () => {
     expect(person?.textContent).toContain('@shop11')
   })
 })
+it('統括のフォルダ名を編集中は画面移動前に確認する', async () => {
+  render(<><AccountBrowser /><a href="/events">イベントへ</a></>)
+  await screen.findByText('店舗22')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダの名前' }), { target: { value: '新しい分類' } })
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})

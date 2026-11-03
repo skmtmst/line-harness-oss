@@ -10,7 +10,7 @@ const FIELD_REQUIREMENTS = {
 import CodeBlock from '@/components/shared/code-block'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from '@/components/shared/list-navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { CircleHelp, Copy, Mail, Pause, Play, Plus, RefreshCw } from 'lucide-react'
 import { ApiError, api, type MeasurementSite } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -37,6 +37,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 /*
  * ★V8 サイトスクリプト（Pencil ）。
@@ -98,6 +101,16 @@ export default function SiteScriptV8() {
   const [siteDialog, setSiteDialog] = useState<SiteDialogState | null>(null)
   const [siteBusy, setSiteBusy] = useState(false)
   const [stopDialog, setStopDialog] = useState<{ site: MeasurementSite; reason: string; error: string | null } | null>(null)
+  const depth = useContext(OverlayDepthContext)
+  const siteChanged = siteDialog !== null && (siteDialog.mode === 'create'
+    ? siteDialog.label !== '' || siteDialog.domainsText !== ''
+    : siteDialog.label !== siteDialog.site.label || siteDialog.domainsText !== siteDialog.site.domains.join('\n'))
+  const editingBusy = siteBusy && (siteDialog !== null || stopDialog !== null)
+  const guard = useUnsavedGuard({
+    dirty: siteChanged || Boolean(stopDialog?.reason) || editingBusy,
+    busy: editingBusy,
+    onDiscard: () => { setSiteDialog(null); setStopDialog(null) },
+  })
   const [resumeTarget, setResumeTarget] = useState<MeasurementSite | null>(null)
   const [siteActionError, setSiteActionError] = useState('')
   const [helpOpen, setHelpOpen] = useState(false)
@@ -522,6 +535,10 @@ export default function SiteScriptV8() {
           </div>
         ) : null}
       </Dialog>
+
+      <OverlayDepthContext.Provider value={depth + 2}>
+        <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={editingBusy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+      </OverlayDepthContext.Provider>
 
       <ConfirmDialog
         open={resumeTarget !== null}

@@ -345,3 +345,16 @@ it('アーカイブの口は消さずに POST で送る', async () => {
   expect(calls[0].method).toBe('POST')
   expect(new URL(calls[0].url).pathname).toBe('/api/webinars/webinar-1/archive')
 })
+it('ウェビナーのフォルダ名を編集中は画面移動前に確認する', async () => {
+  await start()
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  const dialog = screen.getByRole('dialog')
+  fireEvent.change(dialog.querySelector('[data-folder-name-color] input')!, { target: { value: '商品説明' } })
+  const link = document.createElement('a')
+  link.href = '/events'
+  link.textContent = 'イベントへ'
+  document.body.append(link)
+  fireEvent.click(link)
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  link.remove()
+})

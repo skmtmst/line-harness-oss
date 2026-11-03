@@ -8,7 +8,10 @@ const FIELD_REQUIREMENTS = {
 
 
 import { formatDate as polishFormatDate, formatNumber, formatYen } from '@/lib/format'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { AtSign, Check, Music, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api, type AdPlatform } from '@/lib/api'
@@ -166,6 +169,16 @@ export default function AdsV8() {
   const [manualRouteId, setManualRouteId] = useState('')
   const [manualDay, setManualDay] = useState('')
   const [manualAmount, setManualAmount] = useState('')
+  const depth = useContext(OverlayDepthContext)
+  const editingBusy = (manualOpen && manualBusy) || (cancelTarget !== null && cancelBusy)
+  const guard = useUnsavedGuard({
+    dirty: Boolean((manualOpen && (manualLabel || manualRouteId || manualDay || manualAmount)) || (cancelTarget && cancelReason) || editingBusy),
+    busy: editingBusy,
+    onDiscard: () => {
+      if (manualOpen) { setManualOpen(false); setManualLabel(''); setManualRouteId(''); setManualDay(''); setManualAmount('') }
+      if (cancelTarget) { setCancelTarget(null); setCancelReason('') }
+    },
+  })
   const manage = canManage && !readonly
 
   const load = useCallback(async () => {
@@ -583,6 +596,10 @@ export default function AdsV8() {
           </div>
         ) : null}
       </Dialog>
+
+      <OverlayDepthContext.Provider value={depth + 2}>
+        <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={editingBusy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+      </OverlayDepthContext.Provider>
 
       {connectionTarget && selectedAccountId ? (
         <AdConnectionDialog

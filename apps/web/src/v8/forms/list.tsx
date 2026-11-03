@@ -1,6 +1,9 @@
 'use client'
 
 import { renderFormDialogs } from './list-dialogs'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { VIEWER_NOTE } from './list-helpers'
 import { loadFormsPage } from './list-load'
 
@@ -13,7 +16,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleCheck,ClipboardList,Inbox,Percent,Plus,TriangleAlert } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { useCallback,useEffect,useMemo,useRef,useState,type MouseEvent as ReactMouseEvent,type ReactNode } from 'react'
+import { useCallback,useContext,useEffect,useMemo,useRef,useState,type MouseEvent as ReactMouseEvent,type ReactNode } from 'react'
 
 import Link from '@/components/shared/list-navigation'
 import { RowNameLink,StatusCell } from '@/components/shared/table'
@@ -153,6 +156,12 @@ export default function FormsListV8() {
   const [renameRevision, setRenameRevision] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState('')
+  const overlayDepth = useContext(OverlayDepthContext)
+  const renameGuard = useUnsavedGuard({
+    dirty: renameTarget !== null && (renameName !== displayFormName(renameTarget.name) || renaming),
+    busy: renameTarget !== null && renaming,
+    onDiscard: () => { setRenameTarget(null); setRenameError('') },
+  })
   /* 受付を止める。止めるにも編集の版が要るので影響口で読む。 */
   const [stopTarget, setStopTarget] = useState<Form | null>(null)
   const [stopScope, setStopScope] = useState<typeof accountScope.current | null>(null)
@@ -536,8 +545,7 @@ export default function FormsListV8() {
 
   const closeRename = () => {
     if (renaming) return
-    setRenameTarget(null)
-    setRenameError('')
+    renameGuard.guarded(() => { setRenameTarget(null); setRenameError('') })
   }
 
   const openStop = async (form: Form) => {
@@ -1194,7 +1202,7 @@ export default function FormsListV8() {
     <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null
 
-  const overlays = <>{renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms, detailGuard })}{detailGuard.dialog}</>
+  const overlays = <>{renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms, detailGuard })}{detailGuard.dialog}<OverlayDepthContext.Provider value={overlayDepth + 2}><UnsavedLeaveDialog open={renameGuard.leaveTarget !== null} busy={renaming} onConfirm={renameGuard.confirmLeave} onCancel={renameGuard.cancelLeave} /></OverlayDepthContext.Provider></>
 
   return (
     /* 一覧の状態（読込中・失敗・空・表）を外から待てるように出す。箱は作らない（display: contents）。 */
