@@ -208,12 +208,12 @@ export default function HqSupportV8() {
       title="お問い合わせ"
       help="使い方の質問・不具合・料金の相談を運営へ送れます。返信は登録メールアドレスと、「これまでの問い合わせ」タブに届きます（平日 2 営業日以内）。"
       folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}
-      tabs={<Tabs label="問い合わせの表示" items={[
-        { id: `${uid}-history-tab`, controls: `${uid}-history`, label: 'これまでの問い合わせ', current: tab === 'history', onClick: () => setChosenTab('history') },
-        { id: `${uid}-send-tab`, controls: `${uid}-send`, label: '問い合わせを送る', current: tab === 'send', onClick: () => setChosenTab('send') },
-      ]} />}
     >
       <PageContent>
+        <Tabs label="問い合わせの表示" items={[
+          { id: `${uid}-history-tab`, controls: `${uid}-history`, label: 'これまでの問い合わせ', current: tab === 'history', onClick: () => setChosenTab('history') },
+          { id: `${uid}-send-tab`, controls: `${uid}-send`, label: '問い合わせを送る', current: tab === 'send', onClick: () => setChosenTab('send') },
+        ]} />
         {/* 契約者専用LINEの登録案内（2026-09-18 決定：ここからもいつでも開ける。開いた状態が板 D6fh3） */}
         {!tenantUnavailable ? <NoticeLineDialogV8 open={lineGuide} onClose={() => setLineGuide(false)} /> : null}
 

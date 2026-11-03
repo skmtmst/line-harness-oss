@@ -1,3 +1,4 @@
+import './contents-media-test-mocks.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -160,7 +161,6 @@ vi.mock('./file-scan.js', () => ({
   ensureFileScanForUpload: vi.fn(async () => ({ id: 'scan-test-1' })),
 }));
 
-vi.mock('../services/media-upload-storage.js', async importOriginal => ({ ...await importOriginal<typeof import('../services/media-upload-storage.js')>(), copyMediaUpload: vi.fn(async () => true) }));
 const { contents } = await import('./contents.js');
 // 実物のエラークラス（モックは actual を引き継ぐので本物の instanceof が効く）
 const { MediaVersionIncompatibleError } = await import('@line-crm/db');
@@ -171,7 +171,7 @@ const del = vi.fn().mockResolvedValue(undefined);
 const head = vi.fn();
 const get = vi.fn();
 const env = {
-  DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) } as unknown as D1Database,
+  DB: { prepare: () => ({ bind: () => ({ first: async () => null, all: async () => ({ results: [] }) }) }) } as unknown as D1Database,
   IMAGES: { put, delete: del, head, get } as unknown as R2Bucket,
   WORKER_URL: 'https://api.example.com',
   CF_ACCOUNT_ID: 'cf-account',

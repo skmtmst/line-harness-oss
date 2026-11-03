@@ -72,6 +72,12 @@ it('当日の数は開始日で数え、退店済みは未配席に数えない'
  const {container}=render(<TodayView {...props} rows={[prior,completed,current,linked] as never}/>)
  const labels=[...container.querySelectorAll('[data-kpi-label]')]
  const card=(label:string)=>labels.find(node=>node.textContent?.trim()===label)?.closest('[data-kpi-presentation]')
- expect(card('今日の予約')?.textContent).toContain('3件')
+ expect(card('選んだ日の予約')?.textContent).toContain('3件')
+ expect(card('今日の予約')).toBeUndefined()
  expect(card('未配席')?.textContent).toContain('1件')
+})
+
+it('今日を開いている時は今日の予約と表示する',()=>{
+ const {container}=render(<TodayView {...props} isToday />)
+ expect([...container.querySelectorAll('[data-kpi-label]')].some(node=>node.textContent?.trim()==='今日の予約')).toBe(true)
 })

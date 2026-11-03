@@ -473,6 +473,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         onComposerInsert={(alsoSave) => void hostSave(alsoSave)}
         boardId="J60utH"
         title={id ? 'カルーセルを編集' : 'カルーセルを作る'}
+        status={host || loading || loadFailed ? undefined : saving ? '保存しています' : saveFailed ? '保存できませんでした' : dirty ? '未保存の変更があります' : id || createdId ? '保存済み' : '下書きはまだ保存していません'}
         description={`横にめくるカード。最大 ${MAX_COLUMNS} 枚`}
         side={(
           <>

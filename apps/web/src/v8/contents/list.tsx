@@ -1384,7 +1384,7 @@ export default function MediaLibraryListV8() {
               />
             </div>
           ) : (
-            <ListPageCards columns={view === 'grid' ? 4 : 1}>
+            <ListPageCards key={view} columns={view === 'grid' ? 4 : 1}>
               {current.map((item) => (
                 <MediaCardV8
                   key={item.id}

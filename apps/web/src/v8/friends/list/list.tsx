@@ -1006,6 +1006,7 @@ export default function FriendsListV8() {
   return (
     <KpiValueMotionProvider scope={selectedAccountId ? JSON.stringify([selectedAccountId, jstDate().slice(0, 7)]) : null}>
     <ListPage
+      tableInset
       heightMode="content"
       skeleton
       boardId="x6QsVz"

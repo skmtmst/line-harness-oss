@@ -12,9 +12,9 @@ export function groupedNumber(value: unknown): string | undefined {
  const [integer,decimal]=raw.split('.')
  return integer.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(decimal===undefined?'':`.${decimal}`)
 }
-export type NumberFieldProps = ComponentProps<typeof TextField> & {unit?:string;note?:ReactNode;numericText?:boolean;/** 回数・倍率のような短い数。 */short?:boolean}
+export type NumberFieldProps = ComponentProps<typeof TextField> & {unit?:string;leadingAdornment?:ReactNode;note?:ReactNode;numericText?:boolean;/** 回数・倍率のような短い数。 */short?:boolean}
 /** ネイティブの値・入力途中・イベントを保ち、非編集中の表示だけを整える。 */
-const NumberField = forwardRef<HTMLInputElement, NumberFieldProps>(function NumberField({unit,note,numericText=false,short=false,min,max,invalid,onFocus,onBlur,onChange,...props},ref){
+const NumberField = forwardRef<HTMLInputElement, NumberFieldProps>(function NumberField({unit,leadingAdornment,note,numericText=false,short=false,min,max,invalid,onFocus,onBlur,onChange,...props},ref){
  const field=useFieldContext(),unitId=useId()
  const [focused,setFocused]=useState(false),[draft,setDraft]=useState(props.defaultValue ?? '')
  const inputRef=useRef<HTMLInputElement>(null)
@@ -42,7 +42,7 @@ const NumberField = forwardRef<HTMLInputElement, NumberFieldProps>(function Numb
   <span className={styles.row} data-short={short||undefined} data-number-formatted={overlay||undefined}>
    <AffixedTextField {...props} layout="field" id={props.id ?? field?.controlId} ref={inputRef} type={numericText?'text':'number'} inputMode={props.inputMode ?? (numericText?'decimal':undefined)} min={min} max={max} invalid={invalid || field?.invalid} aria-label={props['aria-label'] ?? field?.label} aria-required={props['aria-required'] ?? (field?.required || undefined)} aria-describedby={joinDescribedBy(props['aria-describedby'],field?.describedBy,unit?unitId:undefined)}
     onFocus={event=>{setFocused(true);onFocus?.(event)}} onBlur={event=>{setFocused(false);onBlur?.(event)}} onChange={event=>{setDraft(event.currentTarget.value);onChange?.(event)}}
-    endAdornment={unit?<span id={unitId} className={styles.unit} data-number-unit>{unit}</span>:undefined}/>
+    startAdornment={leadingAdornment} endAdornment={unit?<span id={unitId} className={styles.unit} data-number-unit>{unit}</span>:undefined}/>
    {overlay?<span className={styles.formatted} style={{maxWidth:displayWidth}} aria-hidden="true" data-number-display>{formatted}</span>:null}
   </span>
  </Field>

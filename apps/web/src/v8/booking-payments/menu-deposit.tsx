@@ -3,7 +3,7 @@ import { yenPercent } from '@line-crm/shared';
 import { formatYen as yen } from '@line-crm/shared';
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowRight, CreditCard } from 'lucide-react'
+import { CreditCard } from 'lucide-react'
 import Card, { CardHeader } from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
 import HelpTip from '@/components/shared/help-tip'
@@ -67,7 +67,7 @@ export function BookingMenuPaymentCard({ payment, deposit, price, readOnly }: { 
   const amount = rule && price !== null && rule.value ? (rule.kind === 'percent' ? yenPercent(price, rule.value) : Math.min(rule.value, price)) : null
   const header = <CardHeader size="stacked" title="お支払い" help={<HelpTip label="お支払いの説明">いつもの方法は予約設定 › お支払いのとおりです。デポジットは予約のときに一部を先に払ってもらい、残りはお店で払います。</HelpTip>} />
   if (payment.status === 'loading') return <Card variant="form" gap="normal">{header}<p className={styles.minor}>お支払いの設定を読み込んでいます…</p></Card>
-  if (!payment.connected) return <Card variant="form" gap="normal">{header}<p className={styles.sideCardLink}><CreditCard size={16} aria-hidden="true" />先払い・デポジットを受けるには<TextLink href="/booking/menus?tab=payments">お支払いをつなぐ<ArrowRight size={16} aria-hidden="true" /></TextLink></p></Card>
+  if (!payment.connected) return <Card variant="form" gap="normal">{header}<p className={styles.sideCardLink}><CreditCard size={16} aria-hidden="true" />先払い・デポジットを受けるには<TextLink href="/booking/menus?tab=payments">お支払いをつなぐ</TextLink></p></Card>
   if (readOnly) return <Card variant="form" gap="normal">{header}<p className={styles.readValue}>{payment.value === 'customer_choice' ? MODE_LABEL.customer_choice : choice === 'deposit' ? 'デポジット（一部）' : choice === 'default' ? `いつもの方法（${MODE_LABEL[payment.defaultMode]}）` : MODE_LABEL[choice]}</p></Card>
   return (
     <Card variant="form" gap="normal">

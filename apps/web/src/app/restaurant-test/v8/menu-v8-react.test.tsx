@@ -8,6 +8,7 @@ const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createMenu: vi.fn(), upda
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 
+import { api, ApiError } from '@/lib/api'
 import MenuV8 from '@/v8/restaurant/menu/menu'
 import MenuEditV8 from '@/v8/restaurant/menu/edit'
 const nav = vi.hoisted(() => ({ params: new URLSearchParams('id=m1') }))
@@ -80,6 +81,46 @@ describe('MJoJR メニュー管理のV8', () => {
     fireEvent.change(await screen.findByDisplayValue('秋の鹿肉コース'), { target: { value: '冬の鹿肉コース' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ name: '冬の鹿肉コース' })))
+  })
+
+  it('説明と店舗の登録画像を選び、保存時に送る', async () => {
+    vi.spyOn(api.media, 'list').mockResolvedValue({ success:true, data:{ items:[{id:'media-test',filename:'架空.png',lineAccountId:'account-1',kind:'image'}], total:1, limit:20, offset:0 } } as never)
+    render(<MenuEditV8 />)
+    fireEvent.change(await screen.findByLabelText('メニューの説明'), { target: { value: '季節の説明' } })
+    fireEvent.click(screen.getByRole('button', { name: '登録メディアから選ぶ' }))
+    fireEvent.click(await screen.findByRole('option', { name: /架空.png/ }))
+    expect(screen.getByText('選択中の画像名を確認しています')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1','m1',expect.objectContaining({ description:'季節の説明', imageMediaId:'media-test' })))
+  })
+
+  it('画像の実体を読めない場合は画像なしと表示する', async () => {
+    fixture.snapshot.mockResolvedValue({ data: { ...data, menuItems: data.menuItems.map((item, index) => index === 0 ? { ...item, image_media_id: 'missing-image' } : item) } })
+    vi.spyOn(api.media, 'detail').mockResolvedValue({ success:true, data:{ item:{ filename:'missing.png' } } } as never)
+    render(<MenuEditV8 />)
+    const image = await screen.findByAltText('選択したメニューの画像')
+    fireEvent.error(image)
+    expect(await screen.findByText('画像を読めません。登録メディアから選び直してください。')).toBeTruthy()
+    expect(screen.queryByText(/選択中：/)).toBeNull()
+    expect(screen.queryByAltText('選択したメニューの画像')).toBeNull()
+  })
+
+  it('画像が利用できず保存に失敗したら画像欄に選び直しを案内する', async () => {
+    fixture.updateMenu.mockRejectedValueOnce(new ApiError(400, '画像を選び直してください', 'MENU_IMAGE_UNAVAILABLE'))
+    render(<MenuEditV8 />)
+    fireEvent.change(await screen.findByDisplayValue('秋の鹿肉コース'), { target:{value:'変更した名前'} })
+    fireEvent.click(screen.getByRole('button', { name:'保存する' }))
+    expect(await screen.findByText('選択した画像を利用できません。登録メディアから選び直してください。')).toBeTruthy()
+    expect(screen.getByDisplayValue('変更した名前')).toBeTruthy()
+  })
+
+  it('必須項目がない時は保存できない理由を表示する', async () => {
+    nav.params = new URLSearchParams('store=store-1')
+    try {
+      render(<MenuEditV8 />)
+      expect(await screen.findByText('名前と値段を入力してください。')).toBeTruthy()
+      expect((screen.getByRole('button', { name:'保存して追加する' }) as HTMLButtonElement).disabled).toBe(true)
+    } finally { nav.params = new URLSearchParams('id=m1') }
   })
 
   it('変更は窓（NkmwU）ではなく 1 枚の編集ページ（板 mauOC）', async () => {

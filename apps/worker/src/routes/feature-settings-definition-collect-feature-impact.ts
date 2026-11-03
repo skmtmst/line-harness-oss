@@ -217,7 +217,7 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'dependent',
         targetType: '素材への利用参照',
-        fromWhere: `FROM media_usages u JOIN media m ON m.id = u.media_id AND m.line_account_id = ?`,
+        fromWhere: `FROM media m WHERE m.line_account_id = ? AND (EXISTS (SELECT 1 FROM media_usages u WHERE u.media_id = m.id) OR m.id IN (SELECT image_media_id FROM rt_menu_items WHERE image_media_id IS NOT NULL))`,
         idColumn: 'm.id',
         params: 1,
       },
