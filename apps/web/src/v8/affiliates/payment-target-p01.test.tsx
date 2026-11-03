@@ -19,9 +19,11 @@ it('確認したアカウントを表示し、切り替え後の古い窓から�
   await screen.findByRole('button', { name: /100.*確定する/ })
   expect(screen.getByTestId('operation-account').textContent).toBe('account-a')
   view.rerender(<AffiliatePaymentConfirmDialog {...props} accountId="account-b" />)
+  expect(screen.getByTestId('operation-account').textContent).toBe('account-a')
   view.rerender(<AffiliatePaymentConfirmDialog {...props} accountId="account-a" />)
-  const button = screen.queryByRole('button', { name: /100.*確定する/ })
-  if (button) fireEvent.click(button)
+  const button = await screen.findByRole('button', { name: /100.*確定する/ })
+  expect(screen.getByText(/対象が変わりました/)).toBeTruthy()
+  fireEvent.click(button)
   expect(calls.confirm).not.toHaveBeenCalled()
   expect(screen.getByTestId('operation-account').textContent).toBe('account-a')
 })
@@ -31,6 +33,12 @@ it('確認した同じアカウントに確定を送る', async () => {
   render(<AffiliatePaymentConfirmDialog {...props} accountId="account-a" />)
   fireEvent.click(await screen.findByRole('button', { name: /100.*確定する/ }))
   expect(calls.confirm).toHaveBeenCalledWith('person', expect.objectContaining({ lineAccountId: 'account-a', expectedAmount: 100 }))
+})
+
+it('アカウントが未確定の場合は不明であることを知らせる', async () => {
+  render(<AffiliatePaymentConfirmDialog {...props} accountId="" />)
+  expect(await screen.findByText(/対象のLINEアカウントを確認できません/)).toBeTruthy()
+  expect((await screen.findByRole('button', { name: /100.*確定する/ }) as HTMLButtonElement).disabled).toBe(true)
 })
 
 it('閉じた窓の古い操作は実行しない', async () => {

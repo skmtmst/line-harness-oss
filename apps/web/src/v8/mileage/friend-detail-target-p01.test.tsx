@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const state = vi.hoisted(() => ({ account: 'a', entryAccount: 'a' as string | null, confirm: vi.fn(), voidEntry: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/mileage/friend', useSearchParams: () => new URLSearchParams('id=f1') }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, loading: false }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'a', name: '店A' }, { id: 'other', name: '店B' }] }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('@/lib/api', async original => {
@@ -40,9 +41,24 @@ it('明細のアカウントを実行先に使う', async () => {
  fireEvent.click(await screen.findByRole('button', { name: /操作/ }))
  fireEvent.click(await screen.findByRole('menuitem', { name: '確定する' }))
  const dialog = await screen.findByRole('dialog')
+ expect(await within(dialog).findByText('店B')).toBeTruthy()
+ expect(within(dialog).getByText('10 マイル')).toBeTruthy()
  fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: '確認した理由' } })
  fireEvent.click(within(dialog).getByRole('button', { name: /この理由で確定する/ }))
  expect(state.confirm).toHaveBeenCalledWith('e1', { accountId: 'other', reason: '確認した理由' })
+})
+
+it('取消しも明細の所属アカウントに送る', async () => {
+ state.entryAccount = 'other'
+ state.voidEntry.mockResolvedValue({ success: false, error: 'test' })
+ render(<FriendDetail />)
+ fireEvent.click(await screen.findByRole('button', { name: /操作/ }))
+ fireEvent.click(await screen.findByRole('menuitem', { name: '取消す' }))
+ const dialog = await screen.findByRole('alertdialog')
+ expect(await within(dialog).findByText('店B')).toBeTruthy()
+ fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: '取消の理由' } })
+ fireEvent.click(within(dialog).getByRole('button', { name: /この理由で取消す/ }))
+ expect(state.voidEntry).toHaveBeenCalledWith('e1', { accountId: 'other', reason: '取消の理由' })
 })
 
 it('明細のアカウントが不明なら選択中のアカウントを代用しない', async () => {

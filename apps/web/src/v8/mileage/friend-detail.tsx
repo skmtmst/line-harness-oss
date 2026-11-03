@@ -117,7 +117,7 @@ function FriendDetailInner() {
   const canConfigureAdjustmentPolicy = isOwnerRole(useStaffRole())
   const [adjustmentOpen, setAdjustmentOpen] = useState(false)
   const [adjustMode, setAdjustMode] = useState<'increase' | 'decrease'>('increase')
-  const [pendingAction, setPendingAction] = useState<{ entryId: string; kind: 'confirm' | 'void'; label: string; accountId: string; generation: number } | null>(null)
+  const [pendingAction, setPendingAction] = useState<{ entryId: string; kind: 'confirm' | 'void'; label: string; amount: number; accountId: string; generation: number } | null>(null)
   const pendingActionRef = useRef<typeof pendingAction>(null)
   const [pendingReason, setPendingReason] = useState('')
   const [pendingBusy, setPendingBusy] = useState(false)
@@ -358,7 +358,7 @@ function FriendDetailInner() {
   const rowMenuOf = (item: MileageDetailHistoryItem): ActionMenuItem[] => {
     const items: ActionMenuItem[] = []
     const openPendingAction = (kind: 'confirm' | 'void') => {
-      const action = { entryId: item.id, kind, label: item.reason ?? '', accountId: item.lineAccountId ?? '', generation: accountScope.current.generation }
+      const action = { entryId: item.id, kind, label: item.reason ?? '', amount: item.amount, accountId: item.lineAccountId ?? '', generation: accountScope.current.generation }
       pendingActionRef.current = action
       setPendingAction(action)
       setPendingReason('')
@@ -617,12 +617,13 @@ function FriendDetailInner() {
         onConfirm={() => runPendingAction()}
         onCancel={() => { if (!pendingBusy) { pendingActionRef.current = null; setPendingAction(null); setPendingReason(''); setPendingError('') } }}
       >
-        <div className={styles.dlgBody}>
+        <div className={`${styles.dlgBody} ${styles.dlgTargetBody}`}>
           <OperationTargetSummary accounts={[{ id: pendingAction?.accountId ?? '' }]} externalTarget={{ label: '対象件数', name: pendingAction ? '1件' : null }} />
           <div className={styles.dlgPerson}>
             <div className={styles.dlgPersonText}>
               <span className={styles.dlgPersonSub}>対象の記録</span>
               <span className={styles.dlgPersonName}>{pendingAction?.label}</span>
+              <span className={styles.dlgPersonName}>{`${formatMileageNumber(pendingAction?.amount)} マイル`}</span>
             </div>
           </div>
           <Field label="理由" htmlFor="mileage-pending-reason" required>

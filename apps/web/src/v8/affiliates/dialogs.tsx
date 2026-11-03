@@ -322,7 +322,7 @@ export function AffiliatePaymentConfirmDialog({
         </DialogActions>)}>
         <div className="space-y-3 px-6 py-5">
       <OperationTargetSummary accounts={[{ id: scope?.accountId ?? '' }]} />
-      {(!scope?.accountId || scope.stale) ? <Notice tone="warn" message="対象が変わりました。閉じてから確認し直してください。" /> : null}
+      {(!scope?.accountId || scope.stale) ? <Notice tone="warn" message={!scope?.accountId ? '対象のLINEアカウントを確認できません。閉じてから確認し直してください。' : '対象が変わりました。閉じてから確認し直してください。'} /> : null}
       {phase === 'loading' ? (
         <ListState kind="loading" title="確定する内容を読み込んでいます" />
       ) : phase === 'error' ? (
