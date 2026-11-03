@@ -13,8 +13,9 @@ import styles from './select.module.css'
 import pillStyles from './status-pill.module.css'
 import { useSelectContentWidth } from './use-select-content-width'
 import IconButton from './icon-button'
+import { FolderNarrowActionsContext, uniqueFolderAction } from './folder-narrow-context'
 
-import type { SelectCreateContext, SelectOption, SelectProps } from './select-types'
+import type { SelectCreateAction, SelectCreateContext, SelectOption, SelectProps } from './select-types'
 export type { SelectOption, SelectCreateContext, SelectCreateAction, SelectProps } from './select-types'
 
 /*
@@ -50,10 +51,13 @@ export default function Select({
   value,
   width,
   treatment = 'box',
-  createAction,
+  createAction: explicitCreateAction,
   menuHeading,
   menuAlign,
 }: SelectProps) {
+  const narrowFolderActions = React.useContext(FolderNarrowActionsContext)
+  const narrowFolderAction = ariaLabel === 'フォルダ' ? uniqueFolderAction(narrowFolderActions, action => (JSON.parse(action.rowIds) as string[]).every(id => suppliedOptions.some(option => option.value === id))) : undefined
+  const createAction: SelectCreateAction | undefined = explicitCreateAction ?? (narrowFolderAction ? { label: narrowFolderAction.label, disabled: narrowFolderAction.disabled, lockedReason: narrowFolderAction.lockedReason, onSelect: narrowFolderAction.run } : undefined)
   // Width is a visual preset; a duration selector may use it too. The role
   // comes from the explicit flag or the control's accessible page-size name.
   const isPageSizeControl = pageSizeControl || /表示件数|1ページ|件表示/.test(ariaLabel ?? label ?? '')
@@ -178,6 +182,7 @@ export default function Select({
       if (permission.reason) menuRef.current?.querySelector<HTMLButtonElement>('[data-select-menu-action]')?.focus()
       return
     }
+    if (createAction?.onSelect) { setOpen(false); createAction.onSelect(); return }
     createSessionRef.current += 1
     setMode('create')
   }
@@ -334,7 +339,7 @@ export default function Select({
             if (!next || menuRef.current?.contains(next) || rootRef.current?.contains(next)) return
             setOpen(false)
           }}
-          panel={hasCreate && mode === 'create' && createAction ? createAction.render(createContext(createSessionRef.current)) : undefined}
+          panel={hasCreate && mode === 'create' && createAction?.render ? createAction.render(createContext(createSessionRef.current)) : undefined}
           footer={hasCreate && createAction ? (
             <SelectMenuAction
               label={createAction.label}

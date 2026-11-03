@@ -2,7 +2,7 @@
 'use client'
 
 import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation'
-import { Fragment, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useCallback, useState, type CSSProperties, type ReactNode } from 'react'
 import { CollapsedFolderActions, type FolderPanelRow } from '@/components/shared/folder-panel'
 import Select from '@/components/shared/select'
 import { ListToolbarLeading } from '@/components/shared/list-toolbar'
@@ -11,6 +11,7 @@ import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { ListFolderContext } from '@/components/shared/list-folder-context'
+import { FolderNarrowContext, FolderNarrowActionsContext, folderRowIds, uniqueFolderAction, type FolderNarrowAction } from '@/components/shared/folder-narrow-context'
 
 /**
  * 左の列（フォルダ・タグ・設定のメニュー）を、白い板が狭いとき（1100 未満）に
@@ -97,18 +98,25 @@ export function ListPageStats({ children }: { children: ReactNode }) {
 
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
 export function ListPageBody({ readOnly, readOnlyNeed, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, tableInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, explanationInset = 'notice', listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
+  const [folderActions, setFolderActions] = useState<FolderNarrowAction[]>([])
+  const registerFolderAction = useCallback((action: FolderNarrowAction) => {
+    setFolderActions(current => [...current.filter(item => item.key !== action.key), action])
+    return () => setFolderActions(current => current.filter(item => item.key !== action.key))
+  }, [])
+  const availableFolderActions = readOnly ? [] : folderActions
   const navs = listFolderNavs(folderNav)
   const hasFolders = hasListFolders({ folderNav, folders, collapsedFolders, children })
   const noFolderChoices = navs.length > 0 && navs.every(nav => nav.rows.length <= 1)
-  const visibleNavs = navs.filter(nav => nav.rows.length > 1 || nav.createAction || nav.rows.find(row=>row.id===nav.activeId)?.leadingActions?.length)
-  const collapsed = collapsedFolders ?? (visibleNavs.length > 0 ? visibleNavs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
+  const visibleNavs = navs.filter(nav => nav.rows.length > 1 || nav.createAction || nav.rows.find(row=>row.id===nav.activeId)?.leadingActions?.length || availableFolderActions.some(action => action.rowIds === folderRowIds(nav.rows)))
+  const collapsedContent = collapsedFolders ?? (visibleNavs.length > 0 ? visibleNavs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} addFolder={uniqueFolderAction(availableFolderActions, action => action.rowIds === folderRowIds(nav.rows))} />) : null)
+  const collapsed = collapsedContent ? <FolderNarrowActionsContext.Provider value={availableFolderActions}>{collapsedContent}</FolderNarrowActionsContext.Provider> : null
   const help = listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null
   const helpAtEnd = listHelpPlacement === 'end' && Boolean(toolbar)
-  return <ListFolderContext.Provider value={hasFolders}><div className={styles.listBody} data-list-folders={hasFolders} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} data-table-inset={tableInset || undefined} style={fillWidth ? { width: '100%' } : undefined}>
+  return <FolderNarrowContext.Provider value={registerFolderAction}><ListFolderContext.Provider value={hasFolders}><div className={styles.listBody} data-list-folders={hasFolders} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} data-table-inset={tableInset || undefined} style={fillWidth ? { width: '100%' } : undefined}>
     {readOnly ? <ReadOnlyNotice scope={readOnly === 'hq' ? 'hq' : 'store'} need={readOnlyNeed} /> : null}
     {stats ? <ListPageStats>{stats}</ListPageStats> : null}
     <div className={styles.split} data-template-region="body">
-      {folders && !noFolderChoices ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
+      {folders ? noFolderChoices ? <div hidden>{folders}</div> : <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
       <div className={styles.main}>
         {toolbar || collapsed || listHelp || explanation ? <div className={styles.toolbar} data-explanation-only={explanation && !toolbar && !collapsed && !listHelp || undefined} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp || explanation || noFolderChoices ? undefined : ''}>
           {explanation ? <div className={styles.explanation}><PageExplanationBody keepMounted inset={explanationInset === 'notice' ? 'notice' : undefined}>{explanation}</PageExplanationBody></div> : null}
@@ -119,15 +127,15 @@ export function ListPageBody({ readOnly, readOnlyNeed, skeleton, stats, folders,
         {pagination ? <div className={styles.pagination} data-template-region="pagination">{pagination}</div> : null}
       </div>
     </div>{overlays}
-  </div></ListFolderContext.Provider>
+  </div></ListFolderContext.Provider></FolderNarrowContext.Provider>
 }
 /** folderNav から組む、畳んだときの「作る・フォルダを選ぶ欄」。 */
-function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'フォルダ', width }: ListFolderNav) {
+function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'フォルダ', width, addFolder }: ListFolderNav & { addFolder?: FolderNarrowAction }) {
   const selected = rows.find((row) => row.id === activeId)
   return <>
     {createAction ? <span className={styles.collapsedCreate}>{createAction}</span> : null}
-    {rows.length > 1 ? <span className={styles.collapsedSelect} style={width ? { minWidth: width } : undefined}>
-      <Select size="content" aria-label={label} value={activeId} onChange={onSelect} options={rows.map((row) => ({ value: row.id, label: `${label}：${row.label}` }))} />
+    {rows.length > 1 || addFolder ? <span className={styles.collapsedSelect} style={width ? { minWidth: width } : undefined}>
+      <Select size="content" aria-label={label} value={activeId} onChange={onSelect} options={rows.map((row) => ({ value: row.id, label: `${label}：${row.label}` }))} createAction={addFolder ? { label: addFolder.label, disabled: addFolder.disabled, lockedReason: addFolder.lockedReason, onSelect: addFolder.run } : undefined} />
     </span> : null}
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>

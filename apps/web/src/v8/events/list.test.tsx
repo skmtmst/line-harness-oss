@@ -6,7 +6,7 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -35,6 +35,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: account.id, loading: false }),
+  useOptionalAccount: () => ({ selectedAccountId: account.id, loading: false }),
 }))
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '対象の店' }, { id: 'account-b', name: 'もう一つの店' }] })) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
@@ -44,6 +45,14 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import EventsListV8 from './list'
+
+it('イベント一覧の畳んだフォルダ欄から追加の窓を開ける', async () => {
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  const menu = document.querySelector('[data-select-menu]') as HTMLElement
+  fireEvent.click(within(menu).getByRole('button', { name: 'フォルダを追加' }))
+  expect(await screen.findByRole('textbox', { name: 'フォルダ名' })).toBeTruthy()
+})
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
