@@ -443,7 +443,13 @@ jobs:
       - name: Reject restored legacy admin appearance
         run: node apps/web/scripts/verify-v8-only.mjs
       - run: pnpm --config.enable-pre-post-scripts=false --filter web typecheck
-      - run: pnpm --config.enable-pre-post-scripts=false --filter web test
+      # The route-permission matrix expands to thousands of cases. When it shares
+      # a long-lived Vitest fork with the rest of the suite, Node can exhaust its
+      # heap on the hosted runner. Run the matrix in a fresh process.
+      - name: Test Admin except route-permission matrix
+        run: pnpm --filter web exec vitest run --config vitest.config.ts --exclude src/components/view-permission-routes.test.tsx
+      - name: Test route-permission matrix in isolation
+        run: pnpm --filter web exec vitest run --config vitest.config.ts src/components/view-permission-routes.test.tsx --maxWorkers=1
       # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
       # 専用の設定が無く、**どのワークフローからも一度も呼ばれていなかった**(#704)。
       # #704 で繋いだところ2試験が落ち、原因が画面側の不具合だと分かったので

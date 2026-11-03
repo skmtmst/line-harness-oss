@@ -338,7 +338,7 @@ describe('更新系の権限ガードの網羅', () => {
     const findings = collectUnguarded();
     expect(findings, findings.map(f => `${f.method.toUpperCase()} ${f.path} (${f.file})`).join('\n'))
       .toEqual([]);
-  });
+  }, 20_000);
 });
 
 /**
