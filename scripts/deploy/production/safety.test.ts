@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { assertProductionApproval, assertReleaseSource, assertStagingRun } from './preflight.js';
+import { assertOwnerDispatch, assertReleaseSource, assertStagingRun } from './preflight.js';
 import { assertBootstrap, assertHeaderRules, headerRules } from './artifacts.js';
 import { assertApproved, assertUnchanged } from './database.js';
 import { assertBackupPolicy, decryptBackup, encryptBackup } from './backup.js';
@@ -25,9 +25,19 @@ describe('approved production source and staging proof', () => {
     expect(() => assertStagingRun(run, { jobs: [{ conclusion: 'success', steps: [] }] }, sha, repository)).toThrow();
     expect(() => assertStagingRun(run, { jobs: [{ conclusion: 'success', steps: [{ ...jobs.jobs[0].steps[0], conclusion: 'skipped' }] }] }, sha, repository)).toThrow();
   });
-  it('fails closed if the environment has no actual approval reviewers', () => {
-    expect(() => assertProductionApproval({ protection_rules: [{ type: 'required_reviewers', reviewers: [{ type: 'User' }] }] })).not.toThrow();
-    for (const environment of [{}, { protection_rules: [] }, { protection_rules: [{ type: 'required_reviewers', reviewers: [] }] }]) expect(() => assertProductionApproval(environment)).toThrow();
+  it('requires the original and current owner to have dispatched this production run', () => {
+    const ownerContext = { ...context, GITHUB_RUN_ID: '123', GITHUB_ACTOR: 'skmtmst', GITHUB_TRIGGERING_ACTOR: 'skmtmst' };
+    const productionRun = { id: 123, actor: { login: 'skmtmst' }, triggering_actor: { login: 'skmtmst' }, repository: { full_name: 'skmtmst/line-harness-oss' }, head_repository: { full_name: 'skmtmst/line-harness-oss' }, event: 'workflow_dispatch', head_branch: 'main', head_sha: sha, path: '.github/workflows/deploy-cloudflare-production.yml' };
+    expect(() => assertOwnerDispatch(productionRun, ownerContext, 'skmtmst/line-harness-oss')).not.toThrow();
+    for (const [changedRun, changedContext, repo] of [
+      [{ ...productionRun, actor: { login: 'other' } }, ownerContext, 'skmtmst/line-harness-oss'],
+      [{ ...productionRun, triggering_actor: { login: 'other' } }, ownerContext, 'skmtmst/line-harness-oss'],
+      [productionRun, { ...ownerContext, GITHUB_TRIGGERING_ACTOR: 'other' }, 'skmtmst/line-harness-oss'],
+      [{ ...productionRun, id: 124 }, ownerContext, 'skmtmst/line-harness-oss'],
+      [{ ...productionRun, head_sha: 'b'.repeat(40) }, ownerContext, 'skmtmst/line-harness-oss'],
+      [{ ...productionRun, path: '.github/workflows/other.yml' }, ownerContext, 'skmtmst/line-harness-oss'],
+      [productionRun, ownerContext, 'other/repository'],
+    ] as const) expect(() => assertOwnerDispatch(changedRun, changedContext, repo)).toThrow();
   });
 });
 describe('approved SQL and backup boundaries', () => {

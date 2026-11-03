@@ -24,8 +24,16 @@ export function assertStagingRun(run: any, jobs: any, sha: string, repository: s
   if (run?.repository?.full_name !== repository || run?.head_repository?.full_name !== repository || run?.path !== '.github/workflows/deploy-cloudflare-staging.yml' || run?.head_sha !== sha || run?.status !== 'completed' || run?.conclusion !== 'success' || run?.event !== 'workflow_dispatch') throw new Error('staging_run');
   if (!jobs?.jobs?.some((job: any) => job.conclusion === 'success' && job.steps?.some((step: any) => step.name === 'Verify public source revisions' && step.conclusion === 'success'))) throw new Error('staging_public_verification');
 }
-export function assertProductionApproval(environment: any): void {
-  if (!environment?.protection_rules?.some((rule: any) => rule.type === 'required_reviewers' && rule.reviewers?.length > 0)) throw new Error('production_reviewers');
+export function assertOwnerDispatch(run: any, context: NodeJS.ProcessEnv, repository: string): void {
+  const owner = 'skmtmst';
+  if (repository !== 'skmtmst/line-harness-oss' ||
+      !/^\d+$/.test(context.GITHUB_RUN_ID ?? '') || run?.id !== Number(context.GITHUB_RUN_ID) ||
+      context.GITHUB_ACTOR !== owner || context.GITHUB_TRIGGERING_ACTOR !== owner ||
+      run?.actor?.login !== owner || run?.triggering_actor?.login !== owner ||
+      run?.repository?.full_name !== repository || run?.head_repository?.full_name !== repository ||
+      run?.event !== 'workflow_dispatch' || run?.head_branch !== 'main' ||
+      run?.head_sha !== context.GITHUB_SHA ||
+      run?.path !== '.github/workflows/deploy-cloudflare-production.yml') throw new Error('owner_dispatch_required');
 }
 export async function preflight(sha: string, runId: string, fetcher: typeof fetch = fetch): Promise<void> {
   if (process.env.OPERATIONS_PAUSED !== 'true') throw new Error('operations_pause_confirmation');
@@ -41,7 +49,7 @@ export async function preflight(sha: string, runId: string, fetcher: typeof fetc
     if (!response.ok) throw new Error('github_metadata');
     return response.json();
   };
-  assertProductionApproval(await get('environments/production'));
+  assertOwnerDispatch(await get(`actions/runs/${requireValue(process.env.GITHUB_RUN_ID)}`), process.env, repository);
   assertStagingRun(await get(`actions/runs/${runId}`), await get(`actions/runs/${runId}/jobs?filter=latest&per_page=100`), sha, repository);
   // A successful dry-run or config replay cannot substitute for this exact public revision.
   await verifyPublicBuild('https://stg-api.musubo.jp', sha, 'https://stg-admin.musubo.jp', sha, fetcher);

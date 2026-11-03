@@ -35,7 +35,8 @@ jobs:
   authorize:
     if: >-
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
-      github.repository != 'Shudesu/line-harness-oss' && vars.LINE_HARNESS_CLOUDFLARE_DEPLOY == 'true'
+      github.repository == 'skmtmst/line-harness-oss' && github.actor == 'skmtmst' &&
+      github.triggering_actor == 'skmtmst' && vars.LINE_HARNESS_CLOUDFLARE_DEPLOY == 'true'
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -58,6 +59,9 @@ jobs:
           [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           test "$GITHUB_REF" = refs/heads/main
           test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REPOSITORY" = skmtmst/line-harness-oss
+          test "$GITHUB_ACTOR" = skmtmst
+          test "$GITHUB_TRIGGERING_ACTOR" = skmtmst
           test "$GITHUB_WORKFLOW_REF" = "$GITHUB_REPOSITORY/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main"
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
           git fetch --no-tags origin main >/dev/null 2>&1
