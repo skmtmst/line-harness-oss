@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Check, ClipboardList, Link2, Plus, Workflow } from 'lucide-react'
+import { ArrowRight, Check, ClipboardList, Link2, Plus, Workflow } from 'lucide-react'
 import type { TagGroup } from '@line-crm/shared'
 import { api, type TagDefinition } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -220,6 +220,7 @@ function TagCreate() {
         identity={back}
         previewLabel="設定内容を見る"
         previewTitle="タグの設定"
+        previewSurface="plain"
         preview={(
           <Card variant="aside" gap="normal">
             <h2 className={styles.asideTitle}>できあがるタグ</h2>
@@ -275,13 +276,13 @@ function TagCreate() {
         <Card variant="form" gap="normal" aria-labelledby="tag-new-ways">
           <CardHeader size="stacked" title="付け方（どこで付けるか）" titleId="tag-new-ways" meta="作ったあとに、回答フォーム・オートメーション・タグ連動からこのタグを付けられます" />
           <div className={styles.waysRow}>
-            <Link href="/form-submissions"><Card surface="muted" padding="compact" layout="vertical" gap="tight">
-              <ClipboardList className={styles.wayIcon} aria-hidden="true" />
+            <Link href="/form-submissions" className={styles.wayLink} data-pressable-card><Card surface="muted" padding="compact" layout="vertical" gap="tight">
+              <span className={styles.wayIconRow}><ClipboardList className={styles.wayIcon} aria-hidden="true" /><ArrowRight data-link-indicator size={16} aria-hidden="true" /></span>
               <span className={styles.wayTitle}>回答フォーム</span>
               <span className={styles.wayNote}>答えに合わせて付ける</span>
             </Card></Link>
-            <Link href="/automations"><Card surface="muted" padding="compact" layout="vertical" gap="tight">
-              <Workflow className={styles.wayIcon} aria-hidden="true" />
+            <Link href="/automations" className={styles.wayLink} data-pressable-card><Card surface="muted" padding="compact" layout="vertical" gap="tight">
+              <span className={styles.wayIconRow}><Workflow className={styles.wayIcon} aria-hidden="true" /><ArrowRight data-link-indicator size={16} aria-hidden="true" /></span>
               <span className={styles.wayTitle}>オートメーション</span>
               <span className={styles.wayNote}>決まりで自動に付ける</span>
             </Card></Link>
