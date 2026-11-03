@@ -218,6 +218,31 @@ describe('削除の窓', () => {
     expect(net.remove).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['共通', { ...ruleA, lineAccountId: null }, 'すべてのLINEアカウント'],
+    ['対象未取得', Object.fromEntries(Object.entries(ruleA).filter(([key]) => key !== 'lineAccountId')), '名前を確認できません'],
+  ])('%sの自動応答は実際の対象を表示する', async (_label, rule, expected) => {
+    net.list.mockResolvedValue({ success: true, data: [rule] })
+    renderList(); await flush()
+    openMenu('営業時間外の自動返信', '削除する')
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.textContent).toContain(expected)
+  })
+
+  it('削除対象を表示しアカウントを行き来しても古い確定を拒む', async () => {
+    renderList(); await flush()
+    openMenu('営業時間外の自動返信', '削除する')
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    const button = within(dialog).getByRole('button', { name: '削除する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const oldConfirm = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    accountState.selectedAccountId = 'account-b'; renderList(); await flush()
+    accountState.selectedAccountId = 'account-a'; renderList(); await flush()
+    await act(async () => oldConfirm())
+    expect(net.remove).not.toHaveBeenCalled()
+  })
+
   it('削除中にアカウントが切り替わったら、終わっても前のアカウントの一覧を読み直さない', async () => {
     let finish!: (value: unknown) => void
     net.remove.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
@@ -409,4 +434,48 @@ it('一括停止は選んだ操作先を表示し、切替後は新しいアカ�
   fireEvent.click(stop)
   expect(net.stop).not.toHaveBeenCalled()
   expect(net.update).not.toHaveBeenCalled()
+})
+
+it('共通の自動応答を止める確認では全アカウントを示す', async () => {
+  net.list.mockResolvedValue({ success: true, data: [{ ...ruleA, lineAccountId: null }] })
+  renderList(); await flush()
+  openMenu('営業時間外の自動返信', '止める')
+  const dialog = await screen.findByRole('dialog', { name: '「営業時間外の自動返信」を止める' })
+  expect(dialog.textContent).toContain('すべてのLINEアカウント')
+})
+
+it('一括停止で共通と対象未取得を含む時は両方を示し、アカウントを行き来した古い確定を拒む', async () => {
+  const unknown = Object.fromEntries(Object.entries(ruleA).filter(([key]) => key !== 'lineAccountId'))
+  net.list.mockResolvedValue({ success: true, data: [{ ...ruleA, lineAccountId: null }, { ...unknown, id: 'unknown-rule', name: '対象未取得の自動応答', priority: 1 }] })
+  renderList(); await flush()
+  fireEvent.click(within(screen.getByText('営業時間外の自動返信').closest('tr')!).getByRole('checkbox'))
+  fireEvent.click(within(screen.getByText('対象未取得の自動応答').closest('tr')!).getByRole('checkbox'))
+  fireEvent.click(screen.getByRole('button', { name: 'まとめて止める', exact: true }))
+  const dialog = await screen.findByRole('dialog', { name: '2 件の自動応答を止めますか？' })
+  expect(dialog.textContent).toContain('すべてのLINEアカウント')
+  expect(dialog.textContent).toContain('名前を確認できません')
+  const button = within(dialog).getByRole('button', { name: '止める', exact: true })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const oldConfirm = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+  accountState.selectedAccountId = 'account-b'; renderList(); await flush()
+  accountState.selectedAccountId = 'account-a'; renderList(); await flush()
+  await act(async () => oldConfirm())
+  expect(net.stop).not.toHaveBeenCalled()
+})
+
+it('一括停止の途中でアカウントを行き来したら残りを送らない', async () => {
+  let finish!: (value: unknown) => void
+  net.stop.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  net.list.mockResolvedValue({ success: true, data: [ruleA, { ...ruleA, id: 'another-rule', name: '別のルール', priority: 1 }] })
+  renderList(); await flush()
+  fireEvent.click(within(screen.getByText('営業時間外の自動返信').closest('tr')!).getByRole('checkbox'))
+  fireEvent.click(within(screen.getByText('別のルール').closest('tr')!).getByRole('checkbox'))
+  fireEvent.click(screen.getByRole('button', { name: 'まとめて止める', exact: true }))
+  fireEvent.click(within(await screen.findByRole('dialog', { name: '2 件の自動応答を止めますか？' })).getByRole('button', { name: '止める', exact: true }))
+  await waitFor(() => expect(net.stop).toHaveBeenCalledTimes(1))
+  accountState.selectedAccountId = 'account-b'; renderList(); await flush()
+  accountState.selectedAccountId = 'account-a'; renderList(); await flush()
+  await act(async () => finish({ success: true, data: null }))
+  await flush()
+  expect(net.stop).toHaveBeenCalledTimes(1)
 })

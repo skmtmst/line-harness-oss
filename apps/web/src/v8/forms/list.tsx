@@ -75,6 +75,18 @@ export default function FormsListV8() {
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const renderedScope = accountScope.current
+  const loadedScope = useRef<typeof accountScope.current | null>(null)
+  const mounted = useRef(false)
+  const deleteLock = useRef(false)
+  const stopLock = useRef(false)
+  const deleteTicket = useRef<object | null>(null)
+  const stopTicket = useRef<object | null>(null)
+  const renderedDeleteTicket = deleteTicket.current
+  const renderedStopTicket = stopTicket.current
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   /*
    * 箱の作成・名前変更・削除・並び替えは `/api/folders` が owner/admin で閉じている。
    * 役割と鍵は本人APIで確かめ、答えが来るまでは変更操作を隠す。
@@ -83,6 +95,7 @@ export default function FormsListV8() {
   const staffRole = useStaffRole()
   const canManageFolders = canManageRole(staffRole)
   const canEditForms = useFeatureAccess('forms')
+  const canEditRef = useRef(canEditForms); canEditRef.current = canEditForms
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
@@ -117,6 +130,7 @@ export default function FormsListV8() {
   /** 管理者確認（担当未割り当て）。URL には載せない。選んだときだけ専用口を読む。 */
   const [reviewMode, setReviewMode] = useState(false)
   const [reviewForbidden, setReviewForbidden] = useState(false)
+  const listReady = useRef(false); listReady.current = !loading && !loadError && !reviewForbidden
   const [formFilter, setFormFilter] = useState<FormFilter>(() => validFilter(searchParams.get('filter')))
   const [formSort, setFormSort] = useState<FormSort>(() => validSort(searchParams.get('sort')))
   const [pageSize, setPageSize] = useState(() => validPageSize(searchParams.get('limit')))
@@ -127,6 +141,7 @@ export default function FormsListV8() {
   const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
   /* アーカイブ・削除の窓（）。開いたら影響を読んでから2つの道を出す。 */
   const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
+  const [deleteScope, setDeleteScope] = useState<typeof accountScope.current | null>(null)
   const [deleteImpact, setDeleteImpact] = useState<FormDeleteImpact | null>(null)
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -139,6 +154,7 @@ export default function FormsListV8() {
   const [renameError, setRenameError] = useState('')
   /* 受付を止める。止めるにも編集の版が要るので影響口で読む。 */
   const [stopTarget, setStopTarget] = useState<Form | null>(null)
+  const [stopScope, setStopScope] = useState<typeof accountScope.current | null>(null)
   const [stopRevision, setStopRevision] = useState<number | null>(null)
   const [stopImpactLoading, setStopImpactLoading] = useState(false)
   const [stopping, setStopping] = useState(false)
@@ -185,7 +201,7 @@ export default function FormsListV8() {
     setFolderTotal(0)
   }
 
-  const loadForms = useCallback(() => loadFormsPage({ activeFolderId, clearList, fetchQuery, formFilter, formRequest, formSort, page, pageSize, reviewMode, saveErrors, selectedAccountId, setFolderError, setFolders, setFolderTotal, setForms, setFormTotal, setLoadError, setLoadFailure, setLoading, setReviewForbidden, setUnfiledCount }), [reviewMode, selectedAccountId, activeFolderId, page, pageSize, formFilter, formSort, fetchQuery, saveErrors])
+  const loadForms = useCallback(() => loadFormsPage({ activeFolderId, clearList, fetchQuery, formFilter, formRequest, formSort, page, pageSize, reviewMode, saveErrors, selectedAccountId, setFolderError, setFolders, setFolderTotal, setForms: (value) => { if (renderedScope !== accountScope.current) return; loadedScope.current = renderedScope; setForms(value) }, setFormTotal, setLoadError, setLoadFailure, setLoading, setReviewForbidden, setUnfiledCount }), [reviewMode, selectedAccountId, activeFolderId, page, pageSize, formFilter, formSort, fetchQuery, saveErrors])
 
   useEffect(() => {
     void loadForms()
@@ -348,6 +364,9 @@ export default function FormsListV8() {
 
   /* アーカイブ・削除の窓を開く。影響（回答数・利用先・版）を先に読む。 */
   const openDelete = async (form: Form) => {
+    if (!selectedAccountId || !mounted.current || !canEditRef.current || !listReady.current || renderedScope !== accountScope.current || loadedScope.current !== renderedScope) return
+    const ticket = {}; deleteTicket.current = ticket; setDeleteScope(renderedScope)
+    const current = () => mounted.current && canEditRef.current && renderedScope === accountScope.current && deleteTicket.current === ticket
     closeDetail()
     setDeleteTarget(form)
     setDeleteImpact(null)
@@ -360,15 +379,17 @@ export default function FormsListV8() {
     }
     try {
       const result = await api.forms.deleteImpact(form.id, selectedAccountId)
+      if (!current()) return
       if (!result.success) throw new Error(result.error)
       setDeleteImpact(result.data)
     } catch (saveFailure) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setDeleteError('アーカイブしたときの影響を確認できませんでした。もう一度開き直してください。') }
     } finally {
-      setDeleteImpactLoading(false)
+      if (current()) setDeleteImpactLoading(false)
     }
   }
 
@@ -377,6 +398,7 @@ export default function FormsListV8() {
 
   const closeDelete = () => {
     if (deleting) return
+    deleteTicket.current = null
     setDeleteTarget(null)
     setDeleteImpact(null)
     setDeleteError('')
@@ -387,11 +409,16 @@ export default function FormsListV8() {
    * 応答が失われたときは対象を読み直し、既に消えていれば成功として扱う。
    */
   const removeForm = async (permanentDelete: boolean) => {
-    if (!deleteTarget || !deleteImpact || deleting || !selectedAccountId) return
+    if (!deleteTarget || !deleteImpact || deleting || !selectedAccountId || !deleteScope || !mounted.current || !canEditRef.current || !listReady.current || deleteScope !== accountScope.current || loadedScope.current !== deleteScope || deleteLock.current) return
+    const ticket = renderedDeleteTicket
+    if (!ticket || ticket !== deleteTicket.current) return
+    const current = () => mounted.current && canEditRef.current && deleteScope === accountScope.current && deleteTicket.current === ticket
     const targetId = deleteTarget.id
+    deleteLock.current = true
     setDeleting(true)
     setDeleteError('')
     const finish = () => {
+      deleteTicket.current = null
       setForms((current) => current.filter((form) => form.id !== targetId))
       setDeleteTarget(null)
       setDeleteImpact(null)
@@ -403,9 +430,11 @@ export default function FormsListV8() {
       const result = permanentDelete
         ? await api.forms.remove(targetId, selectedAccountId, deleteImpact.revision)
         : await api.forms.archive(targetId, selectedAccountId, deleteImpact.revision)
+      if (!current()) return
       if (!result.success) throw new Error('delete_failed')
       finish()
     } catch (saveFailure) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(saveFailure);
 
       let gone = false
@@ -416,6 +445,7 @@ export default function FormsListV8() {
 
         if (checkError instanceof ApiError && checkError.status === 404) gone = true
       }
+      if (!current()) return
       if (gone) {
         finish()
       } else {
@@ -425,7 +455,8 @@ export default function FormsListV8() {
           : 'この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。') }
       }
     } finally {
-      setDeleting(false)
+      deleteLock.current = false
+      if (mounted.current) setDeleting(false)
     }
   }
 
@@ -498,6 +529,9 @@ export default function FormsListV8() {
   }
 
   const openStop = async (form: Form) => {
+    if (!selectedAccountId || !mounted.current || !canEditRef.current || !listReady.current || renderedScope !== accountScope.current || loadedScope.current !== renderedScope) return
+    const ticket = {}; stopTicket.current = ticket; setStopScope(renderedScope)
+    const current = () => mounted.current && canEditRef.current && renderedScope === accountScope.current && stopTicket.current === ticket
     closeDetail()
     setStopTarget(form)
     setStopRevision(null)
@@ -510,20 +544,26 @@ export default function FormsListV8() {
     }
     try {
       const result = await api.forms.deleteImpact(form.id, selectedAccountId)
+      if (!current()) return
       if (!result.success) throw new Error(result.error)
       setStopRevision(result.data.contentRevision)
     } catch (saveFailure) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setStopError('フォームの状態を確認できませんでした。もう一度開き直してください。') }
     } finally {
-      setStopImpactLoading(false)
+      if (current()) setStopImpactLoading(false)
     }
   }
 
   const stopAccepting = async () => {
-    if (!stopTarget || stopping || !selectedAccountId) return
+    if (!stopTarget || stopping || !selectedAccountId || !stopScope || !mounted.current || !canEditRef.current || !listReady.current || stopScope !== accountScope.current || loadedScope.current !== stopScope || stopLock.current) return
+    const ticket = renderedStopTicket
+    if (!ticket || ticket !== stopTicket.current) return
+    const current = () => mounted.current && canEditRef.current && stopScope === accountScope.current && stopTicket.current === ticket
+    stopLock.current = true
     setStopping(true)
     setStopError('')
     try {
@@ -531,6 +571,7 @@ export default function FormsListV8() {
       let revision = stopRevision
       if (revision === null) {
         const impact = await api.forms.deleteImpact(stopTarget.id, selectedAccountId)
+        if (!current()) return
         if (!impact.success) throw new Error('revision_failed')
         revision = impact.data.contentRevision
         setStopRevision(revision)
@@ -539,16 +580,19 @@ export default function FormsListV8() {
         isActive: false,
         expectedContentRevision: revision,
       })
+      if (!current()) return
       if (!result.success) throw new Error(result.error)
       setForms((current) => current.map((form) => (
         form.id === stopTarget.id ? { ...form, isActive: false } : form
       )))
+      stopTicket.current = null
       setStopTarget(null)
       setStopRevision(null)
       // 公開中/下書きの絞り込み対象が変わるため読み直す。
       void loadForms()
       void loadStats()
     } catch (error) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(error)
 
       { if (!fieldFailure)
@@ -556,7 +600,8 @@ export default function FormsListV8() {
         ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
         : '回答の受付を止められませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setStopping(false)
+      stopLock.current = false
+      if (mounted.current) setStopping(false)
     }
   }
 
@@ -1136,7 +1181,7 @@ export default function FormsListV8() {
     <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null
 
-  const overlays = renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget, visibleForms })
+  const overlays = renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms })
 
   return (
     /* 一覧の状態（読込中・失敗・空・表）を外から待てるように出す。箱は作らない（display: contents）。 */

@@ -46,6 +46,7 @@ export async function deleteMediaItem({ deleteBusy, deleteRequestRef, deleting, 
       deleteRequestRef.current += 1
       void load()
       void loadKpis()
+      return true
     } catch (e) {
       if (!isCurrentDelete()) return
       const fieldFailure = saveErrors.capture(e);
