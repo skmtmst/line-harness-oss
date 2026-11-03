@@ -263,8 +263,8 @@ export default function NenCampaignsPage() {
     const nextEnabled = !setting.isEnabled
     setSaving(setting.campaignKey); setNotice(null)
     try {
-      await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled)
-      updateDraft(setting.campaignKey, { isEnabled: nextEnabled })
+      const result = await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled, setting.updatedAt)
+      updateDraft(setting.campaignKey, { isEnabled: nextEnabled, ...(result.data?.updatedAt ? { updatedAt: result.data.updatedAt } : {}) })
       setNotice({ tone: 'success', text: `${setting.label}を${nextEnabled ? '動かしました' : '止めました'}。` })
       return true
     } catch (caught) {
