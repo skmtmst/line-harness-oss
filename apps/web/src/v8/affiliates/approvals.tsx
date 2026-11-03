@@ -91,8 +91,6 @@ const SAVED_VIEWS = [
 
 export default function ApprovalsTab() {
   const { readonly, narrow, setCount, focusAffiliateId, accountId } = useAffiliateShell()
-  const readAccount = useRef(accountId)
-  readAccount.current = accountId
   const accountScope = useRef({ id: accountId, generation: 0 })
   if (accountScope.current.id !== accountId) accountScope.current = { id: accountId, generation: accountScope.current.generation + 1 }
 
@@ -133,28 +131,32 @@ export default function ApprovalsTab() {
   /* 承認・却下の後は fresh：操作より前に始まった読み込み（件数用など）を使い回さない（WEB003）。 */
   const loadItems = useCallback(async (options: { fresh?: boolean; preserveSelection?: boolean } = {}) => {
     if (accountScope.current.id !== accountId) return
-    loadVersion.current += 1
+    const scope = accountScope.current
+    const version = ++loadVersion.current
+    const current = () => mounted.current && accountScope.current === scope && loadVersion.current === version
     setLoadingMore(false)
     setLoadState('loading')
     try {
       const statuses = ['pending', 'approved', 'rejected'] as const
       const results = await Promise.all(statuses.map((value) => listAllConversionApprovals(value, 0, { accountId, fresh: options.fresh })))
-      if (!mounted.current || readAccount.current !== accountId) return
+      if (!current()) return
       setItems(results.flatMap((result) => result.items))
       setTruncatedStatuses(statuses.filter((_, index) => results[index].truncated))
       if (!options.preserveSelection) setSelected(new Set())
       setLoadState('ready')
     } catch {
-      if (mounted.current && readAccount.current === accountId) setLoadState('error')
+      if (current()) setLoadState('error')
     }
   }, [accountId])
 
   /* 保留期間（KPI）：登録されたアフィリエイターの保留日数のうち、いちばん長いもの。 */
   const loadHoldDays = useCallback(async () => {
+    if (accountScope.current.id !== accountId) return
+    const scope = accountScope.current
     setHoldDays(null)
     try {
       const res = await api.affiliates.list(accountId ?? undefined)
-      if (!mounted.current || readAccount.current !== accountId || !res.success) return
+      if (!mounted.current || accountScope.current !== scope || !res.success) return
       const days = (res.data as unknown as AffiliateItem[]).map((a) => a.holdDays).filter((d): d is number => typeof d === 'number')
       setHoldDays(days.length > 0 ? Math.max(...days) : null)
     } catch { /* 取れないときは「—」 */ }
