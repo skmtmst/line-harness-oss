@@ -50,6 +50,7 @@ export type MediaDeleteImpactReferenceKind =
   | "event"
   | "webinar"
   | "booking_menu"
+  | "restaurant_menu"
   | "booking_staff"
   | "booking_settings"
   | "form";

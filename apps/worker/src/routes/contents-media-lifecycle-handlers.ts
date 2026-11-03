@@ -313,7 +313,7 @@ export const get__api_media_id_delete_impact_5 = async (c: Context<Env, "/api/me
         verified,
         references: verifiedImpact.references.map((reference, index) => ({
           ...reference,
-          refKind: usages[index]?.ref_kind ?? null,
+          refKind: usages[index]?.ref_kind ?? reference.kind,
           refId: usages[index]?.ref_id ?? null,
           reference: states[index] ?? null,
         })),

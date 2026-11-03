@@ -1,3 +1,4 @@
+import { validRestaurantMenuDescription, validRestaurantMenuImage } from './restaurant-menu-media.js';
 import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
 import { normalizePhone } from '@line-crm/shared';
 import { normalizedPhoneSql as customerPhoneSql } from '../lib/phone-sql.js';
@@ -304,14 +305,16 @@ export const post__api_restaurant_test_menu_10 = async (c: Context<Env, "/api/re
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
-  const body = await c.req.json<{ storeId?: string; kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string }>();
+  const body = await c.req.json<{ storeId?: string; kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string; description?: string | null; imageMediaId?: string | null }>();
   if (!body.storeId || !await storeBelongsTo(c, organization.id, body.storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
   const price = Number(body.price);
   if (!['course', 'a_la_carte'].includes(body.kind || '') || !body.name?.trim() || !Number.isInteger(price) || price < 0) return inputError(c, { success: false, error: 'メニューの入力内容が正しくありません' }, 400, ["kind","name","price"]);
+  if (!validRestaurantMenuDescription(body.description)) return inputError(c, { success:false, error:'説明は2000文字以内で入力してください' }, 400, ['description']);
+  if ((body.imageMediaId != null && (typeof body.imageMediaId !== 'string' || !body.imageMediaId)) || (!await validRestaurantMenuImage(dbFor(c.env, body.storeId), body.storeId, body.imageMediaId ?? null))) return inputError(c, { success:false, code:'MENU_IMAGE_UNAVAILABLE', error:'選択した画像を利用できません。登録メディアから選び直してください。' }, 400, ['imageMediaId']);
   const status = body.status ?? 'active';
   if (!['draft', 'active'].includes(status)) return inputError(c, { success: false, error: '作成時の状態は下書きまたは公開です' }, 400, ["status"]);
   const id = crypto.randomUUID();
-  await dbFor(c.env, body.storeId).prepare('INSERT INTO rt_menu_items (id, store_id, kind, name, price, allergens_json, service_periods_json, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, body.storeId, body.kind, body.name.trim(), price, JSON.stringify(body.allergens || []), JSON.stringify(body.servicePeriods || ['dinner']), status).run();
+  await dbFor(c.env, body.storeId).prepare('INSERT INTO rt_menu_items (id, store_id, kind, name, price, allergens_json, service_periods_json, status, description, image_media_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, body.storeId, body.kind, body.name.trim(), price, JSON.stringify(body.allergens || []), JSON.stringify(body.servicePeriods || ['dinner']), status, body.description?.trim() || null, body.imageMediaId ?? null).run();
   return c.json({ success: true, data: { id } }, 201);
 };
 

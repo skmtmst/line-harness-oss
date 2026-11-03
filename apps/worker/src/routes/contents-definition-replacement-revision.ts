@@ -53,9 +53,12 @@ export async function replacementImpact(
     sourceId, replacementId, lineAccountId: accountId, checkedAt,
   });
   if (!plan) return null;
+  const menuRows = await c.env.DB.prepare('SELECT id FROM rt_menu_items WHERE image_media_id = ? ORDER BY id')
+    .bind(sourceId).all<{id:string}>();
+  const revisionUsages = [...plan.usages, ...menuRows.results.map(row => ({ ref_kind:'restaurant_menu', ref_id:row.id, scanned_at:checkedAt }))];
   return {
     plan,
-    impact: { ...plan.impact, revision: await replacementRevision(sourceId, replacementId, plan.usages) },
+    impact: { ...plan.impact, revision: await replacementRevision(sourceId, replacementId, revisionUsages) },
   };
 }
 
