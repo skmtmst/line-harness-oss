@@ -36,6 +36,8 @@ test('対象は選んだ回から後の有効な回だけ（取消済みは数�
 
 test('取り消す：この回だけにすると 1 件。キャンセル料は口の返事の見込みを知らせに出す', async () => {
   render(<SeriesScopeDialog open mode="cancel" accountId="a1" target={target} onClose={() => {}} onDone={() => {}} />)
+  expect(screen.getByRole('alertdialog').textContent).toContain('LINEアカウント')
+  expect(screen.getByRole('alertdialog').textContent).toContain('環境')
   fireEvent.click(await screen.findByRole('radio', { name: /この回だけ/ }))
   fireEvent.click(await screen.findByRole('button', { name: '1 件を取り消す' }))
   await waitFor(() => expect(cancel).toHaveBeenCalledTimes(1))
@@ -48,6 +50,16 @@ test('対象の日を読めないときは実行できない', async () => {
   render(<SeriesScopeDialog open mode="cancel" accountId="a1" target={target} onClose={() => {}} onDone={() => {}} />)
   expect(await screen.findByText(/対象の日とキャンセル料の見込みを確認できませんでした/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: /件を取り消す/ })?.hasAttribute('disabled') ?? true).toBe(true)
+})
+
+test('アカウントが変わると前の見込みでは実行できない', async () => {
+  const pending = new Promise(() => {})
+  const view = render(<SeriesScopeDialog open mode="cancel" accountId="a1" target={target} onClose={() => {}} onDone={() => {}} />)
+  expect(await screen.findByRole('button', { name: '3 件を取り消す' })).toBeTruthy()
+  get.mockReturnValueOnce(pending)
+  view.rerender(<SeriesScopeDialog open mode="cancel" accountId="a2" target={target} onClose={() => {}} onDone={() => {}} />)
+  expect(screen.queryByRole('button', { name: '3 件を取り消す' })).toBeNull()
+  expect(cancel).not.toHaveBeenCalled()
 })
 
 test('埋まっている回を数えず、見込みの取得失敗は実行を止める', async () => {

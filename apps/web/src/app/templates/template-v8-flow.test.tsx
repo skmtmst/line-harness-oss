@@ -215,6 +215,8 @@ describe('V8 テンプレートの通し', () => {
       fireEvent.click(screen.getAllByRole('button', { name: '公開する' })[0])
     })
     const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
     await act(async () => {
       fireEvent.click(within(dialog).getByRole('button', { name: '公開する' }))
     })
@@ -222,5 +224,20 @@ describe('V8 テンプレートの通し', () => {
     await waitFor(() => expect(screen.queryByText('「流れの型」を公開する')).toBeNull())
     // 読み直すと下書きの帯が消える（公開ずみ）。
     await waitFor(() => expect(screen.queryByText('まだ公開していません')).toBeNull())
+  })
+
+  it('公開確認中にアカウントを切り替えたら元の確認で公開しない', async () => {
+    mocks.accountId = 'acc-1'
+    mocks.query = 'id=t-2'
+    await mount(<TemplateDetailPage />)
+    await screen.findByText('流れの型')
+    fireEvent.click(screen.getAllByRole('button', { name: '公開する' })[0])
+    const confirm = await screen.findByRole('dialog')
+    const button = within(confirm).getByRole('button', { name: '公開する' })
+    mocks.accountId = 'acc-2'
+    await act(async () => { root.render(<><TemplateDetailPage /><ToastHost /></>) })
+    fireEvent.click(button)
+    expect(mocks.publish).not.toHaveBeenCalled()
+    mocks.accountId = 'acc-1'
   })
 })

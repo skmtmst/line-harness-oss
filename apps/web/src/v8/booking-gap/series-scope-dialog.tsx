@@ -8,6 +8,7 @@ import { DataTable, Tr, Th, Td } from '@/components/shared/table'
 
 import { useEffect, useState } from 'react'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifySaved } from '@/components/shared/toast'
 import Checkbox from '@/components/shared/checkbox'
@@ -128,6 +129,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
       onConfirm={run}
       onCancel={onClose}
     >
+      <OperationTargetSummary accounts={[{ id: accountId }]} />
       <div className={styles.body}>
         <RadioCardGroup legend="どこまで" columns={2}>
           <RadioCard name="series-scope" value="this" checked={scope === 'this'} onChange={() => setScope('this')} title="この回だけ"

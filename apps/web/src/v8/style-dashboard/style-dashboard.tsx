@@ -8,7 +8,7 @@ import { FriendAddLink } from '@/v8/dashboard/public/friend-add/index'
 import CalendarPeriod from '@/components/shared/calendar-period'
 import { formatYen } from '@line-crm/shared';
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import { CancelClassDialog,CancelReservationDialog,RefundDialog } from '@/components/shared/booking-confirm-dialogs'
+import { CancelReservationDialog } from '@/components/shared/booking-confirm-dialogs'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import DeltaChip from '@/components/shared/delta-chip'
@@ -304,17 +304,15 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
           onClose={() => setCancelRow(null)} onConfirm={(i) => void confirmCancel(cancelRow, i)} />
       ) : null}
       {refundRow ? (
-        <RefundDialog open subtitle={`${withHonorific(refundRow.name, 'さま')}・${refundRow.time}${refundRow.course ? ` ${refundRow.course}` : ''}${refundRow.people ? ` ${formatNumber(refundRow.people)}名` : ''}`}
-          facts={[{ label: '支払った額', value: refundRow.booking?.price ? `${formatYen(refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1))}` : '—' }, { label: 'これまでの返金', value: 'なし' }]}
-          paidAmount={refundRow.booking?.price ? refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1) : 0} testMode={testMode}
-          onClose={() => setRefundRow(null)} onConfirm={() => { setRefundRow(null); openPayment() }} />
+        <Dialog open title="返金について" description={`${withHonorific(refundRow.name, 'さま')}・${refundRow.time}`} onCancel={() => setRefundRow(null)}>
+          <p>この画面から返金はできません。</p>
+        </Dialog>
       ) : null}
       {classRow ? (
-        <CancelClassDialog open subtitle={`${classRow.name}・${classRow.time}${classRow.endTime ?? ''}・${classRow.sub ?? ''}`}
-          facts={[{ label: '予約', value: roster && roster.rowId === classRow.id ? `${formatNumber(roster.members.filter((m) => m.attend !== 'cancel').length)}人` : '名簿を開くと人数が出ます' }, { label: 'キャンセル待ち', value: classRow.waiting !== undefined ? `${classRow.waiting}人（待ちは終わりにします）` : '—' }]}
-          counts={{ members: roster && roster.rowId === classRow.id ? roster.members.filter((m) => m.attend !== 'cancel').length : 0, paid: 0, paidAmount: 0, tickets: 0, unpaid: 0 }} testMode={testMode}
-          messageFor={(i) => `〇〇さま　本日 ${classRow.time} の${classRow.name}は、${i.reason || '〇〇'}のため休講になりました。`}
-          onClose={() => setClassRow(null)} onConfirm={() => { setClassRow(null); preparing.open('休講') }} />
+        <Dialog open title="休講について" description={`${classRow.name}・${classRow.time}${classRow.endTime ?? ''}・${classRow.sub ?? ''}`} onCancel={() => setClassRow(null)}>
+          <p>この画面から休講にはできません。</p>
+          <p>予約の変更や返金、LINE での連絡は行われません。</p>
+        </Dialog>
       ) : null}
       {resultRow ? <ResultDialog row={resultRow} busy={busy === 'result'} onClose={() => setResultRow(null)} onSave={(outcome) => void saveResult(resultRow, outcome)} /> : null}
       {wizard.dialog}

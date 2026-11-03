@@ -44,6 +44,8 @@ test('実APIの組IDと版を使い、理由の確認後だけまとめて取り
   const changed = vi.fn()
   render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" onChanged={changed} />)
   fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  expect(screen.getByRole('alertdialog').textContent).toContain('LINEアカウント')
+  expect(screen.getByRole('alertdialog').textContent).toContain('環境')
   const confirm = screen.getByRole('button', { name: 'まとめて取り消す' })
   expect(confirm.hasAttribute('disabled')).toBe(true)
   expect(cancelGroup).not.toHaveBeenCalled()
@@ -51,6 +53,15 @@ test('実APIの組IDと版を使い、理由の確認後だけまとめて取り
   fireEvent.click(confirm)
   await waitFor(() => expect(changed).toHaveBeenCalledOnce())
   expect(cancelGroup).toHaveBeenCalledWith('account-1', 'g1', '予定の変更', 2)
+})
+
+test('確認中に対象アカウントや組が変われば古い取消を閉じる', () => {
+  const { rerender } = render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" />)
+  fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
+  rerender(<PartySection party={{ ...party, groupId: 'g2' }} canOperate accountId="account-2" currentBookingId="b1" />)
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(cancelGroup).not.toHaveBeenCalled()
 })
 
 test('失敗しても理由と窓を残し、読み直しを案内する', async () => {

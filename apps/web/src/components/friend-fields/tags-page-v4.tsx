@@ -2,11 +2,12 @@
 
 import Notice from '@/components/shared/notice'
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Button from '@/components/shared/button'
 import { formatDay, formatNumber } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -280,6 +281,11 @@ function deleteImpactRows(
 }
 
 export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; accountId: string | null; onCancel: () => void; onArchived: (notice?: string) => void }) {
+  const key = JSON.stringify([accountId, tag.id])
+  const scope = useRef({ key, generation: 1 })
+  if (scope.current.key !== key) scope.current = { key, generation: scope.current.generation + 1 }
+  const generation = scope.current.generation
+  const [checkedGeneration, setCheckedGeneration] = useState(0)
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -295,23 +301,30 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
 
   useEffect(() => {
     let cancelled = false
+    const requestGeneration = generation
+    setText('')
+    setImpact(null)
+    setCheckedGeneration(0)
+    setSaving(false)
+    setSaveError('')
     setImpactStatus('loading')
     ;(async () => {
       try {
         if (!accountId) throw new Error('account required')
         const res = await api.tags.dependencies(tag.id, accountId)
-        if (cancelled) return
+        if (cancelled || requestGeneration !== scope.current.generation) return
         if (!res.success) throw new Error(res.error)
         setImpact(res.data)
+        setCheckedGeneration(requestGeneration)
         setImpactStatus('ready')
       } catch {
-        if (!cancelled) setImpactStatus('error')
+        if (!cancelled && requestGeneration === scope.current.generation) setImpactStatus('error')
       }
     })()
     return () => { cancelled = true }
-  }, [accountId, tag.id])
+  }, [accountId, tag.id, generation])
 
-  const blocked = impactStatus !== 'ready' || !impact || !accountId || saving
+  const blocked = impactStatus !== 'ready' || checkedGeneration !== generation || !impact || !accountId || saving
   const blockedReason = impactStatus === 'loading'
     ? '影響を確認しています'
     : impactStatus === 'error'
@@ -319,15 +332,18 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
       : ''
 
   const archive = async () => {
-              if (!impact || !accountId) return
+              if (blocked || text !== tag.name || !impact || !accountId || checkedGeneration !== scope.current.generation) return
+              const requestGeneration = scope.current.generation
               setSaving(true); setSaveError('')
               try {
                 await api.tags.archive(tag.id, accountId, {
                   expectedVersion: impact.tag.version,
                   impactRevision: impact.revision,
                 }, crypto.randomUUID())
+                if (requestGeneration !== scope.current.generation) return
                 onArchived(`「${tag.name}」を保管しました`)
               } catch (reason) {
+                if (requestGeneration !== scope.current.generation) return
                 /*
                  * 「もう整理済み」は失敗ではない。着きたかった状態にはもう着いている
                  * ので、赤い失敗ではなく、成功と同じ通知で見せて一覧を読み直す。
@@ -351,6 +367,7 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
       <Button variant="danger" disabled={blocked || text !== tag.name} busy={saving} onClick={() => void archive()}>このタグを保管する</Button>
     </DialogActions>}
   >
+    <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
     <div data-qa-dialog="tag-delete" data-impact={impactStatus}>
       <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。保管すると友だちから外れ、一覧には「保管済み」として残ります。元に戻せません。</p>
         <dl className="mt-5 divide-y divide-hairline overflow-hidden rounded-control border border-hairline text-sm">

@@ -5,8 +5,8 @@
  * 広げすぎると B28 の日付の段（1152 で 852px）に載らなくなるので上限も守る。
  */
 import React from 'react'
-import { cleanup, render } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
@@ -14,6 +14,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 const noop = () => {}
+const dialogState = vi.hoisted(() => ({ refund: false, lesson: false, closeRefund: vi.fn(), closeLesson: vi.fn(), preparing: vi.fn() }))
 
 vi.mock('./use-style-dashboard', () => ({
   useStyleDashboard: () => ({
@@ -37,10 +38,10 @@ vi.mock('./use-style-dashboard', () => ({
     floor: null, loadedAt: '2026-10-30T01:02:00+09:00', store: { store: null }, tables: [],
     setParam: noop, load: noop, loadAnalytics: noop, setCardDefaults: noop,
     roster: null, rosterRow: null, today: null,
-    preparing: { dialog: null, open: noop }, openPayment: noop, reload: noop,
+    preparing: { dialog: null, open: dialogState.preparing }, openPayment: dialogState.preparing, reload: noop,
     subtitle: '', openRow: noop, markVisit: noop, markNoShow: noop, approve: noop,
-    undoVisit: noop, cancelRow: null, setCancelRow: noop, refundRow: null, setRefundRow: noop,
-    resultRow: null, setResultRow: noop, classRow: null, setClassRow: noop,
+    undoVisit: noop, cancelRow: null, setCancelRow: noop, refundRow: dialogState.refund ? { id: 'r1', name: '山田', time: '10:00' } : null, setRefundRow: dialogState.closeRefund,
+    resultRow: null, setResultRow: noop, classRow: dialogState.lesson ? { id: 'c1', name: '朝のクラス', time: '10:00' } : null, setClassRow: dialogState.closeLesson,
     menuFor: () => [], confirmCancel: noop, saveResult: noop, testMode: false,
     alertAction: noop, attend: noop, KIND: {}, saveClosure: noop, addNew: noop,
   }),
@@ -48,7 +49,24 @@ vi.mock('./use-style-dashboard', () => ({
 
 import StyleDashboard from './style-dashboard'
 
-afterEach(cleanup)
+beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ data: [] }), { status: 200 }))) })
+afterEach(() => { cleanup(); dialogState.refund = false; dialogState.lesson = false; vi.clearAllMocks(); vi.unstubAllGlobals() })
+
+it.each([
+  ['refund', 'この画面から返金はできません。'],
+  ['lesson', 'この画面から休講にはできません。'],
+] as const)('%s の窓は実行できない操作を約束せず閉じられる', (kind, explanation) => {
+  dialogState[kind] = true
+  render(<StyleDashboard style="lesson" />)
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText(explanation)).toBeTruthy()
+  if (kind === 'lesson') expect(within(dialog).getByText('予約の変更や返金、LINE での連絡は行われません。')).toBeTruthy()
+  expect(within(dialog).queryByRole('radio')).toBeNull()
+  expect(within(dialog).queryByRole('button', { name: /返金する|休講にする|LINEを送/ })).toBeNull()
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  expect(kind === 'refund' ? dialogState.closeRefund : dialogState.closeLesson).toHaveBeenCalledWith(null)
+  expect(dialogState.preparing).not.toHaveBeenCalled()
+})
 
 it('担当の欄は4字の名前が切れない幅（143px以上）で、日付の段に載る幅（160px以下）', () => {
   const view = render(<StyleDashboard style="salon" />)
