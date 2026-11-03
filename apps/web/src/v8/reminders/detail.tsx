@@ -34,6 +34,7 @@ import TruncatedText from '@/components/shared/truncated-text';
 import { DetailColumns } from '@/components/templates/detail-columns';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import DateTimeField from '@/components/shared/date-time-field'
 import SegmentedControl from '@/components/shared/segmented'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
@@ -196,6 +197,9 @@ function ReminderDetailV8() {
   const [actionMessage, setActionMessage] = useState('')
   const [exporting, setExporting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const deleteScope = JSON.stringify([selectedAccountId, reminderId])
+  const [confirmedDeleteScope, setConfirmedDeleteScope] = useState('')
+  useEffect(() => { setConfirmDelete(false); setConfirmedDeleteScope('') }, [deleteScope])
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [duplicating, setDuplicating] = useState(false)
@@ -369,7 +373,7 @@ function ReminderDetailV8() {
   /* ===== 削除 ===== */
 
   const runDelete = async () => {
-    if (deleting) return
+    if (deleting || confirmedDeleteScope !== deleteScope) return
     setDeleting(true)
     setDeleteError('')
     try {
@@ -408,7 +412,7 @@ function ReminderDetailV8() {
         icon: <Trash2 size={16} aria-hidden="true" />,
         tone: 'danger' as const,
         dividerBefore: true,
-        onSelect: () => setConfirmDelete(true),
+        onSelect: () => { setConfirmedDeleteScope(deleteScope); setConfirmDelete(true) },
       },
     ] : []),
   ]
@@ -596,7 +600,7 @@ function ReminderDetailV8() {
       />
 
       <ConfirmDialog
-        open={confirmDelete}
+        open={confirmDelete && confirmedDeleteScope === deleteScope}
         title={`「${data.reminder.name}」を削除しますか`}
         description="登録者への未送信の通知と送信の履歴も消えます。この操作は取り消せません。"
         confirmLabel="削除する"
@@ -605,7 +609,7 @@ function ReminderDetailV8() {
         error={deleteError}
         onConfirm={() => runDelete()}
         onCancel={() => setConfirmDelete(false)}
-      />
+      ><OperationTargetSummary accounts={[{ id: '' }]} /></ConfirmDialog>
     </PageFrame></PageExplanationProvider></SaveErrorScope>
   )
 }

@@ -245,6 +245,9 @@ describe('箱の作成・名前変更・移動が選んだアカウントでつ�
     await clickMenuItem('名前を変更')
     // 名前変更の窓は最上層の portal に出るため、文書全体で見る。
     expect(document.body.textContent).toContain('フォーム名を変更')
+    const renameDialog = [...document.querySelectorAll('[role="dialog"]')].find(element => element.textContent?.includes('回答者に表示されるフォーム名'))
+    expect(renameDialog?.textContent).toContain('LINEアカウント')
+    expect(renameDialog?.textContent).toContain('環境')
     await act(async () => {})
     const saveButton = [...document.querySelectorAll('button')].find((b) => b.textContent === '保存する')
     expect(saveButton).toBeTruthy()

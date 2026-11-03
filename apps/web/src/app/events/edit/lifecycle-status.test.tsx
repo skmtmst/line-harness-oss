@@ -77,6 +77,8 @@ describe('公開の状態（WEB318/319）', () => {
     const cancel = await screen.findByRole('button', { name: '中止する' })
     await act(async () => { cancel.click() })
     const dialog = screen.getByRole('alertdialog')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
     let confirm = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '中止する')!
     expect(confirm.disabled).toBe(true)
     expect(net.setEventLifecycle).not.toHaveBeenCalled()

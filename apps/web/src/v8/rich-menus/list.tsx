@@ -59,6 +59,7 @@ import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from
 import { ExternalImportWorkspace, type LineMenu } from './external-import';
 import { richMenuError, richMenuErrorAll } from './errors';
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog';
+import OperationTargetSummary from '@/components/shared/operation-target-summary';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue, EmptyCell } from '@/components/shared/empty-value';
@@ -651,7 +652,7 @@ export default function RichMenusListV8() {
   async function confirmDelete() {
     if (!deleteTarget || deleteBusy) return
     const request = impactRequestRef.current
-    if (!request) return
+    if (!request || request.accountId !== selectedAccount?.id) return
     const action = deleteTarget.kind === 'managed'
       ? deleteTarget.group.status === 'published' ? 'unpublish' : 'delete'
       : 'externalDelete'
@@ -1170,7 +1171,7 @@ export default function RichMenusListV8() {
     }
   }
 
-  const blockedDialog = blockedDelete && managedDelete && impact ? (
+  const blockedDialog = blockedDelete && managedDelete && impact && impactRequestRef.current?.accountId === selectedAccount?.id ? (
     <BlockedDeleteDialog
       title={`「${managedDelete.name}」はまだ消せません`}
       description={impact.group.status !== 'published' && impact.blockers.includes('default_for_all')
@@ -1186,12 +1187,12 @@ export default function RichMenusListV8() {
             LINEから取り下げる
           </Button>
         ) : undefined}
-    />
+    ><OperationTargetSummary accounts={[{ id: impactRequestRef.current?.accountId ?? '' }]} /></BlockedDeleteDialog>
   ) : null
 
   const deleteConfirm = (
     <ConfirmDialog
-      open={deleteTarget !== null && !blockedDelete}
+      open={deleteTarget !== null && !blockedDelete && impactRequestRef.current?.accountId === selectedAccount?.id}
       title={
         deleteTarget
           ? `「${deleteTarget.kind === 'managed' ? deleteTarget.group.name : deleteTarget.menu.name}」を削除しますか？`
@@ -1213,6 +1214,7 @@ export default function RichMenusListV8() {
         ? { onConfirm: () => void confirmDelete() }
         : {})}
     >
+      <OperationTargetSummary accounts={[{ id: impactRequestRef.current?.accountId ?? '' }]} />
       {deleteTarget?.kind === 'managed' ? (
         <div className={styles.impact}>
           <p>

@@ -9,6 +9,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { DetailPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import FormSection from '@/components/shared/form-section'
 import { Field } from '@/components/shared/form-controls'
 import { TextArea } from '@/components/shared/text-field'
@@ -134,6 +135,7 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
       destructive={pending?.to === 'cancelled'} confirmLabel={pending?.label ?? '変える'} busy={busy} error={error}
       confirmDisabled={Boolean(pending?.needsReason && reason.trim() === '')} onConfirm={runSwitch}
       onCancel={() => { if (!busy) { setPending(null); setReason(''); setError('') } }}>
+      <OperationTargetSummary accounts={[{ id: accountId }]} />
       {pending?.needsReason ? <Field label="理由（必須・変更の記録に残ります）" required><SaveErrorField names={["reason"]}><TextArea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} placeholder="例：台風のため今週の受付を止めます" /></SaveErrorField></Field> : null}
     </ConfirmDialog>
   </FormSection></SaveErrorScope>

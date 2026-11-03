@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CircleHelp, Copy, FlaskConical, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
@@ -83,9 +84,10 @@ function channelStatus(channel: RestaurantChannel): { value: string; label: stri
 const accountQuery = (accountId: string, storeId: string) =>
   `account_id=${encodeURIComponent(accountId)}&storeId=${encodeURIComponent(storeId)}`
 
-export default function ChannelsBoard({ accountId, storeId, date, canEdit: allowedByRole, timezone }: {
+export default function ChannelsBoard({ accountId, storeId, storeName, date, canEdit: allowedByRole, timezone }: {
   accountId: string
   storeId: string
+  storeName?: string | null
   timezone?: string
   /** 店舗の今日（YYYY-MM-DD）。「今日の取り込み」の見出しに使う。 */
   date: string
@@ -98,6 +100,9 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit: allow
   const [failed, setFailed] = useState(false)
   const [howToOpen, setHowToOpen] = useState(false)
   const [reissueOpen, setReissueOpen] = useState(false)
+  const scope = JSON.stringify([accountId, storeId])
+  const [reissueScope, setReissueScope] = useState('')
+  useEffect(() => { setReissueOpen(false); setReissueScope('') }, [scope])
   const role = useStaffRole()
   const lockedReason = usePermissionLockReason(allowedByRole)
   const canEdit = allowedByRole && !lockedReason
@@ -204,7 +209,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit: allow
             <Button onClick={() => setHowToOpen(true)}><CircleHelp size={16} aria-hidden="true" />転送の設定のしかた</Button>
             <Button href="/restaurant-test/reservations"><FlaskConical size={16} aria-hidden="true" />試しに受け取る（予約台帳へ）</Button>
             {address
-              ? <Button lockedReason={lockedReason} onClick={() => setReissueOpen(true)} disabled={!canEdit || busy}><RefreshCw size={16} aria-hidden="true" />発行し直す（旧は 90 日で失効）</Button>
+              ? <Button lockedReason={lockedReason} onClick={() => { setReissueScope(scope); setReissueOpen(true) }} disabled={!canEdit || busy}><RefreshCw size={16} aria-hidden="true" />発行し直す（旧は 90 日で失効）</Button>
               : <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={issue} busy={Boolean(busy)} busyLabel="処理中…">発行する</Button>}
           </div>
         </Card>
@@ -262,7 +267,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit: allow
         </Card>
       ) : null}
       <RsDialog
-        open={reissueOpen}
+        open={reissueOpen && reissueScope === scope}
         title="取り込みアドレスを発行し直しますか？"
         width={480}
         top={220}
@@ -271,10 +276,11 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit: allow
         actions={(
           <>
             <Button type="button" onClick={() => setReissueOpen(false)} disabled={busy}>キャンセル</Button>
-            <Button lockedReason={lockedReason} type="button" variant="primary" disabled={!canEdit || busy} busy={busy} busyLabel="処理中…" onClick={() => { setReissueOpen(false); issue() }}>発行し直す</Button>
+            <Button lockedReason={lockedReason} type="button" variant="primary" disabled={!canEdit || busy} busy={busy} busyLabel="処理中…" onClick={() => { if (reissueScope !== scope) return; setReissueOpen(false); issue() }}>発行し直す</Button>
           </>
         )}
       >
+        <OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: storeId, name: storeName }} />
         <DialogNote>新しいアドレスを発行します。今のアドレスも 90 日は受け取り、その後は使えなくなります。予約サイトの転送先を新しいアドレスへ変えてください。</DialogNote>
       </RsDialog>
       <RsDialog

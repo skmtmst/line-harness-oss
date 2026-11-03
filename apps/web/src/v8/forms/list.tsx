@@ -148,6 +148,7 @@ export default function FormsListV8() {
   const [deleteError, setDeleteError] = useState('')
   /* 名前を変更。保存は編集保存と同じ口なので版を添える。 */
   const [renameTarget, setRenameTarget] = useState<Form | null>(null)
+  const [renameScope, setRenameScope] = useState<typeof accountScope.current | null>(null)
   const [renameName, setRenameName] = useState('')
   const [renameRevision, setRenameRevision] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
@@ -187,6 +188,7 @@ export default function FormsListV8() {
     setStopTarget(null)
     setMoveTarget(null)
     setRenameTarget(null)
+    setRenaming(false)
     setOpenMenuId(null)
     setStats(null)
     setStatsFailed(false)
@@ -470,17 +472,17 @@ export default function FormsListV8() {
   }
 
   const openRename = async (form: Form) => {
+    if (!selectedAccountId || renderedScope !== accountScope.current || loadedScope.current !== renderedScope) return
+    setRenameScope(renderedScope)
     setRenameTarget(form)
     setRenameName(displayFormName(form.name))
     setRenameError('')
     setRenameRevision(null)
-    if (!selectedAccountId) {
-      setRenameError('LINE公式アカウントを選んでください。')
-      return
-    }
     try {
-      setRenameRevision(await readContentRevision(form.id, selectedAccountId))
+      const revision = await readContentRevision(form.id, selectedAccountId)
+      if (renderedScope === accountScope.current) setRenameRevision(revision)
     } catch (saveFailure) {
+      if (renderedScope !== accountScope.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
@@ -489,7 +491,7 @@ export default function FormsListV8() {
   }
 
   const saveRename = async () => {
-    if (!renameTarget || !renameName.trim() || renaming || !selectedAccountId) return
+    if (!renameTarget || !renameName.trim() || renaming || !selectedAccountId || renameScope !== accountScope.current) return
     const name = displayFormName(renameName)
     setRenaming(true)
     setRenameError('')
@@ -497,12 +499,14 @@ export default function FormsListV8() {
       let revision = renameRevision
       if (revision === null) {
         revision = await readContentRevision(renameTarget.id, selectedAccountId)
+        if (renameScope !== accountScope.current) return
         setRenameRevision(revision)
       }
       const res = await api.forms.update(renameTarget.id, selectedAccountId, {
         name,
         expectedContentRevision: revision,
       })
+      if (renameScope !== accountScope.current) return
       if (!res.success) throw new Error('rename_failed')
       setForms((current) => current.map((form) => (
         form.id === renameTarget.id ? { ...form, name } : form
@@ -511,6 +515,7 @@ export default function FormsListV8() {
       // 名前は検索・名前順の対象。サーバー側の絞り込み・並びとずれないよう読み直す。
       void loadForms()
     } catch (error) {
+      if (renameScope !== accountScope.current) return
       const fieldFailure = saveErrors.capture(error)
 
       { if (!fieldFailure)
@@ -518,7 +523,7 @@ export default function FormsListV8() {
         ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
         : 'フォーム名を変更できませんでした。もう一度お試しください。') }
     } finally {
-      setRenaming(false)
+      if (renameScope === accountScope.current) setRenaming(false)
     }
   }
 
@@ -1181,7 +1186,7 @@ export default function FormsListV8() {
     <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null
 
-  const overlays = renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms })
+  const overlays = renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms })
 
   return (
     /* 一覧の状態（読込中・失敗・空・表）を外から待てるように出す。箱は作らない（display: contents）。 */
