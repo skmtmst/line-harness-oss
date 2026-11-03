@@ -1,6 +1,7 @@
 'use client'
 import { formatYen as yen } from '@line-crm/shared';
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { Check, Landmark, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -188,6 +189,17 @@ export function AffiliatePaymentConfirmDialog({
   onConfirmed: () => void
 }) {
   const saveErrors = useSaveFormErrors()
+  const confirmedScope = useRef<{ targetId: string; accountId: string; stale: boolean } | null>(null)
+  if (!target) {
+    if (confirmedScope.current) confirmedScope.current.stale = true
+    confirmedScope.current = null
+  }
+  else if (!confirmedScope.current || confirmedScope.current.targetId !== target.id) {
+    if (confirmedScope.current) confirmedScope.current.stale = true
+    confirmedScope.current = { targetId: target.id, accountId, stale: false }
+  }
+  else if (confirmedScope.current.accountId !== accountId) confirmedScope.current.stale = true
+  const scope = confirmedScope.current
 
   const [phase, setPhase] = useState<LoadPhase>('loading')
   const [preview, setPreview] = useState<AffiliateSettlementPreview | null>(null)
@@ -247,12 +259,12 @@ export function AffiliatePaymentConfirmDialog({
   }, [load, target])
 
   const confirmPayment = async () => {
-    if (!target || !preview || phase !== 'ready') return
+    if (!target || !preview || phase !== 'ready' || !scope?.accountId || scope.stale || confirmedScope.current !== scope || scope.accountId !== accountId) return
     setBusy(true)
     setError('')
     try {
       const response = await api.affiliates.confirmPayment(target.id, {
-        lineAccountId: accountId,
+        lineAccountId: scope.accountId,
         expectedAmount: preview.amount,
         idempotencyKey,
       })
@@ -263,7 +275,7 @@ export function AffiliatePaymentConfirmDialog({
       if (issueStatement) {
         try {
           const statement = await api.affiliates.createStatement({
-            lineAccountId: accountId,
+            lineAccountId: scope.accountId,
             settlementId: response.data.settlementId,
             affiliateId: target.id,
             expectedVersion: 1,
@@ -303,12 +315,14 @@ export function AffiliatePaymentConfirmDialog({
 
           <>
             <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={16} />キャンセル</Button>
-            {phase === 'ready' && preview ? (<Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
+            {phase === 'ready' && preview ? (<Button type="button" variant="primary" disabled={busy || !scope?.accountId || scope.stale} title={!scope?.accountId || scope.stale ? "対象を確認し直してください" : undefined} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
                 <Check size={16} />{`${yen(preview.amount)} で確定する`}
               </Button>) : null}
           </>
         </DialogActions>)}>
         <div className="space-y-3 px-6 py-5">
+      <OperationTargetSummary accounts={[{ id: scope?.accountId ?? '' }]} />
+      {(!scope?.accountId || scope.stale) ? <Notice tone="warn" message="対象が変わりました。閉じてから確認し直してください。" /> : null}
       {phase === 'loading' ? (
         <ListState kind="loading" title="確定する内容を読み込んでいます" />
       ) : phase === 'error' ? (
