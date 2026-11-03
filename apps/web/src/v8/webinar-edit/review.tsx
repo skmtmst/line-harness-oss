@@ -74,7 +74,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   const checks = validation?.checks ?? []
   const failed = checks.filter((check) => check.status === 'failed')
   const passed = checks.filter((check) => check.status === 'passed').length
-  const canPublish = !readOnly && state === 'ready' && validation !== null && failed.length === 0 && !publishing && testing === false
+  const canPublish = !readOnly && state === 'ready' && validation !== null && validation.version === editor.version && failed.length === 0 && !publishing && testing === false
 
   const testPage = async () => {
     if (lock.current) return
@@ -121,12 +121,13 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
     }
   }
   const publish = async () => {
-    if (!canPublish || lock.current) return
+    if (!canPublish || !validation || lock.current) return
+    const confirmedVersion = validation.version
     lock.current = true
     setPublishing(true)
     setPublishError('')
     try {
-      await webinarApi.publish(webinar.id, version.current)
+      await webinarApi.publish(webinar.id, confirmedVersion)
       ctx.onPublished()
       window.location.assign(`/webinars/published?id=${encodeURIComponent(webinar.id)}`)
     } catch (cause) {
