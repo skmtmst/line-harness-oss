@@ -974,15 +974,16 @@ async function processQueuedBroadcastBatches(
     // 他のCron実行が既に処理中、または停止済み → スキップ
     return;
   }
-  const releaseStopped = async () => {
-    await db.prepare(`UPDATE broadcasts SET batch_offset=0,batch_lock_at=NULL
+  const releaseStopped = async (offset=0) => {
+    await db.prepare(`UPDATE broadcasts SET batch_offset=?,batch_lock_at=NULL,
+      success_count=MAX(success_count,(SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id=? AND state='sent'))
       WHERE id=? AND stopped_at IS NOT NULL AND batch_offset=-1 AND lock_version=?`)
-      .bind(broadcast.id,lockVersion+1).run();
+      .bind(offset,broadcast.id,broadcast.id,lockVersion+1).run();
   };
   const releaseProgress = async (offset:number) => {
     const result=await db.prepare(`UPDATE broadcasts SET batch_offset=?,batch_lock_at=NULL
       WHERE id=? AND lock_version=? AND batch_offset=-1`).bind(offset,broadcast.id,lockVersion).run();
-    if(!result.meta.changes)await releaseStopped();
+    if(!result.meta.changes)await releaseStopped(offset);
   };
 
   // 旧1通では初回の追跡結果を message_content へ保存する。複数通は画面が編集に使う
@@ -1299,7 +1300,7 @@ async function processQueuedBroadcastBatches(
                     )
               WHERE id = ? AND lock_version = ? AND batch_offset = -1`,
           ).bind(progressBase + currentOffset, broadcast.id, broadcast.id,lockVersion).run();
-          if(!released.meta.changes)await releaseStopped();
+          if(!released.meta.changes)await releaseStopped(progressBase+currentOffset);
           return;
         }
       }
@@ -1313,7 +1314,7 @@ async function processQueuedBroadcastBatches(
                 )
           WHERE id = ? AND lock_version = ? AND batch_offset = -1`,
       ).bind(broadcast.id, broadcast.id,lockVersion).run();
-      if(!progressUpdate.meta.changes){await releaseStopped();return;}
+      if(!progressUpdate.meta.changes){await releaseStopped(progressBase+currentOffset);return;}
       if (currentOffset >= friends.length) break;
       // subrequest を使い切る手前で切り上げる。次の cron が続きから再開する。
       if (currentOffset - tickStartOffset >= PERSONALIZED_PUSH_PER_TICK) {
@@ -1435,7 +1436,7 @@ async function processQueuedBroadcastBatches(
     const progressUpdate=await db.prepare(
       `UPDATE broadcasts SET success_count = success_count + ? WHERE id = ? AND lock_version = ? AND batch_offset = -1`,
     ).bind(sendable.length, broadcast.id,lockVersion).run();
-    if(!progressUpdate.meta.changes){await releaseStopped();return;}
+    if(!progressUpdate.meta.changes){await releaseStopped(progressBase+currentOffset);return;}
   }
 
   // まだ残っている（時間をかけて配る設定で途中まで送った）。

@@ -141,7 +141,7 @@ describe('637: 停止者を外して一斉配信を続ける', () => {
     const sent=await dispatchHqBroadcast(f.db,run,'owner',1),child=sent.targets[0].broadcastId!;await processScheduledBroadcasts(f.db,calls as never);
     const old=processQueuedBroadcasts(f.db,calls as never);await started;
     await stopHqBroadcast(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'owner',false,2);release();await old;
-    expect(f.raw.prepare('SELECT batch_offset FROM broadcasts WHERE id=?').get(child)).toEqual({batch_offset:0});
+    expect(f.raw.prepare('SELECT batch_offset,success_count FROM broadcasts WHERE id=?').get(child)).toEqual({batch_offset:3,success_count:3});
   });
   it('送信前に停止した配信は確認時の宛先だけを再開後に送る',async()=>{
     const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-frozen',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
