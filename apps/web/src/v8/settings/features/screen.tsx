@@ -2,6 +2,7 @@
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
+import { DetailContent, DetailFields, DetailSection } from '@/components/shared/detail-content'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpDown, ChevronDown, ChevronRight, GitCompare, Lock, RotateCcw, Save, Star } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -603,14 +604,12 @@ export default function FeatureSettingsScreen() {
         onConfirm={() => { if (canManage && renderedImpactScope?.scope === accountScope.current && renderedImpactScope === impactScope.current) return confirmImpactSave() }}
       >
         <OperationTargetSummary accounts={[{ id: renderedImpactScope?.id ?? '' }]} />
-        <div>
-          {impactGroups.map((group) => (
-            <div key={group.feature} className={styles.impactGroup}>
-              <p className={styles.impactName}>{featureLabelByKey.get(group.feature) ?? group.feature}</p>
-              <p className={styles.impactText}>{impactSummary(group)}</p>
-            </div>
-          ))}
-        </div>
+        <DetailContent><DetailSection><DetailFields><div>
+          <dt>止まるもの</dt>
+          <dd>{impactGroups.map((group) => (
+            <div key={group.feature}>{featureLabelByKey.get(group.feature) ?? group.feature} {impactSummary(group)}</div>
+          ))}</dd>
+        </div></DetailFields></DetailSection></DetailContent>
       </ConfirmDialog>
     </SbSettingsScreen>
   )

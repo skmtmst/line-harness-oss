@@ -111,6 +111,9 @@ describe('★V8 機能設定の閲覧のみ', () => {
       const dialog = within(document.body).getByRole('alertdialog', { name: 'オフにする前に確認' })
       expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
       expect(within(dialog).getByText('環境')).toBeTruthy()
+      const impactLabel = within(dialog).getByText('止まるもの')
+      expect(impactLabel.tagName).toBe('DT')
+      expect(impactLabel.nextElementSibling?.textContent).toMatch(/シナリオ配信.*配信\s*2\s*件/)
       expect(dialog.querySelector('[title="account-a"]')).toBeTruthy()
       expect(dialog.querySelector('.lucide-trash-2')).toBeNull()
       const held = heldImpact.confirm!

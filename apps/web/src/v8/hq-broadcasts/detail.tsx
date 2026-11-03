@@ -62,7 +62,7 @@ const ACTIVITY_LABEL: Record<string, string> = {
 }
 type TabKey = 'overview' | 'recipients' | 'activity'
 
-type Ask = { kind: 'send' | 'stop' | 'cancel' | 'retry-all' } | { kind: 'retry'; target: ResultTarget }
+type Ask = { kind: 'send' } | { kind: 'stop' } | { kind: 'cancel' } | { kind: 'retry-all'; runId: string; targets: ResultTarget[] } | { kind: 'retry'; runId: string; target: ResultTarget }
 
 function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
@@ -428,11 +428,34 @@ function HqBroadcastDetailBody() {
 
   const retryAcknowledged = useRef<{ ask: typeof ask; targets: Set<string> }>({ ask: null, targets: new Set() })
   const [actConflict, setActConflict] = useState(false)
+  const retryState = useRef({ ask, run, canManage, busy, actConflict, loadError, active: true })
+  retryState.current = { ask, run, canManage, busy, actConflict, loadError, active: retryState.current.active }
+  useEffect(() => { retryState.current.active = true; return () => { retryState.current.active = false } }, [])
   useEffect(() => { if (ask) setError(''); setActConflict(false) }, [ask])
   const act = async () => {
     if (!run || !ask || busy || actConflict || loadError) return
+    if (ask.kind === 'retry' || ask.kind === 'retry-all') {
+      const state = retryState.current
+      if (!state.active || state.ask !== ask || !state.canManage || state.busy || state.actConflict || state.loadError || !state.run) return false
+    }
     if (retryAcknowledged.current.ask !== ask) retryAcknowledged.current = { ask, targets: new Set() }
     const acknowledged = retryAcknowledged.current.targets
+    if (ask.kind === 'retry' || ask.kind === 'retry-all') {
+      const state = retryState.current
+      if (!state.run) return false
+      const currentRun = state.run
+      const expected = (ask.kind === 'retry' ? [ask.target] : ask.targets).filter(t => !acknowledged.has(t.accountId))
+      const current = ask.kind === 'retry'
+        ? currentRun.targets.filter(t => t.accountId === ask.target.accountId && canRetry(currentRun, t))
+        : currentRun.targets.filter(t => canRetry(currentRun, t) && !acknowledged.has(t.accountId))
+      const key = (targets: ResultTarget[]) => JSON.stringify(targets.map(t => [t.accountId, t.version]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))))
+      if (currentRun.id !== ask.runId || expected.length === 0 || expected.some(t => !t.accountId) || key(expected) !== key(current)) {
+        setActConflict(true)
+        setError('対象が変わりました。閉じて最新の状態を確認してください。')
+        return false
+      }
+    }
+    if (ask.kind === 'retry' || ask.kind === 'retry-all') retryState.current.busy = true
     setBusy(true); setError('')
     try {
       if (ask.kind === 'send') {
@@ -450,7 +473,7 @@ function HqBroadcastDetailBody() {
         await hqBroadcastsApi.retry(run.id, ask.target.accountId, ask.target.version)
         notifyToast(`${ask.target.accountName}にやり直しています`)
       } else {
-        const targets = run.targets.filter((t) => canRetry(run, t) && !acknowledged.has(t.accountId))
+        const targets = ask.targets.filter((t) => !acknowledged.has(t.accountId))
         const failures: string[] = []
         let conflicted = false
         for (const t of targets) {
@@ -476,6 +499,7 @@ function HqBroadcastDetailBody() {
       setError(needsReview ? `${reason} 閉じて最新の状態を確認してください。` : reason)
       return false
     } finally {
+      retryState.current.busy = false
       setBusy(false)
     }
   }
@@ -486,7 +510,7 @@ function HqBroadcastDetailBody() {
   else if (!run) body = <DetailLoading />
   else body = run.status === 'prepared'
     ? <PreparedCard run={run} />
-    : <ResultCard run={run} canManage={canManage} onRetry={(t) => setAsk({ kind: 'retry', target: t })} onRetryAll={() => setAsk({ kind: 'retry-all' })} />
+    : <ResultCard run={run} canManage={canManage} onRetry={(t) => setAsk({ kind: 'retry', runId: run.id, target: { ...t } })} onRetryAll={() => setAsk({ kind: 'retry-all', runId: run.id, targets: run.targets.filter(t => canRetry(run, t)).map(t => ({ ...t })) })} />
 
   const badge = run ? runBadge(run) : null
   /* 全体の状態は送ったあとも scheduled のまま（口の作り）。止める・取り消すは、まだ送っている・予約中の店があるときだけ。 */
@@ -669,6 +693,7 @@ function HqBroadcastDetailBody() {
           onCancel={() => { setAsk(null); setError(''); if (actConflict) void load() }}
         >
           {ask.kind === 'send' && run ? <OperationTargetSummary accounts={run.targets.filter((target) => !target.excluded && target.blockedReasons.length === 0).map((target) => ({ id: target.accountId, name: target.accountName }))} showAccountCount /> : null}
+          {ask.kind === 'retry' || ask.kind === 'retry-all' ? <OperationTargetSummary accounts={(ask.kind === 'retry' ? [ask.target] : ask.targets).map(target => ({ id: target.accountId, name: target.accountName }))} compactAccounts /> : null}
           {ask.kind === 'send' && gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}
         </ConfirmDialog>
       ) : null}
