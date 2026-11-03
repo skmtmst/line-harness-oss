@@ -5,8 +5,9 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import HelpTip from './help-tip'
+import Dialog from './dialog'
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -220,4 +221,16 @@ it('押して開いた補足は焦点が外れても残り、外を押すと閉�
   expect(view.getByRole('note')).toBeTruthy()
   fireEvent.pointerDown(outside)
   expect(view.queryByRole('note')).toBeNull()
+})
+
+it('窓内の補足をEscで閉じる時、親の窓は閉じない', () => {
+  const onClose = vi.fn()
+  const view = render(<Dialog open title="設定" onCancel={onClose}><HelpTip label="人数の説明">送る相手の数。</HelpTip></Dialog>)
+  fireEvent.click(view.getByRole('button', { name: '人数の説明' }))
+  expect(view.getByRole('note')).toBeTruthy()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(view.queryByRole('note')).toBeNull()
+  expect(onClose).not.toHaveBeenCalled()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(onClose).toHaveBeenCalledOnce()
 })

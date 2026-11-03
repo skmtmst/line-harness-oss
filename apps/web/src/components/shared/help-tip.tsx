@@ -92,10 +92,10 @@ export default function HelpTip({
     const onPointer = (event: PointerEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpenSource(null)
     }
-    document.addEventListener('keydown', onKey)
+    document.addEventListener('keydown', onKey, true)
     document.addEventListener('pointerdown', onPointer)
     return () => {
-      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('keydown', onKey, true)
       document.removeEventListener('pointerdown', onPointer)
     }
   }, [open ])
