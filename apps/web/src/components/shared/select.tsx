@@ -32,6 +32,7 @@ export default function Select({
   'aria-label': ariaLabel,
   className,
   defaultOpen = false,
+  openCreateSignal,
   disabled = false,
   lockedReason,
   error,
@@ -181,6 +182,15 @@ export default function Select({
     createSessionRef.current += 1
     setMode('create')
   }
+  const previousCreateSignal = useRef(openCreateSignal)
+  useEffect(() => {
+    if (openCreateSignal === previousCreateSignal.current) return
+    previousCreateSignal.current = openCreateSignal
+    if (openCreateSignal === undefined || disabled || currentLock.current || !createAction || currentCreatePermission.current.disabled || currentCreatePermission.current.reason) return
+    createSessionRef.current += 1
+    setMode('create')
+    setOpen(true)
+  }, [openCreateSignal, disabled, createAction])
   const backToList = () => {
     createSessionRef.current += 1
     // 焦点を先にボタンへ戻す（入力欄が消えて焦点が迷子になり閉じるのを防ぐ）。

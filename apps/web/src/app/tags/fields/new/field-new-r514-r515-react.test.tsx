@@ -10,6 +10,7 @@ const fixture = vi.hoisted(() => ({
   fieldsList: vi.fn(),
   fieldsCreate: vi.fn(),
   foldersList: vi.fn(),
+  foldersCreate: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -28,7 +29,7 @@ vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
     friendFields: { list: fixture.fieldsList, create: fixture.fieldsCreate },
-    folders: { list: fixture.foldersList },
+    folders: { list: fixture.foldersList, create: fixture.foldersCreate },
     featureSettings: {
       visibility: () => Promise.resolve({ success: true, data: { features: {} } }),
     },
@@ -164,4 +165,20 @@ it('情報欄とフォルダの両方が未保存でもキャンセル確認は1
     fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
   }
   expect((screen.getByRole('textbox', { name: '新しいフォルダの名前' }) as HTMLInputElement).value).toBe('作成途中')
+})
+
+
+it('フォルダ作成中は情報欄の保存を止め、理由を表示する', async () => {
+  fixture.foldersCreate.mockImplementation(() => new Promise(() => {}))
+  render(<NewFriendFieldPage />)
+  await waitFor(() => expect(createButton().disabled).toBe(false))
+  fireEvent.change(screen.getByPlaceholderText('例：愛犬のお名前'), { target: { value: '試す名前' } })
+  fireEvent.change(screen.getByPlaceholderText('pet_name'), { target: { value: 'trial_name' } })
+  fireEvent.click(screen.getByRole('button', { name: '友だち情報欄のフォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成途中' } })
+  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  expect(createButton().disabled).toBe(true)
+  expect(screen.getByText('フォルダを作成中です。完了するまでお待ちください。')).toBeTruthy()
+  expect(fixture.fieldsCreate).not.toHaveBeenCalled()
 })

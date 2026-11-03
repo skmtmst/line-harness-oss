@@ -64,6 +64,8 @@ export interface FolderSelectProps extends Pick<SelectProps, 'aria-label' | 'lab
   createLockedReason?: string
   /** 親の保存で作りかけのフォルダ名を捨てる前にも確認する。 */
   draftGuardRef?: MutableRefObject<FolderDraftGuard | null>
+  /** 作成中は親の保存を止め、理由を出す。 */
+  onCreatingChange?: (creating: boolean) => void
 }
 
 /** API の答え（{ success, data } / { success: false, error }）を、作れたフォルダか Error に直す。 */
@@ -145,6 +147,7 @@ export default function FolderSelect({
   createDisabled,
   createLockedReason,
   draftGuardRef,
+  onCreatingChange,
   ...selectProps
 }: FolderSelectProps) {
   // 作ったフォルダは、画面が一覧を読み直す前でも選べて名前が出るよう、ここでも持つ。
@@ -153,6 +156,11 @@ export default function FolderSelect({
   const [color, setColor] = useState<string>(FOLDER_SELECT_COLORS[0].value)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [openCreateSignal, setOpenCreateSignal] = useState(0)
+  useLayoutEffect(() => {
+    onCreatingChange?.(busy)
+    return () => onCreatingChange?.(false)
+  }, [busy, onCreatingChange])
   const busyRef = useRef(false)
   const sessionRef = useRef(0)
   const guardAction = useRef<FolderDraftGuard | null>(null)
@@ -175,6 +183,7 @@ export default function FolderSelect({
     {(dirty || busy) && <FolderCreationGuard busy={busy} onDiscard={clearDraft} actionRef={guardAction} draftGuardRef={draftGuardRef} />}
     <Select
       {...selectProps}
+      openCreateSignal={openCreateSignal}
       value={value}
       onChange={onChange}
       options={options}
@@ -202,6 +211,12 @@ export default function FolderSelect({
         ),
       } : undefined}
     />
+    {busy ? <span className={styles.draftNote} role="status">フォルダを作成しています…</span> : dirty ? (
+      <span className={styles.draftNote}>
+        <span>{name ? '作りかけのフォルダ名があります。' : 'フォルダの色を変更しています。'}</span>{' '}
+        <button type="button" className={styles.draftLink} disabled={selectProps.disabled || !onCreate || createDisabled || Boolean(createLockedReason)} onClick={() => setOpenCreateSignal(value => value + 1)}>フォルダの入力を確認</button>
+      </span>
+    ) : null}
     </>
   )
 }

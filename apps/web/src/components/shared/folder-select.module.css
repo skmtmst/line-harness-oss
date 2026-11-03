@@ -47,6 +47,24 @@
   border-color: var(--color-danger);
 }
 
+.draftNote {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-ink-faint);
+  font-size: var(--select-menu-item-size);
+  line-height: var(--select-menu-item-line);
+}
+.draftLink {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-deep);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.draftLink:disabled { opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
+
 .nameRow { display: flex; align-items: center; gap: var(--select-menu-swatch-gap); }
 .error {
   inline-size: 0;
