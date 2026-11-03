@@ -7,6 +7,8 @@ import type { TagDependencies, TagDeleteImpactReferences } from '@/lib/api'
 
 const net = vi.hoisted(() => ({ dependencies: vi.fn(), archive: vi.fn(), remove: vi.fn(), unexpectedFetch: vi.fn() }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }] })) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async load => ({ ...await load<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('@/lib/api', async load => {

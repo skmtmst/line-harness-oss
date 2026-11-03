@@ -55,7 +55,9 @@ describe("全V8画面の行き先の見張り", () => {
   })
   it('選んだ行の詳細はURLで復元できる', () => {
     for (const feature of ['broadcasts', 'auto-replies', 'scenarios', 'webinars', 'forms']) {
-      expect(readFileSync(join(root, 'v8', feature, 'list.tsx'), 'utf8')).toContain('useDetailPanelUrl(')
+      const source = readFileSync(join(root, 'v8', feature, 'list.tsx'), 'utf8')
+      const resolved = source.includes('useInlineDetailGuard(') ? readFileSync(join(root, 'components/shared/use-inline-detail-guard.tsx'), 'utf8') : source
+      expect(resolved).toContain('useDetailPanelUrl(')
     }
     expect(readFileSync(new URL('../../v8/reminders/list.tsx', import.meta.url), 'utf8')).toContain('useDetailPanelUrl(')
   })
