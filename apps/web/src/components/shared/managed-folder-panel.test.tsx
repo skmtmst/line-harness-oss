@@ -14,6 +14,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 const folder = (id: string, name: string, order: number, color: string | null = '#3b82f6'): Folder => ({
   id, kind: 'scenario', name, parentId: null, displayOrder: order, color, createdAt: '', updatedAt: '', itemCount: order + 2,
 } as Folder)

@@ -8,7 +8,7 @@
 .field[data-permission-locked] .change { color: var(--color-ink-secondary); }
 .item[data-permission-locked] { cursor: not-allowed; }
 .selection { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tap-action-gap); flex: 1; min-width: 0; }
-.placeholder { color: var(--color-ink-faint); font-size: var(--text-body); }
+.placeholder { color: var(--color-placeholder); font-size: var(--text-body); }
 .change { color: var(--color-action); font-size: var(--text-caption); white-space: nowrap; }
 .rows { display: flex; flex-direction: column; gap: 0; }
 .item { display: flex; align-items: center; gap: var(--tap-action-gap); min-height: var(--tap-action-row-h); font-size: var(--text-body); cursor: pointer; }

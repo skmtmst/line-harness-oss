@@ -33,6 +33,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
   } }
 })
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+vi.mock('@/lib/line-accounts-cache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/line-accounts-cache')>()),
+  loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-1', name: '確認用アカウント' }] })),
+}))
 
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', loading: false }) }))
@@ -91,7 +95,7 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('リマインダ テスト送信段 (N-070)', () => {
-  it('テスト送信前に送信元が未確認であることと環境を示す', async () => {
+  it('テスト送信前に下書きの送信元と環境を示す', async () => {
     apiMocks.getDraft.mockReturnValue(ok(DRAFT))
     apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
     render(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
@@ -99,7 +103,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     const dialog = screen.getByRole('dialog', { name: 'テスト送信しますか？' })
     expect(dialog.textContent).toContain('LINEアカウント')
-    expect(dialog.textContent).toContain('名前を確認できません')
+    await waitFor(() => expect(dialog.textContent).toContain('確認用アカウント'))
     expect(dialog.textContent).toContain('環境')
     expect(apiMocks.testDraft).not.toHaveBeenCalled()
   })

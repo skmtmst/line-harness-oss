@@ -29,11 +29,15 @@ export function useApiTokens() {
   const canManage = ownership.allowed
   const overview = useWebhookOverview()
   const { selectedAccountId } = useAccount()
+  const accountScope = useRef({ accountId: selectedAccountId, generation: 0 })
+  if (accountScope.current.accountId !== selectedAccountId) accountScope.current = { accountId: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const generation = accountScope.current.generation
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
   const loadGenerationRef = useRef(0)
 
-  const [tokens, setTokens] = useState<IntegrationApiTokenInfo[]>([])
+  const [tokenList, setTokenList] = useState<{ generation: number; rows: IntegrationApiTokenInfo[] }>({ generation, rows: [] })
+  const tokens = tokenList.generation === generation ? tokenList.rows : []
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [loadError, setLoadError] = useState('')
   const { error: actionError, setError: setActionError } = useActionError(selectedAccountId ?? '')
@@ -46,8 +50,12 @@ export function useApiTokens() {
   const [createError, setCreateError] = useState('')
   const [issued, setIssued] = useState<{ name: string; token: string; scopes: string[] } | null>(null)
   const [copied, setCopied] = useState(false)
-  const [rotateTarget, setRotateTarget] = useState<IntegrationApiTokenInfo | null>(null)
-  const [revokeTarget, setRevokeTarget] = useState<IntegrationApiTokenInfo | null>(null)
+  const [rotateSelection, setRotateSelection] = useState<{ generation: number; token: IntegrationApiTokenInfo } | null>(null)
+  const [revokeSelection, setRevokeSelection] = useState<{ generation: number; token: IntegrationApiTokenInfo } | null>(null)
+  const rotateTarget = rotateSelection?.generation === generation ? rotateSelection.token : null
+  const revokeTarget = revokeSelection?.generation === generation ? revokeSelection.token : null
+  const setRotateTarget = (token: IntegrationApiTokenInfo | null) => { if (accountScope.current.generation === generation) setRotateSelection(token ? { generation, token } : null) }
+  const setRevokeTarget = (token: IntegrationApiTokenInfo | null) => { if (accountScope.current.generation === generation) setRevokeSelection(token ? { generation, token } : null) }
   const [mutating, setMutating] = useState(false)
   const [dialogError, setDialogError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
@@ -73,7 +81,7 @@ export function useApiTokens() {
     const requestGeneration = ++loadGenerationRef.current
     const requestAccountId = selectedAccountId
     if (!requestAccountId) {
-      setTokens([])
+      setTokenList({ generation, rows: [] })
       setStatus('ready')
       return
     }
@@ -81,28 +89,28 @@ export function useApiTokens() {
     setLoadError('')
     try {
       const res = await api.webhooks.apiTokens.list(requestAccountId)
-      if (loadGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
+      if (loadGenerationRef.current !== requestGeneration || accountScope.current.generation !== generation || selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
         setStatus('error')
         setLoadError(res.error)
         return
       }
       // 止めた鍵は「使っている」と出さない（一覧の口は止めた鍵を返さない決まりだが、混ざっても出さない）。
-      setTokens(res.data.filter((item) => !item.revokedAt))
+      setTokenList({ generation, rows: res.data.filter((item) => !item.revokedAt) })
       setStatus('ready')
     } catch (caught) {
-      if (loadGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
+      if (loadGenerationRef.current !== requestGeneration || accountScope.current.generation !== generation || selectedAccountIdRef.current !== requestAccountId) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.code === 'FEATURE_DISABLED') {
-        setTokens([]);
+        setTokenList({ generation, rows: [] });
 
         setStatus('disabled');
 
         return
       }
       if (caught instanceof ApiError && (caught.status === 403 || caught.status === 404)) {
-        setTokens([])
+        setTokenList({ generation, rows: [] })
         setStatus('forbidden')
         return
       }
@@ -111,7 +119,7 @@ export function useApiTokens() {
       setLoadError(describeApiFailure(caught, '読み込み'))
     }
   }
-  }, [selectedAccountId, saveErrors])
+  }, [selectedAccountId, generation, saveErrors])
 
   useEffect(() => {
     void load()
@@ -121,6 +129,8 @@ export function useApiTokens() {
   useEffect(() => {
     setIssued(null)
     setCopied(false)
+    setStepUp(null)
+    setMutating(false)
   }, [selectedAccountId])
 
   const toggleScope = (scope: string) => {
@@ -188,16 +198,17 @@ export function useApiTokens() {
   }
 
   const handleRotate = async (stepUpToken?: string) => {
+    if (accountScope.current.generation !== generation) return
     if (!canManageWebhooksNow(true)) { setDialogError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     const canContinue = captureWebhookWriteAccess(true)
     setActionError('')
     setDialogError('')
     const requestAccountId = selectedAccountId
-    if (!requestAccountId || selectedAccountIdRef.current !== requestAccountId || !rotateTarget) return
+    if (!requestAccountId || accountScope.current.generation !== generation || selectedAccountIdRef.current !== requestAccountId || !rotateTarget) return
     setMutating(true)
     try {
       const res = await api.webhooks.apiTokens.rotate(rotateTarget.id, requestAccountId, stepUpToken)
-      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (accountScope.current.generation !== generation || selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
         setDialogError(res.error)
         return
@@ -207,6 +218,7 @@ export function useApiTokens() {
       setRotateTarget(null)
       await load()
     } catch (caught) {
+      if (accountScope.current.generation !== generation) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (!stepUpToken && isStepUpRequired(caught)) {
@@ -214,7 +226,7 @@ export function useApiTokens() {
         setStepUp({
           purpose: 'webhook.api_token',
           action: `「${target?.name ?? ''}」の鍵を入れ替える`,
-          retry: async (token) => { if (canContinue() && selectedAccountIdRef.current === requestAccountId) return handleRotate(token); setDialogError('権限やLINEアカウントが変わったため中止しました。') },
+          retry: async (token) => { if (accountScope.current.generation !== generation) return; if (canContinue() && selectedAccountIdRef.current === requestAccountId) return handleRotate(token); setDialogError('権限やLINEアカウントが変わったため中止しました。') },
         })
         return
       }
@@ -231,20 +243,21 @@ export function useApiTokens() {
         scope: 'store',
       })) }
     } finally {
-      if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
+      if (accountScope.current.generation === generation && selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
   }
 
   const handleRevoke = async (stepUpToken?: string) => {
+    if (accountScope.current.generation !== generation) return
     if (!canManageWebhooksNow(true)) { setDialogError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     const canContinue = captureWebhookWriteAccess(true)
     setDialogError('')
     const requestAccountId = selectedAccountId
-    if (!requestAccountId || selectedAccountIdRef.current !== requestAccountId || !revokeTarget) return
+    if (!requestAccountId || accountScope.current.generation !== generation || selectedAccountIdRef.current !== requestAccountId || !revokeTarget) return
     setMutating(true)
     try {
       const res = await api.webhooks.apiTokens.revoke(revokeTarget.id, requestAccountId, stepUpToken)
-      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (accountScope.current.generation !== generation || selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
         setDialogError(res.error)
         return
@@ -252,6 +265,7 @@ export function useApiTokens() {
       setRevokeTarget(null)
       await load()
     } catch (caught) {
+      if (accountScope.current.generation !== generation) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (!stepUpToken && isStepUpRequired(caught)) {
@@ -259,7 +273,7 @@ export function useApiTokens() {
         setStepUp({
           purpose: 'webhook.api_token',
           action: `「${target?.name ?? ''}」の鍵を止める`,
-          retry: async (token) => { if (canContinue() && selectedAccountIdRef.current === requestAccountId) return handleRevoke(token); setDialogError('権限やLINEアカウントが変わったため中止しました。') },
+          retry: async (token) => { if (accountScope.current.generation !== generation) return; if (canContinue() && selectedAccountIdRef.current === requestAccountId) return handleRevoke(token); setDialogError('権限やLINEアカウントが変わったため中止しました。') },
         })
         return
       }
@@ -269,10 +283,10 @@ export function useApiTokens() {
         scope: 'store',
       })) }
     } finally {
-      if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
+      if (accountScope.current.generation === generation && selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
   }
 
 
-  return { saveErrors, ownership, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke }
+  return { saveErrors, ownership, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, targetAccountId: selectedAccountId, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke }
 }

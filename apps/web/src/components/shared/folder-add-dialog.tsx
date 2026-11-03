@@ -11,8 +11,12 @@
  */
 
 import { useOptionalAccount } from '@/contexts/account-context'
-import { useState } from 'react'
+import { useContext, useLayoutEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from './overlay-utils'
+import { InlineDetailHoldingContext } from './use-inline-detail-guard'
 import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared'
 import FolderEditorDialog from './folder-editor-dialog'
 import { describeFolderFailure } from './folder-failure'
@@ -92,6 +96,14 @@ export default function FolderAddDialog({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [nameError, setNameError] = useState('')
+  const initialColor = folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value
+  const dirty = name !== (folder?.name ?? '') || color !== initialColor
+  const guard = useUnsavedGuard({ dirty: dirty || saving, busy: saving, onDiscard: onClose })
+  const depth = useContext(OverlayDepthContext)
+  const onHoldingChange = useContext(InlineDetailHoldingContext)
+  const source = useRef(Symbol('folder'))
+  useLayoutEffect(() => { onHoldingChange?.(source.current, dirty || saving) }, [dirty, saving, onHoldingChange])
+  useLayoutEffect(() => () => { onHoldingChange?.(source.current, false) }, [onHoldingChange])
 
   const add = async () => {
     if (confirmDisabled || confirmLockedReason) return
@@ -112,6 +124,7 @@ export default function FolderAddDialog({
         setError(res.error)
         return
       }
+      guard.disarm()
       onAdded(res.data)
       onClose()
     } catch (caught) {
@@ -131,7 +144,7 @@ export default function FolderAddDialog({
     }
   }
 
-  return <FolderEditorDialog open
+  return <><FolderEditorDialog open
     title={folder ? 'フォルダを直す' : 'フォルダを追加'} description={note}
     name={name} onNameChange={(next) => { setName(next); setNameError('') }} color={color} onColorChange={setColor}
     nameError={nameError || undefined}
@@ -140,5 +153,6 @@ export default function FolderAddDialog({
     confirmLockedReason={confirmLockedReason} confirmDisabled={confirmDisabled}
     onCancel={onClose} onConfirm={() => void add()} confirmLabel={folder ? '保存する' : '追加する'}
   />
+  <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></>
 
 }

@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ create: vi.fn(), role: 'admin' as string | null }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/tags/new' }))
-vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
+vi.mock('next/link', () => ({ default: ({ href, children, ...props }: React.ComponentProps<'a'>) => <a href={href} {...props}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => net.role, canManageRole: (role: string | null) => role === 'admin' || role === 'owner' }))
@@ -77,4 +77,25 @@ for (const role of [null, 'viewer', 'staff']) test(`権限${role}の人には入
   expect(screen.queryByRole('button', { name: 'タグを作る', exact: true })).toBeNull()
   expect(screen.getByRole('button', { name: '一覧へ戻る' })).toBeTruthy()
   expect(net.create).not.toHaveBeenCalled()
+})
+
+test('設定の見本は共通カードで囲み、利用できる付け方だけリンクにする', () => {
+  render(<TagCreate />)
+  const preview = document.querySelector('[data-template-region="preview"]')!
+  expect(preview.querySelector('[data-card-variant="aside"]')).toBeTruthy()
+  expect(screen.getByRole('link', { name: /回答フォーム/ }).getAttribute('href')).toBe('/form-submissions')
+  expect(screen.getByRole('link', { name: /オートメーション/ }).getAttribute('href')).toBe('/automations')
+  expect(screen.queryByRole('link', { name: /タグ連動/ })).toBeNull()
+})
+
+test('付け方のリンクだけに操作の印があり、右欄は共通の透明な面を使う', () => {
+  render(<TagCreate />)
+  for (const label of ['回答フォーム', 'オートメーション']) {
+    const link = screen.getByRole('link', { name: new RegExp(label) })
+    expect(link.hasAttribute('data-pressable-card')).toBe(true)
+    expect(link.querySelector('[data-link-indicator]')).toBeTruthy()
+  }
+  const description = screen.getByText('タグ連動').closest('[data-design-part="card"]')!
+  expect(description.querySelector('[data-link-indicator]')).toBeNull()
+  expect(document.querySelector('[data-template-region="preview"]')?.getAttribute('data-preview-surface')).toBe('plain')
 })

@@ -6,6 +6,8 @@ import FolderEditorDialog from './folder-editor-dialog'
 import FolderAddDialog from './folder-add-dialog'
 import { api } from '@/lib/api'
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('@/contexts/account-context', () => ({ useOptionalAccount: () => ({ selectedAccountId: 'selected-account' }) }))
 vi.mock('@/lib/api', () => ({ api: { folders: { create: vi.fn(), update: vi.fn() } } }))
 afterEach(() => { cleanup(); vi.clearAllMocks() })

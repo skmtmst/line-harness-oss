@@ -13,6 +13,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const folderCreate = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'f1' } })))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('@/lib/api', () => ({ api: { folders: { create: folderCreate, update: vi.fn() } } }))
 import DetailPanel from './detail-panel'
 import InlineEdit from './inline-edit'
