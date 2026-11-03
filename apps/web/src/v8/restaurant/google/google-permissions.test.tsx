@@ -292,3 +292,17 @@ it('Google投稿の古い削除確定はアカウントを切り替えて戻し�
  await act(async () => { await oldConfirm({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
  expect(fixture.removePost).not.toHaveBeenCalled()
 })
+
+it('Google投稿の削除窓を閉じた後の古い確定では送らない', async () => {
+ fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published' }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+ render(<PostsBoard accountId="a" go={vi.fn()} />)
+ fireEvent.click(await screen.findByRole('button', { name: '投稿「合成の投稿」の操作' }))
+ fireEvent.click(await screen.findByRole('menuitem', { name: 'Google から削除' }))
+ const dialog = within(screen.getByRole('alertdialog'))
+ const b = dialog.getByRole('button', { name: '削除する' })
+ const key = Object.keys(b).find(item => item.startsWith('__reactProps$'))!
+ const held = (b as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ fireEvent.click(dialog.getByRole('button', { name: 'キャンセル' }))
+ await act(async () => { await held({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
+ expect(fixture.removePost).not.toHaveBeenCalled()
+})
