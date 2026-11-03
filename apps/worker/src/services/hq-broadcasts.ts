@@ -127,16 +127,29 @@ async function draftAudienceQuery(db:D1Database,broadcastId:string) {
   const prior=await db.prepare('SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=? LIMIT 1').bind(broadcastId).first();
   if(prior)return null;
   const query=await scopeStoredBroadcastSegmentQuery(db,buildBroadcastAudienceQuery(JSON.parse(b.segment_conditions)),b.line_account_id);
-  return {sql:`SELECT q.id AS friend_id FROM (${query.sql}) q WHERE ${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.','q.')}`,bindings:query.bindings};
+  return {sql:`SELECT f.id AS friend_id FROM (${query.sql}) f WHERE ${DELIVERY_CONSENT_ALLOWED_SQL}`,bindings:query.bindings};
 }
 async function retrySnapshot(db:D1Database,broadcastId:string) {
   const draft=await draftAudienceQuery(db,broadcastId);
   const rows=draft
-    ? await db.prepare(`${draft.sql} ORDER BY q.id`).bind(...draft.bindings).all<{friend_id:string}>()
+    ? await db.prepare(`${draft.sql} ORDER BY f.id`).bind(...draft.bindings).all<{friend_id:string}>()
     : await db.prepare(`SELECT s.friend_id FROM broadcast_send_claims s JOIN broadcasts b ON b.id=s.broadcast_id WHERE s.broadcast_id=? AND ${retryableWhere} AND ${availableWhere} ORDER BY s.friend_id`).bind(broadcastId).all<{friend_id:string}>();
   const ids=rows.results.map(r=>r.friend_id), json=JSON.stringify(ids);
   const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(json));
   return {ids,json,token:Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join(''),draft};
+}
+async function retryCount(db:D1Database,broadcastId:string) {
+  const draft=await draftAudienceQuery(db,broadcastId);
+  const count=draft
+    ? await db.prepare(`SELECT COUNT(*) AS n FROM (${draft.sql})`).bind(...draft.bindings).first<{n:number}>()
+    : await db.prepare(`SELECT COUNT(*) AS n FROM broadcast_send_claims s JOIN broadcasts b ON b.id=s.broadcast_id WHERE s.broadcast_id=? AND ${retryableWhere} AND ${availableWhere}`).bind(broadcastId).first<{n:number}>();
+  return Number(count?.n??0);
+}
+export async function previewHqRetry(db:D1Database,run:RunRow,accountId:string) {
+  const target=await db.prepare('SELECT broadcast_id FROM hq_broadcast_targets WHERE run_id=? AND line_account_id=? AND excluded=0').bind(run.id,stampId(accountId)).first<{broadcast_id:string|null}>();
+  if(!target?.broadcast_id)throw new StampError('店舗の配信が見つかりません',404);
+  const snapshot=await retrySnapshot(db,target.broadcast_id);
+  return {count:snapshot.ids.length,token:snapshot.token};
 }
 export class HqRetryConflict extends StampError {
   constructor(public currentCount:number) { super('送る相手が変わりました。もう一度確かめてください',409); }
@@ -150,8 +163,8 @@ export async function readHqBroadcastResult(db:D1Database,run:RunRow):Promise<Hq
     FROM hq_broadcast_targets t JOIN line_accounts a ON a.id=t.line_account_id AND a.tenant_id=? LEFT JOIN broadcasts b ON b.id=t.broadcast_id WHERE t.run_id=? ORDER BY t.line_account_id`).bind(run.tenant_id,run.id).all<Target & {opened_count:number|null;clicked_count:number|null;reaction_count:number|null;approval_status:string|null;child_status:string|null;total_count:number|null;success_count:number|null;stopped_at:string|null;lock_version:number|null}>()).results;
   const failures=(await db.prepare(`SELECT t.line_account_id,s.state,s.error_code,COUNT(*) AS count FROM hq_broadcast_targets t JOIN broadcast_send_claims s ON s.broadcast_id=t.broadcast_id WHERE t.run_id=? AND s.state IN ('failed','unknown') GROUP BY t.line_account_id,s.state,s.error_code`).bind(run.id).all<{line_account_id:string;state:string;error_code:string|null;count:number}>()).results;
   const blocks=await hqBroadcastBlocks(db,run.tenant_id,run.id);
-  const snapshots=await Promise.all(rows.map(r=>r.broadcast_id?retrySnapshot(db,r.broadcast_id):null));
-  return {input,id:run.id,title:input.title,status:run.status,version:run.version,scheduledAt:run.scheduled_at,targets:rows.map((r,index)=>({...(r.preflight_json?JSON.parse(r.preflight_json):{accountId:r.line_account_id,accountName:r.account_name,audienceCount:null,remaining:null,connected:false,paused:false,blockedReasons:[]}),failureReasons:failures.filter(f=>f.line_account_id===r.line_account_id).map(f=>classifyHqFailure(f.state,f.error_code,f.count)).concat(r.child_status==='sent'&&r.total_count===0?[{code:'no_friends',label:'友だちが0人です',count:0,retryable:false}]:r.child_status==='draft'&&run.status==='scheduled'?[{code:'before_send_failed',label:'送信前の確認で止まりました。店舗の送信前確認をやり直してください',count:0,retryable:true}]:[]),excluded:!!r.excluded,broadcastId:r.broadcast_id,status:r.excluded?'excluded':(run.status==='cancelled'?'cancelled':r.child_status==='draft'&&run.status!=='prepared'?'failed':r.child_status??'prepared'),openedCount:r.opened_count,clickedCount:r.clicked_count,reactionCount:r.reaction_count,blockedCount:blocks.blocksByAccount.find(b=>b.accountId===r.line_account_id)?.blockCount??null,approvalStatus:r.approval_status??'none',successCount:r.success_count??0,totalCount:r.total_count??0,version:r.lock_version??1,retryableCount:snapshots[index]?.ids.length??0,retryableToken:snapshots[index]?.token,stopped:!!r.stopped_at}))};
+  const counts=await Promise.all(rows.map(r=>r.broadcast_id&&(r.child_status==='sent'||(r.child_status==='sending'&&r.stopped_at)||(r.child_status==='draft'&&run.status!=='prepared'))?retryCount(db,r.broadcast_id):0));
+  return {input,id:run.id,title:input.title,status:run.status,version:run.version,scheduledAt:run.scheduled_at,targets:rows.map((r,index)=>({...(r.preflight_json?JSON.parse(r.preflight_json):{accountId:r.line_account_id,accountName:r.account_name,audienceCount:null,remaining:null,connected:false,paused:false,blockedReasons:[]}),failureReasons:failures.filter(f=>f.line_account_id===r.line_account_id).map(f=>classifyHqFailure(f.state,f.error_code,f.count)).concat(r.child_status==='sent'&&r.total_count===0?[{code:'no_friends',label:'友だちが0人です',count:0,retryable:false}]:r.child_status==='draft'&&run.status==='scheduled'?[{code:'before_send_failed',label:'送信前の確認で止まりました。店舗の送信前確認をやり直してください',count:0,retryable:true}]:[]),excluded:!!r.excluded,broadcastId:r.broadcast_id,status:r.excluded?'excluded':(run.status==='cancelled'?'cancelled':r.child_status==='draft'&&run.status!=='prepared'?'failed':r.child_status??'prepared'),openedCount:r.opened_count,clickedCount:r.clicked_count,reactionCount:r.reaction_count,blockedCount:blocks.blocksByAccount.find(b=>b.accountId===r.line_account_id)?.blockCount??null,approvalStatus:r.approval_status??'none',successCount:r.success_count??0,totalCount:r.total_count??0,version:r.lock_version??1,retryableCount:counts[index],stopped:!!r.stopped_at}))};
 }
 export async function stopHqBroadcast(db:D1Database,run:RunRow,actorId:string,cancel:boolean,version:number) {
   const token=crypto.randomUUID(),ops=[db.prepare(`UPDATE hq_broadcast_runs SET status=?,version=version+1,dispatch_token=? WHERE id=? AND version=? AND status NOT IN ('cancelled')`).bind(cancel?'cancelled':'stopped',token,run.id,version)];

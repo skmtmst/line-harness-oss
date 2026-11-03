@@ -19,11 +19,11 @@ import { dbFor } from '../services/db-router.js';
 import { requireRole, requireIrreversibleConfirmation } from '../middleware/role-guard.js';
 import { StampError } from '../services/visit-stamps.js';
 import { hqBroadcastAuthority, prepareHqBroadcast, getHqBroadcastRun, readHqBroadcastResult, preflightHqBroadcast,
-  excludeHqBroadcastTargets, dispatchHqBroadcast, stopHqBroadcast, retryHqBroadcastTarget, HqRetryConflict } from '../services/hq-broadcasts.js';
+  excludeHqBroadcastTargets, dispatchHqBroadcast, stopHqBroadcast, retryHqBroadcastTarget, previewHqRetry, HqRetryConflict } from '../services/hq-broadcasts.js';
 export const hqBroadcasts=new Hono<Env>();
 const mediaRuntime = (c: import('hono').Context<Env>) => ({bucket:c.env.IMAGES,publicBaseUrl:c.env.WORKER_URL || new URL(c.req.url).origin});
 hqBroadcasts.onError((e, c) => {
-  if (e instanceof HqRetryConflict) return c.json({success:false,error:e.message,currentCount:e.currentCount},409);
+  if (e instanceof HqRetryConflict) return c.json({success:false,error:e.message,currentCount:e.currentCount,data:{currentCount:e.currentCount}},409);
   if (!(e instanceof StampError)) throw new UnexpectedRouteError(c, { success: false, error: '統括配信を確認できません' });
   return inputError(c, { success: false, ...((e.status === 400 || e.status === 422) ? { fields: e.fields } : {}), error: e.message }, e.status);
 });
@@ -130,6 +130,10 @@ hqBroadcasts.post('/api/hq/broadcasts/:id/cancel',inputJsonBoundary({"expectedVe
 hqBroadcasts.get('/api/hq/broadcasts/:id/reactions',async c=>{const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);return c.json({success:true,data:await hqBroadcastReactions(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')))})});
 for(const [suffix,followup] of [['duplicate',false],['followup',true]] as const)hqBroadcasts.post(`/api/hq/broadcasts/:id/${suffix}`,inputJsonBoundary({requestId:['string'],expectedVersion:['number'],title:['string']}),async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'));return c.json({success:true,data:await copyHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),a.actorId,await c.req.json(),followup)},201);
+});
+hqBroadcasts.get('/api/hq/broadcasts/:id/targets/:accountId/retry-preview',async c=>{
+  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);
+  return c.json({success:true,data:await previewHqRetry(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),c.req.param('accountId'))});
 });
 hqBroadcasts.post('/api/hq/broadcasts/:id/targets/:accountId/retry',requireIrreversibleConfirmation('broadcast-send'),inputJsonBoundary({"expectedVersion":["number"],"confirmedRecipientCount":["number"],"confirmedRecipientToken":["string"]}), async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method)),b=await c.req.json<{expectedVersion:number;confirmedRecipientCount?:number;confirmedRecipientToken?:string}>();

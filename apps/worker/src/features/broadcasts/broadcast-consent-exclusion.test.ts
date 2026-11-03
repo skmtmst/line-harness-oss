@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 import { processBroadcastSend, processQueuedBroadcasts, processScheduledBroadcasts, guardScheduledBroadcastQuota } from './broadcast.js';
-import { prepareHqBroadcast, dispatchHqBroadcast, preflightHqBroadcast, stopHqBroadcast, retryHqBroadcastTarget, getHqBroadcastRun, readHqBroadcastResult } from '../../services/hq-broadcasts.js';
+import { prepareHqBroadcast, dispatchHqBroadcast, preflightHqBroadcast, stopHqBroadcast, retryHqBroadcastTarget, getHqBroadcastRun, readHqBroadcastResult, previewHqRetry } from '../../services/hq-broadcasts.js';
 import { countAudience, previewAudience } from './broadcast-preflight.js';
-import { recoverStalledBroadcasts } from '@line-crm/db';
+import { recoverStalledBroadcasts, markBroadcastRecipientsDispatched } from '@line-crm/db';
 
 const calls = vi.hoisted(() => ({ broadcast: vi.fn(async () => ({ requestId: 'all' })),
   multicast: vi.fn(async (_ids: string[], _messages: unknown) => ({ requestId: 'selected' })),
@@ -36,13 +36,40 @@ beforeEach(() => {
 });
 afterEach(() => { f.raw.close(); vi.unstubAllGlobals(); });
 describe('637: 停止者を外して一斉配信を続ける', () => {
-  it('復旧前の処理と引き継いだ処理が重なっても同じ相手に二重送信しない',async()=>{
+  it('新しい処理がロック中でも古い版は未送信の人を押さえられない',async()=>{
+    seedBroadcast('sending');f.raw.exec("UPDATE broadcasts SET batch_offset=-1,lock_version=2 WHERE id='b'");
+    f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state) VALUES('b','allowed','shop',1,'claimed')").run();
+    const input={broadcastId:'b',attemptNo:1,lineAccountId:'shop',friendIds:['allowed']};
+    expect(await markBroadcastRecipientsDispatched(f.db,{...input,expectedLockVersion:1})).toEqual([]);
+    expect(f.raw.prepare("SELECT dispatched_at FROM broadcast_send_claims WHERE broadcast_id='b'").get()).toEqual({dispatched_at:null});
+    expect(await markBroadcastRecipientsDispatched(f.db,{...input,expectedLockVersion:2})).toEqual(['allowed']);
+  });
+  it('復旧前に取り出した古い処理は、新しい版のロックを取得できない',async()=>{
+    const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-old-lock',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
+    const sent=await dispatchHqBroadcast(f.db,run,'owner',1),child=sent.targets[0].broadcastId!;await processScheduledBroadcasts(f.db,calls as never);
+    let entered!:()=>void,release!:()=>void;const started=new Promise<void>(r=>{entered=r}),wait=new Promise<void>(r=>{release=r});
+    const prepare=f.db.prepare.bind(f.db);let intercepted=false;
+    vi.spyOn(f.db,'prepare').mockImplementation(sql=>{
+      const stmt=prepare(sql);if(intercepted||!sql.includes("UPDATE broadcasts SET batch_offset = -1"))return stmt;intercepted=true;
+      return new Proxy(stmt,{get(target,key){if(key==='bind')return (...args:unknown[])=>{const bound=target.bind(...args);return new Proxy(bound,{get(item,prop){if(prop==='run')return async()=>{entered();await wait;return item.run();};const v=Reflect.get(item,prop);return typeof v==='function'?v.bind(item):v;}});};const v=Reflect.get(target,key);return typeof v==='function'?v.bind(target):v;}});
+    });
+    const old=processQueuedBroadcasts(f.db,calls as never);await started;
+    f.raw.prepare("UPDATE broadcasts SET batch_offset=-1,batch_lock_at=datetime('now','-1 hour') WHERE id=?").run(child);
+    await recoverStalledBroadcasts(f.db);release();await old;expect(sentIds()).toEqual([]);
+    await processQueuedBroadcasts(f.db,calls as never);expect(sentIds().sort()).toEqual(['U-allowed','U-stopped','U-unknown']);
+  });
+  it('古い予約処理は新しい版の配信準備を上書きしない',async()=>{
+    seedBroadcast('sending');f.raw.prepare("UPDATE broadcasts SET target_type='segment',segment_conditions=?,lock_version=2,total_count=99 WHERE id='b'").run(JSON.stringify({operator:'AND',rules:[{type:'is_following',value:true}]}));
+    await processBroadcastSend(f.db,calls as never,'b',undefined,undefined,1);
+    expect(f.raw.prepare("SELECT total_count FROM broadcasts WHERE id='b'").get()).toEqual({total_count:99});expect(sentIds()).toEqual([]);
+  });
+  it.each([false,true])('復旧前後の処理が重なっても二重送信しない（差し込み=%s）',async personalized=>{
     let entered!:()=>void,release!:()=>void;
     const started=new Promise<void>(resolve=>{entered=resolve}),wait=new Promise<void>(resolve=>{release=resolve});
     let enteredNew!:()=>void,releaseNew!:()=>void;
     const startedNew=new Promise<void>(resolve=>{enteredNew=resolve}),waitNew=new Promise<void>(resolve=>{releaseNew=resolve});
-    calls.multicast.mockImplementationOnce(async()=>{enteredNew();await waitNew;return {requestId:'new'};});
-    const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-generation',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
+    (personalized?calls.pushMessageWithRequestId:calls.multicast).mockImplementationOnce(async()=>{enteredNew();await waitNew;return {requestId:'new'};});
+    const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-generation',title:'配信',messageType:'text',messageContent:personalized?'{{name}} さん':'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
     const sent=await dispatchHqBroadcast(f.db,run,'owner',1),child=sent.targets[0].broadcastId!;
     await processScheduledBroadcasts(f.db,calls as never);
     const prepare=f.db.prepare.bind(f.db);let intercepted=false;
@@ -64,7 +91,7 @@ describe('637: 停止者を外して一斉配信を続ける', () => {
     const old=processQueuedBroadcasts(f.db,calls as never);await started;
     let current:Promise<void>|undefined;
     try {
-      f.raw.prepare("UPDATE broadcasts SET batch_lock_at=datetime('now','-1 hour') WHERE id=?").run(child);
+      f.raw.prepare("UPDATE broadcasts SET batch_lock_at=datetime('now','-1 hour'),success_count=? WHERE id=?").run(personalized?1:0,child);
       await recoverStalledBroadcasts(f.db);
       current=processQueuedBroadcasts(f.db,calls as never);await startedNew;
       release();await old;
@@ -86,13 +113,22 @@ describe('637: 停止者を外して一斉配信を続ける', () => {
     } finally {release();await old;}
     expect(sentIds().sort()).toEqual(['U-allowed','U-stopped','U-unknown']);
   });
+  it('送信の応答待ちで停止したら旧処理の終了時にロックを解く',async()=>{
+    let entered!:()=>void,release!:()=>void;const started=new Promise<void>(r=>{entered=r}),wait=new Promise<void>(r=>{release=r});
+    calls.multicast.mockImplementationOnce(async()=>{entered();await wait;return {requestId:'mock'};});
+    const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-stop-release',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
+    const sent=await dispatchHqBroadcast(f.db,run,'owner',1),child=sent.targets[0].broadcastId!;await processScheduledBroadcasts(f.db,calls as never);
+    const old=processQueuedBroadcasts(f.db,calls as never);await started;
+    await stopHqBroadcast(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'owner',false,2);release();await old;
+    expect(f.raw.prepare('SELECT batch_offset FROM broadcasts WHERE id=?').get(child)).toEqual({batch_offset:0});
+  });
   it('送信前に停止した配信は確認時の宛先だけを再開後に送る',async()=>{
     const run=await prepareHqBroadcast(f.db,tenant,'owner',{requestId:'hq-frozen',title:'配信',messageType:'text',messageContent:'お知らせ',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'all'},scheduledAt:null});
     await dispatchHqBroadcast(f.db,run,'owner',1);
     await stopHqBroadcast(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'owner',false,2);
     const current=await getHqBroadcastRun(f.db,tenant,run.id),target=(await readHqBroadcastResult(f.db,current)).targets[0];
     expect(target.retryableCount).toBe(3);
-    await retryHqBroadcastTarget(f.db,current,'shop','owner',target.version,{count:target.retryableCount,token:target.retryableToken!});
+    await retryHqBroadcastTarget(f.db,current,'shop','owner',target.version,await previewHqRetry(f.db,current,'shop'));
     f.raw.exec("INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES('late','U-late','late','shop')");
     await processScheduledBroadcasts(f.db,calls as never);await processQueuedBroadcasts(f.db,calls as never);
     expect(sentIds().sort()).toEqual(['U-allowed','U-stopped','U-unknown']);
@@ -103,7 +139,7 @@ describe('637: 停止者を外して一斉配信を続ける', () => {
     f.raw.prepare("UPDATE broadcasts SET status='sending' WHERE id=?").run(child);
     await stopHqBroadcast(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'owner',false,2);
     const current=await getHqBroadcastRun(f.db,tenant,run.id),target=(await readHqBroadcastResult(f.db,current)).targets[0];
-    await retryHqBroadcastTarget(f.db,current,'shop','owner',target.version,{count:target.retryableCount,token:target.retryableToken!});
+    await retryHqBroadcastTarget(f.db,current,'shop','owner',target.version,await previewHqRetry(f.db,current,'shop'));
     await processBroadcastSend(f.db,calls as never,child,undefined,undefined,1);
     expect(f.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(child)).toEqual({status:'scheduled'});
     expect(sentIds()).toEqual([]);
