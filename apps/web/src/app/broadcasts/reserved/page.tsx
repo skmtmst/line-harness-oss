@@ -1,6 +1,7 @@
 'use client'
 
 import { cancelConflictMessage } from '@/v8/broadcast-detail/display'
+import { isSaveConflict } from '@/components/shared/save-conflict'
 
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -366,9 +367,9 @@ function ReservedBroadcastContent() {
       setCancelOpen(false)
     } catch (cause) {
       if (snapshot !== cancelSnapshot.current || snapshot.generation !== cancelScope.current.generation) return
-      if (cause instanceof ApiError && cause.status === 409) {
+      if (isSaveConflict(cause)) {
         setCancelConflict(true)
-        setCancelError(cancelConflictMessage(cause.data))
+        setCancelError(cancelConflictMessage(cause instanceof ApiError ? cause.data : undefined))
       } else setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
     } finally {
       setCancelling(false)
