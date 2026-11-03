@@ -42,6 +42,8 @@ export function useStyleDashboard(style: IndustryStyle) {
   const accountId = selectedAccountId ?? ''
   const role = useStaffRole()
   const canWrite = canWriteRole(role)
+  const canWriteRef = useRef(canWrite)
+  canWriteRef.current = canWrite
   const [date, setDate] = useState(jstToday)
   const [staff, setStaff] = useState('all')
   const [compare, setCompare] = useState(COMPARE[0].value)
@@ -248,11 +250,24 @@ export function useStyleDashboard(style: IndustryStyle) {
     return run(row, () => restaurantTestApi.deleteSeatVisitMark(accountId, row.reservationId!, version(row), crypto.randomUUID()), '来店の印を取り消しました。', '取り消せませんでした。')
   }
   const [cancelTarget, setCancelTarget] = useState<{ row: StyleRow; generation: number } | null>(null)
-  const cancelScope = useRef({ accountId, generation: 0 })
-  if (cancelScope.current.accountId !== accountId) cancelScope.current = { accountId, generation: cancelScope.current.generation + 1 }
-  const cancelRow = cancelTarget?.generation === cancelScope.current.generation ? cancelTarget.row : null
-  const setCancelRow = (row: StyleRow | null) => setCancelTarget(row ? { row, generation: cancelScope.current.generation } : null)
-  useEffect(() => { setBusy(value => value === 'cancel' ? '' : value) }, [accountId])
+  const cancelTargetRef = useRef(cancelTarget)
+  if (!canWrite) cancelTargetRef.current = null
+  useEffect(() => () => { cancelTargetRef.current = null }, [])
+  const cancelStoreId = style === 'restaurant' ? store.store?.id ?? null : null
+  const cancelScope = useRef({ accountId, style, storeId: cancelStoreId, generation: 0 })
+  if (cancelScope.current.accountId !== accountId || cancelScope.current.style !== style || cancelScope.current.storeId !== cancelStoreId) {
+    cancelScope.current = { accountId, style, storeId: cancelStoreId, generation: cancelScope.current.generation + 1 }
+  }
+  const renderedCancelScope = cancelScope.current
+  const cancelRow = cancelTarget && cancelTarget === cancelTargetRef.current && cancelTarget.generation === cancelScope.current.generation ? cancelTarget.row : null
+  const setCancelRow = (row: StyleRow | null) => {
+    if (renderedCancelScope !== cancelScope.current) return
+    if (!row && cancelTarget !== cancelTargetRef.current) return
+    const target = row ? { row, generation: cancelScope.current.generation } : null
+    cancelTargetRef.current = target
+    setCancelTarget(target)
+  }
+  useEffect(() => { setBusy(value => value === 'cancel' ? '' : value) }, [accountId, style, cancelStoreId])
   const [refundRow, setRefundRow] = useState<StyleRow | null>(null)
   const [resultRow, setResultRow] = useState<StyleRow | null>(null)
   const [classRow, setClassRow] = useState<StyleRow | null>(null)
@@ -274,7 +289,8 @@ export function useStyleDashboard(style: IndustryStyle) {
   })
   /** 取り消す（h2lHCH）。理由は口の cancellationReason へ。返金は決済の口（組3）の一部返金・理由つきが要る。 */
   const confirmCancel = async (row: StyleRow, input: CancelReservationInput) => {
-    if (!cancelTarget || cancelTarget.row !== row || cancelTarget.generation !== cancelScope.current.generation || !accountId) return
+    if (!canWriteRef.current || !cancelTarget || cancelTarget !== cancelTargetRef.current || cancelTarget.row !== row || cancelTarget.generation !== cancelScope.current.generation || !accountId) return
+    if (style === 'restaurant' && (!cancelScope.current.storeId || (row.booking?.storeId && row.booking.storeId !== cancelScope.current.storeId))) return
     const generation = cancelTarget.generation
     let reasonSaved = false
     setBusy('cancel')
@@ -284,7 +300,7 @@ export function useStyleDashboard(style: IndustryStyle) {
         if (row.booking?.version != null) { await styleApi.saveBooking(accountId, bookingId(row), { expectedVersion: row.booking.version, cancellationReason: input.reason }); reasonSaved = true }
         await bookingApi.decideRequest(accountId, bookingId(row), 'cancel')
       }
-      if (cancelScope.current.generation !== generation) { notifyToast('切り替え前の予約を取り消しました。'); return }
+      if (cancelScope.current.generation !== generation || cancelTargetRef.current !== cancelTarget) { notifyToast('前に選んだ予約を取り消しました。'); return }
       setCancelRow(null)
       notifyToast('予約を取り消しました。')
       if (input.refund !== 'none' || input.notify) openPayment()
