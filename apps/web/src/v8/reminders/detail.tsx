@@ -609,7 +609,7 @@ function ReminderDetailV8() {
         error={deleteError}
         onConfirm={() => runDelete()}
         onCancel={() => setConfirmDelete(false)}
-      ><OperationTargetSummary accounts={[{ id: '' }]} /></ConfirmDialog>
+      ><OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} /></ConfirmDialog>
     </PageFrame></PageExplanationProvider></SaveErrorScope>
   )
 }

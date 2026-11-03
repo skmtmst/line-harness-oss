@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'acc-1', name: '本店' }, { id: 'acc-2', name: '別店舗' }] }) }))
 const mocks = vi.hoisted(() => ({ schedule: vi.fn(), list: vi.fn() }))
 vi.mock('@/lib/api', () => ({ api: { chats: { schedule: mocks.schedule }, templates: { list: mocks.list } } }))
 import ScheduleDialog from './schedule-dialog'
@@ -10,10 +11,11 @@ beforeEach(() => {
   mocks.list.mockResolvedValue({ success: true, data: [] })
 })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
-it('友だちへの予約窓に送信元と環境を示す', () => {
+it('友だちへの予約窓に送信元と環境を示す', async () => {
   render(<ScheduleDialog friendId="f-1" friendName="ソラ" accountId="acc-1" onClose={() => {}} onReserved={() => {}} />)
   expect(screen.getByText('LINEアカウント')).toBeTruthy()
-  expect(screen.getByText('名前を確認できません')).toBeTruthy()
+  expect(await screen.findByText('本店')).toBeTruthy()
+  expect(screen.queryByText('別店舗')).toBeNull()
   expect(screen.getByText('環境')).toBeTruthy()
   expect(mocks.schedule).not.toHaveBeenCalled()
 })
@@ -58,4 +60,14 @@ it('予約失敗後はキャンセル・Escが再び使える', async () => {
   expect((screen.getByRole('textbox', { name: '送るもの' }) as HTMLTextAreaElement).value).toBe('案内')
   fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
   expect(onClose).toHaveBeenCalledTimes(2)
+})
+it('アカウントが変わったら古い友だちの予約窓を閉じる', async () => {
+  const close = vi.fn()
+  const props = { friendId: 'f-1', friendName: 'ソラ', onClose: close, onReserved: vi.fn() }
+  const view = render(<ScheduleDialog {...props} accountId="acc-1" />)
+  expect(await screen.findByText('本店')).toBeTruthy()
+  view.rerender(<ScheduleDialog {...props} accountId="acc-2" />)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(close).toHaveBeenCalled()
+  expect(mocks.schedule).not.toHaveBeenCalled()
 })

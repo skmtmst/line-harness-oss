@@ -5,6 +5,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -21,6 +22,8 @@ const state = vi.hoisted(() => ({
   omitId: false,
   management:false,
 }))
+
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '別店舗' }] }) }))
 
 vi.mock('next/link', () => ({
   default: ({ children, href, className }: { children: React.ReactNode; href: string; className?: string }) =>
@@ -149,6 +152,7 @@ describe('V8 リマインダの詳細', () => {
     expect(document.querySelector('[role="alertdialog"]')).toBeNull()
   })
   it('削除確認は所属が取れない場合に不明と環境を示す', async () => {
+    state.accountId = 'unknown'
     await render()
     const more = [...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label')?.includes('その他の操作')) as HTMLButtonElement
     await act(async () => { more.click() })
@@ -157,6 +161,16 @@ describe('V8 リマインダの詳細', () => {
     const dialog = document.querySelector('[role="alertdialog"]')
     expect(dialog?.textContent).toContain('名前を確認できません')
     expect(dialog?.textContent).toContain('環境')
+  })
+  it('削除確認に操作対象の店名を示す', async () => {
+    await render()
+    const more = [...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label')?.includes('その他の操作')) as HTMLButtonElement
+    await act(async () => { more.click() })
+    const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('削除する')) as HTMLElement
+    await act(async () => { remove.click(); await Promise.resolve(); await Promise.resolve() })
+    const dialog = document.querySelector('[role="alertdialog"]')
+    await waitFor(() => expect(dialog?.textContent).toContain('本店'))
+    expect(dialog?.textContent).not.toContain('別店舗')
   })
   it('URLに対象が無いときは共通の対象なし画面を出す', async () => {
     state.omitId = true

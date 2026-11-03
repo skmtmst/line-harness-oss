@@ -9,6 +9,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'acc-1', name: '本店' }, { id: 'acc-2', name: '別店舗' }] }) }))
 import ScheduleSendDialog, { type ScheduledRowView } from './schedule-dialog'
 
 const NOW = new Date('2026-10-01T06:30:00Z') // 木曜 15:30 JST
@@ -17,6 +18,7 @@ function Harness({ onConfirm, onCancelRow, rows = [], initial = '', content = '�
   const [value, setValue] = useState(initial)
   return (
     <ScheduleSendDialog
+      accountId="acc-1"
       open
       onClose={() => undefined}
       content={content}
@@ -40,10 +42,11 @@ beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true) })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('予約して送るの窓', () => {
-  test('予約確認の中に送信元と環境を示す', () => {
+  test('予約確認の中に送信元と環境を示す', async () => {
     render(<Harness onConfirm={() => undefined} />)
     expect(screen.getByText('LINEアカウント')).toBeTruthy()
-    expect(screen.getByText('名前を確認できません')).toBeTruthy()
+    expect(await screen.findByText('本店')).toBeTruthy()
+    expect(screen.queryByText('別店舗')).toBeNull()
     expect(screen.getByText('環境')).toBeTruthy()
   })
   test('空の本文・日時では予約できず、理由が1つだけ出る。両方そろうと予約できる', () => {

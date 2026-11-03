@@ -1239,7 +1239,7 @@ export default function RemindersListV8() {
             ) : null}
           </>
         )}
-      ><OperationTargetSummary accounts={[{ id: '' }]} /></SheetDialog>
+      ><OperationTargetSummary accounts={[{ id: deleteAccountId ?? '' }]} /></SheetDialog>
 
       {/* 複製の窓。下書きとして写し、確認してから有効にする。 */}
       <></>
