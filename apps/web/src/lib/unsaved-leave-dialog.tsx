@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -31,6 +31,7 @@ interface UnsavedLeaveDialogProps {
   discardLockedReason?: string
   /** 呼出側が持つ失敗理由を、開いている窓の中に出す。 */
   error?: string
+  saveFailureReason?: string
   busy?: boolean
   /**
    * 「保存して移る」を出す（★管理画面 sTJsh §5）。保存が通ったらそのまま移動を
@@ -74,6 +75,7 @@ export function UnsavedLeaveDialog({
   discardDisabled = false,
   discardLockedReason,
   error,
+  saveFailureReason,
   busy = false,
   onSave,
   onSavedLeave,
@@ -83,7 +85,9 @@ export function UnsavedLeaveDialog({
   onCancel,
 }: UnsavedLeaveDialogProps) {
   const [savingLeave, setSavingLeave] = useState(false)
+  const [saveFailed, setSaveFailed] = useState(false)
   const [, refreshChanges] = useState(0)
+  useEffect(() => { if (!open) setSaveFailed(false) }, [open])
   const saveBlocked = useRef(false)
   saveBlocked.current = saveDisabled || Boolean(saveLockedReason)
   const discardBlocked = useRef(false)
@@ -101,6 +105,7 @@ export function UnsavedLeaveDialog({
   if (onSave) {
     const saveAndLeave = async () => {
       if (savingLeave || busy || saveBlocked.current) return
+      setSaveFailed(false)
       if (changesDiffer()) { refreshChanges(n => n + 1); return }
       setSavingLeave(true)
       try {
@@ -111,6 +116,7 @@ export function UnsavedLeaveDialog({
          */
         if (saved && changesDiffer()) { refreshChanges(n => n + 1); return }
         if (saved) (onSavedLeave ?? onConfirm)()
+        else if (others.length) setSaveFailed(true)
         else onCancel()
       } finally {
         setSavingLeave(false)
@@ -121,9 +127,9 @@ export function UnsavedLeaveDialog({
         open={open}
         title={title}
         description={body}
-        error={error}
+        error={error || (saveFailed ? (saveFailureReason || `保存できませんでした。${others.join('、')}の編集を閉じて、元の画面の理由を確認してください。`) : undefined)}
         busy={busy || savingLeave}
-        onCancel={onCancel}
+        onCancel={() => { setSaveFailed(false); onCancel() }}
         confirmation
         compact
         footer={

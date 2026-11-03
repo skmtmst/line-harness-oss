@@ -84,6 +84,7 @@ export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked,
       open={leaveTarget !== null}
       subject="配信の変更"
       busy={saving}
+      saveFailureReason={error || undefined}
       onSave={saveDraftNow}
       onConfirm={confirmLeave}
       onCancel={cancelLeave}

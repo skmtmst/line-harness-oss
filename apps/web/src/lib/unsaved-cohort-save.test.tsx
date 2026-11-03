@@ -4,17 +4,18 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { useUnsavedGuard } from './use-unsaved-guard'
 import { UnsavedLeaveDialog } from './unsaved-leave-dialog'
+import { requestUnsavedAction } from './unsaved-action'
 
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 afterEach(cleanup)
 
-function Parent({ save, discard }: { save: () => Promise<boolean>; discard: () => void }) {
-  const guard = useUnsavedGuard({ dirty: true, onDiscard: discard })
+function Parent({ save, discard, dirty = true }: { save: () => Promise<boolean>; discard: () => void; dirty?: boolean }) {
+  const guard = useUnsavedGuard({ dirty, onDiscard: discard })
   return <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="配信の変更" onSave={save}
     onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
 }
-function Bubble({ discard }: { discard: () => void }) {
-  useUnsavedGuard({ dirty: true, onDiscard: discard, subject: '吹き出しの作成内容' })
+function Bubble({ discard, dirty = true }: { discard: () => void; dirty?: boolean }) {
+  useUnsavedGuard({ dirty, onDiscard: discard, subject: '吹き出しの作成内容' })
   return <p>作成中の吹き出し</p>
 }
 
@@ -65,5 +66,34 @@ it('同じ画面内の移動として扱う入力は離脱の対象にしない'
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して移る' })) })
     expect(retained).not.toHaveBeenCalled()
     expect(back).toHaveBeenCalledTimes(1)
+  } finally { go.mockRestore(); back.mockRestore() }
+})
+
+it('吹き出しも編集中に親の保存が失敗したら、確認の窓に失敗を示して留まる', async () => {
+  const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+  const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+  try {
+    render(<><Parent save={async () => false} discard={() => {}} /><Bubble discard={() => {}} /></>)
+    await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '配信の変更だけ保存して移る' })) })
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('保存できませんでした')
+    expect(back).not.toHaveBeenCalled()
+  } finally { go.mockRestore(); back.mockRestore() }
+})
+
+it('保存失敗後に破棄して次の確認を開いても古い失敗を残さない', async () => {
+  const parentDiscard = vi.fn(), bubbleDiscard = vi.fn()
+  const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+  const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+  try {
+    const view = render(<><Parent save={async () => false} discard={parentDiscard} /><Bubble discard={bubbleDiscard} /></>)
+    await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '配信の変更だけ保存して移る' })) })
+    expect(parentDiscard).not.toHaveBeenCalled(); expect(bubbleDiscard).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'すべて保存せずに移る' })) })
+    view.rerender(<><Parent dirty={false} save={async () => false} discard={parentDiscard} /><Bubble dirty={false} discard={bubbleDiscard} /></>)
+    view.rerender(<><Parent save={async () => false} discard={parentDiscard} /><Bubble discard={bubbleDiscard} /></>)
+    await act(async () => { requestUnsavedAction(() => {}) })
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).not.toContain('保存できませんでした')
   } finally { go.mockRestore(); back.mockRestore() }
 })
