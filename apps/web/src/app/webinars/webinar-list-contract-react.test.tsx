@@ -137,7 +137,7 @@ describe('フォルダ', () => {
   it('選んだフォルダの名前を変えると、そのフォルダへ保存する', async () => {
     await start()
     await act(async () => { fireEvent.click(folderRow('セミナー')) })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ「セミナー」の操作' })) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /名前を変える/ })) })
     const dialog = screen.getByRole('dialog')
     fireEvent.change(dialog.querySelector('[data-folder-name-color] input')!, { target: { value: '説明会' } })
@@ -146,10 +146,45 @@ describe('フォルダ', () => {
     expect(mocks.createFolder).not.toHaveBeenCalled()
   })
 
+  it('折りたたんだフォルダ欄でも選択したフォルダを操作できる', async () => {
+    const view = await start()
+    await waitFor(() => expect(folderRow('セミナー')).toBeTruthy())
+    await act(async () => { fireEvent.click(folderRow('セミナー')) })
+    expect(view.container.querySelectorAll('[aria-label="フォルダ「セミナー」の操作"]')).toHaveLength(2)
+  })
+
+  it('フォルダ削除は対象と環境を表示し、アカウント切替後は確定できない', async () => {
+    const view = await start()
+    await waitFor(() => expect(folderRow('セミナー')).toBeTruthy())
+    await act(async () => { fireEvent.click(folderRow('セミナー')) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /消す/ })) })
+    const dialog = screen.getByRole('alertdialog')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
+    mocks.accountId = 'account-2'
+    view.rerender(<WebinarList />)
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(mocks.deleteFolder).not.toHaveBeenCalled()
+  })
+
+  it('フォルダ削除の確認中にアカウントを替えると窓が閉じる', async () => {
+    const view = await start()
+    await waitFor(() => expect(folderRow('セミナー')).toBeTruthy())
+    await act(async () => { fireEvent.click(folderRow('セミナー')) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /消す/ })) })
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
+    mocks.accountId = 'account-2'
+    view.rerender(<WebinarList />)
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(mocks.deleteFolder).not.toHaveBeenCalled()
+  })
+
   it('選んだフォルダを消すと確かめてから消し、一覧とフォルダを読み直す', async () => {
     await start()
     await act(async () => { fireEvent.click(folderRow('セミナー')) })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ「セミナー」の操作' })) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /消す/ })) })
     const dialog = screen.getByRole('alertdialog')
     expect(dialog.textContent).toContain('いまこのフォルダに入っているのは2 件です')
