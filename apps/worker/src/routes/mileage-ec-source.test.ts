@@ -168,7 +168,10 @@ describe('ECの正本を使うマイル残高', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       await processPendingMileageEvents(db, { now: '2099-01-01' });
-      expect(log).toHaveBeenCalledWith('mileage_queue_source_unavailable', 'other', expect.any(Error));
+      const line = String(log.mock.calls.at(-1)?.[0]);
+      expect(JSON.parse(line)).toMatchObject({ level: 'error', code: 'mileage_queue.source_unavailable' });
+      expect(line).not.toContain('other');
+      expect(line).not.toContain('source read failed');
       expect(fixture.raw.prepare('SELECT status FROM mileage_event_queue WHERE engagement_event_id=?').get(event.id)).toEqual({ status: 'pending' });
     } finally { log.mockRestore(); }
   });

@@ -4,6 +4,7 @@ import { type MileageQueueResult, type EngagementEvent, type FollowingMileageRec
 import { applyMileageRulesImmediately } from './grants.js';
 import { parsePublishedSnapshot } from './rules.js';
 import { resolveMileageSource, selectMileageAccountBatch } from './source.js';
+import { logger } from '@line-crm/shared/server';
 
 
 /**
@@ -34,12 +35,12 @@ export async function processPendingMileageEvents(
     WHERE q.status IN ('processing','pending','failed') AND f.line_account_id IS NOT NULL ORDER BY f.line_account_id`).bind()
     .all<{ line_account_id: string }>();
   const accountBatch = selectMileageAccountBatch(owners.results.map(row => row.line_account_id), now);
-  if (accountBatch.length < owners.results.length) console.warn('mileage_queue_accounts_deferred', { total: owners.results.length, selected: accountBatch.length });
+  if (accountBatch.length < owners.results.length) logger.warn('mileage_queue.accounts_deferred');
   const eligible: string[] = [];
   let unreadable = 0;
   for (const accountId of accountBatch) {
     try { if (await resolveMileageSource(db, accountId) === 'musubo') eligible.push(accountId); }
-    catch (error) { unreadable++; console.error('mileage_queue_source_unavailable', accountId, error); }
+    catch { unreadable++; logger.error('mileage_queue.source_unavailable'); }
   }
   if (accountBatch.length && unreadable === accountBatch.length) throw new Error('mileage_queue_all_sources_unavailable');
   if (!eligible.length) return { claimed: 0, processed: 0, failed: 0, granted: 0 };
@@ -60,7 +61,7 @@ export async function processPendingMileageEvents(
         AND f.line_account_id IN (SELECT value FROM json_each(?))
       ORDER BY q.created_at ASC, q.engagement_event_id ASC LIMIT ?`)
       .bind(now, eligibleJson, limit).all<{ engagement_event_id: string; applied_published_snapshot: string | null }>();
-  if (requested > limit && due.results.length === limit) console.warn('mileage_queue_events_deferred', { limit });
+  if (requested > limit && due.results.length === limit) logger.warn('mileage_queue.events_deferred');
 
   const result: MileageQueueResult = { claimed: 0, processed: 0, failed: 0, granted: 0 };
   for (const item of due.results) {

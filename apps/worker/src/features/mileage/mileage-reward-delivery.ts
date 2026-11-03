@@ -1,4 +1,4 @@
-import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { stableUuid } from './mileage-delivery-key.js';
 import {
   accountFeatureOffExclusionSql,
@@ -538,12 +538,12 @@ export async function processDueMileageRewardDeliveries(
     WHERE status IN ('delivery_failed','delivering','refunded') AND line_account_id IS NOT NULL ORDER BY line_account_id`).bind()
     .all<{ line_account_id: string }>();
   const accountBatch = selectMileageAccountBatch(owners.results.map(row => row.line_account_id), options.now);
-  if (accountBatch.length < owners.results.length) console.warn('mileage_delivery_accounts_deferred', { total: owners.results.length, selected: accountBatch.length });
+  if (accountBatch.length < owners.results.length) logger.warn('mileage_delivery.accounts_deferred');
   const eligible: string[] = [];
   let unreadable = 0;
   for (const accountId of accountBatch) {
     try { if (await resolveMileageSource(db, accountId) === 'musubo') eligible.push(accountId); }
-    catch (error) { unreadable++; console.error('mileage_delivery_source_unavailable', accountId, error); }
+    catch { unreadable++; logger.error('mileage_delivery.source_unavailable'); }
   }
   if (accountBatch.length && unreadable === accountBatch.length) throw new Error('mileage_delivery_all_sources_unavailable');
   const eligibleJson = JSON.stringify(eligible);
@@ -573,7 +573,7 @@ export async function processDueMileageRewardDeliveries(
   const stalled = remaining > 0
     ? await findEligible("status = 'delivering' AND updated_at < ?", 'updated_at, created_at', leaseCutoff, remaining)
     : { results: [] as { id: string }[] };
-  if (requested > limit && due.results.length + stalled.results.length === limit) console.warn('mileage_delivery_events_deferred', { limit });
+  if (requested > limit && due.results.length + stalled.results.length === limit) logger.warn('mileage_delivery.events_deferred');
   let succeeded = 0;
   let failed = 0;
   for (const owner of offOwners.results) {
@@ -611,7 +611,7 @@ export async function processDueMileageRewardDeliveries(
     const incomplete = await findIncompleteMileageRefunds(db, { limit: recoveryLimit, lineAccountIds: eligible });
     for (const target of incomplete) {
       try { if (!target.lineAccountId || await resolveMileageSource(db, target.lineAccountId) !== 'musubo') continue; }
-      catch (error) { console.error('mileage_delivery_source_unavailable', target.lineAccountId, error); continue; }
+      catch { logger.error('mileage_delivery.source_unavailable'); continue; }
       if (target.lineAccountId && !await featureJobCanRun(db, { accountId: target.lineAccountId, featureId: 'mileage', job: 'mileage reward delivery retry' })) continue;
       try {
         await refundMileageRewardRedemption(db, { redemptionId: target.id, reason: '中断した返却の再開' });
