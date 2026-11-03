@@ -97,3 +97,11 @@ describe('会話の頭のメニュー', () => {
     expect(onToggle).not.toHaveBeenCalled()
   })
 })
+
+test('長い名前と担当は省略しても全文を確認できる', () => {
+  const longName = '山田 とても長いお客さまのお名前'
+  const longOperator = '鈴木 とても長い担当者のお名前'
+  mount({ name: longName, operator: { value: 'long', operators: [{ id: 'long', name: longOperator }], onChange: vi.fn() } })
+  expect(screen.getByRole('button', { name: longName }).getAttribute('title')).toBe(longName)
+  expect(screen.getByRole('button', { name: '担当者を変える' }).parentElement?.querySelector('[data-choice-value]')?.getAttribute('title')).toContain(longOperator)
+})

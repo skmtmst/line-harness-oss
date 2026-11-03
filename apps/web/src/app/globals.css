@@ -96,7 +96,7 @@
   /* 文字。Pencil V5を共通基盤とし、管理画面でも同じ変数を使う。
    * ink が本文、ink-secondary が補足・説明・ラベルの灰色（1色）。 */
   --color-ink: #1d1d1f;
-  --color-ink-secondary: #4a5565;
+  --color-ink-secondary: #4a5565; --color-placeholder: #6c7481;
   /*
    * ink-faint は補足と同じ灰色を指す。#626a73 と #4a5565 の2つの灰色が同じ役目の
    * 補足に混ざり、画面ごとに濃さが違って見えた。補足は1色にそろえ、どの灰色の面

@@ -24,6 +24,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return { ...actual, api: { ...actual.api, folders: { ...actual.api.folders, delete: remove, swapOrder: swap, update } } }
 })
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 import FolderPanel from './folder-panel'
 import { useFolderRowActions } from './folder-row-actions'
 
@@ -76,6 +78,16 @@ const menuItems = () => [...document.querySelectorAll('[role="menuitem"]')].map(
 const click = async (el: Element | null | undefined) => { await act(async () => { (el as HTMLElement).click() }) }
 
 describe('フォルダの「…」（共通）', () => {
+  it('親画面の未保存確認が済むまでフォルダ編集を開かない', async () => {
+    const stop = (event: Event) => event.preventDefault()
+    window.addEventListener('musubo:request-unsaved-action', stop)
+    try {
+      await act(async () => { root.render(<Screen enabled onChanged={() => {}} onDeleted={() => {}} />) })
+      await click(menuButton('キャンペーン'))
+      await click([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === '名前を変える'))
+      expect(document.querySelector('[role="dialog"]')).toBeNull()
+    } finally { window.removeEventListener('musubo:request-unsaved-action', stop) }
+  })
   it('V8 の言葉で出す。端の行には押せない並べ替えを置かない', async () => {
     await act(async () => { root.render(<Screen enabled onChanged={() => {}} onDeleted={() => {}} />) })
     await click(menuButton('キャンペーン'))

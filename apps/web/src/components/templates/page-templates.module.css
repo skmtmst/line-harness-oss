@@ -126,7 +126,7 @@
 :global(:root) .bodyEndActions { display: flex; flex: none; align-items: center; justify-content: center; gap: var(--polish-space-field); width: 100%; padding-block: var(--polish-space-section); }
 :global(:root) .preview { align-self: flex-start; position: sticky; top: 0; max-height: 100%; width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
 /* 作成の右欄は白い板と同じ面。端末の中の地は見え方の部品が持つ。 */
-:global(:root) .frame[data-page-template='create'] [data-template-region='preview'] { background: var(--color-canvas); }
+:global(:root) .frame[data-page-template='create'] [data-template-region='preview']:not([data-preview-surface='plain']) { background: var(--color-canvas); }
 /* 作成の型の余白の口（CreatePage の contentSpacing・previewSurface）。画面の CSS で型の余白を上書きしない。 */
 :global(:root) .createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }
 /* メニュー先頭の案内と直前の表示面は、幅を問わず同じ8pxで離す。 */

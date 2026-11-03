@@ -10,6 +10,7 @@ import { Field, TextInput } from '@/components/shared/form-controls'
 import { TextArea } from '@/components/shared/text-field'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
 import { formatNumber } from '@/lib/format'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -33,7 +34,7 @@ function sumRefCounts(counts: TagDeleteImpactReferences, keys: Array<keyof TagDe
   return keys.reduce((total, key) => total + (counts[key] ?? 0), 0)
 }
 
-export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, onDelete, deleting, initialConfirmation = '' }: { tag: Tag; dependencies: TagDependencies | null; dependenciesStatus: 'loading' | 'ready' | 'error'; onCancel: () => void; onDelete: () => void; deleting: boolean; initialConfirmation?: string }) {
+export function DeleteDialog({ tag, accountId, dependencies, dependenciesStatus, onCancel, onDelete, deleting, initialConfirmation = '' }: { tag: Tag; accountId?: string | null; dependencies: TagDependencies | null; dependenciesStatus: 'loading' | 'ready' | 'error'; onCancel: () => void; onDelete: () => void; deleting: boolean; initialConfirmation?: string }) {
   const [confirmation, setConfirmation] = useState(initialConfirmation)
   const confirmationId = useId()
   /*
@@ -74,7 +75,8 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
           </Button>
         </DialogActions>)}
     >
-      <div className="overflow-hidden rounded-control border border-hairline">
+      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
+      <div className="w-full overflow-hidden rounded-control border border-hairline">
         <dl className="divide-y divide-hairline text-sm">
           <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-medium">{formatNumber((dependencies?.friendCount ?? tag.friendCount ?? 0))}人</dd></div>
           <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-medium">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>

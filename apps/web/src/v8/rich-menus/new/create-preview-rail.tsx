@@ -86,13 +86,13 @@ export function renderPreviewRail({ activePage, audience, conditionEmpty, condit
                 key: 'actions',
                 label: 'ボタンの動き',
                 value: (
-                  <span className={configuredCount < totalAreaCount || totalAreaCount === 0 ? styles.summaryValueWarn : styles.summaryValueOk}>
+                  <span className={totalAreaCount === 0 ? styles.summaryValueWarn : configuredCount === totalAreaCount ? styles.summaryValueOk : undefined}>
                     {totalAreaCount === 0
                       ? '面がありません'
                       : configuredCount === 0
-                        ? `${totalAreaCount}つとも未設定`
+                        ? `未設定 ${totalAreaCount}`
                         : configuredCount < totalAreaCount
-                          ? `${totalAreaCount - configuredCount}つ未設定`
+                          ? `未設定 ${totalAreaCount - configuredCount}`
                           : 'すべて設定済み'}
                   </span>
                 ),

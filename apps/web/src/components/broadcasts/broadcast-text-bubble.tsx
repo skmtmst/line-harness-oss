@@ -10,16 +10,17 @@ import type { BroadcastMessageButton } from '@/lib/api'
 import { LinePreviewMessage } from '@/components/shared/line-preview'
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '../templates/template-preview-model'
 
-export default function BroadcastTextBubble({ text, buttons, accountName }: {
+export default function BroadcastTextBubble({ text, buttons, accountName, time = '' }: {
   text: string
   buttons: BroadcastMessageButton[]
   accountName?: string
+  time?: string
 }) {
 
   const name = accountName || '公式アカウント'
   return (
     <div>
-      <LinePreviewMessage accountName={name} avatar={name.slice(0, 1)} time="10:00">
+      <LinePreviewMessage accountName={name} avatar={name.slice(0, 1)} time={time}>
         {buildTemplatePreview(text, EMPTY_TEMPLATE_REFERENCES).content || 'テキストを入力すると表示されます'}
       </LinePreviewMessage>
       {buttons.map((button) => (

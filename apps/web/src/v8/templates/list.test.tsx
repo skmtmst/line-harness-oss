@@ -33,6 +33,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [{ id: 'account-1', name: '本店' }, { id: 'account-2', name: '別アカウント' }], selectedAccountId: account.id, loading: false }),
+  useOptionalAccount: () => ({ selectedAccountId: account.id }),
 }))
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => role.value,
@@ -52,7 +53,7 @@ vi.mock('@/lib/api', () => ({
     templates: { list: listTemplates, usages, delete: removeTemplate },
     friendFields: { list: () => Promise.resolve({ success: true, data: [{ fieldKey: 'pet_name', name: 'ペットの名前' }] }) },
     commonVars: { list: () => Promise.resolve({ success: true, data: [{ varKey: 'business_hours', name: '営業時間' }] }) },
-    broadcastMessageAssets: { counts: () => Promise.resolve({ success: true, data: { card_message: 4 } }) },
+    broadcastMessageAssets: { counts: () => Promise.resolve({ success: true, data: { card_message: 4 } }), list: () => Promise.resolve({ success: true, data: [] }), folders: { list: () => Promise.resolve({ success: true, data: [] }) } },
     folders: { list: (...args: unknown[]) => Promise.resolve(folderList.list ? folderList.list(...args) : folderList.value) },
   },
 }))
@@ -120,6 +121,20 @@ afterEach(() => {
 })
 
 describe('V8 テンプレートの一覧', () => {
+  it('フォルダの編集中に履歴で種類が変わっても入力を保つ', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    try {
+      await renderList()
+      fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+      fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '編集中の分類' } })
+      await act(async () => {
+        window.history.replaceState(null, '', '/templates?tab=coupon')
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      })
+      expect((screen.getByRole('textbox', { name: 'フォルダ名' }) as HTMLInputElement).value).toBe('編集中の分類')
+      expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    } finally { go.mockRestore() }
+  })
   it('詳細の名前を編集中に画面を移ると入力を保って確認する', async () => {
     window.history.replaceState(null, '', '/templates?row=t-used')
     await renderList()

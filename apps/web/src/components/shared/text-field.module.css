@@ -19,7 +19,7 @@
 }
 
 .field::placeholder {
-  color: var(--color-ink-faint);
+  color: var(--color-placeholder);
   opacity: 1;
 }
 
