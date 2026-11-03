@@ -28,7 +28,7 @@ function draftRow(id: string, title: string) {
 function scheduledRow(id: string, title: string) {
   return {
     ...draftRow(id, title),
-    status: 'scheduled', scheduledAt: '2026-10-10T10:00:00+09:00',
+    status: 'scheduled', scheduledAt: '2026-10-10T10:00:00+09:00', version: 1,
     displayStatus: 'scheduled', displayStatusLabel: '予約中',
   }
 }

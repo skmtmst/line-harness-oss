@@ -1,5 +1,7 @@
 'use client'
 
+import { cancelConflictMessage } from '@/v8/broadcast-detail/display'
+
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -94,6 +96,12 @@ function ReservedBroadcastContent() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [cancelConflict, setCancelConflict] = useState(false)
+  const cancelScopeKey = JSON.stringify([id, selectedAccountId])
+  const cancelScope = useRef({ key: cancelScopeKey, generation: 0 })
+  if (cancelScope.current.key !== cancelScopeKey) cancelScope.current = { key: cancelScopeKey, generation: cancelScope.current.generation + 1 }
+  const cancelSnapshot = useRef<{ id: string; version: number | null; generation: number } | null>(null)
+  const renderedCancelSnapshot = cancelSnapshot.current
   const [cancelled, setCancelled] = useState(false)
   const [actionBusy, setActionBusy] = useState<'test' | 'duplicate' | null>(null)
   const [actionError, setActionError] = useState('')
@@ -344,17 +352,24 @@ function ReservedBroadcastContent() {
    * 管理画面・V8 どちらの確認ダイアログからもここを呼ぶ。
    */
   const confirmCancel = async () => {
-    if (cancelling) return
+    const snapshot = cancelSnapshot.current
+    if (cancelling || cancelConflict || !canEdit || !snapshot || snapshot.version === null || snapshot !== renderedCancelSnapshot || snapshot.id !== id || snapshot.id !== broadcast.id || snapshot.generation !== cancelScope.current.generation) return
     setCancelling(true)
     setCancelError('')
     try {
-      const res = await api.broadcasts.cancelReservation(broadcast.id)
+      const res = await api.broadcasts.cancelReservation(snapshot.id, snapshot.version)
+      if (snapshot !== cancelSnapshot.current || snapshot.generation !== cancelScope.current.generation) return
       if (!res.success) throw new Error(res.error)
+      cancelSnapshot.current = null
       setBroadcast(res.data)
       setCancelled(true)
       setCancelOpen(false)
-    } catch {
-      setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
+    } catch (cause) {
+      if (snapshot !== cancelSnapshot.current || snapshot.generation !== cancelScope.current.generation) return
+      if (cause instanceof ApiError && cause.status === 409) {
+        setCancelConflict(true)
+        setCancelError(cancelConflictMessage(cause.data))
+      } else setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
     } finally {
       setCancelling(false)
     }
@@ -375,9 +390,11 @@ function ReservedBroadcastContent() {
         actionBusy={actionBusy}
         actionError={actionError}
         clearActionError={() => setActionError('')}
-        cancelOpen={cancelOpen}
-        openCancel={() => { setCancelError(''); setCancelOpen(true) }}
-        closeCancel={() => { if (!cancelling) setCancelOpen(false) }}
+        cancelOpen={cancelOpen && cancelSnapshot.current?.generation === cancelScope.current.generation && cancelSnapshot.current?.id === broadcast.id}
+        openCancel={() => { setCancelError(broadcast.version == null ? '予約の版を確認できません。読み直してから、もう一度選んでください' : ''); setCancelConflict(broadcast.version == null); cancelSnapshot.current = { id: broadcast.id, version: broadcast.version ?? null, generation: cancelScope.current.generation }; setCancelOpen(true) }}
+        closeCancel={() => { if (!cancelling) { cancelSnapshot.current = null; setCancelOpen(false); if (cancelConflict) { setCancelConflict(false); void load() } } }}
+        cancelConflict={cancelConflict}
+        reloadCancel={() => { cancelSnapshot.current = null; setCancelOpen(false); setCancelConflict(false); void load() }}
         confirmCancel={() => void confirmCancel()}
         cancelling={cancelling}
         cancelError={cancelError}

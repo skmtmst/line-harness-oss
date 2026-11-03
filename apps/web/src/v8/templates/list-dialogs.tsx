@@ -39,6 +39,8 @@ const PUBLISH_TONE = { live: 'success', changes: 'warning', draft: 'neutral' } a
 type RenderTemplateDialogsContext = {
   moveGuard: ReturnType<typeof useUnsavedGuard>
   detailGuard: ReturnType<typeof useInlineDetailGuard>
+  folderDeleteAccounts: OperationAccountTarget[]
+  cancelFolderDelete: () => void
   deleteAccounts: OperationAccountTarget[]
   bulkDeleteAccounts: OperationAccountTarget[]
   activeFolderName: string | null
@@ -94,7 +96,6 @@ type RenderTemplateDialogsContext = {
   setBlockedUsage: Dispatch<SetStateAction<UsageDetail | null>>
   setBulkDeleteError: Dispatch<SetStateAction<string>>
   setDeleteError: Dispatch<SetStateAction<string>>
-  setDeletingFolder: Dispatch<SetStateAction<Folder | null>>
   setDuplicateError: (message: string | null) => void
   setEditingFolder: Dispatch<SetStateAction<Folder | null>>
   setExamplesRetry: Dispatch<SetStateAction<number>>
@@ -110,7 +111,7 @@ type RenderTemplateDialogsContext = {
   templates: Template[]
 }
 
-export function renderTemplateDialogs({ moveGuard, deleteAccounts, bulkDeleteAccounts, activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates, detailGuard }: RenderTemplateDialogsContext) {
+export function renderTemplateDialogs({ moveGuard, folderDeleteAccounts, cancelFolderDelete, deleteAccounts, bulkDeleteAccounts, activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates, detailGuard }: RenderTemplateDialogsContext) {
   return ((
     <>
       {savedMenu}
@@ -335,9 +336,9 @@ export function renderTemplateDialogs({ moveGuard, deleteAccounts, bulkDeleteAcc
         destructive
         busy={folderBusy}
         error={folderError || undefined}
-        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
+        onCancel={cancelFolderDelete}
         onConfirm={() => removeFolder()}
-      />
+      ><OperationTargetSummary accounts={folderDeleteAccounts} externalTarget={deletingFolder?.accountId === null ? { label: 'フォルダの対象', name: '共通（全アカウント）' } : undefined} /></ConfirmDialog>
 
       {/* 行の詳細パネル。一覧は左に見えたまま。 */}
       {activeTemplate && isTemplateSection ? (

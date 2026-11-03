@@ -1,13 +1,15 @@
 'use client'
 
 import { startRegistration } from '@simplewebauthn/browser'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiResponse } from '@line-crm/shared'
 import { fetchApi, describeSaveFailure } from '@/lib/api'
 import { useStepUpGate } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+import { useStaffIdentity } from '@/lib/staff-role'
 import styles from './staff.module.css'
 
 type Passkey = { id: string; createdAt: string; lastUsedAt: string | null }
@@ -20,7 +22,15 @@ export default function SelfPasskeys({ enabled }: { enabled: boolean | null }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loaded, setLoaded] = useState(false)
-  const [keyToRemove, setKeyToRemove] = useState<Passkey | null>(null)
+  const [keyToRemove, setKeyToRemove] = useState<(Passkey & { displayIndex: number }) | null>(null)
+  const deleteTicket = useRef<object | null>(null)
+  const renderedDeleteTicket = deleteTicket.current
+  const deleteLock = useRef(false)
+  const identity = useStaffIdentity()
+  const identityId = identity?.id ?? null
+  const currentIdentity = useRef(identityId)
+  if (currentIdentity.current !== identityId) { deleteTicket.current = null; currentIdentity.current = identityId }
+  useEffect(() => { setKeyToRemove(null) }, [identityId])
   const stepUp = useStepUpGate()
   const load = useCallback(async () => {
     try {
@@ -56,21 +66,23 @@ export default function SelfPasskeys({ enabled }: { enabled: boolean | null }) {
 
   const remove = async () => {
     const key = keyToRemove
-    if (!key) return
-    if (busy) return
+    if (!key || busy || deleteLock.current || !renderedDeleteTicket || renderedDeleteTicket !== deleteTicket.current || identityId !== currentIdentity.current) return
+    deleteLock.current = true
     setBusy(true); setError(''); setMessage('')
     try {
       const grant = await stepUp.gate('auth.passkey.remove', 'パスキーを削除する')
-      if (!grant) return
+      if (!grant || renderedDeleteTicket !== deleteTicket.current || identityId !== currentIdentity.current) return
       const res = await fetchApi<ApiResponse<unknown>>('/api/auth/passkeys/self', {
         method: 'DELETE', headers: { 'X-Step-Up-Token': grant }, body: JSON.stringify({ id: key.id }),
       })
       if (!res.success) throw new Error(res.error)
+      if (renderedDeleteTicket !== deleteTicket.current || identityId !== currentIdentity.current) return
+      deleteTicket.current = null
       setMessage('パスキーを削除しました。')
       setKeyToRemove(null)
       await load()
-    } catch (caught) { setError(describeSaveFailure(caught)) }
-    finally { setBusy(false) }
+    } catch (caught) { if (renderedDeleteTicket === deleteTicket.current && identityId === currentIdentity.current) setError(describeSaveFailure(caught)) }
+    finally { deleteLock.current = false; setBusy(false) }
   }
 
   return <>
@@ -80,12 +92,12 @@ export default function SelfPasskeys({ enabled }: { enabled: boolean | null }) {
       <p className={styles.securityState}>パスキー　{loaded ? keys.length ? `登録済み ${keys.length}件` : '未登録' : '確認中'}</p>
       {loaded && keys.length ? <div className={styles.passkeyList}>{keys.map((key, index) => <div key={key.id} className={styles.passkeyItem}>
         <div><strong>パスキー {index + 1}</strong><span>{registeredDate.format(new Date(key.createdAt))} 登録</span></div>
-        <Button variant="text" textTone="danger" size="compact" disabled={busy} onClick={() => setKeyToRemove(key)}>削除</Button>
+        <Button variant="text" textTone="danger" size="compact" disabled={busy} onClick={() => { deleteTicket.current = {}; setKeyToRemove({ ...key, displayIndex: index + 1 }) }}>削除</Button>
       </div>)}</div> : null}
       <Button variant="primary" fullWidth disabled={busy || !enabled || !loaded || keys.length >= 10} onClick={() => void register()} busy={busy} busyLabel="確認しています…">パスキーを追加</Button>
       {enabled === false ? <p className={styles.securityHint}>追加するには認証アプリの登録が必要です。</p> : null}
     </section>
-    <ConfirmDialog open={keyToRemove !== null} title="パスキーを削除しますか？" deleteName={keyToRemove ? 'パスキー' : undefined} description="この端末のパスキーは次回から使えなくなります。認証アプリは引き続き使えます。" destructive busy={busy} error={error} onConfirm={() => void remove()} onCancel={() => setKeyToRemove(null)} />
+    <ConfirmDialog open={keyToRemove !== null} title="パスキーを削除しますか？" deleteName={keyToRemove ? `パスキー ${keyToRemove.displayIndex}` : undefined} description="選んだパスキーは次回から使えなくなります。認証アプリは引き続き使えます。" destructive busy={busy} error={error} onConfirm={() => void remove()} onCancel={() => { if (!busy && !deleteLock.current) { deleteTicket.current = null; setKeyToRemove(null) } }}><OperationTargetSummary accounts={[]} externalTarget={{ label: '担当者', name: identity?.name }} /></ConfirmDialog>
     {stepUp.prompt}
   </>
 }
