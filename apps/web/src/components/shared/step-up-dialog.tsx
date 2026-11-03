@@ -7,6 +7,8 @@ import OtpInput, { otpFailureMessage } from './otp-input'
 import TextLink from './text-link'
 
 interface StepUpDialogProps {
+  /** この操作を見出しでも区別する。 */
+  showActionInTitle?: boolean
   presentation?: 'mfa-off'
   open: boolean
   /** 何のための再認証かを運用者の言葉で。例: '権限を変更する' */
@@ -31,7 +33,7 @@ interface StepUpDialogProps {
  * 止まった操作の前に立てる。聞くのは本人の設定で決まり、二段階認証があれば
  * 6桁コード、なければパスワード。grant 取得と本操作のやり直しは呼び出し側。
  */
-export default function StepUpDialog({ open, action, presentation, method = 'totp', busy = false, error, onSubmit, onCancel }: StepUpDialogProps) {
+export default function StepUpDialog({ open, action, showActionInTitle = false, presentation, method = 'totp', busy = false, error, onSubmit, onCancel }: StepUpDialogProps) {
   const [value, setValue] = useState('')
   const labelId = useId()
   useEffect(() => { if (open) setValue('') }, [open])
@@ -66,7 +68,7 @@ export default function StepUpDialog({ open, action, presentation, method = 'tot
     <Dialog
       open={open}
       tone={mfaOff ? offTone : undefined} footerAlign={mfaOff ? 'start' : undefined}
-      title={mfaOff ? '二段階認証の必須をオフにしますか' : isTotp ? '認証アプリで本人確認' : 'パスワードで本人確認'}
+      title={mfaOff ? '二段階認証の必須をオフにしますか' : `${showActionInTitle ? `${action}：` : ''}${isTotp ? '認証アプリで本人確認' : 'パスワードで本人確認'}`}
       description={mfaOff ? 'オフにすると、パスワードやLINEだけで入れるようになります' : isTotp
         ? `${action}には、権限を持つ本人の確認が必要です。この操作専用に、5分以内に1回だけ使える6桁コードを入力してください。`
         : `${action}には、権限を持つ本人の確認が必要です。この操作専用に、5分以内に1回だけ使える確認を発行するため、パスワードを入力してください。`}
