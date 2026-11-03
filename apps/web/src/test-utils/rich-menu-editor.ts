@@ -38,6 +38,7 @@ export async function pickDateTime(label: string, iso: string) {
   fireEvent.click([...document.querySelectorAll('button')].find((b) =>
     (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
   )!)
+  fireEvent.click(within(screen.getByRole('dialog', { name: '日付を選ぶ' })).getByRole('button', { name: '確定' }))
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   const timeInput = within(reopened as HTMLElement).getByRole('combobox', { name: '時刻' })
   await type(timeInput, `${hour}:${minute}`)

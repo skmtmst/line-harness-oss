@@ -8,6 +8,7 @@
  * アカウント一覧の失敗を黙らせない #518）は今の画面と同じ。動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { OctagonPause, RefreshCw } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -61,6 +62,7 @@ export default function EmergencyScreen({
   const canReadSecurity = Boolean(identity && canManageRole(identity.role))
   const tabs = canReadSecurity ? [...BASE_TABS, SECURITY_TAB] : BASE_TABS
   const tab = useMergedTab(tabs)
+  const hqOrigin = useSearchParams()?.get('from') === 'hq'
   const [historyDetail, setHistoryDetail] = useState<HistoryDetail>(null)
   const { selectedAccountId } = useAccount()
   const staffRole = effectiveStaffRole(identity)
@@ -126,7 +128,7 @@ export default function EmergencyScreen({
       actions={actions}
       notice={tab === 'control' && controlAccess.lockedReason ? <ReadOnlyNotice need="feature" /> : undefined}
     >
-      <Tabs size="compact" spacing="settings" label="運用状態の中の切り替え" items={tabs.map((item) => ({ label: item.label, href: TAB_HREF[item.key], current: tab === item.key }))} />
+      <Tabs size="compact" spacing="settings" label="運用状態の中の切り替え" items={tabs.map((item) => ({ label: item.label, href: hqOrigin ? `${TAB_HREF[item.key]}${TAB_HREF[item.key].includes('?') ? '&' : '?'}from=hq` : TAB_HREF[item.key], current: tab === item.key }))} />
       {accountsFailed ? (
         <Notice tone="danger" action={<> <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => loadAccounts()}>もう一度読み込む</Button> </>} >アカウント一覧を読み込めませんでした。{tab === 'security' ? '安全監視は選んだアカウントだけを確認します。選べないときは、一覧を読み直してください。' : '個別のアカウントを選べず、全体が対象になります。'}</Notice>
       ) : null}
@@ -142,7 +144,7 @@ export default function EmergencyScreen({
       ) : null}
       {tab === 'control' ? renderControl?.(accounts, controlRef, setControlAccess) : null}
       {tab === 'security' && canReadSecurity ? <SecurityMonitorPanel accountId={selectedAccountId} canOperate={canReviewSecurity} /> : null}
-      {tab === 'history' ? (renderHistory ? renderHistory() : <UpdateHistoryV8 />) : null}
+      {tab === 'history' ? (renderHistory ? renderHistory() : <UpdateHistoryV8 hqOrigin={hqOrigin} />) : null}
       <HistoryDetails panel={historyDetail} onClose={() => setHistoryDetail(null)} />
     </SbSettingsScreen>
   )

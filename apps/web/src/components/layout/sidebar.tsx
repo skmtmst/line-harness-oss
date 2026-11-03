@@ -938,7 +938,7 @@ export default function Sidebar({
         v7 の統括（/hq）には出さない。V8 の統括は店の画面と同じく出す（絵 `V8-B/JKjsE`）。
         V8 でメニューを畳んだときは枠ごと隠す（`styles.collapseHide`）。
       */}
-      {preview ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
+      {preview ? null : <div className={styles.collapseHide}><SidebarVersion hqOrigin={isHq} /></div>}
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。

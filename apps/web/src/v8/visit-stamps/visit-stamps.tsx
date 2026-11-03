@@ -3,6 +3,7 @@
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useSearchParams } from 'next/navigation';
 
@@ -162,6 +163,8 @@ function VisitStampsScreen() {
   const [draftReady, setDraftReady] = useState(false)
   const [initialDraft, setInitialDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [slotConfirmation, setSlotConfirmation] = useState<string | null>(null)
+  useEffect(() => { setSlotConfirmation(null) }, [selectedAccountId])
   const [imageBusy, setImageBusy] = useState(false)
   const [issue, setIssue] = useState<{ field: StampSettingField; message: string } | null>(null)
   const rangeIssues = settingsRangeIssues(settings)
@@ -818,7 +821,10 @@ function VisitStampsScreen() {
             actions={(
               <>
                 <Button disabled={saving || imageBusy} disabledReason={saving ? '保存しています' : imageBusy ? '画像を登録しています' : undefined} onClick={() => resetDraft(card)}>キャンセル</Button>
-                <Button variant="primary" disabled={!dirty || saving || imageBusy} disabledReason={imageBusy ? '画像を登録しています' : !dirty ? '変更していません' : undefined} onClick={() => void save()} busy={Boolean(saving)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />保存する</Button>
+                <Button variant="primary" disabled={!dirty || saving || imageBusy} disabledReason={imageBusy ? '画像を登録しています' : !dirty ? '変更していません' : undefined} onClick={() => {
+                  if (card?.active && slotCount(card.settings) !== slotCount(settings)) setSlotConfirmation(JSON.stringify([selectedAccountId, card.id, card.version, name, settings, accountIds]))
+                  else void save()
+                }} busy={Boolean(saving)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />保存する</Button>
               </>
             )}
           />
@@ -841,6 +847,11 @@ function VisitStampsScreen() {
       {saveConflict.conflict ? <SaveConflictBand title="ほかの人が来店スタンプを先に保存しました" compareBusy={saveConflict.compareBusy} onCompare={saveConflict.compare} onReload={saveConflict.reloadLatest} /> : null}
       <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={saveConflict.reloadLatest} lines={saveConflict.latest ? [{ text: `名前：入力 ${name} ／ 最新 ${saveConflict.latest.name}` }, { text: `設定：入力 ${JSON.stringify(settings)} ／ 最新 ${JSON.stringify(saveConflict.latest.settings)}` }, { text: `店舗：入力 ${accountIds.join('・')} ／ 最新 ${saveConflict.latest.accountIds.join('・')}` }] : null} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="保存していないカードの設定" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog open={slotConfirmation !== null && !!card && card.active && slotConfirmation === JSON.stringify([selectedAccountId, card.id, card.version, name, settings, accountIds])} title="マスの数を変更しますか？" description="お客さまのカードのマス表示が変わります。マスより多い個数を必要とする特典は、新しいマスの数に合わせて変わります。" warning confirmLabel="変更して保存する" confirmDisabled={!canManage || saving || imageBusy} onCancel={() => setSlotConfirmation(null)} onConfirm={() => {
+        if (!canManage || saving || imageBusy || !card || slotConfirmation !== JSON.stringify([selectedAccountId, card.id, card.version, name, settings, accountIds])) return
+        setSlotConfirmation(null)
+        void save()
+      }} />
       <PhotoDialog url={photoUrl} name={photo ? friendNames(friendById(photo.friend_id) ?? { displayName: '友だち' }).name : ''} onClose={() => setPhoto(null)} />
     </PageFrame></SaveErrorScope>
   )

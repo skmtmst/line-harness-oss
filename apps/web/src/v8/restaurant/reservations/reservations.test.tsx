@@ -483,3 +483,18 @@ it('通常取得の卓定義を電話画面へ渡し、人数が全卓と結合�
   expect(fixture.snapshot).toHaveBeenCalledTimes(1)
   expect(fixture.createReservation).not.toHaveBeenCalled()
 })
+
+it('来店の競合は詳細の中に示してから予約を読み直す', async () => {
+  fixture.attendance.mockRejectedValueOnce(new ApiError(409, '最新の予約を確認してください。', 'version_conflict'))
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  expect((await within(dialog).findByRole('alert')).textContent).toContain('ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。')
+  await waitFor(() => expect(fixture.snapshot.mock.calls.length).toBeGreaterThan(1))
+  const beforeSnapshot = fixture.snapshot.mock.calls.length
+  const beforeDay = fixture.reservationsDay.mock.calls.length
+  fireEvent.click(within(dialog).getByRole('button', { name: '読み直す' }))
+  await waitFor(() => expect(fixture.snapshot.mock.calls.length).toBeGreaterThan(beforeSnapshot))
+  await waitFor(() => expect(fixture.reservationsDay.mock.calls.length).toBeGreaterThan(beforeDay))
+})
