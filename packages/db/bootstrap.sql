@@ -2697,7 +2697,7 @@ CREATE TABLE conversion_events (
   value_snapshot       REAL,
   idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, point_version_snapshot INTEGER, tenant_id TEXT REFERENCES tenants(id), approval_amount_minor INTEGER, approval_formula TEXT, approval_commission_rate REAL, approval_base_amount REAL, approval_fixed_reward INTEGER, approval_reward_miles INTEGER, approval_notified_generation TEXT);
+, point_version_snapshot INTEGER, tenant_id TEXT REFERENCES tenants(id), approval_amount_minor INTEGER, approval_formula TEXT, approval_commission_rate REAL, approval_base_amount REAL, approval_fixed_reward INTEGER, approval_reward_miles INTEGER, approval_notified_generation TEXT, approval_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE conversion_ingestion_events (
   id                  TEXT PRIMARY KEY,
