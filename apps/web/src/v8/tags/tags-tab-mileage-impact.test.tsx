@@ -45,26 +45,26 @@ async function open(input: Tag = tag, phase = 'ready') {
   expect(net.dependencies).toHaveBeenCalledExactlyOnceWith('tag-1', 'account-a')
   return document.querySelector('[data-qa-dialog="tag-delete"]')!.closest('[role="alertdialog"], [role="dialog"]') as HTMLElement
 }
-function verify(dialog: HTMLElement) {
+function verify(dialog: HTMLElement, mileage: boolean) {
   const rows = [...dialog.querySelectorAll('dl > div')]
-  expect(rows.filter(row => row.querySelector('dt')?.textContent === '積んだマイル')).toHaveLength(1)
-  expect(rows.find(row => row.querySelector('dt')?.textContent === '積んだマイル')?.textContent).toContain('そのまま残る取り消されません')
+  expect(rows.filter(row => row.querySelector('dt')?.textContent === '積んだマイル')).toHaveLength(mileage ? 1 : 0)
+  if (mileage) expect(rows.find(row => row.querySelector('dt')?.textContent === '積んだマイル')?.textContent).toContain('そのまま残る取り消されません')
   expect(dialog.textContent).not.toMatch(/履歴(?:は|が)0|一度も付与/)
   expect((within(dialog).getByRole('button', { name: 'このタグを保管する' }) as HTMLButtonElement).disabled).toBe(true)
 }
 
 describe('実一覧から開くタグ保管窓のマイルと履歴案内', () => {
   it.each([
-    ['連動なし', {}, {}],
-    ['他アクションだけ', { otherActionCount: 1 }, {}],
-    ['取得した本人マイルあり', {}, { configured: true, self: 10 }],
-    ['取得した紹介者マイルあり', {}, { configured: true, referrer: 20 }],
-    ['取得した1倍の設定あり', {}, { configured: true, multiplier: 10000 }],
-    ['古い一覧に設定あり・取得結果は連動なし', { mileageReward: 10 }, {}],
-  ] as const)('%sでも履歴保持を1回だけ知らせる', async (_name, fields, values) => {
+    ['連動なし', {}, {}, false],
+    ['他アクションだけ', { otherActionCount: 1 }, {}, false],
+    ['取得した本人マイルあり', {}, { configured: true, self: 10 }, true],
+    ['取得した紹介者マイルあり', {}, { configured: true, referrer: 20 }, true],
+    ['取得した1倍の設定あり', {}, { configured: true, multiplier: 10000 }, true],
+    ['古い一覧の設定より取得したfalseを優先', { mileageReward: 10 }, {}, false],
+  ] as const)('%sでは現在の根拠でマイル行を分け、履歴保持を1回だけ知らせる', async (_name, fields, values, mileage) => {
     net.dependencies.mockResolvedValue({ success: true, data: impact(values) })
     const dialog = await open({ ...tag, ...fields })
-    verify(dialog)
+    verify(dialog, mileage)
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル', exact: true }))
     expect(document.querySelector('[data-qa-dialog="tag-delete"]')).toBeNull()
     expect(document.querySelector('tr[data-row-id="tag-1"]')).not.toBeNull()
@@ -75,23 +75,23 @@ describe('実一覧から開くタグ保管窓のマイルと履歴案内', () =
     net.dependencies.mockResolvedValue({ success: true, data: retainedHistory.currentImpact })
     expect(retainedHistory.priorAward.amount).toBeGreaterThan(0)
     expect(retainedHistory.currentImpact.mileageImpact).toMatchObject({ configured: false, historyPreserved: true })
-    verify(await open())
+    verify(await open(), false)
   })
 
   it.each([
-    ['本人', { mileageReward: 10 }],
-    ['紹介者', { referralMileageReward: 20 }],
-    ['1倍', { mileageMultiplierBps: 10000 }],
-    ['設定なし', {}],
-  ] as const)('未取得でも%s設定に関係なく履歴案内と停止を保つ', async (_name, fields) => {
+    ['本人', { mileageReward: 10 }, true],
+    ['紹介者', { referralMileageReward: 20 }, true],
+    ['1倍', { mileageMultiplierBps: 10000 }, true],
+    ['設定なし', {}, false],
+  ] as const)('未取得は保存済みの%s設定だけを根拠にし、履歴案内と停止を保つ', async (_name, fields, mileage) => {
     net.dependencies.mockReturnValue(new Promise(() => {}))
-    verify(await open({ ...tag, ...fields }, 'loading'))
+    verify(await open({ ...tag, ...fields }, 'loading'), mileage)
   })
 
-  it.each([{}, { mileageReward: 10 }] as const)('取得失敗でも履歴の説明を残す %j', async fields => {
+  it.each([[{}, false], [{ mileageReward: 10 }, true]] as const)('取得失敗でも履歴の説明を残し、既知設定だけでマイル行を決める %j', async (fields, mileage) => {
     net.dependencies.mockRejectedValue(new Error('fixture read failure'))
     const dialog = await open({ ...tag, ...fields }, 'error')
-    verify(dialog)
+    verify(dialog, mileage)
     expect((within(dialog).getByPlaceholderText('確認用タグ') as HTMLInputElement).disabled).toBe(true)
   })
 
@@ -101,7 +101,7 @@ describe('実一覧から開くタグ保管窓のマイルと履歴案内', () =
   ] as const)('%sの停止理由と依頼文を保ち、履歴案内を重複しない', async (kind, reason, instruction) => {
     net.dependencies.mockResolvedValue({ success: true, data: impact({}, kind) })
     const dialog = await open()
-    verify(dialog)
+    verify(dialog, false)
     expect(within(dialog).getByText(reason)).toBeTruthy()
     expect(dialog.textContent).toContain(instruction)
   })
