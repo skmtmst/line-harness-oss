@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import FolderPanel from '@/components/shared/folder-panel'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import Select from '@/components/shared/select'
 import { ListPageBody } from './list-page'
 
@@ -82,4 +83,20 @@ it('フォルダがまだない時も追加でき、閲覧のみでは追加を�
   rerender(<ListPageBody folders={<FolderPanel rows={rows} activeId="all" onSelect={() => {}} readOnly />} folderNav={{ rows, activeId: 'all', onSelect: () => {} }}>本文</ListPageBody>)
   fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
   expect(within(document.querySelector('[data-select-menu]') as HTMLElement).queryByRole('button', { name: 'フォルダを追加する' })).toBeNull()
+})
+
+it('管理権限がない時は広い列の理由を保ち、畳んだ選択欄に追加を出さない', () => {
+  const rows = [{ id: 'all', label: 'すべて' }, { id: 'unfiled', label: '未分類' }]
+  render(<ListPageBody folders={<ManagedFolderPanel kind="template" folders={[]} onChanged={() => {}} canManage={false} lockedReason="閲覧のみです" itemLabel="テンプレート" activeId="all" onSelect={() => {}} allCount={0} />} folderNav={{ rows, activeId: 'all', onSelect: () => {} }}>本文</ListPageBody>)
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  expect(within(document.querySelector('[data-select-menu]') as HTMLElement).queryByRole('button', { name: 'フォルダを追加' })).toBeNull()
+  expect(screen.getByText('閲覧のみです')).toBeTruthy()
+})
+
+it('管理できる人が一時的に操作を止められている場合は、畳んだ欄に理由を残す', () => {
+  const rows = [{ id: 'all', label: 'すべて' }, { id: 'unfiled', label: '未分類' }]
+  render(<ListPageBody folders={<ManagedFolderPanel kind="template" folders={[]} onChanged={() => {}} canManage lockedReason="確認中です" itemLabel="テンプレート" activeId="all" onSelect={() => {}} allCount={0} />} folderNav={{ rows, activeId: 'all', onSelect: () => {} }}>本文</ListPageBody>)
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  const action = within(document.querySelector('[data-select-menu]') as HTMLElement).getByRole('button', { name: 'フォルダを追加' })
+  expect(action.getAttribute('aria-disabled')).toBe('true')
 })
