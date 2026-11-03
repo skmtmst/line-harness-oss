@@ -13,13 +13,14 @@ import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import TagPill from '@/components/shared/tag-pill'
 import Notice from '@/components/shared/notice'
-import FolderSelect, { folderCreateResult } from '@/components/shared/folder-select'
+import FolderSelect, { folderCreateResult, type FolderDraftGuard } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import Toggle from '@/components/shared/toggle'
 import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { definitionsForSave, linkedActionFromDefinition } from '@/components/friend-fields/tag-editor-v4'
@@ -78,6 +79,7 @@ function TagCreate() {
   const nameRef = useRef<HTMLInputElement>(null)
   const [groupId, setGroupId] = useState('')
   const [isStarred, setIsStarred] = useState(false)
+  const folderDraftGuard = useRef<FolderDraftGuard | null>(null)
   const dirty = Boolean(name.trim() || groupId || isStarred)
   const guard = useUnsavedGuard({ dirty, busy: saving })
 
@@ -197,6 +199,12 @@ function TagCreate() {
     }
   }
 
+  const requestSave = (andAnother: boolean) => {
+    const submit = () => { void save(andAnother) }
+    if (folderDraftGuard.current) folderDraftGuard.current(submit)
+    else submit()
+  }
+
   if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="複製元を読み込んでいます…" /></SaveErrorScope>
 
   if (!canManageRole(staffRole)) return <CreatePage boardId="d9xoI" title="タグを作る" help="友だちを分類するタグを作ります。作ったあとで、タグを付ける条件や動きを決められます。" readOnly footerActions={<Button onClick={() => router.push('/tags')}>一覧へ戻る</Button>}>{null}</CreatePage>
@@ -230,9 +238,9 @@ function TagCreate() {
           </Card>
         )}
         footerActions={<>
-          <Button type="button" onClick={() => guard.guarded(() => router.push('/tags'))} disabled={saving} disabledReason={saving ? 'タグを作っています。終わるまでお待ちください。' : undefined}>キャンセル</Button>
-          <Button type="button" onClick={() => save(true)} disabled={saving} busy={Boolean(saving)} busyLabel="処理中…"><Plus size={16} aria-hidden="true" />保存して続けて作る</Button>
-          <Button type="button" variant="primary" onClick={() => save(false)} busy={saving} busyLabel="作っています…"><Check size={16} aria-hidden="true" />タグを作る</Button>
+          <Button type="button" onClick={() => requestUnsavedAction(() => router.push('/tags'))} disabled={saving} disabledReason={saving ? 'タグを作っています。終わるまでお待ちください。' : undefined}>キャンセル</Button>
+          <Button type="button" onClick={() => requestSave(true)} disabled={saving} busy={Boolean(saving)} busyLabel="処理中…"><Plus size={16} aria-hidden="true" />保存して続けて作る</Button>
+          <Button type="button" variant="primary" onClick={() => requestSave(false)} busy={saving} busyLabel="作っています…"><Check size={16} aria-hidden="true" />タグを作る</Button>
         </>} dirty={false}
       >
         {createdName ? <Notice tone="success" message={`「${createdName}」を作成しました。続けて新しいタグを作れます。`} /> : null}
@@ -255,7 +263,7 @@ function TagCreate() {
 <DuplicateNameNote duplicates={duplicates} kindLabel="タグ" /></Field>
           <Field label="所属フォルダ">
             <span className={styles.selectBox}>
-              <SaveErrorField names={["groupId","group_id"]}><FolderSelect size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} /></SaveErrorField>
+              <SaveErrorField names={["groupId","group_id"]}><FolderSelect draftGuardRef={folderDraftGuard} size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} /></SaveErrorField>
             </span>
             {foldersFailed ? (
               <div className={styles.inlineRetry}>
