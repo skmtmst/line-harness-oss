@@ -27,7 +27,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
 import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
 import EntitySelect from '@/components/shared/entity-select'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffIdentityLoad, useStaffRole } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { restaurantTestApi, type RestaurantStore } from '@/lib/restaurant-test-api'
 import {
@@ -91,6 +91,7 @@ function DeliveryInner() {
   const samePageUrl = useSamePageUrl()
   const { selectedAccountId, setSelectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
+  const { failed: roleFailed } = useStaffIdentityLoad()
   const preparing = usePreparingDialog({ note: 'Uber Eats の個別注文操作は、一覧で利用可能と確認できた店舗で使えます。営業状態の変更・メニュー同期・一括受付はまだ利用できません。' })
   /* 閲覧のみの人には送るボタンを置かず、閲覧のみの帯を出す（Worker側の 403 が最後の守り）。役割を読み込む前も置かない。 */
   const canManage = role !== null && canManageRole(role)
@@ -193,7 +194,7 @@ function DeliveryInner() {
 
   const intakeScope = useMemo(() => ({ selectedAccountId, canManage }), [selectedAccountId, canManage])
   const intakeReady = !accountLoading && !loading && !error && dataAccountId === selectedAccountId
-  const intakeAccess: IntakeAccess & { storeId: string | null } = { scope: intakeScope, accountId: selectedAccountId, storeId: intakeStoreId, canManage, roleKnown: role !== null, ready: intakeReady && Boolean(intakeStoreId), services: data?.services ?? [] }
+  const intakeAccess: IntakeAccess & { storeId: string | null } = { scope: intakeScope, accountId: selectedAccountId, storeId: intakeStoreId, canManage, roleKnown: role !== null, roleFailed, ready: intakeReady && Boolean(intakeStoreId), services: data?.services ?? [] }
   const currentIntake = useRef(intakeAccess)
   const intakeMounted = useRef(false)
   useLayoutEffect(() => {

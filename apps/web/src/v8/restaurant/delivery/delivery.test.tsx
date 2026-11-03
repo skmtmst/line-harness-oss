@@ -103,6 +103,7 @@ vi.mock('./bulk', async (importOriginal) => {
 
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => fixture.role.value,
+  useStaffIdentityLoad: () => ({ failed: false }),
   canManageRole: (role: string | null) => role === 'owner' || role === 'admin',
 }))
 

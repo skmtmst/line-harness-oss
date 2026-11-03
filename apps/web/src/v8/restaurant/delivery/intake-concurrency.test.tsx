@@ -33,6 +33,7 @@ const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(),
   ubereatsConnection: vi.fn(),
   role: { value: 'owner' as string | null },
+  roleFailed: { value: false },
   accountId: { value: 'account-1' as string | null },
   accountLoading: { value: false },
   board: null as React.ComponentProps<typeof import('./orders').default> | null,
@@ -95,6 +96,7 @@ vi.mock('./bulk', async (importOriginal) => {
 
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => fixture.role.value,
+  useStaffIdentityLoad: () => ({ failed: fixture.roleFailed.value }),
   canManageRole: (role: string | null) => role === 'owner' || role === 'admin',
 }))
 
@@ -241,6 +243,7 @@ beforeEach(() => {
   fixture.stopSubmit = null
   fixture.stopDialog = null
   fixture.role.value = verifiedStaffRole('owner')
+  fixture.roleFailed.value = false
   fixture.accountId.value = 'account-1'
   fixture.accountLoading.value = false
   fixture.ubereatsConnection.mockResolvedValue({ connection: { status: 'connected', lastError: null } })
@@ -378,4 +381,19 @@ it.each(['stop', 'resume'] as const)('画面を閉じた後に%sの応答が戻�
   view.unmount()
   await act(async () => { finish({ stopped: ['demaecan'], resumed: ['rocketnow'], failed: [] }); await pending })
   expect(fixture.orders).toHaveBeenCalledTimes(reads)
+})
+
+
+it('受付停止の窓で担当者の確認に失敗したら理由を示し送信しない', async () => {
+  const view = render(<DeliveryPage />)
+  await screen.findByRole('region', { name: '出前館' })
+  fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  const dialog = within(screen.getByRole('alertdialog'))
+  fireEvent.click(dialog.getByRole('button', { name: '60分', exact: true }))
+  fixture.role.value = null
+  fixture.roleFailed.value = true
+  view.rerender(<DeliveryPage />)
+  expect(dialog.getAllByText('担当者を確認できませんでした。画面を読み直してください。').length).toBeGreaterThan(0)
+  expect((dialog.getByRole('button', { name: '止める', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+  expect(fixture.stopIntake).not.toHaveBeenCalled()
 })
