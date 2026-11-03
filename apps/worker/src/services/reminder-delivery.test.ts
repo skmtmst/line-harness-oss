@@ -1107,8 +1107,8 @@ describe('Meet個別相談の送信の最終関係フェンス', () => {
 
   it('claim後の照合await中に実registerで両新版へ進めても旧payloadを送らない', async () => {
     // 実registerは未来日時のみ受けるため、未来の候補で組み立てる。
-    const futureTarget = '2026-11-02T10:00:00.000Z'
-    const futureEnd = '2026-11-02T11:00:00.000Z'
+    const futureTarget = '2099-11-02T10:00:00.000Z'
+    const futureEnd = '2099-11-02T11:00:00.000Z'
     const { db, raw } = createTestD1()
     seedMeetLinked(raw, futureTarget)
     const { registerMeetConsultation } = await import('./meet-consultation-reminders.js')
@@ -1119,7 +1119,7 @@ describe('Meet個別相談の送信の最終関係フェンス', () => {
     })
 
     const result = await processReminderDeliveries(db, client, {
-      now: new Date('2026-11-02T09:00:00.000Z'),
+      now: new Date('2099-11-02T09:00:00.000Z'),
       pause: noPause,
       resolveClient: async () => client,
       // 最終送信権の直前で勝者が実再登録 (同日時・両版のみ更新)。
@@ -1127,7 +1127,7 @@ describe('Meet個別相談の送信の最終関係フェンス', () => {
       beforePush: async () => {
         await db.prepare(
           `UPDATE bookings SET lock_version = 1, updated_at = ? WHERE id = 'booking-1'`,
-        ).bind('2026-11-02T09:00:00.000Z').run()
+        ).bind('2099-11-02T09:00:00.000Z').run()
         const renewed = await registerMeetConsultation(db, {
           externalEventId: 'evt-1',
           friendId: 'friend-1',
@@ -1164,9 +1164,9 @@ describe('Meet個別相談の送信の最終関係フェンス', () => {
 
   it('停止照会await中に実registerで両新版へ進めても旧payloadを送らない', async () => {
     // A候補の日時は未来に置く (実registerは未来日時のみ受ける)。
-    const targetA = '2026-11-02T10:00:00.000Z'
-    const targetB = '2026-11-03T10:00:00.000Z'
-    const endB = '2026-11-03T11:00:00.000Z'
+    const targetA = '2099-11-02T10:00:00.000Z'
+    const targetB = '2099-11-03T10:00:00.000Z'
+    const endB = '2099-11-03T11:00:00.000Z'
     const { db, raw } = createTestD1()
     seedMeetLinked(raw, targetA)
     // 勝者の実再登録が 登録を動かすための予約ルール (published)。
@@ -1188,8 +1188,8 @@ describe('Meet個別相談の送信の最終関係フェンス', () => {
     raw.prepare(
       `INSERT INTO meet_consultation_notification_runs
          (id, consultation_id, kind, scheduled_at, status, retry_count)
-       VALUES ('mcr-day-seed', 'consult-1', 'day_before', '2026-11-01T10:00:00.000Z', 'pending', 0),
-              ('mcr-hour-seed', 'consult-1', 'hour_before', '2026-11-02T09:00:00.000Z', 'pending', 0)`,
+       VALUES ('mcr-day-seed', 'consult-1', 'day_before', '2099-11-01T10:00:00.000Z', 'pending', 0),
+              ('mcr-hour-seed', 'consult-1', 'hour_before', '2099-11-02T09:00:00.000Z', 'pending', 0)`,
     ).run()
     const { registerMeetConsultation } = await import('./meet-consultation-reminders.js')
     const pushes: string[] = []
@@ -1222,7 +1222,7 @@ describe('Meet個別相談の送信の最終関係フェンス', () => {
                   arm.current = false
                   await db.prepare(
                     `UPDATE bookings SET lock_version = 1, starts_at = ?, updated_at = ? WHERE id = 'booking-1'`,
-                  ).bind(targetB, '2026-11-02T09:00:00.000Z').run()
+                  ).bind(targetB, '2099-11-02T09:00:00.000Z').run()
                   const renewed = await registerMeetConsultation(db, {
                     externalEventId: 'evt-1',
                     friendId: 'friend-1',
@@ -1245,7 +1245,7 @@ describe('Meet個別相談の送信の最終関係フェンス', () => {
     } as unknown as Parameters<typeof processReminderDeliveries>[0]
 
     const result = await processReminderDeliveries(stopSeamDb, client, {
-      now: new Date('2026-11-02T09:00:00.000Z'),
+      now: new Date('2099-11-02T09:00:00.000Z'),
       pause: noPause,
       resolveClient: async () => client,
       beforePush: async () => {
@@ -1274,10 +1274,10 @@ describe('Meet個別相談の送信の最終関係フェンス', () => {
       `SELECT id, kind, status, scheduled_at FROM meet_consultation_notification_runs
         WHERE consultation_id = 'consult-1' ORDER BY kind,schedule_revision`,
     ).all()).toEqual([
-      {id:'mcr-day-seed',kind:'day_before',status:'cancelled',scheduled_at:'2026-11-01T10:00:00.000Z'},
-      { id: expect.any(String), kind: 'day_before', status: 'pending', scheduled_at: '2026-11-02T10:00:00.000Z' },
-      {id:'mcr-hour-seed',kind:'hour_before',status:'cancelled',scheduled_at:'2026-11-02T09:00:00.000Z'},
-      { id: expect.any(String), kind: 'hour_before', status: 'pending', scheduled_at: '2026-11-03T09:00:00.000Z' },
+      {id:'mcr-day-seed',kind:'day_before',status:'cancelled',scheduled_at:'2099-11-01T10:00:00.000Z'},
+      { id: expect.any(String), kind: 'day_before', status: 'pending', scheduled_at: '2099-11-02T10:00:00.000Z' },
+      {id:'mcr-hour-seed',kind:'hour_before',status:'cancelled',scheduled_at:'2099-11-02T09:00:00.000Z'},
+      { id: expect.any(String), kind: 'hour_before', status: 'pending', scheduled_at: '2099-11-03T09:00:00.000Z' },
     ])
     expect(raw.prepare(
       `SELECT COUNT(*) AS c FROM friend_reminder_deliveries WHERE friend_reminder_id = 'enrollment-1'`,

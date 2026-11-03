@@ -67,7 +67,7 @@ describe('feature settings scope and versioning', () => {
         expect(response.status).toBe(200);
         const body = await response.json() as { data: { features: Record<string, boolean> } };
         expect(body.data.features.restaurant_test).toBe(visible);
-        expect(Object.keys(body.data)).toEqual(['features']);
+        expect(Object.keys(body.data)).toEqual(['favoriteItemIds', 'restaurantHiddenItemIds', 'features']);
       }
     } finally {
       testDb.raw.close();
@@ -97,7 +97,7 @@ describe('feature settings scope and versioning', () => {
     }
   });
 
-  it('staff用GETは表示booleanだけを返し、契約・理由・保存値・並び・版を返さない', async () => {
+  it('staff用GETは表示と自店のメニュー設定だけを返し、契約・理由・版を返さない', async () => {
     const testDb = createTestD1();
     try {
       testDb.raw.prepare(
@@ -116,7 +116,8 @@ describe('feature settings scope and versioning', () => {
         data: { features: Record<string, unknown> };
       };
       expect(Object.keys(body)).toEqual(['success', 'data']);
-      expect(Object.keys(body.data)).toEqual(['features']);
+      expect(Object.keys(body.data)).toEqual(['favoriteItemIds', 'restaurantHiddenItemIds', 'features']);
+      expect(body.data).toMatchObject({ favoriteItemIds: [], restaurantHiddenItemIds: [] });
       expect(Object.values(body.data.features).every((value) => typeof value === 'boolean')).toBe(true);
       expect(body.data.features.scenarios).toBe(false);
       expect(body.data.features.nen_campaigns).toBe(false);
