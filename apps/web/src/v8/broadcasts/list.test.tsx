@@ -827,6 +827,28 @@ describe('R4 受け付けた数と届いた数を分ける', () => {
     expect(panel.textContent).not.toContain('人に届いた')
   })
 })
+it('下書き削除後は一覧と未分類の件数を同じデータへ更新する', async () => {
+  resetUrl()
+  let rows = [base, rowB]
+  listBroadcasts.mockImplementation(async () => ({ success: true, data: rows, statusCounts: { all: rows.length }, pagination: { total: rows.length, nextCursor: null } }))
+  listFolders.mockImplementation(async () => ({ success: true, data: [], unfiledCount: rows.length }))
+  deleteBroadcast.mockImplementationOnce(async (id: string) => { rows = rows.filter(row => row.id !== id); return { success: true, data: null } })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  expect(buttonByText('未分類2')).toBeTruthy()
+  const trigger = host.querySelector<HTMLButtonElement>('tr[data-row-id="bc-2"] button[aria-haspopup="menu"]')!
+  act(() => trigger.click())
+  const remove = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(item => item.textContent?.includes('削除する'))!
+  act(() => remove.click())
+  await flush()
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(button => button.textContent === '削除する')!
+  act(() => confirm.click())
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 250)) })
+  await flush()
+  await waitFor(() => expect(buttonByText('未分類1')).toBeTruthy())
+  expect(buttonByText('すべて1')).toBeTruthy()
+}, 20_000)
+
 it('2ページ目で削除して1ページになると1ページ目に戻って行を出す', async () => {
   resetUrl()
   let rows = Array.from({ length: 21 }, (_, i) => ({ ...rowB, id: `pg-${i}`, title: `通常${i}` }))

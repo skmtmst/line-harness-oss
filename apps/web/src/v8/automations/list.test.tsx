@@ -137,6 +137,14 @@ const buttons = () => [...host.querySelectorAll('button, a')] as HTMLElement[]
 const named = (text: string) => buttons().filter((element) => (element.textContent ?? '').trim() === text)
 
 describe('V8 オートメーションのルール一覧（LWQXd）', () => {
+  it('条件に外れた回数と30日間動かなかったルール数を区別する', async () => {
+    vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: [automation('idle', '待機中', { executionCount30d: 0 })], summary: { active: 1, stopped: 0, executionCount30d: 0, failureCount30d: 0 } })
+    await render(<AutomationListV8 />)
+    await waitFor(() => Boolean(host.textContent?.includes('待機中')), 'ルールの行')
+    expect(host.textContent).toContain('稼働中で直近30日動いていないルール 1')
+    expect(host.textContent).not.toContain('だれにも当たらないルール')
+  })
+
   it('旧一覧の削減時間は現在の説明へ残し、未取得を0時間にしない', async () => {
     vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: automations, summary: null })
     await render(<AutomationsPage />)

@@ -169,7 +169,7 @@ export default function AutomationTemplatesV8() {
     { key: 'rules', title: 'ルール', icon: <ListChecks size={16} aria-hidden="true" />, value: rules ? rules.length : null, unit: '件', detail: rules ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
     { key: 'runs', title: '今月動いた', icon: <Activity size={16} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
     { key: 'failed', title: '失敗', icon: <FileWarning size={16} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={16} aria-hidden="true" />, value: skipped, unit: '回', detail: rules ? `だれにも当たらないルール ${neverRunCount}` : emptyValue('unknown') },
+    { key: 'skipped', title: '条件に外れた', icon: <Filter size={16} aria-hidden="true" />, value: skipped, unit: '回', detail: rules ? `稼働中で直近30日動いていないルール ${neverRunCount}` : emptyValue('unknown') },
   ]
 
   /* ===== 本文 ===== */

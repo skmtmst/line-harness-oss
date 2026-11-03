@@ -593,7 +593,10 @@ export default function BroadcastListV8() {
       leave(targetId, () => {
         setBroadcasts(current => current.filter(item => item.id !== targetId))
         // loadList は読み直し専用の失敗表示を持つ。削除のcatchへは戻さない。
-        if (currentListRequest.current === requestKey) void loadList((page - 1) * pageSize)
+        if (currentListRequest.current === requestKey) {
+          void loadList((page - 1) * pageSize)
+          void loadFolders()
+        }
       })
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
