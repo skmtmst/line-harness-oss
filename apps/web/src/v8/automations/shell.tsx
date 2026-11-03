@@ -171,7 +171,7 @@ export function useAutomationTabCounts(rulesFromPage?: number | null, commonActi
       api.automations.templates(selectedAccountId),
     ])
     if (generationRef.current !== generation) return
-    if (rulesResult.status === 'fulfilled' && rulesResult.value && rulesResult.value.success) setRules(rulesResult.value.data.length)
+    if (rulesResult.status === 'fulfilled' && rulesResult.value && rulesResult.value.success) setRules(rulesResult.value.data.filter((rule) => rule.status !== 'archived').length)
     if (commonResult.status === 'fulfilled' && commonResult.value && commonResult.value.success) setCommonActions(commonResult.value.data.length)
     if (templatesResult.status === 'fulfilled' && templatesResult.value.success) setTemplates(templatesResult.value.data.length)
   }, [selectedAccountId, needRules, needCommonActions])
