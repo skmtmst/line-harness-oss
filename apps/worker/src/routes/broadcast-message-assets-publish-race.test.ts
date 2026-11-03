@@ -66,6 +66,22 @@ describe('F4公開の交錯（逐次awaitではなくCASの間に別保存を挟
     expect((await listBroadcastMessageAssetVersions(store.db, id)).length).toBe(1);
   });
 
+  it('拒否されたキーは記録されず、正しい版で同じキーを再利用できる', async () => {
+    const created = await createBroadcastMessageAsset(store.db, {
+      lineAccountId: 'account-1', kind: 'coupon', name: '素材', payloadJson: JSON.stringify(COUPON_A),
+    });
+    const id = created!.id;
+    await expect(publishBroadcastMessageAsset(store.db, id, {
+      expectedVersion: 99, expectedDraftRevision: 1, idempotencyKey: 'retry-key',
+    })).rejects.toThrow('ASSET_VERSION_CONFLICT');
+    expect(await keyRows(id)).toEqual([]);
+    const result = await publishBroadcastMessageAsset(store.db, id, {
+      expectedVersion: 0, expectedDraftRevision: 1, idempotencyKey: 'retry-key',
+    });
+    expect(result.published).toBe(true);
+    expect(await keyRows(id)).toEqual(['retry-key']);
+  });
+
   it('CASの読取と書込の間に別保存が挟まっても、負け側の自keyを成功にしない', async () => {
     const created = await createBroadcastMessageAsset(store.db, {
       lineAccountId: 'account-1', kind: 'coupon', name: '素材', payloadJson: JSON.stringify(COUPON_A),

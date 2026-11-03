@@ -80,8 +80,11 @@ it.each([
   expect(within(dialog).getByRole('button', { name: primary })).toBeTruthy()
   if (secondary) expect(within(dialog).getByRole('button', { name: secondary })).toBeTruthy()
   else expect(within(dialog).queryByRole('button', { name: /^(来店|退店)にする$/ })).toBeNull()
+  if (!menuItem) expect(within(dialog).queryByRole('button', { name: '架空のお客さまのその他操作' })).toBeNull()
   if (menuItem) {
     fireEvent.click(within(dialog).getByRole('button', { name: '架空のお客さまのその他操作' }))
     expect(await screen.findByRole('menuitem', { name: menuItem })).toBeTruthy()
+    if (status === 'visited' && departed) expect(screen.queryByRole('menuitem', { name: '来店を取り消す' })).toBeNull()
+    if (status === 'visited' && !departed) expect(screen.queryByRole('menuitem', { name: '無断にする' })).toBeNull()
   }
 })

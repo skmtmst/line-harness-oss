@@ -46,6 +46,12 @@ describe('クーポンの保存と公開', () => {
     expect(ports.update).not.toHaveBeenCalled()
     expect(ports.publish.mock.calls[1]).toEqual(first)
   })
+  it.each(['rich_message', 'research'] as const)('%s の2回目保存は資産フォルダを上書きしない', async kind => {
+    const existing = { ...asset, kind, folderId: 'asset-folder-1' } as BroadcastMessageAsset
+    const { result } = renderHook(() => useCouponPersistence('account-a', existing, kind))
+    await result.current('編集', { ...payload, folder: '旧形式のフォルダ' }, null, 'changed', false)
+    expect(ports.update).toHaveBeenCalledWith('coupon-1', { name: '編集', payload: { ...payload, folder: '旧形式のフォルダ' } })
+  })
   it('公開失敗後に編集すると新しい下書きの版とキーを使う', async () => {
     ports.publish.mockRejectedValueOnce(new Error('競合'))
     const { result } = renderHook(() => useCouponPersistence('account-a'))

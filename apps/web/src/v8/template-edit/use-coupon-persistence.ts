@@ -29,7 +29,7 @@ export function useCouponPersistence(accountId: string | null, existing?: Broadc
     let asset = previous?.asset ?? existing
     if (!previous || previous.snapshot !== snapshot) {
       const response = asset
-        ? await api.broadcastMessageAssets.update(asset.id, { name, payload, folderId })
+        ? await api.broadcastMessageAssets.update(asset.id, { name, payload, ...(kind === 'coupon' ? { folderId } : {}) })
         : await api.broadcastMessageAssets.create({ lineAccountId: account, kind, name, payload, folderId })
       if (!response.success) throw new Error(response.error || 'テンプレートを保存できませんでした')
       if (scope.current !== requestScope) throw new Error('LINE公式アカウントが変わりました。保存先の一覧を確認してください')
