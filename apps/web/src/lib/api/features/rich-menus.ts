@@ -60,6 +60,7 @@ export const richMenusMethods = {
         defaultOpen: boolean;
         /** M951: 保存時に送り返す版。古い版での保存は 409 で止まる。 */
         version: number;
+        publishingGeneration: number;
         createdAt: string;
         updatedAt: string;
         pages: Array<{
@@ -198,10 +199,10 @@ export const richMenusMethods = {
     delete: (groupId: string, expectedVersion?: number) =>
       fetchApi<ApiResponse<null>>(`/api/rich-menu-groups/${groupId}${expectedVersion === undefined ? '' : `?expectedVersion=${expectedVersion}`}`, { method: 'DELETE' }),
 
-    publish: (groupId: string, idempotencyKey: string) =>
+    publish: (groupId: string, idempotencyKey: string, confirmation?:{expectedVersion:number;expectedPublishGeneration:number;expectedImages:Array<{orderIndex:number;imageR2Key:string|null;imageContentType:string|null}>}) =>
       fetchApi<ApiResponse<{ pages: Array<{ pageId: string; newRichMenuId: string }> }>>(
         `/api/rich-menu-groups/${groupId}/publish`,
-        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey },...(confirmation?{body:JSON.stringify(confirmation)}:{}) },
       ),
 
     unpublish: (groupId: string, confirmation?:{expectedVersion:number;expectedPublishGeneration:number;expectedIsDefaultForAll:boolean;expectedPages:Array<{id:string;orderIndex:number;lineRichMenuId:string|null}>}) =>
@@ -411,10 +412,10 @@ export const richMenusMethods = {
 
     // 画像 upload は Content-Type を image/* で送るので fetchApi を使わず直接 fetch。
     // 通信断の日本語化だけ fetchApi とそろえる。
-    uploadImage: async (groupId: string, pageId: string, file: File) => {
+    uploadImage: async (groupId: string, pageId: string, file: File, expectedGeneration?:number) => {
       const csrf = getCsrfToken();
       const res = await fetchWithNetworkMessage(
-        `${API_URL}/api/rich-menu-groups/${groupId}/pages/${pageId}/image`,
+        `${API_URL}/api/rich-menu-groups/${groupId}/pages/${pageId}/image${expectedGeneration===undefined?'':`?expectedGeneration=${expectedGeneration}`}`,
         {
           method: 'POST',
           credentials: 'include',
@@ -431,6 +432,7 @@ export const richMenusMethods = {
         imageR2Key: string;
         imageContentType: string;
         size: 'large' | 'compact';
+        publishingGeneration?:number;
       }>;
       if (!body.success) {
         throw new Error(readApiError(body).message ?? `upload failed: ${res.status}`);
