@@ -358,3 +358,13 @@ it('ウェビナーのフォルダ名を編集中は画面移動前に確認す�
   expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
   link.remove()
 })
+it('フォルダをキャンセルして破棄を選んだら確認は一度で閉じる', async () => {
+  await start()
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '商品説明' } })
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  const confirm = screen.getByRole('dialog', { name: '入力を破棄しますか？' })
+  fireEvent.click(within(confirm).getByRole('button', { name: '破棄する' }))
+  expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+  expect(screen.queryByRole('dialog', { name: 'フォルダを追加する' })).toBeNull()
+})

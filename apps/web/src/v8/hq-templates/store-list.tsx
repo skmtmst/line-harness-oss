@@ -553,7 +553,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             error={folderError || undefined}
             confirmLabel={folderDialog?.editing ? '保存する' : '追加する'}
             cancelLabel="やめる"
-            onCancel={() => folderGuard.guarded(() => setFolderDialog(null))}
+            onCancel={() => { if (!folderBusy) setFolderDialog(null) }}
             onConfirm={() => saveFolder()}
           />
           <ConfirmDialog

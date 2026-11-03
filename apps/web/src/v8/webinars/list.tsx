@@ -253,7 +253,7 @@ function FolderForm({
     description="ウェビナーを分けてしまう箱です。消しても、中のウェビナーは未分類に残ります。"
     name={name} onNameChange={setName} color={color} onColorChange={setColor}
     busy={busy} error={error || undefined} placeholder="例：商品説明"
-    onCancel={() => guard.guarded(onCancel)} onConfirm={() => onSave(name.trim(), color)} confirmLabel={folder ? '保存する' : '追加する'} />
+    onCancel={onCancel} onConfirm={() => onSave(name.trim(), color)} confirmLabel={folder ? '保存する' : '追加する'} />
     <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></>
 }
 

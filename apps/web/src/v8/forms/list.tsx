@@ -545,7 +545,8 @@ export default function FormsListV8() {
 
   const closeRename = () => {
     if (renaming) return
-    renameGuard.guarded(() => { setRenameTarget(null); setRenameError('') })
+    setRenameTarget(null)
+    setRenameError('')
   }
 
   const openStop = async (form: Form) => {

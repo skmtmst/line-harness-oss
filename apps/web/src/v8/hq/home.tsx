@@ -744,7 +744,7 @@ export default function HqHomeV8() {
         name={folderName} nameError={folderNameError} onNameChange={(value) => { setFolderName(value); setFolderNameError('') }} nameId="hq-account-folder-name" nameLabel="フォルダの名前"
         color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS}
         placeholder="例：渋谷エリア" maxLength={100}
-        onCancel={() => folderGuard.guarded(() => setFolderDialog(null))}
+        onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
         designNode="JKjsE" busy={folderSaving} disabled={folderSaving} error={folderError || undefined}
         confirmLabel={folderDialog?.editing ? '保存する' : '追加する'} cancelLabel="やめる"
         confirmDisabled={folderUnchanged}

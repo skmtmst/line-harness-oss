@@ -957,7 +957,7 @@ function FriendAddList() {
           description="設定を分けてしまう箱です。"
           name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} maxLength={50}
           confirmLabel={editingFolder ? '保存する' : '追加する'} busy={folderBusy} error={folderError || undefined}
-          onCancel={() => folderGuard.guarded(closeFolder)}
+          onCancel={closeFolder}
           onConfirm={() => createFolder()} />
         <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={folderGuard.leaveTarget !== null} busy={folderBusy} onConfirm={folderGuard.confirmLeave} onCancel={folderGuard.cancelLeave} /></OverlayDepthContext.Provider>
       </>}
