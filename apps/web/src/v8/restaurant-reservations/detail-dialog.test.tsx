@@ -84,7 +84,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(text()).toContain('アレルギー：なし')
     await waitFor(() => expect(text()).toContain('これまでの来店 3 回・前回 08/14'))
     expect(fixture.customerHistory).toHaveBeenCalledWith('account-1', 'store-1', { phone: '090-1234-5678', lineUid: undefined })
-    for (const name of ['取り消す', '内容を変える']) expect(within(dialog).getByRole('button', { name })).not.toBeNull()
+    expect(within(dialog).getByRole('button', { name: '内容を変える' })).not.toBeNull()
   })
 
   it('「次の予約」の「詳細を見る」でも開く', async () => {
@@ -96,7 +96,8 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
 
   it('取り消すは確かめの窓を通してから今の口へ取消を送る', async () => {
     const dialog = await openDetail()
-    fireEvent.click(within(dialog).getByRole('button', { name: '取り消す' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '取り消す' }))
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     const confirm = await screen.findByRole('dialog', { name: 'この予約を取り消しますか？' })
     fireEvent.click(within(confirm).getByRole('button', { name: '取り消す' }))
@@ -120,8 +121,9 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
   it('閲覧のみは詳細の変更操作を理由付きで押せない', async () => {
     role.value = 'viewer'
     const dialog = await openDetail()
-    expect(within(dialog).getAllByRole('button', { name: '閉じる' }).length).toBe(2)
-    expect(within(dialog).getByRole('button', { name: '取り消す' }).getAttribute('aria-disabled')).toBe('true')
+    expect(within(dialog).getAllByRole('button', { name: '閉じる' }).length).toBe(1)
+    fireEvent.click(within(dialog).getByRole('button', { name: '鈴木 真理のその他操作' }))
+    expect(screen.getByRole('menuitem', { name: '取り消す' }).getAttribute('aria-disabled')).toBe('true')
     expect(within(dialog).getByRole('button', { name: '内容を変える' }).getAttribute('aria-disabled')).toBe('true')
     expect(screen.queryByRole('button', { name: '卓を変える' })).toBeNull()
     expect(screen.queryByRole('button', { name: /電話の予約を入れる/ })).toBeNull()
@@ -135,7 +137,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     render(<ReservationDetailDialog inline={inline} reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
       busy={false} canWrite={false} onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
     const area = inline ? screen.getByRole('region', { name: '予約の詳細' }) : screen.getByRole('dialog', { name: '鈴木 真理さん・4名' })
-    for (const name of ['来店にする', '無断にする']) {
+    for (const name of (inline ? ['来店にする', '無断にする'] : ['来店にする'])) {
       const button = within(area).getByRole('button', { name })
       expect(button.getAttribute('aria-disabled')).toBe('true')
       fireEvent.click(button)
@@ -148,18 +150,20 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     render(<ReservationDetailDialog reservation={{...today[0], status: 'pending'}} accountId="account-1" tables={data.tables} courses={data.menuItems}
       busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={() => {}} />)
-    const button = screen.getByRole('button', { name: '無断にする' })
+    fireEvent.click(screen.getByRole('button', { name: '鈴木 真理のその他操作' }))
+    const button = screen.getByRole('menuitem', { name: '無断にする' })
     expect(button.getAttribute('aria-disabled')).toBe('true')
     expect(document.body.textContent).toContain('承認してから')
   })
 
-  it('来店・無断は窓の下に直接置き、無断は確認後に送る', async () => {
+  it('来店は直接、無断はメニューから確認後に送る', async () => {
     const attendance = vi.fn()
     const data = snapshotOf({ reservations: today, reservationTotal: 2 })
     render(<ReservationDetailDialog reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
       busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
     const dialog = await screen.findByRole('dialog', { name: '鈴木 真理さん・4名' })
-    fireEvent.click(within(dialog).getByRole('button', { name: '無断にする' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     expect(attendance).not.toHaveBeenCalled()
     const confirm = await screen.findByRole('alertdialog', { name: '無断にしますか？' })
     expect(confirm.textContent).toContain('鈴木 真理さん')
@@ -168,9 +172,11 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(within(confirm).getByRole('button', { name: '無断にする' }).getAttribute('data-variant')).toBe('danger')
     fireEvent.click(within(confirm).getByRole('button', { name: 'キャンセル' }))
     expect(attendance).not.toHaveBeenCalled()
-    fireEvent.click(within(dialog).getByRole('button', { name: '無断にする' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '鈴木 真理のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '無断にする' }))
     fireEvent.click(within(await screen.findByRole('alertdialog', { name: '無断にしますか？' })).getByRole('button', { name: '無断にする' }))
     expect(attendance).toHaveBeenCalledWith('r1', 'no_show')
+    await Promise.resolve()
     fireEvent.click(within(dialog).getByRole('button', { name: '来店にする' }))
     expect(attendance).toHaveBeenCalledWith('r1', 'visited')
   })
