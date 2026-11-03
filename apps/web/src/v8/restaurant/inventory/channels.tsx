@@ -99,6 +99,7 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
   const [total, setTotal] = useState(0)
   const [failed, setFailed] = useState(false)
   const [howToOpen, setHowToOpen] = useState(false)
+  const [preparingChannel, setPreparingChannel] = useState<RestaurantChannel | null>(null)
   const [reissueOpen, setReissueOpen] = useState(false)
   const scope = JSON.stringify([accountId, storeId])
   const [reissueScope, setReissueScope] = useState('')
@@ -187,7 +188,9 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
   const rowItems = (channel: RestaurantChannel) => channel.receiveMethod === 'manual'
     ? [{ id: 'ledger', label: '予約台帳で入れる', onSelect: () => router.push('/restaurant-test/reservations') }]
     : channel.status === 'preparing'
-      ? [{ id: 'start', label: '始める（転送の設定のしかた）', onSelect: () => setHowToOpen(true) }]
+      ? channel.receiveMethod === 'direct'
+        ? [{ id: 'start', label: '準備中の案内を見る', onSelect: () => setPreparingChannel(channel) }]
+        : [{ id: 'start', label: '始める（転送の設定のしかた）', onSelect: () => setHowToOpen(true) }]
       : [{ id: 'records', label: '取り込んだ記録を見る', onSelect: () => router.push(`/restaurant-test/reservations?source=${encodeURIComponent(channel.code)}`) }]
 
   return (
@@ -282,6 +285,9 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
       >
         <OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: storeId, name: storeName }} />
         <DialogNote>新しいアドレスを発行します。今のアドレスも 90 日は受け取り、その後は使えなくなります。予約サイトの転送先を新しいアドレスへ変えてください。</DialogNote>
+      </RsDialog>
+      <RsDialog open={Boolean(preparingChannel)} title="直接接続は準備中です" width={520} top={200} onCancel={() => setPreparingChannel(null)} actions={<Button variant="primary" onClick={() => setPreparingChannel(null)}>わかった</Button>}>
+        <DialogNote>{preparingChannel?.name}との直接接続は、利用開始に向けて準備しています。開始時期は決まり次第お知らせします。</DialogNote>
       </RsDialog>
       <RsDialog
         open={howToOpen}

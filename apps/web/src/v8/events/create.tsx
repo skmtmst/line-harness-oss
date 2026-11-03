@@ -22,7 +22,8 @@ import { TextField } from '@/components/shared/text-field'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import ApplicationPreview from './application-preview'
-import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso, todayJst } from './shared'
+import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso } from './shared'
+import { jstDateOffset } from '@/lib/jst-datetime'
 import styles from './create.module.css'
 import { Field, OptionalBadge, RequiredBadge } from '@/components/shared/form-controls'
 import { permissionDeniedMessage, describeApiFailure } from '@/components/shared/api-error-message'
@@ -76,6 +77,11 @@ function timeMinutes(value: string) {
   return hour * 60 + minute
 }
 
+function isPastStart(date: string, time: string): boolean {
+  if (!date || !time) return false
+  try { return Date.parse(jstToUtcIso(date, time)) <= Date.now() } catch { return false }
+}
+
 type QuestionDraft = { label: string; required: boolean }
 
 /* useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。 */
@@ -108,7 +114,7 @@ function EventsCreateV8Inner() {
   }, [continuingId, router])
 
   const [draft, setDraft] = useState<EventDetail>(EVENT_DEFAULT_DRAFT)
-  const [date, setDate] = useState(todayJst)
+  const [date, setDate] = useState(() => jstDateOffset(1))
   const [startTime, setStartTime] = useState('14:00')
   const [endTime, setEndTime] = useState('15:30')
   const [capacity, setCapacity] = useState('')
@@ -178,6 +184,7 @@ function EventsCreateV8Inner() {
     const startError = eventRequirements.start.check(startTime)
     const endError = eventRequirements.end.check(endTime)
     if (dateError) errors['ev-new-date'] = dateError
+    else if (isPastStart(date, startTime)) errors['ev-new-date'] = '開始日時が過去です。日時を確認してください。'
     if (startError) errors['ev-new-start'] = startError
     if (endError) errors['ev-new-end'] = endError
     else if (startTime && endTime <= startTime) errors['ev-new-end'] = '終了は開始より後にしてください'
@@ -404,6 +411,7 @@ function EventsCreateV8Inner() {
 
       <Card variant="form" gap="normal" aria-labelledby="ev-new-slot">
         <CardHeader size="stacked" titleId="ev-new-slot" title="最初の予約枠" meta="あとから回を足せます（中身を見る → 回を足す）" />
+        {isPastStart(date, startTime) && !fieldErrors['ev-new-date'] ? <Notice tone="warn">開始日時が過去です。日時を確認してください。</Notice> : null}
         <SettingsFormRow layout="columns">
           <div className={styles.field}><Field requirement={eventRequirements.date} label="日付" htmlFor="ev-new-date"><SaveErrorField names={["date"]}><DateField id="ev-new-date" value={date} invalid={Boolean(fieldErrors['ev-new-date'])} aria-describedby={fieldErrors['ev-new-date'] ? 'ev-new-date-error' : undefined} onChange={(value) => { setDate(value); clearFieldError('ev-new-date') }} /></SaveErrorField>
 {fieldErrors['ev-new-date'] ? <p id="ev-new-date-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-date']}</p> : null}</Field></div>

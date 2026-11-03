@@ -60,3 +60,19 @@ describe('イベント作成の入力確認', () => {
     expect(createEvent).not.toHaveBeenCalled()
   })
 })
+
+it('初期日時は未来で、過去の日付を選ぶと注意が出る', () => {
+ vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T08:00:00Z'))
+ try {
+  render(<EventsCreate />)
+  expect(screen.getByLabelText('日付').getAttribute('title')).toContain('2026年11月4日')
+  fireEvent.click(screen.getByLabelText('日付'))
+  fireEvent.click(screen.getByRole('button',{name:'2026年11月2日（月）'}))
+  expect(screen.getByText('開始日時が過去です。日時を確認してください。')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('イベント名'), { target: { value: '体験会' } })
+  fireEvent.change(screen.getByLabelText('定員'), { target: { value: '20' } })
+  fireEvent.click(getPageAction({ name: '下書きを保存' }))
+  expect(createEvent).not.toHaveBeenCalled()
+  expect(screen.getByLabelText('日付').getAttribute('aria-invalid')).toBe('true')
+ } finally { cleanup(); vi.useRealTimers() }
+})
