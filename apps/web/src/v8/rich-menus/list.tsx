@@ -1291,6 +1291,7 @@ export default function RichMenusListV8() {
           <KpiCard
             presentation="band"
             title="公開中"
+            help="統括からの配布は下書きとして届きます。LINEへの公開は各アカウントで行います。"
             icon={<CircleCheck size={16} aria-hidden="true" />}
             value={groupKpiReady ? groupFacets?.published ?? null : null}
             unit={groupKpiReady && groupFacets?.published != null ? '件' : ''}

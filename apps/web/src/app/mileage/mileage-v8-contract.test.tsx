@@ -21,6 +21,8 @@ import MileagePage from './page'
  * 互換経路では従来の器が出ることも固定する。
  */
 let query = ''
+let balanceSource: 'ec' | 'musubo' | 'unknown' = 'musubo'
+let selectedAccountId: string | null = 'account-a'
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/mileage',
@@ -28,7 +30,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
-    selectedAccountId: 'account-a', selectedAccount: null, loading: false,
+    selectedAccountId, selectedAccount: null, loading: false,
   }),
 }))
 
@@ -187,6 +189,7 @@ function baseHandler(url: URL) {
     return response({
       success: true,
       data: {
+        balanceSource,
         summary: {
           totalMembers: 10, withBalanceCount: 8, available: 5000, pending: 0,
           monthChange: 300, rankCounts: [], expiringMiles30d: 0, nextExpiringAt: null,
@@ -213,6 +216,7 @@ function baseHandler(url: URL) {
     })
   }
   if (url.pathname === '/api/mileage/redemptions') {
+    if (balanceSource === 'ec' && url.searchParams.get('status') === 'reserved') return response({ success: true, data: { items: [{ id: 'held-1', rewardName: '保留の特典', status: 'reserved', updatedAt: '2026-11-03' }], pagination: { total: 1, limit: 20, offset: 0 } } })
     return response({ success: true, data: { items: [], pagination: { total: 0, limit: 20, offset: 0 } } })
   }
   if (url.pathname === '/api/mileage/adjustment-approvals' || url.pathname === '/api/mileage/adjustments/approvals') {
@@ -262,6 +266,7 @@ async function eventually(check: () => void, timeout = 5000) {
 beforeEach(() => {
   staffRole = verifiedStaffRole('admin')
   query = ''
+  balanceSource = 'musubo'
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
@@ -382,4 +387,53 @@ test('U5：使われたマイルは支出の絶対量で、交換回数を保つ
     expect(card?.querySelector('[data-kpi-number]')?.textContent).toBe('200')
     expect(card?.textContent).toContain('交換 2 件')
   })
+})
+
+test('EC が正の店では musubo の会員ランクを出さず EC と同期と案内する', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  balanceSource = 'ec'
+  query = 'tab=ranks'
+  await act(async () => root.render(<MileagePage />))
+  await eventually(() => expect(host.textContent).toContain('ECと同期'))
+  expect(host.textContent).not.toContain('ランクを足す')
+  expect(host.textContent).not.toContain('動かす')
+})
+
+test.each(['earning-rules', 'rewards'])('ECの%sは説明を出し作成を出さない', async (tab) => {
+  document.documentElement.dataset.theme = 'v8'; balanceSource = 'ec'; query = `tab=${tab}`
+  await act(async () => root.render(<MileagePage />))
+  await eventually(() => expect(host.textContent).toContain('マイルはECで管理しています'))
+  expect(host.querySelector('a[href="/mileage/earning-rules/new"]')).toBeNull()
+  expect(host.querySelector('a[href^="/mileage/rewards/edit"]')).toBeNull()
+})
+
+test('EC切替前の予約中の交換はそのまま一覧で確認できる', async () => {
+  document.documentElement.dataset.theme = 'v8'; balanceSource = 'ec'; query = 'tab=rewards'
+  await act(async () => root.render(<MileagePage />))
+  await eventually(() => expect(host.textContent).toContain('保留の特典'))
+  expect(host.textContent).toContain('保留中の交換 1 件')
+  expect(host.textContent).not.toContain('もう一度届ける')
+})
+
+test.each(['history', 'ranks'])('アカウント未選択の%sは選択案内を出す', async (tab) => {
+  document.documentElement.dataset.theme = 'v8'; selectedAccountId = null; query = `tab=${tab}`
+  try {
+    await act(async () => root.render(<MileagePage />))
+    await eventually(() => expect(host.textContent).toContain('LINEアカウントを選択してください'))
+  } finally { selectedAccountId = 'account-a' }
+})
+
+test('設定元が不明ならランクを推測せず読み込みエラーを出す', async () => {
+  document.documentElement.dataset.theme = 'v8'; balanceSource = 'unknown'; query = 'tab=ranks'
+  await act(async () => root.render(<MileagePage />))
+  await eventually(() => expect(host.textContent).toContain('会員ランクの設定元を読み込めませんでした'))
+  expect(host.textContent).not.toContain('ランクを足す')
+})
+
+test('EC が正の店では過去の musubo 履歴と残高の出所を明記し、増減操作を出さない', async () => {
+  document.documentElement.dataset.theme = 'v8'; balanceSource = 'ec'; query = 'tab=history'
+  await act(async () => root.render(<MileagePage />))
+  await eventually(() => expect(host.textContent).toContain('musubo側の履歴'))
+  expect(host.textContent).toContain('musuboの残高')
+  expect(host.textContent).not.toContain('増やす・減らす')
 })

@@ -30,3 +30,9 @@ it('閲覧のみでは差し込む操作を置かず文字数だけを表示す�
   expect(screen.queryByText('差し込む')).toBeNull()
   expect(insert).not.toHaveBeenCalled()
 })
+
+it('文字数の説明で名前の差し込みの数え方と送信時の長さを案内する', () => {
+  render(<MessageInsertRow count="8 / 5,000"><MessageInsertButton kind="name" label="名前" onClick={() => {}} /></MessageInsertRow>)
+  fireEvent.click(screen.getByRole('button', { name: '文字数の数え方' }))
+  expect(screen.getByText('「名前」は8文字として数えます。送るときは友だちの名前に置き換わるため、実際の長さは人によって変わります。')).toBeTruthy()
+})

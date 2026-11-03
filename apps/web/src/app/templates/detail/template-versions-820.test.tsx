@@ -65,7 +65,7 @@ vi.mock('next/link', () => ({
 }))
 
 import TemplateDetailPage from './page'
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-b', name: '別アカウント' }], loading: false }) }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -73,7 +73,7 @@ function stubAll(usedBy = USED_BY, versions = VERSIONS) {
   templateGet.mockImplementation(() => Promise.resolve({
     success: true,
     data: {
-      id: 'tpl-1', name: '案内', category: 'general', messageType: 'text',
+      id: 'tpl-1', accountId: 'account-b', name: '案内', category: 'general', messageType: 'text',
       messageContent: 'いまの本文', folderId: null, question: null,
       questionStatus: 'draft', usedBy, createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-10T00:00:00.000Z', hasDraft: false,
@@ -112,6 +112,31 @@ async function renderDetail() {
 }
 
 describe('使われている場所', () => {
+  test('削除の窓には実際の対象アカウントと環境を出す', async () => {
+    stubAll({ ...USED_BY, autoReplies: [], scenarioSteps: [], broadcasts: [] })
+    await renderDetail()
+    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog.textContent).toContain('別アカウント')
+    expect(dialog.textContent).toContain('環境')
+  })
+  test('詳細の対象を行き来した後は古い削除の確定を受け付けない', async () => {
+    stubAll({ ...USED_BY, autoReplies: [], scenarioSteps: [], broadcasts: [] })
+    const { api } = await import('@/lib/api')
+    vi.mocked(api.templates.delete).mockClear()
+    const view = render(<TemplateDetailPage />)
+    await screen.findByRole('heading', { name: '使っている所' })
+    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+    const button = within(await screen.findByRole('alertdialog')).getByRole('button', { name: '削除する' })
+    const key = Object.keys(button).find(name => name.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    searchParams.value = new URLSearchParams('id=tpl-2'); await act(async () => { view.rerender(<TemplateDetailPage />) })
+    searchParams.value = new URLSearchParams('id=tpl-1'); await act(async () => { view.rerender(<TemplateDetailPage />) })
+    await act(async () => { oldClick() })
+    expect(api.templates.delete).not.toHaveBeenCalled()
+  })
   test('一斉配信の行に版と状態が出る', async () => {
     stubAll()
     await renderDetail()

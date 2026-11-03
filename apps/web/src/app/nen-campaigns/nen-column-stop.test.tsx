@@ -57,7 +57,7 @@ function renderColumns(setting: NenCampaignSetting, onToggleSetting: (s: NenCamp
         friends={[]}
         testFriendId=""
         onTestFriendChange={noop}
-        accountId={null}
+        accountId="fixture-account"
         loading={false}
         notice={null}
         saving={null}
@@ -115,6 +115,11 @@ describe('NENコラム配信の停止・再開(#934 N-295)', () => {
     const stop = toggleAction('コラム配信を止める')
     expect(stop).toBeDefined()
     act(() => { stop!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(onToggle).not.toHaveBeenCalled()
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    expect(dialog.textContent).toContain('コラム配信を止めますか？')
+    const confirm = Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === '止める')!
+    act(() => { confirm.click() })
     expect(onToggle).toHaveBeenCalledWith(expect.objectContaining({ campaignKey: 'column', isEnabled: true }))
   })
 

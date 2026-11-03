@@ -5,6 +5,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
 import { Field } from '@/components/shared/form-controls'
@@ -139,6 +140,7 @@ export default function FileScanScreen() {
             return release()
           }}
         >
+          <OperationTargetSummary accounts={[{ id: releaseTarget.lineAccountId ?? '' }]} />
           <Field label="理由（必須）" htmlFor="file-scan-release-reason" error={releaseReasonError || undefined}>
             <SaveErrorField names={["releaseReason","release_reason"]}><TextArea
               ref={releaseReasonRef}
@@ -171,7 +173,9 @@ export default function FileScanScreen() {
           error={stopError || undefined}
           onCancel={() => { setStopExternal(false); setStopError('') }}
           onConfirm={() => stopExternalConfig()}
-        />
+        >
+          <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} />
+        </ConfirmDialog>
       ) : null}
 
       {deleteTarget ? (
@@ -187,7 +191,9 @@ export default function FileScanScreen() {
           error={deleteError || undefined}
           onCancel={() => { setDeleteTarget(null); setDeleteError('') }}
           onConfirm={() => remove()}
-        />
+        >
+          <OperationTargetSummary accounts={[{ id: deleteTarget.lineAccountId ?? '' }]} />
+        </ConfirmDialog>
       ) : null}
     </>
   )

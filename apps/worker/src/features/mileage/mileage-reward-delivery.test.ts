@@ -41,6 +41,8 @@ vi.mock('../automations/automation-engine.js', () => ({
 }));
 
 vi.mock('../../services/feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
+const mileageSourceMocks = vi.hoisted(() => ({ resolveMileageSource: vi.fn().mockResolvedValue('musubo') }));
+vi.mock('../../services/mileage-ec-source.js', () => mileageSourceMocks);
 
 const { deliverMileageReward } = await import('./mileage-reward-delivery.js');
 
@@ -77,6 +79,13 @@ beforeEach(() => {
 });
 
 describe('mileage reward delivery', () => {
+  it('EC管理の予約済み交換を配送せず状態も変えない', async () => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    const result = await deliverMileageReward(db, 'redemption-1');
+    expect(result.message).toContain('ECで管理');
+    expect(db.prepare).not.toHaveBeenCalled();
+    expect(dbMocks.recordMileageRedemptionAttempt).not.toHaveBeenCalled();
+  });
   it('decrypts a reserved coupon only during authenticated delivery and records success', async () => {
     const result = await deliverMileageReward(db, 'redemption-1', {
       credentialEncryptionKey: 'secret',

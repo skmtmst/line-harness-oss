@@ -2,9 +2,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
-const fixture = vi.hoisted(() => ({ allowed: true, remove: vi.fn(), crumbs: [] as unknown[] }))
+const fixture = vi.hoisted(() => ({ allowed: true, account: 'account-a', remove: vi.fn(), crumbs: [] as unknown[] }))
 vi.mock('@/lib/use-feature-access', () => ({ usePermissionAccess: () => fixture.allowed }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.account }) }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {}, usePageCrumbs: (crumbs: unknown[]) => { fixture.crumbs = crumbs } }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock() }))
 vi.mock('./staff-edit-dialog', () => ({ EMPTY_STAFF: {}, StaffEditModal: () => <div role="dialog" aria-label="スタッフ編集" /> }))
@@ -13,7 +13,7 @@ vi.mock('@/lib/api', async original => ({ ...(await original<typeof import('@/li
   deleteStaff: (...args: unknown[]) => fixture.remove(...args),
 } }))
 import StaffPage from './page'
-beforeEach(() => { verifiedStaffRole('owner'); fixture.allowed = true; fixture.crumbs = []; fixture.remove.mockReset().mockResolvedValue({ ok: true }) })
+beforeEach(() => { verifiedStaffRole('owner'); fixture.allowed = true; fixture.account = 'account-a'; fixture.crumbs = []; fixture.remove.mockReset().mockResolvedValue({ ok: true }) })
 afterEach(() => { cleanup(); verifiedStaffRole(null) })
 
 it('どのスタッフにもシフト1つとメニュー1つ、編集と最後の削除を保つ', async () => {
@@ -84,4 +84,20 @@ it('削除は確認後だけ送り、失敗したら窓で理由を示して再�
   fireEvent.click(screen.getByRole('button', { name: '削除する' }))
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   expect(fixture.remove).toHaveBeenCalledTimes(2)
+})
+
+it('スタッフ削除の対象を表示し、アカウント変更後の古い確認は実行しない', async () => {
+  const view = render(<StaffPage />)
+  await screen.findByText('佐藤')
+  fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  const dialog = screen.getByRole('alertdialog')
+  expect(dialog.textContent).toContain('LINEアカウント')
+  const button = screen.getByRole('button', { name: '削除する' })
+  const reactKey = Object.keys(button).find(key => key.startsWith('__reactProps$'))!
+  const oldConfirm = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[reactKey].onClick
+  fixture.account = 'account-b'; view.rerender(<StaffPage />)
+  fixture.account = 'account-a'; view.rerender(<StaffPage />)
+  oldConfirm({ preventDefault() {}, stopPropagation() {} })
+  expect(fixture.remove).not.toHaveBeenCalled()
 })

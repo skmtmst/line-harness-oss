@@ -148,6 +148,19 @@ describe('リッチメニューを作る：手順', () => {
 })
 
 describe('リッチメニューを作る：①形と画像', () => {
+  it('空欄で次へ進むと、直す2項目をまとめと欄に示し、入力で消える', async () => {
+    await open('')
+    await act(async () => { fireEvent.change(document.getElementById('rm-chatbar')!, { target: { value: '' } }) })
+    await act(async () => { fireEvent.click(getPageAction({ name: '次へ：ボタンの動き', exact: true })) })
+    const summary = host.querySelector('[data-design-part="validation-summary"]') as HTMLElement
+    expect(summary?.textContent).toContain('2か所直してください')
+    expect(summary?.textContent).toContain('メニュー名')
+    expect(summary?.textContent).toContain('トーク画面の下の文言')
+    expect(screen.getByText('名前を入力してください。')).toBeTruthy()
+    expect(screen.getByText('トーク画面の下の文言を入力してください。')).toBeTruthy()
+    await act(async () => { fireEvent.change(document.getElementById('rm-name')!, { target: { value: '架空のメニュー' } }); fireEvent.change(document.getElementById('rm-chatbar')!, { target: { value: 'メニュー' } }) })
+    expect(host.querySelector('[data-design-part="validation-summary"]')).toBeNull()
+  })
   it('面の分け方は共通の選ぶ部品（radiogroup）で、右に共通の要約と LINE の見え方を出す', async () => {
     await open('')
     expect(board()).toBe('JeINq')

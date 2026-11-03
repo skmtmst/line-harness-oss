@@ -22,6 +22,7 @@ const assetFoldersList = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const account = vi.hoisted(() => ({ id: 'account-a' }))
 const search = vi.hoisted(() => ({ value: '' }))
 const loadExamples = vi.hoisted(() => vi.fn())
 vi.mock('@/v8/templates/examples', () => ({ loadTemplateExamples: loadExamples }))
@@ -50,7 +51,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search.value),
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '然 - NEN -' }], loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, accounts: [{ id: 'account-a', name: '然 - NEN -' }], loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
@@ -104,6 +105,7 @@ beforeEach(() => {
   document.body.appendChild(host)
   root = createRoot(host)
   role.value = verifiedStaffRole('owner')
+  account.id = 'account-a'
   narrow.value = false
   push.mockReset()
   for (const fn of Object.values(templatesApi)) fn.mockReset()
@@ -126,6 +128,31 @@ afterEach(() => {
 })
 
 describe('V8 メッセージを作る・編集', () => {
+  it('利用中のメッセージの公開確認に対象と環境を出す', async () => {
+    templatesApi.get.mockResolvedValue(detail({ usedBy: { autoReplies: [], automations: [], scenarioSteps: [{ stepId: 's', scenarioId: 'scenario', scenarioName: 'ご案内', stepOrder: 1 }], reminderSteps: [], richMenuAreas: [], trackedLinks: [] } }))
+    templatesApi.update.mockResolvedValue({ success: true, data: { id: 'template-1', publishedVersion: 3, draftRevision: 3 } })
+    await mount('id=template-1')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+    await flush()
+    const dialog = screen.getByRole('dialog', { name: 'この内容を公開しますか？' })
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
+  })
+  it('アカウントを切り替えて戻しても古いメッセージ公開確認を使えない', async () => {
+    templatesApi.get.mockResolvedValue(detail({ usedBy: { autoReplies: [], automations: [], scenarioSteps: [{ stepId: 's', scenarioId: 'scenario', scenarioName: 'ご案内', stepOrder: 1 }], reminderSteps: [], richMenuAreas: [], trackedLinks: [] } }))
+    templatesApi.update.mockResolvedValue({ success: true, data: { id: 'template-1', publishedVersion: 3, draftRevision: 3 } })
+    await mount('id=template-1')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+    await flush()
+    const dialog = screen.getByRole('dialog', { name: 'この内容を公開しますか？' })
+    const button = within(dialog).getByRole('button', { name: '公開する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    account.id = 'account-b'; await act(async () => { root.render(<TemplateEditV8 />) })
+    account.id = 'account-a'; await act(async () => { root.render(<TemplateEditV8 />) })
+    await act(async () => { await oldClick({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
+    expect(templatesApi.publish).not.toHaveBeenCalled()
+  })
   it('新しいメッセージは形の切り替えを出さず、テキストで保存する', async () => {
     templatesApi.create.mockResolvedValue({ success: true, data: { id: 'new-text' } })
     await mount()
@@ -236,6 +263,7 @@ describe('V8 メッセージを作る・編集', () => {
     await flush()
     expect((screen.getByLabelText('本文') as HTMLTextAreaElement).value).toBe('{{name}}')
     expect(screen.getByText('8 / 5,000')).toBeTruthy()
+    expect(screen.getByText('文字数は差し込み記号を含みます。実際の文字数は受け取る人ごとに変わります。')).toBeTruthy()
   })
 
   it('読んだ版で保存し、成功後の版を次の保存に使う', async () => {

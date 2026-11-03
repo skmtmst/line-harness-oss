@@ -1,3 +1,5 @@
+import { getEcMileageFriends, resolveMileageSource } from '../services/mileage-ec-source.js';
+import { blockEcMileageWrite } from '../services/mileage-write-guard.js';
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { recordAuditEvent } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
@@ -334,6 +336,8 @@ export const post__api_mileage_redemptions_17 = async (c: Context<Env, "/api/mil
       if (!await canUseMileageAccount(c, accountId)) {
         return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
       }
+      const blocked = await blockEcMileageWrite(c, accountId);
+      if (blocked) return blocked;
       const requestFingerprint = await sha256Hex(`${accountId}\n${friendId}\n${rewardId}`);
       const reserved = await reserveMileageRewardRedemption(c.env.DB, {
         lineAccountId: accountId,
@@ -415,6 +419,8 @@ export const post__api_mileage_redemptions_id_retry_fulfillment_20 = async (c: C
       if (!redemption || redemption.lineAccountId !== accountId) {
         return c.json({ success: false, error: '交換履歴が見つかりません' }, 404);
       }
+      const blocked = await blockEcMileageWrite(c, accountId);
+      if (blocked) return blocked;
       /*
        * 失敗中と配送中だけやり直せる。成功済み・返金済みの再実行は
        * 二重特典の素、予約中の再実行は最初の配送と競合するので断る。
@@ -488,16 +494,21 @@ export const get__api_mileage_friends_21 = async (c: Context<Env, "/api/mileage/
       return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const { limit: requestedLimit, offset: requestedOffset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 20, limitPolicy: { fallback: 'finite', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'finite', minimum: 0 } });
-    const data = await getMileageFriendsV6(c.env.DB, {
+    const input = {
       lineAccountId: accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
       search: c.req.query('search')?.trim() ?? '',
-      // 友だち詳細は名前ではなく友だちIDで1人を取る。
       friendId: c.req.query('friendId')?.trim() || undefined,
       limit: requestedLimit,
       offset: requestedOffset,
-    });
-    return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: data.pagination.total, paging: { limit: data.pagination.limit, offset: data.pagination.offset }, sort: [{ field: 'available', direction: 'desc' }, { field: 'displayName', direction: 'asc' }, { field: 'friendId', direction: 'asc' }] }) });
+    };
+    const source = await resolveMileageSource(c.env.DB, accountId);
+    if (source === 'ec') {
+      const data = await getEcMileageFriends(c.env.DB, input);
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: data.pagination.total, paging: { limit: data.pagination.limit, offset: data.pagination.offset }, sort: [{ field: 'available', direction: 'desc' }, { field: 'displayName', direction: 'asc' }, { field: 'friendId', direction: 'asc' }] }) });
+    }
+    const data = await getMileageFriendsV6(c.env.DB, input);
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, balanceSource: 'musubo' as const, total: data.pagination.total, paging: { limit: data.pagination.limit, offset: data.pagination.offset }, sort: [{ field: 'available', direction: 'desc' }, { field: 'displayName', direction: 'asc' }, { field: 'friendId', direction: 'asc' }] }) });
   } catch (error) {
     return mileageV6Error(c, error);
   }

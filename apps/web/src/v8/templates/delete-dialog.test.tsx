@@ -6,6 +6,16 @@ import TemplateDeleteDialog from './delete-dialog'
 
 afterEach(cleanup)
 
+it('権限が無くなったら理由を出して削除を受け付けない', () => {
+  const remove = vi.fn()
+  render(<TemplateDeleteDialog open title="文を削除しますか？" description="配信には残ります。"
+    confirmLockedReason="テンプレートを変更する権限がありません。" onConfirm={remove} onCancel={() => {}} />)
+  const button = screen.getByRole('button', { name: '削除する' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.click(button)
+  expect(remove).not.toHaveBeenCalled()
+})
+
 it('アカウントが変わった削除は理由を読み、選び直すまで送らない', () => {
   const remove = vi.fn(), cancel = vi.fn()
   const { rerender } = render(<TemplateDeleteDialog open title="文を削除しますか？" description="配信には残ります。"

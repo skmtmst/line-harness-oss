@@ -271,3 +271,64 @@ describe('V8 NEN配信の一覧', () => {
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it('別アカウントの読み直し中は停止中の自動配信を動かせない', async () => {
+ const props = baseProps({ currentAccountData: false })
+ await render(props)
+ await act(async () => { fireEvent.click(button('「困っていませんか」の操作')!) })
+ const start = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim().startsWith('動かす'))!
+ await act(async () => { fireEvent.click(start) })
+ expect(props.onToggleSetting).not.toHaveBeenCalled()
+})
+it.each([true, false])('別アカウントの読み直し中はコラム配信の状態を変えない（有効=%s）', async enabled => {
+ const props = baseProps({ tab: 'columns', currentAccountData: false, settings: SETTINGS.map(item => item.campaignKey === 'column' ? { ...item, isEnabled: enabled } : item) })
+ await render(props)
+ await act(async () => { fireEvent.click(button('よく使う絞り込み')!) })
+ const item = [...document.querySelectorAll('[role="menuitem"]')].find(node => node.textContent?.trim().startsWith(enabled ? 'コラム配信を止める' : 'コラム配信を動かす'))!
+ await act(async () => { fireEvent.click(item) })
+ expect(props.onToggleSetting).not.toHaveBeenCalled()
+})
+it('コラム配信の停止は対象の確認を通す', async () => {
+ const props = baseProps({ tab: 'columns' })
+ await render(props)
+ await act(async () => { fireEvent.click(button('よく使う絞り込み')!) })
+ const item = [...document.querySelectorAll('[role="menuitem"]')].find(node => node.textContent?.trim() === 'コラム配信を止める')!
+ await act(async () => { fireEvent.click(item) })
+ expect(props.onToggleSetting).not.toHaveBeenCalled()
+ expect(screen.getByRole('alertdialog').textContent).toContain('LINEアカウント')
+})
+
+it('別アカウントの情報を読み直す間はコラム配信の確認を開けない', async () => {
+ await render(baseProps({ tab: 'columns', selectedColumnId: 'c-1', currentAccountData: false }))
+ expect(button('配信を予約する')?.disabled).toBe(true)
+})
+
+it.each(['column', 'stop'] as const)('%s の確認に操作するアカウントと環境を表示する', async kind => {
+ const props = baseProps(kind === 'column' ? { tab: 'columns', selectedColumnId: 'c-1' } : {})
+ await render(props)
+ if (kind === 'column') await act(async () => { button('配信を予約する')!.click() })
+ else {
+  await act(async () => { button('「お誕生日クーポン」の操作')!.click() })
+  await act(async () => { fireEvent.click([...document.querySelectorAll('[role="menuitem"]')].find(x => x.textContent?.trim() === '止める')!) })
+ }
+ const dialog = screen.getByRole(kind === 'column' ? 'dialog' : 'alertdialog')
+ expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+ expect(within(dialog).getByText('環境')).toBeTruthy()
+})
+it.each(['column', 'stop'] as const)('%s の古い確定をアカウント切替後に送らない', async kind => {
+ const props = baseProps(kind === 'column' ? { tab: 'columns', selectedColumnId: 'c-1' } : {})
+ await render(props)
+ if (kind === 'column') await act(async () => { button('配信を予約する')!.click() })
+ else {
+  await act(async () => { button('「お誕生日クーポン」の操作')!.click() })
+  await act(async () => { fireEvent.click([...document.querySelectorAll('[role="menuitem"]')].find(x => x.textContent?.trim() === '止める')!) })
+ }
+ const dialog = screen.getByRole(kind === 'column' ? 'dialog' : 'alertdialog')
+ const b = within(dialog).getByRole('button', { name: kind === 'column' ? '送る' : '止める' })
+ const key = Object.keys(b).find(item => item.startsWith('__reactProps$'))!
+ const oldConfirm = (b as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ await render({ ...props, accountId:'account-b' })
+ await render(props)
+ await act(async () => { await oldConfirm({ defaultPrevented:false, preventDefault(){}, stopPropagation(){}, currentTarget:b, target:b }) })
+ expect(props.onDeliverColumn).not.toHaveBeenCalled();expect(props.onToggleSetting).not.toHaveBeenCalled()
+})

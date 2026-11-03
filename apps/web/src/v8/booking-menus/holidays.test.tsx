@@ -126,3 +126,19 @@ it('閲覧のみの休業削除は理由付きで拒否し、確認もAPIも開�
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(net.deleteException).not.toHaveBeenCalled()
 })
+
+it('休業日削除の対象を示し、切替後の古い確定では削除しない', () => {
+ const item = exception('e1', '2026-10-20', '2026-10-20')
+ const props = { settings: { exceptions: [item] } as BookingSettings, status: 'ready' as const, error: null, exceptions: [item], closedWeekdays: [], bookingCountOnClosed: 0, canEdit: true, onSaved: vi.fn(), onReload: vi.fn() }
+ const view = render(<HolidaysTabV8 {...props} accountId="a" />)
+ fireEvent.click(screen.getByRole('button', { name: '削除' }))
+ const dialog = screen.getByRole('alertdialog')
+ expect(dialog.textContent).toContain('LINEアカウント')
+ const button = within(dialog).getByRole('button', { name: '削除する' })
+ const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+ const oldConfirm = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+ view.rerender(<HolidaysTabV8 {...props} accountId="b" />)
+ view.rerender(<HolidaysTabV8 {...props} accountId="a" />)
+ act(() => oldConfirm({ preventDefault() {}, stopPropagation() {} }))
+ expect(net.deleteException).not.toHaveBeenCalled()
+})

@@ -35,6 +35,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       featureSettings: { visibility: async () => ({ success: true, data: { features: {} } }) },
       commonActions: { resources: async () => ({ success: true, data: { commonActions: [] } }) },
       mileage: {
+        friendsV6: async () => ({ success: true, data: { balanceSource: 'musubo' } }),
         reward: vi.fn(),
         rewards: vi.fn(),
         createReward: vi.fn(),

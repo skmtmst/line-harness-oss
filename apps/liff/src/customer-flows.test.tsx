@@ -9,7 +9,7 @@ import { api, type EventBookingMine } from './lib/api.js';
 vi.mock('./lib/liff-auth.js', () => ({ getLiffId: () => 'fixture', getLineUserId: () => 'me', getIdToken: () => 'fixture' }));
 vi.mock('./components/ui/liff-header.js', () => ({ default: ({ title }: { title: string }) => <header>{title}</header> }));
 vi.mock('./lib/liff-runtime.js', () => ({ default: { getProfile: async () => ({ displayName: '人工会員' }), closeWindow: () => {} } }));
-vi.mock('./lib/affiliate-self-api.js', () => ({ affiliateSelfApi: { rewards: async () => ({ availableMiles: 0, rewards: [] }) } }));
+vi.mock('./lib/affiliate-self-api.js', () => ({ affiliateSelfApi: { rewards: async () => ({ availableMiles: 0, balanceSource: 'musubo', rewards: [] }) } }));
 vi.mock('./lib/api.js', () => ({ api: {
   liffConfig: vi.fn(), customerLook: vi.fn(), menus: vi.fn(), storePhotos: vi.fn(), staffOf: vi.fn(), lastBooking: vi.fn(), addons: vi.fn(), bookingSettings: vi.fn(),
   me: vi.fn(), bookingWaitlists: vi.fn(), entitlements: vi.fn(), notificationPreferences: vi.fn(),

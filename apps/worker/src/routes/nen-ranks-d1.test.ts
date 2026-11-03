@@ -536,6 +536,18 @@ describe('ランク削除時の会員別EC送信とやり直し', () => {
 });
 
 describe('PUT /api/nen/lifetime-milestones', () => {
+  it('通知未指定の新しい節目はオフで、未指定の既存節目は保存済みの設定を保つ', async () => {
+    const existing = sql.prepare('SELECT id, threshold_yen, title FROM nen_lifetime_milestones WHERE line_account_id = ? ORDER BY threshold_yen').all(ACCOUNT) as Array<{id:string;threshold_yen:number;title:string}>;
+    sql.prepare('UPDATE nen_lifetime_milestones SET notify_on_reach = 1 WHERE id = ?').run(existing[0].id);
+    const result = await json(harness('owner'), 'PUT', '/api/nen/lifetime-milestones', { accountId: ACCOUNT, milestones: [
+      ...existing.map(row => ({id:row.id, thresholdYen:row.threshold_yen, title:row.title})),
+      {thresholdYen:2500000,title:'新しい節目'},
+    ] });
+    expect(result.status).toBe(200);
+    expect(result.body.data.milestones.find((row:any)=>row.id===existing[0].id).notifyOnReach).toBe(true);
+    expect(result.body.data.milestones.find((row:any)=>row.title==='新しい節目').notifyOnReach).toBe(false);
+  });
+
   it('節目を保存して ECへ送る。同じ金額は 400', async () => {
     await json(harness('owner'), 'GET', `/api/nen/rank-settings?accountId=${ACCOUNT}`);
     const dup = await json(harness('owner'), 'PUT', '/api/nen/lifetime-milestones', { accountId: ACCOUNT, milestones: [

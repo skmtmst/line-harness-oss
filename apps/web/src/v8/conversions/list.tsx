@@ -1183,7 +1183,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
             help="登録している成果地点の数です。"
             value={listUnavailable ? null : total}
             unit="件"
-            detail={stateCounts ? `動いている ${formatNumber(stateCounts.active)}・止めている ${formatNumber(stateCounts.stopped)}` : emptyValue('unknown')}
+            detail={stateCounts ? `有効 ${formatNumber(stateCounts.active)}・下書き ${formatNumber(stateCounts.draft)}・停止中 ${formatNumber(stateCounts.stopped)}` : emptyValue('unknown')}
           />
           <KpiCard
             presentation="band"

@@ -1,6 +1,7 @@
 import { dbTableExists, jstNow } from '../utils.js';
 import { type RecordEngagementEventInput, type EngagementEvent, type EnqueueMileageEventInput, type PostMileageEntryInput, type MileageLedgerEntry } from './types.js';
 import { DEFAULT_MILEAGE_PROGRAM_ID, ensureBuiltInProgram, getAccountRuleVersionMap } from './program.js';
+import { resolveMileageSource } from './source.js';
 
 
 /**
@@ -110,6 +111,13 @@ export async function postMileageEntry(
   }
   if (!input.beneficiaryUserId && !input.beneficiaryFriendId) {
     throw new Error('Mileage beneficiary is required');
+  }
+
+  const accounts = await db.prepare(`SELECT DISTINCT line_account_id FROM friends WHERE (id = ? OR (? IS NULL AND ? IS NOT NULL AND user_id = ?)) AND line_account_id IS NOT NULL`)
+    .bind(input.beneficiaryFriendId ?? null, input.beneficiaryFriendId ?? null, input.beneficiaryUserId ?? null, input.beneficiaryUserId ?? null).all<{ line_account_id: string }>();
+  if (!accounts.results.length) throw new Error('MILEAGE_SOURCE_UNAVAILABLE');
+  for (const account of accounts.results) {
+    if (await resolveMileageSource(db, account.line_account_id) === 'ec') throw new Error('MILEAGE_MANAGED_BY_EC');
   }
 
   const id = crypto.randomUUID();

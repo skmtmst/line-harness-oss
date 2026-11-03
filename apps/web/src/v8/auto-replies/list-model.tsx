@@ -82,6 +82,9 @@ export interface PendingToggle {
   kind: 'stop' | 'resume'
   /** 対象を選んだ時点のアカウント。切替後に古い対象へ作用しないために固定する。 */
   accountId: string | null
+  generation?: number
+  allAccounts?: boolean
+  targetAccountIds?: string[]
 }
 
 /**

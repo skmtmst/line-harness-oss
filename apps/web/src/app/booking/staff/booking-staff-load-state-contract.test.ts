@@ -37,7 +37,7 @@ describe('V8 予約スタッフ・受付時間の一覧状態', () => {
       }
       const requestRef = 'loadRequestRef'
       expect(source).toContain(`const ${requestRef} = useRef(0)`)
-      expect(source).toContain(`if (requestId !== ${requestRef}.current) return`)
+      expect(source).toContain(`if (requestId !== ${requestRef}.current || requestScope !== scope.current) return`)
       expect(source).toContain(`${requestRef}.current += 1`)
     })
   }

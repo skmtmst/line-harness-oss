@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowLeft, CircleCheck, Copy, List, MessageCircle, MessageSquare, Star, Workflow, Zap } from 'lucide-react'
@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
@@ -89,6 +90,19 @@ function FriendDetailV8Inner() {
   const perms = useFriendDetailPermissions()
   const { friend } = data
   const deletion = useCustomerDeletion(() => { router.push('/friends') })
+  const deletionScope = useRef({ friendId, accountId: selectedAccountId, generation: 0 })
+  if (deletionScope.current.friendId !== friendId || deletionScope.current.accountId !== selectedAccountId) {
+    deletionScope.current = { friendId, accountId: selectedAccountId, generation: deletionScope.current.generation + 1 }
+  }
+  const currentScope = deletionScope.current
+  const [deletionContext, setDeletionContext] = useState<{ scope: typeof currentScope; ticket: object; targetAccountId: string; friendName: string } | null>(null)
+  const deletionTicket = useRef<object | null>(null)
+  const deletionMounted = useRef(false)
+  const canDelete = useRef(perms.manage); canDelete.current = perms.manage
+  useEffect(() => { deletionMounted.current = true; return () => { deletionMounted.current = false } }, [])
+  useEffect(() => {
+    if (deletion.error && deletionContext && deletionContext.scope === deletionScope.current && deletion.target) deletionTicket.current = deletionContext.ticket
+  }, [deletion.error, deletion.target, deletionContext])
   usePageTitle(friend?.displayName ?? '友だち詳細')
   usePageCrumbs([{ label: '友だち', href: '/friends' }])
 
@@ -133,7 +147,12 @@ function FriendDetailV8Inner() {
     { id: 'reminders', label: 'この友だちのリマインダを見る', icon: <List size={16} />, external: false, href: friendFilterHref('/reminders', friendId), onSelect: () => router.push(friendFilterHref('/reminders', friendId)) },
     { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: false, href: '/mileage', onSelect: () => router.push('/mileage') },
     { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: false, href: '/duplicates', onSelect: () => router.push('/duplicates') },
-    ...(perms.manage ? [{ id: 'delete-friend-data', label: '友だちのデータを削除する', tone: 'danger' as const, onSelect: () => deletion.open({ id: friendId, name: 'この友だちのデータ', kind: 'friend_data', path: `/api/friends/${encodeURIComponent(friendId)}/data` }) }] : []),
+    ...(perms.manage ? [{ id: 'delete-friend-data', label: '友だちのデータを削除する', tone: 'danger' as const, onSelect: () => {
+      if (!deletionMounted.current || !canDelete.current || deletion.busy || currentScope !== deletionScope.current || data.loading || !friend || friend.id !== friendId) return
+      const ticket = {}; deletionTicket.current = ticket
+      setDeletionContext({ scope: currentScope, ticket, targetAccountId: friend.lineAccountId ?? '', friendName: friend.displayName })
+      deletion.open({ id: friendId, name: 'この友だちのデータ', kind: 'friend_data', path: `/api/friends/${encodeURIComponent(friendId)}/data` })
+    } }] : []),
     { id: 'back-to-list', label: '友だち一覧へ戻る', icon: <ArrowLeft size={16} />, dividerBefore: true, onSelect: () => router.push('/friends') },
   ]
 
@@ -248,7 +267,7 @@ function FriendDetailV8Inner() {
       ) : tab === 'actions' ? (
         <ActionsTab friendId={friendId} />
       ) : tab === 'miles' ? (
-        <MilesTab friendId={friendId} />
+        <MilesTab friendId={friendId} balanceSource={data.mileageStatus === 'ready' ? data.mileage?.balanceSource ?? 'musubo' : null} />
       ) : (
         <RichMenuTab />
       )}
@@ -256,10 +275,18 @@ function FriendDetailV8Inner() {
       {tab !== 'timeline' && scenarioNotice ? <div className={styles.notice}><Notice tone="success" message={scenarioNotice} onClose={() => setScenarioNotice('')} /></div> : null}
       {support.dialog}
       {scenario.dialog}
-      <ConfirmDialog open={deletion.target !== null} title="友だちのデータを削除しますか？" deleteName="この友だちのデータ"
+      <ConfirmDialog open={deletion.target !== null && deletionContext?.scope === currentScope} title="友だちのデータを削除しますか？" deleteName="この友だちのデータ"
         description="お客さまから削除の依頼を受けた場合に実行してください。次の顧客データを削除します。元に戻せません。監査・支払・審査の記録と外部サービスのデータは残ります。"
         destructive confirmDisabled={deletion.blocked} busy={deletion.busy} busyLabel="削除中…" error={deletion.error}
-        onConfirm={deletion.confirm} onCancel={deletion.close}>
+        onConfirm={() => {
+          if (!deletionMounted.current || !canDelete.current || !deletionContext || deletionContext.scope !== deletionScope.current || deletionContext.ticket !== deletionTicket.current) return
+          deletionTicket.current = null
+          void deletion.confirm()
+        }} onCancel={() => {
+          if (!deletionContext || deletionContext.ticket !== deletionTicket.current) return
+          deletionTicket.current = null; deletion.close()
+        }}>
+        {deletionContext ? <OperationTargetSummary accounts={[{ id: deletionContext.targetAccountId }]} externalTarget={{ label: '友だち', name: deletionContext.friendName }} /> : null}
         <ul>
           <li>プロフィール・情報欄・タグとの紐付け・メモ</li>
           <li>トークと送信待ち・配信・予約などの顧客記録</li>

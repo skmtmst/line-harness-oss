@@ -183,6 +183,18 @@ describe('friend-add rule data contracts', () => {
     }
   });
 
+  it('該当する記録が0件の集計は両方のタブで0を返す', async () => {
+    seedRuleAndRun(testDb);
+    testDb.raw.exec("UPDATE friend_add_events SET occurred_at = '2001-01-01T00:00:00.000'");
+    for (const kind of ['first_time', 'returning']) {
+      const response = await app(testDb.db).request(`/api/friend-add-rules?account_id=account-1&kind=${kind}`);
+      expect(response.status).toBe(200);
+      expect((await response.json() as { data: { summary: unknown } }).data.summary).toMatchObject({
+        recentAdds: 0, captured: 0, unknownRoute: 0, delivered: 0, failed: 0,
+      });
+    }
+  });
+
   it('通常: ルールの総件数・競合根拠・実行集計・版とアクション詳細を返す', async () => {
     seedRuleAndRun(testDb);
     const list = await app(testDb.db).request('/api/friend-add-rules?account_id=account-1&kind=first_time&limit=1');

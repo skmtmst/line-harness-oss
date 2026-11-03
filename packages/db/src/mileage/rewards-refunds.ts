@@ -255,7 +255,7 @@ export async function isMileageRefundComplete(
  */
 export async function findIncompleteMileageRefunds(
   db: D1Database,
-  input: { lineAccountId?: string; limit?: number } = {},
+  input: { lineAccountId?: string; lineAccountIds?: string[]; limit?: number; offset?: number } = {},
 ): Promise<MileageRewardRedemption[]> {
   const limit = Math.min(100, Math.max(1, Math.floor(input.limit ?? 50)));
   const binds: unknown[] = [];
@@ -263,6 +263,8 @@ export async function findIncompleteMileageRefunds(
     ? 'AND r.line_account_id = ?'
     : '';
   if (input.lineAccountId) binds.push(input.lineAccountId);
+  const accountsClause = input.lineAccountIds ? 'AND r.line_account_id IN (SELECT value FROM json_each(?))' : '';
+  if (input.lineAccountIds) binds.push(JSON.stringify(input.lineAccountIds));
   const rows = await db.prepare(
     `SELECT r.* FROM mileage_redemptions r
       WHERE r.status = 'refunded'
@@ -277,9 +279,9 @@ export async function findIncompleteMileageRefunds(
              WHERE c.redemption_id = r.id AND c.status = 'reserved'
           )
         )
-        ${accountClause}
-      ORDER BY r.updated_at, r.created_at LIMIT ?`,
-  ).bind(...binds, limit).all<RedemptionRow>();
+        ${accountClause} ${accountsClause}
+      ORDER BY r.updated_at, r.created_at, r.id LIMIT ? OFFSET ?`,
+  ).bind(...binds, limit, Math.max(0, Math.floor(input.offset ?? 0))).all<RedemptionRow>();
   return rows.results.map(mapRedemption);
 }
 

@@ -117,6 +117,12 @@ afterEach(() => {
 })
 
 describe('V8 リッチメニュー一覧', () => {
+  test('公開中の数から、統括からの配布との違いを確認できる', async () => {
+    const view = render(<RichMenusListV8 />)
+    const help = await view.findByRole('button', { name: '公開中の説明' })
+    fireEvent.click(help)
+    expect(document.getElementById(help.getAttribute('aria-describedby')!)?.textContent).toContain('LINEへの公開は各アカウントで行います')
+  })
   async function openExternal(view: ReturnType<typeof render>) {
     await view.findByText('通常メニュー')
     fireEvent.click(view.getByRole('button', { name: /LINE上にあるメニュー/ }))

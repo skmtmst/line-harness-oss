@@ -340,8 +340,10 @@ describe('SCENARIO-15: 設定を保存し直すと試算を取り直す', () => 
     await toggleConcurrent()
     await flush(3)
     // 古い「10人」は確定値として残らず、計算中と分かる。
-    expect(plannedNumber()).toBe('—')
-    expect(plannedNumber()).not.toBe('10')
+    const loadingCard = host.querySelector('[data-kpi-label][title="始まる見込み（試算）"]')?.closest('[data-kpi-presentation]')
+    expect(loadingCard?.getAttribute('aria-busy')).toBe('true')
+    expect(loadingCard?.textContent).toContain('試算中')
+    expect(loadingCard?.textContent).not.toContain('10')
 
     // 2回目の保存（同時購読を元に戻す）→ さらに新しい世代の取り直し。
     await toggleConcurrent()

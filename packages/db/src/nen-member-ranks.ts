@@ -69,7 +69,7 @@ export interface NenMilestoneInput {
   id?: string | null;
   thresholdYen: number;
   title: string;
-  notifyOnReach: boolean;
+  notifyOnReach?: boolean;
 }
 
 /** 初期の4ランク。既存のタグ ID（migration 080）にそのままつなぐ。 */
@@ -125,7 +125,7 @@ export async function ensureNenRankDefaults(db: D1Database, lineAccountId: strin
   await db.batch([
     db.prepare(`WITH defaults(id, threshold_yen, title, sort_order) AS (VALUES ${milestoneValues})
       INSERT INTO nen_lifetime_milestones (id, line_account_id, threshold_yen, title, notify_on_reach, sort_order, created_at, updated_at)
-      SELECT id, ?, threshold_yen, title, 1, sort_order, ?, ? FROM defaults
+      SELECT id, ?, threshold_yen, title, 0, sort_order, ?, ? FROM defaults
       WHERE NOT EXISTS (SELECT 1 FROM nen_rank_settings WHERE line_account_id = ?)
         AND NOT EXISTS (SELECT 1 FROM nen_lifetime_milestones WHERE line_account_id = ?)`)
       .bind(...milestoneArgs, lineAccountId, now, now, lineAccountId, lineAccountId),
@@ -278,7 +278,7 @@ export async function saveNenLifetimeMilestones(
       keepIds.add(current.id);
       await db.prepare(
         `UPDATE nen_lifetime_milestones SET threshold_yen = ?, title = ?, notify_on_reach = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
-      ).bind(input.thresholdYen, input.title.trim(), input.notifyOnReach ? 1 : 0, index, now, current.id).run();
+      ).bind(input.thresholdYen, input.title.trim(), input.notifyOnReach === undefined ? current.notify_on_reach : input.notifyOnReach ? 1 : 0, index, now, current.id).run();
     } else {
       const id = crypto.randomUUID();
       keepIds.add(id);

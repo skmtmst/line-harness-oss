@@ -143,6 +143,8 @@ export type FriendFormSubmission = {
 }
 
 export type FriendDetail = FriendWithTags & {
+  /** 詳細 API が返す、この友だちの LINE アカウント。 */
+  lineAccountId?: string | null
   realName?: string | null
   systemDisplayName?: string | null
   formSubmissions: FriendFormSubmission[]

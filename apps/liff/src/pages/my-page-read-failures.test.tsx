@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.mocked(api.liffConfig).mockResolvedValue({ success: true, data: { accountId: 'store', accountName: '見本の店', botBasicId: '' } });
   vi.mocked(api.notificationPreferences).mockResolvedValue(prefs);
   vi.mocked(visitStampsApi.cards).mockResolvedValue({ success: true, data: [] });
-  vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [], availableMiles: 20 });
+  vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [], availableMiles: 20, balanceSource: 'musubo' });
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 const mount = () => render(<MemoryRouter initialEntries={['/mypage?liffId=store']}><MyPage /></MemoryRouter>);

@@ -161,8 +161,11 @@ export async function applyMileageRulesImmediately(
             referredUserId: friend.user_id,
           },
           occurredAt,
+        }).catch((error: unknown) => {
+          if (error instanceof Error && error.message === 'MILEAGE_MANAGED_BY_EC') return null;
+          throw error;
         });
-        granted.push(referralEntry);
+        if (referralEntry) granted.push(referralEntry);
       }
     }
   }
@@ -272,7 +275,11 @@ export async function applyMileageRulesImmediately(
         } : {}),
       },
       occurredAt,
+    }).catch((error: unknown) => {
+      if (referrer && error instanceof Error && error.message === 'MILEAGE_MANAGED_BY_EC') return null;
+      throw error;
     });
+    if (!entry) continue;
     granted.push(entry);
     /*
      * m22o: 公開版で「通知する」のときだけ、付与の後に友だちへ送る分を

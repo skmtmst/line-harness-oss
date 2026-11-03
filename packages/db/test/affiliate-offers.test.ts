@@ -486,6 +486,8 @@ describe('mileage foundation', () => {
   beforeEach(() => {
     sqlite = setupDb();
     db = asD1(sqlite);
+    sqlite.prepare("INSERT INTO line_accounts (id,channel_id,name,channel_secret,channel_access_token) VALUES ('non-ec-1','mileage-ch-1','店1','s','t'),('non-ec-2','mileage-ch-2','店2','s','t')").run();
+    sqlite.prepare("INSERT INTO account_settings(id,line_account_id,key,value) VALUES ('catalog-non-ec-1','non-ec-1','feature.specialized.catalog','[]'),('catalog-non-ec-2','non-ec-2','feature.specialized.catalog','[]')").run();
     sqlite
       .prepare(
         `INSERT INTO users (id, display_name, created_at, updated_at)
@@ -494,6 +496,7 @@ describe('mileage foundation', () => {
       .run();
     insertFriend(sqlite, 'friend-aff', 'U-AFF');
     insertFriend(sqlite, 'friend-customer', 'U-CUSTOMER');
+    sqlite.prepare("UPDATE friends SET line_account_id='non-ec-1' WHERE id IN ('friend-aff','friend-customer')").run();
     sqlite.prepare(`UPDATE friends SET user_id = 'user-aff' WHERE id = 'friend-aff'`).run();
     insertAffiliate(sqlite, 'aff-mile', 'friend-aff');
     insertConversionPoint(sqlite, 'cp-mile');
@@ -653,7 +656,7 @@ describe('mileage foundation', () => {
 
   test('a linked user sees mileage earned from another LINE-account friend row', async () => {
     insertFriend(sqlite, 'friend-aff-2', 'U-AFF-SECOND');
-    sqlite.prepare(`UPDATE friends SET user_id = 'user-aff' WHERE id = 'friend-aff-2'`).run();
+    sqlite.prepare(`UPDATE friends SET user_id = 'user-aff', line_account_id = 'non-ec-2' WHERE id = 'friend-aff-2'`).run();
     await postMileageEntry(db, {
       beneficiaryUserId: 'user-aff',
       beneficiaryFriendId: 'friend-aff',

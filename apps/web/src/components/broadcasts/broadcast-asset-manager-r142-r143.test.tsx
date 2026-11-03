@@ -17,11 +17,12 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 const scope = vi.hoisted(() => ({ account: 'acc-1' }))
-const { list, create, update, upload } = vi.hoisted(() => ({
+const { list, create, update, upload, remove } = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
   upload: vi.fn(),
+  remove: vi.fn(),
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<Record<string, unknown>>) => {
@@ -34,7 +35,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<Record<string, unknown
         list,
         create,
         update,
-        delete: async () => ({ success: true }),
+        delete: remove,
         upload,
       },
     },
@@ -89,6 +90,7 @@ beforeEach(() => {
   }))
   create.mockImplementation(async () => ({ success: true, data: null }))
   update.mockImplementation(async () => ({ success: true, data: null }))
+  remove.mockResolvedValue({ success: true, data: null })
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -190,4 +192,17 @@ it('WEB255: 画像待ち中に前のカードを削除しても、選んだカ�
   clickText('保存する'); await flush()
   const result = update.mock.calls[0][1].payload.cards
   expect(result.map((c: { id: string; imageUrl: string }) => [c.id, c.imageUrl])).toEqual([['B', 'https://example.com/b.png'], ['C', '']])
+})
+
+it('削除確認には素材のアカウントを示し、切替後の古い確定を拒む', async () => {
+  renderKind('card_message'); await flush(); clickText('削除する')
+  const dialog = document.querySelector('[role="alertdialog"]')!
+  expect(dialog.textContent).toContain('LINEアカウント')
+  const confirm = [...dialog.querySelectorAll('button')].find(b => b.textContent?.trim() === '削除する')!
+  const key = Object.keys(confirm).find(item => item.startsWith('__reactProps$'))!
+  const oldConfirm = (confirm as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+  scope.account = 'acc-2'; renderKind('card_message'); await flush()
+  scope.account = 'acc-1'; renderKind('card_message'); await flush()
+  await act(async () => oldConfirm({ preventDefault() {}, stopPropagation() {} }))
+  expect(remove).not.toHaveBeenCalled()
 })

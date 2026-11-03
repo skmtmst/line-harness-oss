@@ -85,7 +85,7 @@ describe('受付枠と休業日のV8の動作契約', () => {
 
   it('登録済みの休業日は版付きで修正・削除でき、削除は確認を挟む (#953 E-09)', () => {
     expect(PAGE).toContain('bookingApi.updateException(accountId')
-    expect(PAGE).toContain('bookingApi.deleteException(accountId')
+    expect(PAGE).toMatch(/if \([^\n]*deleteScope\.generation !== scope\.current\.generation[^\n]*\) return[\s\S]*?bookingApi\.deleteException\(deleteScope\.accountId, target\.id, target\.version\)/)
     expect(PAGE).toContain('expectedVersion: editing.version')
     expect(PAGE).toContain('openEdit(item)')
     expect(PAGE).toContain('休業日を削除する')

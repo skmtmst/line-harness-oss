@@ -18,11 +18,11 @@ export default function CustomerInfoMileage({ state, onRetry }: { state: Custome
   </div>
   return <div className={styles.summary}>
     <div className={styles.available}>
-      <span className={styles.number}>{formatNumber(state.summary.available)}</span>
+      <span className={styles.number}>{state.summary.available == null ? '—' : formatNumber(state.summary.available)}</span>
       <span className={styles.unit}>マイル</span>
-      {state.summary.pending > 0 ? <span className={styles.caption}>確定待ち {formatNumber(state.summary.pending)}</span> : null}
+      {state.summary.balanceSource !== 'ec' && state.summary.pending > 0 ? <span className={styles.caption}>確定待ち {formatNumber(state.summary.pending)}</span> : null}
     </div>
-    <p className={styles.caption}>{state.summary.programName}・利用可能</p>
+    <p className={styles.caption}>{state.summary.balanceSource === 'ec' ? 'ECと同期・履歴はmusubo側' : `${state.summary.programName}・利用可能`}</p>
     <div className={styles.history}>
       {state.history.length ? state.history.slice(0, 3).map(item => <div className={styles.entry} key={item.id}>
         <span className={styles.reason} title={item.reason ?? undefined}>{item.reason}</span>

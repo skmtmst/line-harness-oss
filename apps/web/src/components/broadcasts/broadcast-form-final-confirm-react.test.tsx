@@ -16,7 +16,7 @@ import { fireEvent } from '@testing-library/react'
 import { formatDateTime } from '@/lib/format'
 import type { BroadcastPreflight } from '@/lib/api'
 
-const mocks = vi.hoisted(() => ({ params: '', get: vi.fn(), preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
+const mocks = vi.hoisted(() => ({ account: 'acc-1', params: '', get: vi.fn(), preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   const empty = async () => ({ success: true, data: [] })
@@ -32,7 +32,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 vi.mock('@/lib/api/helpers/gap1', () => ({ chatSafetyApi: { sendPreview: mocks.preview, confirmBroadcast: mocks.confirm } }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/broadcasts/new', useSearchParams: () => new URLSearchParams(mocks.params) }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: mocks.account, loading: false }) }))
 import BroadcastForm from './broadcast-form'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -101,7 +101,7 @@ async function openSingleOperatorDialog(untested = false) {
 }
 
 beforeEach(() => {
-  vi.useFakeTimers(); vi.clearAllMocks(); mocks.params = ''
+  vi.useFakeTimers(); vi.clearAllMocks(); mocks.params = ''; mocks.account = 'acc-1'
   mocks.get.mockResolvedValue({ success: true, data: { id: 'draft', version: 2, status: 'sending' } })
   mocks.create.mockResolvedValue({ success: true, data: { id: 'draft', version: 1 } })
   mocks.update.mockResolvedValue({ success: true, data: { id: 'draft', version: 2 } })
@@ -115,6 +115,28 @@ beforeEach(() => {
 afterEach(() => { if (root) act(() => root.unmount()); container?.remove(); vi.useRealTimers() })
 
 describe('予約は確認を通し、下書き保存は通さない（段の無い作成画面）', () => {
+  it('配信前の窓で操作するLINEアカウントと環境を確認できる', async () => {
+    await render({ step: null, scheduled: true })
+    await click('配信を予約する', container)
+    expect(dialog()?.textContent).toContain('LINEアカウント')
+    expect(dialog()?.textContent).toContain('環境')
+  })
+  it('アカウントを切り替えて戻しても古い配信確認は復活しない', async () => {
+    await render({ step: null, scheduled: true })
+    await click('配信を予約する', container)
+    expect(dialog()).not.toBeNull()
+    const oldButton = Array.from(dialog()!.querySelectorAll('button')).find(item => item.textContent?.includes('予約する'))!
+    const key = Object.keys(oldButton).find(item => item.startsWith('__reactProps$'))!
+    const oldClick = (oldButton as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    mocks.account = 'acc-2'
+    await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign initialScheduledDate="2099-10-05" initialScheduledTime="10:00" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
+    mocks.account = 'acc-1'
+    await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign initialScheduledDate="2099-10-05" initialScheduledTime="10:00" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
+    expect(dialog()).toBeNull()
+    await act(async () => { await oldClick({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: oldButton, target: oldButton }) })
+    expect(mocks.create).not.toHaveBeenCalled()
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
   it('「配信を予約する」は保存せずに確認の窓を開く', async () => {
     await render({ step: null, scheduled: true })
     await click('配信を予約する', container)
@@ -224,6 +246,40 @@ describe('画面内の最終確認（IDEA-06）', () => {
 })
 
 describe('条件が変わったら古い確認を使わない', () => {
+  it('承認方法が異なるアカウントに切り替えても確認を読み直せる', async () => {
+    let finishConfig!: (value: unknown) => void
+    mocks.config.mockImplementation((account: string) => account === 'acc-1'
+      ? Promise.resolve({ success: true, data: { threshold: 5, singleOperator: true } })
+      : new Promise(resolve => { finishConfig = resolve }))
+    mocks.create.mockImplementation(async () => ({ success: true, data: { id: `draft-${mocks.account}`, version: 1 } }))
+    mocks.update.mockImplementation(async (id: string) => ({ success: true, data: { id, version: 2 } }))
+    await render()
+    await click('今すぐ送る', container); await settle(200)
+    mocks.account = 'acc-2'
+    await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign currentStep="confirm" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
+    await settle()
+    await click('今すぐ送る', container); await settle(200)
+    await act(async () => { finishConfig({ success: true, data: { threshold: 1000, singleOperator: false } }) }); await settle(200)
+    expect(mocks.preview).toHaveBeenLastCalledWith('draft-acc-2')
+    expect(button('37 人に送る', dialog()!)).toBeTruthy()
+  })
+  it('アカウント切替先で確認窓を開き直すと切替先の下書きを確認する', async () => {
+    mocks.create.mockImplementation(async () => ({ success: true, data: { id: `draft-${mocks.account}`, version: 1 } }))
+    mocks.update.mockImplementation(async (id: string) => ({ success: true, data: { id, version: 2 } }))
+    await render()
+    await click('今すぐ送る', container); await settle(200)
+    expect(mocks.preview).toHaveBeenCalledWith('draft-acc-1')
+    mocks.account = 'acc-2'
+    await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign currentStep="confirm" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
+    await settle()
+    await click('今すぐ送る', container); await settle(200)
+    expect(mocks.preview).toHaveBeenLastCalledWith('draft-acc-2')
+    const opened = dialog()!
+    const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))!
+    await act(async () => { fireEvent.click(acknowledgement) }); await flush()
+    await click('37 人に送る', opened)
+    expect(mocks.confirm).toHaveBeenCalledWith('draft-acc-2', expect.anything())
+  })
   async function addExcludeTag() {
     await act(async () => { fireEvent.click(container.querySelector('button[aria-label="除くタグ"]')!) }); await flush()
     await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('input[type="radio"]')).find((item) => item.getAttribute('aria-label')?.includes('配信不要'))!) }); await flush()

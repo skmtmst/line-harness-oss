@@ -12,6 +12,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 
 import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
+import Notice from '@/components/shared/notice'
 import styles from './mileage.module.css'
 
 export const MILEAGE_TABLE_LAYOUT = {
@@ -49,6 +50,7 @@ export interface MileageShellContext {
   readonly: boolean
   narrow: boolean
   counts: MileageTabCounts
+  balanceSource?: 'ec' | 'musubo' | null
   /** 読み直したタブが件数を載せ直す。null で消す。 */
   setCount: (key: MileageTabKey, text: string | null) => void
 }
@@ -97,7 +99,7 @@ export interface MileageFrameProps {
 
 /** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
 export function MileageFrame({ help, explanation, explanationInset, actions, stats, folders, collapsedFolders, folderNav, toolbar, pagination, overlays, children }: MileageFrameProps) {
-  const { tab, readonly, narrow, counts } = useMileageShell()
+  const { tab, readonly, narrow, counts, balanceSource } = useMileageShell()
   const board = tab === 'earning-rules' && narrow
     ? 'ZJIyl'
     : tab === 'earning-rules' && readonly
@@ -127,7 +129,7 @@ export function MileageFrame({ help, explanation, explanationInset, actions, sta
           }))}
         />
       }
-      stats={stats ? <>{readonly ? <ViewerBand /> : null}{stats}</> : readonly ? <ViewerBand /> : undefined}
+      stats={stats || readonly || (balanceSource === 'ec' && ['earning-rules', 'rewards', 'balances', 'history'].includes(tab)) ? <>{readonly ? <ViewerBand /> : null}{balanceSource === 'ec' && ['earning-rules', 'rewards', 'balances', 'history'].includes(tab) ? <Notice tone="info" message="マイルはECで管理しています" /> : null}{stats}</> : undefined}
       folders={folders}
       collapsedFolders={collapsedFolders}
       folderNav={folderNav}

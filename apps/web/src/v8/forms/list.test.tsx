@@ -28,6 +28,7 @@ const deleteImpact = vi.hoisted(() => vi.fn())
 const listStats = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const narrow = vi.hoisted(() => ({ value: false }))
+const account = vi.hoisted(() => ({ id: 'account-a' }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -50,7 +51,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', liffId: 'liff-a' }, loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, selectedAccount: { id: account.id, liffId: 'liff-a' }, loading: false }),
 }));
 
 vi.mock('@/components/shell/page-chrome', () => ({
@@ -102,6 +103,7 @@ async function mount() {
 }
 
 beforeEach(() => {
+  account.id = 'account-a'
   window.history.replaceState(null, '', '/form-submissions')
   forgetStaffIdentity()
   host = document.createElement('div')
@@ -402,6 +404,78 @@ describe('フォームを片付ける時の案内', () => {
     await flush()
     return within(screen.getByRole('dialog', { name: '「来店アンケート」をどうしますか' }))
   }
+  it('削除の対象を示し、切替前の確定を拒む', async () => {
+    const { api } = await import('@/lib/api')
+    const remove = vi.spyOn(api.forms, 'remove').mockResolvedValue({ success: true, data: {} } as never)
+    deleteImpact.mockResolvedValue({ success: true, data: impact })
+    const dialog = await openCleanup()
+    expect(dialog.getByText('LINEアカウント')).toBeTruthy()
+    const button = dialog.getByRole('button', { name: '削除する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const oldConfirm = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    account.id = 'account-b'; await mount()
+    account.id = 'account-a'; await mount()
+    await act(async () => oldConfirm())
+    expect(remove).not.toHaveBeenCalled()
+    remove.mockRestore()
+  })
+
+  it('受付停止の対象を示し、切替前の確定を拒む', async () => {
+    const { api } = await import('@/lib/api')
+    const update = vi.spyOn(api.forms, 'update').mockResolvedValue({ success: true, data: {} } as never)
+    deleteImpact.mockResolvedValue({ success: true, data: impact })
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」のその他の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '受付を止める' }))
+    await flush()
+    const dialog = within(screen.getByRole('alertdialog'))
+    expect(dialog.getByText('LINEアカウント')).toBeTruthy()
+    const button = dialog.getByRole('button', { name: '受付を止める' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const oldConfirm = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    account.id = 'account-b'; await mount()
+    account.id = 'account-a'; await mount()
+    await act(async () => oldConfirm())
+    expect(update).not.toHaveBeenCalled()
+    update.mockRestore()
+  })
+
+  it('閉じて再表示した後は前の削除確定を使えない', async () => {
+    const { api } = await import('@/lib/api')
+    const remove = vi.spyOn(api.forms, 'remove').mockResolvedValue({ success: true, data: {} } as never)
+    deleteImpact.mockResolvedValue({ success: true, data: impact })
+    let dialog = await openCleanup()
+    const button = dialog.getByRole('button', { name: '削除する' })
+    const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+    const oldConfirm = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    fireEvent.click(dialog.getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」のその他の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
+    await flush()
+    dialog = within(screen.getByRole('dialog', { name: '「来店アンケート」をどうしますか' }))
+    await act(async () => oldConfirm())
+    expect(remove).not.toHaveBeenCalled()
+    fireEvent.click(dialog.getByRole('button', { name: '削除する' }))
+    await flush()
+    expect(remove).toHaveBeenCalledTimes(1)
+    remove.mockRestore()
+  })
+
+  it('受付停止の確認後に選んだアカウントへ送る', async () => {
+    const { api } = await import('@/lib/api')
+    const update = vi.spyOn(api.forms, 'update').mockResolvedValue({ success: true, data: {} } as never)
+    deleteImpact.mockResolvedValue({ success: true, data: impact })
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」のその他の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '受付を止める' }))
+    await flush()
+    expect(update).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '受付を止める' }))
+    await flush()
+    expect(update).toHaveBeenCalledWith('f-1', 'account-a', { isActive: false, expectedContentRevision: 3 })
+    update.mockRestore()
+  })
+
   it('削除できる未公開フォームは削除を勧め、開けなくなる公開URLを出さない', async () => {
     deleteImpact.mockResolvedValue({ success: true, data: impact })
     const dialog = await openCleanup()

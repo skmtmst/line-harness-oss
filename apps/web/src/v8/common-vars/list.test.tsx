@@ -236,7 +236,7 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     expect(host.textContent).toContain('会社名')
     expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('{{var.company_name}}')
     expect(host.textContent).toContain('問い合わせ先')
-    expect(host.textContent).toContain('差し込んでいる所')
+    expect([...host.querySelectorAll('[data-kpi-label]')].map(node => node.textContent)).toContain('使っている所')
     expect(host.textContent).toContain('「問い合わせ先」が空のまま 2か所で使われています。')
   })
 

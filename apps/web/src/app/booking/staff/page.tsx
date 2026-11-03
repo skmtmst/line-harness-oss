@@ -10,6 +10,7 @@ import { usePermissionLockReason } from '@/components/shared/use-permission-lock
 import ListState from '@/components/shared/list-state'
 import { isForbidden, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingStaff } from '@/lib/api'
@@ -64,22 +65,32 @@ export default function BookingStaffPage() {
   usePageTitle('担当スタッフ')
   usePageCrumbs([{ label: '予約設定', href: '/booking/menus' }])
   const { selectedAccountId } = useAccount()
+  const scope = useRef({ accountId: selectedAccountId, generation: 0 })
+  if (scope.current.accountId !== selectedAccountId) scope.current = { accountId: selectedAccountId, generation: scope.current.generation + 1 }
+  const renderedScope = scope.current
+  const loadedScope = useRef<typeof scope.current | null>(null)
+  const alive = useRef(false)
+  const deleteLock = useRef(false)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   /* V8 のときだけ骨組み・保存中表示へ。互換経路は従来の見た目のまま。 */
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
   const [loadError, setLoadError] = useState<unknown>(null)
-  const [removeTarget, setRemoveTarget] = useState<BookingStaff | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<{ staff: BookingStaff; scope: typeof scope.current } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [removeError, setRemoveError] = useState('')
   // N-411: 予約スタッフの登録・変更・削除は 'booking.settings' の実効permission。
   const canManageStaff = usePermissionAccess('booking.settings')
   const staffLock = usePermissionLockReason(canManageStaff)
+  const permissionRef = useRef(false)
+  permissionRef.current = canManageStaff && !staffLock
   const loadRequestRef = useRef(0)
 
   const load = useCallback(async () => {
     const requestId = ++loadRequestRef.current
+    const requestScope = renderedScope
     if (!selectedAccountId) {
       setItems([])
       setLoadStatus('ready')
@@ -91,11 +102,12 @@ export default function BookingStaffPage() {
     setItems([])
     try {
       const r = await bookingApi.listStaff(selectedAccountId)
-      if (requestId !== loadRequestRef.current) return
+      if (requestId !== loadRequestRef.current || requestScope !== scope.current) return
+      loadedScope.current = requestScope
       setItems(r.staff)
       setLoadStatus('ready')
     } catch (caught) {
-      if (requestId !== loadRequestRef.current) return
+      if (requestId !== loadRequestRef.current || requestScope !== scope.current) return
       setItems([])
       setLoadError(caught)
       setLoadStatus('error')
@@ -129,19 +141,22 @@ export default function BookingStaffPage() {
    * ブラウザの `confirm` は見た目がブラウザ任せで、設計の確認窓と違ううえ、
    * 画像比較にも写らない（確認の絵をそもそも撮れない）。
    */
-  async function remove(id: string) {
-    if (!selectedAccountId || !canManageStaff || staffLock) return
+  async function remove(id: string, targetScope: typeof scope.current) {
+    if (!targetScope.accountId || targetScope !== scope.current || loadedScope.current !== targetScope || !permissionRef.current || !alive.current || deleteLock.current) return
+    deleteLock.current = true
     setDeleting(true)
     setRemoveError('')
     try {
-      await bookingApi.deleteStaff(selectedAccountId, id)
+      await bookingApi.deleteStaff(targetScope.accountId, id)
+      if (targetScope !== scope.current) return
       setRemoveTarget(null)
       await load()
     } catch {
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
-      setRemoveError('このスタッフを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      if (targetScope === scope.current) setRemoveError('このスタッフを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setDeleting(false)
+      deleteLock.current = false
+      if (alive.current) setDeleting(false)
     }
   }
 
@@ -251,7 +266,7 @@ export default function BookingStaffPage() {
                         edit={{ onClick: () => { if (canManageStaff && !staffLock) setEditing(s) }, disabled: !canManageStaff, lockedReason: staffLock }}
                         destructiveItem={{
                           id: 'delete', label: '削除する', disabled: !canManageStaff, lockedReason: staffLock,
-                          onSelect: () => { if (canManageStaff && !staffLock) { setRemoveError(''); setRemoveTarget(s) } },
+                          onSelect: () => { if (canManageStaff && !staffLock && renderedScope === scope.current && loadedScope.current === renderedScope) { setRemoveError(''); setRemoveTarget({ staff: s, scope: renderedScope }) } },
                         }}
                       />
                     </ActionCell>
@@ -266,8 +281,8 @@ export default function BookingStaffPage() {
       {editing && <StaffEditModal staff={editing} onSave={save} onClose={() => setEditing(null)} />}
 
       <ConfirmDialog
-        open={removeTarget !== null}
-        title={`「${removeTarget?.name ?? ''}」を削除しますか？`}
+        open={removeTarget !== null && removeTarget.scope === scope.current}
+        title={`「${removeTarget?.staff.name ?? ''}」を削除しますか？`}
         description="このスタッフを一覧から削除します。すでに入っている予約はそのまま残ります。この操作は取り消せません。"
         confirmLabel="削除する"
         destructive
@@ -278,8 +293,8 @@ export default function BookingStaffPage() {
           setRemoveTarget(null)
           setRemoveError('')
         }}
-        onConfirm={() => { if (removeTarget) void remove(removeTarget.id) }}
-      />
+        onConfirm={() => { if (removeTarget) void remove(removeTarget.staff.id, removeTarget.scope) }}
+      >{removeTarget ? <OperationTargetSummary accounts={[{ id: removeTarget.scope.accountId ?? '' }]} /> : null}</ConfirmDialog>
     </PageFrame>
   )
 }

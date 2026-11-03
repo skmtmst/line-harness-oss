@@ -159,7 +159,8 @@ const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 export default function EarningRulesTab() {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
-  const { readonly, narrow, setCount } = useMileageShell()
+  const { readonly: roleReadonly, narrow, setCount, balanceSource } = useMileageShell()
+  const readonly = roleReadonly || balanceSource === 'ec'
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountScope = useRef({ id: selectedAccountId, generation: 0 })
   if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
@@ -178,6 +179,7 @@ export default function EarningRulesTab() {
   const [spentMiles, setSpentMiles] = useState<number | null>(null)
   const [spentCount, setSpentCount] = useState<number | null>(null)
   const [balanceTotal, setBalanceTotal] = useState<number | null>(null)
+  const [ecBalanceSource, setEcBalanceSource] = useState(false)
   const [friendTotal, setFriendTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -263,7 +265,8 @@ export default function EarningRulesTab() {
       setGrantedCount(grant?.count ?? 0)
       setSpentMiles(spend?.amount ?? 0)
       setSpentCount(spend?.count ?? 0)
-      setBalanceTotal(friendsRes.data.summary.available)
+      setEcBalanceSource(friendsRes.data.balanceSource === 'ec')
+      setBalanceTotal(friendsRes.data.balanceSource === 'ec' && !friendsRes.data.ecKnownCount ? null : friendsRes.data.summary.available)
       setAverageDenominator(friendsRes.data.summary.withBalanceCount)
       setFriendTotal(friendsRes.data.summary.totalMembers)
       setRuleOrder(items.map((rule) => rule.id))
@@ -582,9 +585,9 @@ export default function EarningRulesTab() {
         presentation="band"
         title="残高の合計"
         icon={<Wallet size={16} aria-hidden="true" />}
-        value={ready ? balanceTotal ?? 0 : null}
+        value={ready ? balanceTotal : null}
         unit=""
-        detail={<span title={ready && averageDenominator !== null && balanceTotal !== null ? averageDenominator > 0 ? `残高0の人は除き、マイルを持っている${formatMileageNumber(averageDenominator)}人で割った平均：${formatMileageNumber(balanceTotal / averageDenominator)}マイル` : '残高がある人がいないため計算していません' : undefined}>{dash(`友だち ${formatMileageNumber(friendTotal ?? 0)} 人`)}</span>}
+        detail={<span title={ready && averageDenominator !== null && balanceTotal !== null ? averageDenominator > 0 ? `残高0の人は除き、マイルを持っている${formatMileageNumber(averageDenominator)}人で割った平均：${formatMileageNumber(balanceTotal / averageDenominator)}マイル` : '残高がある人がいないため計算していません' : undefined}>{ecBalanceSource ? 'ECと同期' : dash(`友だち ${formatMileageNumber(friendTotal ?? 0)} 人`)}</span>}
       />
     </KpiBand>
   )

@@ -7,9 +7,10 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ users: vi.fn() }))
+const route = vi.hoisted(() => ({ query: '' }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(route.query),
   usePathname: () => '/staff',
 }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a> }))
@@ -41,7 +42,18 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import StaffV8 from './staff'
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); route.query = '' })
+
+test.each([false, true])('招待中が0件のとき未読込の有無 %s を区別する', async partial => {
+  net.users.mockResolvedValue({ success: true, data: {
+    items: [user(1)], pagination: { total: partial ? 2 : 1, limit: 200, offset: 0 },
+    summary: { active: 1, suspended: 0, mfaEnabled: 0, invited: 0 },
+  } })
+  route.query = 'tab=invited'
+  render(<StaffV8 />)
+  expect(await screen.findByText(partial ? '読み込んだユーザーに招待中の人はいません。続きを読み込んで確認してください。' : '招待中のユーザーはいません。')).toBeTruthy()
+  expect(screen.queryByText('条件に合うログインユーザーはいません。条件を変えてお試しください。')).toBeNull()
+})
 
 test('全員より少ないときは「続きを読み込む」で残りを足す', async () => {
   net.users.mockImplementation(async (params: { offset?: number }) => {
