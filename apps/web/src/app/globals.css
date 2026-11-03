@@ -39,7 +39,6 @@
    * `--font-noto-sans-jp` で、ビルド時に同梱される。
    */
   --font-sans: var(--font-inter), Inter, var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
-
   /* --- 色：画面の緑は深い緑1色。明るい LINE の緑は［LINE でログイン］など LINE の決まりの所だけ。数を知らせる丸は赤。アクセントを状態表示に使わない。 */
   --color-line-green: #06c755; --color-line-green-hover: #05b34c; --color-accent: var(--color-accent-deep); --color-accent-hover: #066a35;
   --color-accent-soft: #e8f8ee;
@@ -62,14 +61,12 @@
    */
   --color-accent-deep: #087a3e;
   --color-on-accent: #ffffff;
-
   /* 文字の操作は濃い字。主ボタンと成功は専用の緑を使う。 */
   --color-action: var(--color-ink);
   --color-action-hover: var(--color-ink);
   --color-action-soft: var(--polish-selection-bg);
   --color-focus-ring: var(--polish-focus);
   --color-on-action: #ffffff;
-
   /*
    * #669 緑の意味は2つだけ。**主操作（CTA）と成功・有効状態。**
    *
@@ -96,8 +93,7 @@
   /* 文字。Pencil V5を共通基盤とし、管理画面でも同じ変数を使う。
    * ink が本文、ink-secondary が補足・説明・ラベルの灰色（1色）。 */
   --color-ink: #1d1d1f;
-  --color-ink-secondary: #4a5565;
-  --color-placeholder: #737d8b;
+  --color-ink-secondary: #4a5565; --color-placeholder: #6c7481;
   /*
    * ink-faint は補足と同じ灰色を指す。#626a73 と #4a5565 の2つの灰色が同じ役目の
    * 補足に混ざり、画面ごとに濃さが違って見えた。補足は1色にそろえ、どの灰色の面
