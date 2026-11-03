@@ -972,6 +972,7 @@ export default function InflowListV8({
         {qrRoute ? <QrDialog route={qrRoute} routes={routes} onClose={() => setQrRoute(null)} /> : null}
         {bulkAction ? (
           <BulkDialog
+            scopeRef={accountScope}
             targets={selectedRoutes}
             genreOptions={genreNames}
             initialAction={bulkAction}
