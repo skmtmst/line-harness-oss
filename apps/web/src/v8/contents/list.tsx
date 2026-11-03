@@ -1197,7 +1197,7 @@ export default function MediaLibraryListV8() {
 
             <p>
               {impact.verified !== false && impact.usageCount > 0 ? <>使われている場所から外すと削除できます。別のメディアを選ぶと、使用先をまとめて差し替えられます。<br /></> : null}
-              {checkedAtText(impact.checkedAt)} 時点で、{impact.verified === false ? '確認できなかった場所があります。' : 'テンプレート・一斉配信・リッチメニュー・シナリオ・コラム・イベント・ウェビナーの7種類を確認しました。'}
+              {checkedAtText(impact.checkedAt)} 時点で、{impact.verified === false ? '確認できなかった場所があります。' : '登録メディアの使用先を確認しました。'}
             </p>
           </div>
         ) : null}
