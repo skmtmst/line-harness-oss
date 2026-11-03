@@ -82,6 +82,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useFormErrors } from '@/lib/use-form-errors'
+import ValidationSummary from '@/components/shared/validation-summary'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { orderTargetingGroups } from '@/v8/rich-menus/targeting-order'
 import {
@@ -1318,6 +1319,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           </>
         } status={dirty ? '未保存の変更があります' : undefined} >
       {host?.notice}
+      <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
       {error ? (
         <Notice
