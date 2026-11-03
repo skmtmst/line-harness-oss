@@ -20,6 +20,22 @@ const definition: TagDefinition = {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('統括の V8 タグ編集と保存先', () => {
+  it.each(['保存する', '保存して続けて作る', '下書きを保存'])('統括の%sは作りかけのフォルダを確かめる', async label => {
+    const save = vi.fn(async () => {})
+    const draft = vi.fn(async () => {})
+    render(<HqTagEditorV8 definition={definition} editing={false} saving={false} onCancel={() => {}} onSave={save} onSaveDraft={draft} onCreateFolder={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '所属フォルダ' }))
+    fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+    fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '未完成の分類' } })
+    fireEvent.pointerDown(document.body)
+    fireEvent.click(getPageAction({ name: label }))
+    expect(await screen.findByRole('button', { name: 'フォルダを破棄して保存' })).toBeTruthy()
+    expect(save).not.toHaveBeenCalled()
+    expect(draft).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'フォルダを破棄して保存' }))
+    await waitFor(() => expect(label === '下書きを保存' ? draft : save).toHaveBeenCalledOnce())
+  })
+
   it('タグ連動の題から説明を読んで閉じても、保存する連動設定を変えない', async () => {
     const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
     render(<HqTagEditorV8 definition={{ ...definition, tag: { name: '手動用', linkedEnabled: false } }} editing={false} saving={false} onCancel={() => {}} onSave={save} />)
