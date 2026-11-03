@@ -129,3 +129,13 @@ it.each([{ canSend: false }, { writeEnabled: false }])('再確認できないと
   expect(screen.getByText(/前回の送信結果を確認できていません/).textContent).not.toContain('を押すと')
   expect(mocks.sendChange).not.toHaveBeenCalled()
 })
+
+it.each([{ canSend: false }, { writeEnabled: false }])('送信できないときの失敗案内は再送可能と断定しない %o', async restriction => {
+  mocks.change.mockResolvedValue({ ...response, ...restriction, change: { ...change, status: 'failed', error: '接続エラー' } })
+  await open()
+  const notice = screen.getByText(/前回の送信は失敗しました/)
+  expect(notice.textContent).toContain('接続エラー')
+  expect(notice.textContent).toContain('Google側の状態を確認してください')
+  expect(notice.textContent).not.toContain('もう一度送信できます')
+  expect(mocks.sendChange).not.toHaveBeenCalled()
+})
