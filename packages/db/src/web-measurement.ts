@@ -325,6 +325,7 @@ export async function appendConversionReversal(
     actorName?: string | null;
     expectedReversalId?: string | null;
     expectedApprovalStatus?: 'pending' | 'approved' | 'rejected' | null;
+    expectedApprovalRevision?: number;
     expectedCancelled?: boolean;
   },
 ): Promise<ConversionReversal> {
@@ -351,12 +352,13 @@ export async function appendConversionReversal(
        ${conditional ? `WHERE (SELECT r.id FROM conversion_event_reversals r
          WHERE r.conversion_event_id = ? ORDER BY r.created_at DESC, r.rowid DESC LIMIT 1) IS ?
        AND EXISTS (SELECT 1 FROM conversion_events ce WHERE ce.id = ? AND ce.approval_status IS ?
+         ${input.expectedApprovalRevision === undefined ? '' : 'AND ce.approval_revision = ?'}
          AND (COALESCE((SELECT r.kind FROM conversion_event_reversals r WHERE r.conversion_event_id = ce.id ORDER BY r.created_at DESC, r.rowid DESC LIMIT 1) = 'reverse', 0) OR ${affiliateCancelled}) = ?)` : ''}`,
     )
     .bind(
       id, input.conversionEventId, input.kind, input.reason.trim(),
       input.actorId ?? null, input.actorName ?? null, now,
-      ...(conditional ? [input.conversionEventId, input.expectedReversalId, input.conversionEventId, input.expectedApprovalStatus, input.expectedCancelled ? 1 : 0] : []),
+      ...(conditional ? [input.conversionEventId, input.expectedReversalId, input.conversionEventId, input.expectedApprovalStatus, ...(input.expectedApprovalRevision === undefined ? [] : [input.expectedApprovalRevision]), input.expectedCancelled ? 1 : 0] : []),
     )
     .run();
   if (conditional && result.meta.changes === 0) throw new Error('conversion_event_stale');

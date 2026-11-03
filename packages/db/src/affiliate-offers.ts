@@ -351,7 +351,7 @@ export async function setConversionApproval(
   const result = await db
     .prepare(
       `UPDATE conversion_events
-          SET approval_status = ?, approved_at = ?
+          SET approval_status = ?, approved_at = ?, approval_revision = approval_revision + 1
         WHERE id = ? AND affiliate_id IS NOT NULL
           AND (approval_status IS NULL OR approval_status != ?)`,
     )
@@ -653,7 +653,7 @@ export async function decideConversionApproval(
     const result = await db
       .prepare(
         `UPDATE conversion_events
-            SET approval_status = ?, approved_at = ?
+            SET approval_status = ?, approved_at = ?, approval_revision = approval_revision + 1
           WHERE id = ? AND affiliate_id IS NOT NULL AND ${expectedSql}`,
       )
       .bind(status, now, eventId, ...expectedBinds)

@@ -73,7 +73,7 @@ export async function listConversionDefinitionEvents(
   const rows = await db
     .prepare(
       `SELECT ce.id, ce.friend_id, f.display_name AS friend_name,
-              ce.approval_status, ce.value_snapshot, ce.metadata, ce.created_at,
+              ce.approval_status, ce.approval_revision, ce.value_snapshot, ce.metadata, ce.created_at,
               ${cancelledSql} AS cancelled,
               ${reversedSql} AS reversed,
               ${latestReversalSql} AS latest_reversal_id
@@ -99,6 +99,7 @@ export async function listConversionDefinitionEvents(
           ? 'pending'
           : row.approval_status === 'rejected' ? 'rejected' : 'confirmed',
       approvalStatus: row.approval_status,
+      approvalRevision: row.approval_revision,
       cancelled,
       reversed: row.reversed === 1,
       latestReversalId: row.latest_reversal_id,

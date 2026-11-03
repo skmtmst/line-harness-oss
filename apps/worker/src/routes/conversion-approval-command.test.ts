@@ -12,6 +12,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { setConversionApproval } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
@@ -138,6 +139,43 @@ beforeEach(() => {
 });
 
 describe('PATCH 承認の版契約(N-208)', () => {
+  test('承認が変わって戻ったら古い成果取消の確認は効かず、新しい版なら取消できる', async () => {
+    seedEvent('ev-1', 'cp-1', 'approved');
+    const version=()=>sqlite.raw.prepare("SELECT approval_revision FROM conversion_events WHERE id='ev-1'").get() as {approval_revision:number};
+    expect(version().approval_revision).toBe(1);
+    expect((await patch('ev-1',{status:'rejected',expectedStatus:'approved'})).status).toBe(200);
+    expect((await patch('ev-1',{status:'rejected',expectedStatus:'rejected'})).status).toBe(200);
+    expect(version().approval_revision).toBe(2);
+    expect((await patch('ev-1',{status:'approved',expectedStatus:'rejected'})).status).toBe(200);
+    expect(version().approval_revision).toBe(3);
+    const cancel=(revision:number)=>app(owner).request('/api/conversions/events/ev-1/reversals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'reverse',reason:'確認済み',expectedReversalId:null,expectedApprovalStatus:'approved',expectedCancelled:false,expectedApprovalRevision:revision})});
+    expect((await cancel(1)).status).toBe(409);
+    expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM conversion_event_reversals WHERE conversion_event_id='ev-1'").get()).toEqual({n:0});
+    expect((await cancel(3)).status).toBe(200);
+  });
+  test('旧承認経路でも状態変更だけ版が進み、同じ判断の再送は増えない', async () => {
+    seedEvent('ev-1','cp-1','approved');
+    const version=()=>sqlite.raw.prepare("SELECT approval_revision FROM conversion_events WHERE id='ev-1'").get() as {approval_revision:number};
+    expect(await setConversionApproval(sqlite.db,'ev-1','rejected')).toBe(true);expect(version().approval_revision).toBe(2);
+    expect(await setConversionApproval(sqlite.db,'ev-1','rejected')).toBe('already_set');expect(version().approval_revision).toBe(2);
+    expect(await setConversionApproval(sqlite.db,'ev-1','approved')).toBe(true);expect(version().approval_revision).toBe(3);
+  });
+  test('取消のINSERT直前に承認が往復しても古い版では追記しない', async () => {
+    seedEvent('ev-1','cp-1','approved');const prepare=sqlite.db.prepare.bind(sqlite.db);let intercepted=false;
+    vi.spyOn(sqlite.db,'prepare').mockImplementation(sql=>{
+      const stmt=prepare(sql);if(intercepted||!sql.includes('INSERT INTO conversion_event_reversals'))return stmt;intercepted=true;
+      return new Proxy(stmt,{get(target,key){if(key==='bind')return (...args:unknown[])=>{
+        const bound=target.bind(...args);return new Proxy(bound,{get(item,prop){if(prop==='run')return async()=>{
+          expect((await patch('ev-1',{status:'rejected',expectedStatus:'approved'})).status).toBe(200);
+          expect((await patch('ev-1',{status:'approved',expectedStatus:'rejected'})).status).toBe(200);
+          return item.run();
+        };const value=Reflect.get(item,prop);return typeof value==='function'?value.bind(item):value;}});
+      };const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
+    });
+    const response=await app(owner).request('/api/conversions/events/ev-1/reversals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'reverse',reason:'確認済み',expectedReversalId:null,expectedApprovalStatus:'approved',expectedCancelled:false,expectedApprovalRevision:1})});
+    expect(intercepted).toBe(true);expect(response.status).toBe(409);
+    expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM conversion_event_reversals WHERE conversion_event_id='ev-1'").get()).toEqual({n:0});
+  });
   test('expectedStatusなしは400で、行は動かない', async () => {
     seedEvent('ev-1', 'cp-1', null);
     const res = await patch('ev-1', { status: 'approved' });
