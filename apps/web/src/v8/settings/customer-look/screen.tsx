@@ -61,7 +61,7 @@ export default function CustomerLookScreen() {
   finally{if(request===generation.current)setSaving(false)}
  }
  return <SaveErrorScope errors={saveErrors}><SettingsPage title="お客さまの画面のデザイン" layout="customer-look" navigation={<SettingsInnerNav inline/>}
-  help="予約・回答フォーム・履歴・スタンプなど、お客さまに見える画面のデザインを決めます。型を選ぶと右の見本が変わり、保存するとお客さまの画面に反映されます。"
+  help={canEdit ? '予約・回答フォーム・履歴・スタンプなど、お客さまに見える画面のデザインを決めます。型を選ぶと右の見本が変わり、保存するとお客さまの画面に反映されます。' : '予約・回答フォーム・履歴・スタンプなど、お客さまに見える画面のデザインです。'}
   notice={status==='ready'&&role!==null&&!canEdit?<ReadOnlyNotice need="manager"/>:undefined}
   preview={status==='ready'?<CustomerLookPreview accountId={selectedAccountId} look={draft} accountName={accountName}/>:undefined}
   saveStatus={error?<><FieldError id="customer-look-save-error">{error}</FieldError>{conflict?<Button disabled={saving} onClick={()=>void reloadLatest()}>最新を読み直す</Button>:null}</>:undefined}
