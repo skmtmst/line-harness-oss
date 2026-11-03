@@ -187,6 +187,16 @@ export async function describeMediaUsageInner(
   };
 }
 
+/** 飲食のメニューは専用列を正本として直接照合する。別アカウントの名称を伏せる。 */
+async function restaurantMenuReferences(db: D1Database, mediaId: string, lineAccountId: string, checkedAt: string): Promise<MediaDeleteImpactReference[]> {
+  const rows = await db.prepare(`SELECT m.id, m.name, s.line_account_id FROM rt_menu_items m
+    JOIN rt_stores s ON s.id = m.store_id WHERE m.image_media_id = ?`).bind(mediaId)
+    .all<{id:string; name:string; line_account_id:string|null}>();
+  return rows.results.map(row => ({ kind:'restaurant_menu', name:row.line_account_id === lineAccountId ? row.name : null,
+    href:row.line_account_id === lineAccountId ? `/restaurant-test/menu/edit?id=${encodeURIComponent(row.id)}` : null,
+    state:row.line_account_id === lineAccountId ? 'available' : 'unavailable', scannedAt:checkedAt }));
+}
+
 /**
  * 登録メディアを消す直前の影響。
  *
@@ -207,6 +217,7 @@ export async function getMediaDeleteImpactSnapshot(
   const references = await Promise.all(
     usages.map((usage) => describeMediaUsage(db, usage, lineAccountId)),
   );
+  references.push(...await restaurantMenuReferences(db, mediaId, lineAccountId, checkedAt));
   const lastScannedAt = references.reduce<string | null>(
     (latest, reference) => latest === null || reference.scannedAt > latest
       ? reference.scannedAt
@@ -332,6 +343,8 @@ export async function getMediaReplacementPlan(
   const references = await Promise.all(
     usages.map((usage) => describeMediaReplacementUsage(db, usage, input.lineAccountId)),
   );
+  const menuReferences = await restaurantMenuReferences(db, source.id, input.lineAccountId, input.checkedAt);
+  references.push(...menuReferences.map(reference => ({ ...reference, replaceable:false, blocker:'unsupported_reference' as const, reason:'飲食メニューの編集画面で画像を変更してください。' })));
   const blockers = new Set<MediaReplacementBlocker>();
   if (source.id === replacement.id) blockers.add('same_media');
   if (source.kind !== replacement.kind) blockers.add('different_kind');
@@ -364,7 +377,7 @@ export async function getMediaReplacementPlan(
       references,
       blockers: [...blockers],
       canReplace: blockers.size === 0,
-      canPartiallyReplace: !mediaPairBlocked && replaceableCount > 0,
+      canPartiallyReplace: !mediaPairBlocked && menuReferences.length === 0 && replaceableCount > 0,
       checkedAt: input.checkedAt,
     },
   };

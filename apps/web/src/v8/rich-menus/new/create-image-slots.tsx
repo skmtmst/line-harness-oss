@@ -78,6 +78,8 @@ export function renderSingleImageSlot({ accountId, busy, clearPendingImage, hand
           <div className={styles.imageSlot}>
             <SaveErrorField names={["src","image?.src"]}><MediaSlot
               size="compact"
+              fit="contain"
+              previewActionsBelow
               title="画像を追加"
               previewAlt={image ? `選択中の画像: ${image.name}` : undefined}
               value={image?.src ?? null}
@@ -143,6 +145,8 @@ export function renderTabSlot({ accountId, busy, clearPendingImage, group, handl
         <span className={styles.tabImageHead}>{`タブ${index + 1}「${tabName}」`}</span>
         <SaveErrorField names={["src","image?.src"]}><MediaSlot
           size="compact"
+          fit="contain"
+          previewActionsBelow
           title={`タブ${index + 1}の画像を追加`}
           previewAlt={image ? `タブ${index + 1}の画像: ${image.name}` : undefined}
           value={image?.src ?? null}

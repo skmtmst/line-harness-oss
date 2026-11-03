@@ -208,6 +208,10 @@ html:root .row[data-row-open]:not(.rowInteractive):hover:not([aria-selected='tru
   color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: normal; white-space: nowrap;
 }
 :root .frame[data-density='reviews'] th { font-size: var(--text-micro); font-weight: var(--polish-weight-label); }
+/* 中身の列と状態行を残りの幅いっぱいに広げる。 */
+:root .frame[data-density='reviews'][data-column-sizing='content'] :is(th, td)[data-cell-grow],
+:root .frame[data-density='reviews'][data-column-sizing='content'] td[colspan] { flex: 1 1 0; }
+
 :root .frame[data-density='media'] th {
   height: auto; padding: var(--tpl-e49-head-pad); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: var(--polish-weight-label); line-height: var(--tpl-e49-lh-18);
 }

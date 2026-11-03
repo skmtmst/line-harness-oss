@@ -1,4 +1,6 @@
 'use client'
+
+import { clearHqRichMenuDraft } from '@/lib/hq-rich-menu-draft-store'
 import { useListSnapshot } from '@/lib/use-list-snapshot'
 
 import { formDistributedLine,formStatusLine } from './form-status-line'
@@ -43,7 +45,7 @@ import { HqRichMenuCompatibilityError,hqRichMenuDefinitionFromSeed,hqRichMenuSee
 import { readScenarioEditorDraft } from '@/lib/hq-scenario-editor-draft'
 import { readFormEditorDraft } from '@/lib/hq-form-editor-draft'
 import { freshDefinition } from '@/lib/hq-template-authoring'
-import { clearCreationAttempt,clearEditorDraft,loadCreationAttempt,loadEditorDraft,persistCreationAttempt,persistEditorDraft,sameCreationScope,type CreationAttempt,type CreationScope,type EditorDraftContent } from '@/lib/hq-template-create-attempt'
+import { creationStorageKey,clearCreationAttempt,clearEditorDraft,loadCreationAttempt,loadEditorDraft,persistCreationAttempt,persistEditorDraft,sameCreationScope,type CreationAttempt,type CreationScope,type EditorDraftContent } from '@/lib/hq-template-create-attempt'
 import { hqTemplatesApi,type DistributionMode,type DistributionResult,type FormDefinition,type HqAccount,type HqTemplate,type HqTemplateListItem,type MessageTemplateDefinition,type Preflight,type RichMenuDefinition,type TagDefinition,type TemplateDefinition,type TemplateDetail,type TemplateInput,type TemplateType } from '@/lib/hq-templates-api'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { useStaffRole,useTenantWideAccess } from '@/lib/staff-role'
@@ -408,6 +410,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     if (batchKey) window.sessionStorage.removeItem(batchKey)
     setFolderBatch(null); setFolderDistribution(null)
     if (createUncertain) return
+    if (!detail && type === 'rich_menu' && creationScope.current) void clearHqRichMenuDraft(creationStorageKey(creationScope.current, 'rich_menu')).catch(() => setDraftFailure(true))
     setDraftFailure(false)
     reconcileSessionUploads(detail ? uploadedKeysIn(detail.definition) : [])
     createAttempt.current = null; preferredBulkMode.current = ''; setStage('list'); setPreflight(null); setChoices({}); setBulkMode(''); setPendingRun(null); setResult(null); setError(''); setConflict(false); setRestoreDraft(null)
@@ -593,6 +596,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       }
       clearReceipt()
       clearEditorDraft(window.sessionStorage, scope, type, kind)
+      if (type === 'rich_menu') void clearHqRichMenuDraft(creationStorageKey(scope, 'rich_menu')).catch(() => setDraftFailure(true))
       clearTagCreateDraft()
       clearScenarioCreateDraft()
       if (type === 'form') { clearFormCreateDraft(); setRestoreDraft(null) }
@@ -1113,6 +1117,10 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   if (stage === 'edit' && type === 'rich_menu' && RichMenuCreate && !createUncertain && menuSeed !== null) {
     const host: RichMenuCreateHost = {
       backHref: '/hq/rich-menus',
+      draftKey: !detail && creationScope.current ? creationStorageKey(creationScope.current, 'rich_menu') : undefined,
+      restoreSelectedIds: ids => setMenuTargets(ids.filter(id => accounts.some(account => account.id === id))),
+      restoreUploadedKeys: keys => keys.forEach(r2Key => noteSessionUpload({ r2Key })),
+      uploadedKeys: [...sessionUploads.current],
       onCancel: toList,
       canOperate: canEdit,
       folders: folders.map((folder) => ({ id: folder.id, name: folder.name, color: folder.color })),

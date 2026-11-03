@@ -189,6 +189,8 @@ export interface MediaSlotProps {
   aspectRatio?: string
   /** 固定した小さい画像枠では、URL・登録済みの操作を枠の下に置く。 */
   controlsBelow?: boolean
+  /** 選択済み画像に操作を重ねない。 */
+  previewActionsBelow?: boolean
   framePart?: 'image-frame'
   /** 貼り付け（Cmd+V）でも受ける。 */
   acceptPaste?: boolean
@@ -233,6 +235,7 @@ export default function MediaSlot({
   size = 'regular',
   aspectRatio,
   controlsBelow = false,
+  previewActionsBelow = false,
   framePart,
   acceptPaste = false,
   children,
@@ -475,6 +478,21 @@ export default function MediaSlot({
       </span>
     ) : null
 
+  const filledActions = readOnly ? null : (
+    <span className={styles.actions}>
+      {canFile ? (
+        <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.pill} disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); openPicker() }}>
+          差し替える
+        </MediaSlotButton>
+      ) : null}
+      {removable ? (
+        <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.pill} disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); clear() }}>
+          消す
+        </MediaSlotButton>
+      ) : null}
+    </span>
+  )
+
   let body: ReactNode
   if (busy) {
     body = (
@@ -498,20 +516,7 @@ export default function MediaSlot({
             <span className={styles.fileName} title={valueName ?? value ?? ''}>{valueName ?? value}</span>
           </span>
         )}
-        {readOnly ? null : (
-          <span className={styles.actions}>
-            {canFile ? (
-              <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.pill} disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); openPicker() }}>
-                差し替える
-              </MediaSlotButton>
-            ) : null}
-            {removable ? (
-              <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.pill} disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); clear() }}>
-                消す
-              </MediaSlotButton>
-            ) : null}
-          </span>
-        )}
+        {!previewActionsBelow ? filledActions : null}
         {error && !controlsBelow ? <span className={styles.filledError} role="alert">{error}</span> : null}
       </>
     )
@@ -581,7 +586,7 @@ export default function MediaSlot({
   if (renderTrigger) return <>{renderTrigger(openPicker)}{picker}{error ? <p role="alert">{error}</p> : null}</>
 
   return (
-    <div id={id} className={styles.root} data-has-help={extraHelp ? true : undefined} data-controls-below={controlsBelow || undefined} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription}>
+    <div id={id} className={styles.root} data-has-help={extraHelp ? true : undefined} data-controls-below={controlsBelow || undefined} data-preview-actions-below={previewActionsBelow || undefined} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription}>
       {extraHelp ? <HelpTip className={styles.help} label={`${title}の補足`}>{extraHelp}</HelpTip> : null}
       <div
         role="group"
@@ -614,6 +619,7 @@ export default function MediaSlot({
         {body}
         {picker}
       </div>
+      {previewActionsBelow && filled && !busy && drag === 'idle' ? filledActions : null}
       {controlsBelow && !readOnly && (error || drag === 'reject') ? <span className={styles.reason} role="alert">{error ?? (formats ? `${formats} の${noun}を選んでください` : `この${noun}は入れられません`)}</span> : null}
       {/* 説明と上限は枠の中（絵 J60utH・e875x・D6fh3）。枠の下は「URL で入れる」「登録メディアから選ぶ」だけを左にそろえて縦に並べる。 */}
       {controlsBelow && drag === 'idle' ? links : null}

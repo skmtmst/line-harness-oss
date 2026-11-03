@@ -49,11 +49,6 @@
 /* 予約盤の道具は表と同じ左端に置き、収まらない場合は段を折り返す。押せるもの同士の間は道具の段の共通の値。 */
 .board[data-kind='people'] > .toolbar { padding-inline: 0; gap: var(--tpl-toolbar-gap); }
 .toolbar > strong { flex-shrink: 0; white-space: nowrap; }
-/* 入りきらない幅では印刷を印だけにする（読み上げ名は残す）。 */
-@media (max-width: 1440px) {
-  .printLabel { display: none; }
-  .printButton { padding-inline: 10px; }
-}
 
 .booking[data-compact] { padding-inline: 0; }
 

@@ -120,7 +120,7 @@ export function ReviewListV8(props: ReviewListV8Props) {
   ) : loadError ? (
     <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={props.onRetryLoad} />
   ) : photos.length === 0 ? (
-    <ListState kind="empty" emptyPreset="readonly" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" />
+    <ListState kind="empty" emptyPreset="readonly" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。掲載した写真は「公式サイト掲載」タブで確認できます。" />
   ) : null
 
   const cards = (

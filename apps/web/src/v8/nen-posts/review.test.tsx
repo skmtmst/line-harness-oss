@@ -102,6 +102,20 @@ async function click(element: Element | undefined) {
 }
 
 describe('V8 投稿（審査）', () => {
+  it('審査が空でも掲載済み写真の場所を案内する', async () => {
+    const original = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://worker.test')
+      if (url.pathname === '/api/nen-members/photos') return json({ success: true, data: [] })
+      if (url.pathname === '/api/nen-members/photos/review-metrics') return json({ success: true, data: { pendingCount: 0, reviewedCount: 0, averageReviewMinutes: null, oldestPendingAt: null, attentionCount: 0 } })
+      if (url.pathname === '/api/nen-members/photos/publications') return json({ success: true, data: { summary: { publishedCount: 2 }, items: [], pendingWithdrawals: [], withdrawnItems: [] } })
+      return original(input, init)
+    })
+    await render()
+    expect(host.textContent).toContain('この状態の写真はありません')
+    expect(host.textContent).toContain('掲載した写真は「公式サイト掲載」タブで確認できます')
+  })
+
   it('掲載のURLでは掲載タブと本文をそろえ、審査のカードを出さない', async () => {
     window.history.replaceState(null, '', '/nen-members?tab=publications')
     await render()

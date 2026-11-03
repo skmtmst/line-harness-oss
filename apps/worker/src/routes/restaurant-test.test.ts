@@ -1,5 +1,7 @@
 import { seedRestaurantFixture as seedRestaurantData } from '../test-utils/restaurant-fixture.js';
 import { publishScenarioVersion } from '@line-crm/db';
+import { checkRestaurantMenuMedia } from '../test-utils/restaurant-menu-media.js';
+import { seedNoticeFriend } from '../test-utils/restaurant-test-fixture-helpers.js';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -138,13 +140,7 @@ describe('電話予約のLINE確認通知', () => {
   const path = '/api/restaurant-test/reservations/manual?account_id=account-1';
   const body = { storeId: 'store-ginza', customerName: '試験用のお客さま', guestCount: 2,
     startsAt: '2026-11-10T10:00:00.000Z', endsAt: '2026-11-10T12:00:00.000Z', lineUid: 'U' + '1'.repeat(32), notifyLine: true };
-  function seedFriend(following = 1, accountId = 'account-2') {
-    seedRestaurantFixture();
-    testDb.raw.exec(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
-      VALUES ('account-2', '試験店舗', 'fixture-channel', 'unused', 'unused-token');`);
-    testDb.raw.prepare('INSERT INTO friends (id, line_user_id, line_account_id, is_following) VALUES (?, ?, ?, ?)')
-      .run('friend-fixture', body.lineUid, accountId, following);
-  }
+  const seedFriend = (following = 1, accountId = 'account-2') => seedNoticeFriend(testDb, seedRestaurantFixture, body.lineUid, following, accountId);
   async function approveFollowup(){
     testDb.raw.prepare("UPDATE scenario_steps SET message_content=? WHERE scenario_id='restaurant-followup:store-ginza' AND step_order=0").run('予約が確定しました。\n店舗: {{var.store_name}}\n日時: {{var.reservation_datetime}}〜{{var.reservation_end}}\n人数: {{var.guest_count}}名\nコース: {{var.course_name}}');
     await publishScenarioVersion(testDb.db,'restaurant-followup:store-ginza',{staffId:'owner',idempotencyKey:crypto.randomUUID()});
@@ -1206,6 +1202,10 @@ describe('V8-B 卓から出す予約枠と週の営業時間', () => {
     expect((await requestWithMethod(slotPath, 'PUT', capacities(), token)).status).toBe(404);
     expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-1', 'PUT', { storeId: 'store-ginza', hours: hours(), expectedVersion: 0 }, token)).status).toBe(400);
   });
+});
+
+describe('R2-18 飲食メニューの説明と登録画像', () => {
+  it('登録済み画像と説明を保存し、読み直せる', () => checkRestaurantMenuMedia({ testDb, seedRestaurantFixture, request, requestWithMethod }));
 });
 
 describe('V8-B メニューの価格確定', () => {

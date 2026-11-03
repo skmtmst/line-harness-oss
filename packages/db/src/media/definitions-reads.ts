@@ -160,7 +160,7 @@ export async function getMedia(
     values.push(`%${opts.query.toLowerCase().replace(/[\\%_]/g, '\\$&')}%`);
   }
   if (opts.unusedOnly) {
-    conditions.push('(SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) = 0');
+    conditions.push('(SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) = 0 AND COALESCE(menu_uses.usage_count, 0) = 0');
   }
   if (opts.nearLimitOnly) {
     // 一覧口と同じ計算元。INSERT OR IGNORE で上限行が無い口座にも既定値が入る。
@@ -181,8 +181,9 @@ export async function getMedia(
   const result = await db
     .prepare(
       `SELECT m.*,
-              (SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) AS usage_count
+              (SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) + COALESCE(menu_uses.usage_count, 0) AS usage_count
          FROM media m
+         LEFT JOIN (SELECT image_media_id, COUNT(*) AS usage_count FROM rt_menu_items WHERE image_media_id IS NOT NULL GROUP BY image_media_id) menu_uses ON menu_uses.image_media_id = m.id
          ${where}
         ORDER BY ${orderBy}
         LIMIT ? OFFSET ?`,
@@ -207,7 +208,7 @@ export async function countMedia(
     conditions.push("LOWER(m.filename) LIKE ? ESCAPE '\\'");
     values.push(`%${opts.query.toLowerCase().replace(/[\\%_]/g, '\\$&')}%`);
   }
-  if (opts.unusedOnly) conditions.push('(SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) = 0');
+  if (opts.unusedOnly) conditions.push('(SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) = 0 AND COALESCE(menu_uses.usage_count, 0) = 0');
   if (opts.archived === 'only') conditions.push('m.archived_at IS NOT NULL');
   else if (opts.archived !== 'all') conditions.push('m.archived_at IS NULL');
   if (opts.nearLimitOnly) {
@@ -216,7 +217,7 @@ export async function countMedia(
     conditions.push('m.size_bytes >= ?');
     values.push(quota.limitBytes * MEDIA_NEAR_LIMIT_SHARE);
   }
-  const row = await db.prepare(`SELECT COUNT(*) AS total FROM media m WHERE ${conditions.join(' AND ')}`)
+  const row = await db.prepare(`SELECT COUNT(*) AS total FROM media m LEFT JOIN (SELECT image_media_id, COUNT(*) AS usage_count FROM rt_menu_items WHERE image_media_id IS NOT NULL GROUP BY image_media_id) menu_uses ON menu_uses.image_media_id = m.id WHERE ${conditions.join(' AND ')}`)
     .bind(...values).first<{ total: number }>();
   return Number(row?.total ?? 0);
 }

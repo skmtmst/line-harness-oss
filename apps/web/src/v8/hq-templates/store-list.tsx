@@ -345,7 +345,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                 onClick={() => setTagQuickOpen((open) => !open)}
               >
                 <Bookmark size={16} aria-hidden="true" />
-                {narrow ? null : <span>よく使う絞り込み</span>}
+                {narrow ? null : <span>絞り込み</span>}
               </Button>
               <ActionMenu open={tagQuickOpen} onClose={() => setTagQuickOpen(false)} ariaLabel="よく使う絞り込み" items={[
                 { id: 'quick-undistributed', label: 'まだ配っていない', icon: undistributedOnly ? <Check size={16} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />, onSelect: () => { setUndistributedOnly((value) => !value); setPage(1) } },

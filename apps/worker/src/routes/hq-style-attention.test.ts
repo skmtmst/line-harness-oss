@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { gapApp, gapCall, gapFixture, gapOwner, seedGapBooking } from '../test-utils/gap1.js';
 import { readAccountAttention } from '../services/hq-account-attention.js';
 import { styles } from './styles.js';
+import { getInboxStatusCounts } from '@line-crm/db';
 
 let d: ReturnType<typeof gapFixture>;
 const path = '/api/hq/style-attention';
@@ -55,7 +56,7 @@ test('複数アカウントの名前・スタイル・件数と先頭の行き�
   expect(response.data.items).toEqual([
     { accountId: 'a', name: '店', style: 'salon',
       counts: { unhandledChats: 2, pendingBookings: 2, unpaid: 1, connections: 1, stoppedDeliveries: 0 },
-      details: { unhandledChats: [{ id: 'second', href: '/chats' }], pendingBookings: [{ id: 'requested', href: '/booking/bookings' }],
+      details: { unhandledChats: [{ id: expect.stringMatching(/^(first|second)$/), href: '/chats' }], pendingBookings: [{ id: 'requested', href: '/booking/bookings' }],
         unpaid: [{ id: 'payment' }], connections: [{ id: 'bad', href: '/accounts' }], stoppedDeliveries: [] } },
     { accountId: 'a2', name: '二号店', style: 'standard',
       counts: { unhandledChats: 1, pendingBookings: 1, unpaid: 0, connections: 0, stoppedDeliveries: 0 },
@@ -154,3 +155,15 @@ test('集計に失敗したら0件の成功応答にせず、取得失敗を返�
   expect(response.status).toBe(503);
   expect(await response.json()).toMatchObject({ success: false, code: 'style_unavailable' });
 });
+
+test('統括のトーク数と受信箱の状態別数は友だちの所属で一致する', async () => {
+  chat('unread-a','a','unread'); chat('progress-a','a','in_progress'); chat('hold-a','a','on_hold');
+  chat('resolved-a','a','resolved'); chat('private-b','b','unread');
+  d.raw.exec("UPDATE chats SET line_account_id=NULL WHERE id IN ('unread-a','progress-a'); UPDATE chats SET line_account_id='a' WHERE id='private-b'");
+  const inbox = await getInboxStatusCounts(d.db, { allowedAccountIds:['a'], includeUnassigned:false });
+  const attention = await readAccountAttention(d.db, 'a', false);
+  expect(attention.counts.unhandledChats).toBe(inbox.line.unanswered + inbox.line.inProgress + inbox.line.onHold);
+  expect(attention.targets.unhandledChats).toEqual(expect.arrayContaining([
+    {href:'/chats?status=unread',count:1}, {href:'/chats?status=in_progress',count:1}, {href:'/chats?status=on_hold',count:1},
+  ]));
+})

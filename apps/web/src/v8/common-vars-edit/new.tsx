@@ -472,7 +472,7 @@ export default function NewCommonVarV8() {
                 if (nameFieldError && validateVarName(next) === null) setNameFieldError('')
               }}
               onBlur={() => setNameFieldError(validateVarName(name) ?? '')}
-              placeholder="営業時間"
+              placeholder="例：営業時間"
               aria-invalid={nameFieldError ? true : undefined}
               title={`${name.length}/${NAME_MAX}文字`}
             /></SaveErrorField>
@@ -515,7 +515,7 @@ export default function NewCommonVarV8() {
                   if (keyFieldError && validateVarKey(next) === null) setKeyFieldError('')
                 }}
                 onBlur={() => setKeyFieldError(validateVarKey(varKey) ?? '')}
-                placeholder="shop_hours"
+                placeholder="例：shop_hours"
                 aria-invalid={keyFieldError ? true : undefined}
               /></SaveErrorField>
             <CopyTextButton label="コピーする" value={`{{var.${varKey.trim()}}}`} aria-label="差し込み名をコピー" disabled={!varKey.trim()} />
@@ -560,7 +560,7 @@ export default function NewCommonVarV8() {
                 setValue(e.target.value)
                 setSecretWarningFields(null)
               }}
-              placeholder={spec.placeholder}
+              placeholder={`例：${spec.placeholder}`}
               aria-invalid={valueFieldError ? true : undefined}
               rows={3}
               title={`${value.length}/10000文字`}
@@ -587,7 +587,7 @@ export default function NewCommonVarV8() {
               maxLength={type === 'number' ? undefined : VALUE_MAX}
               value={value}
               onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }}
-              placeholder={spec.placeholder}
+              placeholder={`例：${spec.placeholder}`}
               aria-invalid={valueFieldError ? true : undefined}
               title={type === 'number' ? undefined : `${value.length}/${VALUE_MAX}文字`}
             /></SaveErrorField>
@@ -635,7 +635,7 @@ export default function NewCommonVarV8() {
             setMemo(e.target.value)
             setSecretWarningFields(null)
           }}
-          placeholder="臨時休業のときは「臨時のお知らせ」も直す"
+          placeholder="例：臨時休業のときは「臨時のお知らせ」も直す"
         /></SaveErrorField></Field></div>
 
       {secretWarningFields && (
