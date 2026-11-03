@@ -31,6 +31,7 @@ export async function acquirePublishLease(
   nowIso: string,
   ttlMs = PUBLISH_LEASE_MS,
   expected?:{version:number;generation:number;isDefaultForAll:boolean;pages:Array<{id:string;orderIndex:number;lineRichMenuId:string|null}>},
+  expectedDraft?:{version:number;generation:number;pages:Array<{orderIndex:number;imageR2Key:string|null;imageContentType:string|null}>},
 ): Promise<number | null> {
   // 取得と世代の採番を1文にする。別々にすると、間に割り込んだ取得の世代を
   // 自分のものと取り違える。
@@ -47,9 +48,12 @@ export async function acquirePublishLease(
            AND (SELECT COUNT(*) FROM rich_menu_pages WHERE group_id=rich_menu_groups.id)=json_array_length(?)
            AND NOT EXISTS(SELECT 1 FROM rich_menu_pages p WHERE p.group_id=rich_menu_groups.id AND NOT EXISTS
              (SELECT 1 FROM json_each(?) e WHERE json_extract(e.value,'$.id')=p.id AND json_extract(e.value,'$.orderIndex')=p.order_index AND json_extract(e.value,'$.lineRichMenuId') IS p.line_richmenu_id))` : ''}
+         ${expectedDraft ? `AND version=? AND publishing_generation=? AND (SELECT COUNT(*) FROM rich_menu_pages WHERE group_id=rich_menu_groups.id)=json_array_length(?)
+           AND NOT EXISTS(SELECT 1 FROM rich_menu_pages p WHERE p.group_id=rich_menu_groups.id AND NOT EXISTS
+             (SELECT 1 FROM json_each(?) e WHERE json_extract(e.value,'$.orderIndex')=p.order_index AND json_extract(e.value,'$.imageR2Key') IS p.image_r2_key AND json_extract(e.value,'$.imageContentType') IS p.image_content_type))` : ''}
        RETURNING publishing_generation`,
     )
-    .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso,...(expected?[expected.version,expected.generation,Number(expected.isDefaultForAll),JSON.stringify(expected.pages),JSON.stringify(expected.pages)]:[]))
+    .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso,...(expected?[expected.version,expected.generation,Number(expected.isDefaultForAll),JSON.stringify(expected.pages),JSON.stringify(expected.pages)]:[]),...(expectedDraft?[expectedDraft.version,expectedDraft.generation,JSON.stringify(expectedDraft.pages),JSON.stringify(expectedDraft.pages)]:[]))
     .first<{ publishing_generation: number }>();
   return row ? row.publishing_generation : null;
 }

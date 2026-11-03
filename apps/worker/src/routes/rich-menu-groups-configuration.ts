@@ -350,7 +350,7 @@ export const post__api_rich_menu_groups_8 = async (c: Context<Env, "/api/rich-me
         ?? created.pages[0];
       const contentType = media.mime_type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
       const ext = contentType === 'image/png' ? 'png' : 'jpg';
-      const key = `rich-menus/${parsed.value.accountId}/${created.id}/${defaultPage.id}/${Date.now()}.${ext}`;
+      const key = `rich-menus/${parsed.value.accountId}/${created.id}/${defaultPage.id}/${crypto.randomUUID()}.${ext}`;
       await c.env.IMAGES.put(key, buf, { httpMetadata: { contentType } });
       try {
         await setRichMenuPageImage(c.env.DB, defaultPage.id, key, contentType);

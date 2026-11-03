@@ -106,7 +106,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
 // 画像取得 — エディタからの <img src="..."> 用。private cache でアクセス制御は auth に委ねる。
 richMenuGroups.get('/api/rich-menu-images/:key{.+}', get__api_rich_menu_images_key__2);
 
-richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireDeliveryAccess('richMenus', 'publish'), inputJsonBoundary(), post__api_rich_menu_groups_groupId_publish_3);
+richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireDeliveryAccess('richMenus', 'publish'), inputJsonBoundary({"expectedVersion":["number"],"expectedPublishGeneration":["number"],"expectedImages":["array"]}), post__api_rich_menu_groups_groupId_publish_3);
 
 // ----- ・公開の進み・公開前の確認 -----
 

@@ -22,6 +22,7 @@ const { richMenuGroups } = await import('./rich-menu-groups.js');
 const {
   acquirePublishLease,
   isPublishLeaseHeld,
+  setRichMenuPageImage,
 } = await import('@line-crm/db');
 
 type TestEnv = {
@@ -56,6 +57,7 @@ function asD1(sqlite: Database.Database): D1Database {
         const stmt = sqlite.prepare(query);
         return {
           async run() {
+            if(stmt.reader)return {success:true,results:stmt.all(...params),meta:{changes:0}};
             const info = stmt.run(...params);
             return { success: true, meta: { changes: info.changes } };
           },
@@ -166,6 +168,41 @@ function expireLease() {
 }
 
 describe('実の停止API × 別D1接続の割り込み', () => {
+  test('画像が変わって元に戻っても公開処理の世代は進む',async()=>{
+    sqlite.exec("UPDATE rich_menu_groups SET status='draft',is_default_for_all=0 WHERE id='g1'");
+    await setRichMenuPageImage(db,'p1','image-1','image/png');
+    const previous=groupRow().g;
+    await setRichMenuPageImage(db,'p1','image-2','image/png');
+    await setRichMenuPageImage(db,'p1','image-1','image/png');
+    expect(groupRow().g).toBe(previous+2);
+  });
+  test('画像が変わって元に戻ると古い公開確認ではLINEへ進まない',async()=>{
+    sqlite.exec("UPDATE rich_menu_groups SET status='draft',is_default_for_all=0 WHERE id='g1'");
+    await setRichMenuPageImage(db,'p1','image-1','image/png');
+    const confirmedGeneration=groupRow().g;
+    await setRichMenuPageImage(db,'p1','image-2','image/png');
+    await setRichMenuPageImage(db,'p1','image-1','image/png');
+    const response=await setupApp(db).request('/api/rich-menu-groups/g1/publish',{method:'POST',headers:{'content-type':'application/json','Idempotency-Key':'image-aba'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:confirmedGeneration,expectedImages:[{orderIndex:0,imageR2Key:'image-1',imageContentType:'image/png'}]})});
+    expect(response.status).toBe(409);expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  test('古い世代で画像を保存しても現在の画像を上書きしない',async()=>{
+    sqlite.exec("UPDATE rich_menu_groups SET status='draft',is_default_for_all=0 WHERE id='g1'");
+    await setRichMenuPageImage(db,'p1','first','image/png',0);
+    await expect(setRichMenuPageImage(db,'p1','stale','image/png',0)).rejects.toThrow('rich_menu_image_conflict');
+    expect(sqlite.prepare("SELECT image_r2_key FROM rich_menu_pages WHERE id='p1'").get()).toEqual({image_r2_key:'first'});expect(groupRow().g).toBe(1);
+  });
+  test('公開処理中の画像更新は古い呼び出しでも拒否する',async()=>{
+    sqlite.exec("UPDATE rich_menu_groups SET status='draft',is_default_for_all=0 WHERE id='g1'");
+    expect(await acquirePublishLease(db,'g1','publisher',new Date().toISOString())).toBe(1);
+    await expect(setRichMenuPageImage(db,'p1','new','image/png')).rejects.toThrow('rich_menu_image_conflict');
+    expect(groupRow()).toMatchObject({o:'publisher',g:1});
+  });
+  test('公開の受付直前に画像が変わればLINEへ触れない',async()=>{
+    sqlite.exec("UPDATE rich_menu_groups SET status='draft',is_default_for_all=0 WHERE id='g1';UPDATE rich_menu_pages SET line_richmenu_id=NULL,image_r2_key='image-1',image_content_type='image/png' WHERE id='p1'");
+    const dbRoute=hookedDb(db,/UPDATE rich_menu_groups\s+SET publishing_at/,async()=>{sqlite.prepare("UPDATE rich_menu_pages SET image_r2_key='image-2' WHERE id='p1'").run()});
+    const response=await setupApp(dbRoute).request('/api/rich-menu-groups/g1/publish',{method:'POST',headers:{'content-type':'application/json','Idempotency-Key':'publish-image-race'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedImages:[{orderIndex:0,imageR2Key:'image-1',imageContentType:'image/png'}]})});
+    expect(response.status).toBe(409);expect(groupRow().g).toBe(0);expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
   test('取り下げ確認には現在の版・世代・LINE対象を返す',async()=>{
     const response=await setupApp(db).request('/api/rich-menu-groups/g1/delete-impact');
     expect(response.status).toBe(200);
@@ -293,7 +330,7 @@ describe('実の停止API × 別D1接続の割り込み', () => {
       { method: 'POST' },
     );
 
-    expect(takerGeneration).toBe(2);
+    expect(takerGeneration).toBe(3); // 画像登録でも世代が1つ進む。
     // 成功応答にしない。
     expect(res.status).toBe(409);
     const created = sqlite.prepare(

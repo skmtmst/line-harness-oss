@@ -22,6 +22,7 @@ export function serializeGroup(row: RichMenuGroup) {
     defaultOpen: row.default_open === 1,
     // 保存時に送り返す版。古い版での保存は 409 で止める。
     version: row.version ?? 1,
+    publishingGeneration: row.publishing_generation ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

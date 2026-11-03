@@ -30,6 +30,9 @@ export const post__api_rich_menu_groups_groupId_pages_pageId_image_1 = async (c:
       409,
     );
   }
+  const generationValue=c.req.query('expectedGeneration');
+  if(generationValue!==undefined&&(!/^\d+$/.test(generationValue)||!Number.isSafeInteger(Number(generationValue))))return inputError(c,{success:false,error:'画像の確認情報を指定してください'},400,[]);
+  const expectedGeneration=generationValue===undefined?undefined:Number(generationValue);
   const contentType = c.req.header('content-type') ?? '';
   if (contentType !== 'image/png' && contentType !== 'image/jpeg') {
     return inputError(c, { success: false, error: 'content-type must be image/png or image/jpeg' }, 400, []);
@@ -59,10 +62,11 @@ export const post__api_rich_menu_groups_groupId_pages_pageId_image_1 = async (c:
   }
 
   const ext = contentType === 'image/png' ? 'png' : 'jpg';
-  const key = `rich-menus/${group.account_id}/${groupId}/${pageId}/${Date.now()}.${ext}`;
+  const key = `rich-menus/${group.account_id}/${groupId}/${pageId}/${crypto.randomUUID()}.${ext}`;
   await c.env.IMAGES.put(key, buf, { httpMetadata: { contentType } });
   try {
-    await setRichMenuPageImage(c.env.DB, pageId, key, contentType);
+    if(expectedGeneration===undefined)await setRichMenuPageImage(c.env.DB,pageId,key,contentType);
+    else await setRichMenuPageImage(c.env.DB,pageId,key,contentType,expectedGeneration);
   } catch (error) {
     // DB への記録に失敗したら、上げた画像を片付ける。
     // 置きっぱなしにすると再試行のたびに孤児が溜まる。
@@ -72,12 +76,13 @@ export const post__api_rich_menu_groups_groupId_pages_pageId_image_1 = async (c:
       // 片付けの失敗は元の失敗に付けない。ログだけ残す。
       logger.error("rich_menu_groups.rich_menu_groups_group_id_pages_page_id_image_post_failed");
     }
+    if(error instanceof Error&&error.message==='rich_menu_image_conflict')return c.json({success:false,code:'RICH_MENU_IMAGE_CHANGED',error:'画像または公開状態が変わりました。最新の状態を確認してください'},409);
     throw error;
   }
 
   return c.json({
     success: true,
-    data: { imageR2Key: key, imageContentType: contentType, size: validation.size },
+    data: { imageR2Key: key, imageContentType: contentType, size: validation.size, publishingGeneration:expectedGeneration===undefined?(await getRichMenuGroupById(c.env.DB,groupId))?.publishing_generation??0:expectedGeneration+1 },
   });
 };
 
@@ -106,7 +111,11 @@ export const post__api_rich_menu_groups_groupId_publish_3 = async (c: Context<En
   if (!idempotencyKey) {
     return inputError(c, { success: false, error: 'Idempotency-Key header required' }, 400, []);
   }
-  return handleManualPublish(c, c.req.param('groupId'), idempotencyKey);
+  const body=validatedInputBody(c)??{};
+  const hasConfirmation=body.expectedVersion!==undefined||body.expectedPublishGeneration!==undefined||body.expectedImages!==undefined;
+  if(hasConfirmation&&(!Number.isSafeInteger(body.expectedVersion)||Number(body.expectedVersion)<1||!Number.isSafeInteger(body.expectedPublishGeneration)||Number(body.expectedPublishGeneration)<0||!Array.isArray(body.expectedImages)||body.expectedImages.length>RICH_MENU_MAX_PAGES||body.expectedImages.some((item:unknown)=>!item||typeof item!=='object'||!Number.isSafeInteger((item as {orderIndex?:unknown}).orderIndex)||Number((item as {orderIndex?:unknown}).orderIndex)<0||!((item as {imageR2Key?:unknown}).imageR2Key===null||typeof (item as {imageR2Key?:unknown}).imageR2Key==='string')||!((item as {imageContentType?:unknown}).imageContentType===null||typeof (item as {imageContentType?:unknown}).imageContentType==='string'))||new Set(body.expectedImages.map((item:{orderIndex:number})=>item.orderIndex)).size!==body.expectedImages.length))return inputError(c,{success:false,error:'確認した公開内容を指定してください'},400,[]);
+  const expected=hasConfirmation?{version:Number(body.expectedVersion),generation:Number(body.expectedPublishGeneration),pages:body.expectedImages as Array<{orderIndex:number;imageR2Key:string|null;imageContentType:string|null}>}:undefined;
+  return handleManualPublish(c, c.req.param('groupId'), idempotencyKey,expected);
 };
 
 export const get__api_rich_menu_groups_groupId_prepublish_check_4 = async (c: Context<Env, "/api/rich-menu-groups/:groupId/prepublish-check">) => {
