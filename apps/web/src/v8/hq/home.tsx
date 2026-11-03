@@ -327,10 +327,12 @@ export default function HqHomeV8() {
     setFolderDialog({ editing })
   }
 
+  const folderUnchanged = Boolean(folderDialog?.editing && folderName.trim() === folderDialog.editing.name.trim() && folderColor === folderDisplayColor(folderDialog.editing))
+
   /* フォルダを足す／名前と色を変える（API-17：POST・PATCH /api/line-account-folders）。 */
   const saveFolder = async () => {
     const name = folderName.trim()
-    if (!name || folderSaving || !folderDialog) return
+    if (!name || folderSaving || !folderDialog || folderUnchanged) return
     setFolderSaving(true)
     setFolderError('')
     try {
@@ -736,8 +738,9 @@ export default function HqHomeV8() {
         onCancel={() => { if (!folderSaving) setFolderDialog(null) }}
         designNode="JKjsE" busy={folderSaving} disabled={folderSaving} error={folderError || undefined}
         confirmLabel={folderDialog?.editing ? '保存する' : '追加する'} cancelLabel="やめる"
+        confirmDisabled={folderUnchanged}
         onConfirm={() => saveFolder()}
-      />
+      >{folderUnchanged ? <Notice tone="info" compact>名前か色を変えると保存できます。</Notice> : null}</FolderEditorDialog>
 
       {deleteFolder ? (
         <ConfirmDialog

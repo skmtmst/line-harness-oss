@@ -143,3 +143,19 @@ test('同名フォルダを拒否したら名前欄に理由を出し、直す�
   fireEvent.change(input, { target: { value: '九州' } })
   expect(screen.queryByText('同じ名前のフォルダがあります')).toBeNull()
 })
+
+test('フォルダは名前と色が未変更なら理由を出して保存せず、名前を変えると保存できる', async () => {
+  vi.mocked(api.lineAccountFolders.update).mockClear()
+  render(<HqHomeV8 />)
+  await screen.findAllByText('銀座店')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ「関西」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '色を変える' }))
+  const save = screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  expect(screen.getByText('名前か色を変えると保存できます。')).toBeTruthy()
+  fireEvent.click(save)
+  expect(api.lineAccountFolders.update).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダの名前' }), { target: { value: '関西エリア' } })
+  expect(save.disabled).toBe(false)
+  expect(screen.queryByText('名前か色を変えると保存できます。')).toBeNull()
+})
