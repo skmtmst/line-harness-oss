@@ -149,7 +149,7 @@ describe('外部連携 V8', () => {
     await waitFor(() => expect(host.textContent).toContain('受け取り口を読み込めませんでした'))
     expect(host.textContent).toContain('集計を読み込めませんでした')
     const band = host.querySelector('[data-kpi-strip]')!
-    for (const label of ['受け取り口', '直近30日 受け取った']) {
+    for (const label of ['受け取り口', '過去30日 受け取った']) {
       const card = within(band as HTMLElement).getByText(label).closest('[data-kpi-presentation]')
       expect(card?.textContent).toContain('—')
     }
@@ -568,7 +568,7 @@ it('管理者は実際の受け取り口の中で、受信後の行動を追加�
 it('受け取りと見本には送信タブの数を表示しない', async () => {
   await render(<WebhooksIncomingV8 />)
   expect(host.textContent).toContain('受け取り口')
-  expect(host.textContent).toContain('直近30日 受け取った')
+  expect(host.textContent).toContain('過去30日 受け取った')
   expect(host.textContent).not.toContain('直近30日 送った')
   await render(<WebhooksSamplesV8 />)
   expect(host.textContent).toContain('こちらで受け取る（どこから来るか）')
