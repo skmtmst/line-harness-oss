@@ -705,7 +705,7 @@ export default function AffiliatorsTab() {
         <ConfirmDialog
           open={bulkConfirm}
           title={`${formatNumber(bulkArchiveTargets.current.length)} 人の紹介をまとめて止めますか？`}
-          description="止めると、その人たちの紹介リンクからの成果はこれから数えません。認めるのを待っている成果がある人は、行の「…」の紹介を止めるで中身を確かめてから止めてください。"
+          description="止めると、その人たちの紹介リンクからの成果はこれから数えません。承認待ちの成果がある人は、行の「…」から個別に中身を確認して止めてください。"
           confirmLabel="まとめて止める"
           destructive
           busy={bulkBusy}
