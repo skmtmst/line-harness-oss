@@ -732,6 +732,13 @@ function LineNotificationsPage() {
    */
   const selectedAccountRef = useRef(selectedAccountId)
   selectedAccountRef.current = selectedAccountId
+  // 店舗切替ゲートでこの画面が外れた後、旧画面の保存応答が端末内の
+  // 新しい下書きを消さないようにする。
+  const mountedRef = useRef(false)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
   const testAccountScope = useRef({ accountId: selectedAccountId })
   if (testAccountScope.current.accountId !== selectedAccountId) testAccountScope.current = { accountId: selectedAccountId }
   const tab = useMergedTab(TABS, 'tab', 'customer')
@@ -1096,7 +1103,7 @@ function LineNotificationsPage() {
     generation: loadGeneration.current,
     currentGeneration: () => loadGeneration.current,
     forAccountId: selectedAccountId ?? '',
-    currentAccountId: () => selectedAccountRef.current,
+    currentAccountId: () => mountedRef.current ? selectedAccountRef.current : null,
     sentFingerprint: customerDraftFingerprint(pickCustomerDraft(setting)),
     currentFingerprint: () => editFingerprintRef.current.get(setting.eventType),
   })
