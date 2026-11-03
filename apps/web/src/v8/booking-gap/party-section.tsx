@@ -43,8 +43,9 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
   useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   const preparing = usePreparingDialog()
   const [open, setOpen] = useState(false)
-  const targetScope = useRef({ accountId, groupId: party.groupId, version: party.version })
-  if (targetScope.current.accountId !== accountId || targetScope.current.groupId !== party.groupId || targetScope.current.version !== party.version) targetScope.current = { accountId, groupId: party.groupId, version: party.version }
+  const membersKey = JSON.stringify(party.members.map(member => [member.bookingId, member.version, member.status]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))))
+  const targetScope = useRef({ accountId, groupId: party.groupId, version: party.version, membersKey })
+  if (targetScope.current.accountId !== accountId || targetScope.current.groupId !== party.groupId || targetScope.current.version !== party.version || targetScope.current.membersKey !== membersKey) targetScope.current = { accountId, groupId: party.groupId, version: party.version, membersKey }
   const [confirmedScope, setConfirmedScope] = useState<typeof targetScope.current | null>(null)
   const lockedReason = usePermissionLockReason(permissionAllowed)
   const [reason, setReason] = useState('')
@@ -58,9 +59,11 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
   async function cancelAll() {
     if (!accountId || confirmedScope !== targetScope.current || busy || !canOperate || lockedReason || !reason.trim() || cancellable.length === 0) return
     const scope = targetScope.current
+    const expectedMembers = party.members.map(member => ({ bookingId: member.bookingId, version: member.version, status: member.status }))
+    if (expectedMembers.some(member => !Number.isSafeInteger(member.version))) { setError('予約を読み直してから、もう一度お試しください。'); return }
     setBusy(true); setError('')
     try {
-      const response = await bookingAdvancedApi.cancelGroup(accountId, party.groupId, reason.trim(), party.version)
+      const response = await bookingAdvancedApi.cancelGroup(accountId, scope.groupId, reason.trim(), scope.version, expectedMembers as Array<{ bookingId: string; version: number; status: string }>)
       if (!active.current || scope !== targetScope.current) return
       notifySaved(`${response.data.cancelled} 件の予約を取り消しました`)
       setOpen(false)
