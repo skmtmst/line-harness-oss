@@ -201,7 +201,9 @@ export function useUnsavedGuard(options: {
     const own = historyGuardRef.current
     const cohort = historyCohortRef.current
     if (leaveTarget.kind === 'history-back' && !cohort) { disarmedRef.current = false; return }
-    if (busyRef.current || (leaveTarget.kind === 'history-back' && cohort?.some(entry => historyGuards.has(entry) && (entry === own || entry.active()) && entry.busy()))) {
+    // 保存成功直後は再描画前の busyRef が true のままなので、自分は確認時の busy を使う。
+    // 他の入力は保存中に破棄しないよう、最新の状態を確認する。
+    if (busy || (leaveTarget.kind === 'history-back' && cohort?.some(entry => entry !== own && historyGuards.has(entry) && entry.active() && entry.busy()))) {
       disarmedRef.current = false
       setLeaveTarget(leaveTarget)
       return

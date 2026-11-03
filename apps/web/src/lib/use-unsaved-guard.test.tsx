@@ -7,10 +7,11 @@
  *   クエリ遷移（コンポーネントが外れない）でも「消えます」の約束を守るため
  * - 同じパス・同じクエリで hash だけ変わる移動は画面内ジャンプなので止めない
  */
-import React, { act } from 'react'
+import React, { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUnsavedGuard } from './use-unsaved-guard'
+import { UnsavedLeaveDialog } from './unsaved-leave-dialog'
 
 const router = vi.hoisted(() => ({ push: vi.fn() }))
 const discard = vi.hoisted(() => vi.fn())
@@ -39,6 +40,15 @@ function Harness({ dirty, onDiscard, busy, disarmBeforeConfirm }: { dirty: boole
       ) : null}
     </div>
   )
+}
+
+function SaveHarness({ onDiscard, save }: { onDiscard: () => void; save: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const guard = useUnsavedGuard({ dirty: true, busy, onDiscard })
+  return <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} onSave={async () => {
+    setBusy(true)
+    try { await save(); return true } finally { setBusy(false) }
+  }} />
 }
 
 let host: HTMLDivElement
@@ -83,6 +93,42 @@ async function clickDialogButton(action: 'confirm' | 'cancel') {
 }
 
 describe('useUnsavedGuard', () => {
+  it('履歴で保存が完了したら保存中の描画が残っていても戻る', async () => {
+    let finish!: () => void
+    const save = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<SaveHarness onDiscard={discard} save={save} />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      const button = [...document.querySelectorAll('button')].find(node => node.textContent?.includes('保存して移る'))
+      expect(button).toBeTruthy()
+      await act(async () => { button!.click() })
+      expect(save).toHaveBeenCalledTimes(1)
+      expect(back).not.toHaveBeenCalled()
+      await act(async () => { finish(); await Promise.resolve() })
+      expect(back).toHaveBeenCalledTimes(1)
+      expect(discard).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+  it('自分の保存中には確認できず、保存が終われば戻れる', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<Harness dirty onDiscard={discard} />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await render(<Harness dirty busy onDiscard={discard} />)
+      await clickDialogButton('confirm')
+      expect(discard).not.toHaveBeenCalled()
+      expect(back).not.toHaveBeenCalled()
+      expect(host.querySelector('[role="dialog"]')).toBeTruthy()
+      await render(<Harness dirty onDiscard={discard} />)
+      await clickDialogButton('confirm')
+      expect(discard).toHaveBeenCalledTimes(1)
+      expect(back).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+
   it('2つの未保存状態があっても履歴は1回戻し、1つの確認で両方を破棄する', async () => {
     const parentDiscard = vi.fn(), childDiscard = vi.fn()
     const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
