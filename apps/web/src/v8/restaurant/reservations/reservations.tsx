@@ -183,10 +183,6 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     return ok
   }, [mutate, reload])
 
-  const attendance=(id:string,action:'visited'|'depart'|'undo_departure'|'undo_visit'|'no_show')=>{
-    const row=rows.find(r=>r.id===id)??data.reservations.find(r=>r.id===id);if(!row)return;
-    void save(async()=>{const result=await restaurantTestApi.attendance(accountId,id,{action,expectedVersion:row.customer_version??1,requestId:crypto.randomUUID()});if(action==='visited')notifyToast(result.data.stamp.status==='recorded'?`来店スタンプ ${result.data.stamp.count} 個を確認しました。`:'スタンプは会計待ち・停止中・未連携の場合には増えません。');return result},action==='visited'?'来店にしました。':action==='depart'?'退店にしました。卓が空きました。':action==='no_show'?'無断にしました。':'来店・退店の記録を訂正しました。');
-  }
   const restoreReservation=(id:string)=>{
     const target=rows.find(r=>r.id===id)??data.reservations.find(r=>r.id===id);
     return restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:target?.customer_version??1});
@@ -208,6 +204,37 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     : !currentOpened)
   const detailed = rows.find((r) => r.id === detailId) ?? data.reservations.find((r) => r.id === detailId) ?? null
   const cancelling = rows.find((r) => r.id === cancelId) ?? data.reservations.find((r) => r.id === cancelId) ?? null
+  const detailReservation = view === 'today' ? detailed : detailId === 'closed' ? null : detailed ?? rows[0] ?? null
+  const attendanceKey = JSON.stringify([accountId, storeId, view, detailId, detailReservation?.id, page, period, status, source, canWrite, !!phone])
+  const attendanceScope = useRef({ key: attendanceKey })
+  if (attendanceScope.current.key !== attendanceKey) attendanceScope.current = { key: attendanceKey }
+  const scope = attendanceScope.current
+  const attendanceActive = useRef(true)
+  const attendanceWorking = useRef(false)
+  useEffect(() => { attendanceActive.current = true; return () => { attendanceActive.current = false } }, [])
+  const attendance = async (id: string, action: 'visited' | 'depart' | 'undo_departure' | 'undo_visit' | 'no_show') => {
+    const current = () => attendanceActive.current && attendanceScope.current === scope
+    const row = rows.find(r => r.id === id) ?? data.reservations.find(r => r.id === id)
+    if (!canWrite || busy || attendanceWorking.current || !current() || detailReservation?.id !== id || !row) return
+    attendanceWorking.current = true
+    let failure: { error: unknown } | undefined
+    try {
+      const ok = await mutate(async () => {
+        try {
+          if (!current()) throw new QuietError()
+          const result = await restaurantTestApi.attendance(accountId, id, { action, expectedVersion: row.customer_version ?? 1, requestId: crypto.randomUUID() })
+          if (!current()) throw new QuietError()
+          if (action === 'visited') notifyToast(result.data.stamp.status === 'recorded' ? `来店スタンプ ${result.data.stamp.count} 個を確認しました。` : 'スタンプは会計待ち・停止中・未連携の場合には増えません。')
+          return result
+        } catch (error) {
+          if (current() && !(error instanceof QuietError)) failure = { error }
+          throw new QuietError()
+        }
+      }, action === 'visited' ? '来店にしました。' : action === 'depart' ? '退店にしました。卓が空きました。' : action === 'no_show' ? '無断にしました。' : '来店・退店の記録を訂正しました。')
+      if (!ok && current()) void reload()
+      return current() ? failure : undefined
+    } finally { attendanceWorking.current = false }
+  }
 
   if (phone) {
     return (
@@ -262,7 +289,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onDetail={id=>{const r=rows.find(r=>r.id===id);if(r?.hold_expires_at)setOpenId(id);else setDetailId(id)}}
         />
       ) : (
-        <ListView pageSize={pageSize} onPageSize={(next) => { onPageSize(next); onPage(1) }} selectedId={detailId==='closed'?undefined:(detailed??rows[0])?.id} onEdit={setOpenId} onView={onView} day={day} onDay={onDay} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restoreReservation(id),'予約を有効に戻しました。')}}/>}
+        <ListView pageSize={pageSize} onPageSize={(next) => { onPageSize(next); onPage(1) }} selectedId={detailId==='closed'?undefined:(detailed??rows[0])?.id} onEdit={setOpenId} onView={onView} day={day} onDay={onDay} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog operationScope={scope} onAttendance={attendance} inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restoreReservation(id),'予約を有効に戻しました。')}}/>}
           view={view}
           rows={rows}
           total={total}
@@ -284,6 +311,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         />
       )}
       <ReservationDetailDialog
+        operationScope={scope}
         onAttendance={attendance}
         reservation={view==='today'?detailed:null}
         accountId={accountId}
