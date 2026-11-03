@@ -124,3 +124,17 @@ it('入力の失敗は実際の欄名を応答する', async () => {
   expect(await response.json()).toMatchObject({ error: { fieldErrors: [{ field: 'tableId', message: '卓が正しくありません' }] } })
   expect(fetch).not.toHaveBeenCalled()
 })
+
+it('予約の取消理由を取消状態と同時に保存し、通常の編集では保持する', async () => {
+  seedRestaurantFixture()
+  const path = '/api/restaurant-test/reservations/reservation-ginza?account_id=account-1'
+  const invalid = await requestWithMethod(path, 'PATCH', { status: 'cancelled', cancellationReason: '  ' })
+  expect(invalid.status).toBe(400)
+  expect(testDb.raw.prepare('SELECT status, cancel_reason FROM rt_reservations WHERE id=?').get('reservation-ginza')).toEqual({ status: 'confirmed', cancel_reason: null })
+  const cancelled = await requestWithMethod(path, 'PATCH', { status: 'cancelled', cancellationReason: '  店舗の都合  ' })
+  expect(cancelled.status).toBe(200)
+  expect(testDb.raw.prepare('SELECT status, cancel_reason FROM rt_reservations WHERE id=?').get('reservation-ginza')).toEqual({ status: 'cancelled', cancel_reason: '店舗の都合' })
+  const edit = await requestWithMethod(path, 'PATCH', { note: '確認済み' })
+  expect(edit.status).toBe(200)
+  expect(testDb.raw.prepare('SELECT cancel_reason FROM rt_reservations WHERE id=?').get('reservation-ginza')).toEqual({ cancel_reason: '店舗の都合' })
+})

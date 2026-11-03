@@ -13,6 +13,7 @@
 
 import { AlertTriangle, Ban, Check, X } from 'lucide-react'
 import Button from '@/components/shared/button'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ListState from '@/components/shared/list-state'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
 import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
@@ -329,6 +330,8 @@ export function OrderDetailDialog({
 
 export interface CancelOrderDialogProps {
   open: boolean
+  accountId: string | null
+  store?: { id: string; name?: string | null }
   orderNumber: string
   serviceLabel: string
   /** 画面に出す合計金額。取れていないときは `null`。 */
@@ -344,6 +347,8 @@ export interface CancelOrderDialogProps {
 /** D-3 `dgeTy`。取り消せない操作なので、理由を選んでから送る。 */
 export function CancelOrderDialog({
   open,
+  accountId,
+  store,
   orderNumber,
   serviceLabel,
   totalAmount,
@@ -393,6 +398,7 @@ export function CancelOrderDialog({
         </>
       )}
     >
+      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} store={store ?? { id: '' }} />
       <p className={styles.dialogLead}>
         {subject}をキャンセルします。{serviceLabel}側のお客様にも通知され、この操作は取り消せません。
       </p>

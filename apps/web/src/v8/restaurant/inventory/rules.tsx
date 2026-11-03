@@ -5,6 +5,7 @@ import type { RestaurantInventoryRules, RestaurantInventoryRuleState } from '@li
 import { PageContent } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import DateField from '@/components/shared/date-field'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
@@ -61,6 +62,7 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
   const contextKey = JSON.stringify([accountId, storeId])
   const currentContext = useRef({ key: contextKey })
   if (currentContext.current.key !== contextKey) currentContext.current = { key: contextKey }
+  const confirmContext = useRef<typeof currentContext.current | null>(null)
   useEffect(() => { setConfirm(false); setSaving(false); setValidationBlocked(false); setSaveError(''); setSaved(null); setDraft(null) }, [contextKey])
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
@@ -93,7 +95,7 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
   const dirty = Boolean(canEdit && draft && saved && JSON.stringify(draft) !== JSON.stringify(toDraft(saved)))
   const guard = useUnsavedGuard({ dirty, busy: saving })
   async function save() {
-    if (!canEditRef.current || !draft || !saved || saving || conflict.conflict || validationBlocked) return
+    if (!canEditRef.current || confirmContext.current !== currentContext.current || !draft || !saved || saving || conflict.conflict || validationBlocked) return
     const scope = currentContext.current
     setSaving(true); setSaveError('')
     try {
@@ -133,7 +135,7 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
         if (error) {
           setFieldError(error); return
         }
-        setFieldError(''); setSaveError(''); saveErrors.reset(); setConfirm(true)
+        confirmContext.current = currentContext.current; setFieldError(''); setSaveError(''); saveErrors.reset(); setConfirm(true)
       }}>
         <SettingsFormRow layout="columns" columns={3}>
           <Field label="残り席がこの数以下で止める" optional={false} help="0〜10,000 席の範囲で整数を入れます。" error={fieldError}>
@@ -157,7 +159,7 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
       <Button lockedReason={lockedReason} disabled={!canEdit || !dirty || saving} onClick={() => { setDraft(toDraft(saved)); setFieldError(''); saveErrors.reset() }}>キャンセル</Button>
       <Button lockedReason={lockedReason} type="submit" form="inventory-rules-form" variant="primary" busy={saving} disabled={!canEdit || !dirty || validationBlocked || Boolean(conflict.conflict)}>ルールを保存する</Button>
     </>} />
-    <ConfirmDialog open={confirm && canEdit} title="自動調整のルールを保存しますか？" description="保存すると、すでにある予約を含めて受付枠を数え直します。受付停止を外すと、保持していた配分へ戻ります。担当への通知を有効にすると、自動通知の対象になります。" confirmLabel="保存する" busy={saving} error={saveError || undefined} onSuccess={() => setConfirm(false)} cancelLabel={validationBlocked ? "戻って直す" : "キャンセル"} confirmDisabled={validationBlocked || Boolean(conflict.conflict)} confirmDisabledReason={validationBlocked ? "戻って入力を直してください。" : "閉じて最新の内容と比べてください。"} onConfirm={save} onCancel={() => { if (!saving) setConfirm(false) }} />
+    <ConfirmDialog open={confirm && canEdit && confirmContext.current === currentContext.current} title="自動調整のルールを保存しますか？" description="保存すると、すでにある予約を含めて受付枠を数え直します。受付停止を外すと、保持していた配分へ戻ります。担当への通知を有効にすると、自動通知の対象になります。" confirmLabel="保存する" busy={saving} error={saveError || undefined} onSuccess={() => setConfirm(false)} cancelLabel={validationBlocked ? "戻って直す" : "キャンセル"} confirmDisabled={validationBlocked || Boolean(conflict.conflict)} confirmDisabledReason={validationBlocked ? "戻って入力を直してください。" : "閉じて最新の内容と比べてください。"} onConfirm={save} onCancel={() => { if (!saving) setConfirm(false) }}><OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: storeId }} /></ConfirmDialog>
     <SaveConflictCompareDialog open={conflict.compareOpen} busy={conflict.compareBusy} error={conflict.compareError} lines={diff} onReload={conflict.reloadLatest} onCancel={conflict.closeCompare} />
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="自動調整ルールの変更" busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
   </></SaveErrorScope>

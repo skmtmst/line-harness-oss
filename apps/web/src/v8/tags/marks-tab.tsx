@@ -96,12 +96,16 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   const gateRef = useRef(createResponseGate())
   const accountRef = useRef(accountId)
   accountRef.current = accountId
+  const archiveScope = useRef<{ accountId: string | null; generation: number }>({ accountId, generation: 0 })
+  if (archiveScope.current.accountId !== accountId) archiveScope.current = { accountId, generation: archiveScope.current.generation + 1 }
+  const openArchiveGeneration = useRef(-1)
 
   useEffect(() => {
     gateRef.current.invalidate()
     setRestoreTarget(null)
     setRestoreError('')
     setPendingDelete(null)
+    setDeleting(false)
     setArchiveImpact(null)
     setDragId(null)
     setPage(1)
@@ -241,6 +245,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   const openArchive = async (mark: MarkRow) => {
     const account = accountId
     if (!account) return
+    openArchiveGeneration.current = archiveScope.current.generation
     const token = gateRef.current.begin()
     setPendingDelete(mark)
     setArchiveImpact(null)
@@ -265,7 +270,8 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   const confirmRemove = async (mark: MarkRow) => {
     // R180: 0人のときは置換先なしで保管する。
     const replacement = (archiveImpact?.friendCount ?? 0) > 0 ? replacementMarkId : (replacementMarkId || null)
-    if (!accountId || !archiveImpact || ((archiveImpact.friendCount ?? 0) > 0 && !replacementMarkId) || deleting) return
+    if (!accountId || openArchiveGeneration.current !== archiveScope.current.generation || !archiveImpact || ((archiveImpact.friendCount ?? 0) > 0 && !replacementMarkId) || deleting) return
+    const generation = archiveScope.current.generation
     setError('')
     setDeleteError('')
     setDeleting(true)
@@ -275,14 +281,16 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
         impactRevision: archiveImpact.impactRevision,
         expectedVersion: archiveImpact.expectedVersion,
       }, crypto.randomUUID())
+      if (generation !== archiveScope.current.generation) return
       if (!res.success) throw new Error(res.error)
       setPendingDelete(null)
       setArchiveImpact(null)
       await load()
     } catch {
+      if (generation !== archiveScope.current.generation) return
       setDeleteError('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setDeleting(false)
+      if (generation === archiveScope.current.generation) setDeleting(false)
     }
   }
 
@@ -596,9 +604,10 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
 </DetailContent>
 </DetailPanel>
 
-      {pendingDelete ? (
+      {pendingDelete && openArchiveGeneration.current === archiveScope.current.generation ? (
         <ArchiveMarkDialog
           mark={pendingDelete}
+          accountId={accountId}
           impact={archiveImpact}
           replacementMarkId={replacementMarkId}
           loading={impactLoading}

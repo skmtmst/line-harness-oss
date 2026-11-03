@@ -98,6 +98,9 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  const archiveScope = useRef({ accountId: selectedAccountId, markId, generation: 0 })
+  if (archiveScope.current.accountId !== selectedAccountId || archiveScope.current.markId !== markId) archiveScope.current = { accountId: selectedAccountId, markId, generation: archiveScope.current.generation + 1 }
+  const openArchiveGeneration = useRef(-1)
   const editing = Boolean(markId)
   usePageTitle(editing ? '対応マークを編集' : '対応マークを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }, { label: '対応マーク', href: '/tags?tab=marks' }])
@@ -141,6 +144,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const [impactLoading, setImpactLoading] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState('')
+  useEffect(() => { setArchiveOpen(false); setArchiveImpact(null); setImpactLoading(false); setArchiving(false); setArchiveError('') }, [selectedAccountId, markId])
   /* 編集のときのきまり（読むだけ。変える・作るは窓の部品）。 */
   const [rules, setRules] = useState<SupportMarkAutomationRule[]>([])
   const [rulesState, setRulesState] = useState<'loading' | 'ready' | 'error' | 'forbidden' | 'not-connected'>('loading')
@@ -354,7 +358,9 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   /* 保管：一覧の保管と同じ影響確認を経る。 */
   const openArchive = async () => {
     const account = selectedAccountId
-    if (canManageByRole !== true || !account || !selected) return
+    if (canManageByRole !== true || !account || !selected || loadedAccountRef.current !== account) return
+    const generation = archiveScope.current.generation
+    openArchiveGeneration.current = generation
     setArchiveOpen(true)
     setArchiveImpact(null)
     setReplacementMarkId('')
@@ -362,22 +368,25 @@ function MarkEditorBody({ markId }: { markId?: string }) {
     setImpactLoading(true)
     try {
       const res = await api.supportMarks.archiveImpact(selected.id, account)
+      if (generation !== archiveScope.current.generation) return
       if (!res.success) throw new Error(res.error)
       setArchiveImpact(res.data)
       setReplacementMarkId(res.data.replacementOptions.find((option) => option.isDefault)?.id ?? res.data.replacementOptions[0]?.id ?? '')
     } catch (saveFailure) {
+      if (generation !== archiveScope.current.generation) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setArchiveError('保管の影響を確認できませんでした。画面を閉じて、もう一度お試しください。') }
     } finally {
-      setImpactLoading(false)
+      if (generation === archiveScope.current.generation) setImpactLoading(false)
     }
   }
 
   const confirmArchive = async (mark: MarkRow) => {
     const replacement = (archiveImpact?.friendCount ?? 0) > 0 ? replacementMarkId : (replacementMarkId || null)
-    if (canManageByRole !== true || !selectedAccountId || !archiveImpact || ((archiveImpact.friendCount ?? 0) > 0 && !replacementMarkId) || archiving) return
+    if (canManageByRole !== true || !selectedAccountId || loadedAccountRef.current !== selectedAccountId || openArchiveGeneration.current !== archiveScope.current.generation || !archiveImpact || ((archiveImpact.friendCount ?? 0) > 0 && !replacementMarkId) || archiving) return
+    const generation = archiveScope.current.generation
     setArchiveError('')
     setArchiving(true)
     try {
@@ -386,18 +395,20 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         impactRevision: archiveImpact.impactRevision,
         expectedVersion: archiveImpact.expectedVersion,
       }, crypto.randomUUID())
+      if (generation !== archiveScope.current.generation) return
       if (!res.success) throw new Error(res.error)
       setArchiveOpen(false)
       setArchiveImpact(null)
       disarm()
       router.push('/tags?tab=marks')
     } catch (saveFailure) {
+      if (generation !== archiveScope.current.generation) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setArchiveError('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setArchiving(false)
+      if (generation === archiveScope.current.generation) setArchiving(false)
     }
   }
 
@@ -559,9 +570,10 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} lines={comparison} onReload={collision.reloadLatest} onCancel={collision.closeCompare} />
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="マークへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-      {archiveOpen && selected ? (
+      {archiveOpen && selected && openArchiveGeneration.current === archiveScope.current.generation ? (
         <ArchiveMarkDialog
           mark={selected}
+          accountId={selectedAccountId}
           impact={archiveImpact}
           replacementMarkId={replacementMarkId}
           loading={impactLoading}

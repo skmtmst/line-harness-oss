@@ -28,7 +28,7 @@ export function useBookingDetail() {
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
-  const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
+  const [decideTarget, setDecideTargetState] = useState<BookingAction | null>(null)
   const [error, setError] = useState('')
   // 取得の失敗を共通部品へ渡し、権限・混雑・通信の案内を区別する。
   const [loadError, setLoadError] = useState<unknown>(null)
@@ -55,6 +55,11 @@ export function useBookingDetail() {
   const targetGeneration = useRef(0)
   if (targetRef.current.accountId !== selectedAccountId || targetRef.current.bookingId !== id) targetGeneration.current += 1
   targetRef.current = { accountId: selectedAccountId, bookingId: id }
+  const decideGeneration = useRef<number | null>(null)
+  const setDecideTarget = (action: BookingAction | null) => {
+    decideGeneration.current = action === null ? null : targetGeneration.current
+    setDecideTargetState(action)
+  }
   const isCurrentTarget = useCallback(
     (target: { accountId: string; bookingId: string; generation?: number }) =>
       targetRef.current.accountId === target.accountId
@@ -316,7 +321,7 @@ export function useBookingDetail() {
   }
 
   const decide = async (action: BookingAction) => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || decideGeneration.current !== targetGeneration.current) return
     const actionTarget = { accountId: selectedAccountId, bookingId: id, generation: targetGeneration.current }
     setActing(true)
     setError('')
@@ -583,6 +588,7 @@ export function useBookingDetail() {
   }
   return {
     id,
+    selectedAccountId,
     loading,
     acting,
     decideTarget,

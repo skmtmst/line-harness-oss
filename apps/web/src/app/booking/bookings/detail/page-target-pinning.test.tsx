@@ -215,6 +215,8 @@ describe('DEEP-20: 確認窓の説明を実処理に合わせる', () => {
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     await flush()
     expect(screen.getByText(/キャンセルしてもお客様への自動連絡はありません/)).toBeTruthy()
+    expect(screen.getByText('LINEアカウント')).toBeTruthy()
+    expect(screen.getByText('環境')).toBeTruthy()
     expect(screen.queryByText(/この結果がLINEで届きます/)).toBeNull()
   })
 

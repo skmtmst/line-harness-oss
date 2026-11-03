@@ -25,6 +25,14 @@ async function confirmSave() {
   const dialog = await screen.findByRole('dialog')
   fireEvent.click(within(dialog).getByRole('button', { name: '保存する' }))
 }
+it('保存確認で対象のアカウント・店舗・環境を示す', async () => {
+  render(<RulesBoard {...props} />); await edit()
+  fireEvent.click(screen.getByRole('button', { name: 'ルールを保存する' }))
+  const dialog = await screen.findByRole('dialog', { name: '自動調整のルールを保存しますか？' })
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('店舗')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+})
 beforeEach(() => {
   role.value = verifiedStaffRole('owner')
   api.inventoryRules.mockResolvedValue({ data: initial })

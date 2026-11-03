@@ -14,6 +14,7 @@ import Card from '@/components/shared/card'
 import type { ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
@@ -85,6 +86,10 @@ export default function ScenarioResultsV8() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const accountScope = useRef({ id, accountId: selectedAccountId })
+  if (accountScope.current.id !== id || accountScope.current.accountId !== selectedAccountId) accountScope.current = { id, accountId: selectedAccountId }
+  const runsScope = useRef<typeof accountScope.current | null>(null)
+  const moveScope = useRef<typeof accountScope.current | null>(null)
   // 役割が読めるまでは出す（最後の守りはサーバー）。閲覧のみは購読を変える操作（…）を隠す。
   const featureAccess = useFeatureAccess('scenarios')
   const canEdit = featureAccess
@@ -160,6 +165,7 @@ export default function ScenarioResultsV8() {
    */
   const loadRuns = useCallback(async (seq: number, cursor?: string) => {
     if (!id) return
+    const requestScope = accountScope.current
     if (!selectedAccountId) {
       // アカウントが選ばれていないと購読は読めない。「0件」ではなく未取得。
       if (seq === loadSeqRef.current) {
@@ -172,6 +178,7 @@ export default function ScenarioResultsV8() {
       setRunsLoadingMore(true)
       setRunsMoreError('')
     } else {
+      runsScope.current = null
       setRuns(null)
       setRunsState('loading')
       setRunsMoreError('')
@@ -182,8 +189,9 @@ export default function ScenarioResultsV8() {
         status: subscriptionStatus || undefined,
         cursor,
       })
-      if (seq !== loadSeqRef.current) return
+      if (seq !== loadSeqRef.current || requestScope !== accountScope.current) return
       if (!res.success) throw new Error(res.error)
+      runsScope.current = requestScope
       setRuns((current) => {
         if (!cursor || !current) return res.data
         const seen = new Set(current.subscriptions.map((s) => s.id))
@@ -307,9 +315,11 @@ export default function ScenarioResultsV8() {
 
   /** 移し先候補を取る。失敗は0件と分けて、窓の中で読み直せるようにする。 */
   const loadMoveOptions = async () => {
+    const requestScope = accountScope.current
     setMoveOptions(null)
     setMoveOptionsError(false)
     const res = await api.scenarios.list({ accountId: selectedAccountId || undefined }).catch(() => null)
+    if (requestScope !== accountScope.current) return
     if (res?.success) {
       setMoveOptions(res.data)
     } else {
@@ -318,6 +328,8 @@ export default function ScenarioResultsV8() {
   }
 
   const openMoveDialog = async (subscription: { id: string; friendName: string }) => {
+    if (!selectedAccountId || runsScope.current !== accountScope.current) return
+    moveScope.current = accountScope.current
     setMoveTarget({ subscriptionId: subscription.id, friendName: subscription.friendName })
     setMoveScenarioId('')
     setOpError('')
@@ -325,7 +337,7 @@ export default function ScenarioResultsV8() {
   }
 
   const confirmMove = async () => {
-    if (!moveTarget || !moveScenarioId) return
+    if (!moveTarget || !moveScenarioId || moveScope.current !== accountScope.current) return
     const signature = `${moveTarget.subscriptionId}:move:${moveScenarioId}`
     const key = opKeys.current.get(signature)
     setOpBusy(signature)
@@ -635,7 +647,7 @@ export default function ScenarioResultsV8() {
 
       {/* 「別のシナリオへ移す」の窓。移し先は有効の別シナリオだけ選べる。 */}
       <Dialog
-        open={moveTarget !== null}
+        open={moveTarget !== null && moveScope.current === accountScope.current}
         title={moveTarget ? `${moveTarget.friendName} を別のシナリオへ移す` : ''}
         description="いまのシナリオはここで終わり、選んだシナリオの最初から届き始めます。"
         busy={opBusy !== null}
@@ -655,6 +667,7 @@ export default function ScenarioResultsV8() {
             </Button>
           </DialogActions>)}
       >
+        <OperationTargetSummary accounts={[{ id: moveScope.current?.accountId ?? '' }]} />
         {/* 候補の取得失敗は「移せるシナリオがありません」と分ける（SCENARIO-10 と同じ分け方）。 */}
         {moveOptionsError ? (
           <Notice tone="danger" className={styles.moreErrorNoticePlacement} >移し先の候補を読み込めませんでした。

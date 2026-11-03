@@ -16,6 +16,7 @@ import { isForbiddenOrRateLimited,loadFailureCopy } from '@/components/shared/ap
 import Button from '@/components/shared/button'
 import ConditionBuilder, { findConditionDraftIssue, pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -530,7 +531,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         error={testIssue}
         onConfirm={() => sendTest()}
         onCancel={() => setTestConfirm(false)}
-      />
+      ><OperationTargetSummary accounts={[{ id: '' }]} /></ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="この手順への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <ConfirmDialog
         open={compareTarget !== null || compareError !== ''}
