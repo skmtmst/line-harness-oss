@@ -255,3 +255,12 @@ describe('公開前の確認の Instagram の行（★V8-B `U1X7T2`）', () => {
 })
 
 seedIdentity(() => { verifiedStaffRole('owner') })
+
+it.each([{ canPublish: false }, { writeEnabled: false }])('投稿の送信結果が未確認でも送れない時は押せない操作を案内しない %o', async restriction => {
+  fixture.post.mockResolvedValue({ post: post('p-1', { status: 'pending_confirm' }), store: { id: 'store', name: '然カフェ 本店' }, writeEnabled: true, canPublish: true, ...restriction })
+  render(<PostConfirm accountId="acc-1" id="p-1" go={go} />)
+  const notice = await screen.findByText(/前回の送信結果を確認できていません/)
+  expect(notice.textContent).toContain('Google側の状態を確認してください。')
+  expect(notice.textContent).not.toContain('を押すと')
+  expect(fixture.publishPost).not.toHaveBeenCalled()
+})
