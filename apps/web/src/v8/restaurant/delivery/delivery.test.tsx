@@ -162,6 +162,7 @@ function order(
 ): DeliveryOrderSummary {
   return {
     id,
+    version: 1,
     service: 'ubereats',
     serviceLabel: 'Uber Eats',
     orderNumber,
@@ -276,6 +277,7 @@ beforeEach(() => {
     success: true,
     order: {
       id: 'o1',
+      version: 1,
       service: 'ubereats',
       serviceLabel: 'Uber Eats',
       orderNumber: 'UE-1001',
@@ -383,8 +385,8 @@ describe('kDQHr デリバリー受注', () => {
 
     fireEvent.click(screen.getByText('まとめて受け付ける'))
     await waitFor(() => expect(fixture.accept).toHaveBeenCalledTimes(1))
-    expect(fixture.accept).toHaveBeenCalledWith('account-1', 'other-new')
-    expect(fixture.accept).not.toHaveBeenCalledWith('account-1', 'o1')
+    expect(fixture.accept).toHaveBeenCalledWith('account-1', 'other-new', 1)
+    expect(fixture.accept).not.toHaveBeenCalledWith('account-1', 'o1', 1)
   })
 
   it('注文番号を押すと ?id= が付いて注文の詳細が開く', async () => {
@@ -691,7 +693,7 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     const button = dialog.getByRole('button', { name: label }) as HTMLButtonElement
     expect(button.disabled).toBe(false)
     fireEvent.click(button)
-    await waitFor(() => expect(fixture[action]).toHaveBeenCalledWith('account-1', 'o1'))
+    await waitFor(() => expect(fixture[action]).toHaveBeenCalledWith('account-1', 'o1', 1))
   })
 
   it('サーバが利用可能と返したUber注文を確認後にキャンセルできる', async () => {
@@ -705,7 +707,7 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     expect(confirmation.getByText('店舗')).toBeTruthy()
     expect(confirmation.getByText('環境')).toBeTruthy()
     fireEvent.click(confirmation.getByRole('button', { name: 'キャンセルする' }))
-    await waitFor(() => expect(fixture.cancel).toHaveBeenCalledWith('account-1', 'o1', 'out_of_stock'))
+    await waitFor(() => expect(fixture.cancel).toHaveBeenCalledWith('account-1', 'o1', 'out_of_stock', 1))
   })
 
   it('キャンセル確認中にアカウントを切り替えたら古い窓から送らない', async () => {
@@ -768,8 +770,8 @@ describe('Uberの接続と未完成の操作を分ける', () => {
 
     const dialog = within(screen.getByRole('dialog', { name: '注文の詳細' }))
     fireEvent.click(dialog.getByRole('button', { name: '受け付ける' }))
-    await waitFor(() => expect(fixture.accept).toHaveBeenCalledWith('account-2', 'o1'))
-    expect(fixture.accept).not.toHaveBeenCalledWith('account-1', 'o1')
+    await waitFor(() => expect(fixture.accept).toHaveBeenCalledWith('account-2', 'o1', 1))
+    expect(fixture.accept).not.toHaveBeenCalledWith('account-1', 'o1', 1)
   })
 
   it.each([
@@ -792,7 +794,7 @@ describe('Uberの接続と未完成の操作を分ける', () => {
       expect((dialog.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(false)
     }
     fireEvent.click(actionButton)
-    await waitFor(() => expect(fixture[action]).toHaveBeenCalledWith('account-1', 'o1'))
+    await waitFor(() => expect(fixture[action]).toHaveBeenCalledWith('account-1', 'o1', 1))
   })
 
   it('一括停止でUberを選べず、他社だけを送る', async () => {

@@ -141,6 +141,7 @@ function DeliveryInner() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailBusy, setDetailBusy] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState<DeliveryOrderDetailData['order'] | null>(null)
   const [cancelReason, setCancelReason] = useState<DeliveryCancelReasonCode>('out_of_stock')
   const [cancelBusy, setCancelBusy] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
@@ -381,13 +382,14 @@ function DeliveryInner() {
 
   /* ── 送信（一覧と詳細のどちらからでも同じ道を通る） ─────────── */
   const runOrderAction = useCallback(async (
-    id: string,
-    action: (accountId: string, orderId: string) => Promise<DeliveryOrderMutationData>,
+    order: DeliveryOrderSummary | DeliveryOrderDetailData['order'],
+    action: (accountId: string, orderId: string, expectedVersion?: number) => Promise<DeliveryOrderMutationData>,
     successText: string,
     fallback: string,
   ) => {
-    const order = data?.orders.find((item) => item.id === id)
-      ?? (currentDetail?.order.id === id ? currentDetail.order : null)
+    const id = order.id
+    if (currentIntake.current.scope !== intakeScope || !currentIntake.current.canManage) return
+    if (!Number.isSafeInteger(order.version)) { setNotice({ tone: 'danger', text: '注文を読み直してから操作してください。' }); return }
     if (
       !canManage
       || !selectedAccountId
@@ -398,7 +400,7 @@ function DeliveryInner() {
     setDetailBusy(true)
     setNotice(null)
     try {
-      await action(selectedAccountId, id)
+      await action(selectedAccountId, id, order.version)
       setNotice({ tone: 'success', text: successText })
       await loadOrders(true)
       if (orderId === id) await loadDetail(id, true)
@@ -408,38 +410,38 @@ function DeliveryInner() {
       setBusyOrderId(null)
       setDetailBusy(false)
     }
-  }, [canManage, data, currentDetail, selectedAccountId, uberOrderActionsEnabled, loadOrders, loadDetail, orderId])
+  }, [canManage, intakeScope, selectedAccountId, uberOrderActionsEnabled, loadOrders, loadDetail, orderId])
 
-  const acceptOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
+  const acceptOrder = useCallback((order: DeliveryOrderSummary | DeliveryOrderDetailData['order']) => {
     void runOrderAction(
-      order.id,
+      order,
       restaurantDeliveryApi.accept,
       '注文を受け付けました。',
       '注文を受け付けられませんでした。',
     )
   }, [runOrderAction])
 
-  const rejectOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
+  const rejectOrder = useCallback((order: DeliveryOrderSummary | DeliveryOrderDetailData['order']) => {
     void runOrderAction(
-      order.id,
+      order,
       restaurantDeliveryApi.reject,
       '注文を拒否しました。',
       '注文を拒否できませんでした。',
     )
   }, [runOrderAction])
 
-  const readyOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
+  const readyOrder = useCallback((order: DeliveryOrderSummary | DeliveryOrderDetailData['order']) => {
     void runOrderAction(
-      order.id,
+      order,
       restaurantDeliveryApi.ready,
       '準備完了にしました。',
       '準備完了にできませんでした。',
     )
   }, [runOrderAction])
 
-  const handOverOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
+  const handOverOrder = useCallback((order: DeliveryOrderSummary | DeliveryOrderDetailData['order']) => {
     void runOrderAction(
-      order.id,
+      order,
       restaurantDeliveryApi.handOver,
       '受け渡し済みにしました。',
       '受け渡し済みにできませんでした。',
@@ -462,7 +464,8 @@ function DeliveryInner() {
     let failed = 0
     for (const order of targets) {
       try {
-        await restaurantDeliveryApi.accept(selectedAccountId, order.id)
+        if (!Number.isSafeInteger(order.version)) throw new Error('注文の版を読み直してください')
+        await restaurantDeliveryApi.accept(selectedAccountId, order.id, order.version)
         done += 1
       } catch {
         failed += 1
@@ -482,7 +485,7 @@ function DeliveryInner() {
   }, [canManage, selectedAccountId, selected, data, loadOrders])
 
   const submitCancel = useCallback(async () => {
-    const order = currentDetail?.order
+    const order = cancelTarget
     if (
       !canManage
       || !selectedAccountId
@@ -494,7 +497,7 @@ function DeliveryInner() {
     setCancelBusy(true)
     setCancelError(null)
     try {
-      await restaurantDeliveryApi.cancel(selectedAccountId, order.id, cancelReason)
+      await restaurantDeliveryApi.cancel(selectedAccountId, order.id, cancelReason, order.version)
       if (requestScope !== cancelScope.current) return
       setCancelOpen(false)
       setNotice({ tone: 'success', text: '注文をキャンセルしました。' })
@@ -506,7 +509,7 @@ function DeliveryInner() {
     } finally {
       if (requestScope === cancelScope.current) setCancelBusy(false)
     }
-  }, [canManage, selectedAccountId, currentDetail, cancelReason, uberOrderActionsEnabled, loadOrders, closeDetail])
+  }, [canManage, selectedAccountId, cancelTarget, cancelReason, uberOrderActionsEnabled, loadOrders, closeDetail])
 
   /* ── 受付の停止・再開 ───────────────────────────────────── */
   const openStop = useCallback((service?: DeliveryService) => {
@@ -876,7 +879,9 @@ function DeliveryInner() {
         onReady={() => { if (detailOrder) readyOrder(detailOrder) }}
         onHandOver={() => { if (detailOrder) handOverOrder(detailOrder) }}
         onCancelOrder={() => {
+          if (!detailOrder || !Number.isSafeInteger(detailOrder.version)) { setNotice({ tone: 'danger', text: '注文を読み直してから操作してください。' }); return }
           openedCancelScope.current = cancelScope.current
+          setCancelTarget({ ...detailOrder })
           setCancelReason('out_of_stock')
           setCancelError(null)
           setCancelOpen(true)
@@ -886,12 +891,12 @@ function DeliveryInner() {
       <CancelOrderDialog
         open={cancelOpen && openedCancelScope.current === cancelScope.current}
         accountId={detailAccountId}
-        store={dataAccountId === selectedAccountId && data?.orders.some(order => order.id === detailOrder?.id) ? data.store : undefined}
-        orderNumber={detailOrder?.orderNumber ?? ''}
-        serviceLabel={detailOrder
-          ? detailOrder.serviceLabel || DELIVERY_SERVICE_LABELS[detailOrder.service]
+        store={dataAccountId === selectedAccountId && data?.orders.some(order => order.id === cancelTarget?.id) ? data.store : undefined}
+        orderNumber={cancelTarget?.orderNumber ?? ''}
+        serviceLabel={cancelTarget
+          ? cancelTarget.serviceLabel || DELIVERY_SERVICE_LABELS[cancelTarget.service]
           : DASH}
-        totalAmount={detailOrder?.totalAmount ?? null}
+        totalAmount={cancelTarget?.totalAmount ?? null}
         reasonCode={cancelReason}
         busy={cancelBusy}
         error={cancelError}

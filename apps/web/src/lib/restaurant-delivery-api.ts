@@ -66,6 +66,7 @@ export interface DeliveryServiceState {
 
 export interface DeliveryOrderSummary {
   id: string
+  version?: number
   service: DeliveryService
   serviceLabel: string
   orderNumber: string
@@ -116,6 +117,7 @@ export interface DeliveryOrderDetailData {
   success: true
   order: {
     id: string
+    version?: number
     service: DeliveryService
     serviceLabel: string
     orderNumber: string
@@ -267,31 +269,31 @@ export const restaurantDeliveryApi = {
     )
   },
 
-  accept(accountId: string, id: string): Promise<DeliveryOrderMutationData> {
+  accept(accountId: string, id: string, expectedVersion?: number): Promise<DeliveryOrderMutationData> {
     return fetchApi<DeliveryOrderMutationData>(
       withAccount(`${BASE}/orders/${encodeURIComponent(id)}/accept`, accountId),
-      { method: 'POST', body: '{}' },
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
     )
   },
 
-  ready(accountId: string, id: string): Promise<DeliveryOrderMutationData> {
+  ready(accountId: string, id: string, expectedVersion?: number): Promise<DeliveryOrderMutationData> {
     return fetchApi<DeliveryOrderMutationData>(
       withAccount(`${BASE}/orders/${encodeURIComponent(id)}/ready`, accountId),
-      { method: 'POST', body: '{}' },
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
     )
   },
 
-  handOver(accountId: string, id: string): Promise<DeliveryOrderMutationData> {
+  handOver(accountId: string, id: string, expectedVersion?: number): Promise<DeliveryOrderMutationData> {
     return fetchApi<DeliveryOrderMutationData>(
       withAccount(`${BASE}/orders/${encodeURIComponent(id)}/handed-over`, accountId),
-      { method: 'POST', body: '{}' },
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
     )
   },
 
-  reject(accountId: string, id: string): Promise<DeliveryOrderMutationData> {
+  reject(accountId: string, id: string, expectedVersion?: number): Promise<DeliveryOrderMutationData> {
     return fetchApi<DeliveryOrderMutationData>(
       withAccount(`${BASE}/orders/${encodeURIComponent(id)}/reject`, accountId),
-      { method: 'POST', body: '{}' },
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
     )
   },
 
@@ -300,12 +302,13 @@ export const restaurantDeliveryApi = {
     accountId: string,
     id: string,
     reasonCode: DeliveryCancelReasonCode,
+    expectedVersion?: number,
   ): Promise<DeliveryOrderMutationData> {
     return fetchApi<DeliveryOrderMutationData>(
       withAccount(`${BASE}/orders/${encodeURIComponent(id)}/cancel`, accountId),
       {
         method: 'POST',
-        body: JSON.stringify({ reason_code: reasonCode }),
+        body: JSON.stringify({ reason_code: reasonCode, expectedVersion }),
         headers: { 'x-confirm-irreversible': CANCEL_CONFIRM_TOKEN },
       },
     )
