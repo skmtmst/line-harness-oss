@@ -679,6 +679,7 @@ export default function TemplatesListV8() {
       {
         id: 'broadcast',
         label: '一斉配信で使う',
+        icon: <Send size={16} aria-hidden="true" />,
         onSelect: () => router.push(`/broadcasts/new?templateId=${encodeURIComponent(t.id)}`),
       },
       ...(canMutate ? [

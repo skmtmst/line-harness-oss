@@ -1061,7 +1061,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
         </GridHeadRow>
         {loading ? <p className={styles.stateRow} role="status">ログインユーザーを読み込んでいます…</p>
           : error ? <ListState kind="error" title="ログインユーザーを読み込めませんでした。登録した内容は消えていません。" description="" action={<><Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
-          : shown.length === 0 ? <p className={styles.stateRow}>条件に合うログインユーザーはいません。条件を変えてお試しください。</p>
+          : shown.length === 0 ? <p className={styles.stateRow}>{tab === 'invited' && invitedUsers.length === 0 ? usersTotal > accessUsers.length ? '読み込んだ範囲に招待中の人はいません。続きを読み込んで確認してください。' : '招待中のユーザーはまだいません。' : '条件に合うログインユーザーはいません。条件を変えてお試しください。'}</p>
           : shown.map((user) => {
             const member = memberById.get(user.id)
             const items = rowMenuItems(user)

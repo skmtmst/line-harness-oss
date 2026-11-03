@@ -361,3 +361,16 @@ it('C-10: 下書きが1通でも公開中の複数通を見失わない', async 
   fireEvent.click(multiple)
   expect(screen.getByText('公開中は複数通')).toBeTruthy()
 })
+
+it('行の操作は意味ごとの印を出し、一斉配信に編集の鉛筆を使わない', async () => {
+  await renderList()
+  fireEvent.click(screen.getByRole('button', { name: `テンプレート「${used.name}」の操作` }))
+  const item = (label: string) => screen.getByRole('menuitem', { name: label })
+  expect(item('編集する').querySelector('.lucide-pencil')).toBeTruthy()
+  expect(item('使っている所を見る').querySelector('.lucide-eye')).toBeTruthy()
+  expect(item('一斉配信で使う').querySelector('.lucide-send')).toBeTruthy()
+  expect(item('一斉配信で使う').querySelector('.lucide-pencil')).toBeNull()
+  expect(item('複製する').querySelector('.lucide-copy')).toBeTruthy()
+  expect(item('フォルダへ移す').querySelector('.lucide-folder')).toBeTruthy()
+  expect(item('削除する').querySelector('.lucide-trash-2')).toBeTruthy()
+})
