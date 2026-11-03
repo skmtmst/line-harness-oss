@@ -45,10 +45,11 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
         <span className={styles.spacer} />
         {canEdit && blocked === null ? <Toggle label="A/B で試す" checked={ab.enabled} onChange={ab.setEnabled} /> : null}
       </div>
+      {on ? <Notice tone="warn" appearance="soft">A/Bは送信未対応です。③でB案を消すとA案を配信できます。</Notice> : null}
       {blocked === 'all' ? (
-        <Notice tone="warn" appearance="soft" action={canEdit ? <Button onClick={onNarrow}>絞り込みにする</Button> : undefined}>全員への配信では使えません。絞り込みにすると使えます。</Notice>
+        <Notice tone="warn" appearance="soft" action={canEdit ? <Button onClick={onNarrow}>絞り込みにする</Button> : undefined}>全員への配信では使えません。A/Bは現在、送信に対応していません。</Notice>
       ) : blocked === 'few' ? (
-        <Notice tone="warn" appearance="soft">{`試すには ${formatNumber(AB_MIN_TOTAL)} 人以上の配信が要ります（今 ${formatNumber(total ?? 0)} 人）。`}</Notice>
+        <Notice tone="warn" appearance="soft">{`A/Bは送信未対応です。対象条件は ${formatNumber(AB_MIN_TOTAL)} 人以上です（今 ${formatNumber(total ?? 0)} 人）。`}</Notice>
       ) : on ? (
         <>
           <div className={styles.settingsGrid}>

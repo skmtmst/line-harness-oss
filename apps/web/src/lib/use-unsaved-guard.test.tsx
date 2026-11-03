@@ -11,6 +11,7 @@ import React, { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUnsavedGuard } from './use-unsaved-guard'
+import { requestUnsavedAction } from './unsaved-action'
 import { UnsavedLeaveDialog } from './unsaved-leave-dialog'
 
 const router = vi.hoisted(() => ({ push: vi.fn() }))
@@ -93,6 +94,58 @@ async function clickDialogButton(action: 'confirm' | 'cancel') {
 }
 
 describe('useUnsavedGuard', () => {
+  it('同じ履歴確定が2回呼ばれても、戻るのは1回だけ', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    let confirm = () => {}
+    function Capture() {
+      const guard = useUnsavedGuard({ dirty: true, onDiscard: discard })
+      confirm = guard.confirmLeave
+      return guard.leaveTarget ? <div role="dialog" /> : null
+    }
+    try {
+      await render(<Capture />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await act(async () => { confirm(); confirm() })
+      expect(discard).toHaveBeenCalledTimes(1)
+      expect(back).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+
+  it('親子とも未保存の画面内切替も1つの確認で両方を破棄する', async () => {
+    const parentDiscard = vi.fn(), childDiscard = vi.fn(), run = vi.fn()
+    await render(<><Harness dirty onDiscard={parentDiscard} /><Harness dirty onDiscard={childDiscard} /></>)
+    await act(async () => { requestUnsavedAction(run) })
+    expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+    await clickDialogButton('confirm')
+    expect(parentDiscard).toHaveBeenCalledTimes(1)
+    expect(childDiscard).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+  it('変更がなくても保存中ならリンク移動を止める', async () => {
+    await render(<Harness dirty={false} busy />)
+    const event = await click(anchor('回答フォーム'))
+    expect(event.defaultPrevented).toBe(true)
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(router.push).not.toHaveBeenCalled()
+  })
+  it('親子とも未保存のリンク移動は1つの確認で両方を破棄する', async () => {
+    const parentDiscard = vi.fn(), childDiscard = vi.fn()
+    await render(<><Harness dirty onDiscard={parentDiscard} /><Harness dirty onDiscard={childDiscard} /></>)
+    await click(anchor('デザイン設定'))
+    expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+    await clickDialogButton('confirm')
+    expect(parentDiscard).toHaveBeenCalledTimes(1)
+    expect(childDiscard).toHaveBeenCalledTimes(1)
+    expect(router.push).toHaveBeenCalledTimes(1)
+  })
+  it('親子の一方が保存中ならリンクからも移動しない', async () => {
+    await render(<><Harness dirty /><Harness dirty busy /></>)
+    const event = await click(anchor('回答フォーム'))
+    expect(event.defaultPrevented).toBe(true)
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(router.push).not.toHaveBeenCalled()
+  })
   it('履歴で保存が完了したら保存中の描画が残っていても戻る', async () => {
     let finish!: () => void
     const save = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))

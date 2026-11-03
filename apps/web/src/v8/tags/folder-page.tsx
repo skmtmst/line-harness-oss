@@ -1,5 +1,8 @@
 'use client'
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useContext, useEffect, useRef, useState } from 'react'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { FolderCheck, FolderPlus, Trash2 } from 'lucide-react'
@@ -7,6 +10,7 @@ import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
@@ -79,20 +83,35 @@ function TagFolderPage() {
   const [folderAccountId, setFolderAccountId] = useState<string | null>(selectedAccountId)
   const [saving, setSaving] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const deleteTicket = useRef<object | null>(null)
+  const renderedDeleteTicket = deleteTicket.current
+  const deleteLock = useRef(false)
+  const currentAccount = useRef(selectedAccountId)
+  currentAccount.current = selectedAccountId
   const [error, setError] = useState('')
   const activeRef = useRef<RequestKey>({ editId, generation: 0 })
   /* 直すとき、ready になるまで名前も色も本物ではない。空のまま保存して元の名前を消さない。 */
   const [loadState, setLoadState] = useState<'ready' | 'loading' | 'error' | 'forbidden'>(editId ? 'loading' : 'ready')
+  const baseline = useRef({ name: '', color: DEFAULT_COLOR })
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({
+    dirty: (loadState === 'ready' && (name !== baseline.current.name || color !== baseline.current.color)) || saving,
+    busy: saving,
+    onDiscard: () => { setName(baseline.current.name); setColor(baseline.current.color) },
+  })
 
   const close = () => router.push(scope === 'tag' ? '/tags' : '/tags?tab=fields')
 
   const loadFolder = () => {
     const request = { editId, generation: activeRef.current.generation + 1 }
     activeRef.current = request
+    deleteTicket.current = null
+    setDeleteOpen(false)
     setError('')
     setNameError('')
     setSaving(false)
     if (!editId) {
+      baseline.current = { name: '', color: DEFAULT_COLOR }
       setName('')
       setColor(DEFAULT_COLOR)
       setFolderAccountId(selectedAccountId)
@@ -108,6 +127,7 @@ function TagFolderPage() {
         if (!result.success) { setLoadState('error'); return }
         const group = result.data.find((item) => item.id === editId)
         if (!group) { setLoadState('error'); return }
+        baseline.current = { name: group.name, color: folderDisplayColor(group) }
         setName(group.name)
         setColor(folderDisplayColor(group))
         setFolderAccountId(group.accountId)
@@ -139,6 +159,7 @@ function TagFolderPage() {
         if (!result.success) throw new Error('save_failed')
       }
       if (!sameRequest(activeRef.current, request)) return
+      guard.disarm()
       close()
     } catch (reason) {
       if (!sameRequest(activeRef.current, request)) return
@@ -152,24 +173,28 @@ function TagFolderPage() {
   }
 
   const remove = async () => {
-    if (!editId || saving) return
+    if (!editId || saving || loadState !== 'ready' || !renderedDeleteTicket || renderedDeleteTicket !== deleteTicket.current || deleteLock.current || selectedAccountId !== currentAccount.current) return false
     const request = { ...activeRef.current }
+    deleteLock.current = true
     setSaving(true)
     setError('')
     try {
       const result = await api.tagGroups.delete(editId, folderAccountId)
       if (!result.success) throw new Error('delete_failed')
-      if (!sameRequest(activeRef.current, request)) return
+      if (!sameRequest(activeRef.current, request) || renderedDeleteTicket !== deleteTicket.current || selectedAccountId !== currentAccount.current) return false
+      deleteTicket.current = null
+      guard.disarm()
       router.push('/tags')
       return true
     } catch (reason) {
-      if (!sameRequest(activeRef.current, request)) return
+      if (!sameRequest(activeRef.current, request) || renderedDeleteTicket !== deleteTicket.current || selectedAccountId !== currentAccount.current) return false
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
 
       setError(folderDeleteError(reason instanceof ApiError ? reason.status : undefined)) }
       return false
     } finally {
+      deleteLock.current = false
       if (sameRequest(activeRef.current, request)) setSaving(false)
     }
   }
@@ -201,7 +226,7 @@ function TagFolderPage() {
         footer={(
           <>
             {editId ? (
-              <Button type="button" variant="danger" disabled={saving} onClick={() => { setError(''); setDeleteOpen(true) }}>
+              <Button type="button" variant="danger" disabled={saving || loadState !== 'ready'} disabledReason={blockedReason} title={blockedReason ?? undefined} onClick={() => { deleteTicket.current = {}; setError(''); setDeleteOpen(true) }}>
                 <Trash2 size={16} aria-hidden="true" />削除する
               </Button>
             ) : null}
@@ -226,6 +251,7 @@ function TagFolderPage() {
           ) : null}
         </>
       </FolderEditorDialog>
+      <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
       <ConfirmDialog
         open={deleteOpen}
         title={`「${name}」を削除しますか？`}
@@ -233,9 +259,9 @@ function TagFolderPage() {
         confirmLabel="このフォルダを削除する"
         destructive
         busy={saving}
-        onCancel={() => { if (!saving) setDeleteOpen(false) }}
-        error={error || undefined} onSuccess={() => setDeleteOpen(false)} onConfirm={() => remove()}
-      />
+        onCancel={() => { if (!saving && !deleteLock.current) { deleteTicket.current = null; setDeleteOpen(false) } }}
+        error={error || undefined} onSuccess={() => { deleteTicket.current = null; setDeleteOpen(false) }} onConfirm={() => remove()}
+      ><OperationTargetSummary accounts={[{ id: folderAccountId ?? '' }]} /></ConfirmDialog>
     </></SaveErrorScope>
   )
 }

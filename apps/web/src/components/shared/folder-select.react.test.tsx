@@ -6,6 +6,7 @@
 import { act, useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import FolderSelect, { FolderCreateError, folderCreateResult, type FolderSelectCreate, type FolderSelectFolder } from './folder-select'
 import { ApiError } from '@/lib/api'
 import FolderPanel from './folder-panel'
@@ -395,4 +396,59 @@ it.each(['<script>', '番号 with space', 'a'.repeat(129), ''])('使えない追
   expect(text).not.toContain('追跡番号')
   expect(input.value).toBe('挨拶')
   expect(onCreate).toHaveBeenCalledTimes(1)
+})
+
+it('フォルダ名の入力中に外へ焦点が移っても、開き直せば入力を保つ', async () => {
+  await openMenu({ onCreate: vi.fn() })
+  const input = await startCreate()
+  await act(async () => { fireEvent.change(input, { target: { value: '確認中の分類' } }) })
+  const outside = document.createElement('button'); outside.textContent = '外側'; document.body.append(outside)
+  await act(async () => { fireEvent.blur(input, { relatedTarget: outside }) })
+  expect(screen.getByText('作りかけのフォルダ名があります。')).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダの入力を確認' })) })
+  const restored = screen.getByRole('textbox', { name: '新しいフォルダの名前' }) as HTMLInputElement
+  expect(restored.value).toBe('確認中の分類')
+  outside.remove()
+})
+
+
+it('フォルダ名を破棄するときは確認し、編集を続けるなら入力を保持する', async () => {
+  const button = await openMenu({ onCreate: vi.fn() })
+  const input = await startCreate()
+  await act(async () => { fireEvent.change(input, { target: { value: '新しい分類' } }) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'やめる' })) })
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '編集を続ける' })) })
+  if (!screen.queryByRole('textbox', { name: '新しいフォルダの名前' })) {
+    await act(async () => { fireEvent.click(button) })
+    await startCreate()
+  }
+  expect((screen.getByRole('textbox', { name: '新しいフォルダの名前' }) as HTMLInputElement).value).toBe('新しい分類')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'やめる' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' })) })
+  if (!createRow()) await act(async () => { fireEvent.click(button) })
+  expect((await startCreate()).value).toBe('')
+})
+
+
+it('フォルダ名だけが未保存でも画面移動を確認する', async () => {
+  window.history.replaceState(null, '', '/forms')
+  await act(async () => { render(<><Host onCreate={vi.fn()} /><a href="/events">イベントへ</a></>) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '所属フォルダ' })) })
+  const input = await startCreate()
+  await act(async () => { fireEvent.change(input, { target: { value: '未保存' } }) })
+  await act(async () => { fireEvent.click(screen.getByRole('link', { name: 'イベントへ' })) })
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})
+
+it('作成通信中に選択欄が外れたら親の処理中を解除する', async () => {
+  const creating = vi.fn()
+  const view = render(<FolderSelect aria-label="所属フォルダ" folders={FOLDERS} value="" onChange={() => {}} onCreatingChange={creating} onCreate={() => new Promise(() => {})} />)
+  fireEvent.click(screen.getByRole('button', { name: '所属フォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成中' } })
+  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  expect(creating).toHaveBeenLastCalledWith(true)
+  view.unmount()
+  expect(creating).toHaveBeenLastCalledWith(false)
 })

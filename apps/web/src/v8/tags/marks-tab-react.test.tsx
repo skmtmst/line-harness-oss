@@ -14,14 +14,14 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
 }))
 
-const net = vi.hoisted(() => ({ list: vi.fn(), stats: vi.fn(), impact: vi.fn(), archive: vi.fn() }))
+const net = vi.hoisted(() => ({ list: vi.fn(), stats: vi.fn(), impact: vi.fn(), archive: vi.fn(), restore: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
     api: {
       ...actual.api,
-      supportMarks: { ...actual.api.supportMarks, list: net.list, archiveImpact: net.impact, archive: net.archive },
+      supportMarks: { ...actual.api.supportMarks, list: net.list, archiveImpact: net.impact, archive: net.archive, restore: net.restore },
       listStats: { ...actual.api.listStats, get: net.stats },
     },
   }
@@ -114,6 +114,37 @@ describe('対応マークの一覧', () => {
 })
 
 describe('保管', () => {
+  it('戻す確認に対象を表示し、アカウントを切り替えた後の古い操作を断る', async () => {
+    net.list.mockResolvedValue({ success: true, data: [mark({ archivedAt: '2026-10-01T00:00:00Z' }), mark({ id: 'active', name: '有効' })] })
+    const view = render(<MarksTab accountId="acc" canEdit />)
+    await screen.findByRole('table')
+    fireEvent.click(screen.getByRole('button', { name: /保管/ }))
+    await waitFor(() => expect(rowOf('mk1')).toBeTruthy())
+    fireEvent.click(within(table()).getByRole('button', { name: '対応マーク「要対応」の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '保管から戻す' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
+    const button = within(dialog).getByRole('button', { name: '保管から戻す' })
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    view.rerender(<MarksTab accountId="other" canEdit />)
+    view.rerender(<MarksTab accountId="acc" canEdit />)
+    old()
+    expect(net.restore).not.toHaveBeenCalled()
+  })
+  it('戻す確認と同じアカウントを送る', async () => {
+    net.list.mockResolvedValue({ success: true, data: [mark({ archivedAt: '2026-10-01T00:00:00Z' }), mark({ id: 'active', name: '有効' })] })
+    net.restore.mockResolvedValue({ success: false, error: 'test' })
+    render(<MarksTab accountId="acc" canEdit />)
+    await screen.findByRole('table')
+    fireEvent.click(screen.getByRole('button', { name: /保管/ }))
+    await waitFor(() => expect(rowOf('mk1')).toBeTruthy())
+    fireEvent.click(within(table()).getByRole('button', { name: '対応マーク「要対応」の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '保管から戻す' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '保管から戻す' }))
+    expect(net.restore).toHaveBeenCalledWith('mk1', 'acc', 2)
+  })
   async function openArchive() {
     render(<MarksTab accountId="acc" canEdit />)
     await screen.findByRole('table')

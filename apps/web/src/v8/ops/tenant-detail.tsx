@@ -5,11 +5,12 @@ import { LogIn } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, type OpsTenantDetail } from '@/lib/api'
 import { AUDIT_ACTION_LABEL, PLAN_STATUS_LABEL, ROLE_LABEL, formatDate, formatDateTime, planLabel, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
@@ -73,10 +74,12 @@ export default function OpsTenantDetailV8() {
 function DetailContent() {
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
+  const routeScope = useRef({ id, generation: 0 })
+  if (routeScope.current.id !== id) routeScope.current = { id, generation: routeScope.current.generation + 1 }
   const [detail, setDetail] = useState<OpsTenantDetail | null>(null)
   const [tab, setTab] = useUrlTab(TABS.map(t => t.key), 'overview')
   const [error, setError] = useState('')
-  const [statusDialog, setStatusDialog] = useState<StatusTarget | null>(null)
+  const [statusDialog, setStatusDialog] = useState<{ target: StatusTarget; generation: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [impersonateConfirm, setImpersonateConfirm] = useState(false)
   const access = useOpsReadOnlyState()
@@ -137,11 +140,11 @@ function DetailContent() {
         band={<TenantOverviewStats detail={detail} />}
         actions={(
           <>
-            {tenant.status === 'active' ? <Button lockedReason={lock} disabled={unknown} onClick={() => setStatusDialog('archived')}>アーカイブ</Button> : null}
+            {tenant.status === 'active' ? <Button lockedReason={lock} disabled={unknown} onClick={() => setStatusDialog({ target: 'archived', generation: routeScope.current.generation })}>アーカイブ</Button> : null}
             <Button onClick={() => setImpersonateConfirm(true)} disabled={busy || tenant.status === 'archived'}><LogIn aria-hidden="true" />代理ログイン（閲覧のみ）</Button>
             {tenant.status === 'active'
-              ? <Button variant="danger" lockedReason={lock} disabled={unknown} onClick={() => setStatusDialog('suspended')}>停止</Button>
-              : <Button lockedReason={lock} disabled={unknown} onClick={() => setStatusDialog('active')}>再開</Button>}
+              ? <Button variant="danger" lockedReason={lock} disabled={unknown} onClick={() => setStatusDialog({ target: 'suspended', generation: routeScope.current.generation })}>停止</Button>
+              : <Button lockedReason={lock} disabled={unknown} onClick={() => setStatusDialog({ target: 'active', generation: routeScope.current.generation })}>再開</Button>}
           </>
         )}
       />
@@ -261,11 +264,15 @@ function DetailContent() {
         ) : null}
       </div>
 
-      {statusDialog ? (
+      {statusDialog && statusDialog.generation === routeScope.current.generation && tenant.id === id ? (
         <StatusDialog
+          key={`${id}-${routeScope.current.generation}`}
           tenantId={tenant.id}
-          target={statusDialog}
+          target={statusDialog.target}
           tenantName={tenant.name}
+          accounts={accounts.map(account => ({ id: account.id, name: account.name }))}
+          routeScope={routeScope}
+          generation={routeScope.current.generation}
           onClose={() => setStatusDialog(null)}
           onDone={() => { setStatusDialog(null); void load() }}
         />
@@ -296,7 +303,9 @@ function Kv({ k, v }: { k: string; v: ReactNode }) {
 }
 
 /** 停止・アーカイブ・再開。名前の打ち直しと4文字以上の理由がそろうまで押せない。 */
-function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenantId: string; target: StatusTarget; tenantName: string; onClose: () => void; onDone: () => void }) {
+function StatusDialog({ tenantId, target, tenantName, accounts, routeScope, generation, onClose, onDone }: { tenantId: string; target: StatusTarget; tenantName: string; accounts: { id: string; name: string }[]; routeScope: React.RefObject<{ id: string; generation: number }>; generation: number; onClose: () => void; onDone: () => void }) {
+  const active = useRef(true)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   const [reason, setReason] = useState('')
   const [confirmName, setConfirmName] = useState('')
   const [busy, setBusy] = useState(false)
@@ -307,9 +316,12 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
   const reasonRequirement: FormRequirement = { required: true, check: value => value.trim().length >= 4 ? null : '理由を4文字以上で入力してください' }
   const problem = nameRequirement.check(confirmName) ?? reasonRequirement.check(reason)
   const dialogAccess = useOpsReadOnlyState()
+  const accountNames = accounts.slice(0, 3).map(account => account.name || '不明').join('、')
+  const accountSummary = accountNames || 'なし'
+  const accountLabel = `LINEアカウント（${accounts.length}件）${accounts.length > 3 ? `・ほか${accounts.length - 3}件` : ''}`
 
   const submit = async () => {
-    if (dialogAccess !== 'writer') return
+    if (!active.current || routeScope.current.generation !== generation || routeScope.current.id !== tenantId || dialogAccess !== 'writer') return
     if (problem) {
       setError(problem)
       return
@@ -337,10 +349,12 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       error={error || undefined}
       designNode={target === 'suspended' ? 'okXoi' : undefined}
       onConfirm={() => submit()}
-      onCancel={onClose}
+      onCancel={() => { active.current = false; onClose() }}
     >
       <div className={parts.dialogBody}>
-        <Notice tone={needsName ? "danger" : "info"}>
+        <OperationTargetSummary accounts={[]} externalTarget={{ label: accountLabel, name: accountSummary }} />
+        <p className={parts.note}>{`契約先：${tenantName}（1件）`}</p>
+        <Notice tone={needsName ? "warn" : "info"}>
           {target === 'suspended'
             ? '停止すると、この契約先の権限者はログインできなくなります。配信も止まります。'
             : target === 'archived'

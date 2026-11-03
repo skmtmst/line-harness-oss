@@ -18,7 +18,7 @@ export function useInlineDetailHoldingState() {
   }), [])
   return { holding: sources.size > 0, onHoldingChange }
 }
-export function useInlineDetailGuard(key: string) {
+export function useInlineDetailGuard(key: string, extraHolding = false) {
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
   const [resetToken, setResetToken] = useState(0)
@@ -27,11 +27,11 @@ export function useInlineDetailGuard(key: string) {
   useLayoutEffect(() => { onHoldingChange?.(source.current, dirty || busy) }, [dirty, busy, onHoldingChange])
   useLayoutEffect(() => () => { onHoldingChange?.(source.current, false) }, [onHoldingChange])
   const hold = useRef(false)
-  hold.current = dirty || busy
+  hold.current = dirty || busy || extraHolding
   const [id, setIdRaw] = useDetailPanelUrl(key, () => hold.current)
   useEffect(() => { if (id === null) { setDirty(false); setBusy(false) } }, [id])
   const depth = useContext(OverlayDepthContext)
-  const guard = useUnsavedGuard({ dirty: dirty || busy, busy, onDiscard: () => {
+  const guard = useUnsavedGuard({ dirty: dirty || busy, busy, subject: '詳細パネルの変更', onDiscard: () => {
     hold.current = false
     setDirty(false)
     setResetToken(value => value + 1)
@@ -39,7 +39,7 @@ export function useInlineDetailGuard(key: string) {
   const setId = useCallback((next: SetStateAction<string | null>) => guard.guarded(() => setIdRaw(next)), [guard.guarded, setIdRaw])
   const editor = { preserveDirtyOnBlur: true as const, onDirtyChange: setDirty, onSavingChange: setBusy, resetToken }
   const dialog = <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
-  return { id, setId, protect: guard.guarded, busy, holding: dirty || busy, editor, dialog }
+  return { id, setId, protect: guard.guarded, busy, holding: dirty || busy || extraHolding, editor, dialog }
 }
 
 /** 一覧の再読込で行が一時的に消えても編集中の内容を保つ。別アカウントへは持ち越さない。 */

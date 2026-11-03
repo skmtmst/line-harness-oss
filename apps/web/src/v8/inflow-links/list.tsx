@@ -117,6 +117,8 @@ export default function InflowListV8({
 
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
   const loadRequestRef = useRef(0)
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [genres, setGenres] = useState<EntryRouteGenre[]>([])
@@ -153,9 +155,11 @@ export default function InflowListV8({
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
   const [poolMemberNames, setPoolMemberNames] = useState<Record<string, string[]>>({})
   const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(() => new Set())
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; accountId: string | null; routeAccountId: string | null } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; accountId: string | null; routeAccountId: string | null; generation: number } | null>(null)
+  const activeDelete = useRef<typeof deleteTarget>(null)
   const [deleteName, setDeleteName] = useState('')
-  const [stopTarget, setStopTarget] = useState<{ id: string; name: string; routeAccountId: string | null } | null>(null)
+  const [stopTarget, setStopTarget] = useState<{ id: string; name: string; routeAccountId: string | null; generation: number } | null>(null)
+  const activeStop = useRef<typeof stopTarget>(null)
   const toggleLocks = useRef(new Set<string>())
   const [bulkAction, setBulkAction] = useState<BulkRouteAction | null>(null)
   // 数の帯のマスの「…」。開いているマスの名前。
@@ -240,6 +244,8 @@ export default function InflowListV8({
     setQrRoute(null)
     setSelectedRouteIds(new Set())
     setBulkAction(null)
+    activeStop.current = null
+    activeDelete.current = null
     setStopTarget(null)
     setDeleteTarget(null)
     setDeleteName('')
@@ -481,7 +487,7 @@ export default function InflowListV8({
       }
       if (target && canManageRole(role)) items.push({
         id: 'delete', label: '削除する', tone: 'danger',
-        onSelect: () => { setOpenMenuRefCode(null); setDeleteName(''); setDeleteTarget({ id: target.id, name: target.name, accountId: selectedAccountId, routeAccountId: target.lineAccountId ?? null }) },
+        onSelect: () => { const value = { id: target.id, name: target.name, accountId: selectedAccountId, routeAccountId: target.lineAccountId ?? null, generation: accountScope.current.generation }; activeDelete.current = value; setOpenMenuRefCode(null); setDeleteName(''); setDeleteTarget(value) },
       })
       items.push(row.isActive === false
         ? {
@@ -493,7 +499,7 @@ export default function InflowListV8({
           id: 'stop',
           label: '受付を止める',
           tone: 'danger' as const,
-          onSelect: () => { setOpenMenuRefCode(null); setStopError(''); setStopTarget({ id: row.entryRouteId!, name: row.name, routeAccountId: target?.lineAccountId ?? null }) },
+          onSelect: () => { const value = { id: row.entryRouteId!, name: row.name, routeAccountId: target?.lineAccountId ?? null, generation: accountScope.current.generation }; activeStop.current = value; setOpenMenuRefCode(null); setStopError(''); setStopTarget(value) },
         })
     }
     return items
@@ -908,13 +914,13 @@ export default function InflowListV8({
           description="この経路からの新しい受付が止まります。再開するまで、お客さまはこのリンクから登録できません。"
           confirmLabel="受付を停止する"
           destructive
-          error={stopError || undefined} onSuccess={() => setStopTarget(null)} onCancel={() => { setStopTarget(null); setStopError('') }}
+          error={stopError || undefined} onSuccess={() => { activeStop.current = null; setStopTarget(null) }} onCancel={() => { activeStop.current = null; setStopTarget(null); setStopError('') }}
           onConfirm={async () => {
-            if (!stopTarget) return
+            if (!stopTarget || activeStop.current !== stopTarget || stopTarget.generation !== accountScope.current.generation) return false
             return toggleRouteActive(stopTarget.id, false, stopTarget.name, true)
           }}
         >
-          <OperationTargetSummary accounts={[{ id: stopTarget?.routeAccountId ?? '', label: '経路の所属LINEアカウント' }]} />
+          <OperationTargetSummary accounts={[{ id: stopTarget?.routeAccountId ?? '', label: '経路の所属LINEアカウント' }]} externalTarget={{ label: '対象件数', name: stopTarget ? '1件' : null }} />
           <p>受付先のすべてのアカウントは確認できません。リンクの設定や利用時の指定によって変わります。</p>
         </ConfirmDialog>
         <ConfirmDialog
@@ -924,10 +930,10 @@ export default function InflowListV8({
           confirmLabel="削除する" destructive
           confirmDisabled={!deleteTarget || deleteName !== deleteTarget.name || !canManageRole(role)}
           confirmDisabledReason="経路名を正確に入力してください。"
-          onCancel={() => { setDeleteTarget(null); setDeleteName('') }}
-          onSuccess={() => { setDeleteTarget(null); setDeleteName(''); void load() }}
+          onCancel={() => { activeDelete.current = null; setDeleteTarget(null); setDeleteName('') }}
+          onSuccess={() => { activeDelete.current = null; setDeleteTarget(null); setDeleteName(''); void load() }}
           onConfirm={async () => {
-            if (!deleteTarget || !canManageRole(role) || deleteTarget.accountId !== latestAccountRef.current || deleteName !== deleteTarget.name) return false
+            if (!deleteTarget || activeDelete.current !== deleteTarget || deleteTarget.generation !== accountScope.current.generation || !canManageRole(role) || deleteTarget.accountId !== latestAccountRef.current || deleteName !== deleteTarget.name) return false
             try {
               const response = await fetchApi<{ success: boolean; error?: string }>(`/api/entry-routes/${encodeURIComponent(deleteTarget.id)}`, { method: 'DELETE', body: JSON.stringify({ confirmationName: deleteName }) })
               if (!response.success) return { status: 'failed' as const, error: response.error, message: response.error || '削除できませんでした。' }
@@ -937,7 +943,7 @@ export default function InflowListV8({
             }
           }}
         >
-          <OperationTargetSummary accounts={[{ id: deleteTarget?.routeAccountId ?? '', label: '経路の所属LINEアカウント' }]} />
+          <OperationTargetSummary accounts={[{ id: deleteTarget?.routeAccountId ?? '', label: '経路の所属LINEアカウント' }]} externalTarget={{ label: '対象件数', name: deleteTarget ? '1件' : null }} />
           <p>受付先のすべてのアカウントは確認できません。リンクの設定や利用時の指定によって変わります。</p>
           <Field required label={`完全削除するには「${deleteTarget?.name ?? ''}」と入力`}>
             <TextField required value={deleteName} onChange={event => setDeleteName(event.target.value)} autoComplete="off" />
@@ -963,6 +969,7 @@ export default function InflowListV8({
         {qrRoute ? <QrDialog route={qrRoute} routes={routes} onClose={() => setQrRoute(null)} /> : null}
         {bulkAction ? (
           <BulkDialog
+            scopeRef={accountScope}
             targets={selectedRoutes}
             genreOptions={genreNames}
             initialAction={bulkAction}

@@ -67,7 +67,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
   const snapshotOf = (value: RichVideoDraft) => JSON.stringify(hqHost ? {...value,folderId:host!.folder} : value)
   const snapshot = snapshotOf(draft)
   const [clean,setClean] = useState(snapshot)
-  const { leaveTarget,confirmLeave,cancelLeave,disarm,guarded } = useUnsavedGuard({dirty:snapshot !== clean,busy})
+  const { leaveTarget,confirmLeave,cancelLeave,disarm,guarded } = useUnsavedGuard({dirty:snapshot !== clean,busy,subject:'リッチビデオの作成内容'})
   const generation = useRef(0)
   const saveLock = useRef(false)
   const editVersion = useRef<{ expectedVersion: number; expectedDraftRevision: number } | null>(null)

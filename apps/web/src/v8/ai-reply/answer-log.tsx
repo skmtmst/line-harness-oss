@@ -13,6 +13,7 @@ import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Drawer from '@/components/shared/drawer'
 import EmptyList from '@/components/shared/empty-list'
 import KpiBand from '@/components/shared/kpi-band'
@@ -63,6 +64,8 @@ const at = (value: string) => formatDate(value, { style: 'list', fallback: '—'
 export default function AnswerLogV8() {
   const { selectedAccountId } = useAccount()
   const accountId = selectedAccountId ?? ''
+  const accountScope = useRef({ accountId })
+  if (accountScope.current.accountId !== accountId) accountScope.current = { accountId }
   const { permissions } = useAiSettings(selectedAccountId)
   usePageTitle('AI が答えた記録')
   usePageCrumbs([{ label: '自動応答', href: '/auto-replies' }])
@@ -74,7 +77,11 @@ export default function AnswerLogV8() {
   const [menuId, setMenuId] = useState<string | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [seed, setSeed] = useState<QaDraftSeed | null>(null)
-  const [stopTarget, setStopTarget] = useState<{ qaEntryId: string; title: string; version: number } | null>(null)
+  const [stopTarget, setStopTarget] = useState<{ qaEntryId: string; title: string; version: number; scope: { accountId: string }; ticket: object } | null>(null)
+  const stopTicket = useRef<object | null>(null)
+  const stopLock = useRef<object | null>(null)
+  const [detailScope, setDetailScope] = useState<{ accountId: string } | null>(null)
+  const detailGeneration = useRef(0)
   const [stopBusy, setStopBusy] = useState(false)
   const [stopError, setStopError] = useState('')
   const generation = useRef(0)
@@ -95,39 +102,47 @@ export default function AnswerLogV8() {
   useEffect(() => { void fetchList() }, [fetchList])
 
   const openLog = useCallback(async (id: string) => {
+    const scope = accountScope.current
+    const mine = ++detailGeneration.current
+    setDetailScope(scope)
     setDetail({ kind: 'loading' })
     try {
       const res = await aiReplyApi.log(accountId, id)
+      if (scope !== accountScope.current || mine !== detailGeneration.current) return
       setDetail({ kind: 'ready', data: res.data })
     } catch (caught) {
+      if (scope !== accountScope.current || mine !== detailGeneration.current) return
       setDetail({ kind: 'error', message: describeApiFailure(caught, '記録の読み込み') })
     }
   }, [accountId])
   useEffect(() => {
     if (url.log && accountId) void openLog(url.log)
-    else setDetail(null)
+    else { detailGeneration.current += 1; setDetail(null) }
   }, [url.log, accountId, openLog])
 
   const stopAnswer = async () => {
-    if (!stopTarget) return
+    if (!stopTarget || stopTarget.scope !== accountScope.current || stopTarget.ticket !== stopTicket.current || stopLock.current === stopTarget.ticket || !stopTarget.scope.accountId) return
+    stopLock.current = stopTarget.ticket
     setStopBusy(true)
     setStopError('')
     try {
-      await aiReplyApi.stopQa(accountId, stopTarget.qaEntryId, stopTarget.version)
+      await aiReplyApi.stopQa(stopTarget.scope.accountId, stopTarget.qaEntryId, stopTarget.version)
+      if (stopTarget.scope !== accountScope.current || stopTicket.current !== stopTarget.ticket) return
+      stopTicket.current = null
       notifyToast('この答えを止めました。返信案にも自動の答えにも使いません')
       setStopTarget(null)
       if (url.log) void openLog(url.log)
     } catch (caught) {
-      setStopError(describeApiFailure(caught, '止める操作'))
+      if (stopTarget.scope === accountScope.current && stopTicket.current === stopTarget.ticket) setStopError(describeApiFailure(caught, '止める操作'))
     } finally {
-      setStopBusy(false)
+      if (stopLock.current === stopTarget.ticket) { stopLock.current = null; setStopBusy(false) }
     }
   }
 
   const total = load.kind === 'ready' ? load.total : 0
   const summary = load.kind === 'ready' ? load.summary : null
   const failure = load.kind === 'error' ? loadFailureCopy(load.error, 'AI が答えた記録') : null
-  const opened = detail?.kind === 'ready' ? detail.data : null
+  const opened = detailScope === accountScope.current && detail?.kind === 'ready' ? detail.data : null
 
   return (
     <ListPage
@@ -155,14 +170,14 @@ export default function AnswerLogV8() {
       pagination={load.kind === 'ready' && total > size ? <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / size))} onPageChange={(next) => setUrl({ page: String(next) })} range={{ total, first: (page - 1) * size + 1, last: Math.min(total, page * size) }} /> : undefined}
       overlays={<>
         <Drawer
-          open={detail !== null}
+          open={detail !== null && detailScope === accountScope.current}
           title="AI が答えた記録"
           description={opened ? `${at(opened.createdAt)}・${withHonorific(opened.friendName, 'さん', { space: true })}` : undefined}
           closeAppearance="box"
           heightMode="viewport"
           onClose={() => setUrl({ log: '' })}
           status={opened ? <StatusBadge tone={ACTION_TONE[opened.action]}>{ACTION_LABEL[opened.action]}</StatusBadge> : null}
-          actions={{ primary: opened ? <Button variant="primary" href={`/chats?friend=${encodeURIComponent(opened.friendId)}`}>受信箱で会話を開く</Button> : null, menuItems: [...(opened?.qa ? [{id: 'open-qa', label: 'Q&A を開く', href: '/auto-replies?tab=qa'}] : []), ...(opened && opened.qa && opened.qa.status === 'published' && opened.action === 'answered' ? [{ allowed: permissions.publishQa, id: 'detail-0', label: "この答えを止める", onSelect: () => { setStopError(''); setStopTarget({ qaEntryId: opened.qa!.id, title: opened.qa!.title, version: opened.qa!.version }); } }] : [])] }}
+          actions={{ primary: opened ? <Button variant="primary" href={`/chats?friend=${encodeURIComponent(opened.friendId)}`}>受信箱で会話を開く</Button> : null, menuItems: [...(opened?.qa ? [{id: 'open-qa', label: 'Q&A を開く', href: '/auto-replies?tab=qa'}] : []), ...(opened && opened.qa && opened.qa.status === 'published' && opened.action === 'answered' ? [{ allowed: permissions.publishQa, id: 'detail-0', label: "この答えを止める", onSelect: () => { if (!detailScope || detailScope !== accountScope.current) return; setStopError(''); const ticket = {}; stopTicket.current = ticket; setStopTarget({ qaEntryId: opened.qa!.id, title: opened.qa!.title, version: opened.qa!.version, scope: detailScope, ticket }); } }] : [])] }}
         >
 <DetailContent>
           {detail?.kind === 'loading' ? <ListState kind="loading" /> : null}
@@ -180,15 +195,15 @@ export default function AnswerLogV8() {
           onClose={() => setSeed(null)}
         />
         <ConfirmDialog
-          open={stopTarget !== null}
+          open={stopTarget !== null && stopTarget.scope === accountScope.current}
           title={`「${stopTarget?.title ?? ''}」の答えを止めますか？`}
           description="止めると、この Q&A を返信案にも自動の答えにも使いません。すでに送った答えは取り消せません。あとから公開し直せます。"
           confirmLabel="止める"
-          busy={stopBusy}
+          busy={stopBusy && stopLock.current === stopTarget?.ticket}
           error={stopError || undefined}
           onConfirm={() => void stopAnswer()}
-          onCancel={() => { if (!stopBusy) setStopTarget(null) }}
-        />
+          onCancel={() => { if (stopLock.current !== stopTarget?.ticket) { stopTicket.current = null; setStopTarget(null) } }}
+        ><OperationTargetSummary accounts={[{ id: stopTarget?.scope.accountId ?? '' }]} /></ConfirmDialog>
       </>}
     >
       {load.kind === 'loading' ? <ListState kind="loading" /> : null}
