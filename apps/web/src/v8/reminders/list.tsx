@@ -216,8 +216,10 @@ export default function RemindersListV8() {
   const pauseRef = useRef<{ target: ReminderRow; generation: number } | null>(null)
   const openedPause = pauseRef.current
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
+  const deleteRef = useRef<{ target: ReminderRow; generation: number } | null>(null)
+  const openedDelete = deleteRef.current
   const [deleteAccountId, setDeleteAccountId] = useState(selectedAccountId)
-  useEffect(() => { setDeleteTarget(null) }, [selectedAccountId])
+  useEffect(() => { deleteRef.current = null; setDeleteTarget(null) }, [selectedAccountId])
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
@@ -398,6 +400,7 @@ export default function RemindersListV8() {
 
   // 下書きも公開済みも、削除は必ず確認する（・決まり2）。
   const requestDelete = (row: ReminderRow) => {
+    deleteRef.current = { target: row, generation: pauseContext.current.generation }
     setDeleteError('')
     setDeleteAccountId(selectedAccountId)
     setDeleteTarget(row)
@@ -407,12 +410,13 @@ export default function RemindersListV8() {
     deleteTarget !== null && reminders.some((row) => row.id === deleteTarget.id)
 
   const runDelete = async () => {
-    if (!deleteTarget || deleting || !deleteStillListed || deleteAccountId !== selectedAccountId) return
+    if (!deleteTarget || deleting || !deleteStillListed || deleteAccountId !== selectedAccountId || !openedDelete || deleteRef.current !== openedDelete || openedDelete.target !== deleteTarget || openedDelete.generation !== pauseContext.current.generation) return
     setDeleting(true)
     setDeleteError('')
     try {
       const res = await api.reminders.delete(deleteTarget.id)
       if (!res.success) throw new Error(res.error)
+      deleteRef.current = null
       setDeleteTarget(null)
       setSelectedIds((current) => {
         const next = new Set(current)
@@ -1206,7 +1210,7 @@ export default function RemindersListV8() {
 
       {/* 削除の窓（★V8 `VsSyu`）。 */}
       <SheetDialog
-        open={deleteTarget !== null && deleteAccountId === selectedAccountId}
+        open={deleteTarget !== null && deleteAccountId === selectedAccountId && openedDelete?.generation === pauseContext.current.generation}
         designNode="VsSyu" designWidth={480}
         title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
         description="通知の予定と登録者がすべて消えます。すでに送ったメッセージは友だちのトークに残ります。"
@@ -1216,6 +1220,7 @@ export default function RemindersListV8() {
         error={deleteError || (deleteTarget && !deleteStillListed ? 'このリマインダが一覧から外れました。この窓を閉じて、いまの一覧から選び直してください。' : undefined)}
         onClose={() => {
           if (deleting) return
+          deleteRef.current = null
           setDeleteTarget(null)
           setDeleteError('')
         }}
@@ -1228,6 +1233,7 @@ export default function RemindersListV8() {
           <>
             <Button
               onClick={() => {
+                deleteRef.current = null
                 setDeleteTarget(null)
                 setDeleteError('')
               }}
@@ -1239,6 +1245,7 @@ export default function RemindersListV8() {
               <Button
                 onClick={() => {
                   openPause(deleteTarget)
+                  deleteRef.current = null
                   setDeleteTarget(null)
                 }}
                 disabled={deleting}

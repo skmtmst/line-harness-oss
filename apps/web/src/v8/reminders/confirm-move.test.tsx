@@ -5,11 +5,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import RemindersList from './list'
 
-const net = vi.hoisted(() => ({ read: vi.fn(), update: vi.fn(), folders: vi.fn(), stats: vi.fn(), hold: false, account: 'account-a' }))
+const net = vi.hoisted(() => ({ read: vi.fn(), update: vi.fn(), remove: vi.fn(), folders: vi.fn(), stats: vi.fn(), hold: false, account: 'account-a' }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, fetchApi: net.read, api: { ...actual.api,
-    reminders: { ...actual.api.reminders, update: net.update },
+    reminders: { ...actual.api.reminders, update: net.update, delete: net.remove },
     folders: { ...actual.api.folders, list: net.folders }, listStats: { get: net.stats },
   } }
 })
@@ -175,6 +175,20 @@ it('削除の窓は選択中ではなく記録の所属先を示す', async () =
   const dialog = await screen.findByRole('alertdialog')
   expect(await within(dialog).findByText('二号店')).toBeTruthy()
   expect(within(dialog).queryByText('本店')).toBeNull()
+})
+it('削除の窓を開いて店を往復した後は古い確定を実行できない', async () => {
+  const view = render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '削除する' }))
+  const dialog = await screen.findByRole('alertdialog')
+  const button = within(dialog).getByRole('button', { name: '削除する' })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+  net.account = 'account-b'; view.rerender(<RemindersList />)
+  net.account = 'account-a'; view.rerender(<RemindersList />)
+  await act(async () => old())
+  expect(net.remove).not.toHaveBeenCalled()
 })
 it('確認した一件のリマインダを停止する', async () => {
   render(<RemindersList />)

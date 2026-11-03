@@ -19,6 +19,7 @@ const state = vi.hoisted(() => ({
   tab: '' as string,
   updates: [] as Array<Record<string, unknown>>,
   deletes: [] as string[],
+  retry: vi.fn(),
   plannedTotal: 2,
   onlyPlanned: false,
   omitId: false,
@@ -92,6 +93,7 @@ vi.mock('@/lib/api', () => {
           return { success: true, data: null }
         }),
         delete: vi.fn(async (id: string) => { state.deletes.push(id); return { success: true, data: null } }),
+        retryRun: state.retry,
         registrants: {
           list: vi.fn(async () => ({
             success: true,
@@ -122,6 +124,7 @@ beforeEach(() => {
   state.tab = ''
   state.updates = []
   state.deletes = []
+  state.retry.mockReset()
   state.plannedTotal = 2
   state.onlyPlanned = false
   state.omitId = false
@@ -148,6 +151,68 @@ const buttonByText = (text: string) =>
   [...document.querySelectorAll('button')].find((el) => el.textContent?.trim() === text) as HTMLButtonElement | undefined
 
 describe('V8 リマインダの詳細', () => {
+  it('実行結果を表示中にURLを変えた後、古い結果が遅れても再送できない', async () => {
+    state.tab = 'runs'
+    const runs = vi.mocked(api.reminders.runs), get = vi.mocked(api.reminders.get)
+    const originalRuns = runs.getMockImplementation()!, originalGet = get.getMockImplementation()!
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    runs.mockImplementation(async (id, params) => {
+      const res = await originalRuns(id, params)
+      if (id === 'reminder-1' && params?.limit === 20) await pending
+      if (!res.success) return res
+      return { ...res, data: { ...res.data, reminder: { ...res.data.reminder, id }, items: res.data.items.map(item => ({ ...item, friendName: id === 'reminder-1' ? '古いお客さま' : '新しいお客さま', canRetry: true })) } }
+    })
+    get.mockImplementation(async id => { const res = await originalGet(id); return res.success ? { ...res, data: { ...res.data, id } } : res })
+    try {
+      await render()
+      state.urlId = 'reminder-2'; await render()
+      expect(host.textContent).toContain('新しいお客さま')
+      await act(async () => { release(); await pending })
+      expect(host.textContent).toContain('新しいお客さま')
+      expect(host.textContent).not.toContain('古いお客さま')
+      expect(state.retry).not.toHaveBeenCalled()
+    } finally { runs.mockImplementation(originalRuns); get.mockImplementation(originalGet) }
+  })
+  it('実行結果の応答が別のリマインダなら行を表示せず再送できない', async () => {
+    state.tab = 'runs'
+    const runs = vi.mocked(api.reminders.runs)
+    const original = runs.getMockImplementation()!
+    runs.mockImplementation(async (id, params) => {
+      const res = await original(id, params)
+      if (!res.success || params?.limit !== 20) return res
+      return { ...res, data: { ...res.data, reminder: { ...res.data.reminder, id: 'old-id' }, items: res.data.items.map(item => ({ ...item, friendName: '古いお客さま', canRetry: true })) } }
+    })
+    try {
+      await render()
+      expect(host.textContent).not.toContain('古いお客さま')
+      expect(buttons()).not.toContain('再試行する')
+      expect(host.textContent).toContain('実行結果を読み込めませんでした')
+      expect(state.retry).not.toHaveBeenCalled()
+    } finally { runs.mockImplementation(original) }
+  })
+  it('停止の返事が遅れても、移動後の別リマインダを停止中にしない', async () => {
+    const runs = vi.mocked(api.reminders.runs), get = vi.mocked(api.reminders.get), update = vi.mocked(api.reminders.update)
+    const originalRuns = runs.getMockImplementation()!, originalGet = get.getMockImplementation()!, originalUpdate = update.getMockImplementation()!
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    runs.mockImplementation(async (id, params) => { const res = await originalRuns(id, params); return res.success ? { ...res, data: { ...res.data, reminder: { ...res.data.reminder, id, name: id === 'reminder-2' ? '新しい対象' : '古い対象' } } } : res })
+    get.mockImplementation(async id => { const res = await originalGet(id); return res.success ? { ...res, data: { ...res.data, id } } : res })
+    update.mockImplementation(async () => { await pending; return { success: true, data: null } as never })
+    try {
+      await render()
+      await act(async () => { buttonByText('一時停止する')!.click() })
+      const dialog = document.querySelector('[data-design-node="RwVo5"]')!
+      const confirm = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === '一時停止する') as HTMLButtonElement
+      await act(async () => { confirm.click() })
+      state.urlId = 'reminder-2'; await render()
+      expect(host.textContent).toContain('新しい対象')
+      await act(async () => { release(); await pending })
+      expect(host.textContent).toContain('新しい対象')
+      expect(buttonByText('一時停止する')).toBeTruthy()
+      expect(host.textContent).not.toContain('リマインダを一時停止しました')
+    } finally { runs.mockImplementation(originalRuns); get.mockImplementation(originalGet); update.mockImplementation(originalUpdate) }
+  })
   it('URLを変更した後に古い応答が届いても現在の対象を保つ', async () => {
     const runs = vi.mocked(api.reminders.runs)
     const get = vi.mocked(api.reminders.get)

@@ -295,14 +295,17 @@ function ReminderDetailV8() {
   const setReminderActive = async (isActive: boolean): Promise<boolean> => {
     if (!data || data.reminder.id !== reminderId || pauseContext.current.reminderId !== reminderId) return false
     if (data.reminder.isActive === isActive) return true
+    const generation = pauseContext.current.generation
     setActionMessage('')
     try {
       const response = await api.reminders.update(reminderId, { isActive })
+      if (generation !== pauseContext.current.generation) return false
       if (!response.success) throw new Error(response.error)
-      setData((current) => current ? { ...current, reminder: { ...current.reminder, isActive } } : current)
+      setData((current) => current?.reminder.id === reminderId ? { ...current, reminder: { ...current.reminder, isActive } } : current)
       setActionMessage(isActive ? 'リマインダを再開しました。' : 'リマインダを一時停止しました。')
       return true
     } catch (caught) {
+      if (generation !== pauseContext.current.generation) return false
       const fieldFailure = saveErrors.capture(caught)
       // API も未公開の再開を 409 で止める。その文面をそのまま出す。
       { if (!fieldFailure)
@@ -580,9 +583,10 @@ function ReminderDetailV8() {
               onShowAllRuns={() => selectTab('runs')}
             />
           ) : tab === 'schedule' ? (
-            <ScheduleTab reminderId={reminderId} steps={data.steps} />
+            <ScheduleTab key={`${selectedAccountId}:${reminderId}`} reminderId={reminderId} steps={data.steps} />
           ) : tab === 'runs' ? (
             <RunsTab
+              key={`${selectedAccountId}:${reminderId}`}
               // 概要の警告帯から飛んだとき、絞り込みを確実に掛け直す。
               key={runsStatusParam ?? ''}
               reminderId={reminderId}
@@ -590,7 +594,7 @@ function ReminderDetailV8() {
               initialStatus={runsStatusParam === 'permanent_failed' ? 'permanent_failed' : ''}
             />
           ) : (
-            <RegistrantsTab reminderId={reminderId} canManage={canManage} />
+            <RegistrantsTab key={`${selectedAccountId}:${reminderId}`} reminderId={reminderId} canManage={canManage} />
           )}
         </div>
       </DetailColumns></PageContent>
@@ -820,6 +824,9 @@ const RUN_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
 ]
 
 function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string; canManage: boolean; initialStatus: '' | ReminderDeliveryRunStatus }) {
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  const loadSequence = useRef(0)
   const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>(initialStatus)
   const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -831,6 +838,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
   const [notice, setNotice] = useState('')
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setState('loading')
     try {
       const res = await api.reminders.runs(reminderId, {
@@ -839,12 +847,14 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
       })
+      if (!mounted.current || sequence !== loadSequence.current) return
       if (!res.success) throw new Error(res.error)
+      if (res.data.reminder.id !== reminderId) throw new Error('reminder id mismatch')
       setItems(res.data.items)
       setTotal(res.data.pagination.total)
       setState('ready')
     } catch {
-      setState('error')
+      if (mounted.current && sequence === loadSequence.current) setState('error')
     }
   }, [appliedSearch, page, reminderId, status])
 
@@ -854,6 +864,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
   useEffect(() => { if (page > pageCount) setPage(pageCount) }, [page, pageCount])
 
   const retry = async (runId: string) => {
+    if (!mounted.current || !items.some(item => item.id === runId && item.canRetry) || !canManage) return
     setRetryingId(runId)
     setNotice('')
     try {
