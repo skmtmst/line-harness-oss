@@ -89,6 +89,14 @@ it('点数の範囲だけで来たときは、未採点の人を外す条件を�
   expect(rule.value.scoredOnly).toBeUndefined()
 })
 
+it('CSVの書き出しを主操作にし、取り込みを副操作にする', async () => {
+  render(<List />)
+  const exportButton = await screen.findByRole('button', { name: '表示中をCSVで書き出す' })
+  await waitFor(() => expect((exportButton as HTMLButtonElement).disabled).toBe(false))
+  expect(exportButton.getAttribute('data-variant')).toBe('primary')
+  expect(screen.getByRole('link', { name: 'CSVから取り込む' }).getAttribute('data-variant')).toBe('text')
+})
+
 it('閲覧のみの人には配信を作る項目を出さない', async () => {
   fx.role = 'viewer'
   window.history.replaceState(null, '', '/friends?scoreMax=9')
