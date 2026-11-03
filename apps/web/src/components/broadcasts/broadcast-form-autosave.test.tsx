@@ -70,6 +70,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 import BroadcastForm from './broadcast-form'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -226,6 +227,40 @@ describe('一斉配信の下書き自動保存（★管理画面 sTJsh §5）', 
     await act(async () => { clickButton('下書きを保存する') })
     expect(document.body.textContent).toContain('B案の文字以外は保存されません。文字だけにしてから保存してください')
     expect(createApi).not.toHaveBeenCalled()
+  })
+
+  it('B案がある間は入力が有効でも自動保存しない', async () => {
+    await renderForm()
+    await act(async () => { setValue(titleInput(), '秋の案内') })
+    await act(async () => { setValue(messageInput(), 'A案の本文') })
+    await act(async () => { clickButton('B 案を追加') })
+    await waitForDebounce()
+    expect(createApi).not.toHaveBeenCalled()
+    expect(updateApi).not.toHaveBeenCalled()
+  })
+
+  it('B案のある単頁の下書き保存は下書きを保存できない理由を出す', async () => {
+    await renderForm()
+    await act(async () => { setValue(titleInput(), '秋の案内') })
+    await act(async () => { setValue(messageInput(), '本文') })
+    await act(async () => { clickButton('B 案を追加') })
+    await act(async () => { clickButton('下書きを保存する') })
+    expect(document.body.textContent).toContain('B案は下書きに保存できません')
+    expect(createApi).not.toHaveBeenCalled()
+  })
+
+  it('B案がある状態でのアカウント切替は破棄の確認を通す', async () => {
+    await renderForm()
+    await act(async () => { clickButton('B 案を追加') })
+    const changeAccount = vi.fn(() => { testAccount.id = 'acc-2'; root.render(<BroadcastForm tags={[]} onSuccess={() => {}} onCancel={onCancelSpy} />) })
+    await act(async () => { requestUnsavedAction(changeAccount) })
+    expect(changeAccount).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('保存していない変更があります')
+    await act(async () => { clickButton('保存せずに移る') })
+    expect(changeAccount).toHaveBeenCalledTimes(1)
+    await flush()
+    expect(container.textContent).toContain('B 案を追加')
+    testAccount.id = 'acc-1'
   })
 
   it('B案を追加しただけでも離脱前に確認し、保存できないB案を黙って捨てない', async () => {
