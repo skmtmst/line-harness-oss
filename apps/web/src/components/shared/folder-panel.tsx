@@ -166,6 +166,7 @@ export default function FolderPanel({
   addFolderDisabled = false,
   addFolderLockedReason,
   addFolderTitle,
+  hideNarrowAdd = false,
   addFolderNote,
   children,
   createAction,
@@ -201,6 +202,8 @@ export default function FolderPanel({
   onAddFolder?: () => void
   addFolderLabel?: string
   addFolderDisabled?: boolean
+  /** 畳んだ選択欄には追加を出さない。広い列の権限表示は保つ。 */
+  hideNarrowAdd?: boolean
   /** 入力不足とは別の権限理由。 */
   addFolderLockedReason?: string
   addFolderTitle?: string
@@ -217,9 +220,9 @@ export default function FolderPanel({
   const rowIds = folderRowIds(rows)
   const canRegisterAdd = Boolean(onAddFolder || addFolderLockedReason)
   useLayoutEffect(() => {
-    if (!registerNarrowAction || readOnly || !canRegisterAdd) return
+    if (!registerNarrowAction || readOnly || hideNarrowAdd || !canRegisterAdd) return
     return registerNarrowAction({ key: narrowKey.current, rowIds, label: addFolderLabel, disabled: disabled || addFolderDisabled, lockedReason: addFolderLockedReason, run: () => latestAdd.current?.() })
-  }, [registerNarrowAction, rowIds, addFolderLabel, disabled, addFolderDisabled, addFolderLockedReason, readOnly, canRegisterAdd])
+  }, [registerNarrowAction, rowIds, addFolderLabel, disabled, addFolderDisabled, addFolderLockedReason, readOnly, hideNarrowAdd, canRegisterAdd])
   const addLock = usePermissionLockTip<HTMLButtonElement>(addFolderLockedReason)
   const notes = takeFolderNotes(children), addNotes = takeFolderNotes(addFolderNote)
   const hasExplanation = (!readOnly && heading === 'フォルダ') || headingHelp || notes.help.length > 0 || addNotes.help.length > 0
