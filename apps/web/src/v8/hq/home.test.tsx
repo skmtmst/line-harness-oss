@@ -19,6 +19,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const attention = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/helpers/styles', () => ({ hqStyleApi: { attention } }))
 const accounts = vi.hoisted(() => vi.fn())
 const checkConnection = vi.hoisted(() => vi.fn())
 const importState = vi.hoisted(() => vi.fn())
@@ -98,6 +100,8 @@ beforeEach(() => {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
+  attention.mockReset()
+  attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { connections: 0, unhandledChats: 5 } }] } })
   accounts.mockResolvedValue({ success: true, data: [warnedAccount] })
   checkConnection.mockReset()
   checkConnection.mockResolvedValue({ success: true, data: {} })
@@ -465,4 +469,21 @@ describe('アーカイブから戻す入口の権限表示', () => {
       noWrites()
     })
   }
+})
+
+it('表の対応件数はほかの問題を混ぜず接続の問題だけを数える', async () => {
+  await render()
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('0 件')
+})
+
+it('接続の件数が取得できないとき不明とし、再読込できる', async () => {
+  attention.mockRejectedValue(new Error('offline'))
+  await render()
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  expect(container.querySelector('tbody tr')!.children[3].textContent).not.toContain('0 件')
+  expect(container.textContent).toContain('対応件数：表示できませんでした')
+  attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { connections: 2 } }] } })
+  await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === 'もう一度読み込む')!.click() })
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('2 件')
 })

@@ -105,6 +105,7 @@ export default function QuickCreateV8({
   useEffect(() => { acknowledgedRef.current = [] }, [accountId])
 
   const saving = phase === 'saving'
+  const missingReason = !accountId ? '上のバーでLINE公式アカウントを選んでください' : validateKeywords(keywords.length || !draft.trim() ? keywords : [draft.trim()]) ?? validateReply(reply)
   const guard = useUnsavedGuard({ dirty: keywords.length > 0 || draft !== '' || reply !== '', busy: saving, onDiscard: onClose })
 
   const addKeyword = (value: string) => {
@@ -183,11 +184,14 @@ export default function QuickCreateV8({
 
   const save = async () => {
     if (!canEditNow() || saveLock.current) return
-    const keywordMessage = validateKeywords(keywords)
+    const word = draft.trim()
+    const words = word && !keywords.includes(word) ? [...keywords, word] : keywords
+    const keywordMessage = validateKeywords(words)
     const replyMessage = validateReply(reply)
     setKeywordError(keywordMessage ?? '')
     setReplyError(replyMessage ?? '')
     if (keywordMessage || replyMessage) return
+    if (word) { setKeywords(words); setDraft('') }
     if (!accountId) {
       setSaveError('上のバーでLINE公式アカウントを選んでください')
       return
@@ -204,7 +208,7 @@ export default function QuickCreateV8({
     setSaveError('')
     let completed = false
     try {
-      const input = buildInput(keywords, reply)
+      const input = buildInput(words, reply)
       const snapshot = JSON.stringify(input)
       let id = draftIdRef.current
       const changed = snapshot !== savedInputRef.current
@@ -280,7 +284,8 @@ export default function QuickCreateV8({
           <Button
             type="button"
             variant="primary"
-            disabled={saving || inputsDisabled}
+            disabled={saving || inputsDisabled || Boolean(missingReason)}
+            disabledReason={!inputsDisabled ? missingReason : undefined}
             lockedReason={lockedReason}
             busy={saving}
             busyLabel={phase === 'confirming' ? '有効にしています…' : '保存しています…'}

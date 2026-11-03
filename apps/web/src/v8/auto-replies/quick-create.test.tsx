@@ -105,3 +105,17 @@ it('保存ボタンを続けて押しても下書き作成は1回で、失敗後
   expect(apiMock.createDraft).toHaveBeenCalledTimes(2)
   expect(apiMock.publishDraft).not.toHaveBeenCalled()
 })
+
+it('必須の言葉と返す文が不足すると理由を示して保存を止める', () => {
+  render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={created} />)
+  const button = screen.getByRole('button', { name: '有効にして保存' }) as HTMLButtonElement
+  expect(button.disabled).toBe(true)
+  expect(screen.getByText('反応する言葉を1つ以上入れてください')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('追加する言葉'), { target: { value: '営業時間' } })
+  fireEvent.keyDown(screen.getByLabelText('追加する言葉'), { key: 'Enter' })
+  expect(button.disabled).toBe(true)
+  expect(screen.getByText('返す内容を入力してください')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('返す文'), { target: { value: '10時からです' } })
+  expect(button.disabled).toBe(false)
+  expect(apiMock.createDraft).not.toHaveBeenCalled()
+})

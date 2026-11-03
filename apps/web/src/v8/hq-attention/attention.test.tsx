@@ -33,7 +33,7 @@ beforeEach(() => {
 afterEach(cleanup)
 
 it.each([
-  ['本店の接続の異常 1件を開く', '/accounts'],
+  ['本店の接続の異常 1件を開く', '/accounts/detail?id=account-a'],
   ['本店の未対応のトーク 2件を開く', '/chats?status=unread'],
 ])('%sから個別画面を開くと切り替え先を知らせる', async (name, href) => {
   render(<AttentionPage />)
@@ -65,4 +65,14 @@ it('?kind=connections で来たら種類を接続の異常に絞る', async () =
   } finally {
     window.history.replaceState(null, '', '/hq/attention')
   }
+})
+
+it('LINEアカウントへの接続リンクは対象アカウントの詳細を開く', async () => {
+  fixture.attention.mockResolvedValue({ success: true, data: { items: [{
+    accountId: 'account-a', name: '本店', counts: { connections: 1 },
+    details: { connections: [{ id: 'check', href: '/line-accounts/account-a' }] },
+  }] } })
+  render(<AttentionPage />)
+  fireEvent.click(await screen.findByRole('button', { name: '本店の接続の異常 1件を開く' }))
+  expect(fixture.push).toHaveBeenCalledWith('/accounts/detail?id=account-a')
 })
