@@ -29,6 +29,7 @@ import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 
 import TargetMissing from '@/components/shared/target-missing'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 
@@ -44,6 +45,7 @@ import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/comp
 export default function BookingDetailScreen({ model }: { model: BookingDetailModel }) {
   const {
     id,
+    selectedAccountId,
     loading,
     acting,
     decideTarget,
@@ -753,7 +755,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
         busy={acting}
         onCancel={() => setDecideTarget(null)}
         error={error || undefined} onSuccess={() => setDecideTarget(null)} onConfirm={() => decideTarget ? decide(decideTarget) : false}
-      />
+      ><OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} /></ConfirmDialog>
     </div>
   )
 

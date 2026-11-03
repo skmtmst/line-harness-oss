@@ -146,6 +146,8 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
     await renderResults(SUBSCRIPTIONS)
     await chooseRowOp('進行 一郎', '別のシナリオへ移す')
     const dialog = await screen.findByRole('dialog', { name: '進行 一郎 を別のシナリオへ移す' })
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
     expect(resultFixture.list).toHaveBeenCalledWith({ accountId: 'account-a' })
     fireEvent.click(await screen.findByRole('button', { name: /^移し先のシナリオ(?::|：)?(選ぶ|変える)?$/ }))
     const picker = await findPickerDialog()
@@ -159,6 +161,22 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'このシナリオへ移す' })) })
     await waitFor(() => expect(resultFixture.ops.move).toHaveBeenCalledWith('sub-active', 'sc-2', expect.stringMatching(/^[0-9a-f-]{36}$/)))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '進行 一郎 を別のシナリオへ移す' })).toBeNull())
+  })
+
+  it('アカウントを切り替えた後に古い移動先を復活させない', async () => {
+    let finish!: (value: unknown) => void
+    resultFixture.list.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+      .mockResolvedValueOnce({ success: true, data: [{ id: 'fresh', name: '新しい候補', isActive: true }] })
+    const view = await renderResults(SUBSCRIPTIONS)
+    await chooseRowOp('進行 一郎', '別のシナリオへ移す')
+    resultFixture.account = 'account-b'; view.rerender(React.createElement(ScenarioResultsV8))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '進行 一郎 を別のシナリオへ移す' })).toBeNull())
+    await act(async () => { finish({ success: true, data: [{ id: 'old', name: '古い候補', isActive: true }] }) })
+    await chooseRowOp('進行 一郎', '別のシナリオへ移す')
+    fireEvent.click(await screen.findByRole('button', { name: /^移し先のシナリオ(?::|：)?(選ぶ|変える)?$/ }))
+    const picker = await findPickerDialog()
+    expect(within(picker).queryByRole('radio', { name: '古い候補' })).toBeNull()
+    expect(within(picker).getByRole('radio', { name: '新しい候補' })).toBeTruthy()
   })
 
   it('取得失敗・未取得・0件を分けて出す（SCENARIO-10）', async () => {

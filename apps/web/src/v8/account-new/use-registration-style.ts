@@ -16,11 +16,15 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
   const resumeKey = registrationStorageKey(REGISTRATION_STYLE_KEY, readStaffIdentity())
   const [menu,setMenu]=useState<InitialMenuSelection>({value:'simple'})
   const [choice, setChoice] = useState<AccountStyle | ''>('')
+  const [baselineChoice, setBaselineChoice] = useState<AccountStyle | ''>('')
+  const [baselineMenu, setBaselineMenu] = useState<InitialMenuSelection>({ value: 'simple' })
   const [version, setVersion] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [tick, setTick] = useState(0)
   const busyLock = useRef(false)
+  const dirty = choice !== baselineChoice || JSON.stringify(menu) !== JSON.stringify(baselineMenu)
+  const discard = () => { setChoice(baselineChoice); setMenu(baselineMenu) }
   useEffect(() => {
     if (!enabled || !accountId) return
     let active = true
@@ -29,7 +33,9 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
       if (!res.success) throw new Error('使い方を読み込めませんでした')
       if (!active) return
       setVersion(res.data.version)
-      setChoice(current => current || (res.data.styleSelected ? res.data.style : ''))
+      const loadedChoice = res.data.styleSelected ? res.data.style : ''
+      setBaselineChoice(loadedChoice)
+      setChoice(current => current || loadedChoice)
     }).catch(caught => { if (active) setError(describeApiFailure(caught, '読み込み')) })
     return () => { active = false }
   }, [accountId, enabled, tick])
@@ -47,6 +53,8 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
       const res = await styleApi.save(accountId, { expectedVersion: version, style: choice, confirmInitialMenu:menu.value==='simple',answers: {image},choices })
       if (!res.success) throw new Error('使い方を保存できませんでした。時間をおいて、もう一度お試しください。')
       setVersion(res.data.version)
+      setBaselineChoice(choice)
+      setBaselineMenu(menu)
       accountStyleUpdated(accountId)
       try { if (resumeKey) sessionStorage.removeItem(resumeKey) } catch { /* 保存済みの版を再読すれば再開できる。 */ }
       return true
@@ -64,6 +72,9 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
       if (!res.success) throw new Error('スキップを保存できませんでした。時間をおいて、もう一度お試しください。')
       setVersion(res.data.version)
       setChoice('')
+      setMenu({ value: 'simple' })
+      setBaselineChoice('')
+      setBaselineMenu({ value: 'simple' })
       accountStyleUpdated(accountId)
       try { if (resumeKey) sessionStorage.removeItem(resumeKey) } catch { /* 設定画面であとから変更できる。 */ }
       return true
@@ -72,5 +83,5 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
       return false
     } finally { busyLock.current = false; setBusy(false) }
   }
-  return { choice, setChoice, menu, setMenu, accountId, version, busy, error, reload: () => setTick(n => n + 1), save, skip }
+  return { choice, setChoice, menu, setMenu, accountId, version, busy, error, dirty, discard, reload: () => setTick(n => n + 1), save, skip }
 }

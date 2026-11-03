@@ -11,7 +11,7 @@ import { createResponseGate } from '@/lib/latest-request'
 import { useRowLeaving } from '@/lib/use-row-leaving'
 import { type FolderPanelRow } from '@/components/shared/folder-panel'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { useHeldDetail, useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
 import { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Button from '@/components/shared/button'
@@ -54,7 +54,8 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
   const [folderError, setFolderError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?field=<id> を残す。 */
-  const [activeFieldId, setActiveFieldId] = useDetailPanelUrl('field')
+  const detailGuard = useInlineDetailGuard('field')
+  const { id: activeFieldId, setId: setActiveFieldId } = detailGuard
   const openFieldDetail = (id: string) => host ? (canEdit ? host.onEdit(id) : undefined) : withViewTransition(() => setActiveFieldId(current => current === id ? null : id))
 
   /* アカウント切替のあとに届いた古い応答で一覧を上書きしない（ATTR-01）。 */
@@ -140,7 +141,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
   const liveOrder = useLiveReorder(pageItems, (field) => field.id, dragId)
   const bodyRef = useRef<HTMLTableSectionElement>(null)
   useFlipRows(bodyRef, liveOrder.shown.map((field) => field.id).join(','), JSON.stringify([accountId, query, type, folderFilter, page, pageSize]))
-  const activeField = items.find((item) => item.id === activeFieldId) ?? null
+  const activeField = useHeldDetail(items.find((item) => item.id === activeFieldId) ?? null, activeFieldId, detailGuard.holding, accountId)
   const activeFieldIndex = pageItems.findIndex((item) => item.id === activeFieldId)
   useEffect(() => setPage(1), [query, type, folderFilter, pageSize])
   useEffect(() => {
@@ -256,7 +257,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
   }
 
   /* 行の「…」と右クリックは同じ中身。統括は配る、店は移行。 */
-  const rowMenuItems = (field: FriendField): ActionMenuItem[] => {
+  const rowMenuItemsRaw = (field: FriendField): ActionMenuItem[] => {
     if (host) return canEdit ? [
       { id: 'edit', label: '編集', onSelect: () => host.onEdit(field.id) },
       { id: 'distribute', label: '配る', icon: <Send size={16} aria-hidden="true" />, disabled: host.busy, onSelect: () => host.onDistribute(field.id) },
@@ -283,6 +284,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
     }
     return list
   }
+  const rowMenuItems = (field: FriendField): ActionMenuItem[] => rowMenuItemsRaw(field).map(item => item.onSelect ? { ...item, onSelect: () => detailGuard.protect(() => { void item.onSelect?.() }) } : item)
   const fieldContextItems = (field: FriendField): ContextMenuItem[] =>
     rowMenuItems(field).map((item) => ({
       id: item.id,
@@ -314,10 +316,10 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
       label: f.name,
       count: status === 'ready' ? items.filter((field) => field.folderId === f.id).length : null,
       color: f.color,
-      onEdit: canEdit ? () => host ? host.onEditFolder?.(f.id) : setFolderDialog(f) : undefined,
-      onMoveUp: !host && canEdit && index > 0 ? () => void moveFolderOrder(index, -1) : undefined,
-      onMoveDown: !host && canEdit && index < folders.length - 1 ? () => void moveFolderOrder(index, 1) : undefined,
-      onDelete: canEdit ? () => host ? host.onRemoveFolder?.(f.id) : setDeletingFolder(f) : undefined,
+      onEdit: canEdit ? () => detailGuard.protect(() => { if (host) host.onEditFolder?.(f.id); else setFolderDialog(f) }) : undefined,
+      onMoveUp: !host && canEdit && index > 0 ? () => detailGuard.protect(() => { void moveFolderOrder(index, -1) }) : undefined,
+      onMoveDown: !host && canEdit && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolderOrder(index, 1) }) : undefined,
+      onDelete: canEdit ? () => detailGuard.protect(() => { if (host) host.onRemoveFolder?.(f.id); else setDeletingFolder(f) }) : undefined,
       deleteNote: '削除しても、中の項目は未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: status === 'ready' ? items.filter((field) => !field.folderId).length : null },
@@ -334,5 +336,5 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
     <Button {...(host ? { onClick: host.onCreate, disabled: host.busy } : { href: '/tags/fields/new' })} variant="primary" className={wide ? styles.createWide : undefined}><Plus size={16} aria-hidden="true" />項目を作る</Button>
   )
 
-  return { accountId, canEdit, narrow, host, explanation, items, loaded, status, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, page, setPage, dragId, setDragId, pendingDelete, setPendingDelete, deleteError, deleteNeedsReview, leavingId, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, openMenuId, setOpenMenuId, setActiveFieldId, openFieldDetail, load, loadFolders, visible, pages, currentPage, pageItems, liveOrder, bodyRef, activeField, activeFieldIndex, applyOrder, move, keyboardMove, remove, removeFolder, rowMenuItems, fieldContextItems, kpis, folderRows, folderDotOf, filterActive, createButton }
+  return { accountId, canEdit, narrow, host, explanation, items, loaded, status, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, page, setPage, dragId, setDragId, pendingDelete, setPendingDelete, deleteError, deleteNeedsReview, leavingId, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, openMenuId, setOpenMenuId, setActiveFieldId, openFieldDetail, load, loadFolders, visible, pages, currentPage, pageItems, liveOrder, bodyRef, activeField, activeFieldIndex, applyOrder, move, keyboardMove, remove, removeFolder, rowMenuItems, fieldContextItems, kpis, folderRows, folderDotOf, filterActive, createButton, detailGuard }
 }

@@ -30,6 +30,7 @@ import { permissionDeniedMessage, describeApiFailure } from '@/components/shared
 import NumberInput from '@/components/shared/number-field'
 import { saveInitialSlot, type InitialSlotCache } from './save-initial-slot'
 import SaveFeedback, { useSaveFeedback } from '@/components/shared/save-feedback'
+import { notifyToast } from '@/components/shared/toast'
 import { requiredText, type FormRequirement } from '@/lib/form-requirement'
 
 const eventRequirements = {
@@ -248,6 +249,7 @@ function EventsCreateV8Inner() {
       feedback.success('イベントと最初の予約枠')
       initialRef.current = snapshot
       setPublishTarget(null)
+      if (!publish && saved?.is_published === 0) notifyToast('下書きを保存しました', { tone: 'success' })
       router.push(`/events?highlight=${encodeURIComponent(eventId)}`)
       return true
     } catch (cause) {

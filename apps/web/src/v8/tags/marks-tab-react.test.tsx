@@ -126,6 +126,8 @@ describe('保管', () => {
     const dialog = await openArchive()
     expect(net.impact).toHaveBeenCalledWith('mk1', 'acc')
     expect(dialog.closest('[data-design-node="fy5dz"]')).not.toBeNull()
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
     await waitFor(() => expect(dialog.textContent).toContain('いま 8 人に付いています。保管すると、この 8 人は下で選んだマークへ置き換え、履歴に残します。'))
     expect(dialog.textContent).not.toContain('対応マークが未設定へ戻ります')
   })
@@ -135,6 +137,19 @@ describe('保管', () => {
     await waitFor(() => expect(within(dialog).getByRole('button', { name: '置き換えて保管する' }).hasAttribute('disabled')).toBe(false))
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '置き換えて保管する' })) })
     expect(net.archive).toHaveBeenCalledWith('mk1', 'acc', { replacementMarkId: 'mk2', impactRevision: 'rev-7', expectedVersion: 2 }, expect.stringMatching(/^[0-9a-f-]{36}$/))
+  })
+
+  it('保管確認中にアカウントを切り替えたら古い窓から送らない', async () => {
+    const view = render(<MarksTab accountId="acc" canEdit />)
+    await screen.findByRole('table')
+    fireEvent.click(within(table()).getByRole('button', { name: '対応マーク「要対応」の操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '保管する' }))
+    const dialog = await screen.findByRole('alertdialog', { name: '「要対応」を保管しますか' })
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '置き換えて保管する' }).hasAttribute('disabled')).toBe(false))
+    const confirm = within(dialog).getByRole('button', { name: '置き換えて保管する' })
+    view.rerender(<MarksTab accountId="other" canEdit />)
+    fireEvent.click(confirm)
+    expect(net.archive).not.toHaveBeenCalled()
   })
 
   it('保管の失敗はAPIの文言を出さず、読み直してからもう一度と言う', async () => {

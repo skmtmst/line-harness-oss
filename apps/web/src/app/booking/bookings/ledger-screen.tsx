@@ -33,6 +33,7 @@ import { Calendar, CalendarPlus, CalendarX, CircleAlert, Download, Phone, X } fr
 import { bookingApi, type BookingAdminDetail, type BookingRequest } from '@/lib/api'
 
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
 import { BookingGapSections } from '@/v8/booking-gap/public/booking-gap-sections/index'
 
@@ -227,7 +228,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
       ))}
       {selectedAccountId && canOperate ? <SeriesHost params={new URLSearchParams(urlParams.toString())} accountId={selectedAccountId} menus={menus} staffList={staffList} basePath="/booking/bookings" /> : null}
       <ConfirmDialog
-        open={decideTarget !== null}
+        open={decideTarget !== null && decideTarget.accountId === selectedAccountId}
         designNode={decideTarget?.action === 'cancel' ? 'iJdAi' : undefined}
         title={`この予約を「${decideTarget ? actionLabel[decideTarget.action] : ''}」にしますか？`}
         description={
@@ -241,8 +242,8 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
         busy={deciding}
         error={decideError || undefined}
         onCancel={() => { setDecideTarget(null); setDecideError('') }}
-        onConfirm={() => { if (decideTarget) void runDecide(decideTarget.id, decideTarget.action) }}
-      />
+        onConfirm={() => { if (decideTarget && decideTarget.accountId === selectedAccountId) void runDecide(decideTarget.id, decideTarget.action) }}
+      ><OperationTargetSummary accounts={[{ id: decideTarget?.accountId ?? '' }]} /></ConfirmDialog>
     </>
   )
 

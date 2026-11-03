@@ -14,6 +14,7 @@ vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-util
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => null }))
 vi.mock('./resume-style', () => ({ default: () => null }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn() } }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 const connection = {
   steps: [1, 2, 3, 4, 5].map(order => ({ order, state: 'passed', message: '確認済み' })),
@@ -63,6 +64,13 @@ async function confirmation(answer: boolean, restored?: boolean, explicit = fals
   LOGIN_ACKS.forEach(ack => fireEvent.click(screen.getByRole('checkbox', { name: ack.label }))); next()
   return screen.getByRole('checkbox', { name: 'いまの友だちの引き継ぎ' }) as HTMLInputElement
 }
+
+it('登録前の接続情報がある間はページを離れる前に確認する', async () => {
+  await confirmation(false)
+  const event = new Event('beforeunload', { cancelable: true })
+  window.dispatchEvent(event)
+  expect(event.defaultPrevented).toBe(true)
+})
 
 it.each([undefined, true])('引き継ぎを断った回答は、接続確認でも未選択になる（保存値 %s）', async restored => {
   const checkbox = await confirmation(false, restored)

@@ -20,7 +20,7 @@ vi.mock('@/lib/api', async (original) => {
   } }
 })
 import { TagEditForm } from './edit-form'
-import type { LinkedAction } from '@/components/friend-fields/tag-editor-v4'
+import { RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 
 type Props = Partial<React.ComponentProps<typeof TagEditForm>>
 function renderForm(props: Props = {}) {
@@ -63,6 +63,8 @@ describe('マイル', () => {
     fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))
     const title = await screen.findByText('5人にさかのぼってマイルを積みますか？')
     const dialog = title.closest<HTMLElement>('[role="dialog"], [role="alertdialog"]')!
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
     expect(dialog.textContent).toContain('この操作は取り消せません')
     expect(dialog.textContent).toContain('新規作成のときはこのダイアログは出ません')
     expect(onSave).not.toHaveBeenCalled()
@@ -72,6 +74,19 @@ describe('マイル', () => {
     await waitFor(() => expect(go.disabled).toBe(false))
     fireEvent.click(go)
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ applyToExisting: true }), true, 'pt-1')
+  })
+
+  it('アカウント切替後は以前の人数と確認で遡及を実行しない', async () => {
+    const values = { name: 'VIP', groupId: '', isStarred: false, linked: false, rewardMiles: 100, referralRewardMiles: 0, multiplierBps: null, multiplierPriority: 0, applyToExisting: true, reapplyPolicy: 'first_only', actions: [] } as TagEditorValues
+    const save = vi.fn()
+    net.preview.mockResolvedValueOnce({ success: true, data: { selfTargets: 4, referralTargets: 1, selfMiles: 400, referralMiles: 0, selfExcluded: 1, referralExcluded: 0, previewToken: 'pt-1' } }).mockReturnValueOnce(new Promise(() => {}))
+    const view = render(<RetroactiveDialog values={values} count={5} tagId="t1" accountId="a1" onCancel={vi.fn()} onSaveWithoutApplying={vi.fn()} onSave={save} />)
+    await screen.findByText('5人にさかのぼってマイルを積みますか？')
+    fireEvent.click(screen.getByRole('checkbox', { name: '人数と合計マイルを確認しました' }))
+    const button = screen.getByRole('button', { name: 'さかのぼって反映して保存する' })
+    view.rerender(<RetroactiveDialog values={values} count={5} tagId="t1" accountId="a2" onCancel={vi.fn()} onSaveWithoutApplying={vi.fn()} onSave={save} />)
+    fireEvent.click(button)
+    expect(save).not.toHaveBeenCalled()
   })
 })
 

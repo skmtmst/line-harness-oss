@@ -82,6 +82,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => { root.unmount() })
   host.remove()
+  window.history.replaceState(null, '', '/webinars')
   vi.unstubAllGlobals()
   document.documentElement.removeAttribute('data-theme')
 })
@@ -96,6 +97,19 @@ const buttonByLabel = (label: string) =>
   [...document.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === label) as HTMLButtonElement | undefined
 
 describe('V8 ウェビナー一覧', () => {
+  it('詳細のウェビナー名を編集中に移動すると入力を保って確認する', async () => {
+    window.history.replaceState(null, '', '/webinars?webinar=webinar-1')
+    await render()
+    await act(async () => { buttonByLabel('ウェビナー名を変更する')!.click() })
+    const input = document.querySelector<HTMLInputElement>('input[aria-label="ウェビナー名"]')!
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    await act(async () => { setter.call(input, '編集中のウェビナー'); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })) })
+    const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+    await act(async () => { link.click() })
+    expect(document.body.textContent).toContain('保存していない変更があります')
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="ウェビナー名"]')?.value).toBe('編集中のウェビナー')
+    link.remove()
+  })
   it('未取得の視聴数は横線にし、理由を実際の補足へ一度だけ出す', async () => {
     const originalFetch = globalThis.fetch
     const reason = '視聴区間の記録をまだ集計できないため'

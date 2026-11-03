@@ -382,6 +382,16 @@ function confirmDialog(): HTMLElement {
 }
 
 describe('まとめて削除の確認', () => {
+  it('一括削除の理由を入力したら画面移動を確認する', async () => {
+    await render()
+    await selectRows('問い合わせ先', '臨時のお知らせ')
+    await click(button('選択した共通情報を削除'))
+    await type(inputByPlaceholder('店舗情報の変更のため', confirmDialog()), '整理のため')
+    const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+    await click(link)
+    expect(document.body.textContent).toContain('保存していない変更があります')
+    link.remove()
+  })
   it('アカウントを切り替えて戻しても古い一括確定では削除しない', async () => {
     await render()
     await selectRows('問い合わせ先', '臨時のお知らせ')

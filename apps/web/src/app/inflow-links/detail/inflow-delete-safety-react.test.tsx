@@ -95,6 +95,9 @@ afterEach(() => cleanup())
 describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
   it('既定は受付停止で、Escapeで閉じて起点ボタンへfocusを戻す', async () => {
     const { opener, dialog } = await mountAndOpen()
+    expect(within(dialog).getByText('受付先アカウント')).toBeTruthy()
+    expect(within(dialog).getByText('受付先の全アカウントは確認できません。')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: '受けるのをやめる' })).toBeTruthy()
 
     fireEvent.keyDown(document, { key: 'Escape' })

@@ -16,6 +16,7 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { DistributionAccountName,DistributionProgress,DistributionTable,DistributionToolbar } from '@/components/shared/distribution-table'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import FolderSelect from '@/components/shared/folder-select'
@@ -940,7 +941,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
               refreshStats()
               setRemove(null); setMessage('ひな形を削除しました。')
             })}
-          />
+          ><OperationTargetSummary accounts={[]} externalTarget={{ label: '統括ひな形', name: remove?.name }} /></ConfirmDialog>
           </>
         )}
       /></SaveErrorScope>
@@ -1003,7 +1004,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           setRemove(null); setMessage('ひな形を削除しました。')
           toList()
         })}
-      /></SaveErrorScope>
+      ><OperationTargetSummary accounts={[]} externalTarget={{ label: '統括ひな形', name: remove?.name }} /></ConfirmDialog></SaveErrorScope>
     )
   }
 

@@ -1,6 +1,5 @@
 import type { AccountStyle, StyleTemplateSample, StarterCatalogDefinition, StarterCatalogOption, StarterCatalogSelection, StarterCatalogDetails } from '@line-crm/shared';
 import { fetchApi } from '../../api';
-import { fetchSharedRead } from '../transport/cache';
 
 import {
   write,
@@ -79,8 +78,8 @@ export const hqStyleApi = {
       '/api/hq/style-starter-sets/' + encodeURIComponent(style) + '/distribute',
       write('POST', body),
     ),
-  attention: () =>
-    fetchSharedRead<
+  attention: (options?: { cache?: 'reload' }) =>
+    fetchApi<
       Result<{
         asOf: string;
         items: Array<{
@@ -91,5 +90,5 @@ export const hqStyleApi = {
           details: Record<string, Array<{ id: string; href?: string }>>;
         }>;
       }>
-    >('/api/hq/style-attention'),
+    >('/api/hq/style-attention', options),
 };
