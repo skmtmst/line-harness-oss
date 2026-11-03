@@ -30,6 +30,6 @@ describe('一斉配信の細かい板', () => {
     expect(DETAIL).toMatch(/<Button[^>]*variant="primary"[^>]*onClick=\{onClose\}/)
     // 予約後の窓は3操作を独自footerへ移した。残す操作を主ボタンにする。
     expect(RESERVED).toMatch(/<Button[^>]*variant="primary"[^>]*onClick=\{onClose\}[^>]*>[\s\S]*?予約のまま残す/)
-    expect(RESERVED).toMatch(/variant="danger" onClick=\{\(\) => \{ if \(!target\.current\.invalid && target\.current\.key === key\) onConfirm\(\)/)
+    expect(RESERVED).toMatch(/variant="danger" onClick=\{\(\) => \{ if \(!reviewRequired && !target\.current\.invalid && target\.current\.key === key\) onConfirm\(\)/)
   })
 })
