@@ -94,3 +94,5 @@
 .compactField { height: var(--tpl-chip-h); }
 
 :root .closeBtn { box-sizing: border-box; height: 32px; padding-block-start: calc(4px + var(--polish-text-center-inset)); }
+
+:root .clearableField { padding-inline-end: calc(36px + var(--space-8)); }

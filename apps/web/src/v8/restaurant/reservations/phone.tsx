@@ -431,7 +431,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
             </div>
             <SettingsFormRow layout="columns">
               <Field labelSize="compact" label="卓">
-                <SaveErrorField names={["tableMode","table_mode"]}><EntitySelect aria-label="卓" size="full" value={tableMode} onChange={setTableMode} options={[
+                <SaveErrorField names={["tableMode","table_mode"]}><EntitySelect aria-label="卓" label="卓" size="full" value={tableMode} onChange={setTableMode} options={[
                   { value: 'auto', color: 'var(--color-status-info)', label: recommended ? `自動で選ぶ（おすすめ：${recommended.code} ${recommended.label} ${recommended.max_capacity}名）` : '自動で選ぶ' },
                   ...activeTables.map((t) => ({ ...entityOptionMetadata(t), color: 'var(--color-status-info)', value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` })),
                 ]} /></SaveErrorField>

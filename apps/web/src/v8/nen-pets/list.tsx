@@ -224,7 +224,7 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
           <span className={styles.sub}>{pet.owner.customerId ? `EC会員 ${pet.owner.customerId}` : 'EC未連携'}</span>
         </span>
       </Td>
-      <Td className={styles.colAge}><span className={styles.cell}>{pet.ageLabel}</span></Td>
+      <Td className={styles.colAge}><span className={styles.cell} title={pet.ageLabel}>{pet.ageLabel}</span></Td>
       <Td className={styles.colWeight}><span className={styles.num}>{pet.weightKg == null ? emptyValue('unknown') : `${pet.weightKg}kg`}</span></Td>
       <Td className={styles.colFeed}>
         <span className={styles.stack}>

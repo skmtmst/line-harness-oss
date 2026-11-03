@@ -326,11 +326,14 @@
 
 .sideCardLink {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-bm-6);
   color: var(--color-ink);
   font-size: var(--tpl-bm-12);
 }
+
+.sideCardLink a { white-space: nowrap; }
 
 .connectionIcon {
   flex: none;

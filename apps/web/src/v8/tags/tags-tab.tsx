@@ -795,6 +795,7 @@ export default function TagsTab({
   return (
     <SaveErrorScope errors={saveErrors}><>
       <ListPageBody
+        tableInset
         skeleton
         stats={
       <KpiBand data-design="KPIs" className={styles.kpis}>

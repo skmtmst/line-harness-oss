@@ -436,7 +436,7 @@ export function CanvasEditor({
                 {/* 絵 Z0uO6・kmTab：面の真ん中に面の名前。押す場所がどの面かを画像の上で分かるようにする。 */}
                 {appearance === 'v8' && !preview ? (
                   <>
-                    <AreaIcon intent={area.intent} />
+                    {area.boundsHeight * scale >= 40 ? <AreaIcon intent={area.intent} /> : null}
                     <span className={styles.areaName}>{areaDisplayName(area, index)}</span>
                   </>
                 ) : null}

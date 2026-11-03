@@ -590,6 +590,9 @@
 /* 頁の本文が間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
 :global(:root) .pageContent > :global([data-design-part='notice']) { margin-block: 0; }
 :global(:root) .pageContent[data-content-layout='stats'] { padding-block: 0; }
+/* すでに本文の内側にある数の帯へ、左右の余白を重ねない。 */
+:global(:root) .stats > .pageContent[data-content-layout='stats'],
+:global(:root) [data-restaurant-fusion] .pageContent[data-content-layout='stats'] { padding-inline: 0; }
 :global(:root) .pageContent[data-content-layout='columns'] { flex-direction: row; align-items: flex-start; }
 :global(:root) .createColumns { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-preview-width); min-height: 0; align-items: stretch; }
 :global(:root) .createColumns > aside { contain: size; min-height: 0; overflow-y: auto; }

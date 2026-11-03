@@ -317,3 +317,7 @@
 :root :is(.hit, .pill, .link)[data-permission-locked],
 :root :is(.hit, .pill, .link)[data-permission-locked]:hover { color: var(--color-ink-faint); cursor: not-allowed; }
 :root .root > .links .link[data-permission-locked] { opacity: var(--polish-disabled-opacity); }
+
+/* 画像全体を見せる欄は操作を画像の下に置く。 */
+.root[data-preview-actions-below] .frame[data-state='filled'] { min-height: 0; }
+.root[data-preview-actions-below] > .actions { position: static; align-self: flex-start; }
