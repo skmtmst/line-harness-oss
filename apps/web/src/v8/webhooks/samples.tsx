@@ -15,9 +15,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import {
   ViewerBand,
   WEBHOOKS_DESCRIPTION,
-  WebhookBand,
   WebhookTabs,
-  overviewBandCells,
   useWebhookOverview,
 } from './shell'
 import { useWebhookWriteAccess } from './write-access'
@@ -60,13 +58,6 @@ export default function WebhooksSamplesV8() {
       tabs={<WebhookTabs active="notify" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {management.known && !canManage ? <ViewerBand /> : null}
-        <WebhookBand
-          cells={overviewBandCells({
-            outgoing: overview.outgoingCount === null ? null : overview.outgoing,
-            incomingCount: overview.incomingCount,
-            summary: overview.summary,
-          })}
-        />
       </>}
     >
       <div className={styles.body}>
