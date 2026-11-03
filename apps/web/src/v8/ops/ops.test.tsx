@@ -350,7 +350,23 @@ describe('送る・止める前に確かめる', () => {
     expect(dialog.textContent).toContain('店舗1')
     expect(dialog.textContent).toContain('ほか')
     expect(dialog.textContent).not.toContain('店舗6')
-    expect(dialog.textContent).toContain('契約先 1件')
+    expect(dialog.textContent).toContain('契約先：契約先A（1件）')
+  })
+
+  it.each([
+    ['停止', 'active', '要確認'],
+    ['アーカイブ', 'active', '要確認'],
+    ['再開', 'suspended', '再開すると'],
+  ])('契約先の%s確認は対象名と操作前の案内を示す', async (action, status, expected) => {
+    tenantStatus = status
+    search = 'id=t1'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    await act(async () => { getPageAction({ name: action }).click() })
+    const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+    expect(dialog.textContent).toContain('契約先：契約先A（1件）')
+    expect(dialog.textContent).toContain(expected)
+    expect(dialog.textContent).not.toContain('失敗：')
   })
 
   it('閉じた契約先停止の確認では実行できない', async () => {

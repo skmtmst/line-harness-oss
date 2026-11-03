@@ -353,8 +353,8 @@ function StatusDialog({ tenantId, target, tenantName, accounts, routeScope, gene
     >
       <div className={parts.dialogBody}>
         <OperationTargetSummary accounts={[]} externalTarget={{ label: accountLabel, name: accountSummary }} />
-        <p className={parts.note}>契約先 1件</p>
-        <Notice tone={needsName ? "danger" : "info"}>
+        <p className={parts.note}>{`契約先：${tenantName}（1件）`}</p>
+        <Notice tone={needsName ? "warn" : "info"}>
           {target === 'suspended'
             ? '停止すると、この契約先の権限者はログインできなくなります。配信も止まります。'
             : target === 'archived'
