@@ -115,12 +115,12 @@ function listResult(items: unknown[], total = items.length) {
 
 function impact(groupId: string, status: string, extra: Record<string, unknown> = {}) {
   return {
-    group: { id: groupId, accountId: 'account-a', name: 'x', status },
+    group: { id: groupId, accountId: 'account-a', name: groupId === 'g-pub' ? '通常メニュー' : 'x', status, version:1, publishingGeneration:0 },
     currentAudience: { value: 0, state: 'available', reason: null },
     nextDisplay: { guaranteedGroupId: null, reason: 'no_fallback', candidates: [] },
     incomingSwitches: [],
     operationalReferences: [],
-    lineResources: { pageCount: 1, pagesWithLineRichMenuId: 0, isDefaultForAll: false, publishing: false },
+    lineResources: { pageCount: 1, pagesWithLineRichMenuId: 0, isDefaultForAll: false, publishing: false, pages:[{id:'page-1',orderIndex:0,lineRichMenuId:'line-1'}] },
     blockers: [],
     canDelete: true,
     recommendedAction: status === 'published' ? 'unpublish' : 'delete',
@@ -261,9 +261,20 @@ describe('失敗の文', () => {
     const dialog = await openDialog()
     fireEvent.click(await within(dialog).findByRole('button', { name: /LINEから取り下げる/ }))
     await waitFor(() => expect(dialog.textContent).toContain(richMenuError(new Error('x'), 'unpublish')))
-    expect(mocks.unpublish).toHaveBeenCalledWith('g-pub')
+    expect(mocks.unpublish).toHaveBeenCalledWith('g-pub',{expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:false,expectedPages:[{id:'page-1',orderIndex:0,lineRichMenuId:'line-1'}]})
     expect(mocks.remove).not.toHaveBeenCalled()
     expect(document.body.textContent).not.toContain('D1_ERROR')
+  })
+
+  test('公開内容が変わった409では確認を閉じ、途中まで進んだ可能性を知らせる',async()=>{
+    mocks.unpublish.mockRejectedValue(new ApiError(409,'changed','RICH_MENU_CONFIRMATION_CHANGED'))
+    const view=renderList()
+    await pick(view,'通常メニュー','取り下げ・削除する')
+    const dialog=await openDialog()
+    fireEvent.click(await within(dialog).findByRole('button',{name:/LINEから取り下げる/}))
+    await waitFor(()=>expect(document.body.textContent).toContain('一部の取り下げが進んだ可能性があります'))
+    expect(document.body.contains(dialog)).toBe(false)
+    expect(mocks.unpublish).toHaveBeenCalledTimes(1)
   })
 
   test('LINEからの削除と取り込みの失敗は、それぞれの文にする', async () => {

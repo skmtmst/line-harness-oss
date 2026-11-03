@@ -656,12 +656,15 @@ export default function RichMenusListV8() {
     const action = deleteTarget.kind === 'managed'
       ? deleteTarget.group.status === 'published' ? 'unpublish' : 'delete'
       : 'externalDelete'
+    if(deleteTarget.kind==='managed'&&action==='unpublish'&&(!impact||impactPhase!=='ready'||impact.group.id!==deleteTarget.group.id||impact.group.name!==deleteTarget.group.name||impact.group.status!=='published'||!Number.isSafeInteger(impact.group.version)||!Number.isSafeInteger(impact.group.publishingGeneration)||typeof impact.lineResources.isDefaultForAll!=='boolean'||!Array.isArray(impact.lineResources.pages))){
+      setDeleteError('公開内容を確認できません。閉じてもう一度お試しください。');return
+    }
     setDeleteBusy(true)
     setDeleteError(null)
     try {
       if (deleteTarget.kind === 'managed') {
         const res = deleteTarget.group.status === 'published'
-          ? await api.richMenuGroups.unpublish(deleteTarget.group.id)
+          ? await api.richMenuGroups.unpublish(deleteTarget.group.id,{expectedVersion:impact!.group.version!,expectedPublishGeneration:impact!.group.publishingGeneration!,expectedIsDefaultForAll:impact!.lineResources.isDefaultForAll,expectedPages:impact!.lineResources.pages!})
           : await api.richMenuGroups.delete(deleteTarget.group.id)
         if (!res.success) throw new Error('delete_failed')
       } else {
@@ -682,6 +685,12 @@ export default function RichMenusListV8() {
       const fieldFailure = saveErrors.capture(e)
       /* 409は「読んだあとに状態が変わった」。新しい影響を描き直す。 */
       if (e instanceof ApiError && e.status === 409) {
+        if(action==='unpublish'&&e.code==='RICH_MENU_CONFIRMATION_CHANGED'){
+          setDeleteTarget(null)
+          notifyToast('公開内容が変わりました。一部の取り下げが進んだ可能性があります。最新の状態を確認してください。',{tone:'error'})
+          void reload()
+          return
+        }
         const latest = impactFromError(e.data);
 
         if (latest && impactMatchesRequest(latest, request)) {
