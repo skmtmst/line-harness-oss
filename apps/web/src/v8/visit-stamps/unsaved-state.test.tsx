@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const fx = vi.hoisted(() => ({
@@ -222,4 +222,45 @@ it.each(['viewer', 'staff'])('役割%sは設定を変えられず、初期値で
   expect((await nameInput()).hasAttribute('readonly')).toBe(true)
   expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
   expect(unload()).toBe(false)
+})
+
+it('公開中カードのマス数を変える場合だけ、影響を確認して保存する', async () => {
+  render(<VisitStampsV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: 'マスの数' }))
+  fireEvent.click(screen.getByRole('button', { name: '12 個' }))
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  const dialog = screen.getByRole('dialog', { name: 'マスの数を変更しますか？' })
+  expect(within(dialog).getByText(/お客さま/)).toBeTruthy()
+  expect(fx.save).not.toHaveBeenCalled()
+  fireEvent.click(within(dialog).getByRole('button', { name: '変更して保存する' }))
+  await waitFor(() => expect(fx.save).toHaveBeenCalledTimes(1))
+  expect(fx.save.mock.calls[0][1].settings.slotCount).toBe(12)
+})
+
+it('確認を取り消すと保存せず、入力したマス数を保持する', async () => {
+  render(<VisitStampsV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: 'マスの数' }))
+  fireEvent.click(screen.getByRole('button', { name: '12 個' }))
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'マスの数を変更しますか？' })).getByRole('button', { name: 'キャンセル' }))
+  expect(fx.save).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'マスの数' }).textContent).toContain('12')
+})
+
+it('停止中カードのマス数変更は確認なしで保存する', async () => {
+  fx.cards.mockResolvedValue({ success: true, data: [{...card, active:false}] })
+  render(<VisitStampsV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: 'マスの数' }))
+  fireEvent.click(screen.getByRole('button', { name: '12 個' }))
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(fx.save).toHaveBeenCalledTimes(1))
+  expect(screen.queryByRole('dialog', { name: 'マスの数を変更しますか？' })).toBeNull()
+})
+
+it('公開中でもマス数以外の変更は確認なしで保存する', async () => {
+  render(<VisitStampsV8 />)
+  fireEvent.change(await screen.findByDisplayValue('然 来店スタンプカード'), { target: { value: '新しい名前' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(fx.save).toHaveBeenCalledTimes(1))
+  expect(screen.queryByRole('dialog', { name: 'マスの数を変更しますか？' })).toBeNull()
 })

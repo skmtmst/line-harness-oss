@@ -186,3 +186,10 @@ describe('左メニューの版は1行、詳細と更新は開いて確かめる
     expect(screen.queryByRole('button', { name: '2.7.0・検証環境' })).toBeNull()
   })
 })
+
+it('統括から開く更新履歴に統括への戻り先を付ける', async () => {
+  fetchMock.mockResolvedValue(json(detail))
+  await act(async () => { render(<SidebarVersion hqOrigin />) })
+  const { dialog } = open()
+  expect(within(dialog).getByRole('link', { name: '更新履歴' }).getAttribute('href')).toBe('/updates?from=hq')
+})
