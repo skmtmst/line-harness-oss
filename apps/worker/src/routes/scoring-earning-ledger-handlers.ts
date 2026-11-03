@@ -2,6 +2,7 @@ import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.j
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
+import { blockEcMileageWrite } from '../services/mileage-write-guard.js';
 import { getMileageAdminOverview, getMileageAdminHistory, getMileageHistoryPeriodSummary, getMileageManualAdjustmentPolicy, setMileageManualAdjustmentPolicy, findCommittedMileageAdjustment, postMileageAdjustment, MileageAdjustmentError, publishMileageEarningRule, confirmPendingMileageEntry, voidMileageLedgerEntry, createMileageAdjustmentApprovalRequest, listMileageAdjustmentApprovalRequests, approveMileageAdjustmentRequest, rejectMileageAdjustmentRequest, cancelMileageAdjustmentRequest } from '@line-crm/db';
 import type { MileageEntryStatus, MileageEntryType } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -242,6 +243,8 @@ export const post__api_mileage_adjustments_6 = async (c: Context<Env, "/api/mile
       if (!scope.allowedAccountIds.includes(accountId)) {
         return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
+      const blocked = await blockEcMileageWrite(c, accountId);
+      if (blocked) return blocked;
       const friend = await c.env.DB.prepare(
         `SELECT id FROM friends WHERE id = ? AND line_account_id = ?`,
       ).bind(friendId, accountId).first<{ id: string }>();
@@ -428,6 +431,8 @@ export const post__api_mileage_adjustment_approvals_id_approve_8 = async (c: Con
       if (!await canUseMileageAccount(c, accountId)) {
         return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
       }
+      const blocked = await blockEcMileageWrite(c, accountId);
+      if (blocked) return blocked;
       const staff = c.get('staff');
       const { request, entry } = await approveMileageAdjustmentRequest(c.env.DB, {
         requestId: c.req.param('id'),
@@ -475,6 +480,8 @@ export const post__api_mileage_adjustment_approvals_id_reject_9 = async (c: Cont
       if (!await canUseMileageAccount(c, accountId)) {
         return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
       }
+      const blocked = await blockEcMileageWrite(c, accountId);
+      if (blocked) return blocked;
       const staff = c.get('staff');
       const request = await rejectMileageAdjustmentRequest(c.env.DB, {
         requestId: c.req.param('id'),
@@ -500,6 +507,8 @@ export const post__api_mileage_adjustment_approvals_id_cancel_10 = async (c: Con
       if (!await canUseMileageAccount(c, accountId)) {
         return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
       }
+      const blocked = await blockEcMileageWrite(c, accountId);
+      if (blocked) return blocked;
       const request = await cancelMileageAdjustmentRequest(c.env.DB, {
         requestId: c.req.param('id'),
         lineAccountId: accountId,
@@ -529,6 +538,8 @@ export const post__api_mileage_entries_id_confirm_11 = async (c: Context<Env, "/
       if (!await canUseMileageAccount(c, accountId)) {
         return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
+      const blocked = await blockEcMileageWrite(c, accountId);
+      if (blocked) return blocked;
       const staff = c.get('staff');
       const { entry, alreadyConfirmed } = await confirmPendingMileageEntry(c.env.DB, {
         entryId: c.req.param('id'),
@@ -561,6 +572,8 @@ export const post__api_mileage_entries_id_void_12 = async (c: Context<Env, "/api
       if (!await canUseMileageAccount(c, accountId)) {
         return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
+      const blocked = await blockEcMileageWrite(c, accountId);
+      if (blocked) return blocked;
       const staff = c.get('staff');
       const result = await voidMileageLedgerEntry(c.env.DB, {
         entryId: c.req.param('id'),

@@ -1,20 +1,5 @@
 import { getNenRankSettings } from '@line-crm/db';
-import { accountFeatureIsEnabled } from './feature-enforcement.js';
-
-/** 専用カタログの旧アカウント既定値と、実際の EC 接続・会員データの両方で判定する。 */
-export async function resolveMileageSource(db: D1Database, accountId: string): Promise<'ec' | 'musubo'> {
-  const setting = await db.prepare(`SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'feature.specialized.catalog'`).bind(accountId).first<{ value: string }>();
-  if (setting?.value != null) {
-    const parsed: unknown = JSON.parse(setting.value);
-    if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === 'string')) throw new Error('mileage_source_catalog_invalid');
-    if (!parsed.includes('ec_commerce')) return 'musubo';
-  }
-  if (!await accountFeatureIsEnabled(db, accountId, 'ec_commerce')) return 'musubo';
-  const connected = await db.prepare(`SELECT 1 AS present WHERE EXISTS (SELECT 1 FROM ec_connectors WHERE line_account_id = ? AND provider = 'ec_cube' AND status = 'connected')
-    OR EXISTS (SELECT 1 FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id WHERE f.line_account_id = ?)`)
-    .bind(accountId, accountId).first<{ present: number }>();
-  return connected?.present === 1 ? 'ec' : 'musubo';
-}
+export { resolveMileageSource } from '@line-crm/db/src/mileage/source.js';
 
 type Input = { lineAccountId: string; search: string; friendId?: string; limit: number; offset: number };
 export async function getEcMileageBalance(db: D1Database, accountId: string, friendId: string): Promise<number | null> {

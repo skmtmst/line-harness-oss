@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import { ensureNenRankDefaults, getMileageAdminHistory } from '@line-crm/db';
+import { ensureNenRankDefaults, getMileageAdminHistory, postMileageEntry, enqueueMileageEvent, processPendingMileageEvents, syncAffiliateConversionMileage } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { get__api_mileage_friends_21 } from './scoring-reward-catalog-handlers.js';
 import { get__api_friends_id_mileage_1 } from './friends-summaries-handlers.js';
+import { createAutomationActionExecutors } from '../features/automations/automation-action-handlers.js';
 
 let fixture: SqliteD1;
 const now = '2026-11-03T00:00:00';
@@ -37,6 +38,43 @@ beforeEach(async () => {
 afterEach(() => fixture.raw.close());
 
 describe('ECの正本を使うマイル残高', () => {
+  it('自動化の直接付与もEC管理を示すコードで止まる', async () => {
+    const run = createAutomationActionExecutors().grant_mileage!;
+    await expect(run({ db: fixture.db, lineAccountId: 'nen', friendId: 'f-nen', action: { id: 'a', type: 'grant_mileage', params: { amount: 10 } }, sourceEventId: 'evt', idempotencyKey: 'i' } as any)).rejects.toMatchObject({ code: 'MILEAGE_MANAGED_BY_EC' });
+    expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM mileage_ledger WHERE source='automation'").get()).toEqual({ n: 0 });
+  });
+  it('非EC店の行動は処理し、EC店の紹介者への付与だけ止める', async () => {
+    fixture.raw.prepare("INSERT INTO affiliates(id,name,code,is_active,created_at,friend_id) VALUES('ref','紹介者','REF',1,?,'f-nen')").run(now);
+    fixture.raw.prepare("INSERT INTO affiliate_links(id,affiliate_id,ref_code,is_active,created_at) VALUES('link','ref','REFCODE',1,?)").run(now);
+    fixture.raw.prepare("INSERT INTO ref_tracking(id,ref_code,friend_id,created_at) VALUES('touch','REFCODE','f-other',?)").run(now);
+    fixture.raw.prepare("INSERT INTO tags(id,name,color,mileage_reward,referral_mileage_reward) VALUES ('tag','タグ','#000',10,25)").run();
+    const event = await enqueueMileageEvent(fixture.db, { friendId: 'f-other', eventType: 'tag_added', source: 'tag', sourceEventId: 'other-tag', subjectKey: 'tag', occurredAt: now });
+    await processPendingMileageEvents(fixture.db, { now: '2099-01-01', limit: 10 });
+    expect(fixture.raw.prepare('SELECT status FROM mileage_event_queue WHERE engagement_event_id=?').get(event.id)).toEqual({ status: 'processed' });
+    expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM mileage_ledger WHERE beneficiary_friend_id='f-other' AND source='tag'").get()).toEqual({ n: 1 });
+    expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM mileage_ledger WHERE beneficiary_friend_id='f-nen' AND source='tag_referral'").get()).toEqual({ n: 0 });
+  });
+  it('EC管理では紹介成果の承認による付与も行わない', async () => {
+    fixture.raw.prepare("INSERT INTO affiliates(id,name,code,is_active,created_at,friend_id) VALUES('aff','紹介者','CODE',1,?,'f-nen')").run(now);
+    fixture.raw.prepare("INSERT INTO conversion_points(id,name,event_type,value,created_at) VALUES('cp','成果','custom',1000,?)").run(now);
+    fixture.raw.prepare("INSERT INTO conversion_events(id,conversion_point_id,friend_id,affiliate_id,approval_status,approval_reward_miles,created_at) VALUES('ce','cp','f-other','aff','approved',20,?)").run(now);
+    await expect(syncAffiliateConversionMileage(fixture.db, 'ce', 'approved')).resolves.toBeUndefined();
+    expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM mileage_ledger WHERE source_event_id='ce'").get()).toEqual({ n: 0 });
+    expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM engagement_events WHERE source_event_id='ce'").get()).toEqual({ n: 0 });
+  });
+  it('ECの付与待ちは変更せず他店のキューは進める', async () => {
+    const ec = await enqueueMileageEvent(fixture.db, { friendId: 'f-nen', eventType: 'friend_added', source: 'test', sourceEventId: 'ec-queued' });
+    const other = await enqueueMileageEvent(fixture.db, { friendId: 'f-other', eventType: 'friend_added', source: 'test', sourceEventId: 'other-queued' });
+    fixture.raw.prepare("UPDATE mileage_event_queue SET created_at='2020-01-01' WHERE engagement_event_id=?").run(ec.id);
+    const before = fixture.raw.prepare('SELECT * FROM mileage_event_queue WHERE engagement_event_id=?').get(ec.id);
+    await processPendingMileageEvents(fixture.db, { limit: 1 });
+    expect(fixture.raw.prepare('SELECT * FROM mileage_event_queue WHERE engagement_event_id=?').get(ec.id)).toEqual(before);
+    expect(fixture.raw.prepare('SELECT status FROM mileage_event_queue WHERE engagement_event_id=?').get(other.id)).toEqual({ status: 'processed' });
+  });
+  it('ECの会員へ直接付与しても台帳に記録しない', async () => {
+    await expect(postMileageEntry(fixture.db, { beneficiaryFriendId: 'f-nen', entryType: 'grant', amount: 10, reason: 'test', source: 'automation', idempotencyKey: 'ec-direct' })).rejects.toThrow('MILEAGE_MANAGED_BY_EC');
+    expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM mileage_ledger WHERE idempotency_key='ec-direct'").get()).toEqual({ n: 0 });
+  });
   it('友だち詳細はECの29を返し、未取得は不明として返す', async () => {
     let data = (await (await app().request('/api/friends/f-nen/mileage?accountId=nen')).json() as any).data;
     expect(data.summary).toMatchObject({ available: 29, balanceSource: 'ec', ecRank: 'ゴールド' });

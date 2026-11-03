@@ -255,7 +255,7 @@ export async function isMileageRefundComplete(
  */
 export async function findIncompleteMileageRefunds(
   db: D1Database,
-  input: { lineAccountId?: string; limit?: number } = {},
+  input: { lineAccountId?: string; limit?: number; offset?: number } = {},
 ): Promise<MileageRewardRedemption[]> {
   const limit = Math.min(100, Math.max(1, Math.floor(input.limit ?? 50)));
   const binds: unknown[] = [];
@@ -278,8 +278,8 @@ export async function findIncompleteMileageRefunds(
           )
         )
         ${accountClause}
-      ORDER BY r.updated_at, r.created_at LIMIT ?`,
-  ).bind(...binds, limit).all<RedemptionRow>();
+      ORDER BY r.updated_at, r.created_at, r.id LIMIT ? OFFSET ?`,
+  ).bind(...binds, limit, Math.max(0, Math.floor(input.offset ?? 0))).all<RedemptionRow>();
   return rows.results.map(mapRedemption);
 }
 

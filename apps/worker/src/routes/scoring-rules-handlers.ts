@@ -3,6 +3,8 @@ import { jstDate as japanDate } from '@line-crm/shared';
 import { createMileageRuleIdempotent, serializeMileageRule } from './mileage-rule-create.js';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
+import { blockEcMileageWrite } from '../services/mileage-write-guard.js';
+import { getFriendById } from '@line-crm/db';
 import { getFriendScore, getFriendScoreHistory, addScore, getMileageRules, getMileageRuleById, createMileageRule, updateMileageRule, deleteMileageRule, getMileageEarningRulesV6, applyMileageRulesForEvent, getMileageAdjustmentNotificationRecord, getActionScoreOverview, getActionScoreBands, testMileageEarningRuleDraft, validateMileageEarningRuleDraft } from '@line-crm/db';
 import type { ActionScoreFilter, ActionScoreSort } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -186,6 +188,12 @@ export const post__api_mileage_events_5 = async (c: Context<Env, "/api/mileage/e
     if (JSON.stringify(metadata).length > 4096) {
       return c.json({ success: false, error: 'metadata_too_large' }, 413);
     }
+    const friend = await getFriendById(c.env.DB, friendId);
+    if (!friend?.line_account_id) return fail(c, 404, 'FRIEND_NOT_FOUND');
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.allowedAccountIds.includes(friend.line_account_id)) return fail(c, 404, 'FRIEND_NOT_FOUND');
+    const blocked = await blockEcMileageWrite(c, friend.line_account_id);
+    if (blocked) return blocked;
     const result = await applyMileageRulesForEvent(c.env.DB, {
       friendId,
       eventType,

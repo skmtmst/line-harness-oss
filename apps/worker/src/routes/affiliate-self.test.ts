@@ -378,6 +378,33 @@ describe('GET /api/liff/mileage/me — generic wallet', () => {
 });
 
 describe('LIFF mileage rewards — verified account and real limits', () => {
+  it('EC管理の店には交換可能な使い道を返さない', async () => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    mileageSourceMocks.getEcMileageBalance.mockResolvedValueOnce(29);
+    const response = await call('/api/liff/mileage/rewards?lineAccessToken=tok-alice');
+    expect(await response.json()).toMatchObject({ balanceSource: 'ec', availableMiles: 29, rewards: [] });
+    expect(dbMocks.listMileageRewards).not.toHaveBeenCalled();
+  });
+  it('ECで管理する店は交換を拒否して台帳を変更しない', async () => {
+    mileageSourceMocks.resolveMileageSource.mockResolvedValueOnce('ec');
+    const response = await call('/api/liff/mileage/rewards/reward-1/redeem', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': '018f6c6e-7b37-4a2f-8a71-1e1224dbdb93' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(response.status).toBe(409);
+    expect((await response.json() as any).error.code).toBe('MILEAGE_MANAGED_BY_EC');
+    expect(dbMocks.reserveMileageRewardRedemption).not.toHaveBeenCalled();
+  });
+  it('取得元が読めなければ交換を拒否する', async () => {
+    mileageSourceMocks.resolveMileageSource.mockRejectedValueOnce(new Error('unreadable'));
+    const response = await call('/api/liff/mileage/rewards/reward-1/redeem', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': '018f6c6e-7b37-4a2f-8a71-1e1224dbdb93' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(response.status).toBe(503);
+    expect((await response.json() as any).error.code).toBe('MILEAGE_SOURCE_UNAVAILABLE');
+    expect(dbMocks.reserveMileageRewardRedemption).not.toHaveBeenCalled();
+  });
   it('rejects a legacy fallback friend from a different LINE account', async () => {
     dbMocks.getFriendByLineUserIdForAccount.mockResolvedValueOnce({
       ...FRIENDS['U-alice'],

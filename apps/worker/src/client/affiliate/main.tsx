@@ -635,6 +635,7 @@ function AddOfferLinkForm({
 function OfferCard({
   offer,
   offerLinks,
+  showMileageReward,
   token,
   atLimit,
   onEnrolled,
@@ -642,6 +643,7 @@ function OfferCard({
 }: {
   offer: OfferData;
   offerLinks: AffiliateLinkData[];
+  showMileageReward: boolean;
   token: string;
   atLimit: boolean;
   onEnrolled: (link: AffiliateLinkData) => void;
@@ -680,7 +682,7 @@ function OfferCard({
           <span className="af-badge" style={{ background: '#ecfdf5', color: 'var(--customer-primary, #06C755)' }}>
             {rewardText(offer.rewardAmount)}
           </span>
-          {offer.rewardMiles > 0 && (
+          {showMileageReward && offer.rewardMiles > 0 && (
             <span className="af-badge" style={{ background: '#fff7ed', color: '#d97706' }}>
               +{offer.rewardMiles.toLocaleString()} mile
             </span>
@@ -849,7 +851,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
 
       {wallet && <MileageSummaryCard wallet={wallet} />}
 
-      {wallet && <MileageOpportunities items={wallet.opportunities} />}
+      {wallet && wallet.mileage.balanceSource === 'musubo' && <MileageOpportunities items={wallet.opportunities} />}
 
       <MileageRewards onChanged={loadMe} />
       <AffiliatePayments editable={state.affiliate.isActive} />
@@ -865,6 +867,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
             <OfferCard
               key={offer.id}
               offer={offer}
+              showMileageReward={wallet?.mileage.balanceSource === 'musubo'}
               offerLinks={linksByOffer.get(offer.id) ?? []}
               token={token}
               atLimit={atLimit}
@@ -885,6 +888,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
             <OfferCard
               key={offer.id}
               offer={offer}
+              showMileageReward={wallet?.mileage.balanceSource === 'musubo'}
               offerLinks={[]}
               token={token}
               atLimit={atLimit}

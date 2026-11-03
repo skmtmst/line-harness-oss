@@ -144,6 +144,8 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
       return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
+    const source = await resolveMileageSource(c.env.DB, resolved.lineAccountId);
+    if (source === 'ec') return c.json({ success: true, balanceSource: 'ec', availableMiles: await getEcMileageBalance(c.env.DB, resolved.lineAccountId, resolved.friend.id), rewards: [] });
     const [rewards, mileage, redemptionCounts] = await Promise.all([
       listMileageRewards(c.env.DB, {
         lineAccountId: resolved.lineAccountId,
@@ -157,6 +159,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
     ]);
     return c.json({
       success: true,
+      balanceSource: 'musubo',
       availableMiles: mileage.available,
       rewards: rewards.map((reward) => {
         const version = reward.currentVersion;
@@ -208,6 +211,10 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', inputJsonBounda
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
       return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
+    let source: 'ec' | 'musubo';
+    try { source = await resolveMileageSource(c.env.DB, resolved.lineAccountId); }
+    catch { return fail(c, 503, 'MILEAGE_SOURCE_UNAVAILABLE', { code: 'MILEAGE_SOURCE_UNAVAILABLE', error: 'マイルの管理元を確認できませんでした' }); }
+    if (source === 'ec') return fail(c, 409, 'MILEAGE_MANAGED_BY_EC', { code: 'MILEAGE_MANAGED_BY_EC', error: 'マイルはECで管理しています' });
     const rewardId = c.req.param('id');
     const requestFingerprint = await sha256Hex(
       `${resolved.lineAccountId}\n${resolved.friend.id}\n${rewardId}`,
