@@ -214,6 +214,17 @@ export default function AppTopBar() {
           return
         }
       }
+      // StoreSelectionGate remounts the page while checking the new account.
+      // Remove the old account's media detail before that remount so the
+      // newly selected account starts at its own list.
+      if (pathname === '/contents' && accountId !== selectedAccountId && window.location.search) {
+        const url = new URL(window.location.href)
+        if (url.searchParams.has('id')) {
+          url.searchParams.delete('id')
+          window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+          window.dispatchEvent(new PopStateEvent('popstate'))
+        }
+      }
       setSelectedAccountId(accountId)
       if (hqShell && accountId && !after) router.push('/')
       after?.()
