@@ -48,7 +48,7 @@ async function request<T>(path: string, method = 'GET', body?: object, key?: str
   return result as T;
 }
 export const affiliateSelfApi = {
-  rewards: () => request<{ rewards: Reward[]; availableMiles: number | null; balanceSource: 'ec' | 'musubo' }>('mileage/rewards'),
+  rewards: () => request<{ rewards: Reward[]; availableMiles: number | null; balanceSource: 'ec' | 'musubo'; hasHeldRedemption?: boolean }>('mileage/rewards'),
   redeem: (id: string, key: string) => request<Redemption>(`mileage/rewards/${encodeURIComponent(id)}/redeem`, 'POST', {}, key),
   bank: () => request<{ data: BankProfile | null }>('affiliate/bank').then(r => r.data),
   saveBank: (body: BankInput, expectedVersion: number, key: string) =>

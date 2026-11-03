@@ -30,6 +30,16 @@ describe('お客さまの交換と振込先', () => {
     expect(await screen.findByText('マイルはECで管理しています')).toBeTruthy();
     expect(screen.queryByRole('button', { name: '使い道を選ぶ' })).toBeNull();
   });
+  it('EC管理中に保留交換がある人だけ店への問い合わせを案内する', async () => {
+    vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [], availableMiles: 29, balanceSource: 'ec', hasHeldRedemption: true } as never);
+    const { unmount } = render(<MileageRewards onChanged={async () => {}} />);
+    expect(await screen.findByText('お申し込みの特典はお店で確認しています。ご利用のお店へお問い合わせください。')).toBeTruthy();
+    unmount();
+    vi.mocked(affiliateSelfApi.rewards).mockResolvedValue({ rewards: [], availableMiles: 29, balanceSource: 'ec', hasHeldRedemption: false } as never);
+    render(<MileageRewards onChanged={async () => {}} />);
+    await screen.findByText('マイルはECで管理しています');
+    expect(screen.queryByText(/ご利用のお店へお問い合わせください/)).toBeNull();
+  });
   it('交換を確認し、通信失敗の再送は同じキー。202は交換受付として扱う', async () => {
     vi.mocked(affiliateSelfApi.redeem).mockRejectedValueOnce(new Error('通信が切れました')).mockResolvedValueOnce({ status: 'delivery_failed', rewardName: '割引券', customerMessage: '', rewardCode: null, message: '交換を受け付けました' });
     const onChanged = vi.fn().mockResolvedValue(undefined);

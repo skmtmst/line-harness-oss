@@ -6,7 +6,7 @@ import ConfirmDialog from './ui/confirm-dialog.js';
 import { FormTextControl } from './forms/controls.js';
 
 export default function MileageRewards({ onChanged }: { onChanged: () => Promise<void> }) {
-  const [data, setData] = useState<{ rewards: Reward[]; availableMiles: number | null; balanceSource: 'ec' | 'musubo' } | null>(null);
+  const [data, setData] = useState<{ rewards: Reward[]; availableMiles: number | null; balanceSource: 'ec' | 'musubo'; hasHeldRedemption?: boolean } | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<Reward | null>(null);
@@ -40,6 +40,7 @@ export default function MileageRewards({ onChanged }: { onChanged: () => Promise
   return <section aria-label="マイルを使う" className="space-y-3">
     <h2 className="text-sm font-bold text-ink">マイルを使う</h2>
     {failed ? <><p role="alert" className="text-sm text-danger">使い道を読み込めませんでした</p><Button variant="secondary" onClick={() => setReload(n => n + 1)}>もう一度読み込む</Button></> : data?.balanceSource === 'ec' ? <p className="text-sm">マイルはECで管理しています</p> : data?.balanceSource === 'musubo' ? <Button variant="secondary" onClick={() => { setOpen(true); setError(''); }}>使い道を選ぶ</Button> : null}
+    {data?.balanceSource === 'ec' && data.hasHeldRedemption && <p className="text-sm">お申し込みの特典はお店で確認しています。ご利用のお店へお問い合わせください。</p>}
     {error && !picked && <p role="alert" className="text-sm text-danger">{error}</p>}
     {result && <Card className="space-y-2 p-4">
       <p role="status">{result.status === 'succeeded' ? `${result.rewardName}に交換しました` : result.message || '交換を受け付けました。特典のお届けを確認しています。'}</p>
