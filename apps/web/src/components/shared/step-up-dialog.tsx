@@ -5,10 +5,13 @@ import { KeyRound } from 'lucide-react'
 import Dialog from './dialog'
 import OtpInput, { otpFailureMessage } from './otp-input'
 import TextLink from './text-link'
+import { TextField } from './text-field'
 
 interface StepUpDialogProps {
   /** この操作を見出しでも区別する。 */
   showActionInTitle?: boolean
+  /** パスワード入力を窓の幅に合わせる。 */
+  fullWidthPassword?: boolean
   presentation?: 'mfa-off'
   open: boolean
   /** 何のための再認証かを運用者の言葉で。例: '権限を変更する' */
@@ -33,7 +36,7 @@ interface StepUpDialogProps {
  * 止まった操作の前に立てる。聞くのは本人の設定で決まり、二段階認証があれば
  * 6桁コード、なければパスワード。grant 取得と本操作のやり直しは呼び出し側。
  */
-export default function StepUpDialog({ open, action, showActionInTitle = false, presentation, method = 'totp', busy = false, error, onSubmit, onCancel }: StepUpDialogProps) {
+export default function StepUpDialog({ open, action, showActionInTitle = false, fullWidthPassword = false, presentation, method = 'totp', busy = false, error, onSubmit, onCancel }: StepUpDialogProps) {
   const [value, setValue] = useState('')
   const labelId = useId()
   useEffect(() => { if (open) setValue('') }, [open])
@@ -42,6 +45,7 @@ export default function StepUpDialog({ open, action, showActionInTitle = false, 
   const offTone: 'default' | 'destructive' = 'default'
   const isTotp = method === 'totp'
   const isNone = method === 'none'
+  const PasswordField = fullWidthPassword ? TextField : 'input'
   const ready = !isNone && (isTotp ? /^\d{6}$/.test(value) : value.length > 0)
   // R502: 方法未設定では使えない入力欄・実行ボタンを出さない。案内と設定への導線だけ出す。
   if (isNone) {
@@ -99,8 +103,8 @@ export default function StepUpDialog({ open, action, showActionInTitle = false, 
       ) : (
         <>
           <label htmlFor={labelId} className="mt-1 block text-sm font-medium text-ink">パスワード</label>
-          <div className="mt-2">
-            <input
+          <div className={fullWidthPassword ? 'mt-2 w-full' : 'mt-2'}>
+            <PasswordField
               id={labelId}
               type="password"
               value={value}
@@ -109,7 +113,7 @@ export default function StepUpDialog({ open, action, showActionInTitle = false, 
               autoFocus
               autoComplete="current-password"
               aria-invalid={Boolean(error)}
-              className="w-full rounded-control border border-shell-gray bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-action"
+              className={fullWidthPassword ? undefined : 'w-full rounded-control border border-shell-gray bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-action'}
             />
           </div>
         </>

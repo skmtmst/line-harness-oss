@@ -59,7 +59,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
   ungrouped?: boolean
 }) {
   const saveErrors = useSaveFormErrors()
-  const stepUp = useStepUpGate({ showActionInTitle: true })
+  const stepUp = useStepUpGate({ showActionInTitle: true, fullWidthPassword: true })
   const operationRef = useRef<symbol | null>(null)
   const operationContext = useRef(0)
   useEffect(() => {
