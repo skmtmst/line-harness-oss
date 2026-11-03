@@ -1,3 +1,4 @@
+import { findDirectMediaUsages } from '../features/media/direct-media-usages.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
@@ -55,10 +56,23 @@ export async function replacementImpact(
   if (!plan) return null;
   const menuRows = await c.env.DB.prepare('SELECT id FROM rt_menu_items WHERE image_media_id = ? ORDER BY id')
     .bind(sourceId).all<{id:string}>();
-  const revisionUsages = [...plan.usages, ...menuRows.results.map(row => ({ ref_kind:'restaurant_menu', ref_id:row.id, scanned_at:checkedAt }))];
+  const direct = await findDirectMediaUsages(c.env.DB, source, accountId);
+  const directRefs = direct.map(row => ({ kind: row.refKind, name: row.name, href: row.href, state: 'available' as const,
+    scannedAt: checkedAt, replaceable: false, blocker: 'unsupported_reference' as const,
+    reason: 'この使用先は編集画面から画像を変更してください。' }));
+  const blockedByKind = { ...plan.impact.blockedByKind };
+  for (const ref of directRefs) blockedByKind[ref.kind] = (blockedByKind[ref.kind] ?? 0) + 1;
+  const allUsages = [...plan.usages, ...menuRows.results.map(row => ({ ref_kind: 'restaurant_menu', ref_id: row.id, scanned_at: checkedAt })),
+    ...direct.map(row => ({ ref_kind: row.refKind, ref_id: row.refId, scanned_at: checkedAt }))];
   return {
     plan,
-    impact: { ...plan.impact, revision: await replacementRevision(sourceId, replacementId, revisionUsages) },
+    impact: { ...plan.impact, usageCount: plan.impact.usageCount + direct.length,
+      blockedCount: plan.impact.blockedCount + direct.length, blockedByKind,
+      references: [...plan.impact.references, ...directRefs],
+      blockers: direct.length ? [...new Set([...plan.impact.blockers, 'unsupported_reference' as const])] : plan.impact.blockers,
+      canReplace: direct.length ? false : plan.impact.canReplace,
+      canPartiallyReplace: direct.length ? false : plan.impact.canPartiallyReplace,
+      revision: await replacementRevision(sourceId, replacementId, allUsages) },
   };
 }
 

@@ -53,7 +53,9 @@ export type MediaDeleteImpactReferenceKind =
   | "restaurant_menu"
   | "booking_staff"
   | "booking_settings"
-  | "form";
+  | "form"
+  | "auto_reply"
+  | "visit_stamp_card";
 
 /** 登録メディアを消す前に、運用者が確認する現在の使用先。 */
 export interface MediaDeleteImpactReference {

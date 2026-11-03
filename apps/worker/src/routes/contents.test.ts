@@ -1,3 +1,4 @@
+import './contents-media-test-mocks.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -160,7 +161,6 @@ vi.mock('./file-scan.js', () => ({
   ensureFileScanForUpload: vi.fn(async () => ({ id: 'scan-test-1' })),
 }));
 
-vi.mock('../services/media-upload-storage.js', async importOriginal => ({ ...await importOriginal<typeof import('../services/media-upload-storage.js')>(), copyMediaUpload: vi.fn(async () => true) }));
 const { contents } = await import('./contents.js');
 // 実物のエラークラス（モックは actual を引き継ぐので本物の instanceof が効く）
 const { MediaVersionIncompatibleError } = await import('@line-crm/db');

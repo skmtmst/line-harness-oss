@@ -10,6 +10,11 @@ import type { HqRichMenuSeed } from './hq-rich-menu-create'
  */
 export interface RichMenuCreateHost {
   /** 戻る先（キャンセル・頭の「← リッチメニューへ」）。 */
+  /** 作成中の一時下書き。所属と担当者で分離したキー。 */
+  draftKey?: string
+  restoreSelectedIds?: (ids: string[]) => void
+  restoreUploadedKeys?: (keys: string[]) => void
+  uploadedKeys?: string[]
   backHref: string
   onCancel: () => void
   /** owner・admin だけ保存・配るを押せる。 */

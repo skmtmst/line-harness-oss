@@ -103,8 +103,8 @@ export default function ListView({ view, rows, total, tables, page, period, stat
   return (
     <>
       <StatRow fusion>
-        <KpiCard title="予約" value={total} unit="件" detail={`表示中 ${formatNumber(rows.length)}件`} icon={undefined} presentation="band" />
-        <KpiCard title="ご来店人数" value={guests} unit="名" detail={cancelledGuests > 0 ? `取消 ${cancelledGuests}名を除く` : `表示中 ${formatNumber(rows.length)}件`} icon={undefined} presentation="band" />
+        <KpiCard title="予約記録" value={total} unit="件" detail={`取消・押さえを含む・表示中 ${formatNumber(rows.length)}件`} icon={undefined} presentation="band" />
+        <KpiCard title="ご来店人数" value={guests} unit="名" detail={cancelledGuests > 0 ? `表示中の有効な予約・取消 ${cancelledGuests}名を除く` : '表示中の有効な予約'} icon={undefined} presentation="band" />
         <KpiCard title="LINE予約" value={lineCount} unit="件" detail="自社導線" icon={undefined} presentation="band" />
         <KpiCard title="媒体予約" value={mediaCount} unit="件" detail="受信した予約" icon={undefined} presentation="band" />
       </StatRow>

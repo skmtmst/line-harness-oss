@@ -21,6 +21,8 @@ const USAGE_KIND_LABELS: Record<string, string> = {
   nen_column: 'NENコラム',
   event: 'イベント',
   webinar: 'ウェビナー',
+  auto_reply: '自動応答',
+  visit_stamp_card: '来店スタンプ',
   booking_menu: '予約メニューの写真',
   restaurant_menu: '飲食メニューの画像',
   booking_staff: '予約スタッフの写真',
