@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { CONTACT_URL, LEGAL_LINKS, PUBLIC_AUTH_PATHS } from '@/lib/auth-email'
+import AuthCard from '@/components/auth/auth-card'
 
 const SRC = join(__dirname, '..', '..')
 const read = (p: string) => readFileSync(join(SRC, p), 'utf8')
@@ -91,16 +94,24 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
   })
 
   it('ログイン前の問い合わせ先は公開サイトに向け、ログイン必須の統括窓口へ送らない', () => {
-    const card = read('components/auth/auth-card.tsx')
-    expect(card).toContain('href={CONTACT_URL}')
-    expect(card).not.toContain('href="/hq/support"')
+    const markup = renderToStaticMarkup(createElement(AuthCard, {
+      title: 'ログイン', description: 'テスト', children: null, step: { current: 1, total: 2 },
+    }))
+    expect(markup).toContain(`href="${CONTACT_URL}"`)
+    expect(markup).toContain('>お問い合わせ</a>')
+    expect(markup).not.toContain('href="/hq/support"')
     const page = read('app/register/page.tsx')
     expect(page).toContain('!LEGAL_LINKS.terms || !LEGAL_LINKS.privacy')
     expect(page).toContain('href={CONTACT_URL}')
     // フッターに残すのは法務の3つだけ。
-    expect(card).toContain('利用規約')
-    expect(card).toContain('プライバシーポリシー')
-    expect(card).toContain('特定商取引法に基づく表記')
+    for (const [label, url] of [
+      ['利用規約', LEGAL_LINKS.terms],
+      ['プライバシーポリシー', LEGAL_LINKS.privacy],
+      ['特定商取引法に基づく表記', LEGAL_LINKS.commerce],
+    ]) {
+      expect(markup).toContain(`href="${url}"`)
+      expect(markup).toContain(`>${label}</a>`)
+    }
   })
 })
 
