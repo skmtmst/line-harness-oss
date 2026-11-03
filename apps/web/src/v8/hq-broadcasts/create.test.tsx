@@ -62,6 +62,18 @@ import HqBroadcastCreate from './create'
 import HqBroadcastDetail from './detail'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
+it('通常の最終確認にも送信先だけと環境を示す', async () => {
+  render(<HqBroadcastCreate />)
+  await fillToConfirm()
+  await screen.findByText('送る：1アカウント・6,120 人')
+  fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
+  const dialog = await screen.findByRole('dialog', { name: '送る前の確かめ' })
+  expect(within(dialog).getByText('銀座店')).toBeTruthy()
+  expect(within(dialog).queryByText('新宿店')).toBeNull()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+  expect(hq.send).not.toHaveBeenCalled()
+})
+
 it('単独運用の最終確認に送信先だけと環境を示す', async () => {
   const originalApproval = hq.approval.getMockImplementation()
   hq.approval.mockResolvedValue({ success: true, data: { approval: { status: 'none', requestedByStaffId: null, requestedAt: null, approverStaffId: null, note: null, decidedByStaffId: null, decidedAt: null, rejectReason: null, confirmedCount: null }, gate: { required: true, recipientCount: 6120, threshold: 1000, singleOperator: true, operatorCount: 1 }, viewer: { isApprover: false, canApprove: false, isRequester: false } } })

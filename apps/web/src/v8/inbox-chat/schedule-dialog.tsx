@@ -1,6 +1,7 @@
 'use client'
 import { Clock3, FileText } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import DateTimeField from '@/components/shared/date-time-field'
 import FilterChip from '@/components/shared/filter-chip'
 import { isNightJst, schedulePresets, shortJst } from './schedule-presets'
@@ -91,6 +92,7 @@ export default function ScheduleSendDialog({
       confirmDisabled={Boolean(disabledReason)}
       confirmDisabledReason={disabledReason}
     >
+      <OperationTargetSummary accounts={[{ id: '' }]} />
       <div className={styles.schBox}>
         <p className={styles.schBoxLabel}>送るもの</p>
         <p className={styles.schBoxValue}>

@@ -19,6 +19,7 @@ import AttachmentChip from '@/v8/inbox-chat/attachment-chip';
 import { ATTACH_NOTE, ATTACH_NOTE_TITLE, scheduledContentLabel } from '@/v8/inbox-chat/attachments';
 import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css';
 import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog';
+import OperationTargetSummary from '@/components/shared/operation-target-summary';
 import { Clock3, FileText, NotebookPen, Send, Settings2, X } from 'lucide-react';
 import type { Props as ConversationProps } from './inbox-conversation-view-types';
 import { MESSAGE_MAX_LENGTH, formatByteSize, formatJstScheduledAt, isoToJstDatetimeLocal } from './inbox-model';
@@ -421,6 +422,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           onCancel={() => setPendingPack(null)}
           busy={sending}
         >
+          {pendingPack ? <OperationTargetSummary accounts={[{ id: '' }]} /> : null}
           {pendingPack ? (
             <ol className="max-h-56 space-y-2 overflow-y-auto">
               {pendingPack.texts.map((text, index) => (

@@ -35,3 +35,10 @@ it('時刻を指定して送る操作は送信予約と表示する', () => {
   render(<InboxReplyComposer {...props('owner')} />)
   expect(screen.getByRole('button', { name: '送信予約' })).toBeTruthy()
 })
+
+it('テンプレートの束の送信確認に送信元と環境を示す', () => {
+  render(<InboxReplyComposer {...props('owner')} pendingPack={{ texts: ['本文'], chatId: 'chat-1', accountId: 'acc-1' }} />)
+  expect(screen.getByText('LINEアカウント')).toBeTruthy()
+  expect(screen.getByText('名前を確認できません')).toBeTruthy()
+  expect(screen.getByText('環境')).toBeTruthy()
+})

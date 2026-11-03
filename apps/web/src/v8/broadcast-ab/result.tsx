@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary, { type OperationAccountTarget } from '@/components/shared/operation-target-summary'
 import StatusBadge from '@/components/shared/status-badge'
 import { notifySaved } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -78,16 +79,19 @@ function Variant({ variant, winner, metric }: { variant: AbVariantResult; winner
   )
 }
 
-export default function BroadcastAbResult({ broadcastId, ab, canSend }: { broadcastId: string; ab: ReturnType<typeof useAbResult>; canSend: boolean }) {
+export default function BroadcastAbResult({ broadcastId, ab, canSend, accounts }: { broadcastId: string; ab: ReturnType<typeof useAbResult>; canSend: boolean; accounts: OperationAccountTarget[] }) {
   const [choose, setChoose] = useState<'A' | 'B' | 'none' | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [key, setKey] = useState('')
+  const scope = JSON.stringify([broadcastId, accounts.map(account => account.id)])
+  const [confirmedScope, setConfirmedScope] = useState('')
+  useEffect(() => { setChoose(null); setConfirmedScope('') }, [scope])
   if (ab.state === 'none' || ab.state === 'idle') return null
   const result = ab.result
-  const open = (variant: 'A' | 'B' | 'none') => { setError(''); setKey(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `ab-${Date.now()}`); setChoose(variant) }
+  const open = (variant: 'A' | 'B' | 'none') => { setError(''); setKey(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `ab-${Date.now()}`); setConfirmedScope(scope); setChoose(variant) }
   const run = async () => {
-    if (!choose || !result) return
+    if (!choose || !result || confirmedScope !== scope) return
     setBusy(true)
     setError('')
     try {
@@ -150,7 +154,7 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend }: { broadc
         </>
       )}
       <ConfirmDialog
-        open={choose !== null}
+        open={choose !== null && confirmedScope === scope}
         title={choose === 'none' ? '送らずに終えますか？' : `残りの人へ ${choose} 案を送りますか？`}
         description={choose === 'none'
           ? `残りの ${formatNumber(result?.remainder.count ?? 0)} 人には送りません。終えたあとは戻せません。`
@@ -161,7 +165,7 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend }: { broadc
         error={error || undefined}
         onCancel={() => { if (!busy) setChoose(null) }}
         onConfirm={() => void run()}
-      />
+      ><OperationTargetSummary accounts={accounts} /></ConfirmDialog>
     </Card>
   )
 }
