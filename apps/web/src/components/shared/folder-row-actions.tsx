@@ -19,6 +19,7 @@ import { notifyToast } from './toast'
 import type { FolderPanelRow } from './folder-panel'
 import { formatNumber } from '@/lib/format'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
+import OperationTargetSummary from './operation-target-summary'
 
 export interface FolderRowActionsOptions {
   /** `folders.kind`（'rich_menu'・'scenario' など）。 */
@@ -59,6 +60,7 @@ export function useFolderRowActions({
   const [deletingCount, setDeletingCount] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [conflict, setConflict] = useState(false)
 
   const scope = useRef({ kind, accountId })
   if (scope.current.kind !== kind || scope.current.accountId !== accountId) scope.current = { kind, accountId }
@@ -66,24 +68,23 @@ export function useFolderRowActions({
   const dialogScope = useRef(renderedScope)
   const dialogEpoch = useRef({})
   const renderedDialog = dialogEpoch.current
-  const latest = useRef({ enabled, canWriteNow, busy, deleting, editing })
-  latest.current = { enabled, canWriteNow, busy, deleting, editing }
+  const latest = useRef({ enabled, canWriteNow, busy, deleting, editing, conflict })
+  latest.current = { enabled, canWriteNow, busy, deleting, editing, conflict }
   const livePermission = canWriteNow !== undefined
   useEffect(() => {
-    if (livePermission) { dialogEpoch.current = {}; setEditing(null); setDeleting(null); setBusy(false); setError('') }
+    dialogEpoch.current = {}; setEditing(null); setDeleting(null); setBusy(false); setError(''); setConflict(false)
   }, [kind, accountId, livePermission])
+  useEffect(() => () => { dialogEpoch.current = {} }, [])
   const usesLivePermission = () => livePermission || latest.current.canWriteNow !== undefined
   const sameScope = () => renderedScope === scope.current
   const sameDialog = () => sameScope() && dialogScope.current === renderedScope && renderedDialog === dialogEpoch.current
-  const canActNow = () => usesLivePermission()
-    ? sameScope() && latest.current.enabled && !lockReason(latest.current.enabled)
-      && latest.current.canWriteNow !== undefined && latest.current.canWriteNow()
-    : enabled && !lockReason(enabled)
+  const canActNow = () => sameScope() && latest.current.enabled && !lockReason(latest.current.enabled)
+    && (!usesLivePermission() || (latest.current.canWriteNow !== undefined && latest.current.canWriteNow()))
   const permissionReason = lockedReason === undefined ? lockReason(enabled) : lockedReason ?? undefined
   const actionEnabled = canActNow()
   const interrupted = '権限が変わったため、フォルダの操作を中止しました。'
   const changeBusy = (value: boolean) => {
-    if (usesLivePermission()) latest.current.busy = value
+    latest.current.busy = value
     setBusy(value)
   }
 
@@ -94,14 +95,14 @@ export function useFolderRowActions({
       if (usesLivePermission() && sameScope()) notifyToast(interrupted, { tone: 'error' })
       return
     }
-    if (!target || !neighbor || (usesLivePermission() ? latest.current.busy : busy)) return
+    if (!target || !neighbor || latest.current.busy) return
     changeBusy(true)
     try {
       await api.folders.swapOrder(target.id, neighbor.id, accountId ?? undefined)
     } catch {
       // 並びが変わらなかったときも、読み直した今の並びを見せる
     } finally {
-      if (!usesLivePermission() || sameScope()) {
+      if (sameScope()) {
         changeBusy(false)
         await onChanged()
       }
@@ -109,20 +110,20 @@ export function useFolderRowActions({
   }
 
   const remove = async () => {
-    if (usesLivePermission() && (!sameDialog() || deleting !== latest.current.deleting)) return
+    if (!sameDialog() || deleting !== latest.current.deleting) return
     if (!canActNow()) { if (usesLivePermission()) setError(interrupted); return }
-    if (!deleting || (usesLivePermission() ? latest.current.busy : busy)) return
+    if (!deleting || !Number.isSafeInteger(deleting.revision) || (deleting.revision ?? 0) < 1 || latest.current.busy || latest.current.conflict) return
     changeBusy(true)
     setError('')
     try {
-      const res = await api.folders.delete(deleting.id, accountId ?? undefined)
-      if (usesLivePermission() && (!sameDialog() || deleting !== latest.current.deleting)) return
+      const res = await api.folders.delete(deleting.id, accountId ?? undefined, deleting.revision)
+      if (!sameDialog() || deleting !== latest.current.deleting) return
       if (!res.success) throw new Error(res.error)
       onDeleted?.(deleting.id)
       setDeleting(null)
       await onChanged()
     } catch (caught) {
-      if (usesLivePermission() && (!sameDialog() || deleting !== latest.current.deleting)) return
+      if (!sameDialog() || deleting !== latest.current.deleting) return
       // 理由ごとに言い分ける（共通の describeFolderFailure）。消されていたら読み直して窓を閉じる。
       const failure = describeFolderFailure(caught, 'delete')
       if (failure.kind === 'missing') {
@@ -132,10 +133,14 @@ export function useFolderRowActions({
         await onChanged()
         return
       }
-      if (failure.kind === 'conflict') await onChanged()
-      setError(failure.message)
+      if (failure.kind === 'conflict') {
+        await onChanged()
+        if (!sameDialog()) return
+        setConflict(true)
+        setError('フォルダが変更されました。窓を閉じて最新の内容を確認し、もう一度操作してください。')
+      } else setError(failure.message)
     } finally {
-      if (!usesLivePermission() || sameScope()) changeBusy(false)
+      if (sameScope()) changeBusy(false)
     }
   }
 
@@ -146,7 +151,7 @@ export function useFolderRowActions({
       if (!canActNow()) return
       requestUnsavedAction(() => {
         if (!canActNow()) return
-        if (usesLivePermission()) { dialogScope.current = scope.current; dialogEpoch.current = {}; setDeleting(null) }
+        dialogScope.current = scope.current; dialogEpoch.current = {}; setDeleting(null)
         setEditing(folder)
       })
     },
@@ -154,12 +159,14 @@ export function useFolderRowActions({
     onMoveDown: index < folders.length - 1 ? () => void move(index, 1) : undefined,
     onDelete: () => {
       if (!canActNow()) return
-      if (usesLivePermission()) { dialogScope.current = scope.current; dialogEpoch.current = {}; setEditing(null) }
-      setError(''); setDeletingCount(countOf?.(folder.id) ?? null); setDeleting(folder)
+      dialogScope.current = scope.current; dialogEpoch.current = {}; setEditing(null)
+      setError(''); setConflict(false); setDeletingCount(countOf?.(folder.id) ?? null); setDeleting(folder)
     },
   })
 
-  const dialogs = (livePermission ? dialogScope.current === renderedScope : enabled && !lockReason(enabled)) ? (
+  // API の accountId は所有先。選択中のアカウントで不明な所有先を埋めない。
+  const folderAccount = (deleting as (Folder & { accountId?: string | null }) | null)?.accountId
+  const dialogs = dialogScope.current === renderedScope && (livePermission || (enabled && !lockReason(enabled))) ? (
     <>
       {editing ? (
         <FolderAddDialog
@@ -169,17 +176,17 @@ export function useFolderRowActions({
           note={`${itemLabel}を分けてしまう箱です。消しても、中の${itemLabel}は未分類に残ります。`}
           placeholder={placeholder}
           onClose={() => {
-            if (usesLivePermission() && !sameDialog()) return
-            if (usesLivePermission()) dialogEpoch.current = {}
+            if (!sameDialog()) return
+            dialogEpoch.current = {}
             setEditing(null)
           }}
           onAdded={() => {
-            if (usesLivePermission() && !sameDialog()) return
-            if (usesLivePermission()) dialogEpoch.current = {}
+            if (!sameDialog()) return
+            dialogEpoch.current = {}
             setEditing(null); void onChanged()
           }}
           onReload={onChanged}
-          canSaveNow={livePermission ? () => sameDialog() && canActNow() : undefined}
+          canSaveNow={() => sameDialog() && canActNow()}
           confirmLockedReason={livePermission ? permissionReason : undefined}
           confirmDisabled={livePermission ? !actionEnabled && !permissionReason : undefined}
         />
@@ -194,16 +201,20 @@ export function useFolderRowActions({
         busy={busy}
         error={error || undefined}
         onCancel={() => {
-          if (usesLivePermission() && !sameDialog()) return
+          if (!sameDialog()) return
           if (!busy) {
-            if (usesLivePermission()) dialogEpoch.current = {}
+            dialogEpoch.current = {}
             setDeleting(null); setError('')
           }
         }}
         onConfirm={() => void remove()}
         confirmLockedReason={livePermission ? permissionReason : undefined}
-        confirmDisabled={livePermission ? !actionEnabled && !permissionReason : undefined}
-      />
+        confirmDisabled={conflict || Boolean(deleting) && (!Number.isSafeInteger(deleting?.revision) || (deleting?.revision ?? 0) < 1) || (livePermission ? !actionEnabled && !permissionReason : false)}
+        confirmDisabledReason={deleting && (!Number.isSafeInteger(deleting.revision) || (deleting.revision ?? 0) < 1) ? 'フォルダの情報を読み直してから、もう一度お試しください。' : undefined}
+      ><OperationTargetSummary accounts={[
+        { id: typeof folderAccount === 'string' ? folderAccount : '', name: folderAccount === null ? '所属なし' : undefined, label: 'フォルダの所属先' },
+        { id: accountId ?? '', label: '選択中のLINEアカウント' },
+      ]} /></ConfirmDialog>
     </>
   ) : null
 
