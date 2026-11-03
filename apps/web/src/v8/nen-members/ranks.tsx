@@ -10,6 +10,7 @@ import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import { RowActions } from '@/components/shared/row-actions';
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
@@ -83,6 +84,7 @@ export default function RankSettingsV8({
   const [draftAccountId, setDraftAccountId] = useState(accountId)
   const activeAccount = useRef({ id: accountId })
   if (activeAccount.current.id !== accountId) activeAccount.current = { id: accountId }
+  const removeAccount = useRef<typeof activeAccount.current | null>(null)
 
   const fields = useFieldValidation(drafts.flatMap((row, index) => [
     ...(!row.name.trim() ? [{ id: `rank-name-${index}`, message: 'ランク名を入れるか、行を消してください。' }] : []),
@@ -215,6 +217,7 @@ export default function RankSettingsV8({
     /* 移す先は、ひとつ下のランクを先に選んでおく（いちばん多い選び方）。 */
     const below = drafts.slice(index + 1).find((candidate) => candidate.id)
       ?? [...drafts.slice(0, index)].reverse().find((candidate) => candidate.id)
+    removeAccount.current = activeAccount.current
     setReplacement(below?.id ?? '')
     setRemoveTarget(index)
   }
@@ -222,7 +225,7 @@ export default function RankSettingsV8({
   /** ランクの削除は版つきの DELETE（移す先を選んで会員を反映する）。 */
   const removeRank = async () => {
     const target = activeAccount.current
-    if (removeTarget === null || !settings?.rules) return
+    if (removeTarget === null || removeAccount.current !== activeAccount.current || draftAccountId !== accountId || !settings?.rules) return
     const row = drafts[removeTarget]
     if (!row?.id) return
     setBusy(true)
@@ -463,7 +466,7 @@ export default function RankSettingsV8({
 
       {/* dEv6G：会員がいるランクは移す先が必須（API の決まりと同じ）。 */}
       <Dialog
-        open={removeTarget !== null && removeRow !== null && removeRow.id !== null}
+        open={removeTarget !== null && removeAccount.current === activeAccount.current && removeRow !== null && removeRow.id !== null}
         designNode="dEv6G"
         size="medium"
         designTop={300}
@@ -477,6 +480,7 @@ export default function RankSettingsV8({
         onConfirm={moving > 0 && !replacement ? undefined : () => removeRank()}
         onCancel={() => setRemoveTarget(null)}
       >
+        <OperationTargetSummary accounts={[{ id: accountId }]} />
         <div className={styles.removeBody}>
           {/* 説明は題の行（×と並ぶ）ではなく、窓の幅いっぱいに置く（dEv6G）。 */}
           <p className={styles.removeDesc}>

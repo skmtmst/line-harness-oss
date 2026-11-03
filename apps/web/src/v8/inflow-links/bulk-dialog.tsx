@@ -6,6 +6,7 @@ import type { EntryRoute } from '@line-crm/shared'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -109,6 +110,8 @@ export default function BulkRoutesDialog({
             </Button>) : null}
         </DialogActions>)}
     >
+      <OperationTargetSummary accounts={[{ id: '', label: '受付先アカウント' }]} />
+      <p>受付先の全アカウントは確認できません。</p>
       {result ? (
         <div className="space-y-3">
           <p className="text-ink text-sm">

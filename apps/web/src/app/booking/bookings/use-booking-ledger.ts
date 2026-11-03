@@ -168,7 +168,7 @@ export function useBookingLedger() {
   useEffect(() => () => {
     if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
   }, [])
-  const [decideTarget, setDecideTarget] = useState<{ id: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
+  const [decideTarget, setDecideTarget] = useState<{ id: string; accountId: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
   const [deciding, setDeciding] = useState(false)
   const [decideError, setDecideError] = useState('')
   /* 台帳CSVの書出し中。失敗は一覧の error 帯へ出す（TECH-03）。 */
@@ -565,8 +565,9 @@ export function useBookingLedger() {
   }
 
   function handleDecide(id: string, action: BookingAction) {
+    if (!selectedAccountId || listAccountRef.current !== selectedAccountId) return
     setDecideError('')
-    setDecideTarget({ id, action })
+    setDecideTarget({ id, action, accountId: selectedAccountId })
   }
 
   const kpi = {

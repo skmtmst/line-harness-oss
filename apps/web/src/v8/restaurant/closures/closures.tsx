@@ -1,10 +1,11 @@
 'use client'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { RestaurantChannelCloseTask, RestaurantClosure, RestaurantOpeningDay } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import HelpTip from '@/components/shared/help-tip'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
@@ -73,6 +74,12 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   const router = useRouter()
   const store = ctx.store
   const storeId = ctx.selectedStoreId
+  const scopeKey = JSON.stringify([accountId, storeId])
+  const scope = useRef({ key: scopeKey, generation: 1 })
+  if (scope.current.key !== scopeKey) scope.current = { key: scopeKey, generation: scope.current.generation + 1 }
+  const currentGeneration = scope.current.generation
+  const [loadedGeneration, setLoadedGeneration] = useState(0)
+  const removeGeneration = useRef(0)
   const timezone = store?.timezone || 'Asia/Tokyo'
   const tables = useMemo(() => ctx.data.tables.filter((t) => t.store_id === storeId), [ctx.data.tables, storeId])
   const [month, setMonth] = useState(today.slice(0, 7))
@@ -90,6 +97,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   const [removing, setRemoving] = useState<RestaurantClosure | null>(null)
   const [busy, setBusy] = useState('')
   const [removeError, setRemoveError] = useState('')
+  useEffect(() => { setRemoving(null); setRemoveError(''); setBusy('') }, [currentGeneration])
   /* 記録ごとの重なる予約の数と連絡済みの数（contact-status。閲覧のみも読める）。 */
   const [contacts, setContacts] = useState<Record<string, { reservations: number; contacted: number }>>({})
 
@@ -104,11 +112,16 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
 
   const loadClosures = useCallback(async () => {
     if (!accountId || !storeId) return
+    const generation = scope.current.generation
     try {
       const res = await restaurantTestApi.closures(accountId, storeId)
+      if (scope.current.generation !== generation) return
       setClosures(Array.isArray(res.data) ? res.data : [])
+      setLoadedGeneration(generation)
       setLoadError(null)
     } catch (caught) {
+      if (scope.current.generation !== generation) return
+      setLoadedGeneration(0)
       setLoadError(caught)
     }
   }, [accountId, storeId])
@@ -213,19 +226,22 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   }
 
   const remove = async () => {
-    if (!removing) return
+    if (!removing || removeGeneration.current !== scope.current.generation || loadedGeneration !== scope.current.generation || removing.storeId !== storeId) return
+    const generation = scope.current.generation
     setBusy(`remove-${removing.id}`); setRemoveError('')
     try {
       await restaurantTestApi.deleteClosure(accountId, removing.id, removing.version)
+      if (generation !== scope.current.generation) return
       const hadTasks = tasksFor(removing, tasks).total > 0
       setRemoving(null)
       notifyToast(hadTasks ? '消しました。他の予約サイトに「もう開けてよい」の知らせを出しました。' : '消しました。LINE からの予約をまた受け付けます。')
       await Promise.all([loadClosures(), loadTasks()])
     } catch (caught) {
+      if (generation !== scope.current.generation) return
       setRemoveError(deleteMessage(caught))
       void loadClosures()
     } finally {
-      setBusy('')
+      if (generation === scope.current.generation) setBusy('')
     }
   }
 
@@ -364,7 +380,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                   ] : []),
                   { id: 'ledger', label: '予約台帳でこの日を見る', onSelect: () => { router.push(`/restaurant-test/reservations?date=${closure.startDate}`) } },
                   ...(canWrite ? [
-                    { id: 'remove', label: '消して開ける', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setRemoveError(''); setRemoving(closure) } },
+                    { id: 'remove', label: '消して開ける', tone: 'danger' as const, dividerBefore: true, onSelect: () => { if (loadedGeneration !== scope.current.generation || closure.storeId !== storeId) return; removeGeneration.current = scope.current.generation; setRemoveError(''); setRemoving(closure) } },
                   ] : []),
                 ]
                 return (
@@ -432,7 +448,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
         />
       ) : null}
       <ConfirmDialog
-        open={removing !== null}
+        open={removing !== null && removeGeneration.current === currentGeneration}
         destructive
         title={removing ? `${rangeTitle(removing)}の${KIND_LABEL[removing.kind]}を消しますか` : ''}
         description={removing && tasksFor(removing, tasks).total > 0
@@ -443,7 +459,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
         error={removeError || undefined}
         onConfirm={() => remove()}
         onCancel={() => setRemoving(null)}
-      />
+      ><OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: storeId, name: store?.id === storeId ? store.name : undefined }} /></ConfirmDialog>
     </></SaveErrorScope>
   )
 }

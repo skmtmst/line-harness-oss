@@ -8,7 +8,7 @@ import { FriendAddLink } from '@/v8/dashboard/public/friend-add/index'
 import CalendarPeriod from '@/components/shared/calendar-period'
 import { formatYen } from '@line-crm/shared';
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import { CancelClassDialog,CancelReservationDialog,RefundDialog } from '@/components/shared/booking-confirm-dialogs'
+import { CancelReservationDialog } from '@/components/shared/booking-confirm-dialogs'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import DeltaChip from '@/components/shared/delta-chip'
@@ -20,6 +20,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import { lockUnless } from '@/components/shared/permission-lock'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { useEventAbsence } from '@/v8/events'
 import { RadioCardGroup } from '@/components/shared/radio-card'
 import Radio from '@/components/shared/radio'
@@ -115,6 +116,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const writeLock = role === null ? undefined : lockUnless(canWrite)
   const viewErrors = useSaveFormErrors()
   const restaurantStoreReady = Boolean(accountId && !store.loading && !store.error && store.tableDefinition?.accountId === accountId && store.tableDefinition.snapshot === store.snapshot && store.store && store.snapshot?.stores.includes(store.store))
+  const cancelStoreId = cancelRow?.booking?.storeId ?? store.today?.find(row => row.id === cancelRow?.reservationId)?.store_id
   const storeLock = restaurantStoreReady ? undefined : !store.loading || store.error ? '店舗情報を確認できません。読み直してからお試しください。' : '店舗情報を読み込んでいます。確認が終わるまでお待ちください。'
   const reservationLock = cfg.walkIn ? storeLock ?? (!today ? failed ? '予約情報を確認できません。読み直してからお試しください。' : '予約情報を読み込んでいます。確認が終わるまでお待ちください。' : undefined) : undefined
   const headActions = (
@@ -297,24 +299,22 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       {start.arrived && accountId && canManageRole(role) ? <FirstRunDoneDialog accountId={accountId} style={style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
       {preparing.dialog}
       {cancelRow ? (
-        <CancelReservationDialog open title={`${withHonorific(cancelRow.name, 'さま')}の予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${formatNumber(cancelRow.people)}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
+        <CancelReservationDialog cancellationOnly targetSummary={<OperationTargetSummary accounts={[{ id: accountId }]} store={style === 'restaurant' ? (restaurantStoreReady && store.store && cancelStoreId === store.store.id ? { id: store.store.id, name: store.store.name } : { id: '' }) : undefined} />} open title={`${withHonorific(cancelRow.name, 'さま')}の予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${formatNumber(cancelRow.people)}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
           facts={[{ label: 'お支払い', value: cancelRow.booking?.price ? `${formatYen(cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1))}（支払いの記録は決済の口から）` : 'お支払いなし' }]}
           fullAmount={cancelRow.booking?.price ? cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1) : null} testMode={testMode} busy={busy === 'cancel'}
           messageFor={(i) => `${withHonorific(cancelRow.name, 'さま')}　${i.reason ? `${i.reason}で` : 'お店の都合で'} ${cancelRow.time} のご予約を取り消しました。申し訳ありません。${i.refund === 'full' ? 'お支払いは全額を返金します。' : ''}`}
           onClose={() => setCancelRow(null)} onConfirm={(i) => void confirmCancel(cancelRow, i)} />
       ) : null}
       {refundRow ? (
-        <RefundDialog open subtitle={`${withHonorific(refundRow.name, 'さま')}・${refundRow.time}${refundRow.course ? ` ${refundRow.course}` : ''}${refundRow.people ? ` ${formatNumber(refundRow.people)}名` : ''}`}
-          facts={[{ label: '支払った額', value: refundRow.booking?.price ? `${formatYen(refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1))}` : '—' }, { label: 'これまでの返金', value: 'なし' }]}
-          paidAmount={refundRow.booking?.price ? refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1) : 0} testMode={testMode}
-          onClose={() => setRefundRow(null)} onConfirm={() => { setRefundRow(null); openPayment() }} />
+        <Dialog open title="返金について" description={`${withHonorific(refundRow.name, 'さま')}・${refundRow.time}`} onCancel={() => setRefundRow(null)}>
+          <p>この画面から返金はできません。</p>
+        </Dialog>
       ) : null}
       {classRow ? (
-        <CancelClassDialog open subtitle={`${classRow.name}・${classRow.time}${classRow.endTime ?? ''}・${classRow.sub ?? ''}`}
-          facts={[{ label: '予約', value: roster && roster.rowId === classRow.id ? `${formatNumber(roster.members.filter((m) => m.attend !== 'cancel').length)}人` : '名簿を開くと人数が出ます' }, { label: 'キャンセル待ち', value: classRow.waiting !== undefined ? `${classRow.waiting}人（待ちは終わりにします）` : '—' }]}
-          counts={{ members: roster && roster.rowId === classRow.id ? roster.members.filter((m) => m.attend !== 'cancel').length : 0, paid: 0, paidAmount: 0, tickets: 0, unpaid: 0 }} testMode={testMode}
-          messageFor={(i) => `〇〇さま　本日 ${classRow.time} の${classRow.name}は、${i.reason || '〇〇'}のため休講になりました。`}
-          onClose={() => setClassRow(null)} onConfirm={() => { setClassRow(null); preparing.open('休講') }} />
+        <Dialog open title="休講について" description={`${classRow.name}・${classRow.time}${classRow.endTime ?? ''}・${classRow.sub ?? ''}`} onCancel={() => setClassRow(null)}>
+          <p>この画面から休講にはできません。</p>
+          <p>予約の変更や返金、LINE での連絡は行われません。</p>
+        </Dialog>
       ) : null}
       {resultRow ? <ResultDialog row={resultRow} busy={busy === 'result'} onClose={() => setResultRow(null)} onSave={(outcome) => void saveResult(resultRow, outcome)} /> : null}
       {wizard.dialog}

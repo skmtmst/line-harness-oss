@@ -48,7 +48,7 @@
 - ［無断にする］（面談は［欠席にする］）は開始の時刻を過ぎた予約にだけ出す（行の主ボタン［来店｜無断］と「…」の両方）。あとで戻せる。飲食は `postSeatVisitMark(no_show)`、人の予約は `bookingApi.postVisitMark(no_show)`、Meet は `styleApi.saveMeetResult(attendance=no_show)`。
 - サロンの承認待ちは主ボタン［承認する］（`bookingApi.decideRequest(approve)`）。面談の実施済みで結果が無い物は［結果を付ける］（`saveBooking`・`saveMeetResult` の outcome）と「結果待ち」タブ（件数つき）。
 - 教室の名簿は［出席｜欠席］（欠席は回が始まった後だけ）、7 人を超えたら［ほか N人を表示する］。
-- 取り消す（h2lHCH）・返金（Y8MWGs、2 段）・休講（Md9O3）・休みの重なる予約（s8BwT8）は共通の確かめの窓（`components/shared/booking-confirm-dialogs.tsx`）。取り消しは理由を口へ。返金・休講・重なる予約への LINE は口が無いので、押すと共通の準備中の窓。
+- 取り消す窓（h2lHCH）は共通部品を使い、理由を予約の口へ渡す。取消時の連絡・返金は自動では行わない。ダッシュボードの返金・休講は、この画面から実行できないことを説明する窓を出す。休みを入れても重なる予約は取り消さず、連絡は自動では送らない。
 - 試験モードの印は `TestModeNote`（`bookingApi.getPaymentConfig().testMode`）。支払いの札の言葉は `payment-status.ts` の 1 か所。
 - 閲覧のみは上に閲覧のみの帯、異常の帯は外の管理画面を開く物だけ残す。［表示を変える］に［型を変える］（`styleApi.save` の style）。
 

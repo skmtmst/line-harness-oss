@@ -11,6 +11,7 @@ const calls = vi.hoisted(() => ({
   staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(), friendsList: vi.fn(),
   styleGet: vi.fn(), styleSave: vi.fn(), starterSet: vi.fn(),
 }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/api', () => ({
   api: {
     lineAccounts: {

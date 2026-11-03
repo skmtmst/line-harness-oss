@@ -2,6 +2,7 @@
 
 import type { SupportMarkArchiveImpact, SupportMarkListItem } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -52,8 +53,9 @@ export function isUsed(mark: MarkRow): boolean {
   return mark.friendCount > 0 || referenceCount(mark) > 0
 }
 
-export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, error, onReplacement, onCancel, onConfirm }: {
+export function ArchiveMarkDialog({ mark, accountId, impact, replacementMarkId, loading, saving, error, onReplacement, onCancel, onConfirm }: {
   mark: MarkRow
+  accountId: string | null
   impact: SupportMarkArchiveImpact | null
   replacementMarkId: string
   loading: boolean
@@ -98,6 +100,7 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
       designWidth={560} designHeaderPadding="24px 24px 0" designContentPadding="12px 24px 12px" designFooterPadding="14px 24px 24px"
       onCancel={onCancel} onConfirm={onConfirm} busy={saving} confirmDisabled={!canConfirm}
       confirmLabel={needsReplacement ? '置き換えて保管する' : '保管する'} busyLabel="保管中…">
+      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
       {/* ★V8 fy5dz：説明は題の段ではなく本文の頭。説明・置き換え先・注意を 12 ずつ縦に並べる。 */}
       <div className="flex flex-col gap-3">
           <p className="text-xs leading-[18px] text-ink-secondary">{needsReplacement ? `いま ${formatNumber(friendCount)} 人に付いています。保管すると、この ${formatNumber(friendCount)} 人は下で選んだマークへ置き換え、履歴に残します。` : '使っている友だちはいないので、そのまま保管できます。'}</p>

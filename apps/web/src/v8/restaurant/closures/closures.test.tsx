@@ -15,10 +15,10 @@ const fixture = vi.hoisted(() => ({
   inventoryDay: vi.fn(), closureContactStatus: vi.fn(),
 }))
 const google = vi.hoisted(() => ({ profile: vi.fn(), proposeClosureHours: vi.fn() }))
-const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const role = vi.hoisted(() => ({ value: 'owner' as string | null, account: 'account-1' }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/inventory', useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: role.account, accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: google }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
@@ -49,6 +49,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = 'owner'
+  role.account = 'account-1'
   window.history.replaceState(null, '', '/restaurant-test/inventory?tab=closures')
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
   fixture.closures.mockResolvedValue({ data: [closure('cl-1', future), closure('cl-2', future, { kind: 'private_event', allDay: false, startTime: '18:00', endTime: '22:00', tableIds: ['pa', 't1'], memo: '会社の宴会' })] })
@@ -173,8 +174,23 @@ describe('UVnvR 休業日・貸切', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: '消して開ける' }))
     const confirm = (await screen.findByText(/の臨時休業を消しますか/)).closest('[role="alertdialog"]') as HTMLElement
     expect(confirm.textContent).toContain('「もう開けてよい」の知らせを出します')
+    expect(confirm.textContent).toContain('LINEアカウント')
+    expect(confirm.textContent).toContain('渋谷店')
+    expect(confirm.textContent).toContain('環境')
     fireEvent.click(within(confirm).getByRole('button', { name: '消して開ける' }))
     await waitFor(() => expect(fixture.deleteClosure).toHaveBeenCalledWith('account-1', 'cl-1', 3))
+  })
+
+  it('削除の確認中にアカウントが変わったら古い確認から消せない', async () => {
+    const view = render(<InventoryPage />)
+    await waitFor(() => expect(document.querySelector('[data-closure-card="cl-1"]')).not.toBeNull())
+    fireEvent.click(within(document.querySelector('[data-closure-card="cl-1"]') as HTMLElement).getByRole('button', { name: /の操作$/ }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '消して開ける' }))
+    const confirm = (await screen.findByText(/の臨時休業を消しますか/)).closest('[role="alertdialog"]') as HTMLElement
+    role.account = 'account-2'
+    view.rerender(<InventoryPage />)
+    fireEvent.click(within(confirm).getByRole('button', { name: '消して開ける' }))
+    expect(fixture.deleteClosure).not.toHaveBeenCalled()
   })
 
   it('閲覧のみ（viewer）には足す・日を押す・変える・消す・［閉じた］・Google の案を置かない', async () => {

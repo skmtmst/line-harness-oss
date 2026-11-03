@@ -88,9 +88,14 @@ type RenderCommonVarDialogsContext = {
   statusTarget: CommonVar | null
   typedKey: string
   usageExpanded: boolean
+  nameSaving: boolean
+  nameReset: number
+  setNameDirty: (dirty: boolean) => void
+  setNameSaving: (saving: boolean) => void
+  protect: (action: () => void) => void
 }
 
-export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped, applyStatus, batchReason, batchRequestRef, canWrite, closeDelete, closeStatusDialog, confirmDirectDelete, confirmReplacement, confirmStopInstead, current, deleteBatchError, deleteBusy, deleteChoice, deleteError, deleteImpact, deletePhase, deleteReason, deleteTarget, deleteTargets, deleting, folderDotOf, items, openDelete, openStatusDialog, panelStatus, removeSelected, renameVar, replacementCandidates, replacementId, replacementImpact, replacementPhase, router, selectedAccountId, selectReplacement, setActiveId, setBatchReason, setDeleteBatchError, setDeleteChoice, setDeleteReason, setDeleteTargets, setPanelStatus, setStatusError, setStatusReason, setTypedKey, setUsageExpanded, statusAction, statusBusy, statusError, statusReason, statusScheduled, statusTarget, typedKey, usageExpanded }: RenderCommonVarDialogsContext) {
+export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped, applyStatus, batchReason, batchRequestRef, canWrite, closeDelete, closeStatusDialog, confirmDirectDelete, confirmReplacement, confirmStopInstead, current, deleteBatchError, deleteBusy, deleteChoice, deleteError, deleteImpact, deletePhase, deleteReason, deleteTarget, deleteTargets, deleting, folderDotOf, items, openDelete, openStatusDialog, panelStatus, removeSelected, renameVar, replacementCandidates, replacementId, replacementImpact, replacementPhase, router, selectedAccountId, selectReplacement, setActiveId, setBatchReason, setDeleteBatchError, setDeleteChoice, setDeleteReason, setDeleteTargets, setPanelStatus, setStatusError, setStatusReason, setTypedKey, setUsageExpanded, statusAction, statusBusy, statusError, statusReason, statusScheduled, statusTarget, typedKey, usageExpanded, nameSaving, nameReset, setNameDirty, setNameSaving, protect }: RenderCommonVarDialogsContext) {
   return ((
     <>
       {/* 止める窓（板 `Hhl9M`）。下の窓を隠すため、削除の窓とは同時に出さない。 */}
@@ -403,21 +408,22 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
       {activeItem ? (
         <DetailPanel
           open
+          busy={nameSaving}
           title={activeItem.name}
           description={placeholderText(activeItem.varKey)}
-          onClose={() => {
+          onClose={() => protect(() => {
             setActiveId(null)
             setPanelStatus(false)
-          }}
+          })}
           hasPrev={activeIndex > 0}
           hasNext={activeIndex >= 0 && activeIndex < current.length - 1}
           onPrev={() => setActiveId(current[activeIndex - 1]?.id ?? null)}
           onNext={() => setActiveId(current[activeIndex + 1]?.id ?? null)}
-          actions={{ primary: <Button type="button" variant="primary" onClick={() => withViewTransition(() => router.push(`/contents/vars/edit?id=${activeItem.id}`))} busyLabel="移動中…">
+          actions={{ primary: <Button type="button" variant="primary" onClick={() => protect(() => withViewTransition(() => router.push(`/contents/vars/edit?id=${activeItem.id}`)))} busyLabel="移動中…">
                 編集する
               </Button>,
-    menuItems: [...([{ allowed: canWrite, id: 'detail-0', label: (activeStopped ? '再開する' : '止める'), onSelect: () => openStatusDialog(activeItem, activeStopped ? 'resume' : 'stop') }]),
-        ...([{ allowed: canWrite, id: 'detail-1', label: "削除する", onSelect: () => openDelete(activeItem), tone: 'danger' as const }])] }}
+    menuItems: [...([{ allowed: canWrite, id: 'detail-0', label: (activeStopped ? '再開する' : '止める'), onSelect: () => protect(() => openStatusDialog(activeItem, activeStopped ? 'resume' : 'stop')) }]),
+        ...([{ allowed: canWrite, id: 'detail-1', label: "削除する", onSelect: () => protect(() => { void openDelete(activeItem) }), tone: 'danger' as const }])] }}
          status={<StatusBadge tone={activeStopped ? 'neutral' : (activeItem.status ?? 'active') === 'draft' ? 'warning' : 'success'}>{activeStopped ? '停止中' : (activeItem.status ?? 'active') === 'draft' ? '下書き' : '使用中'}</StatusBadge>}>
 <DetailContent>
           <div className={styles.panelBody}>
@@ -425,6 +431,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                 value={activeItem.name}
                 label="共通情報の名前"
                 maxLength={100}
+                preserveDirtyOnBlur onDirtyChange={setNameDirty} onSavingChange={setNameSaving} resetToken={nameReset}
                 onSave={(next) => renameVar(activeItem, next)}
               /> </DetailField>
             <DetailField label="中身">

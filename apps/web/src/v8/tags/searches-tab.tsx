@@ -19,7 +19,8 @@ import { api, ApiError, type SavedSearchSummary } from '@/lib/api';
 import { ListPageBody } from '@/components/templates';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import DetailPanel from '@/components/shared/detail-panel';
+import { useHeldDetail, useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
 import { withViewTransition } from '@/components/shared/view-transition';
@@ -123,7 +124,8 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
   const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?search=<id> を残す。 */
-  const [activeSearchId, setActiveSearchId] = useDetailPanelUrl('search')
+  const detailGuard = useInlineDetailGuard('search')
+  const { id: activeSearchId, setId: setActiveSearchId } = detailGuard
   const openSearchDetail = (id: string) => withViewTransition(() => setActiveSearchId(current => current === id ? null : id))
   const loadSequence = useRef(0)
 
@@ -263,7 +265,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
   const pages = Math.max(1, Math.ceil(filteredList.length / pageSize))
   const currentPage = Math.min(page, pages)
   const visible = filteredList.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-  const activeSearch = items.find((item) => item.id === activeSearchId) ?? null
+  const activeSearch = useHeldDetail(items.find((item) => item.id === activeSearchId) ?? null, activeSearchId, detailGuard.holding, accountId)
   const activeSearchIndex = visible.findIndex((item) => item.id === activeSearchId)
   useEffect(() => setPage(1), [query, usageFilter, matchFilter, pageSize])
 
@@ -279,7 +281,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
   }
 
   /* 行の「…」と右クリックは同じ中身。閲覧のみは変える操作を出さない（2026-10-06 オーナー）。 */
-  const rowMenuItems = (search: SavedSearch): ActionMenuItem[] => {
+  const rowMenuItemsRaw = (search: SavedSearch): ActionMenuItem[] => {
     const list: ActionMenuItem[] = []
     const index = filteredList.findIndex((item) => item.id === search.id)
     if (search.lineAccountId) {
@@ -318,6 +320,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
     }
     return list
   }
+  const rowMenuItems = (search: SavedSearch): ActionMenuItem[] => rowMenuItemsRaw(search).map(item => item.onSelect ? { ...item, onSelect: () => detailGuard.protect(() => { void item.onSelect?.() }) } : item)
   const searchContextItems = (search: SavedSearch): ContextMenuItem[] =>
     rowMenuItems(search).map((item) => ({
       id: item.id,
@@ -498,8 +501,10 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
       </ListPageBody>
 
       {/* 行の詳細パネル。名前はその場で直せる。 */}
+      {detailGuard.dialog}
       <DetailPanel
         open={activeSearch !== null}
+        busy={detailGuard.busy}
         title={activeSearch?.name ?? ''}
         description={activeSearch ? `${activeSearch.isShared ? '全員' : '自分だけ'}・第${activeSearch.revision ?? 1}版` : undefined}
         onClose={() => setActiveSearchId(null)}
@@ -517,7 +522,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
             <div>
               <dt>検索名</dt>
               <dd>
-                <DetailInlineEdit allowed={canEdit}
+                <DetailInlineEdit {...detailGuard.editor} allowed={canEdit}
                     label="検索名"
                     value={activeSearch.name}
                     maxLength={60}

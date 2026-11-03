@@ -48,6 +48,7 @@ const KINDS: ReadonlyArray<{ key: HqAttentionKind; label: string; href: string }
 
 /** 口の行き先のうち、今の画面に無い道（予約設定・LINE アカウント）は今ある画面へ読み替える。 */
 function hrefOf(item: HqAttentionItem, kind: { key: HqAttentionKind; href: string }): string {
+  if (kind.key === 'connections') return `/accounts/detail?id=${encodeURIComponent(item.accountId)}`
   const href = item.details[kind.key]?.[0]?.href
   if (!href || href.startsWith('/booking/settings') || href.startsWith('/line-accounts')) return kind.href
   return href

@@ -71,7 +71,7 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
     const page = readFileSync(resolve(SRC_V8, 'templates/list.tsx'), 'utf8')
     const styles = readFileSync(resolve(import.meta.dirname, '../templates/page-templates.module.css'), 'utf8')
     expect(page).toContain('folders={folderPanel}')
-    expect(page).toContain('onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}')
+    expect(page).toContain('onAddFolder={canMutateTemplates ? () => detailGuard.protect(() => setFolderDialogOpen(true)) : undefined}')
     expect(styles).toContain('width: var(--tpl-folder-width)')
     expect(styles).toContain('flex-shrink: 0')
   })

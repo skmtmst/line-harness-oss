@@ -83,6 +83,18 @@ const menuItems = () => [...document.querySelectorAll('[role="menuitem"]')].map(
 const click = async (el: Element | null | undefined) => { await act(async () => { (el as HTMLElement).click() }) }
 
 describe('一覧の左のフォルダの列（共通）', () => {
+  it('未保存の確認が必要なときは確認が済むまでフォルダ追加を開かない', async () => {
+    let resume: (() => void) | undefined
+    const hold = (event: Event) => { event.preventDefault(); resume = (event as CustomEvent<{ run: () => void }>).detail.run }
+    window.addEventListener('musubo:request-unsaved-action', hold)
+    await act(async () => { root.render(<Screen kind="scenario" canManage />) })
+    await click(buttonByText('フォルダを追加'))
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(resume).toBeTypeOf('function')
+    await act(async () => { resume?.() })
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('フォルダを追加')
+    window.removeEventListener('musubo:request-unsaved-action', hold)
+  })
   it('店舗を切り替えたあとは、前の店舗の遅い件数で上書きしない', async () => {
     let resolveOld!: (value: unknown) => void
     list.mockImplementation((_kind, accountId) => accountId === 'acc-1'

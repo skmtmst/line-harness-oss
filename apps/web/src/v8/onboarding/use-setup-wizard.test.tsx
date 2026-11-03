@@ -71,3 +71,19 @@ it('新規の未選択だけを自動で案内し、閉じた質問やQRには�
   view.rerender(<Host account="b" data={fresh} />)
   expect(screen.queryByRole('dialog')).toBeNull()
 })
+
+it.each(['閉じる', '保存を知らせる'])('設定から開いた質問を「%s」で閉じると設定へ戻る', async name => {
+  fixture.search = 'setup=0&setupReturn=accounts'
+  render(<Host />)
+  await screen.findByRole('dialog')
+  fireEvent.click(screen.getByRole('button', { name }))
+  expect(fixture.replace).toHaveBeenCalledWith('/accounts')
+})
+
+it('不明な戻り先を指定しても外のサイトに移らない', async () => {
+  fixture.search = 'setup=0&setupReturn=https%3A%2F%2Fevil.example&range=week'
+  render(<Host />)
+  await screen.findByRole('dialog')
+  fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+  expect(fixture.replace).toHaveBeenCalledWith('/?range=week')
+})

@@ -9,6 +9,7 @@ import RegistrationStyleDialog from './registration-style-dialog'
 import { useRegistrationStyle } from './use-registration-style'
 import { useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
+import RegistrationUnsavedGuard from './registration-unsaved-guard'
 
 export default function ResumeRegistrationStyle({ accountId }: { accountId: string }) {
   const { accounts } = useAccount()
@@ -45,5 +46,6 @@ export default function ResumeRegistrationStyle({ accountId }: { accountId: stri
       <Button type="button" onClick={() => setDialogOpen(true)} disabled={state.busy}>スタイルを選ぶ</Button>
       <Button type="button" onClick={() => void finish('skip')} disabled={state.busy || state.version === null} busy={state.busy}>あとで設定する</Button>
     </>} /> : null}
+    {!done ? <RegistrationUnsavedGuard dirty={state.dirty} busy={state.busy} onDiscard={state.discard} /> : null}
   </PageFrame>
 }
