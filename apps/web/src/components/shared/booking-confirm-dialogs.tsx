@@ -77,7 +77,7 @@ export function CancelReservationDialog({ open, title, subtitle, facts, fullAmou
           </Field>
         ) : null}
         <Field label="取り消す理由" required><TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="お店の都合（食材が届かない）" /></Field>
-        {cancellationOnly ? <><p>自動の連絡・返金は行われません。</p><p>取り消すと元に戻せません。</p></> : <>
+        {cancellationOnly ? <><p className={styles.note}>このお客さまへの自動の連絡・返金は行われません。</p><p className={styles.note}>取り消すと元に戻せません。</p></> : <>
           <Checkbox checked={notify} onCheckedChange={setNotify}>LINE でお客さまに知らせる</Checkbox>
           {notify ? <Message text={messageFor(input)} /> : null}
         </>}

@@ -276,19 +276,19 @@ export function useStyleDashboard(style: IndustryStyle) {
   const confirmCancel = async (row: StyleRow, input: CancelReservationInput) => {
     if (!cancelTarget || cancelTarget.row !== row || cancelTarget.generation !== cancelScope.current.generation || !accountId) return
     const generation = cancelTarget.generation
+    let reasonSaved = false
     setBusy('cancel')
     try {
       if (style === 'restaurant' && row.reservationId) await restaurantTestApi.updateReservation(accountId, row.reservationId, { status: 'cancelled', expectedVersion: version(row), cancellationReason: input.reason })
       else {
-        if (row.booking?.version != null) await styleApi.saveBooking(accountId, bookingId(row), { expectedVersion: row.booking.version, cancellationReason: input.reason })
-        if (cancelScope.current.generation !== generation) return
+        if (row.booking?.version != null) { await styleApi.saveBooking(accountId, bookingId(row), { expectedVersion: row.booking.version, cancellationReason: input.reason }); reasonSaved = true }
         await bookingApi.decideRequest(accountId, bookingId(row), 'cancel')
       }
-      if (cancelScope.current.generation !== generation) return
+      if (cancelScope.current.generation !== generation) { notifyToast('切り替え前の予約を取り消しました。'); return }
       setCancelRow(null)
       notifyToast('予約を取り消しました。')
       if (input.refund !== 'none' || input.notify) openPayment()
-    } catch (caught) { if (cancelScope.current.generation === generation) notifyToast(japaneseDetailOf(caught) || '取り消せませんでした。', { tone: 'error' }) } finally { if (cancelScope.current.generation === generation) { setBusy(''); void reload() } }
+    } catch (caught) { notifyToast(reasonSaved ? '理由は保存されましたが、取消の結果を確認できません。元のアカウントで予約を確認してください。' : (japaneseDetailOf(caught) || '取り消せませんでした。'), { tone: 'error' }) } finally { if (cancelScope.current.generation === generation) { setBusy(''); void reload() } }
   }
   /** 面談の結果（検討中・成約・見送り）。予約ごとに持つ（ 追記 4 ⑤）。 */
   const saveResult = async (row: StyleRow, outcome: 'considering' | 'won' | 'lost') => {

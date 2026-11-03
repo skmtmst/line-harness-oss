@@ -116,6 +116,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const writeLock = role === null ? undefined : lockUnless(canWrite)
   const viewErrors = useSaveFormErrors()
   const restaurantStoreReady = Boolean(accountId && !store.loading && !store.error && store.tableDefinition?.accountId === accountId && store.tableDefinition.snapshot === store.snapshot && store.store && store.snapshot?.stores.includes(store.store))
+  const cancelStoreId = cancelRow?.booking?.storeId ?? store.today?.find(row => row.id === cancelRow?.reservationId)?.store_id
   const storeLock = restaurantStoreReady ? undefined : !store.loading || store.error ? '店舗情報を確認できません。読み直してからお試しください。' : '店舗情報を読み込んでいます。確認が終わるまでお待ちください。'
   const reservationLock = cfg.walkIn ? storeLock ?? (!today ? failed ? '予約情報を確認できません。読み直してからお試しください。' : '予約情報を読み込んでいます。確認が終わるまでお待ちください。' : undefined) : undefined
   const headActions = (
@@ -298,7 +299,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       {start.arrived && accountId && canManageRole(role) ? <FirstRunDoneDialog accountId={accountId} style={style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
       {preparing.dialog}
       {cancelRow ? (
-        <CancelReservationDialog cancellationOnly targetSummary={<OperationTargetSummary accounts={[{ id: accountId }]} store={style === 'restaurant' ? { id: '' } : undefined} />} open title={`${withHonorific(cancelRow.name, 'さま')}の予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${formatNumber(cancelRow.people)}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
+        <CancelReservationDialog cancellationOnly targetSummary={<OperationTargetSummary accounts={[{ id: accountId }]} store={style === 'restaurant' ? (restaurantStoreReady && store.store && cancelStoreId === store.store.id ? { id: store.store.id, name: store.store.name } : { id: '' }) : undefined} />} open title={`${withHonorific(cancelRow.name, 'さま')}の予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${formatNumber(cancelRow.people)}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
           facts={[{ label: 'お支払い', value: cancelRow.booking?.price ? `${formatYen(cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1))}（支払いの記録は決済の口から）` : 'お支払いなし' }]}
           fullAmount={cancelRow.booking?.price ? cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1) : null} testMode={testMode} busy={busy === 'cancel'}
           messageFor={(i) => `${withHonorific(cancelRow.name, 'さま')}　${i.reason ? `${i.reason}で` : 'お店の都合で'} ${cancelRow.time} のご予約を取り消しました。申し訳ありません。${i.refund === 'full' ? 'お支払いは全額を返金します。' : ''}`}

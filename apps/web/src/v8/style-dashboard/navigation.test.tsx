@@ -97,7 +97,7 @@ it('APIから受けた旧Meet相談の相談者IDを実画面の行へ引き継�
   const booking: StyleBooking = {
     id: 'meet-only-id', kind: 'meet', friendId: 'friend-real', personKey: 'friend-real', name: '相談者',
     startsAt, endsAt, requestedAt: startsAt, status: 'confirmed', staffId: 'staff-real', version: null, updatedAt: startsAt,
-    menuId: null, storeId: null, slotId: null, partySize: 1, price: 0, visited: false, attendance: null, held: false,
+    menuId: null, storeId: 'store-real', slotId: null, partySize: 1, price: 0, visited: false, attendance: null, held: false,
     meetingMode: 'online', meetingUrl: 'https://meet.google.com/fixture', location: null, outcome: null, source: 'calendar',
     entryPoint: null, refCode: null, designation: null, cancelledAt: null, confirmedResponse: null, participationMode: null,
   }
@@ -110,6 +110,7 @@ it('APIから受けた旧Meet相談の相談者IDを実画面の行へ引き継�
   }
   const converted = toToday('consult', snapshot, schedule, '2026-11-02', 'today')
   expect(converted.rows[0].booking?.friendId).toBe('friend-real')
+  expect(converted.rows[0].booking).toMatchObject({ storeId: 'store-real' })
   const { result } = renderHook(() => useStyleDashboard('consult'))
   await act(async () => {})
   act(() => result.current.openRow(converted.rows[0]))
