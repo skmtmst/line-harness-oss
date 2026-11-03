@@ -195,9 +195,11 @@ function DeliveryInner() {
   const intakeReady = !accountLoading && !loading && !error && dataAccountId === selectedAccountId
   const intakeAccess: IntakeAccess & { storeId: string | null } = { scope: intakeScope, accountId: selectedAccountId, storeId: intakeStoreId, canManage, roleKnown: role !== null, ready: intakeReady && Boolean(intakeStoreId), services: data?.services ?? [] }
   const currentIntake = useRef(intakeAccess)
+  const intakeMounted = useRef(false)
   useLayoutEffect(() => {
+    intakeMounted.current = true
     currentIntake.current = intakeAccess
-    return () => { currentIntake.current = { ...currentIntake.current, ready: false } }
+    return () => { intakeMounted.current = false; currentIntake.current = { ...currentIntake.current, ready: false } }
   })
   const [stopScope, setStopScope] = useState<object | null>(null)
   const openedStopScope = useRef<typeof intakeScope | null>(null)
@@ -560,17 +562,17 @@ function DeliveryInner() {
     setStopError(null)
     try {
       const result = await restaurantDeliveryApi.stopIntake(accountId, selection.services, selection.preset)
-      if (currentIntake.current.scope !== intakeScope) return
+      if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
       setStopOpen(false)
       await reload(true)
-      if (currentIntake.current.scope !== intakeScope) return
+      if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
       if (result.failed.length === 0) {
         setNotice({ tone: 'success', text: `${formatNumber(result.stopped.length)}件のサービスの受付を停止しました。` })
       } else {
         setNotice({ tone: 'warn', text: `${formatNumber(result.stopped.length)}件を停止しました。${formatNumber(result.failed.length)}件は停止できませんでした。もう一度お試しください。` })
       }
     } catch (err) {
-      if (currentIntake.current.scope === intakeScope) setStopError(errorMessage(err, '受付を停止できませんでした。'))
+      if (intakeMounted.current && currentIntake.current.scope === intakeScope) setStopError(errorMessage(err, '受付を停止できませんでした。'))
     } finally {
       releaseIntake(storeId, job)
     }
@@ -587,14 +589,14 @@ function DeliveryInner() {
     setNotice(null)
     try {
       const result = await restaurantDeliveryApi.resumeIntake(accountId, [service])
-      if (currentIntake.current.scope !== intakeScope) return
+      if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
       await loadOrders(true)
-      if (currentIntake.current.scope !== intakeScope) return
+      if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
       setNotice(result.failed.length === 0
         ? { tone: 'success', text: `${DELIVERY_SERVICE_LABELS[service]}の受付を再開しました。` }
         : { tone: 'warn', text: `${DELIVERY_SERVICE_LABELS[service]}の受付を再開できませんでした。もう一度お試しください。` })
     } catch (err) {
-      if (currentIntake.current.scope === intakeScope) setNotice({ tone: 'danger', text: errorMessage(err, '受付を再開できませんでした。') })
+      if (intakeMounted.current && currentIntake.current.scope === intakeScope) setNotice({ tone: 'danger', text: errorMessage(err, '受付を再開できませんでした。') })
     } finally {
       releaseIntake(storeId, job)
     }
