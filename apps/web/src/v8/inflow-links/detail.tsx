@@ -10,7 +10,7 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { Info, Pause, Play, ArrowRight, Pencil, QrCode, UserPlus, Gift, Check, CalendarDays, Users, Ban, Target, MousePointerClick, FileText, ShoppingBag } from 'lucide-react'
+import { Info, Pause, ArrowRight, Pencil, QrCode, UserPlus, Gift, Check, CalendarDays, Users, Ban, Target, MousePointerClick, FileText, ShoppingBag } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -106,8 +106,8 @@ export function monthKeyOf(iso: string | null): string | null {
   return japanCalendar(d).toISOString().slice(0, 7)
 }
 
-export function routeMenuState(route: Pick<EntryRoute, 'isActive'> | null): 'stop' | 'resume' | null {
-  return route ? (route.isActive ? 'stop' : 'resume') : null
+export function routeMenuState(route: Pick<EntryRoute, 'isActive'> | null): 'stop' | null {
+  return route?.isActive ? 'stop' : null
 }
 
 function InflowDetailContent() {
@@ -390,7 +390,7 @@ function InflowDetailContent() {
   }
 
   const afterMenuItems: ActionMenuItem[] = [
-    ...(routeMenuState(route) === 'stop' ? [{ id: 'stop', label: '受付を止める', onSelect: () => openDelete('stop') }] : routeMenuState(route) === 'resume' ? [{ id: 'resume', label: '受付を再開する', icon: <Play size={16} aria-hidden="true" />, onSelect: () => void reopenRoute() }] : []),
+    ...(routeMenuState(route) === 'stop' ? [{ id: 'stop', label: '受付を止める', onSelect: () => openDelete('stop') }] : []),
     { id: 'redirect', label: '別リンクへ送る', icon: <ArrowRight size={16} aria-hidden="true" />, onSelect: () => openDelete('redirect') },
     ...(canPermanentlyDelete ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: () => openDelete('delete') }] : []),
   ]
