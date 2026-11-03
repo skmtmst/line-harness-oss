@@ -321,7 +321,7 @@ it('フォルダの数は表示ページの20件ではなく取得した26件全
 it('確認できる自動応答の有効状態を一覧の上に示す', async () => {
   act(() => { root.render(<AutoRepliesListV8 />) })
   await flush()
-  expect(host.textContent).toContain('確認できる自動応答のうち、有効なルールが1件あります。')
+  expect(host.textContent).toContain('確認できる自動応答に、有効なルールがあります。')
 })
 
 it('確認できる有効なルールがない時はその範囲を明示する', async () => {

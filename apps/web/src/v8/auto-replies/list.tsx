@@ -922,7 +922,7 @@ export default function AutoRepliesListV8() {
           <div className={styles.viewerBand}><ReadOnlyNotice need="feature" role="status" data-design-node="Q5lOCc"></ReadOnlyNotice></div>
         )}
         {ready ? <Notice tone="info" role="status" message={rules.some((rule) => rule.isActive)
-          ? `確認できる自動応答のうち、有効なルールが${formatNumber(rules.filter((rule) => rule.isActive).length)}件あります。`
+          ? '確認できる自動応答に、有効なルールがあります。'
           : '確認できる自動応答に、有効なルールはありません。'} /> : null}
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
         <KpiBand data-design="KPIs">
