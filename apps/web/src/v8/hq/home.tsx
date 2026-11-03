@@ -302,8 +302,16 @@ export default function HqHomeV8() {
     unconfirmed: sum.unconfirmed + (statusOf(account).label === '未確認' ? 1 : 0),
   }), { friends: 0, messages: 0, warnings: 0, unconfirmed: 0 }), [currentAccounts])
 
-  const connectionTotal = attentionCounts && currentAccounts.every(account => attentionCounts[account.id] !== undefined)
-    ? currentAccounts.reduce((sum, account) => sum + attentionCounts[account.id]!, 0) : null
+  const connectionUnconfirmed = attentionCounts ? currentAccounts.filter(account => {
+    const state = statusOf(account).label
+    return state !== '停止中' && (state === '未確認' || attentionCounts[account.id] === undefined)
+  }).length : 0
+  const knownConnectionTotal = attentionCounts
+    ? currentAccounts.reduce((sum, account) => sum + (attentionCounts[account.id] ?? 0), 0) : null
+  const connectionTotal = knownConnectionTotal === 0 && connectionUnconfirmed > 0 ? null : knownConnectionTotal
+  const connectionDetail = loadError || attentionError ? '読み込めませんでした'
+    : connectionUnconfirmed ? `${knownConnectionTotal ? 'ほかに' : ''}未確認 ${formatNumber(connectionUnconfirmed)} 件`
+      : connectionTotal === null ? '接続の問題を確認できません' : null
 
   /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
@@ -531,7 +539,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={loadError || attentionError ? '読み込めませんでした' : connectionTotal === null ? '接続の問題を確認できません' : null} valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
+        <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={connectionDetail} valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">
