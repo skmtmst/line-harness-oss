@@ -165,7 +165,7 @@ export default function AutomationTemplatesV8() {
   /* ===== 数の帯（ルールの一覧と同じ4つ） ===== */
   const activeCount = currentRules ? currentRules.filter((rule) => rule.isActive).length : 0
   const stoppedCount = currentRules ? currentRules.length - activeCount : 0
-  const neverRunCount = rules ? rules.filter((rule) => rule.isActive && rule.executionCount30d === 0).length : 0
+  const neverRunCount = currentRules ? currentRules.filter((rule) => rule.isActive && rule.executionCount30d === 0).length : 0
   const cells: BandCell[] = [
     { key: 'rules', title: 'ルール', icon: <ListChecks size={16} aria-hidden="true" />, value: currentRules ? currentRules.length : null, unit: '件', detail: rules ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
     { key: 'runs', title: '今月動いた', icon: <Activity size={16} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },

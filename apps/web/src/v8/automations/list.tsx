@@ -260,7 +260,7 @@ export default function AutomationListV8() {
   const activeCount = useMemo(() => items.filter((item) => item.status !== 'archived' && item.isActive).length, [items])
   const stoppedCount = items.filter((item) => item.status !== 'archived' && !item.isActive).length
   /** 動かしているのに、この30日に一度も動いていないルール。 */
-  const neverRunCount = useMemo(() => items.filter((item) => item.isActive && item.executionCount30d === 0).length, [items])
+  const neverRunCount = useMemo(() => items.filter((item) => item.status !== 'archived' && item.isActive && item.executionCount30d === 0).length, [items])
 
   const visible = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('ja')

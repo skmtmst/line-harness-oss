@@ -373,3 +373,13 @@ it('保管したルールを合計から除き、下書きは停止側に数え�
   expect(band.textContent?.replace(/\s/g, '')).toContain('動いている1・止めている1')
   expect(host.textContent).not.toContain('保管済み')
 })
+
+it('動いていない稼働ルールの件数に保管済みを含めない', async () => {
+  vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: [
+    automation('active-idle', '稼働中', { executionCount30d: 0 }),
+    automation('archived-idle', '保管済み', { status: 'archived', isActive: true, executionCount30d: 0 }),
+  ], summary: null })
+  await render(<AutomationListV8 />)
+  await waitFor(() => Boolean(host.textContent?.includes('稼働中')), '一覧')
+  expect(host.textContent).toContain('稼働中で直近30日動いていないルール 1')
+})
