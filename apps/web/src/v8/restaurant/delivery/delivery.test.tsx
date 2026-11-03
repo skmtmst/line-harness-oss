@@ -147,6 +147,8 @@ function serviceState(
     service,
     label,
     connectionStatus: 'connected',
+    version: 1,
+    target: `target-${service}`,
     intakeStatus: 'open',
     stopUntil: null,
     todayCount: 4,
@@ -233,6 +235,8 @@ function store(): RestaurantStore {
 function menuItem(id: string, name: string, soldOut = false): DeliveryMenuItem {
   return {
     id,
+    version: 1,
+    target: `menu-${id}`,
     name,
     category: '弁当',
     price: 980,
@@ -810,12 +814,12 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     fireEvent.click(dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }))
     fireEvent.click(dialog.getByRole('button', { name: '60分', exact: true }))
     fireEvent.click(dialog.getByRole('button', { name: '止める' }))
-    await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m'))
+    await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'demaecan', version: 1, target: 'target-demaecan' }] }))
   })
 
   it('Uberを含む商品の同期を止め、他社だけの商品は残す', async () => {
     const other = { ...menuItem('other', '他社だけの商品'), services: [{ service: 'demaecan', label: '出前館' }] }
-    fixture.menuItems.mockResolvedValue({ success: true, items: [menuItem('m1', 'Uberの商品'), other] })
+    fixture.menuItems.mockResolvedValue({ success: true, store: { id: 'store-1', name: '架空店' }, items: [menuItem('m1', 'Uberの商品'), other] })
     fixture.bulkSoldOut.mockResolvedValue({ updated: ['other'], failed: [] })
     at('/restaurant-test/delivery?view=sold-out')
     render(<DeliveryPage />)
@@ -827,7 +831,17 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     expect((screen.getByLabelText('Uberの商品を選ぶ') as HTMLInputElement).disabled).toBe(true)
     fireEvent.click(screen.getByLabelText('表示中をすべて選ぶ'))
     fireEvent.click(screen.getByRole('button', { name: '選んだ商品を品切れにする' }))
-    await waitFor(() => expect(fixture.bulkSoldOut).toHaveBeenCalledWith('account-1', ['other'], true))
+    await waitFor(() => expect(fixture.bulkSoldOut).toHaveBeenCalledWith('account-1', ['other'], true, { expectedStoreId: 'store-1', expectedItems: [{ id: 'other', version: 1, target: 'menu-other' }] }))
+  })
+
+  it('商品の個別変更も表示した版と接続先を送る', async () => {
+    const other = { ...menuItem('other', '他社だけの商品'), services: [{ service: 'demaecan', label: '出前館' }] }
+    fixture.menuItems.mockResolvedValue({ success: true, store: { id: 'store-1', name: '架空店' }, items: [other] })
+    fixture.bulkSoldOut.mockResolvedValue({ updated: ['other'], failed: [] })
+    at('/restaurant-test/delivery?view=sold-out')
+    render(<DeliveryPage />)
+    fireEvent.click(await screen.findByRole('switch', { name: '他社だけの商品の販売' }))
+    await waitFor(() => expect(fixture.bulkSoldOut).toHaveBeenCalledWith('account-1', ['other'], true, { expectedStoreId: 'store-1', expectedItems: [{ id: 'other', version: 1, target: 'menu-other' }] }))
   })
 
   it('Uberの過去の注文・詳細・CSVを引き続き確認できる', async () => {
@@ -898,7 +912,7 @@ describe('受付操作は現在の接続状態と店を確かめる', () => {
     expect(fixture.stopDialog!.selected).toEqual(['rocketnow'])
     fireEvent.click(dialog.getByRole('button', { name: '止める' }))
     await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledTimes(1))
-    expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['rocketnow'], '60m')
+    expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['rocketnow'], '60m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'rocketnow', version: 1, target: 'target-rocketnow' }] })
   })
 
   it('停止できる接続が無い時はまとめ停止にも理由を出し、保持した入口からも窓を開かない', async () => {
@@ -963,7 +977,7 @@ describe('受付操作は現在の接続状態と店を確かめる', () => {
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
     const dialog = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
     fireEvent.click(dialog.getByRole('button', { name: '止める' }))
-    await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m'))
+    await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'demaecan', version: 1, target: 'target-demaecan' }] }))
     expect(fixture.stopIntake).toHaveBeenCalledTimes(1)
     expect(fixture.resumeIntake).toHaveBeenCalledTimes(1)
   })
@@ -1020,7 +1034,7 @@ it('StrictModeの2回描画でも正当な受付停止を変化扱いにしな�
   fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
   fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
   fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '止める', exact: true }))
-  await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m'))
+  await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'demaecan', version: 1, target: 'target-demaecan' }] }))
   expect(screen.queryByText(/店舗や権限が変わった/)).toBeNull()
 })
 
@@ -1091,7 +1105,7 @@ it('接続が切れた選択だけを外し、窓を開き直さず他のサー�
   fireEvent.click(dialog.getByRole('button', { name: '操作できないサービスの選択を外す' }))
   expect(fixture.stopDialog!.selected).toEqual(['rocketnow'])
   fireEvent.click(dialog.getByRole('button', { name: '止める', exact: true }))
-  await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['rocketnow'], '60m'))
+  await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['rocketnow'], '60m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'rocketnow', version: 1, target: 'target-rocketnow' }] }))
 })
 
 it('本人の確認中に保持された操作を呼んでも拒否と断定せず書き込まない', async () => {
@@ -1184,7 +1198,7 @@ it('停止の選択を全部外しても接続済みの行を選び直して送�
   expect(reason.closest('[class*="dialogActions"]')).toBeNull()
   fireEvent.click(choose)
   fireEvent.click(dialog.getByRole('button', { name: '止める', exact: true }))
-  await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['rocketnow'], '60m'))
+  await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['rocketnow'], '60m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'rocketnow', version: 1, target: 'target-rocketnow' }] }))
   expect(fixture.stopIntake).toHaveBeenCalledTimes(1)
 })
 
@@ -1212,7 +1226,7 @@ it('1件だけの選択が切れたら、その選択を外して他の接続済
   expect(other.disabled).toBe(false)
   fireEvent.click(other)
   fireEvent.click(dialog.getByRole('button', { name: '止める', exact: true }))
-  await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['rocketnow'], '60m'))
+  await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['rocketnow'], '60m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'rocketnow', version: 1, target: 'target-rocketnow' }] }))
 })
 
 it('接続が切れた選択の理由を他の接続済みの行へ流用しない', async () => {
@@ -1276,7 +1290,7 @@ it('一括停止は切替後の対象を表示し、切替前の確認では送�
   expect(fixture.stopIntake).not.toHaveBeenCalled()
   fireEvent.click(reopened.getByRole('button', { name: '止める', exact: true }))
   await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledTimes(1))
-  expect(fixture.stopIntake.mock.calls).toEqual([['account-2', ['demaecan'], '30m']])
+  expect(fixture.stopIntake.mock.calls).toEqual([['account-2', ['demaecan'], '30m', { expectedStoreId: 'store-2', expectedStates: [{ service: 'demaecan', version: 1, target: 'target-demaecan' }] }]])
 })
 
 
@@ -1317,7 +1331,7 @@ describe('受付を止める前の明示選択', () => {
     expect((dialog.getByRole('button', { name: '止める' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }))
     fireEvent.click(dialog.getByRole('button', { name: '止める' }))
-    await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m'))
+    await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'demaecan', version: 1, target: 'target-demaecan' }] }))
     await dialog.findByText('受付を停止できませんでした。')
     expect((dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement).checked).toBe(true)
     expect(dialog.getByRole('button', { name: '30分', exact: true }).getAttribute('aria-pressed')).toBe('true')
@@ -1363,7 +1377,7 @@ it('古い停止の押し口も最新の未選択で止まり、二度呼んで�
   expect(fixture.stopIntake).not.toHaveBeenCalled()
   fireEvent.click(service)
   act(() => { held!(); held!() })
-  expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '90m')
+  expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '90m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'demaecan', version: 1, target: 'target-demaecan' }] })
   finish({ stopped: ['demaecan'], failed: [] })
   await waitFor(() => expect(screen.queryByRole('alertdialog', { name: '受付を一括停止しますか？' })).toBeNull())
 })
@@ -1406,7 +1420,7 @@ it.each(['success', 'failure'] as const)('停止の%s応答前に切り替えた
   expect(fixture.stopSubmit).toBeTypeOf('function')
   let completion: void = undefined
   act(() => { completion = fixture.stopSubmit!() })
-  expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m')
+  expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'demaecan', version: 1, target: 'target-demaecan' }] })
   fixture.accountId.value = 'account-2'
   view.rerender(<DeliveryPage />)
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
@@ -1447,5 +1461,5 @@ it('停止後の一覧読み直し中に切り替えた時も前の店の成功�
   await waitFor(() => expect(fixture.orders).toHaveBeenCalledWith('account-2', { tab: 'new' }))
   await act(async () => { finishReload(ordersData([])); await completion })
   expect(screen.queryByText('1件のサービスの受付を停止しました。')).toBeNull()
-  expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m')
+  expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m', { expectedStoreId: 'store-1', expectedStates: [{ service: 'demaecan', version: 1, target: 'target-demaecan' }] })
 })

@@ -54,6 +54,8 @@ export type DeliveryIntakeStopPreset = '30m' | '60m' | '90m' | 'today'
 
 export interface DeliveryServiceState {
   service: DeliveryService
+  version?: number
+  target?: string | null
   label: string
   connectionStatus: DeliveryConnectionStatus
   /** サーバーが明示的に許可した場合だけUberの個別注文操作を表示する。 */
@@ -191,6 +193,8 @@ export interface DeliveryHistoryData {
 
 export interface DeliveryMenuItem {
   id: string
+  version?: number
+  target?: string | null
   name: string
   category: string | null
   price: number
@@ -367,10 +371,11 @@ export const restaurantDeliveryApi = {
     accountId: string,
     itemIds: string[],
     soldOut: boolean,
+    confirmation?: { expectedStoreId: string; expectedItems: Array<{ id: string; version: number; target: string }> },
   ): Promise<DeliveryBulkSoldOutData> {
     return fetchApi<DeliveryBulkSoldOutData>(
       withAccount(`${BASE}/menu-items/bulk-sold-out`, accountId),
-      { method: 'POST', body: JSON.stringify({ item_ids: itemIds, sold_out: soldOut }) },
+      { method: 'POST', body: JSON.stringify({ item_ids: itemIds, sold_out: soldOut, ...confirmation }) },
     )
   },
 
@@ -379,10 +384,11 @@ export const restaurantDeliveryApi = {
     accountId: string,
     services: DeliveryService[],
     preset: DeliveryIntakeStopPreset,
+    confirmation?: { expectedStoreId: string; expectedStates: Array<{ service: DeliveryService; version: number; target: string }> },
   ): Promise<DeliveryIntakeStopData> {
     return fetchApi<DeliveryIntakeStopData>(withAccount(`${BASE}/intake/stop`, accountId), {
       method: 'POST',
-      body: JSON.stringify({ services, preset }),
+      body: JSON.stringify({ services, preset, ...confirmation }),
       headers: { 'x-confirm-irreversible': INTAKE_STOP_CONFIRM_TOKEN },
     })
   },
