@@ -127,11 +127,11 @@ async function render() {
   await act(async () => { await Promise.resolve() })
 }
 
-it('表の対応が要る件数は同じアカウントの対応一覧の5種類を合計する', async () => {
+it('表の対応が要る件数は同じアカウントの接続問題だけを表示する', async () => {
   await render()
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
   const row = container.querySelector('tbody tr')!
-  expect(row.children[3].textContent).toContain('4 件')
+  expect(row.children[3].textContent).toContain('0 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
 })
 

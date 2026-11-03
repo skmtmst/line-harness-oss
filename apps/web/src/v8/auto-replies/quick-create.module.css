@@ -170,7 +170,6 @@
 
 :global(html:root) .actionFooter > :global([data-dialog-actions][data-dialog-action-pair]) {
   border-top: 0;
-  grid-template-columns: max-content minmax(0, 1fr);
 }
 
 :global(html:root) .actionFooter > :global([data-dialog-actions]) > :global(span:not([data-dialog-action-leading])) {

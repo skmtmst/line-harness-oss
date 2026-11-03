@@ -10,7 +10,7 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { Info, Pause, Pencil, QrCode, UserPlus, Gift, Check, CalendarDays, Users, Ban, Target, MousePointerClick, FileText, ShoppingBag } from 'lucide-react'
+import { Info, Pause, Play, ArrowRight, Pencil, QrCode, UserPlus, Gift, Check, CalendarDays, Users, Ban, Target, MousePointerClick, FileText, ShoppingBag } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -386,8 +386,8 @@ function InflowDetailContent() {
   }
 
   const afterMenuItems: ActionMenuItem[] = [
-    ...(route?.isActive ? [{ id: 'stop', label: '受付を止める', onSelect: () => openDelete('stop') }] : [{ id: 'resume', label: '受付を再開する', onSelect: () => void reopenRoute() }]),
-    { id: 'redirect', label: '別リンクへ送る', onSelect: () => openDelete('redirect') },
+    ...(route?.isActive ? [{ id: 'stop', label: '受付を止める', onSelect: () => openDelete('stop') }] : [{ id: 'resume', label: '受付を再開する', icon: <Play size={16} aria-hidden="true" />, onSelect: () => void reopenRoute() }]),
+    { id: 'redirect', label: '別リンクへ送る', icon: <ArrowRight size={16} aria-hidden="true" />, onSelect: () => openDelete('redirect') },
     ...(canPermanentlyDelete ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: () => openDelete('delete') }] : []),
   ]
   const afterMenuLabels = afterMenuItems.map((item) => item.label).join('・')

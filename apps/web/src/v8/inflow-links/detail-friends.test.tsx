@@ -155,4 +155,7 @@ it('停止中の経路には停止を出さず、再開を選べる', async () =
   const menuItems = [...document.querySelectorAll('[role="menuitem"]')].map(node => node.textContent)
   expect(menuItems).not.toContain('受付を止める')
   expect(menuItems).toContain('受付を再開する')
+  const entries = [...document.querySelectorAll('[role="menuitem"]')]
+  expect(entries.find(node => node.textContent === '受付を再開する')?.querySelector('svg.lucide-play')).toBeTruthy()
+  expect(entries.find(node => node.textContent === '別リンクへ送る')?.querySelector('svg.lucide-arrow-right')).toBeTruthy()
 })
