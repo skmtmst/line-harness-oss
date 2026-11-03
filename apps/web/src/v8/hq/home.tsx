@@ -586,7 +586,7 @@ export default function HqHomeV8() {
                   <div className={styles.cardName}>
                     {/* 絵 `JKjsE`：名前の前に左の列（フォルダ）の色の丸。未分類は色の無い輪。 */}
                     <p className={styles.name} title={name}>
-                      <FolderDotName folder={folderDotOf(account)}><span className={styles.middleName} title={name} aria-label={name}><span aria-hidden="true" className={styles.middleNamePrefix}>{namePrefix}</span><span aria-hidden="true" data-hq-name-suffix="">{nameSuffix}</span></span></FolderDotName>
+                      <FolderDotName folder={folderDotOf(account)}>{nameCharacters.length > 6 ? <span className={styles.middleName} title={name}><span className="sr-only">{name}</span><span aria-hidden="true" className={styles.middleNamePrefix}>{namePrefix}</span><span aria-hidden="true" data-hq-name-suffix="">{nameSuffix}</span></span> : <span title={name}>{name}</span>}</FolderDotName>
                     </p>
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
                     <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
