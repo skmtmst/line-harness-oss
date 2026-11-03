@@ -103,12 +103,12 @@ describe('メンバー（36-5）', () => {
     await waitFor(() => expect(self.textContent).toContain(lastLoginShort('2026-10-20T09:15:00+09:00')))
     expect(within(table).queryByText('中川 由美（あなた）')).toBeNull()
     expect(mocks.title).toHaveBeenCalledWith('メンバー')
-    expect(document.querySelectorAll('h1')).toHaveLength(1)
+    expect(document.querySelectorAll('h1')).toHaveLength(0)
   })
 
   it('招待で選べる役割は管理者と閲覧のみだけ。送る口は統括の扱いにする', async () => {
     render(<HqMembersV8 />)
-    fireEvent.click(await screen.findByRole('button', { name: '権限者を招待' }))
+    fireEvent.click(await screen.findByRole('button', { name: '招待する' }))
     const dialog = await screen.findByRole('dialog', { name: '権限者を招待' })
     expect(optionNames('役割')).toEqual(['管理者（すべて操作できる）', '閲覧のみ（見るだけ）'])
     fireEvent.change(within(dialog).getByRole('textbox', { name: '名前' }), { target: { value: '山田 太郎' } })
