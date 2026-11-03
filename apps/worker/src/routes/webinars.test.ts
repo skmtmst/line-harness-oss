@@ -112,6 +112,8 @@ const webinarNotificationMocks = {
   registerWebinarSession: vi.fn(),
   saveWebinarNotificationSettings: vi.fn(),
   sendWebinarNotificationTest: vi.fn(),
+  webinarTestRecipientPreview: vi.fn(),
+  WebinarTestRecipientsChanged: class extends Error { readonly code='WEBINAR_TEST_RECIPIENT_CHANGED'; constructor(public current:{count:number;recipients:Array<{id:string;displayName:string|null}>}) {super('テスト宛先が変わりました');} },
 };
 vi.mock('../features/webinars/webinar-notifications.js', () => webinarNotificationMocks);
 
@@ -1299,6 +1301,28 @@ describe('webinar notification settings', () => {
       SESSION_START,
       expect.objectContaining({ defaultLiffId: '999-test' }),
     );
+  });
+
+  test('テスト受信者の確認情報を取得し、送信時に引き継ぐ', async () => {
+    vi.setSystemTime(new Date((SESSION_START - 3600) * 1000));
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    webinarNotificationMocks.webinarTestRecipientPreview.mockResolvedValueOnce({count:1,recipients:[{id:'f',displayName:'確認の人'}],token:'a'.repeat(64)});
+    const preview=await adminReq('/api/webinars/w1/notifications/test');
+    expect(preview.status).toBe(200);
+    const {data}=await preview.json() as {data:{token:string;confirmationId:string;count:number}};
+    expect(data.count).toBe(1);
+    const sent=await adminReq('/api/webinars/w1/notifications/test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedRecipientToken:data.token,confirmationId:data.confirmationId})});
+    expect(sent.status).toBe(200);
+    expect(webinarNotificationMocks.sendWebinarNotificationTest).toHaveBeenCalledWith(expect.anything(),expect.anything(),SESSION_START,expect.objectContaining({expectedRecipientToken:data.token,confirmationId:data.confirmationId}));
+  });
+
+  test('テスト受信者が変われば現在人数を409で返す', async () => {
+    vi.setSystemTime(new Date((SESSION_START - 3600) * 1000));
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    webinarNotificationMocks.sendWebinarNotificationTest.mockRejectedValueOnce(new webinarNotificationMocks.WebinarTestRecipientsChanged({count:2,recipients:[]}));
+    const response=await adminReq('/api/webinars/w1/notifications/test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedRecipientToken:'a'.repeat(64),confirmationId:'00000000-0000-4000-8000-000000000001'})});
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({code:'WEBINAR_TEST_RECIPIENT_CHANGED',data:{count:2}});
   });
 
   test('存在しないウェビナーへのテスト送信は 404', async () => {

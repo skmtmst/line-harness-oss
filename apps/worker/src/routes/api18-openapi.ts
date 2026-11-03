@@ -15,6 +15,7 @@ function op(summary:string,params:string[]=[],data:Schema={},body?:Schema,query:
    '400':{description:'入力を確認'},'403':{description:'統括の権限が不足'},'404':{description:'対象がない・別統括'},'409':{description:'編集・承認・宛先条件の競合'}}};
 }
 export const api18Paths={
+ '/api/webinars/{id}/notifications/test':{get:op('ウェビナー通知のテスト受信者と確認用情報を取得する',['id'],{type:'object',properties:{count:number,recipients:{type:'array'},token:string,confirmationId:string}})},
  ...hqAuthoringPaths,
  '/api/hq/templates/attribute-kind-counts':{get:op('友だち属性の種類別件数。情報欄・対応マークは所属未対応のためnull',[],{type:'object',properties:{tag:number,friend_field:{type:'null'},support_mark:{type:'null'}}})},
  '/api/hq/templates/{id}/versions':{get:op('ひな形の版履歴・作った人・日時・下書きか',['id'],{type:'array',items:version})},

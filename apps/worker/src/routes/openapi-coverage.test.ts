@@ -1215,6 +1215,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/liff/nen/pets/{id}',
   'PUT /api/nen/feeding-products',
   'PUT /api/nen/rank-settings',
+  'GET /api/webinars/{id}/notifications/test',
   'GET /api/webinars/{id}/sessions/{startAt}',
   'GET /api/webinars/{id}/video-asset',
   'PATCH /api/line-account-tags/{id}',
