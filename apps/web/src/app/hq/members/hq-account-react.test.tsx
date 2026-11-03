@@ -13,6 +13,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+vi.mock('@/v8/settings/staff', () => ({ SelfSecurity: () => null }))
+
 const mocks = vi.hoisted(() => ({
   me: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn(), resend: vi.fn(), lastLogins: vi.fn(), accounts: vi.fn(),
   tenant: vi.fn(), updateName: vi.fn(), contact: vi.fn(),

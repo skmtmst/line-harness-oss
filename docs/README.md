@@ -462,6 +462,7 @@
 
 ## 反映履歴
 
+- [統括メンバーの本人パスキー設定](release-log/unreleased/2026-11-03-masato-hq-passkeys.md)
 - [配信枠の確認の修正](release-log/unreleased/2053-kenta-operations-quota.md)
 - [履歴と数の単位の表示修正](release-log/unreleased/2056-kenta-review-wording.md)
 - [使い方デモと管理画面の操作の修正](release-log/unreleased/2057-kenta-demo-operations.md)
