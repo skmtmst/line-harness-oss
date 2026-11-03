@@ -29,7 +29,7 @@
 }
 .search[data-size='account'] { width: var(--tpl-htn-search-w); }
 .search input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); color: var(--color-ink); }
-.search input::placeholder { color: var(--color-ink-faint); opacity: 1; }
+.search input::placeholder { color: var(--color-placeholder); opacity: 1; }
 /* 絵：空の値の「—」は薄い字。 */
 .cellEmpty { color: var(--color-ink-faint); }
 .count { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-faint); white-space: nowrap; }

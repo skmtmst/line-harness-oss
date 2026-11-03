@@ -7,10 +7,11 @@
  *   クエリ遷移（コンポーネントが外れない）でも「消えます」の約束を守るため
  * - 同じパス・同じクエリで hash だけ変わる移動は画面内ジャンプなので止めない
  */
-import React, { act } from 'react'
+import React, { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUnsavedGuard } from './use-unsaved-guard'
+import { UnsavedLeaveDialog } from './unsaved-leave-dialog'
 
 const router = vi.hoisted(() => ({ push: vi.fn() }))
 const discard = vi.hoisted(() => vi.fn())
@@ -19,8 +20,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => router,
 }))
 
-function Harness({ dirty, onDiscard, busy }: { dirty: boolean; onDiscard?: () => void; busy?: boolean }) {
-  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, onDiscard, busy })
+function Harness({ dirty, onDiscard, busy, disarmBeforeConfirm }: { dirty: boolean; onDiscard?: () => void; busy?: boolean; disarmBeforeConfirm?: boolean }) {
+  const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, onDiscard, busy })
   return (
     <div>
       <a href="/form-submissions">回答フォーム</a>
@@ -33,12 +34,21 @@ function Harness({ dirty, onDiscard, busy }: { dirty: boolean; onDiscard?: () =>
       {leaveTarget ? (
         <div role="dialog">
           <p>leave:{leaveTarget.kind}:{leaveTarget.kind === 'link' ? leaveTarget.href : ''}</p>
-          <button type="button" data-action="confirm" onClick={confirmLeave}>保存せずに移る</button>
+          <button type="button" data-action="confirm" onClick={() => { if (disarmBeforeConfirm) disarm(); confirmLeave() }}>保存せずに移る</button>
           <button type="button" data-action="cancel" onClick={cancelLeave}>編集を続ける</button>
         </div>
       ) : null}
     </div>
   )
+}
+
+function SaveHarness({ onDiscard, save }: { onDiscard: () => void; save: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const guard = useUnsavedGuard({ dirty: true, busy, onDiscard })
+  return <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} onSave={async () => {
+    setBusy(true)
+    try { await save(); return true } finally { setBusy(false) }
+  }} />
 }
 
 let host: HTMLDivElement
@@ -83,6 +93,147 @@ async function clickDialogButton(action: 'confirm' | 'cancel') {
 }
 
 describe('useUnsavedGuard', () => {
+  it('履歴で保存が完了したら保存中の描画が残っていても戻る', async () => {
+    let finish!: () => void
+    const save = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<SaveHarness onDiscard={discard} save={save} />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      const button = [...document.querySelectorAll('button')].find(node => node.textContent?.includes('保存して移る'))
+      expect(button).toBeTruthy()
+      await act(async () => { button!.click() })
+      expect(save).toHaveBeenCalledTimes(1)
+      expect(back).not.toHaveBeenCalled()
+      await act(async () => { finish(); await Promise.resolve() })
+      expect(back).toHaveBeenCalledTimes(1)
+      expect(discard).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+  it('自分の保存中には確認できず、保存が終われば戻れる', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<Harness dirty onDiscard={discard} />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await render(<Harness dirty busy onDiscard={discard} />)
+      await clickDialogButton('confirm')
+      expect(discard).not.toHaveBeenCalled()
+      expect(back).not.toHaveBeenCalled()
+      expect(host.querySelector('[role="dialog"]')).toBeTruthy()
+      await render(<Harness dirty onDiscard={discard} />)
+      await clickDialogButton('confirm')
+      expect(discard).toHaveBeenCalledTimes(1)
+      expect(back).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+
+  it('2つの未保存状態があっても履歴は1回戻し、1つの確認で両方を破棄する', async () => {
+    const parentDiscard = vi.fn(), childDiscard = vi.fn()
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty onDiscard={parentDiscard} /><Harness dirty onDiscard={childDiscard} /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      expect(go).toHaveBeenCalledTimes(1)
+      expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+      await clickDialogButton('confirm')
+      expect(parentDiscard).toHaveBeenCalledTimes(1)
+      expect(childDiscard).toHaveBeenCalledTimes(1)
+      expect(back).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+  it('履歴確定の直前に解除しても、自分と他の未保存入力を両方破棄する', async () => {
+    const parentDiscard = vi.fn(), childDiscard = vi.fn()
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty onDiscard={parentDiscard} disarmBeforeConfirm /><Harness dirty onDiscard={childDiscard} /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await clickDialogButton('confirm')
+      expect(parentDiscard).toHaveBeenCalledTimes(1)
+      expect(childDiscard).toHaveBeenCalledTimes(1)
+      expect(back).toHaveBeenCalledTimes(1)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+  it('確認後に別の入力が保存中なら解除を戻して確認を維持する', async () => {
+    const firstDiscard = vi.fn(), otherDiscard = vi.fn()
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty onDiscard={firstDiscard} disarmBeforeConfirm /><Harness dirty onDiscard={otherDiscard} /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await render(<><Harness dirty onDiscard={firstDiscard} disarmBeforeConfirm /><Harness dirty busy onDiscard={otherDiscard} /></>)
+      await clickDialogButton('confirm')
+      expect(firstDiscard).not.toHaveBeenCalled()
+      expect(otherDiscard).not.toHaveBeenCalled()
+      expect(back).not.toHaveBeenCalled()
+      expect(host.querySelector('[role="dialog"]')).toBeTruthy()
+      await render(<><Harness dirty onDiscard={firstDiscard} disarmBeforeConfirm /><Harness dirty={false} onDiscard={otherDiscard} /></>)
+      const event = await click(anchor('回答フォーム'))
+      expect(event.defaultPrevented).toBe(true)
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+  it('破棄後に再編集して戻る時も、もう一度確認する', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<Harness dirty onDiscard={discard} />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await clickDialogButton('confirm')
+      await render(<Harness dirty={false} onDiscard={discard} />)
+      await render(<Harness dirty onDiscard={discard} />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      expect(go).toHaveBeenCalledTimes(2)
+      expect(host.querySelector('[role="dialog"]')).toBeTruthy()
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
+  it('復元後の通知では他の未保存状態も再び止めない', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty /><Harness dirty /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      expect(go).toHaveBeenCalledTimes(1)
+      expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+    } finally { go.mockRestore() }
+  })
+  it('復元前に入力がきれいになっても次の戻る操作を確認する', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    try {
+      await render(<Harness dirty />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await render(<Harness dirty={false} />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await render(<Harness dirty />)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      expect(go).toHaveBeenCalledTimes(2)
+    } finally { go.mockRestore() }
+  })
+  it('一方が保存中なら別の入力からも履歴を進めない', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty /><Harness dirty busy /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      expect(go).toHaveBeenCalledTimes(1)
+      expect(host.querySelector('[role="dialog"]')).toBeNull()
+    } finally { go.mockRestore() }
+  })
+  it('2つの入力で編集を続けると、どちらも破棄しない', async () => {
+    const parentDiscard = vi.fn(), childDiscard = vi.fn()
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    try {
+      await render(<><Harness dirty onDiscard={parentDiscard} /><Harness dirty onDiscard={childDiscard} /></>)
+      await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')) })
+      await clickDialogButton('cancel')
+      expect(parentDiscard).not.toHaveBeenCalled()
+      expect(childDiscard).not.toHaveBeenCalled()
+      expect(back).not.toHaveBeenCalled()
+    } finally { go.mockRestore(); back.mockRestore() }
+  })
   it('保存中は未保存判定にかかわらず閉じる操作を止める', async () => {
     await render(<Harness dirty={false} busy />)
     await act(async () => host.querySelector<HTMLButtonElement>('[data-action="leave-button"]')!.click())

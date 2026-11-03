@@ -11,6 +11,8 @@ vi.mock('./folder-editor-dialog', async importOriginal => {
   const Original = actual.default
   return { ...actual, default: (props: React.ComponentProps<typeof Original>) => { editor.confirm = props.onConfirm ?? null; return <Original {...props} /> } }
 })
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 import FolderAddDialog from './folder-add-dialog'
 import FolderEditorDialog from './folder-editor-dialog'
 beforeEach(() => { vi.resetAllMocks(); editor.confirm = null })

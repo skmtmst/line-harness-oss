@@ -40,7 +40,7 @@
 .memo { display: grid; gap: var(--space-10); margin-top: var(--space-20); padding-top: var(--space-20); border-top: 1px solid var(--ad-line); }
 .memo label { font-size: var(--text-body); font-weight: 700; }
 .memo textarea { width: 100%; min-height: var(--ad-memo-min-h); resize: vertical; padding: var(--space-12); border: 1px solid var(--ad-field-line); border-radius: var(--radius-tile); background: white; color: var(--color-ink); font-size: var(--text-body); }
-.memo textarea::placeholder { color: var(--ad-faint); }
+.memo textarea::placeholder { color: var(--color-placeholder); }
 .approve { flex: 0 0 var(--ad-approve-w); }
 .actionBand { display: flex; align-items: center; justify-content: space-between; gap: var(--space-20); min-height: var(--ad-band-min-h); margin-top: var(--ad-band-gap-t); padding: var(--space-16) var(--space-20); border-radius: var(--radius-card); background: var(--ad-wash); }
 .actionBand p { margin: 0; color: var(--ad-muted); font-size: var(--text-caption); line-height: var(--ad-band-lh); }
