@@ -31,6 +31,7 @@ export async function acquirePublishLease(
   nowIso: string,
   ttlMs = PUBLISH_LEASE_MS,
   expectedGeneration?: number,
+  expectedConfirmationRevision?: number,
 ): Promise<number | null> {
   // 取得と世代の採番を1文にする。別々にすると、間に割り込んだ取得の世代を
   // 自分のものと取り違える。
@@ -38,15 +39,16 @@ export async function acquirePublishLease(
     .prepare(
       `UPDATE rich_menu_groups
          SET publishing_at = ?, publishing_owner = ?, publishing_expires_at = ?,
-             publishing_generation = publishing_generation + 1
+             publishing_generation = publishing_generation + 1, confirmation_revision = confirmation_revision + 1
        WHERE id = ?
          AND (publishing_owner IS NULL
            OR publishing_expires_at IS NULL
            OR publishing_expires_at <= ?)
          AND (? IS NULL OR publishing_generation = ?)
+         AND (? IS NULL OR confirmation_revision = ?)
        RETURNING publishing_generation`,
     )
-    .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso, expectedGeneration ?? null, expectedGeneration ?? null)
+    .bind(jstNow(), owner, publishLeaseExpiresAt(nowIso, ttlMs), groupId, nowIso, expectedGeneration ?? null, expectedGeneration ?? null, expectedConfirmationRevision ?? null, expectedConfirmationRevision ?? null)
     .first<{ publishing_generation: number }>();
   return row ? row.publishing_generation : null;
 }
@@ -65,14 +67,15 @@ export async function renewPublishLease(
   fence: PublishLeaseFence,
   nowIso: string,
   ttlMs = PUBLISH_LEASE_MS,
+  expectedConfirmationRevision?: number,
 ): Promise<boolean> {
   const result = await db
     .prepare(
       `UPDATE rich_menu_groups
-         SET publishing_at = ?, publishing_expires_at = ?
-       WHERE id = ? AND publishing_owner = ? AND publishing_generation = ?`,
+         SET publishing_at = ?, publishing_expires_at = ?, confirmation_revision = confirmation_revision + 1
+       WHERE id = ? AND publishing_owner = ? AND publishing_generation = ? AND (? IS NULL OR confirmation_revision = ?)`,
     )
-    .bind(jstNow(), publishLeaseExpiresAt(nowIso, ttlMs), groupId, fence.owner, fence.generation)
+    .bind(jstNow(), publishLeaseExpiresAt(nowIso, ttlMs), groupId, fence.owner, fence.generation, expectedConfirmationRevision ?? null, expectedConfirmationRevision ?? null)
     .run();
   return (result.meta?.changes ?? 0) > 0;
 }
@@ -89,7 +92,7 @@ export async function releasePublishLease(
   const result = await db
     .prepare(
       `UPDATE rich_menu_groups
-         SET publishing_at = NULL, publishing_owner = NULL, publishing_expires_at = NULL
+         SET publishing_at = NULL, publishing_owner = NULL, publishing_expires_at = NULL, confirmation_revision = confirmation_revision + 1
        WHERE id = ? AND publishing_owner = ? AND publishing_generation = ?`,
     )
     .bind(groupId, fence.owner, fence.generation)

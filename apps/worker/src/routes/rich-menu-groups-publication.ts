@@ -452,8 +452,10 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return fail(c, 404, 'NOT_FOUND');
   }
-  const body = await c.req.json<{ expectedPublicationGeneration?: unknown }>().catch(() => ({} as { expectedPublicationGeneration?: unknown }));
+  const body = await c.req.json<{ expectedPublicationGeneration?: unknown; expectedConfirmationRevision?: unknown }>().catch(() => ({} as { expectedPublicationGeneration?: unknown; expectedConfirmationRevision?: unknown }));
   const expected = body.expectedPublicationGeneration;
+  const expectedConfirmationRevision = body.expectedConfirmationRevision;
+  if (expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(expectedConfirmationRevision) || (expectedConfirmationRevision as number) < 1)) return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
   if (expected !== undefined && (!Number.isSafeInteger(expected) || (expected as number) < 0)) {
     return inputError(c, { success: false, error: '確認した公開の世代が不正です' }, 400, ['expectedPublicationGeneration']);
   }
@@ -464,11 +466,11 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   // lease なしで畳むと、同じ group を公開中の実行の owner と期限を消してしまう。
   const unpublishOwner = `unpublish-${crypto.randomUUID()}`;
   const unpublishGeneration = await acquirePublishLease(
-    c.env.DB, groupId, unpublishOwner, new Date().toISOString(), undefined, expected as number | undefined,
+    c.env.DB, groupId, unpublishOwner, new Date().toISOString(), undefined, expected as number | undefined, expectedConfirmationRevision as number | undefined,
   );
   if (unpublishGeneration === null) {
     const current = await getRichMenuGroupById(c.env.DB, groupId);
-    return c.json({ success: false, error: '公開状態が変わったか、別の操作が進行中です。読み直してください。', data: current ? { publicationGeneration: current.publishing_generation, status: current.status } : null }, 409);
+    return c.json({ success: false, error: '公開状態が変わったか、別の操作が進行中です。読み直してください。', data: current ? { publicationGeneration: current.publishing_generation, confirmationRevision: current.confirmation_revision, status: current.status } : null }, 409);
   }
   const unpublishFence = { owner: unpublishOwner, generation: unpublishGeneration };
   // lease 取得前に読んだページは古い可能性があるため、取得後に読み直す。
@@ -508,11 +510,13 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   };
   try {
     // ページ数ぶんの削除で時間がかかる。外部呼び出しの直前ごとに実時刻で延ばす。
+    let guardedRevision = expectedConfirmationRevision === undefined ? undefined : (expectedConfirmationRevision as number) + 1;
     const heartbeat = async () => {
       const alive = await renewPublishLease(
-        c.env.DB, groupId, unpublishFence, new Date().toISOString(),
+        c.env.DB, groupId, unpublishFence, new Date().toISOString(), undefined, guardedRevision,
       );
       if (!alive) throw new PublishLeaseLostError();
+      if (guardedRevision !== undefined) guardedRevision += 1;
     };
     const result = await unpublishRichMenuGroup(groupInput, line, heartbeat);
     // false は失権。書けていないのに成功と返さない。
@@ -531,8 +535,9 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
     });
     await releasePublishLease(c.env.DB, groupId, unpublishFence);
     if (e instanceof PublishLeaseLostError) {
+      const current = await getRichMenuGroupById(c.env.DB, groupId);
       return c.json(
-        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' },
+        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。', data: current ? { publicationGeneration: current.publishing_generation, confirmationRevision: current.confirmation_revision, status: current.status } : null },
         409,
       );
     }
