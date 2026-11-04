@@ -57,7 +57,8 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).toContain("github.ref == 'refs/heads/codex/development'");
     expect(workflow).toContain('environment: staging');
     expect(workflow).toContain('apps/worker/wrangler.staging.toml');
-    expect(workflow).toContain('nen-line-stg-admin');
+    expect(workflow).toContain('STAGING_PAGES_PROJECT: nen-line-stg-admin-git');
+    expect(workflow).toContain('--branch codex/development');
     expect(workflow).not.toContain('apps/worker/wrangler.toml');
   });
 
