@@ -50,6 +50,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
     acting,
     decideTarget,
     setDecideTarget,
+    closeDecideTarget,
     error,
     setError,
     loadError,
@@ -754,8 +755,8 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
         cancelLabel="戻る"
         destructive={decideTarget === 'reject' || decideTarget === 'cancel' || decideTarget === 'no_show'}
         busy={acting}
-        onCancel={() => setDecideTarget(null)}
-        error={error || undefined} onSuccess={() => setDecideTarget(null)} onConfirm={() => decideTarget ? decide(decideTarget) : false}
+        onCancel={closeDecideTarget}
+        error={error || undefined} onSuccess={closeDecideTarget} onConfirm={() => decideTarget ? decide(decideTarget) : false}
       ><OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} /></ConfirmDialog>
     </div>
   )
