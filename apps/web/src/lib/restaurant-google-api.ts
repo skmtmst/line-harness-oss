@@ -348,4 +348,9 @@ export const restaurantGoogleApi = {
   // 第4段：パフォーマンス
   performance: (accountId: string, days: GooglePerformanceDays) =>
     fetchApi<GooglePerformanceData>(withAccount(`${base}/performance`, accountId, { days })),
+  syncPerformance: (accountId: string) =>
+    fetchApi<{ success: true; synced: number; skipped: number; failed: number; syncedAt: string }>(
+      withAccount(`${base}/performance/sync`, accountId),
+      { method: 'POST', body: '{}' },
+    ),
 }
