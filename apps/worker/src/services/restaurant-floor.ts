@@ -19,7 +19,7 @@ export async function saveRestaurantFloor(db:D1Database,f:RestaurantFloorWrite):
  // batch の後段は、この文で保存した版・値を再確認する。
  const result=await db.batch([
  db.prepare(`UPDATE rt_floors SET name=?,width=?,height=?,outline_json=?,fixtures_json=?,version=version+1
- WHERE id=? AND store_id=? AND version=? AND (SELECT COUNT(*) FROM rt_tables WHERE floor_id=rt_floors.id)=? AND (SELECT COUNT(*) FROM rt_tables WHERE floor_id=rt_floors.id AND store_id=? AND id IN(SELECT json_extract(value,'$.id') FROM json_each(?)))=?`)
+ WHERE id=? AND store_id=? AND archived_at IS NULL AND version=? AND (SELECT COUNT(*) FROM rt_tables WHERE floor_id=rt_floors.id)=? AND (SELECT COUNT(*) FROM rt_tables WHERE floor_id=rt_floors.id AND store_id=? AND id IN(SELECT json_extract(value,'$.id') FROM json_each(?)))=?`)
  .bind(f.name.trim(),f.width,f.height,JSON.stringify(f.outline),JSON.stringify(f.fixtures),f.id,f.storeId,f.expectedVersion,f.tables.length,f.storeId,JSON.stringify(f.tables),f.tables.length),
  db.prepare(`UPDATE rt_tables SET confirmation_revision=confirmation_revision+1, floor_id=?,floor_x=json_extract(p.value,'$.x'),floor_y=json_extract(p.value,'$.y'),
  width=json_extract(p.value,'$.width'),height=json_extract(p.value,'$.height'),shape=json_extract(p.value,'$.shape'),rotation=json_extract(p.value,'$.rotation'),updated_at=datetime('now')
@@ -30,7 +30,7 @@ export async function saveRestaurantFloor(db:D1Database,f:RestaurantFloorWrite):
 }
 
 export async function readRestaurantFloor(db:D1Database,id:string,storeId:string):Promise<RestaurantFloorWrite|null> {
- const row=await db.prepare('SELECT * FROM rt_floors WHERE id=? AND store_id=?').bind(id,storeId).first<Record<string,unknown>>();
+ const row=await db.prepare('SELECT * FROM rt_floors WHERE id=? AND store_id=? AND archived_at IS NULL').bind(id,storeId).first<Record<string,unknown>>();
  if(!row)return null;
  const tables=await db.prepare('SELECT * FROM rt_tables WHERE floor_id=? AND store_id=?').bind(id,storeId).all<Record<string,unknown>>();
  return {id,storeId,name:String(row.name),width:Number(row.width),height:Number(row.height),expectedVersion:Number(row.version),outline:JSON.parse(String(row.outline_json)),fixtures:JSON.parse(String(row.fixtures_json)),tables:tables.results.map(t=>({id:String(t.id),x:Number(t.floor_x),y:Number(t.floor_y),width:Number(t.width),height:Number(t.height),rotation:Number(t.rotation),shape:t.shape as RestaurantFloorWrite['tables'][number]['shape']}))};

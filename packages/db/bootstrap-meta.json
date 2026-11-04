@@ -667,11 +667,12 @@
     "752_restaurant_menu_media.sql",
     "753_restaurant_table_pen_layout.sql",
     "754_instagram_shared_within_tenant.sql",
-    "755_restaurant_store_group_member_version.sql",
+    "755_restaurant_floor_archive.sql",
     "756_confirmation_revisions.sql",
     "757_account_handover_moves.sql",
     "758_first_onboarding_times.sql",
-    "760_conversion_approval_revision.sql"
+    "760_conversion_approval_revision.sql",
+    "761_restaurant_store_group_member_version.sql"
   ],
-  "migrationCount": 672
+  "migrationCount": 673
 }
