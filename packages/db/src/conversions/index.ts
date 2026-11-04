@@ -83,6 +83,11 @@ export interface ConversionPointAccountScope {
   includeUnassigned: boolean;
 }
 
+function normalizePointTime(point: ConversionPoint): ConversionPoint {
+  return { ...point, created_at: storedTimestamp(point.created_at),
+    updated_at: point.updated_at ? storedTimestamp(point.updated_at) : point.updated_at };
+}
+
 export async function getConversionPoints(
   db: D1Database,
   scope?: ConversionPointAccountScope,
@@ -95,22 +100,23 @@ export async function getConversionPoints(
         ? 'WHERE line_account_id IS NULL'
         : 'WHERE 1 = 0';
   const statement = db.prepare(
-    `SELECT * FROM conversion_points ${accountWhere} ORDER BY created_at DESC`,
+    `SELECT * FROM conversion_points ${accountWhere} ORDER BY julianday(${storedTimestamp('created_at', 'sql')}) DESC`,
   );
   const result = scope?.allowedLineAccountIds.length
     ? await statement.bind(...(scope.allowedLineAccountIds.length ? sqlIdSet(scope.allowedLineAccountIds).binds : [])).all<ConversionPoint>()
     : await statement.all<ConversionPoint>();
-  return result.results;
+  return result.results.map(normalizePointTime);
 }
 
 export async function getConversionPointById(
   db: D1Database,
   id: string,
 ): Promise<ConversionPoint | null> {
-  return db
+  const point = await db
     .prepare(`SELECT * FROM conversion_points WHERE id = ?`)
     .bind(id)
     .first<ConversionPoint>();
+  return point ? normalizePointTime(point) : null;
 }
 
 export interface ConversionPointOptions {
@@ -351,7 +357,7 @@ export async function getUrlReachConversionPoints(
     )
     .bind(lineAccountId, DEFAULT_TENANT_ID, lineAccountId, DEFAULT_TENANT_ID)
     .all<ConversionPoint>();
-  return result.results.filter((point) => matchesUrlReachTarget(point.target_url, url));
+  return result.results.filter((point) => matchesUrlReachTarget(point.target_url, url)).map(normalizePointTime);
 }
 
 /**

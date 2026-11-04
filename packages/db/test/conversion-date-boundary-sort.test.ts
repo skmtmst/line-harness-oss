@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { getConversionEvents, getConversionReport } from '../src/conversions/index.js';
+import { getConversionEvents, getConversionPointById, getConversionPoints, getConversionReport } from '../src/conversions/index.js';
 import { listConversionDefinitions } from '../src/conversion-definitions/index.js';
 import { estimateWindowDedupCount } from '../src/conversion-definitions/preview.js';
 import { applyConversionTestSchema } from './conversion-test-schema.js';
@@ -33,6 +33,22 @@ function setup(): Database.Database {
 }
 
 describe('終了日の境界', () => {
+  it('成果地点の作成・更新日時を実時刻で表示して並べる', async () => {
+    const sqlite = setup();
+    sqlite.exec(`UPDATE conversion_points SET created_at='2026-10-02T01:00:00', updated_at='2026-10-02T01:00:00' WHERE id='point-low';
+      UPDATE conversion_points SET created_at='2026-10-01 17:00:00', updated_at='2026-10-01 17:00:00' WHERE id='point-high';`);
+    const db = asD1(sqlite);
+    const points = await getConversionPoints(db);
+    expect(points.slice(0, 2).map(({ id, created_at }) => [id, created_at])).toEqual([
+      ['point-high', '2026-10-01T17:00:00Z'], ['point-low', '2026-10-02T01:00:00+09:00'],
+    ]);
+    expect(await getConversionPointById(db, 'point-high')).toMatchObject({ updated_at: '2026-10-01T17:00:00Z' });
+    const definitions = await listConversionDefinitions(db, { scope, range, cursor: 0, limit: 20, sort: 'updated_desc' });
+    expect(definitions.items.slice(0, 2).map(({ id, updatedAt }) => [id, updatedAt])).toEqual([
+      ['point-high', '2026-10-01T17:00:00Z'], ['point-low', '2026-10-02T01:00:00+09:00'],
+    ]);
+    sqlite.close();
+  });
   it('重複判定で UTC・JST・時差付きの実時刻を比べる', () => {
     expect(estimateWindowDedupCount([
       { friend_id: 'f', created_at: '2026-09-14 15:00:00' },

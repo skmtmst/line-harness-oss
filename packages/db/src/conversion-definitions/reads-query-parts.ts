@@ -184,7 +184,8 @@ export function selectDefinitionsSql(): string {
                  cp.count_repeat, cp.attribution_days, cp.source_config_json,
                  cp.deduplication_mode, cp.deduplication_window_days, cp.value_mode,
                  cp.reversal_policy, cp.line_account_id, cp.status,
-                 cp.version, cp.stopped_at, cp.created_at, cp.updated_at,
+                 cp.version, cp.stopped_at, ${storedTimestamp('cp.created_at', 'sql')} AS created_at,
+                 ${storedTimestamp('cp.updated_at', 'sql')} AS updated_at,
                  cp.ingest_secret_encrypted, cp.ingest_disabled_at,
                  COALESCE(pm.recorded_count, 0) AS recorded_count,
                  COALESCE(pm.net_value, 0) AS net_value,
@@ -195,10 +196,10 @@ export function selectDefinitionsSql(): string {
 }
 
 export function orderBy(sort: ConversionDefinitionSort): string {
-  if (sort === 'value_desc') return 'cp.value DESC, cp.updated_at DESC, cp.id ASC';
+  if (sort === 'value_desc') return `cp.value DESC, julianday(${storedTimestamp('cp.updated_at', 'sql')}) DESC, cp.id ASC`;
   if (sort === 'name_asc') return 'cp.name ASC, cp.id ASC';
-  if (sort === 'updated_desc') return 'cp.updated_at DESC, cp.id ASC';
-  return 'recorded_count DESC, cp.updated_at DESC, cp.id ASC';
+  if (sort === 'updated_desc') return `julianday(${storedTimestamp('cp.updated_at', 'sql')}) DESC, cp.id ASC`;
+  return `recorded_count DESC, julianday(${storedTimestamp('cp.updated_at', 'sql')}) DESC, cp.id ASC`;
 }
 
 export async function cancellationMetrics(db: D1Database, from: string, to: string, pointIds: string[]): Promise<Map<string, CancellationMetric>> {

@@ -1,4 +1,4 @@
-import type { AdEventMapping,SaveAdEventMappingRequest } from '@line-crm/shared';
+import { storedTimestamp, type AdEventMapping, type SaveAdEventMappingRequest } from '@line-crm/shared';
 import { dbTableExists,jstNow } from './utils.js';
 import { getActiveAdPlatforms,readPublicAdPlatformConfig,enqueueAdConversionOutbox } from './ad-platforms.js';
 import { selectAdClickForPlatform } from './entry-routes.js';
@@ -20,7 +20,7 @@ export async function listAdEventMappings(db:D1Database,accountId:string):Promis
     FROM conversion_points cp JOIN line_accounts la ON la.id = ?
     LEFT JOIN ad_event_mappings m ON m.conversion_point_id = cp.id AND m.line_account_id = la.id
     WHERE (cp.line_account_id = la.id OR cp.line_account_id IS NULL)
-    AND COALESCE(cp.tenant_id,'default') = COALESCE(la.tenant_id,'default') ORDER BY cp.created_at,cp.id`)
+    AND COALESCE(cp.tenant_id,'default') = COALESCE(la.tenant_id,'default') ORDER BY julianday(${storedTimestamp('cp.created_at', 'sql')}),cp.id`)
     .bind(accountId).all<{id:string;name:string;event_type:string;provider:'meta'|'google'|null;mode:AdEventMapping['mode']|null;event_name:string|null;google_action_id:string|null;version:number|null}>();
   const points=new Map<string,typeof rows.results>();for(const row of rows.results){const list=points.get(row.id)??[];list.push(row);points.set(row.id,list)}
   return [...points.values()].flatMap(rows=>(['google','meta'] as const).map(provider=>{

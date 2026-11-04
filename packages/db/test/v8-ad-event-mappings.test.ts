@@ -13,6 +13,14 @@ function setup(){
  raw.prepare(`INSERT INTO ref_tracking(id,ref_code,friend_id,line_account_id,fbclid,gclid,created_at,ad_conversion_consent_at) VALUES('r','ad','f','a','fb','gc',?,?)`).run(now,now);
  return{raw,db};
 }
+it('広告連携の地点一覧を作成時刻で並べる',async()=>{
+ const{raw,db}=setup();
+ try {
+  raw.exec(`UPDATE conversion_points SET created_at='2026-10-01 17:00:00' WHERE id='p';
+    INSERT INTO conversion_points(id,name,event_type,line_account_id,created_at) VALUES('earlier','Earlier','purchase','a','2026-10-02T01:00:00')`);
+  expect((await listAdEventMappings(db,'a')).map(m=>m.pointId)).toEqual(['earlier','earlier','p','p']);
+ } finally { raw.close(); }
+});
 it('lists automatic names and protects scope and stale versions',async()=>{
  const{db}=setup();expect(await listAdEventMappings(db,'a')).toEqual(expect.arrayContaining([expect.objectContaining({pointId:'p',provider:'meta',eventName:'Purchase',version:0})]));
  expect((await listAdEventMappings(db,'a')).some(m=>m.pointId==='other')).toBe(false);
