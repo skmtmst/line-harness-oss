@@ -254,7 +254,9 @@ export default function Select({
       else setOpen(true)
       return
     }
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && open) {
+      event.preventDefault()
+      event.stopPropagation()
       setOpen(false)
     }
   }

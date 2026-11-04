@@ -1,4 +1,4 @@
-import { validRestaurantCoursesSql } from './forms/course-guard.js';
+import { validRestaurantCoursesSql } from './forms/index.js';
 import type { HqTemplateVersion } from './hq-template-version-types.js';
 export type { HqTemplateVersion } from './hq-template-version-types.js';
 import type { HqTemplateArchiveStatus } from '@line-crm/shared';

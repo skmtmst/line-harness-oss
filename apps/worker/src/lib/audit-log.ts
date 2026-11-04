@@ -175,6 +175,7 @@ export type AuditAction =
   | 'restaurant.google.disconnect'
   | 'restaurant.google.review.reply'
   | 'restaurant.google.change.send'
+  | 'restaurant.google.hours.save'
   | 'restaurant.google.post.publish'
   | 'restaurant.google.post.instagram_retry'
   | 'restaurant.google.post.remove'
