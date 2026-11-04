@@ -166,7 +166,7 @@ export function totalRetentionActions(result: GoogleRetentionResult): number {
  * 残すのは rt_google_write_log（自分たちの送信履歴。before_text は下で消す）と
  * rt_google_connections の行（status='disconnected' の記録）だけ。
  */
-export async function deleteGoogleContentForStore(db: D1Database, storeId: string): Promise<void> {
+export function deleteGoogleContentStatements(db: D1Database, storeId: string): D1PreparedStatement[] {
   const statements = [
     'DELETE FROM rt_google_reviews WHERE store_id = ?',
     'DELETE FROM rt_google_profiles WHERE store_id = ?',
@@ -183,7 +183,9 @@ export async function deleteGoogleContentForStore(db: D1Database, storeId: strin
     // 送信履歴の行は残す。Google由来の送信前スナップショットだけ消す。
     'UPDATE rt_google_write_log SET before_text = NULL WHERE store_id = ?',
   ];
-  for (const sql of statements) {
-    await db.prepare(sql).bind(storeId).run();
-  }
+  return statements.map((sql) => db.prepare(sql).bind(storeId));
+}
+
+export async function deleteGoogleContentForStore(db: D1Database, storeId: string): Promise<void> {
+  for (const statement of deleteGoogleContentStatements(db, storeId)) await statement.run();
 }

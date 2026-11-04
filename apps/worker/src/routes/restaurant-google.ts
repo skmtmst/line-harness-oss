@@ -16,7 +16,7 @@ import { googleBusinessEnabled } from '../lib/environment-features.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
-import { deleteGoogleContentForStore } from '../services/google-business-retention.js';
+import { deleteGoogleContentForStore, deleteGoogleContentStatements } from '../services/google-business-retention.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import {
   GOOGLE_BUSINESS_REQUIRED_SCOPES,
@@ -794,10 +794,18 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const connection = await connectionFor(c, store.id);
-  if (!connection || connection.status !== 'pending_location') return fail(c, 409, '店舗の選択待ちではありません');
+  if (!connection || connection.status !== 'pending_location') return fail(c, 409, '店舗の選択待ちではありません', { current: publicConnection(connection) });
   const body = await c.req
-    .json<{ locationName?: string; confirmSwitch?: boolean }>()
-    .catch(() => ({}) as { locationName?: string; confirmSwitch?: boolean });
+    .json<{ locationName?: string; confirmSwitch?: boolean; expectedConnectionId?: unknown; expectedConfirmationRevision?: unknown }>()
+    .catch(() => ({} as { locationName?: string; confirmSwitch?: boolean; expectedConnectionId?: unknown; expectedConfirmationRevision?: unknown }));
+  if (body.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(body.expectedConfirmationRevision) || (body.expectedConfirmationRevision as number) < 1)) return fail(c, 400, '確認した版が不正です');
+  if (body.expectedConnectionId !== undefined && (typeof body.expectedConnectionId !== 'string' || !body.expectedConnectionId)) return fail(c, 400, '確認した接続先が不正です');
+  const guarded = body.expectedConnectionId !== undefined || body.expectedConfirmationRevision !== undefined;
+  if (guarded && (body.expectedConnectionId === undefined || body.expectedConfirmationRevision === undefined)) return fail(c, 400, '確認した接続先と版が必要です');
+  if ((body.expectedConnectionId !== undefined && body.expectedConnectionId !== connection.id)
+    || (body.expectedConfirmationRevision !== undefined && body.expectedConfirmationRevision !== connection.confirmation_revision)) {
+    return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(connection) });
+  }
   const locationName = body.locationName?.trim();
   if (!locationName) return fail(c, 400, 'locationName が必要です', {}, ["locationName"]);
   // 以前つないでいた店舗が残っている状態で別の店舗を選ぶのは「店舗の切り替え」。
@@ -824,7 +832,7 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
     return googleErrorResponse(c, error);
   }
   if (!selectedLocation) return fail(c, 409, '選択した店舗をGoogleで確認できません', { code: 'location_mismatch' });
-  if (switching) {
+  if (switching && !guarded) {
     // 取り込み済みのものは全部「前の店舗」の中身。新しい店舗の画面に混ざらないよう先に消す。
     // 操作の記録（rt_google_write_log）は誰がいつ切り替えたかを追えるように残す。
     await db.batch([
@@ -835,19 +843,40 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
       db.prepare('DELETE FROM rt_google_metrics_daily WHERE store_id = ?').bind(store.id),
     ]);
   }
-  await db
-    .prepare(
+  const update = db.prepare(
       switching
         ? // 件数・評価・最終同期も前の店舗のものなので空に戻し、新しい店舗で取り直させる。
           `UPDATE rt_google_connections
              SET confirmation_revision = confirmation_revision + 1, location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ?,
                  average_rating = NULL, total_review_count = NULL, last_synced_at = NULL, last_metrics_synced_at = NULL, last_sync_error = NULL
-             WHERE store_id = ?`
-        : `UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1, location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?`,
+             WHERE store_id = ?${guarded ? " AND id = ? AND confirmation_revision = ? AND status = 'pending_location'" : ''}`
+        : `UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1, location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?${guarded ? " AND id = ? AND confirmation_revision = ? AND status = 'pending_location'" : ''}`,
     )
-    .bind(candidate.location_name, selectedLocation.title, selectedLocation.mapsUri, nowIso(), nowIso(), store.id)
-    .run();
-  await db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
+    .bind(candidate.location_name, selectedLocation.title, selectedLocation.mapsUri, nowIso(), nowIso(), store.id,
+      ...(guarded ? [connection.id, connection.confirmation_revision] : []));
+  if (guarded) {
+    try {
+      await db.batch([
+        db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM rt_google_connections WHERE store_id = ? AND id = ? AND confirmation_revision = ? AND status = 'pending_location')
+          AND EXISTS(SELECT 1 FROM rt_google_location_candidates WHERE store_id = ? AND location_name = ?) THEN '{}' ELSE 'CONNECTION_CHANGED' END)`)
+          .bind(store.id, connection.id, connection.confirmation_revision, store.id, candidate.location_name),
+        update,
+        ...(switching ? ['rt_google_reviews', 'rt_google_changes', 'rt_google_profiles', 'rt_google_posts', 'rt_google_metrics_daily']
+          .map((table) => db.prepare(`DELETE FROM ${table} WHERE store_id = ?`).bind(store.id)) : []),
+        db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id),
+      ]);
+    } catch (error) {
+      const latest = await connectionFor(c, store.id);
+      const stillCandidate = await db.prepare('SELECT 1 FROM rt_google_location_candidates WHERE store_id = ? AND location_name = ?').bind(store.id, candidate.location_name).first();
+      if (!latest || latest.id !== connection.id || latest.confirmation_revision !== connection.confirmation_revision || latest.status !== 'pending_location' || !stillCandidate) {
+        return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(latest) });
+      }
+      throw error;
+    }
+  } else {
+    await update.run();
+    await db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
+  }
   await writeLog(c, store.id, {
     kind: switching ? 'reconnect' : 'connect',
     targetName: candidate.location_name,
@@ -861,10 +890,34 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
 restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectionManager, inputJsonBoundary({"confirmed":["boolean"]}), async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
-  const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });
+  const body = await c.req.json<{ confirmed?: boolean; expectedConnectionId?: unknown; expectedConfirmationRevision?: unknown }>().catch(() => ({} as { confirmed?: boolean; expectedConnectionId?: unknown; expectedConfirmationRevision?: unknown }));
   if (body.confirmed !== true) return fail(c, 400, '確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
   const connection = await connectionFor(c, store.id);
-  if (!connection || connection.status === 'disconnected') return fail(c, 409, '接続されていません');
+  if (!connection || connection.status === 'disconnected') return fail(c, 409, '接続されていません', { current: publicConnection(connection) });
+  if (body.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(body.expectedConfirmationRevision) || (body.expectedConfirmationRevision as number) < 1)) return fail(c, 400, '確認した版が不正です');
+  if (body.expectedConnectionId !== undefined && (typeof body.expectedConnectionId !== 'string' || !body.expectedConnectionId)) return fail(c, 400, '確認した接続先が不正です');
+  const db = dbFor(c.env, store.id);
+  const guarded = body.expectedConfirmationRevision !== undefined || body.expectedConnectionId !== undefined;
+  if (guarded && (body.expectedConnectionId === undefined || body.expectedConfirmationRevision === undefined)) return fail(c, 400, '確認した接続先と版が必要です');
+  let claimedRevision: number | null = null;
+  if (guarded) {
+    if ((body.expectedConnectionId !== undefined && body.expectedConnectionId !== connection.id)
+      || (body.expectedConfirmationRevision !== undefined && body.expectedConfirmationRevision !== connection.confirmation_revision)) {
+      return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(connection) });
+    }
+    const claim = await db.prepare(`UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1
+      WHERE store_id = ? AND (? IS NULL OR id = ?) AND (? IS NULL OR confirmation_revision = ?) AND status <> 'disconnected'
+      RETURNING confirmation_revision`)
+      .bind(store.id, body.expectedConnectionId ?? null, body.expectedConnectionId ?? null,
+        body.expectedConfirmationRevision ?? null, body.expectedConfirmationRevision ?? null)
+      .first<{ confirmation_revision: number }>();
+    if (!claim) return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(await connectionFor(c, store.id)) });
+    claimedRevision = claim.confirmation_revision;
+    const latest = await connectionFor(c, store.id);
+    if (!latest || latest.id !== connection.id || latest.confirmation_revision !== claimedRevision) {
+      return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(latest) });
+    }
+  }
   let revoked = false;
   try {
     if (connection.refresh_token_enc) {
@@ -879,20 +932,33 @@ restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectio
   // Googleアカウントのメール・店舗名まで消す。
   // 残すのは rt_google_write_log の操作記録（誰がいつ何を送ったか。送信前の
   // スナップショットは消す）と、解除済みという接続行そのもの。
-  const db = dbFor(c.env, store.id);
-  await db
-    .prepare(
+  const clear = db.prepare(
       `UPDATE rt_google_connections
        SET confirmation_revision = confirmation_revision + 1, refresh_token_enc = NULL, access_token_enc = NULL, access_token_expires_at = NULL,
            google_account_email = NULL, location_name = NULL, location_title = NULL, location_maps_url = NULL,
            average_rating = NULL, total_review_count = NULL,
            last_synced_at = NULL, last_metrics_synced_at = NULL, last_sync_error = NULL,
            status = 'disconnected', disconnected_at = ?, updated_at = ?
-       WHERE store_id = ?`,
+       WHERE store_id = ?${guarded ? ' AND id = ? AND confirmation_revision = ?' : ''}`,
     )
-    .bind(nowIso(), nowIso(), store.id)
-    .run();
-  await deleteGoogleContentForStore(db, store.id);
+    .bind(nowIso(), nowIso(), store.id, ...(guarded ? [connection.id, claimedRevision] : []));
+  if (guarded) {
+    try {
+      await db.batch([
+        db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM rt_google_connections WHERE store_id = ? AND id = ? AND confirmation_revision = ?) THEN '{}' ELSE 'CONNECTION_CHANGED' END)`)
+          .bind(store.id, connection.id, claimedRevision),
+        clear,
+        ...deleteGoogleContentStatements(db, store.id),
+      ]);
+    } catch (error) {
+      const latest = await connectionFor(c, store.id);
+      if (!latest || latest.id !== connection.id || latest.confirmation_revision !== claimedRevision) return fail(c, 409, '接続が変わりました。読み直してください', { current: publicConnection(latest) });
+      throw error;
+    }
+  } else {
+    await clear.run();
+    await deleteGoogleContentForStore(db, store.id);
+  }
   await writeLog(c, store.id, { kind: 'disconnect', targetName: connection.location_name, result: revoked ? 'accepted' : 'unknown', error: revoked ? null : 'revoke_failed' });
   auditLog(c, 'restaurant.google.disconnect', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
   return c.json({ success: true, revoked, connection: publicConnection(await connectionFor(c, store.id)) });

@@ -885,6 +885,8 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requi
     if (value !== undefined && (!Number.isSafeInteger(value) || (value as number) < 1)) return fail(c, 400, '確認した版が不正です');
   }
   if (body.expectedConnectionId !== undefined && (typeof body.expectedConnectionId !== 'string' || !body.expectedConnectionId)) return fail(c, 400, '確認した接続先が不正です');
+  const guarded = body.expectedPostRevision !== undefined || body.expectedConnectionRevision !== undefined || body.expectedConnectionId !== undefined;
+  if (guarded && (body.expectedPostRevision === undefined || body.expectedConnectionRevision === undefined || body.expectedConnectionId === undefined)) return fail(c, 400, '確認した投稿と接続先の版が必要です');
 
   let options: RequestOptions;
   try {
@@ -900,7 +902,12 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requi
     ]);
     return { post: post ? publicPost(post) : null, connection: selected };
   };
-  if (body.expectedPostRevision !== undefined || body.expectedConnectionRevision !== undefined || body.expectedConnectionId !== undefined) {
+  if (guarded) {
+    if ((body.expectedPostRevision !== undefined && body.expectedPostRevision !== row.confirmation_revision)
+      || (body.expectedConnectionId !== undefined && body.expectedConnectionId !== connection.id)
+      || (body.expectedConnectionRevision !== undefined && body.expectedConnectionRevision !== connection.confirmation_revision)) {
+      return c.json({ success: false, error: '対象が変わりました。読み直してください', current: await current() }, 409);
+    }
     const claimed = await db.prepare(`UPDATE rt_google_posts SET confirmation_revision = confirmation_revision + 1
     WHERE id = ? AND store_id = ? AND (? IS NULL OR confirmation_revision = ?)
       AND EXISTS (SELECT 1 FROM rt_google_connections WHERE store_id = ? AND (? IS NULL OR id = ?)

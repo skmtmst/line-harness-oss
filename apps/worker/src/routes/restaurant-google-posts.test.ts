@@ -820,9 +820,9 @@ describe('削除', () => {
     const id = draft.json.post!.id;
     await publish(id);
     const current = testDb.raw.prepare('SELECT confirmation_revision AS revision FROM rt_google_posts WHERE id=?').get(id) as { revision: number };
-    const connection = testDb.raw.prepare("SELECT confirmation_revision AS revision FROM rt_google_connections WHERE store_id='store-shibuya'").get() as { revision: number };
+    const connection = testDb.raw.prepare("SELECT id, confirmation_revision AS revision FROM rt_google_connections WHERE store_id='store-shibuya'").get() as { id: string; revision: number };
     testDb.raw.prepare('UPDATE rt_google_posts SET confirmation_revision=confirmation_revision+1 WHERE id=?').run(id);
-    const response = await call(`/api/restaurant-test/google/posts/${id}/remove`, { body: { confirmed: true, expectedPostRevision: current.revision, expectedConnectionRevision: connection.revision } });
+    const response = await call(`/api/restaurant-test/google/posts/${id}/remove`, { body: { confirmed: true, expectedPostRevision: current.revision, expectedConnectionRevision: connection.revision, expectedConnectionId: connection.id } });
     expect(response.status).toBe(409);
     expect(googleCalls.some((entry) => entry.init?.method === 'DELETE')).toBe(false);
   });
