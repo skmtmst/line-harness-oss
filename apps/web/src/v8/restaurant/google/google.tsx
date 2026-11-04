@@ -5,7 +5,7 @@ export type { GoogleNav } from './navigation-types'
 import { useGooglePermission } from './use-google-permission'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
@@ -15,7 +15,7 @@ import ListState from '@/components/shared/list-state'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 import { Tabs } from '@/components/shared/tabs'
-import { restaurantGoogleApi, type GoogleConnectionData, type GoogleBusinessStore, type GooglePostKind } from '@/lib/restaurant-google-api'
+import { restaurantGoogleApi, type GoogleConnectionData, type GooglePostKind } from '@/lib/restaurant-google-api'
 import { BoundaryBanner, RestaurantPage } from '@/v8/restaurant/common-a/public/frame/index'
 import { errorMessage } from './format'
 import { ReviewDraft, ReviewsBoard } from './reviews'
@@ -27,14 +27,13 @@ import { HistoryScreen } from './profile-history'
 import { ProfileEditScreen } from './profile-edit'
 import { HoursEditor } from './profile-hours'
 import styles from './google.module.css'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 Googleビジネス（Pencil：口コミ ・返信を作る ・投稿 ・投稿を作る ・
  * パフォーマンス ・プロフィール ）。
  *
- * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール）
+ * 板の頭（題・説明）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール）
  * → タブの中身。受け付ける URL は今の画面と同じ（?tab=・?view=・?id=・?kind=・?google=）。
  * 営業時間・確認・履歴・編集も共通の V8 部品で出す。動きは BEHAVIOR.md。
  */
@@ -66,9 +65,8 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
-  const { selectedAccountId, setSelectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const [data, setData] = useState<GoogleConnectionData | null>(null)
-  const [stores, setStores] = useState<GoogleBusinessStore[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -79,7 +77,6 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     try {
       const connection = await restaurantGoogleApi.connection(selectedAccountId)
       setData(connection)
-      setStores(connection.stores ?? [{ id: connection.store.id, name: connection.store.name, line_account_id: connection.store.lineAccountId }])
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
       setData(null)
@@ -130,26 +127,6 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       : tab === 'performance' ? 'SrmVs'
         : tab === 'profile' ? 'JUTGz'
           : 'j0Wcg'
-
-  const currentStoreId = useMemo(() => stores.find((item) => item.line_account_id === selectedAccountId)?.id
-    ?? stores.find((item) => item.id === data?.store.id)?.id ?? '', [stores, selectedAccountId, data])
-
-  /* 86: 店の切り替えは［店舗：…］の選ぶ欄1つに統一。店が1つしか無い時は出さない。 */
-  const picker = stores.length > 1 ? (
-    <SaveErrorField names={["currentStoreId","selectedAccountId"]}><EntitySelect
-      aria-label="店舗"
-      noun="店舗"
-      value={currentStoreId}
-      onChange={(value) => {
-        const next = stores.find((item) => item.id === value)
-        if (next?.line_account_id && next.line_account_id !== selectedAccountId) {
-          const nextAccountId = next.line_account_id
-          requestUnsavedAction(() => setSelectedAccountId(nextAccountId))
-        }
-      }}
-      options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id, description: !item.line_account_id ? 'LINE公式アカウントが結び付いていません' : undefined }))}
-    /></SaveErrorField>
-  ) : null
 
   const body = (() => {
     if (accountLoading || loading) return <div className={styles.stateBox}><ListState kind="loading" title="Googleビジネスを読み込んでいます" /></div>
@@ -206,7 +183,6 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       boardId={boardId}
       title="Googleビジネス"
       description={draftOpen ? HELP_BASE : TAB_HELP[tab]}
-      picker={picker}
     >
       <div className={styles.noticeStack} data-google-notices>
         {!accountLoading && !loading && !error && Boolean(data) && known && !(tab === 'profile' ? canManage : canEdit)
