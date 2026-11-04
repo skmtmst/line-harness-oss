@@ -30,7 +30,7 @@ export default function Disclosure({
   hint?: ReactNode
   defaultOpen?: boolean
   size?: 'standard' | 'compact'
-  appearance?: 'card' | 'inset'
+  appearance?: 'card' | 'inset' | 'section'
   /** 選択中の欄を見出し左の緑印で示す。 */
   selected?: boolean
   className?: string

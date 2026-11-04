@@ -10,7 +10,7 @@ export const RESTAURANT_MENU_LAYOUT = [
   { id: 'results', label: '成果と分析', itemIds: ['affiliates', 'mileage', 'inflow', 'conversions', 'analytics'] },
   { id: 'automation', label: '自動化', itemIds: ['automations', 'webhooks'] },
   { id: 'specialized', label: '専用機能', itemIds: ['nen-members', 'nen-pets', 'nen-health', 'photo-review', 'nen-campaigns'] },
-  { id: 'settings', label: '設定', itemIds: ['getting-started', 'line-accounts', 'pools', 'staff', 'settings', 'emergency', 'ec-commerce'] },
+  { id: 'settings', label: '設定', itemIds: ['getting-started', 'pools', 'staff', 'settings', 'emergency', 'ec-commerce'] },
 ] as const;
 
 export const RESTAURANT_DEFAULT_OFF_FEATURES = [

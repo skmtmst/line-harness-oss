@@ -496,11 +496,9 @@ export function CancelReservationDialog({
       busy={busy}
       error={reviewRequired && onReload ? undefined : error || undefined}
       onCancel={onClose}
-      footer={
+      footer={reviewRequired && onReload ? undefined :
         <DialogActions>
-          {reviewRequired && onReload ? <>
-            <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
-          </> : <>
+          <>
             <Button type="button" variant="danger" onClick={() => { if (!reviewRequired && !target.current.invalid && target.current.key === key) onConfirm() }} disabled={busy || reviewRequired} busy={busy} busyLabel="取り消しています…">
               予約を取り消す
             </Button>
@@ -511,7 +509,7 @@ export function CancelReservationDialog({
               <ArrowLeft aria-hidden="true" />
               予約のまま残す
             </Button>
-          </>}
+          </>
         </DialogActions>
       }
     >

@@ -1,6 +1,6 @@
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { getFriendFieldsForScope } from './friend-fields.js';
-import { getTagsWithUsage } from './tags/usage-references.js';
+import { getTagsWithUsage } from './tags/index.js';
 
 /** 一覧と同じ所属の定義を数え、友だちへの登録数と混同しない。 */
 export async function getAttributeResourceUsage(db: D1Database, accountId: string) {

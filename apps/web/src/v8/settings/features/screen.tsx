@@ -26,6 +26,7 @@ import { groupEnabledCount, groupFeatureCount, itemIsEnabled, type FeatureGroup,
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { FEATURE_SETTINGS_CONFLICT_MESSAGE } from './feature-settings-view'
 import { groupSummary, shortUsageDate, useFeatureSettings, type FeatureUsage, type UsageCategory } from './use-feature-settings'
+import '@/components/shared/favorite-button-tokens.css'
 import styles from './screen.module.css'
 
 import { SaveErrorField } from '@/components/shared/save-form-errors'

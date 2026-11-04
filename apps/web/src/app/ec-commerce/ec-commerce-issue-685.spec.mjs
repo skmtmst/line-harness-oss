@@ -112,11 +112,12 @@ async function stubUnrelatedApis(page) {
  */
 async function openEc(page, waitFor = 'domcontentloaded') {
   await stubUnrelatedApis(page)
+  await page.route('**/api/dashboard/style*', (route) => route.fulfill({ json: { success: true, data: { style: 'ec', styleSelected: true } } }))
   await page.route('**/api/staff/me', (route) => route.fulfill({ json: {
     success: true, data: { id: 'owner-1', name: '管理者', role: 'owner', permissionKeys: [] },
   } }))
   await page.route('**/api/settings/features*', (route) => route.fulfill({ json: {
-    success: true, data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 },
+    success: true, data: { features: { ec_commerce: true }, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 },
   } }))
   await page.route('**/api/auth/session', (route) => route.fulfill({
     json: {
@@ -125,6 +126,7 @@ async function openEc(page, waitFor = 'domcontentloaded') {
       csrfToken: 'test-csrf',
     },
   }))
+  await page.route('**/api/line-accounts/*/follower-import', (route) => route.fulfill({ json: { success: true, data: { phase: 'complete' } } }))
   await page.route('**/api/line-accounts', (route) => route.fulfill({
     json: {
       success: true,
