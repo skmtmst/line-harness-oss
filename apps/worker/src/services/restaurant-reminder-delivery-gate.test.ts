@@ -10,6 +10,7 @@ import type { RestaurantEvent } from './restaurant-event-types.js';
 let t:SqliteD1;
 const now=new Date('2026-11-01T09:00:00Z');
 beforeEach(()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);
  t=createTestD1();t.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','a','店舗','t','s');
  INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','UID','友だち');
  INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','組織');
@@ -18,7 +19,7 @@ beforeEach(()=>{
  VALUES('r1','store','line','友だち','UID',2,'2026-11-01T10:00:00Z','2026-11-01T11:00:00Z','confirmed'),
  ('r2','store','line','友だち','UID',4,'2026-11-02T10:00:00Z','2026-11-02T11:00:00Z','confirmed');`);
 });
-afterEach(()=>t.raw.close());
+afterEach(()=>{t.raw.close();vi.useRealTimers()});
 async function configured(){
  const draft=await createReminderWithDraftVersion(t.db,{name:'前日',lineAccountId:'a',triggerType:'manual',deliveryMode:'time',
  stopConditions:{bookingCancelled:true,supportMarkCompleted:false,daysAfterTarget:null,friendBlocked:true},

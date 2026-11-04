@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { LineClient } from '@line-crm/line-sdk'
 import {
@@ -1051,6 +1051,8 @@ describe('監査の直し (R337・R339・R340・R341・R342・R344)', () => {
 })
 
 describe('Meet個別相談の送信の最終関係フェンス', () => {
+  beforeEach(() => { vi.useFakeTimers({toFake:['Date']}); vi.setSystemTime(new Date('2026-11-01T00:00:00Z')) })
+  afterEach(() => vi.useRealTimers())
   const NOW = new Date('2026-08-28T09:00:00.000Z')
   const TARGET = '2026-08-28T10:00:00.000Z'
 
