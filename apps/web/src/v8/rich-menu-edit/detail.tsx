@@ -310,10 +310,20 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       router.push('/rich-menus')
     } catch (caught) {
       if (!alive.current || generation !== scope.current.generation) return
+      if (caught instanceof ApiError && caught.status === 409) {
+        try {
+          const latest = await api.richMenuGroups.get(groupId)
+          if (!alive.current || generation !== scope.current.generation) return
+          const group = latest.success ? latest.data as unknown as Group : null
+          if (!group || group.status !== 'published' || !group.accountId || !Number.isSafeInteger(group.publicationGeneration) || !Number.isSafeInteger(group.confirmationRevision)) {
+            setUnpublishOpen(false); setUnpublishScope(null); await loadGroup(); return
+          }
+          setGroup(group)
+          setUnpublishScope({ groupId, accountId: group.accountId, generation, publicationGeneration: group.publicationGeneration!, confirmationRevision: group.confirmationRevision! })
+        } catch { if (alive.current && generation === scope.current.generation) { setUnpublishOpen(false); setUnpublishScope(null) } }
+      }
       const fieldFailure = saveErrors.capture(caught)
-
-      { if (!fieldFailure)
-      setDialogError(richMenuError(caught, 'unpublish')) }
+      if (!fieldFailure) setDialogError(richMenuError(caught, 'unpublish'))
     } finally {
       if (alive.current && generation === scope.current.generation) setUnpublishing(false)
     }

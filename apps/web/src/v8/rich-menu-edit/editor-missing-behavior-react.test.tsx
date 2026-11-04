@@ -145,6 +145,16 @@ describe('現役V8へ残す旧編集の動き', () => {
     await waitFor(() => expect(net.push).toHaveBeenCalledWith('/rich-menus'))
     expect(net.unpublish).toHaveBeenCalledTimes(2)
   })
+  it('取り下げが409なら最新の版を読み直す', async () => {
+    const { ApiError } = await import('@/lib/api')
+    const dialog = await openUnpublish()
+    net.get.mockResolvedValueOnce({ success: true, data: { ...group, publicationGeneration: 8, confirmationRevision: 9 } })
+    net.unpublish.mockRejectedValueOnce(new ApiError(409, 'changed'))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'LINEから取り下げる' }))
+    await waitFor(() => expect(net.get).toHaveBeenCalledTimes(2))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'LINEから取り下げる' }))
+    await waitFor(() => expect(net.unpublish).toHaveBeenLastCalledWith('g1', 8, 9))
+  })
   it('取り下げが完全に成功したら一覧へ戻る', async () => {
     const dialog = await openUnpublish()
     expect(net.unpublish).not.toHaveBeenCalled()

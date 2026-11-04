@@ -194,6 +194,22 @@ export function PostsBoard({ accountId, go, store, googleLocation, connection }:
       return true
     } catch (err) {
       setActionError(errorMessage(err, '削除できませんでした。'))
+      if (err instanceof ApiError && err.status === 409) {
+        const generation = scope.current.generation
+        try {
+          const [latestPosts, latestConnection] = await Promise.all([
+            restaurantGoogleApi.posts(accountId, { filter, kind, page, perPage }),
+            restaurantGoogleApi.connection(accountId),
+          ])
+          if (!alive.current || generation !== scope.current.generation) return false
+          const latest = latestConnection.connection?.id && Number.isSafeInteger(latestConnection.connection.confirmationRevision)
+            ? latestPosts.posts.find(item => item.id === confirmRemove.id && item.status === 'published') : undefined
+          setData(latestPosts)
+          setConfirmRemove(latest ?? null)
+          setRemoveScope(previous => previous && latest ? { ...previous, googleLocation: latestConnection.connection?.locationTitle,
+            connectionId: latestConnection.connection?.id, connectionRevision: latestConnection.connection?.confirmationRevision } : null)
+        } catch { if (alive.current && generation === scope.current.generation) setConfirmRemove(null) }
+      }
       return false
     } finally {
       setBusyId(null)

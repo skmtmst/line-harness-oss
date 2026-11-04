@@ -18,7 +18,7 @@ import { ChangeConfirmScreen } from './profile-confirm'
 const fixture = vi.hoisted(() => ({
   role: 'owner' as string | null,
   handlers: new Map<string, () => unknown>(),
-  posts: vi.fn(), syncPosts: vi.fn(), cancelPost: vi.fn(), removePost: vi.fn(), retryInstagram: vi.fn(),
+  connection: vi.fn(), posts: vi.fn(), syncPosts: vi.fn(), cancelPost: vi.fn(), removePost: vi.fn(), retryInstagram: vi.fn(),
   post: vi.fn(), publishPost: vi.fn(), createPost: vi.fn(), savePost: vi.fn(),
   listReviews: vi.fn(), syncReviews: vi.fn(), profile: vi.fn(), syncProfile: vi.fn(), proposeHours: vi.fn(),
   connectStart: vi.fn(), selectLocation: vi.fn(), disconnect: vi.fn(), change: vi.fn(), sendChange: vi.fn(), cancelChange: vi.fn(),
@@ -305,6 +305,21 @@ it('Google投稿の削除確認に対象アカウントと環境を表示する'
  expect(within(dialog).getByText('環境')).toBeTruthy()
  fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
  await waitFor(() => expect(fixture.removePost).toHaveBeenCalledWith('a', post.id, { expectedPostRevision: 3, expectedConnectionRevision: 5, expectedConnectionId: 'connection-1' }))
+})
+it('Google投稿の409後は投稿と接続の版を読み直す', async () => {
+ const { ApiError } = await import('@/lib/api')
+ fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published', confirmationRevision: 3 }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+ fixture.connection.mockResolvedValue({ ...connection(), connection: { ...connection().connection, id: 'connection-1', confirmationRevision: 6, locationTitle: '新しい店舗' } })
+ render(<PostsBoard accountId="a" go={vi.fn()} store={{ id: 's', name: '合成店' }} googleLocation="Google 合成店" connection={{ id: 'connection-1', confirmationRevision: 5 }} />)
+ fireEvent.click(await screen.findByRole('button', { name: '投稿「合成の投稿」の操作' }))
+ fireEvent.click(await screen.findByRole('menuitem', { name: 'Google から削除' }))
+ const dialog = screen.getByRole('alertdialog')
+ fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published', confirmationRevision: 4 }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+ fixture.removePost.mockRejectedValueOnce(new ApiError(409, 'changed'))
+ fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+ await within(dialog).findByText('新しい店舗')
+ fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度' }))
+ await waitFor(() => expect(fixture.removePost).toHaveBeenLastCalledWith('a', post.id, { expectedPostRevision: 4, expectedConnectionRevision: 6, expectedConnectionId: 'connection-1' }))
 })
 it('Google投稿の古い削除確定はアカウントを切り替えて戻しても送らない', async () => {
  fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published' }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })

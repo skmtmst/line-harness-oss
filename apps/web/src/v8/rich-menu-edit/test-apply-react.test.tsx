@@ -111,6 +111,16 @@ describe('現役V8の本人LINEでのテスト', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '自分のLINEにこのメニューを出しますか？' })).toBeNull())
     expect(screen.getByRole('button', { name: '元のメニューに戻す' })).toBeTruthy()
   })
+  it('409の後は新しい宛先と版を読み直す', async () => {
+    const { ApiError } = await import('@/lib/api')
+    const dialog = await confirmApply()
+    net.state = { ...net.state, confirmationRevision: 5, destinationToken: 'b'.repeat(64), destination: { staffName: '担当者B', lineUserIdMasked: 'U***9999' } }
+    net.apply.mockRejectedValueOnce(new ApiError(409, 'changed'))
+    fireEvent.click(within(dialog).getByRole('button', { name: '自分のLINEに適用する' }))
+    await within(dialog).findByText(/担当者BのLINE/)
+    fireEvent.click(within(dialog).getByRole('button', { name: '自分のLINEに適用する' }))
+    await waitFor(() => expect(net.apply).toHaveBeenLastCalledWith('g1', expect.any(String), { expectedConfirmationRevision: 5, expectedDestinationToken: 'b'.repeat(64) }))
+  })
   it('実行中の二重押下では適用要求を増やさない', async () => {
     let resolve!: (value: unknown) => void
     net.apply.mockReturnValue(new Promise(r => { resolve = r }))

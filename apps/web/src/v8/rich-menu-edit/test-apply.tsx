@@ -63,6 +63,7 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
       if (!res.success) throw new Error(res.error)
       setState(res.data)
       setLoadError('')
+      return res.data
     } catch (e) {
       if (request !== generation.current) return
       setLoadError(e instanceof ApiError && e.status === 403
@@ -107,6 +108,15 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
       await load()
     } catch (e) {
       if (request !== generation.current) return
+      if (e instanceof ApiError && e.status === 409) {
+        confirmation.current = null
+        const latest = await load()
+        if (!mounted.current) return
+        if (latest?.linked && typeof latest.confirmationRevision === 'number' && latest.destinationToken) {
+          confirmation.current = { expectedConfirmationRevision: latest.confirmationRevision, expectedDestinationToken: latest.destinationToken }
+          keyRef.current = crypto.randomUUID()
+        } else setConfirmKind(null)
+      }
       setActionError(e instanceof ApiError && e.status === 409
         ? 'ほかの操作と重なりました。状態を確認してから、もう一度お試しください。'
         : confirmKind === 'apply'

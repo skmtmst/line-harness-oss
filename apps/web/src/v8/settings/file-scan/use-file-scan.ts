@@ -140,11 +140,13 @@ export function useFileScan() {
       setTotal(list.data.total)
       /* 消す・戻すで今のページが空になったら1ページ目へ戻す（監査 R132）。 */
       if (list.data.items.length === 0 && page > 1) setPage(1)
+      const latestItems = list.data.items
       setConfig(configRes.data.config)
       setProvider(configRes.data.config?.externalProvider ?? '')
       setEndpoint(configRes.data.config?.externalEndpointUrl ?? '')
       setSecretRef(configRes.data.config?.externalSecretRef ?? '')
       setPhase('ready')
+      return latestItems
     } catch {
       if (current()) setPhase('error')
     }
@@ -216,6 +218,11 @@ export function useFileScan() {
       await load()
     } catch (caught) {
       if (!current()) return
+      if (caught instanceof ApiError && caught.status === 409) {
+        const latest = await load()
+        if (!current()) return
+        setDeleteTarget(latest?.find(item => item.id === deleteTarget.id) ?? null)
+      }
       setDeleteError(caught instanceof ApiError && caught.status === 409
         ? 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
         : '消せませんでした。通信状態を確認して、もう一度お試しください。')

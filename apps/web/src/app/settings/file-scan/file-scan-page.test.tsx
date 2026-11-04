@@ -476,13 +476,14 @@ describe('ファイルの安全確認の設定画面', () => {
     })
     expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('LINEアカウント')
     expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('環境')
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf({ confirmationRevision: 8, filename: 'new.pdf' })], total: 1, limit: 50, offset: 0 } })
     confirmInDialog('削除する')
     const message = 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
     await waitFor(() => {
       expect(screen.getByText(message)).toBeTruthy()
     })
     expect(mocks.remove).toHaveBeenCalledWith('scan-1', 'acc-1', 7)
-    expect(screen.getByText('「invoice.pdf」を削除しますか？')).toBeTruthy()
+    expect(await screen.findByText('「new.pdf」を削除しますか？')).toBeTruthy()
     expect(container.querySelector('p[role="alert"]')).toBeNull()
   })
 
