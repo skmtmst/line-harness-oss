@@ -47,6 +47,7 @@ let root: Root
 beforeEach(() => {
   heldImpact.confirm = null
   clearFeatureSettingsCache()
+  fixture.role = 'owner'
   fixture.identity = 'ready'
   fixture.account = 'account-a'
   fixture.style = 'standard'
@@ -128,6 +129,15 @@ describe('★V8 機能設定の閲覧のみ', () => {
       expect(spy.mock.calls.filter(([input]) => String(input).includes('/api/settings/features/impact'))).toHaveLength(impactCalls)
       expect(spy.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
     } finally { spy.mockRestore() }
+  })
+  it('権限がない人の星は無効として共通の表示対象になる', async () => {
+    fixture.style = 'restaurant'
+    fixture.role = 'viewer'
+    await act(async () => { root.render(<FeatureSettingsScreen />) })
+    await flush()
+    const star = within(host).getByRole('button', { name: '予約台帳をお気に入りに入れる' }) as HTMLButtonElement
+    expect(star.disabled).toBe(true)
+    expect(star.parentElement?.hasAttribute('data-disabled')).toBe(true)
   })
   it('飲食店の機能行で星を選ぶと黄色の状態になり、保存対象になる', async () => {
     fixture.style = 'restaurant'
