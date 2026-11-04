@@ -105,6 +105,7 @@ export interface StoreContext {
 
 export interface ConnectionRow {
   id: string;
+  confirmation_revision: number;
   store_id: string;
   line_account_id: string | null;
   google_account_email: string | null;
@@ -309,6 +310,8 @@ export async function connectionFor(c: Context<Env>, storeId: string): Promise<C
 export function publicConnection(row: ConnectionRow | null) {
   if (!row) return { status: 'disconnected' as ConnectionStatus };
   return {
+    id: row.id,
+    confirmationRevision: row.confirmation_revision,
     status: row.status,
     googleAccountEmail: row.google_account_email,
     locationName: row.location_name,
@@ -346,7 +349,7 @@ function publicReview(row: ReviewRow) {
 
 export async function setConnectionStatusForEnv(env: Env['Bindings'], storeId: string, status: ConnectionStatus, error?: string | null): Promise<void> {
   await dbFor(env, storeId)
-    .prepare(`UPDATE rt_google_connections SET status = ?, last_sync_error = COALESCE(?, last_sync_error), updated_at = ? WHERE store_id = ?`)
+    .prepare(`UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1, status = ?, last_sync_error = COALESCE(?, last_sync_error), updated_at = ? WHERE store_id = ?`)
     .bind(status, error ?? null, nowIso(), storeId)
     .run();
 }
@@ -404,7 +407,7 @@ export async function accessTokenForConnection(env: Env['Bindings'], connection:
     await dbFor(env, connection.store_id)
       .prepare(
         `UPDATE rt_google_connections
-         SET access_token_enc = ?, access_token_expires_at = ?, refresh_token_enc = ?, updated_at = ?
+         SET confirmation_revision = confirmation_revision + 1, access_token_enc = ?, access_token_expires_at = ?, refresh_token_enc = ?, updated_at = ?
          WHERE store_id = ?`,
       )
       .bind(
@@ -459,7 +462,7 @@ export async function requireConnectedStore(c: Context<Env>): Promise<{ store: S
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const connection = await connectionFor(c, store.id);
   if (!connection || connection.status === 'disconnected' || connection.status === 'pending_location' || !connection.location_name) {
-    return fail(c, 409, 'Googleアカウントが接続されていません', { code: 'not_connected' });
+    return fail(c, 409, 'Googleアカウントが接続されていません', { code: 'not_connected', current: { connection: publicConnection(connection) } });
   }
   return { store, connection };
 }
@@ -683,7 +686,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
         await db
           .prepare(
             `UPDATE rt_google_connections
-             SET google_account_email = ?, refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?,
+             SET confirmation_revision = confirmation_revision + 1, google_account_email = ?, refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?,
                  status = 'pending_location', connected_by_staff_id = ?, disconnected_at = NULL,
                  last_sync_error = NULL, updated_at = ?
              WHERE store_id = ?`,
@@ -704,7 +707,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
       await db
         .prepare(
           `UPDATE rt_google_connections
-           SET google_account_email = ?, location_title = ?, location_maps_url = COALESCE(?, location_maps_url),
+           SET confirmation_revision = confirmation_revision + 1, google_account_email = ?, location_title = ?, location_maps_url = COALESCE(?, location_maps_url),
                refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?,
                status = 'connected', connected_by_staff_id = ?, connected_at = ?, disconnected_at = NULL,
                last_sync_error = NULL, updated_at = ?
@@ -732,6 +735,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
             refresh_token_enc, access_token_enc, access_token_expires_at, status, connected_by_staff_id, connected_at, disconnected_at, last_sync_error, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
          ON CONFLICT(store_id) DO UPDATE SET
+           confirmation_revision = rt_google_connections.confirmation_revision + 1,
            line_account_id = excluded.line_account_id,
            google_account_email = excluded.google_account_email,
            location_name = excluded.location_name,
@@ -836,10 +840,10 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
       switching
         ? // 件数・評価・最終同期も前の店舗のものなので空に戻し、新しい店舗で取り直させる。
           `UPDATE rt_google_connections
-             SET location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ?,
+             SET confirmation_revision = confirmation_revision + 1, location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ?,
                  average_rating = NULL, total_review_count = NULL, last_synced_at = NULL, last_metrics_synced_at = NULL, last_sync_error = NULL
              WHERE store_id = ?`
-        : `UPDATE rt_google_connections SET location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?`,
+        : `UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1, location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?`,
     )
     .bind(candidate.location_name, selectedLocation.title, selectedLocation.mapsUri, nowIso(), nowIso(), store.id)
     .run();
@@ -879,7 +883,7 @@ restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectio
   await db
     .prepare(
       `UPDATE rt_google_connections
-       SET refresh_token_enc = NULL, access_token_enc = NULL, access_token_expires_at = NULL,
+       SET confirmation_revision = confirmation_revision + 1, refresh_token_enc = NULL, access_token_enc = NULL, access_token_expires_at = NULL,
            google_account_email = NULL, location_name = NULL, location_title = NULL, location_maps_url = NULL,
            average_rating = NULL, total_review_count = NULL,
            last_synced_at = NULL, last_metrics_synced_at = NULL, last_sync_error = NULL,
@@ -903,7 +907,7 @@ export async function recordReviewSyncResult(
   await dbFor(env, storeId)
     .prepare(
       `UPDATE rt_google_connections
-       SET last_synced_at = ?, last_sync_error = ?, average_rating = COALESCE(?, average_rating),
+       SET confirmation_revision = confirmation_revision + 1, last_synced_at = ?, last_sync_error = ?, average_rating = COALESCE(?, average_rating),
            total_review_count = COALESCE(?, total_review_count), status = 'connected', updated_at = ?
        WHERE store_id = ?`,
     )

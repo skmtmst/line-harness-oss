@@ -123,7 +123,7 @@ export async function purgeExpiredGoogleContent(
   const redactedPostState = await changedRows(
     db,
     `UPDATE rt_google_posts
-        SET google_state = NULL, search_url = NULL, google_create_time = NULL, google_update_time = NULL
+        SET confirmation_revision = confirmation_revision + 1, google_state = NULL, search_url = NULL, google_create_time = NULL, google_update_time = NULL
       WHERE origin = 'admin' AND updated_at < ?
         AND (google_state IS NOT NULL OR search_url IS NOT NULL
              OR google_create_time IS NOT NULL OR google_update_time IS NOT NULL)`,
@@ -178,7 +178,7 @@ export async function deleteGoogleContentForStore(db: D1Database, storeId: strin
     // 自分たちが作った投稿の記録は残すが、Googleが返した状態の写しは消す。
     // google_post_name は「どの投稿を送ったか」という自分たちの記録なので残す。
     `UPDATE rt_google_posts
-        SET google_state = NULL, search_url = NULL, google_create_time = NULL, google_update_time = NULL
+        SET confirmation_revision = confirmation_revision + 1, google_state = NULL, search_url = NULL, google_create_time = NULL, google_update_time = NULL
       WHERE store_id = ? AND origin = 'admin'`,
     // 送信履歴の行は残す。Google由来の送信前スナップショットだけ消す。
     'UPDATE rt_google_write_log SET before_text = NULL WHERE store_id = ?',
