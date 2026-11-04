@@ -35,7 +35,7 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   /** 内側の線で寸法を保つカード（inset）・薄い面（muted）・NEN の設定の枠（bordered）。指定した面だけに適用。 */
   /** 選んだカードの枠と面。指定したカードだけ共通の選択色にする。 */
   selected?: boolean
-  surface?: 'standard' | 'inset' | 'muted' | 'bordered' | 'danger'
+  surface?: 'standard' | 'inset' | 'muted' | 'bordered' | 'danger' | 'success'
 }
 
 /*

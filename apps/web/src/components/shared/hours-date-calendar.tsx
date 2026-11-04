@@ -25,12 +25,12 @@ export default function HoursDateCalendar({ month, onMonth, selected, onSelect, 
     <CalendarPeriod period={month}><div ref={ref} role="grid" aria-label={`${year}年${m}月`} className={styles.grid} data-detailed={Boolean(describe) || undefined}>
       <div role="row" className={styles.weekdays}>{['月','火','水','木','金','土','日'].map((d,i)=><span role="columnheader" data-weekend={i === 5 ? 'sat' : i === 6 ? 'sun' : undefined} key={d}>{d}</span>)}</div>
       {Array.from({length:count/7},(_,week)=><div role="row" className={styles.week} key={week}>{Array.from({length:7},(_,i)=>{const date=hoursDateAdd(start,week*7+i),outside=date.slice(0,7)!==month;return <div role="gridcell" aria-selected={selected.includes(date)} key={date} className={styles.cell} data-outside={outside || undefined}>
-        <button type="button" data-date={date} className={styles.day} aria-label={date} aria-pressed={selected.includes(date)} disabled={disabled || date<min || date>max} onClick={()=>onSelect(date)} onKeyDown={e=>key(e,date)}>{Number(date.slice(-2))}</button>{describe&&!outside?<span className={styles.detail}>{describe(date)}</span>:null}
+        <button type="button" data-part="calendar-day" data-date={date} className={styles.day} aria-label={date} aria-pressed={selected.includes(date)} disabled={disabled || date<min || date>max} onClick={()=>onSelect(date)} onKeyDown={e=>key(e,date)}>{Number(date.slice(-2))}</button>{describe&&!outside?<span className={styles.detail}>{describe(date)}</span>:null}
       </div>})}</div>)}
     </div></CalendarPeriod>
   </div>
 }
 
 export function WeekdayButtons({ labels, selected, onChange, disabled }: { labels: string[]; selected: number[]; onChange: (values: number[]) => void; disabled?: boolean }) {
- return <div className={styles.weekdayButtons} role="group" aria-label="曜日">{labels.map((label,i)=><button key={label} type="button" className={styles.weekdayChoice} aria-label={`${label}曜日`} aria-pressed={selected.includes(i)} disabled={disabled} onClick={()=>onChange(selected.includes(i)?selected.filter(n=>n!==i):[...selected,i].sort())}>{label}</button>)}</div>
+ return <div className={styles.weekdayButtons} role="group" aria-label="曜日">{labels.map((label,i)=><button key={label} type="button" data-part="weekday-choice" className={styles.weekdayChoice} aria-label={`${label}曜日`} aria-pressed={selected.includes(i)} disabled={disabled} onClick={()=>onChange(selected.includes(i)?selected.filter(n=>n!==i):[...selected,i].sort())}>{label}</button>)}</div>
 }

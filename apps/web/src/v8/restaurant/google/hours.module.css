@@ -50,3 +50,6 @@
 .serviceComparison{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:var(--space-16);}
 
 .dateChip{display:inline-flex;align-items:center;gap:var(--space-4);}
+
+.editorSections{display:flex;flex-direction:column;gap:var(--space-20);min-width:0;}
+.editorSections h3{margin:0;font-size:var(--polish-text-body);font-weight:600;}

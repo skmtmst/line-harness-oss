@@ -1157,3 +1157,5 @@
 - [Googleビジネスの店舗選択](release-log/unreleased/2076-masato-google-store-selector.md) — 反映履歴、確認 2026-11-04。
 
 - [営業時間のPen照合と操作確認](testing/google-hours-pen-qa.md) — 承認済み18画面と営業時間タブの検査。
+
+- [Googleビジネスの営業時間タブ](release-log/unreleased/2082-masato-google-hours.md) — 営業時間の設定と確認の反映履歴。
