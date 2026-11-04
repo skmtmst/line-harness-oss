@@ -194,6 +194,14 @@ it('Instagramログイン→暗号化保存→更新→新着同期→切断を�
     db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
   ).toEqual({ n: 0 });
 });
+it('接続確認で保存済みの誤った投稿先IDを正確なプロフィールIDへ戻す', async () => {
+  await connect();
+  db.raw.prepare("UPDATE instagram_connections SET page_id='21',instagram_id='21'").run();
+  expect((await req('/api/instagram/refresh', {})).status).toBe(200);
+  expect(db.raw.prepare('SELECT page_id,instagram_id FROM instagram_connections').get()).toEqual({
+    page_id: '20', instagram_id: '20',
+  });
+});
 it('同じ統括の2つのLINEアカウントへ同じInstagramを接続でき、別統括には共有しない', async () => {
   db.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a3','3','3','','','t1')");
   await connect();

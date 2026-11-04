@@ -404,8 +404,8 @@ instagram.post(
       cfg = ready(c),
       r = await connection(c, id);
     if (expired(r)) throw new InstagramError('meta_token_expired', 409);
-    // 期限を延ばすだけの口。Instagram は同じ合鍵を延長するので、つながっている相手も
-    // 許可の範囲も変わらない（Facebook ページの照合は無くなった）。
+    // Instagram は同じ合鍵を延長するので、つながっている相手と許可の範囲は変わらない。
+    // 投稿先IDは /me の正確な値で照合し、古い丸め済みIDだけ修復する。
     const long = await instagramRefreshToken(
       cfg,
       await decryptInstagramCredential(
@@ -413,6 +413,13 @@ instagram.post(
         cfg.encryptionKey,
       ),
     );
+    // 既に保存された丸め済みIDも、接続確認時に同じ合鍵の /me から修復する。
+    const profile = await instagramGraph<InstagramProfile>(cfg, 'me', long.token, {
+      fields: 'id,username',
+    });
+    const exactId = typeof profile.id === 'string' ? profile.id : '';
+    if (!/^\d{1,24}$/.test(exactId))
+      throw new InstagramError('instagram_business_account_required', 403);
     // 合鍵は1本だけなので、2つの列へ同じものを入れ直す。
     const token = await encryptInstagramCredential(
         long.token,
@@ -420,9 +427,11 @@ instagram.post(
       ),
       user = token;
     const saved = await c.env.DB.prepare(
-      'UPDATE instagram_connections SET page_token_encrypted=?,user_token_encrypted=?,expires_at=?,data_access_expires_at=?,scopes=?,refreshed_at=?,version=version+1 WHERE line_account_id=? AND version=?',
+      'UPDATE instagram_connections SET page_id=?,instagram_id=?,page_token_encrypted=?,user_token_encrypted=?,expires_at=?,data_access_expires_at=?,scopes=?,refreshed_at=?,version=version+1 WHERE line_account_id=? AND version=?',
     )
       .bind(
+        exactId,
+        exactId,
         token,
         user,
         long.expiresAt,
