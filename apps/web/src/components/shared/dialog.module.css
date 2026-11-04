@@ -572,3 +572,5 @@ html:root .panel[data-confirmation='compact'][data-design-layout='stacked'] > .f
 html:root .panel[data-title-content] .headerContent { align-items: stretch; }
 html:root .panel[data-title-content] .title { min-width: 0; }
 html:root .panel[data-title-content] .title > span:last-child { min-width: 0; flex: 1; }
+
+.actionNote { grid-column: 1 / -1; flex-basis: 100%; min-height: var(--space-24); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--space-20); text-align: center; }

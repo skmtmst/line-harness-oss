@@ -276,8 +276,7 @@ export default function QuickCreateV8({
       busy={saving}
       error={saveError || undefined}
       onCancel={onClose}
-      footer={(<div className={styles.actionFooter}>
-        <DialogActions align="center" leadingAction={<Button {...(!inputsDisabled ? { href: '/auto-replies/edit' } : { type: 'button', disabled: true })} variant="text" lockedReason={lockedReason}>
+      footer={(<DialogActions note={!saving && !inputsDisabled ? missingReason : undefined} align="center" leadingAction={<Button {...(!inputsDisabled ? { href: '/auto-replies/edit' } : { type: 'button', disabled: true })} variant="text" lockedReason={lockedReason}>
             <ListOrdered size={16} aria-hidden="true" />
             詳しく作るへ
           </Button>}>
@@ -302,9 +301,7 @@ export default function QuickCreateV8({
 
           {/* 左の「詳しく作るへ」と釣り合いを取り、キャンセル・保存を窓の真ん中に置く。 */}
 
-        </DialogActions>
-        <div className={styles.actionReason} role="status">{!saving && !inputsDisabled ? missingReason : undefined}</div>
-      </div>)}
+        </DialogActions>)}
     >
       <div className={styles.body}>
         <OperationTargetSummary accounts={[{ id: initialAccountId.current ?? '' }]} />

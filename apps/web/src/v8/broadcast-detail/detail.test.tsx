@@ -243,7 +243,7 @@ describe('V8 一斉配信の詳細', () => {
     const confirm = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === '予約を取り消す')!
     await act(async () => { confirm.click() })
     expect(dialog.textContent).toContain('送信が始まったため取り消せません')
-    const close = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === '閉じる')!
+    const close = dialog.querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')!
     await act(async () => close.click())
     expect(reload).toHaveBeenCalledTimes(1)
     cancel.mockRestore()

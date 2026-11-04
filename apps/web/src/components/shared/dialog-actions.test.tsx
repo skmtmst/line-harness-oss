@@ -28,3 +28,9 @@ it('実行の確かめの窓は取消と赤い実行を同じ組に残す', () =
   expect(screen.getByRole('button', { name: 'このまま削除' }).parentElement).toBe(container.querySelector('[data-dialog-actions]'))
   expect(container.querySelector('input')).toBeNull()
 })
+
+it('操作理由を共通の操作帯から読み上げ、保存の組と分ける', () => {
+  render(<DialogActions note="キーワードを入力してください"><Button disabled>保存</Button></DialogActions>)
+  expect(screen.getByRole('status').textContent).toBe('キーワードを入力してください')
+  expect((screen.getByRole('button', { name: '保存' }) as HTMLButtonElement).disabled).toBe(true)
+})

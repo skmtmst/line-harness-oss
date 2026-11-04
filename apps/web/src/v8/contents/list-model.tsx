@@ -90,3 +90,15 @@ export type MediaKpis = {
   unusedTotal: number | null
   archivedTotal: number | null
 }
+
+export function mediaDetailPath(id: string | null, accountId: string | null): string {
+  const url = new URL(window.location.href)
+  if (id) {
+    url.searchParams.set('id', id)
+    if (accountId) url.searchParams.set('mediaAccountId', accountId)
+  } else {
+    url.searchParams.delete('id')
+    url.searchParams.delete('mediaAccountId')
+  }
+  return `${url.pathname}${url.search}${url.hash}`
+}
