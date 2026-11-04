@@ -288,6 +288,8 @@
 /* 絵の窓の幅・上からの位置を画面が渡したとき（designWidth・designTop）。狭い画面では画面の幅まで。
    層（@layer components）の中に置くと、この層の外の「幅 560」に負けて効かない。必ずこの後ろに置く。 */
 :root .panel[data-design-width] { width: min(var(--dialog-design-width), 100%); }
+:root .panel[data-design-min-height] { min-height: min(var(--dialog-design-min-height), calc(100dvh - var(--dialog-design-top, 16px) - 16px)); }
+:root .panel[data-design-min-height] > .content { flex: 1; }
 :root .overlay[data-design-top] { align-items: flex-start; padding-top: var(--dialog-design-top); }
 :root .overlay[data-viewport-fit][data-design-top] {
   padding-top: clamp(var(--space-16), var(--dialog-design-top), calc(50dvh - var(--space-16)));

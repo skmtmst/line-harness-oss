@@ -1,5 +1,6 @@
 .columns{display:grid;grid-template-columns:1fr 1fr;gap:24px;color:#202124;font-size:13px}
 .col{min-width:0;display:flex;flex-direction:column;gap:16px}
+.col:nth-child(2){gap:20px}
 .col h3{font-size:15px;margin:0 0 2px;font-weight:700}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
 .two label,.block,.addBox label{display:flex;flex-direction:column;gap:7px;min-width:0}
@@ -28,9 +29,10 @@
 .switchRow input:checked{background:#00833f}
 .switchRow input:before{content:'';position:absolute;width:19px;height:19px;top:3px;left:3px;border-radius:50%;background:#fff;transition:transform .2s}
 .switchRow input:checked:before{transform:translateX(17px)}
-.preview{border-radius:9px;background:#f5f6f7;padding:14px;min-height:145px}
+.preview{border-radius:9px;background:#f5f6f7;padding:14px;min-height:145px;margin-top:35px}
 .preview strong{font-size:12px}.preview p{margin:5px 0 0;color:#65717d;font-size:11px}
-.previewCanvas{height:95px;display:flex;align-items:center;justify-content:center}
+.previewCanvas{height:75px;display:flex;align-items:center;justify-content:center}
+.preview .footnote{margin-top:2px}
 .previewTable{position:relative;width:110px;height:45px;border:1px solid #00833f;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;color:#00833f;font-size:11px;font-weight:700}
 .previewTable[data-shape=circle]{width:60px;height:60px;border-radius:50%}
 .previewTable[data-shape=long]{width:125px;height:43px}

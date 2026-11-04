@@ -333,7 +333,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         title={editing ? '卓を変更する' : '卓を作る'}
         actionsPlacement="footer"
         width={824}
+        exactWidth
+        minHeight={840}
         top={60}
+        headerHeight={64}
         busy={busy}
         designNode="ljShF"
         titleIcon={<Grid2X2 size={17} aria-hidden="true"/>}
