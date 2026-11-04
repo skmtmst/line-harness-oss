@@ -279,13 +279,13 @@ export const restaurantGoogleApi = {
     fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(withAccount(`${base}/connect/start`, accountId), { method: 'POST', body: '{}' }),
   // confirmSwitch は「前につないでいた店舗とは別の店舗に切り替える」確認を取れたときだけ true。
   // 付けずに別店舗を送ると、サーバーが code: 'switch_confirmation_required' で止める。
-  selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean) =>
+  selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean, expected?: { expectedConnectionId: string; expectedConfirmationRevision: number }) =>
     fetchApi<{ success: true; connection: GoogleConnection }>(withAccount(`${base}/connect/select-location`, accountId), {
       method: 'POST',
-      body: JSON.stringify(confirmSwitch ? { locationName, confirmSwitch: true } : { locationName }),
+      body: JSON.stringify(confirmSwitch ? { locationName, confirmSwitch: true, ...expected } : { locationName }),
     }),
-  disconnect: (accountId: string) =>
-    fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(withAccount(`${base}/disconnect`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
+  disconnect: (accountId: string, expected?: { expectedConnectionId: string; expectedConfirmationRevision: number }) =>
+    fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(withAccount(`${base}/disconnect`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true, ...expected }) }),
   syncReviews: (accountId: string) =>
     fetchApi<{ success: true; fetched: number; complete: boolean; averageRating: number | null; totalReviewCount: number | null; syncedAt: string }>(
       withAccount(`${base}/reviews/sync`, accountId),

@@ -1,7 +1,7 @@
 'use client'
 import { useGooglePermission } from './use-google-permission'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
@@ -23,6 +23,8 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  */
 
 export default function SettingsBoard({ accountId, data, onChanged }: { accountId: string; data: GoogleConnectionData; onChanged: () => void }) {
+  const scope = useRef({ accountId, generation: 0 })
+  if (scope.current.accountId !== accountId) scope.current = { accountId, generation: scope.current.generation + 1 }
   const saveErrors = useSaveFormErrors()
   const { allowed: canManage, lockedReason } = useGooglePermission('tenantWide', data.permissions.canManageConnection)
   const [busy, setBusy] = useState(false)
@@ -31,6 +33,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   const [locationSaved, setLocationSaved] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState('')
   const [confirmSwitch, setConfirmSwitch] = useState(false)
+  const [confirmation, setConfirmation] = useState<{ accountId: string; generation: number; connectionId?: string; revision?: number; locationName?: string; locationTitle?: string | null; previousTitle?: string | null } | null>(null)
   const { connection } = data
   // 店舗の選択待ちなのに前の店舗名が残っている＝別の店舗へ切り替えようとしている状態。
   const previousTitle = connection.status === 'pending_location' ? connection.locationTitle : null
@@ -53,11 +56,13 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   }
 
   const selectLocation = async (confirmedSwitch = false) => {
-    if (!canManage || busy || !selectedLocation) return
+    if (!canManage || busy || !selectedLocation || (confirmedSwitch && !confirmSwitch)) return
     setBusy(true)
     setActionError('')
     try {
-      await restaurantGoogleApi.selectLocation(accountId, selectedLocation, confirmedSwitch)
+      if (confirmedSwitch && (!confirmation || confirmation.accountId !== accountId || confirmation.generation !== scope.current.generation || !confirmation.connectionId || !Number.isSafeInteger(confirmation.revision) || !confirmation.locationName)) throw new Error('確認した版がありません')
+      await restaurantGoogleApi.selectLocation(accountId, confirmedSwitch ? confirmation!.locationName! : selectedLocation, confirmedSwitch,
+        confirmedSwitch ? { expectedConnectionId: confirmation!.connectionId!, expectedConfirmationRevision: confirmation!.revision! } : undefined)
       setLocationSaved(true)
       setConfirmSwitch(false)
       onChanged()
@@ -74,11 +79,12 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   }
 
   const disconnect = async () => {
-    if (!canManage || busy) return
+    if (!canManage || busy || !confirmDisconnect) return
     setBusy(true)
     setActionError('')
     try {
-      await restaurantGoogleApi.disconnect(accountId)
+      if (!confirmation || confirmation.accountId !== accountId || confirmation.generation !== scope.current.generation || !confirmation.connectionId || !Number.isSafeInteger(confirmation.revision)) throw new Error('確認した版がありません')
+      await restaurantGoogleApi.disconnect(accountId, { expectedConnectionId: confirmation.connectionId, expectedConfirmationRevision: confirmation.revision! })
       setConfirmDisconnect(false)
       onChanged()
       return true
@@ -138,24 +144,24 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
         {(
           <div className={styles.buttonRowEnd}>
-            <Button lockedReason={lockedReason} onClick={() => { if (canManage && !busy) { setActionError(''); setConfirmDisconnect(true) } }} disabled={!canManage || busy}>接続を取り消す</Button>
+            <Button lockedReason={lockedReason} onClick={() => { if (canManage && !busy) { setActionError(''); setConfirmation({ accountId, generation: scope.current.generation, connectionId: connection.id, revision: connection.confirmationRevision, locationTitle: connection.locationTitle }); setConfirmDisconnect(true) } }} disabled={!canManage || busy}>接続を取り消す</Button>
             <Button lockedReason={lockedReason} onClick={() => void startConnect()} disabled={!canManage || busy} busy={Boolean(busy)} busyLabel="処理中…">別のGoogleアカウントでやり直す</Button>
-            <Button lockedReason={lockedReason} variant="primary" onClick={() => { if (!canManage || busy) return; setActionError(''); if (switchingLocation) setConfirmSwitch(true); else void selectLocation() }} disabled={!canManage || busy || !selectedLocation} busy={Boolean(busy)} busyLabel="処理中…">
+            <Button lockedReason={lockedReason} variant="primary" onClick={() => { if (!canManage || busy) return; setActionError(''); if (switchingLocation) { setConfirmation({ accountId, generation: scope.current.generation, connectionId: connection.id, revision: connection.confirmationRevision, locationName: selectedLocation, locationTitle: data.candidates.find(candidate => candidate.locationName === selectedLocation)?.locationTitle, previousTitle }); setConfirmSwitch(true) } else void selectLocation() }} disabled={!canManage || busy || !selectedLocation} busy={Boolean(busy)} busyLabel="処理中…">
               {switchingLocation ? 'この店舗に切り替える' : 'この店舗を接続する'}
             </Button>
           </div>
         )}
-        <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason} open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} error={actionError || undefined} onSuccess={() => setConfirmDisconnect(false)} onConfirm={() => disconnect()} onCancel={() => setConfirmDisconnect(false)}><OperationTargetSummary accounts={[{ id: accountId }]} store={data.store} externalTarget={{ label: 'Googleの店舗', name: connection.locationTitle }} /></ConfirmDialog>
+        <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason} open={confirmDisconnect && confirmation?.generation === scope.current.generation} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} error={actionError || undefined} onSuccess={() => setConfirmDisconnect(false)} onConfirm={() => disconnect()} onCancel={() => setConfirmDisconnect(false)}><OperationTargetSummary accounts={[{ id: accountId }]} store={data.store} externalTarget={{ label: 'Googleの店舗', name: confirmation?.locationTitle }} /></ConfirmDialog>
         <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason}
-          open={confirmSwitch}
+          open={confirmSwitch && confirmation?.generation === scope.current.generation}
           title="接続する店舗を切り替えますか？"
-          description={`「${previousTitle ?? ''}」から「${data.candidates.find(candidate => candidate.locationName === selectedLocation)?.locationTitle ?? '確認できない店舗'}」へ切り替えます。これまでに取り込んだ口コミ・返信の下書き・プロフィール・投稿・数値は消え、戻せません。新しい店舗の分はこのあと取り込み直します。`}
+          description={`「${confirmation?.previousTitle ?? ''}」から「${confirmation?.locationTitle ?? '確認できない店舗'}」へ切り替えます。これまでに取り込んだ口コミ・返信の下書き・プロフィール・投稿・数値は消え、戻せません。新しい店舗の分はこのあと取り込み直します。`}
           confirmLabel="切り替える"
           destructive
           busy={busy}
           error={actionError || undefined} onSuccess={() => setConfirmSwitch(false)} onConfirm={() => selectLocation(true)}
           onCancel={() => setConfirmSwitch(false)}
-        ><OperationTargetSummary accounts={[{ id: accountId }]} store={data.store} externalTarget={{ label: '切り替え先のGoogleの店舗', name: data.candidates.find(candidate => candidate.locationName === selectedLocation)?.locationTitle }} /></ConfirmDialog>
+        ><OperationTargetSummary accounts={[{ id: accountId }]} store={data.store} externalTarget={{ label: '切り替え先のGoogleの店舗', name: confirmation?.locationTitle }} /></ConfirmDialog>
       </div></SaveErrorScope>
     )
   }
@@ -174,13 +180,13 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         </dl>
         {(
           <div className={styles.buttonRowEnd}>
-            <Button lockedReason={lockedReason} variant="danger-outline" onClick={() => { if (canManage && !busy) { setActionError(''); setConfirmDisconnect(true) } }} disabled={!canManage || busy}>接続を解除する</Button>
+            <Button lockedReason={lockedReason} variant="danger-outline" onClick={() => { if (canManage && !busy) { setActionError(''); setConfirmation({ accountId, generation: scope.current.generation, connectionId: connection.id, revision: connection.confirmationRevision, locationTitle: connection.locationTitle }); setConfirmDisconnect(true) } }} disabled={!canManage || busy}>接続を解除する</Button>
             <Button lockedReason={lockedReason} onClick={() => void startConnect()} disabled={!canManage || busy} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden className={styles.icon16} />つなぎ直す</Button>
           </div>
         )}
       </div>
       <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason}
-        open={confirmDisconnect}
+        open={confirmDisconnect && confirmation?.generation === scope.current.generation}
         title="Googleアカウントの接続を解除しますか？"
         description="解除すると、Google側の許可を取り消し、保存しているトークンと、Googleから取得した口コミ・プロフィール・指標・取り込んだ投稿を削除します。返信の下書きも消えます。だれがいつ何をGoogleへ送ったかの記録だけ残ります。この操作は取り消せません。もう一度使うには再接続が必要です。"
         confirmLabel="接続を解除する"
@@ -189,7 +195,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         error={actionError}
         onConfirm={() => disconnect()}
         onCancel={() => setConfirmDisconnect(false)}
-      ><OperationTargetSummary accounts={[{ id: accountId }]} store={data.store} externalTarget={{ label: 'Googleの店舗', name: connection.locationTitle }} /></ConfirmDialog>
+      ><OperationTargetSummary accounts={[{ id: accountId }]} store={data.store} externalTarget={{ label: 'Googleの店舗', name: confirmation?.locationTitle }} /></ConfirmDialog>
     </></SaveErrorScope>
   )
 }

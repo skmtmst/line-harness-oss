@@ -38,7 +38,7 @@ vi.mock('@/components/shared/button', async (original) => {
   } }
 })
 const connection = (status = 'connected') => ({
-  store: { id: 's', name: '合成店', lineAccountId: 'a' }, connection: { status, locationName: 'locations/a', locationTitle: '合成店' },
+  store: { id: 's', name: '合成店', lineAccountId: 'a' }, connection: { id: 'conn', confirmationRevision: 4, status, locationName: 'locations/a', locationTitle: '合成店' },
   candidates: [{ locationName: 'locations/b', locationTitle: '別の合成店' }],
   summary: { storedCount: 1, unrepliedCount: 1, attentionCount: 0, syncStale: true },
   permissions: { canManageConnection: true, canPublishReply: true }, oauthConfigured: true, writeEnabled: true,
@@ -185,6 +185,31 @@ it('Googleの接続先を変える前に元と移行先・LINE・店舗・環境
   expect(dialog.getByText('合成店', { exact: true })).toBeTruthy()
   expect(dialog.getByText('検証環境')).toBeTruthy()
   expect(fixture.selectLocation).not.toHaveBeenCalled()
+  fireEvent.click(dialog.getByRole('button', { name: '切り替える' }))
+  await waitFor(() => expect(fixture.selectLocation).toHaveBeenCalledWith('a', 'locations/b', true, { expectedConnectionId: 'conn', expectedConfirmationRevision: 4 }))
+})
+it('接続解除で確認した接続の版を送る', async () => {
+  render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '接続を解除する' }))
+  const dialog = within(await screen.findByRole('alertdialog'))
+  fireEvent.click(dialog.getByRole('button', { name: '接続を解除する' }))
+  await waitFor(() => expect(fixture.disconnect).toHaveBeenCalledWith('a', { expectedConnectionId: 'conn', expectedConfirmationRevision: 4 }))
+})
+it('選択待ちの接続取消でも確認した接続の版を送る', async () => {
+  render(<SettingsBoard accountId="a" data={connection('pending_location')} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '接続を取り消す' }))
+  const dialog = within(await screen.findByRole('alertdialog'))
+  fireEvent.click(dialog.getByRole('button', { name: '取り消す' }))
+  await waitFor(() => expect(fixture.disconnect).toHaveBeenCalledWith('a', { expectedConnectionId: 'conn', expectedConfirmationRevision: 4 }))
+})
+it('店舗を切り替えて戻しても前の接続確認を使えない', async () => {
+  const view = render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '接続を解除する' }))
+  await screen.findByRole('alertdialog')
+  view.rerender(<SettingsBoard accountId="b" data={connection()} onChanged={vi.fn()} />)
+  view.rerender(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(fixture.disconnect).not.toHaveBeenCalled()
 })
 it('編集の鍵を持つ担当者だけが機能を変えられ、管理者専用の操作は許可しない', () => {
   role('staff')
