@@ -1,4 +1,5 @@
 {
+  "inbox_response_samples": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"chats","columns":[{"column":"chat_id","parentColumn":"id"}]}]},
   "hq_store_response_samples": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"chats","columns":[{"column":"chat_id","parentColumn":"id"}]}]},
   "ai_answer_logs": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[]},
   "booking_groups": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
