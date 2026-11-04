@@ -153,12 +153,12 @@ export const webhooksMethods = {
         if (params?.limit) query.set('limit', String(params.limit))
         return fetchApi<ApiResponse<WebhookInteractionList>>(`/api/webhooks/interactions?${query}`)
       },
-      retry: (id: string, lineAccountId: string, options?: { confirmed?: boolean }) =>
+      retry: (id: string, lineAccountId: string, options?: { confirmed?: boolean; interactionRevision?: number; webhookRevision?: number }) =>
         // IDEA-26: 「届いたか分からない」失敗は、相手先で確かめた旨
         // (confirmed)を添えないと口側が409で止める。無条件の再送を防ぐ。
         fetchApi<ApiResponse<WebhookInteraction>>(
           `/api/webhooks/interactions/${id}/retry?lineAccountId=${encodeURIComponent(lineAccountId)}`,
-          { method: 'POST', body: JSON.stringify({ confirmed: options?.confirmed === true }) },
+          { method: 'POST', body: JSON.stringify({ confirmed: options?.confirmed === true, interactionRevision: options?.interactionRevision, webhookRevision: options?.webhookRevision }) },
         ),
       payload: (id: string, lineAccountId: string) =>
         // F-18: 伏せた本文。available が false のとき body は null。
