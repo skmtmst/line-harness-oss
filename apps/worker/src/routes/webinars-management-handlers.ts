@@ -6,7 +6,7 @@ import { getWebinarById, getWebinarBySlug, updateWebinar, getWebinarComments, ge
 
 import { parseScheduleRules, upcomingSessions } from '../features/webinars/webinar-schedule/index.js';
 import { sendWebinarNotificationTest } from '../features/webinars/webinar-notifications/index.js';
-import { webinarTestRecipientPreview, WebinarTestRecipientsChanged } from '../features/webinars/webinar-notifications.js';
+import { webinarTestRecipientPreview, WebinarTestRecipientsChanged } from '../features/webinars/webinar-notifications/index.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import type { Env } from '../worker-env.js';
 
