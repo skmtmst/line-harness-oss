@@ -502,6 +502,8 @@ jobs:
       - name: Test Admin except route-permission matrix
         run: pnpm --filter web exec vitest run --config vitest.config.ts --exclude src/components/view-permission-routes.test.tsx
       - name: Test route-permission matrix in isolation
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm --filter web exec vitest run --config vitest.config.ts src/components/view-permission-routes.test.tsx --maxWorkers=1
       # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
       # 専用の設定が無く、**どのワークフローからも一度も呼ばれていなかった**(#704)。
