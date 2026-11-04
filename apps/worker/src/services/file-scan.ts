@@ -21,6 +21,7 @@ export type FileScanSubjectKind =
 
 export interface FileScanRow {
   id: string;
+  confirmation_revision?: number;
   line_account_id: string;
   subject_kind: FileScanSubjectKind;
   subject_id: string;
@@ -378,7 +379,7 @@ export async function markFileScanClean(db: ScanDb, id: string): Promise<void> {
   const now = jstNow();
   await db.prepare(
     `UPDATE media_file_scans
-        SET status = 'clean', reason_code = NULL, reason_detail = NULL,
+        SET status = 'clean', confirmation_revision=confirmation_revision+1, reason_code = NULL, reason_detail = NULL,
             scanned_at = ?, next_retry_at = NULL, updated_at = ?
       WHERE id = ?`,
   ).bind(now, now, id).run();
@@ -390,7 +391,7 @@ export async function markFileScanRejected(
   const now = jstNow();
   await db.prepare(
     `UPDATE media_file_scans
-        SET status = 'rejected', reason_code = ?, reason_detail = ?,
+        SET status = 'rejected', confirmation_revision=confirmation_revision+1, reason_code = ?, reason_detail = ?,
             scanned_at = ?, next_retry_at = NULL, updated_at = ?
       WHERE id = ?`,
   ).bind(reasonCode, detail, now, now, id).run();
@@ -402,7 +403,7 @@ export async function markFileScanQuarantined(
   const now = jstNow();
   await db.prepare(
     `UPDATE media_file_scans
-        SET status = 'quarantined', reason_code = ?, reason_detail = ?,
+        SET status = 'quarantined', confirmation_revision=confirmation_revision+1, reason_code = ?, reason_detail = ?,
             scanned_at = ?, quarantined_at = ?, next_retry_at = NULL, updated_at = ?
       WHERE id = ? AND status != 'quarantined'`,
   ).bind(reasonCode, detail, now, now, now, id).run();
@@ -411,13 +412,13 @@ export async function markFileScanQuarantined(
 export async function markFileScanPendingRetry(db: ScanDb, id: string, attempts: number, maxAttempts?: number): Promise<FileScanStatus> {
   const now = jstNow();
   if (maxAttempts !== undefined && attempts + 1 >= maxAttempts) {
-    await db.prepare(`UPDATE media_file_scans SET attempts = ? WHERE id = ?`).bind(attempts + 1, id).run();
+    await db.prepare(`UPDATE media_file_scans SET attempts = ?, confirmation_revision=confirmation_revision+1 WHERE id = ?`).bind(attempts + 1, id).run();
     await markFileScanRejected(db, id, 'scan_attempts_exhausted', `検査を${maxAttempts}回試しても終わりませんでした`);
     return 'rejected';
   }
   await db.prepare(
     `UPDATE media_file_scans
-        SET status = 'pending', attempts = ?, next_retry_at = ?, updated_at = ?
+        SET status = 'pending', confirmation_revision=confirmation_revision+1, attempts = ?, next_retry_at = ?, updated_at = ?
       WHERE id = ?`,
   ).bind(attempts + 1, nextFileScanRetryAt(attempts, Date.now()), now, id).run();
   return 'pending';

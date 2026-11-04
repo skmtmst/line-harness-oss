@@ -46,6 +46,7 @@ function reasonLabel(code: string | null): string | null {
 function serializeScan(row: FileScanRow) {
   return {
     id: row.id,
+    confirmationRevision: row.confirmation_revision,
     lineAccountId: row.line_account_id,
     subjectKind: row.subject_kind,
     subjectId: row.subject_id,
@@ -318,7 +319,7 @@ fileScan.post('/api/file-scans/:id/retry', requireRole('owner', 'admin'), inputJ
   // 二重実行は行の状態で抑える。pending の再試行は時刻だけ前倒しする。
   const now = new Date().toISOString();
   await c.env.DB.prepare(
-    `UPDATE media_file_scans SET status = 'pending', next_retry_at = ?, updated_at = ? WHERE id = ?`,
+    `UPDATE media_file_scans SET status = 'pending', confirmation_revision=confirmation_revision+1, next_retry_at = ?, updated_at = ? WHERE id = ?`,
   ).bind(now, now, scan.id).run();
   await recordAuditEvent(c.env.DB, {
     lineAccountId: accountId,
@@ -335,31 +336,38 @@ fileScan.post('/api/file-scans/:id/retry', requireRole('owner', 'admin'), inputJ
 
 /** 誤りなので戻す。理由の記録は必須。quarantined だけ戻せる。 */
 fileScan.post('/api/file-scans/:id/release', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
-  const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ accountId?: unknown; reason?: unknown; expectedConfirmationRevision?: unknown }>().catch(() => null);
   const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
   const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
   if (!accountId || !reason) {
     return inputError(c, { success: false, error: 'accountId と理由が必要です' }, 400, ["accountId","reason"]);
   }
+  const expected = body?.expectedConfirmationRevision;
+  if (expected !== undefined && (!Number.isSafeInteger(expected) || Number(expected) < 1)) return c.json({ success: false, error: '確認した版が正しくありません' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   const scan = await c.env.DB.prepare(`SELECT * FROM media_file_scans WHERE id = ?`)
     .bind(c.req.param('id')).first<FileScanRow>();
   if (!scan || scan.line_account_id !== accountId) {
+    if (expected !== undefined) return c.json({ success: false, error: '検査の状態が変わりました。一覧を読み直してください', current: null }, 409);
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   if (isPrivateFormDocumentScan(scan)) return c.json({ success: false, error: '回答の書類は戻せません。別のファイルを選んでください' }, 409);
   if (scan.status !== 'quarantined') {
-    return c.json({ success: false, code: 'file_scan_not_quarantined', error: 'しまったファイルだけ戻せます' }, 409);
+    return c.json({ success: false, code: 'file_scan_not_quarantined', error: 'しまったファイルだけ戻せます', current: serializeScan(scan) }, 409);
   }
   const now = new Date().toISOString();
-  await c.env.DB.prepare(
+  const changed = await c.env.DB.prepare(
     `UPDATE media_file_scans
-        SET status = 'clean', released_at = ?, release_reason = ?,
+        SET status = 'clean', confirmation_revision=confirmation_revision+1, released_at = ?, release_reason = ?,
             released_by = ?, next_retry_at = NULL, updated_at = ?
-      WHERE id = ? AND status = 'quarantined'`,
-  ).bind(now, reason.slice(0, 500), c.get('staff')?.id ?? null, now, scan.id).run();
+      WHERE id = ? AND line_account_id = ? AND status = 'quarantined' AND (? IS NULL OR confirmation_revision = ?)`,
+  ).bind(now, reason.slice(0, 500), c.get('staff')?.id ?? null, now, scan.id, accountId, expected ?? null, expected ?? null).run();
+  if (expected !== undefined && !changed.meta.changes) {
+    const current = await c.env.DB.prepare('SELECT * FROM media_file_scans WHERE id=? AND line_account_id=?').bind(scan.id, accountId).first<FileScanRow>();
+    return c.json({ success: false, error: '検査の状態が変わりました。一覧を読み直してください', current: current ? serializeScan(current) : null }, 409);
+  }
   await recordAuditEvent(c.env.DB, {
     lineAccountId: accountId,
     category: 'business',

@@ -127,6 +127,38 @@ beforeEach(() => {
 });
 
 describe('ファイル検査の一覧', () => {
+  it('確認後に版が変わった隔離ファイルは戻さず 409', async () => {
+    const scan = insertScan();
+    testDb.raw.prepare('UPDATE media_file_scans SET confirmation_revision=2 WHERE id=?').run(scan.id);
+    const res = await post(`/api/file-scans/${scan.id}/release`, 'owner-1', { accountId: 'acc-1', reason: '誤検知', expectedConfirmationRevision: 1 });
+    expect(res.status).toBe(409);
+    expect((await res.json() as { current: { confirmationRevision: number } }).current.confirmationRevision).toBe(2);
+    expect(testDb.raw.prepare('SELECT status FROM media_file_scans WHERE id=?').get(scan.id)).toEqual({ status: 'quarantined' });
+    const current = await post(`/api/file-scans/${scan.id}/release`, 'owner-1', { accountId: 'acc-1', reason: '誤検知', expectedConfirmationRevision: 2 });
+    expect(current.status).toBe(200);
+    expect(testDb.raw.prepare('SELECT status,confirmation_revision FROM media_file_scans WHERE id=?').get(scan.id)).toEqual({ status: 'clean', confirmation_revision: 3 });
+  });
+  it('版なしの古い解除は従来どおり', async () => {
+    const scan = insertScan();
+    expect((await post(`/api/file-scans/${scan.id}/release`, 'owner-1', { accountId: 'acc-1', reason: '誤検知' })).status).toBe(200);
+  });
+  it('同じ確認で解除を二度実行しても一度だけ通る', async () => {
+    const scan = insertScan();
+    const body = { accountId: 'acc-1', reason: '誤検知', expectedConfirmationRevision: 1 };
+    const responses = await Promise.all([post(`/api/file-scans/${scan.id}/release`, 'owner-1', body), post(`/api/file-scans/${scan.id}/release`, 'owner-1', body)]);
+    expect(responses.map(res => res.status).sort()).toEqual([200, 409]);
+    expect(testDb.raw.prepare('SELECT status,confirmation_revision FROM media_file_scans WHERE id=?').get(scan.id)).toEqual({ status: 'clean', confirmation_revision: 2 });
+  });
+  it('消えた確認と他の統括の対象を区別せず 409、版なしの旧呼び出しは 404', async () => {
+    const scan = insertScan({ line_account_id: 'acc-2' });
+    const expected = { accountId: 'acc-1', reason: '誤検知', expectedConfirmationRevision: 1 };
+    for (const id of [scan.id, 'missing-scan']) {
+      const res = await post(`/api/file-scans/${id}/release`, 'owner-1', expected);
+      expect(res.status).toBe(409);
+      expect((await res.json() as { current: unknown }).current).toBeNull();
+    }
+    expect((await post('/api/file-scans/missing-scan/release', 'owner-1', { accountId: 'acc-1', reason: '誤検知' })).status).toBe(404);
+  });
   it('owner は見られるが staff は見られない', async () => {
     insertScan();
     const ownerRes = await get('/api/file-scans?accountId=acc-1', 'owner-1');
