@@ -35,6 +35,16 @@ beforeEach(() => {
   m.get.mockResolvedValue({ booking: null }); m.decide.mockResolvedValue({})
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
+it('予約の取消確認では戻る操作と取消の確定を区別する', async () => {
+  m.realView = true
+  const h = mountController()
+  await waitFor(() => expect(h.result.current.loading).toBe(false))
+  act(() => h.result.current.handleDecide('current', 'cancel'))
+  const dialog = await screen.findByRole('alertdialog')
+  const labels = Array.from(dialog.querySelectorAll('button')).map(button => button.textContent?.trim())
+  expect(labels).toEqual(expect.arrayContaining(['戻る', 'キャンセル']))
+  expect(labels.filter(label => label === 'キャンセル')).toHaveLength(1)
+})
 it.each([['consult', '相談者'], ['lesson', '会員']] as const)('%sでは検索と予約詳細も同じ業種の人の呼び方を使う', async (style, person) => {
   m.realView = true; m.style = style
   render(<Page />)

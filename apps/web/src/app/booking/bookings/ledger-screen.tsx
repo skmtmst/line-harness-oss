@@ -238,6 +238,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             : `LINEと結びついていないため、${words.person}への自動連絡はありません。取り消すには、もう一度状態を変える必要があります。`
         }
         confirmLabel={decideTarget ? actionLabel[decideTarget.action] : '実行する'}
+        cancelLabel="戻る"
         destructive={decideTarget?.action === 'reject' || decideTarget?.action === 'cancel' || decideTarget?.action === 'no_show'}
         busy={deciding}
         error={decideError || undefined}

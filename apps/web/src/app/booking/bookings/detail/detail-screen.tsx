@@ -751,6 +751,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
           ? decideDescription(decideTarget, isLineLinked, detail.notificationPolicy)
           : ''}
         confirmLabel={decideTarget ? ACTION_LABELS[decideTarget] : '実行する'}
+        cancelLabel="戻る"
         destructive={decideTarget === 'reject' || decideTarget === 'cancel' || decideTarget === 'no_show'}
         busy={acting}
         onCancel={() => setDecideTarget(null)}
