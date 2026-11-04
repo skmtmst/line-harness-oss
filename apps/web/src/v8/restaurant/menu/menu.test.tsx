@@ -85,7 +85,24 @@ describe('MJoJR メニュー管理', () => {
     expect(dialog.textContent).toContain('渋谷店')
     expect(dialog.textContent).toContain('環境')
     fireEvent.click(within(dialog).getByRole('button', { name: '停止する' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived', expectedVersion: 1 }))
+  })
+
+  it('停止の競合後は最新の内容で確認窓を作り直す', async () => {
+    const latest = snapshotOf()
+    latest.menuItems = latest.menuItems.map(item => item.id === 'm1' ? {...item, name:'更新後のコース', confirmation_revision:2} : item)
+    fixture.snapshot.mockResolvedValueOnce({data:snapshotOf()}).mockResolvedValue({data:latest})
+    fixture.updateMenu.mockRejectedValueOnce(new ApiError(409, '変更されました', 'menu_confirmation_conflict')).mockResolvedValue({success:true})
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    openMenu('秋の鹿肉コース')
+    fireEvent.click(screen.getByRole('menuitem', {name:'停止'}))
+    fireEvent.click(screen.getByRole('button', {name:'停止する'}))
+    expect(await screen.findByText('内容が変わりました。最新の内容を確認してください。')).toBeTruthy()
+    const dialog = screen.getByRole('dialog', {name:'このメニューを停止しますか？'})
+    expect(dialog.textContent).toContain('更新後のコース')
+    fireEvent.click(within(dialog).getByRole('button', {name:'停止する'}))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenLastCalledWith('account-1', 'm1', {status:'archived',expectedVersion:2}))
   })
 
   it('アカウント切替後の取得中は前の一覧から削除を開けない', async () => {
@@ -115,7 +132,24 @@ describe('MJoJR メニュー管理', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '削除' }))
     expect(screen.getByRole('dialog', { name: 'このメニューを削除しますか？' }).textContent).toContain('環境')
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
-    await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE' }))
+    await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE', body: JSON.stringify({ expectedVersion: 1 }) }))
+  })
+
+  it('削除の競合後は最新の名前と版で確認窓を開き直す', async () => {
+    const latest = snapshotOf()
+    latest.menuItems = latest.menuItems.map(item => item.id === 'm4' ? {...item, name:'変更後の下書き', confirmation_revision:2} : item)
+    fixture.snapshot.mockResolvedValueOnce({data:snapshotOf()}).mockResolvedValue({data:latest})
+    fetchApi.mockRejectedValueOnce(new ApiError(409, '変更されました', 'menu_confirmation_conflict')).mockResolvedValue({success:true})
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    openMenu('春の下書きコース')
+    fireEvent.click(screen.getByRole('menuitem', {name:'削除'}))
+    fireEvent.click(screen.getByRole('button', {name:'削除する'}))
+    expect(await screen.findByText('内容が変わりました。最新の内容を確認してください。')).toBeTruthy()
+    const dialog = screen.getByRole('dialog', {name:'このメニューを削除しますか？'})
+    expect(dialog.textContent).toContain('変更後の下書き')
+    fireEvent.click(within(dialog).getByRole('button', {name:'削除する'}))
+    await waitFor(() => expect(fetchApi).toHaveBeenLastCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', {method:'DELETE',body:JSON.stringify({expectedVersion:2})}))
   })
 
   it('参照中のメニューは確認窓に理由を出して残す', async () => {
@@ -236,6 +270,21 @@ describe('mauOC コースの編集ページ', () => {
     await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/restaurant-test/menu'))
   })
 
+  it('版が変わったら編集内容を最新に読み直し、再確認を求める', async () => {
+    nav.params = new URLSearchParams('id=m1')
+    const latest = snapshotOf()
+    latest.menuItems = latest.menuItems.map(item => item.id === 'm1' ? {...item, name:'別の担当が変更', confirmation_revision:2} : item)
+    fixture.snapshot.mockResolvedValueOnce({data:snapshotOf()}).mockResolvedValue({data:latest})
+    fixture.updateMenu.mockRejectedValueOnce(new ApiError(409, '変更されました', 'menu_confirmation_conflict'))
+    render(<MenuEditPage />)
+    fireEvent.change(await screen.findByLabelText('メニュー名'), {target:{value:'確認した変更'}})
+    fireEvent.click(screen.getByRole('button', {name:/保存する/}))
+    expect(await screen.findByText('メニューが変わりました。最新の内容を確認してやり直してください。')).toBeTruthy()
+    expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('別の担当が変更')
+    expect(fixture.updateMenu.mock.calls[0][2]).toEqual(expect.objectContaining({expectedVersion:1}))
+    expect(nav.push).not.toHaveBeenCalled()
+  })
+
   it('価格を変えると確認を経て、開始日時を添えて確定する', async () => {
     nav.params = new URLSearchParams('id=m1')
     render(<MenuEditPage />)
@@ -292,7 +341,7 @@ describe('mauOC コースの編集ページ', () => {
     expect(screen.getByRole('alertdialog', { name: /削除しますか/ }).textContent).toContain('環境')
     const confirm = await screen.findAllByRole('button', { name: '削除する' })
     fireEvent.click(confirm[confirm.length - 1])
-    await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE' }))
+    await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE', body: JSON.stringify({ expectedVersion: 1 }) }))
   })
 
   it('閲覧のみでも提供時間と所要時間を読み、保存はできない', async () => {
@@ -394,12 +443,12 @@ describe('価格変更の開始待ちとメニューの停止状態', () => {
     openMenu('秋の鹿肉コース')
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '停止する' }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived', expectedVersion: 1 }))
     await waitFor(() => expect(within(menuRow('秋の鹿肉コース')).getByText('停止中')).toBeTruthy())
     expect(scheduledCount()).toBe('0')
     fixture.snapshot.mockResolvedValue({ data })
     fireEvent.click(within(menuRow('秋の鹿肉コース')).getByRole('button', { name: '再開', exact: true }))
-    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'active' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'active', expectedVersion: 1 }))
     await waitFor(() => expect(within(menuRow('秋の鹿肉コース')).getByText('開始待ち')).toBeTruthy())
     expect(scheduledCount()).toBe('1')
   })
