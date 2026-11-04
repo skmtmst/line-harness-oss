@@ -1,6 +1,7 @@
 import { formMediaUsageStatements } from './media-references.js';
 import { sqlIdSet } from '../id-queries.js';
 import { jstDateString, toJstString } from '../utils.js';
+import { storedTimestamp } from '@line-crm/shared';
 import { type Form, type FormAccountScope, type FormWithStats, type FormUsedByAccount } from './types.js';
 
 
@@ -15,9 +16,9 @@ export const FORM_SUBMIT_CLAIM_STALE_MS = 60 * 1000;
 
 export async function getForms(db: D1Database): Promise<Form[]> {
   const result = await db
-    .prepare(`SELECT * FROM forms WHERE status = 'active' ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM forms WHERE status = 'active' ORDER BY julianday(${storedTimestamp('created_at', 'sql')}) DESC`)
     .all<Form>();
-  return result.results;
+  return result.results.map(row => ({ ...row, created_at: storedTimestamp(row.created_at), updated_at: storedTimestamp(row.updated_at) }));
 }
 
 export async function getFormsWithStats(
@@ -54,7 +55,7 @@ export async function getFormsWithStats(
   // Single query: forms + last submission + per-account submission counts.
   // json_group_array returns '[]' (not NULL) when subquery yields no rows.
   // P：試し（is_test=1）は最後の回答・利用先の数・今月の数のどこにも入れない。
-  // 今月は日本時間の1日から。DBの時刻はJST文字列なので頭7文字（YYYY-MM）で切る。
+  // 今月は日本時間の1日から。旧 UTC 値と現行の値を実時刻にそろえる。
   const monthPrefix = jstDateString().slice(0, 7);
   // 後処理の未完の目安と同じ「止まった」とみなす基準時刻(JST 文字列比較)。
   const staleBefore = toJstString(new Date(Date.now() - FORM_SUBMIT_CLAIM_STALE_MS));
@@ -62,13 +63,13 @@ export async function getFormsWithStats(
     .prepare(
       `SELECT
          f.*,
-         (SELECT MAX(created_at) FROM form_submissions WHERE form_id = f.id AND is_test = 0) AS last_submitted_at,
+         (SELECT ${storedTimestamp('fs.created_at', 'sql')} FROM form_submissions fs WHERE fs.form_id = f.id AND fs.is_test = 0 ORDER BY julianday(${storedTimestamp('fs.created_at', 'sql')}) DESC LIMIT 1) AS last_submitted_at,
          (SELECT COUNT(*) FROM form_submissions
            WHERE form_id = f.id AND is_test = 0
-             AND substr(created_at, 1, 7) = ?) AS monthly_submit_count,
+             AND strftime('%Y-%m', ${storedTimestamp('created_at', 'sql')}, '+9 hours') = ?) AS monthly_submit_count,
          (SELECT COUNT(DISTINCT friend_id) FROM form_opens
            WHERE form_id = f.id AND is_test = 0 AND friend_id IS NOT NULL
-             AND substr(opened_at, 1, 7) = ?) AS monthly_open_count,
+             AND strftime('%Y-%m', ${storedTimestamp('opened_at', 'sql')}, '+9 hours') = ?) AS monthly_open_count,
          (SELECT COUNT(*) FROM form_submit_claims c
            WHERE c.form_id = f.id AND c.submission_id IS NOT NULL
              AND (c.status = 'failed'
@@ -99,8 +100,8 @@ export async function getFormsWithStats(
        ${scopeClause}
        ORDER BY
          CASE WHEN last_submitted_at IS NULL THEN 1 ELSE 0 END,
-         last_submitted_at DESC,
-         f.created_at DESC`,
+         julianday(last_submitted_at) DESC,
+         julianday(${storedTimestamp('f.created_at', 'sql')}) DESC`,
     )
     .bind(monthPrefix, monthPrefix, staleBefore, ...(accountIds.length ? sqlIdSet(accountIds).binds : []), ...folderBinds)
     .all<Form & {
@@ -133,6 +134,8 @@ export async function getFormsWithStats(
     const monthlyOpens = Number(monthly_open_count ?? 0);
     return {
       ...rest,
+      created_at: storedTimestamp(rest.created_at),
+      updated_at: storedTimestamp(rest.updated_at),
       account_scope_review_required: Boolean(rest.account_scope_review_required),
       used_by_accounts: parsed.map((account) => ({ ...account, count: account.count ?? 0 })),
       monthly_submit_count: monthlySubmits,
@@ -184,7 +187,7 @@ export async function getFormById(
   options: { includeArchived?: boolean; published?: boolean } = {},
 ): Promise<Form | null> {
   if (options.published) {
-    return db
+    const row = await db
       .prepare(
         `SELECT f.id,
                 v.name, v.description, v.fields, v.layout,
@@ -204,8 +207,9 @@ export async function getFormById(
       )
       .bind(id)
       .first<Form>();
+    return row ? { ...row, created_at: storedTimestamp(row.created_at), updated_at: storedTimestamp(row.updated_at) } : null;
   }
-  return db
+  const row = await db
     .prepare(
       `SELECT f.*,
               (SELECT source_content_revision FROM form_versions v
@@ -216,4 +220,5 @@ export async function getFormById(
     )
     .bind(id)
     .first<Form>();
+  return row ? { ...row, created_at: storedTimestamp(row.created_at), updated_at: storedTimestamp(row.updated_at) } : null;
 }
