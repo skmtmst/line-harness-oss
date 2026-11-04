@@ -18,10 +18,6 @@
   min-width: 0;
 }
 
-.floorPanel {
-  flex: 1 1 0;
-}
-
 .mapGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -90,27 +86,6 @@
   justify-content: center;
 }
 
-.ruleBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-rs-stat-gap);
-  padding: var(--tpl-rs-panel-body-pad);
-}
-
-.ruleTitle {
-  margin: 0;
-  color: var(--color-accent-deep);
-  font-size: var(--text-caption);
-  font-weight: 700;
-  line-height: var(--tpl-rs-lh-12);
-}
-
-.ruleText {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-rs-lh-12);
-}
 
 /* 窓 */
 .pair {
@@ -153,8 +128,6 @@
 
 .pair > * { flex: 1 1 0; min-width: 0; }
 
-.rules { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--polish-space-card); }
-@media (max-width: 700px) { .rules { grid-template-columns: minmax(0,1fr); } }
 
 .detailRow{padding-inline: var(--tpl-rest1-restaurant-tables-tables-padding-inline-1);}.detailName{font-size: var(--tpl-rest1-restaurant-tables-tables-font-size-1);line-height: var(--tpl-rest1-restaurant-tables-tables-line-height-1);}.detailStatus{width: var(--tpl-rest1-restaurant-tables-tables-width-1);flex: var(--tpl-rest1-restaurant-tables-tables-flex-1);}
 

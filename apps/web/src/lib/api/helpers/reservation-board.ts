@@ -5,7 +5,7 @@ export const reservationBoardApi={
  page:(kind:'people'|'seats',accountId:string,from:string,to:string,offset=0,scopeId?:string)=>fetchApi<{success:true;data:ReservationBoardPage}>(account(`/api/${kind==='people'?'booking/admin':'restaurant-test'}/board?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&limit=500&offset=${offset}${kind==='seats'&&scopeId?'&storeId='+encodeURIComponent(scopeId):''}`,accountId)),
  move:(accountId:string,id:string,body:ReservationBoardMove)=>fetchApi(account(`/api/${body.kind==='people'?'booking/admin/board':'restaurant-test/reservations'}/${encodeURIComponent(id)}`,accountId),{method:'PATCH',body:JSON.stringify(body)}),
  floors:(accountId:string,storeId:string)=>fetchApi<{success:true;data:RestaurantFloor[]}>(account(`/api/restaurant-test/floors?storeId=${encodeURIComponent(storeId)}`,accountId)),
- createFloor:(accountId:string,storeId:string,name:string)=>fetchApi(account('/api/restaurant-test/floors',accountId),{method:'POST',body:JSON.stringify({storeId,name})}),
+ createFloor:(accountId:string,storeId:string,name:string,kind:'floor'|'area'='floor',parentFloorId?:string|null)=>fetchApi(account('/api/restaurant-test/floors',accountId),{method:'POST',body:JSON.stringify({storeId,name,kind,parentFloorId})}),
  saveFloor:(accountId:string,body:RestaurantFloorWrite)=>fetchApi(account(`/api/restaurant-test/floors/${encodeURIComponent(body.id)}`,accountId),{method:'PUT',body:JSON.stringify(body)}),
 }
 export async function allBoardPages(kind:'people'|'seats',accountId:string,from:string,to:string,scopeId?:string):Promise<ReservationBoardEntry[]> {

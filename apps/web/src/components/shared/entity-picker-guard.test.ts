@@ -24,4 +24,6 @@ test('共通候補ダイアログ内のカテゴリ絞り込みだけを例外�
   const code = `import Select from '@/components/shared/select'; const view = <Select aria-label="候補の絞り込み" options={categories.map(c => ({ value: c.id, label: c.label }))} />`
   expect(inspectPickers(code, 'components/shared/entity-picker.tsx')).toHaveLength(0)
   expect(inspectPickers(code, 'features/custom-picker.tsx')).toHaveLength(1)
+  const entityCode = `import Select from '@/components/shared/select'; const view = <Select aria-label="候補の絞り込み" options={tags.map(t => ({ value: t.id, label: t.name }))} />`
+  expect(inspectPickers(entityCode, 'components/shared/entity-picker.tsx')).toHaveLength(1)
 })

@@ -423,6 +423,8 @@ const EXEMPTIONS: Record<string, string> = {
     'app/restaurant-test/v8/menu.tsx と同じ画面の★V8版（MJoJR）。メニューの追加・変更は窓（NkmwU）の中で、閉じると戻る',
   'v8/restaurant/tables/tables.tsx':
     'app/restaurant-test/v8/tables.tsx と同じ画面の★V8版（BERxg）。卓の追加・変更は窓（gBrCz）の中で、閉じると戻る',
+  'components/shared/restaurant-table-pen-editor.tsx':
+    '卓の追加・変更フォーム本体。下書きは親の tables.tsx が持ち、親の窓を閉じると保存前の値を破棄する。',
   'v8/scenario-first-step/first-step.tsx':
     'app/scenarios/first-step-v8.tsx と同じ画面の★V8版（V6xAo）。番兵の要否は元の画面（first-step/page.tsx・未判定）と一緒に決めるため同じ扱い',
   'v8/nen-pets/editor.tsx':

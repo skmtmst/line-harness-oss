@@ -38,7 +38,7 @@ export async function readRestaurantFloor(db:D1Database,id:string,storeId:string
 export function tablePlacementFits(f:RestaurantFloorWrite,table:RestaurantFloorWrite['tables'][number]):boolean {
  return floorBoxInside(table,f.width,f.height)&&!f.tables.some(other=>other.id!==table.id&&floorBoxesOverlap(table,other));
 }
-export function firstTablePlacement(f:RestaurantFloorWrite):{x:number;y:number}|null {
- for(let y=0;y+64<=f.height;y+=74)for(let x=0;x+80<=f.width;x+=90)if(tablePlacementFits(f,{id:'new',x,y,width:80,height:64,rotation:0,shape:'rectangle'}))return {x,y};
+export function firstTablePlacement(f:RestaurantFloorWrite,width=80,height=64):{x:number;y:number}|null {
+ for(let y=20;y+height<=f.height;y+=10)for(let x=20;x+width<=f.width;x+=10)if(tablePlacementFits(f,{id:'new',x,y,width,height,rotation:0,shape:'rectangle'}))return {x,y};
  return null;
 }
