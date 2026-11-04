@@ -31,6 +31,8 @@ export type DialogProps = {
   designWidth?: number
   /** 承認済みの個別デザインで正確な幅が必要な窓だけ、段への丸めを省く。 */
   exactDesignWidth?: boolean
+  /** 承認済みの個別デザインで指定された高さ。短い画面では画面内に収める。 */
+  designMinHeight?: number
   /** の共通選択窓だけ640pxの幅を使う。 */
   widthPreset?: 'picker'
   /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。互換経路では効かない。 */
@@ -147,6 +149,7 @@ export default function Dialog({
   size = 'medium',
   designWidth,
   exactDesignWidth = false,
+  designMinHeight,
   widthPreset,
   designLayout,
   confirmFirst,
@@ -315,6 +318,7 @@ export default function Dialog({
       data-footer-divider={shortConfirmation || !footerDivider ? 'none' : undefined}
       data-footer-lead={footerLeadFlexible ? undefined : 'fixed'}
       data-design-width=""
+      data-design-min-height={designMinHeight ? '' : undefined}
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
       data-design-content-padding={designContentPadding ? '' : undefined}
@@ -322,6 +326,7 @@ export default function Dialog({
       style={({
         ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
         '--dialog-design-width': `${widthPreset === 'picker' ? 640 : exactDesignWidth && designWidth ? designWidth : dialogWidth((designWidth === 600 ? 560 : designWidth === 844 ? 720 : designWidth) ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,
+        ...(designMinHeight ? { '--dialog-design-min-height': `${designMinHeight}px` } : {}),
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),

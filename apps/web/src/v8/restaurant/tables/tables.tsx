@@ -1,5 +1,4 @@
 'use client'
-import { restaurantWalkIn } from '@/lib/terms'
 import { DetailPreview } from '@/components/shared/detail-content'
 
 import { tableRequirements as b244Requirements } from './requirements'
@@ -21,19 +20,15 @@ import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api/transport/errors'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect,useMemo, useRef, useState } from 'react'
-import { Check, Inbox, Plus } from 'lucide-react'
-import SeatTile from '@/components/shared/seat-tile'
+import { Grid2X2, Inbox, Plus } from 'lucide-react'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import { Field } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
-import EntitySelect from '@/components/shared/entity-select'
-import { TextField } from '@/components/shared/text-field'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
-import { RestaurantShell, Panel, QuietError, StatRow, Status, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { RestaurantShell, QuietError, StatRow, Status, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { pickMoveTarget, reservationLine } from './move'
 import styles from './tables.module.css'
@@ -41,7 +36,9 @@ import TableRowActions from './table-row-actions'
 import TablesAssignBoard from './assign'
 import { useSearchParams } from 'next/navigation'
 import { Scale, Map as MapIcon } from 'lucide-react'
-import NumberInput from '@/components/shared/number-field'
+import TablePenEditor, {type Draft} from '@/components/shared/restaurant-table-pen-editor'
+import RestaurantTableHeaderActions from '@/components/shared/restaurant-table-header-actions'
+import RestaurantFloorPanel from '@/components/shared/restaurant-floor-panel'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
@@ -62,22 +59,11 @@ const SEAT_TYPE_LABEL: Record<string, string> = {
   counter: 'カウンター',
   private_room: '個室',
   terrace: 'テラス',
+  horigotatsu:'掘りごたつ',zashiki:'座敷',
 }
-
-const SEAT_TYPE_OPTIONS = [
-  { value: 'table', label: 'テーブル' },
-  { value: 'counter', label: 'カウンター' },
-  { value: 'private_room', label: '個室' },
-  { value: 'terrace', label: 'テラス' },
-]
 
 function seatTypeLabel(value: string): string {
   return SEAT_TYPE_LABEL[value] ?? value
-}
-
-type Draft = {
-  code: string; label: string; seatType: string; minCapacity: string; maxCapacity: string
-  floorX: string; floorY: string; joinGroup: string;floorId:string
 }
 
 type MoveMode = 'move' | 'unassign'
@@ -100,20 +86,16 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const canEdit = canManageRole(role)
   const canEditRef = useRef(canEdit); canEditRef.current = canEdit
   const rows = useMemo(() => (store ? data.tables.filter((row) => row.store_id === store.id) : data.tables), [data.tables, store])
-  const placed = useMemo(
-    () => [...rows].sort((a, b) => a.floor_y - b.floor_y || a.floor_x - b.floor_x || a.code.localeCompare(b.code)),
-    [rows],
-  )
   const [asideExpanded, setAsideExpanded] = useState(false)
-  const [dragId, setDragId] = useState('')
   const [selectedId, setSelectedId] = useState('')
+  const [duplicateRequest,setDuplicateRequest]=useState(0)
+  const [statusFilter,setStatusFilter]=useState<'all'|'active'|'suspended'>('all')
   /* 窓：'new' は追加、卓の id は変更。 */
   const [editor, setEditor] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof Draft, string>>>({})
   const [editorError, setEditorError] = useState('')
   const editorRef = useRef<HTMLFormElement>(null)
-  const [showPlacement, setShowPlacement] = useState(false)
   const [deleteId, setDeleteId] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [stopId, setStopId] = useState('')
@@ -122,6 +104,8 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const deleteTicket = useRef<object | null>(null)
   const stopTicket = useRef<object | null>(null)
   const [stopError, setStopError] = useState('')
+  const [stopStale, setStopStale] = useState(false)
+  const [pendingStop, setPendingStop] = useState<{ id: string; scope: typeof renderedScope; before: typeof tableDefinition } | null>(null)
   const [stopProgress, setStopProgress] = useState('')
   const stopProgressRef = useRef(false)
   const [moveMode, setMoveMode] = useState<MoveMode>('move')
@@ -129,14 +113,30 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const editing = editor && editor !== 'new' ? rows.find((row) => row.id === editor) ?? null : null
   const deleting = deleteScope?.scope === scope.current && deleteScope.ticket === deleteTicket.current ? rows.find((row) => row.id === deleteId) : undefined
   const stopping = stopScope?.scope === scope.current && stopScope.ticket === stopTicket.current && stopScope.table.id === stopId ? stopScope.table : undefined
+  const openStop = (table: RestaurantTable) => {
+    if (!selectedAccountId || !store || !snapshotCurrentRef.current || !canEditRef.current || renderedScope !== scope.current) return
+    const ticket = {}, asOf = new Date().toISOString()
+    const reservations = data.reservations.filter(item => seatBoardEntry(item as unknown as Record<string, unknown>).resourceIds.includes(table.id) && !['cancelled', 'no_show', 'completed', 'visited', 'seated'].includes(item.status) && !item.departed_at && new Date(item.ends_at).getTime() > Date.parse(asOf)).sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+    stopTicket.current = ticket
+    setStopScope({ scope: renderedScope, ticket, table, reservations, asOf })
+    setStopError(''); setStopStale(false); stopProgressRef.current = false; setStopProgress(''); setMoveMode('move'); setStopId(table.id)
+  }
+  useEffect(() => {
+    if (!pendingStop) return
+    if (pendingStop.scope !== scope.current || !canEditRef.current) { setPendingStop(null); return }
+    if (busy || !snapshotAccountCurrent || !tableDefinition || tableDefinition === pendingStop.before) return
+    const table = data.tables.find(item => item.id === pendingStop.id && item.store_id === scope.current.storeId && item.is_active)
+    setPendingStop(null)
+    if (table) openStop(table)
+  }, [pendingStop, busy, snapshotAccountCurrent, tableDefinition, data]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /* この卓に入っている、これから先の予約（取消・無断キャンセル・来店済みは除く）。 */
   const upcoming = stopping ? stopScope!.reservations : []
 
   const openNew = () => {
     setEditorError('')
-    setDraft({ code: '', label: '', seatType: 'table', minCapacity: '1', maxCapacity: '2', floorX: '', floorY: '', joinGroup: '',floorId:floors[0]?.id??'floor-'+store?.id })
+    setDraft({ code: '', label: '', seatType: 'table', seatDetailType:'table', minCapacity: '1', maxCapacity: '2', floorX: '', floorY: '', joinGroup: '',floorId:floors[0]?.id??'floor-'+store?.id,shape:'rectangle',orientation:'horizontal',smokingPolicy:'non_smoking',partition:'open',shoesAllowed:true,isActive:true,visibleOnMap:true,chairArrangement:'both',chairSide:'left' })
     setFieldErrors({})
-    setShowPlacement(false)
     setEditor('new')
   }
   const openEdit = (table: RestaurantTable) => {
@@ -145,9 +145,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       code: table.code, label: table.label, seatType: table.seat_type,
       minCapacity: String(table.min_capacity), maxCapacity: String(table.max_capacity),
       floorX: String(table.floor_x), floorY: String(table.floor_y), joinGroup: table.join_group || '',floorId:table.floor_id??'floor-'+table.store_id,
+      shape:table.shape==='circle'?'circle':table.shape==='long'?'long':'rectangle',orientation:(table.height??64)>(table.width??80)?'vertical':'horizontal',smokingPolicy:table.smoking_policy??'non_smoking',partition:table.partition_type??'open',shoesAllowed:table.shoes_allowed!==0,isActive:!!table.is_active,visibleOnMap:table.visible_on_map!==0,chairArrangement:table.chair_arrangement??'both',chairSide:table.chair_side??'left',
+      seatDetailType:(table.seat_detail_type??table.seat_type) as Draft['seatDetailType'],
     })
     setFieldErrors({})
-    setShowPlacement(false)
     setEditor(table.id)
   }
 
@@ -173,6 +174,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     const errors: Partial<Record<keyof Draft, string>> = {}
     if ((b244Requirements.draft_code.check(draft.code) !== null)) errors.code = '卓番を入れてください。'
     if ((b244Requirements.draft_label.check(draft.label) !== null)) errors.label = '表示名を入れてください。'
+    if(!draft.floorId||(floors.length>0&&!floors.some(f=>f.id===draft.floorId))) errors.floorId='階・エリアを選んでください。'
     const min = Number(draft.minCapacity), max = Number(draft.maxCapacity)
     if (!Number.isInteger(min) || min < 1) errors.minCapacity = '最小人数は1以上の整数にしてください。'
     if (!Number.isInteger(max) || max < min || max < 1) errors.maxCapacity = '最大人数は最小人数以上の整数にしてください。'
@@ -183,7 +185,6 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     if (!editing && Boolean(draft.floorX.trim()) !== Boolean(draft.floorY.trim())) errors[draft.floorX.trim() ? 'floorY' : 'floorX'] = '横と縦の位置を一緒に指定してください。'
     setFieldErrors(errors)
     if (Object.keys(errors).length) {
-      if (errors.floorX || errors.floorY) setShowPlacement(true)
       requestAnimationFrame(() => { const field = editorRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
     }
@@ -198,30 +199,37 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       floorX: draft.floorX.trim()?Number(draft.floorX):undefined,
       floorY: draft.floorY.trim()?Number(draft.floorY):undefined,
       joinGroup: draft.joinGroup.trim() || null,
+      shape:draft.seatType==='counter'?'counter':draft.shape,
+      seatDetailType:draft.seatDetailType,
+      width:draft.shape==='long'?(draft.orientation==='vertical'?64:120):draft.seatType==='counter'?(draft.orientation==='vertical'?64:80):80,
+      height:draft.shape==='long'?(draft.orientation==='vertical'?120:64):draft.seatType==='counter'?(draft.orientation==='vertical'?80:64):64,
+      rotation:0,smokingPolicy:draft.smokingPolicy,partition:draft.partition,shoesAllowed:draft.shoesAllowed,visibleOnMap:draft.visibleOnMap,chairArrangement:draft.chairArrangement,chairSide:draft.seatType==='counter'||draft.chairArrangement==='one'?draft.chairSide:null,
+      ...(!editing?{isActive:draft.isActive}:{}),
+      ...(editing&&draft.isActive&&!editing.is_active?{isActive:true}:{}),
     }
-    const ok = editing
-      ? await mutate(() => restaurantTestApi.updateTable(selectedAccountId, editing.id, body), '卓を更新しました。', setEditorError)
-      : store
-        ? await mutate(() => restaurantTestApi.createTable(selectedAccountId, { storeId: store.id, ...body }), '卓を追加しました。', setEditorError)
-        : false
-    if (ok) setEditor(null)
+    const saveScope = renderedScope
+    const beforeSave = tableDefinition
+    let ok = false
+    try {
+      const options = { rethrow: () => true }
+      ok = editing
+        ? await mutate(() => restaurantTestApi.updateTable(selectedAccountId, editing.id, body), '卓を更新しました。', options)
+        : store
+          ? await mutate(() => restaurantTestApi.createTable(selectedAccountId, { storeId: store.id, ...body }), '卓を追加しました。', options)
+          : false
+    } catch (cause) {
+      if (!saveErrors.capture(cause)) setEditorError(japaneseDetailOf(cause) || '卓を保存できませんでした。')
+      return
+    }
+    if (ok) {
+      setEditor(null)
+      if(editing&&editing.is_active&&!draft.isActive){
+        if (saveScope === scope.current && canEditRef.current) setPendingStop({ id: editing.id, scope: saveScope, before: beforeSave })
+      }
+    }
   }
 
-  const moveTable = (targetId: string) => {
-    if (!store || !selectedAccountId || !dragId || dragId === targetId || busy) return
-    const from = placed.findIndex((t) => t.id === dragId)
-    const to = placed.findIndex((t) => t.id === targetId)
-    setDragId('')
-    if (from < 0 || to < 0) return
-    const reordered = [...placed]
-    reordered.splice(to, 0, reordered.splice(from, 1)[0])
-    void mutate(() => restaurantTestApi.saveTableLayout(selectedAccountId, {
-      storeId: store.id, expectedVersion:reordered[0]?.floor_version??1,
-      tables: reordered.map((t, index) => ({ id: t.id, floorX: index % 3, floorY: Math.floor(index / 3), joinGroup: t.join_group })),
-    }), '卓の配置を保存しました。')
-  }
-
-  /* 先の予約を移して（または未配席に戻して）から卓を止める。1件ずつ送り、失敗したらそこで止める。 */
+  /* 確認した予約と卓の版を一括で照合し、移動と停止をまとめて行う。 */
   const stop = (table: RestaurantTable, reservations: RestaurantReservation[]) => {
     if (!alive.current || stopProgressRef.current || !selectedAccountId || !snapshotCurrentRef.current || !canEditRef.current || !stopScope || stopScope.scope !== scope.current || stopScope.ticket !== stopTicket.current) return
     const belongs = () => alive.current && canEditRef.current && stopScope.scope === scope.current && stopScope.ticket === stopTicket.current
@@ -253,6 +261,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       } catch (error) {
         if (error instanceof ApiError && error.status === 409) {
           const detail = error.data && typeof error.data === 'object' && 'reason' in error.data ? error.data.reason : undefined
+          if (current()) setStopStale(true)
           if (current()) setStopError(typeof detail === 'string' && /[ぁ-んァ-ヶ一-龠]/u.test(detail) ? detail : japaneseDetailOf(error) || '確認した内容が変わりました。読み直してください。')
           throw new QuietError()
         }
@@ -281,6 +290,11 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     )
   }
 
+  const reloadStop = () => {
+    if (stopScope?.ticket !== stopTicket.current) return
+    stopTicket.current = null; setStopId(''); setStopStale(false); void ctx.reload()
+  }
+
   const closeStop = () => {
     if (stopScope?.ticket !== stopTicket.current) return
     stopTicket.current = null; setStopId('')
@@ -288,24 +302,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   }
 
   const activeRows = rows.filter((item) => item.is_active)
+  const visibleRows=rows.filter(item=>statusFilter==='all'||(statusFilter==='active'?!!item.is_active:!item.is_active))
+  useEffect(()=>{if(rows.length&&!selectedId)setSelectedId(rows[0].id)},[rows,selectedId])
   const groups = new Set(activeRows.filter((item) => item.join_group).map((item) => item.join_group))
-  const placementFields = draft ? (
-    <>
-      <div className={styles.pair}>
-        <Field label="階・エリア"><SaveErrorField names={["floorId","draft.floorId","floor_id","draft.floor_id"]}><EntitySelect size="full" aria-label="階・エリア" noun="階・エリア" value={draft.floorId} onChange={v=>setDraft({...draft,floorId:v})} options={floors.map(f=>({value:f.id,label:f.name}))}/></SaveErrorField></Field>
-        <Field label="横の位置" htmlFor="rs-table-x" error={fieldErrors.floorX}>
-          <SaveErrorField names={["floorX","draft.floorX","floor_x","draft.floor_x"]}><NumberInput placeholder={editing?undefined:"自動配置"} id="rs-table-x" type="number" min={0} max={10000} value={draft.floorX} onChange={(event) => setDraft({ ...draft, floorX: event.target.value })} /></SaveErrorField>
-        </Field>
-        <Field label="縦の位置" htmlFor="rs-table-y" error={fieldErrors.floorY}>
-          <SaveErrorField names={["floorY","draft.floorY","floor_y","draft.floor_y"]}><NumberInput placeholder={editing?undefined:"自動配置"} id="rs-table-y" type="number" min={0} max={10000} value={draft.floorY} onChange={(event) => setDraft({ ...draft, floorY: event.target.value })} /></SaveErrorField>
-        </Field>
-      </div>
-      {!editing?<DialogNote>位置を空欄にすると、重ならない空き位置へ自動で配置します。追加後は座席図上で移動できます。</DialogNote>:null}
-      <DialogField label="結合グループ" htmlFor="rs-table-group">
-        <SaveErrorField names={["joinGroup","draft.joinGroup","join_group","draft.join_group"]}><TextField id="rs-table-group" maxLength={100} value={draft.joinGroup} onChange={(event) => setDraft({ ...draft, joinGroup: event.target.value })} /></SaveErrorField>
-      </DialogField>
-    </>
-  ) : null
+  const refreshFloors=async()=>{if(!selectedAccountId||!store)return;const result=await reservationBoardApi.floors(selectedAccountId,store.id);setFloors(result.data)}
 
   return (
     <SaveErrorScope errors={saveErrors}><>
@@ -315,31 +315,26 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         <KpiCard title="結合可能" value={groups.size} unit="組" detail="結合グループ" icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={<Inbox size={16} aria-hidden />} presentation="band" />
       </StatRow>
-      <DetailColumns variant="restaurant-tables" asideLabel="卓の詳細を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title={'卓の詳細'}>
+      <DetailColumns variant="restaurant-tables" asideLabel="卓の詳細を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title="卓の詳細" headerActions={<RestaurantTableHeaderActions canEdit={canEdit} selectedId={selectedId} onDuplicate={()=>setDuplicateRequest(n=>n+1)} statusFilter={statusFilter} onStatusFilter={setStatusFilter}/>}>
           <ul className={styles.detailList}>
-            {rows.map((item) => (
+            {visibleRows.map((item) => (
               <li key={item.id} className={`${styles.detailRow} ${item.id === selectedId ? styles.detailRowSelected : ''}`}>
                 <div className={styles.detailMain}>
                   <p className={styles.detailName} title={`${item.code} · ${item.label}`}>{`${item.code} · ${item.label}`}</p>
-                  <p className={styles.detailSub}>{`${seatTypeLabel(item.seat_type)} / ${item.min_capacity}〜${item.max_capacity}名`}</p>
+                  <p className={styles.detailSub}>{`${seatTypeLabel(item.seat_detail_type??item.seat_type)} / ${item.min_capacity}〜${item.max_capacity}名 / ${item.smoking_policy==='smoking'?'喫煙':item.smoking_policy==='heated_tobacco'?'加熱式のみ':'禁煙'} / ${item.shoes_allowed===0?'土足不可':'土足可'}`}</p>
                 </div>
                 <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} /></span>
                 <TableRowActions table={item} canEdit={canEdit} busy={busy} pendingAccount={!snapshotAccountCurrent} onEdit={openEdit} onResume={resume}
                   onDelete={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteError(''); setDeleteId(table.id) }}
-                  onStop={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}, asOf = new Date().toISOString(); const reservations = data.reservations.filter(item => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(table.id) && !['cancelled','no_show','completed','visited','seated'].includes(item.status) && !item.departed_at && new Date(item.ends_at).getTime() > Date.parse(asOf)).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)); stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket, table, reservations, asOf }); setStopError(''); stopProgressRef.current = false; setStopProgress(''); setMoveMode('move'); setStopId(table.id) }} />
+                  onStop={openStop} />
               </li>
             ))}
           </ul>
         </DetailPreview>} asideLayout="detail">
-        <div className={styles.floorPanel}>
-          {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} refreshKey={JSON.stringify(rows.map(t=>[t.id,t.floor_id,t.floor_version]))} resources={rows.map(t=>({id:t.id,label:t.code,capacity:t.max_capacity,active:!!t.is_active}))} canEdit={canEdit} onSelect={setSelectedId}/>:null}
-        </div>
+        <RestaurantFloorPanel>
+          {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} refreshKey={JSON.stringify(rows.map(t=>[t.id,t.floor_id,t.floor_version,t.label,t.min_capacity,t.max_capacity,t.shape,t.width,t.height,t.smoking_policy,t.shoes_allowed,t.visible_on_map,t.chair_arrangement,t.chair_side,t.is_active]))} resources={rows.map(t=>({id:t.id,label:t.label,capacity:t.max_capacity,active:!!t.is_active}))} existingCodes={rows.map(t=>t.code)} canEdit={canEdit} onSelect={setSelectedId} selectedId={selectedId} duplicateRequest={duplicateRequest} onCreated={async()=>{await ctx.reload()}}/>:null}
+        </RestaurantFloorPanel>
       </DetailColumns>
-      <div className={styles.rules}>
-        <Panel fusion title="自動配席ルール" description="収容差が最小の卓を優先"><p className={styles.ruleText}>人数を収容できる卓のうち、余裕が最も少ない卓を候補にします。電話・{restaurantWalkIn}も同じ候補を使います。</p></Panel>
-        <Panel fusion title="結合のルール" description="結合グループ"><p className={styles.ruleText}>同じ結合グループの卓は全卓を一緒に確保します。配置と結合グループは卓の変更から設定できます。</p></Panel>
-        <Panel fusion title="卓を止めるとき"><p className={styles.ruleText}>先の予約を同じ人数が入る別の卓へ自動で移すか、未配席に戻します。お客さまへの通知はこの画面からは送りません。</p></Panel>
-      </div>
       <RsDialog open={Boolean(deleting)} title="この卓を削除しますか？" width={480} top={300} busy={busy}
         onCancel={() => { if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setDeleteId('') } }} actions={<>
           <Button disabled={busy} onClick={() => { if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setDeleteId('') } }}>キャンセル</Button>
@@ -361,51 +356,25 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       </RsDialog>
       <RsDialog
         open={editor !== null && draft !== null}
-        title={editing ? `卓「${editing.code}・${editing.label}」を変更` : '新しい卓'}
+        title={editing ? '卓を変更する' : '卓を作る'}
         actionsPlacement="footer"
-        width={520}
-        top={200}
+        width={824}
+        exactWidth
+        minHeight={840}
+        top={60}
+        headerHeight={64}
         busy={busy}
-        designNode="gBrCz"
+        designNode="ljShF"
+        titleIcon={<Grid2X2 size={17} aria-hidden="true"/>}
+        titleRow="mark"
+        plainTitle
         onCancel={() => setEditor(null)}
-        actions={(
-          <>
-            <Button presentation="restaurant" type="button" onClick={() => setEditor(null)} disabled={busy}>キャンセル</Button>
-            <Button presentation="restaurant" type="submit" form="rs-table-editor" variant="primary" disabled={busy}>
-              {editing ? <Check size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}{editing ? '保存する' : '追加する'}
-            </Button>
-          </>
-        )}
+        actions={<><Button presentation="restaurant" type="button" onClick={() => setEditor(null)} disabled={busy}>キャンセル</Button><Button presentation="restaurant" type="submit" form="rs-table-editor" variant="primary" disabled={busy}><Plus size={16} aria-hidden="true" />{editing ? '変更を保存' : '卓を作る'}</Button></>}
       >
-        {draft ? (
-          <form id="rs-table-editor" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
-            {editorError ? <Notice tone="danger" role="alert">{editorError}</Notice> : null}
-            <div className={styles.pair}>
-              <Field label="卓番" htmlFor="rs-table-code" error={fieldErrors.code} requirement={b244Requirements.draft_code}>
-                <SaveErrorField names={["code","draft.code"]}><TextField id="rs-table-code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} /></SaveErrorField>
-              </Field>
-              <Field label="表示名" htmlFor="rs-table-label" error={fieldErrors.label} requirement={b244Requirements.draft_label}>
-                <SaveErrorField names={["label","draft.label"]}><TextField id="rs-table-label" value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></SaveErrorField>
-              </Field>
-            </div>
-            <DialogField label="席種" kind="select">
-              <SaveErrorField names={["seatType","draft.seatType","seat_type","draft.seat_type"]}><Select aria-label="席種" size="full" value={draft.seatType} onChange={(value) => setDraft({ ...draft, seatType: value })} options={SEAT_TYPE_OPTIONS} /></SaveErrorField>
-            </DialogField>
-            <div className={styles.pair}>
-              <Field label="最小人数" htmlFor="rs-table-min" error={fieldErrors.minCapacity} requirement={b244Requirements.draft_min_capacity}>
-                <SaveErrorField names={["minCapacity","draft.minCapacity","min_capacity","draft.min_capacity"]}><NumberInput id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => changeCapacity('minCapacity', event.target.value)} /></SaveErrorField>
-              </Field>
-              <Field label="最大人数" htmlFor="rs-table-max" error={fieldErrors.maxCapacity} requirement={b244Requirements.draft_max_capacity}>
-                <SaveErrorField names={["maxCapacity","draft.maxCapacity","max_capacity","draft.max_capacity"]}><NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => changeCapacity('maxCapacity', event.target.value)} /></SaveErrorField>
-              </Field>
-            </div>
-            <Button presentation="restaurant" type="button" aria-expanded={showPlacement} onClick={() => setShowPlacement((open) => !open)}>
-              {showPlacement ? '配置・結合グループを閉じる' : '配置・結合グループ'}
-            </Button>
-            {showPlacement ? placementFields : null}
-            <DialogNote>{editing ? '人数を変えると、予約枠・在庫の総数も変わります。' : '卓を足すと、予約枠・在庫の総数も増えます。'}</DialogNote>
-          </form>
-        ) : null}
+        {draft && selectedAccountId && store ? <form id="rs-table-editor" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
+          {editorError ? <Notice tone="danger" role="alert">{editorError}</Notice> : null}
+          <TablePenEditor draft={draft} onChange={setDraft} floors={floors} accountId={selectedAccountId} storeId={store.id} onFloorAdded={refreshFloors} errors={fieldErrors} onCapacity={changeCapacity}/>
+        </form> : null}
       </RsDialog>
       <RsDialog
         open={Boolean(stopping)}
@@ -419,7 +388,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         actions={(
           <>
             <Button presentation="restaurant" onClick={closeStop} disabled={busy}>キャンセル</Button>
-            <Button presentation="restaurant" variant="danger" disabled={busy} lockedReason={stopProgress ? '予約台帳と卓の状態を確認してから、操作をやり直してください。' : undefined} onClick={() => { if (stopping) stop(stopping, upcoming) }}>
+            <Button presentation="restaurant" variant="danger" disabled={busy || stopStale} lockedReason={stopProgress ? '予約台帳と卓の状態を確認してから、操作をやり直してください。' : undefined} onClick={() => { if (stopping) stop(stopping, upcoming) }}>
               {upcoming.length === 0 ? '止める' : moveMode === 'move' ? '予約を移して止める' : '未配席に戻して止める'}
             </Button>
           </>
@@ -427,6 +396,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       >
         {stopScope?.scope.accountId && store && <OperationTargetSummary accounts={[{ id: stopScope.scope.accountId, name: accounts.find(account => account.id === stopScope.scope.accountId)?.name }]} store={{ id: store.id, name: store.name }} />}
         {stopError ? <Notice tone="danger" role="alert" message={stopError} /> : null}
+        {stopStale ? <Button presentation="restaurant" onClick={reloadStop} disabled={busy}>読み直す</Button> : null}
         {stopProgress ? <Notice tone="info">{stopProgress}</Notice> : null}
         {upcoming.length === 0 ? (
           <>

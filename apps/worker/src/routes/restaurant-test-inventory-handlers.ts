@@ -285,7 +285,11 @@ export const post__api_restaurant_test_floors_19 = async (c: Context<Env, "/api/
  const org=await organizationFor(c),b=await c.req.json();
  if(!org||typeof b.storeId!=='string'||!await storeBelongsTo(c,org.id,b.storeId))return c.json({success:false,error:'店舗がありません'},404);
  if(typeof b.name!=='string'||!b.name.trim()||b.name.length>80)return inputError(c,{success:false,error:'階・エリアの名前を指定してください'},400,['name']);
- const id=crypto.randomUUID(),saved=await dbFor(c.env,b.storeId).prepare('INSERT OR IGNORE INTO rt_floors(id,store_id,name) VALUES(?,?,?)').bind(id,b.storeId,b.name.trim()).run();
+ const kind=b.kind??'floor';
+ if(!['floor','area'].includes(kind)||kind==='area'&&typeof b.parentFloorId!=='string'||kind==='floor'&&b.parentFloorId)return inputError(c,{success:false,error:'階・エリアの種類を確認してください'},400,['kind','parentFloorId']);
+ const db=dbFor(c.env,b.storeId);
+ if(kind==='area'&&!await db.prepare("SELECT id FROM rt_floors WHERE id=? AND store_id=? AND kind='floor'").bind(b.parentFloorId,b.storeId).first())return inputError(c,{success:false,error:'親の階を確認してください'},400,['parentFloorId']);
+ const id=crypto.randomUUID(),saved=await db.prepare('INSERT OR IGNORE INTO rt_floors(id,store_id,name,kind,parent_floor_id,sort_order) VALUES(?,?,?,?,?,(SELECT COUNT(*) FROM rt_floors WHERE store_id=?))').bind(id,b.storeId,b.name.trim(),kind,kind==='area'?b.parentFloorId:null,b.storeId).run();
  if(!saved.meta.changes)return c.json({success:false,error:'同じ名前の階があります'},409);
  return c.json({success:true,data:{id,version:1}},201);
 };
@@ -295,10 +299,10 @@ export const get__api_restaurant_test_floors_20 = async (c: Context<Env, "/api/r
  const org=await organizationFor(c),storeId=c.req.query('storeId')??'';
  if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'店舗がありません'},404);
  const db=dbFor(c.env,storeId);
- const floors=await db.prepare('SELECT * FROM rt_floors WHERE store_id=? ORDER BY name,id').bind(storeId).all<Record<string,unknown>>();
+ const floors=await db.prepare('SELECT * FROM rt_floors WHERE store_id=? ORDER BY sort_order,name,id').bind(storeId).all<Record<string,unknown>>();
  const tables=await db.prepare('SELECT * FROM rt_tables WHERE store_id=?').bind(storeId).all<Record<string,unknown>>();
- return c.json({success:true,data:floors.results.map(f=>({id:f.id,storeId:f.store_id,name:f.name,width:f.width,height:f.height,version:f.version,
- outline:JSON.parse(String(f.outline_json)),fixtures:JSON.parse(String(f.fixtures_json)),tables:tables.results.filter(t=>t.floor_id===f.id).map(t=>({id:t.id,x:t.floor_x,y:t.floor_y,width:t.width,height:t.height,shape:t.shape,rotation:t.rotation,joinGroup:t.join_group}))}))});
+ return c.json({success:true,data:floors.results.map(f=>({id:f.id,storeId:f.store_id,name:f.name,kind:f.kind,parentFloorId:f.parent_floor_id,sortOrder:f.sort_order,width:f.width,height:f.height,version:f.version,
+ outline:JSON.parse(String(f.outline_json)),fixtures:JSON.parse(String(f.fixtures_json)),tables:tables.results.filter(t=>t.floor_id===f.id).map(t=>({id:t.id,x:t.floor_x,y:t.floor_y,width:t.width,height:t.height,shape:t.shape,rotation:t.rotation,joinGroup:t.join_group,seatType:t.seat_type,seatDetailType:t.seat_detail_type,minCapacity:t.min_capacity,maxCapacity:t.max_capacity,smokingPolicy:t.smoking_policy,partition:t.partition_type,shoesAllowed:Boolean(t.shoes_allowed),acceptsReservations:Boolean(t.is_active),visibleOnMap:Boolean(t.visible_on_map),chairArrangement:t.chair_arrangement,chairSide:t.chair_side}))}))});
 };
 
 export const put__api_restaurant_test_floors_id_21 = async (c: Context<Env, "/api/restaurant-test/floors/:id">) => {

@@ -40,7 +40,10 @@ export type RestaurantReservation = {
 }
 export type RestaurantTable = {
   id: string; store_id: string; code: string; label: string; seat_type: string; min_capacity: number;
-  max_capacity: number; floor_id?:string; floor_version?:number; confirmation_revision?:number; floor_x: number; floor_y: number; join_group: string | null; is_active: number
+  max_capacity: number; floor_id?:string; floor_version?:number; confirmation_revision?:number; floor_x: number; floor_y: number; join_group: string | null; is_active: number;
+  shape?: 'rectangle'|'circle'|'long'|'counter'|'sofa'; width?:number; height?:number; rotation?:number;
+  smoking_policy?:'non_smoking'|'smoking'|'heated_tobacco'; partition_type?:'open'|'semi_private'|'private'; shoes_allowed?:number;
+  visible_on_map?:number; chair_arrangement?:'both'|'one'|'all'; chair_side?:'top'|'right'|'bottom'|'left'|null; seat_detail_type?:string|null
 }
 export type RestaurantRotation = {date:string;activeTables:number;departedGroups:number;turnover:number|null;utilization:number|null;averageStayMinutes:number|null;noShowRate:number|null;unmeasuredVisits:number};
 

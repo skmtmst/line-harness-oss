@@ -1828,7 +1828,7 @@
   --tpl-rs-band-pad: 10px 16px; --tpl-rs-band-gap: 12px; --tpl-rs-badge-pad: 2px 10px; --tpl-rs-dot: 8px;
   --tpl-rs-band-bg: #faf6ec; --tpl-rs-band-line: #e7dcc2; --tpl-rs-gold: #c9a24b;
   --tpl-rs-stats-gap: 12px; --tpl-rs-stat-pad: 16px; --tpl-rs-stat-gap: 4px;
-  --tpl-rs-panel-head-pad: 14px 20px; --tpl-rs-panel-head-gap: 12px; --tpl-rs-panel-head-text-gap: 2px; --tpl-rs-panel-body-pad: 20px; --tpl-rs-state-pad: 40px 20px;
+  --tpl-rs-panel-head-pad: 14px 20px; --tpl-rs-panel-head-gap: 12px; --tpl-rs-panel-head-text-gap: 2px; --tpl-rs-panel-body-pad: 20px; --tpl-rs-state-pad: 40px 20px; --tpl-rs-floor-panel-min-height: 600px;
   --tpl-rs-icon-btn: 36px; --tpl-rs-row-actions-gap: 6px; --tpl-rs-legend-pad: 10px 14px;
   --tpl-rs-th-pad-block: 8px; --tpl-rs-cell-side: 20px; --tpl-rs-cell-gap: 16px; --tpl-rs-row-h: var(--polish-table-row); --tpl-rs-col-pad-num: 32px; --tpl-rs-col-pad-ops: 36px;
   --tpl-rs-dlg-gap: 14px; --tpl-rs-dlg-pull: -14px; --tpl-rs-dlg-actions-gap: 8px; --tpl-rs-field-gap: var(--polish-space-field); --tpl-rs-dlg-note-pad: 10px 12px; --tpl-rs-pair-gap: var(--polish-space-field);
