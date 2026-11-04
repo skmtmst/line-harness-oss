@@ -1,4 +1,5 @@
 import { holdUncertainLineStep } from '../../services/workflow-line-client.js';
+import { storedTimestamp } from '@line-crm/shared';
 import { EXTERNAL_DELIVERY_MAX_ATTEMPTS, externalDeliveryRetryAt, externalDeliveryNotBefore, EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES } from '../../services/external-delivery-retry.js';
 // ウェビナーの予約前から個別相談予約まで、途中離脱した人へ自動追客する。
 // 対象ウェビナーは webinar_followup_configs で明示的に有効化し、enabled_at
@@ -152,7 +153,7 @@ async function candidates(
          SELECT 1 FROM form_submissions fs
          JOIN webinar_ctas wc ON wc.form_id = fs.form_id
          WHERE wc.webinar_id = w.id AND fs.friend_id = c.friend_id
-           AND datetime(fs.created_at) >= datetime(c.cta_clicked_at)
+           AND datetime(${storedTimestamp('fs.created_at', 'sql')}) >= datetime(c.cta_clicked_at)
        )
        AND NOT EXISTS (
          SELECT 1 FROM webinar_followups wf
@@ -275,7 +276,7 @@ async function journeyCandidates(
            SELECT 1 FROM form_submissions fs
            JOIN webinar_ctas wc ON wc.form_id = fs.form_id
            WHERE wc.webinar_id = m.webinar_id AND fs.friend_id = m.friend_id
-             AND datetime(fs.created_at) >= datetime(COALESCE(cfg.stage_enabled_at, cfg.enabled_at))
+             AND datetime(${storedTimestamp('fs.created_at', 'sql')}) >= datetime(COALESCE(cfg.stage_enabled_at, cfg.enabled_at))
          )
          AND NOT EXISTS (
            SELECT 1 FROM webinar_journey_followups jf
@@ -303,13 +304,13 @@ async function journeyCandidates(
     : '';
   const { results } = await db.prepare(
     `WITH submissions AS (
-       SELECT wc.webinar_id, fs.friend_id, MIN(fs.created_at) AS submitted_at
+       SELECT wc.webinar_id, fs.friend_id, MIN(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('fs.created_at', 'sql')})) AS submitted_at
        FROM form_submissions fs
        JOIN webinar_ctas wc ON wc.form_id = fs.form_id
        JOIN webinar_followup_configs cfg
          ON cfg.webinar_id = wc.webinar_id AND cfg.is_active = 1
        WHERE fs.friend_id IS NOT NULL
-         AND datetime(fs.created_at) >= datetime(COALESCE(cfg.stage_enabled_at, cfg.enabled_at))
+         AND datetime(${storedTimestamp('fs.created_at', 'sql')}) >= datetime(COALESCE(cfg.stage_enabled_at, cfg.enabled_at))
        GROUP BY wc.webinar_id, fs.friend_id
      )
      SELECT w.id AS webinar_id, w.account_id, s.friend_id, w.slug, w.title,
