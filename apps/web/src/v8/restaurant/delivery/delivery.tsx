@@ -67,6 +67,12 @@ type DeliveryView = keyof typeof VIEW_BOARDS
 
 const TABS: DeliveryOrderTab[] = ['all', 'new', 'cooking', 'handed_over']
 
+const TITLE_PROPS = {
+  orders: {},
+  history: { titleSize: 'sub' },
+  'sold-out': { titleSize: 'sub' },
+} as const
+
 /** 自動で読み直す間（絵の「30秒ごとに自動更新」）。予約一覧と同じ間にする。 */
 const REFRESH_MS = 30_000
 
@@ -836,6 +842,7 @@ function DeliveryInner() {
 
   return (
     <RestaurantPage
+      {...TITLE_PROPS[view]}
       boardId={VIEW_BOARDS[view]}
       title={meta.title}
       description={meta.description}

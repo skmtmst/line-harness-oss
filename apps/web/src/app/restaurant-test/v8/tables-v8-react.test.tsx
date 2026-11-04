@@ -131,7 +131,7 @@ it('ドラッグした配置をまとめて保存し、再取得した座標で�
  const view=render(<TablesV8 />);dragTable(within(await screen.findByRole('group',{name:'1階の座席表'})).getAllByRole('button',{name:'2人卓'})[0])
  fireEvent.click(screen.getByRole('button',{name:'座席図を保存'}))
  await waitFor(()=>expect(floorApi.saveFloor).toHaveBeenCalledWith('account-1',expect.objectContaining({storeId:'store-1',expectedVersion:1,tables:[expect.objectContaining({id:'t1',x:60}),...floor.tables.slice(1)]})))
- await waitFor(()=>expect(screen.queryByRole('button',{name:'座席図を保存'})).toBeNull())
+ await waitFor(()=>expect((screen.getByRole('button',{name:'座席図を保存'}) as HTMLButtonElement).disabled).toBe(true))
  view.unmount();render(<TablesV8 />)
  expect(within(await screen.findByRole('group',{name:'1階の座席表'})).getAllByRole('button',{name:'2人卓'})[0].getAttribute('transform')).toContain('translate(60 50)')
 })

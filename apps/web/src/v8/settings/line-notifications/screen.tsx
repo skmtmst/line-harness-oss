@@ -956,7 +956,7 @@ function LineNotificationsPage() {
       }
     }
   }, [selectedAccountId, tab, saveErrors])
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { void load(); return () => { loadGeneration.current += 1 } }, [load])
 
   /*
    * 行の「今日」「この30日」は実際の送信履歴（send-counts）で数える。
@@ -1106,13 +1106,13 @@ function LineNotificationsPage() {
     generation: number,
     outcome: CustomerMutationOutcome,
   ) => {
+    if (outcome.kind === 'stale' || generation !== loadGeneration.current) return
     if (outcome.settleDraft) {
       // 送った文面がそのまま画面に残っている。ここで初めて「保存済み」にする。
       clearCustomerDraft(accountId, setting.eventType)
       lastSavedRef.current.set(setting.eventType, { ...setting, isEnabled: outcome.enabled })
       setDirtyEvents((prev) => prev.filter((value) => value !== setting.eventType))
     }
-    if (outcome.kind === 'stale' || generation !== loadGeneration.current) return
     if (outcome.kind === 'failed') {
       // WEB199：作れた定義は一覧に足す（やり直しで同じキーの作成をもう一度送らない）。
       const createdDefinition = outcome.createdDefinition

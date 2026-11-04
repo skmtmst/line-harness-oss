@@ -33,7 +33,7 @@ export interface PageHeadingProps {
    * 18/700/27 で描いている。正本の順位は 使いやすさ → 絵 → 決まりの板 → 共通部品 なので
    * 絵に合わせる。渡さない画面はこれまでどおり 22/700/32 のまま。
    */
-  titleSize?: 'sub'
+  titleSize?: 'sub' | 'workspace'
   /** 説明の文字を本文の大きさ（13/20）にする。渡さないときは補足の 12/19 のまま。 */
   subtitleSize?: 'body'
   /** 一覧・詳細の頭と本文の間を詰める口。指定しない画面には効かない。 */
@@ -93,7 +93,7 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', title
     : ({
         ...(padTop === undefined ? null : { '--tpl-head-pad-top': `${padTop}px` }),
         ...(textGap === undefined ? null : { '--tpl-head-gap': `${textGap}px` }),
-        ...(titleSize === 'sub' ? { '--tpl-title-size': '18px', '--tpl-title-lh': '27px' } : null),
+        ...(titleSize === 'sub' ? { '--tpl-title-size': '18px', '--tpl-title-lh': '27px' } : titleSize === 'workspace' ? { '--tpl-title-size': '24px', '--tpl-title-lh': '37px', '--tpl-title-weight': '600' } : null),
       } as CSSProperties)
   const notice = readOnlyBand ? <div className={styles.headingNotice} data-template-region="notice"><ReadOnlyNotice scope={readOnlyBand === 'hq' ? 'hq' : 'store'} need={readOnlyNeed} /></div> : null
   return <header className={styles.heading} style={headStyle} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-subtitle-size={subtitleSize} data-bottom-spacing={bottomSpacing} data-heading-separator={separator} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>

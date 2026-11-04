@@ -1,0 +1,5 @@
+.workspace{display:flex;flex-direction:column;gap:16px;min-width:0;}
+.context{display:flex;align-items:center;justify-content:flex-end;min-height:27px;color:var(--color-ink-secondary);font-size:var(--polish-text-support);}
+.board{min-width:0;min-height:calc(100dvh - 137px);border-radius:16px;background:var(--color-board-tint);overflow:hidden;box-shadow:var(--shadow-board);}
+.board>[data-page-template]{min-height:calc(100dvh - 137px);}
+@media(max-width:767px){.context{min-height:20px;}.board{border-radius:12px;}}

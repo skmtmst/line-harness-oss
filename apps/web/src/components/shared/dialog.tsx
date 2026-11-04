@@ -422,11 +422,12 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
 }
 
 /** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
-export function DialogActions({ children, leadingAction, align, padding }: { children: ReactNode; leadingAction?: ReactNode; align?: 'center'; padding?: 'none' }) {
+export function DialogActions({ children, leadingAction, align, padding, note }: { children: ReactNode; leadingAction?: ReactNode; align?: 'center'; padding?: 'none'; note?: ReactNode }) {
   const centered = align === 'center' || leadingAction !== undefined
   const ref = useDialogActionWidth()
   return <div ref={ref} className={styles.actions} data-dialog-actions data-dialog-action-pair={centered || undefined} data-padding={padding}>
     {leadingAction ? <span data-dialog-action-leading className={centered ? styles.actionStart : styles.actionLead}>{typeof leadingAction === 'string' ? <span className={styles.footerLead}>{leadingAction}</span> : leadingAction}</span> : null}
     {centered ? <span className={styles.buttonPair}>{children}</span> : children}
+    {note !== undefined ? <span className={styles.actionNote} role="status">{note}</span> : null}
   </div>
 }

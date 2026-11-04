@@ -1,6 +1,7 @@
 import { claimMediaDeletion, beginMediaObjectDeletion, finishMediaDeletion, releaseUnstartedMediaDeletion, releaseMediaDeletionLease } from '@line-crm/db/src/media/deletion-jobs.js';
 import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
-import { countSentMediaMessages, findDirectMediaUsages } from '../features/media/direct-media-usages.js';
+import { findDirectMediaUsages } from '../features/media/index.js';
+import { countSentMediaMessages } from '../features/media/direct-media-usages.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
