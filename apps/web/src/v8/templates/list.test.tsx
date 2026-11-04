@@ -15,6 +15,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const listTemplates = vi.hoisted(() => vi.fn())
 const folderList = vi.hoisted(() => ({ value: { success: true, data: [] as unknown[], unfiledCount: 2 }, list: null as null | ((...args: unknown[]) => unknown) }))
 const usages = vi.hoisted(() => vi.fn())
+const folderRemove = vi.hoisted(() => vi.fn(async () => ({ success: true })))
+const heldFolder = vi.hoisted(() => ({ confirm: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && typeof props.description === 'string' && props.description.includes('中のテンプレートは未分類') && props.onConfirm) heldFolder.confirm = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 const removeTemplate = vi.hoisted(() => vi.fn())
 const removeTemplates = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
@@ -55,7 +64,7 @@ vi.mock('@/lib/api', () => ({
     friendFields: { list: () => Promise.resolve({ success: true, data: [{ fieldKey: 'pet_name', name: 'ペットの名前' }] }) },
     commonVars: { list: () => Promise.resolve({ success: true, data: [{ varKey: 'business_hours', name: '営業時間' }] }) },
     broadcastMessageAssets: { counts: () => Promise.resolve({ success: true, data: { card_message: 4 } }), list: () => Promise.resolve({ success: true, data: [] }), folders: { list: () => Promise.resolve({ success: true, data: [] }) } },
-    folders: { list: (...args: unknown[]) => Promise.resolve(folderList.list ? folderList.list(...args) : folderList.value) },
+    folders: { list: (...args: unknown[]) => Promise.resolve(folderList.list ? folderList.list(...args) : folderList.value), delete: folderRemove },
   },
 }))
 
@@ -464,4 +473,53 @@ it('C-10: 下書きが1通でも公開中の複数通を見失わない', async 
   const multiple = within(screen.getByRole('group', { name: 'メッセージの数' })).getByRole('button', { name: '複数通' })
   fireEvent.click(multiple)
   expect(screen.getByText('公開中は複数通')).toBeTruthy()
+})
+
+it('テンプレートフォルダの削除窓に所有アカウントと環境を出す', async () => {
+  folderList.value = { success: true, data: [{ id: 'f1', name: '予約', color: null, displayOrder: 0, itemCount: 1, accountId: 'account-1' }], unfiledCount: 0 }
+  await renderList()
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  const dialog = await screen.findByRole('alertdialog')
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('本店')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+})
+
+it('共通フォルダの削除窓は選択中のアカウントではなく共通の対象を示す', async () => {
+  folderRemove.mockClear()
+  folderList.value = { success: true, data: [{ id: 'f1', name: '予約', color: null, displayOrder: 0, itemCount: 1, accountId: null }], unfiledCount: 0 }
+  await renderList()
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  const dialog = await screen.findByRole('alertdialog')
+  expect(within(dialog).getByText('共通（全アカウント）')).toBeTruthy()
+  expect(within(dialog).queryByText('本店')).toBeNull()
+  fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+  await act(async () => { await Promise.resolve() })
+  expect(folderRemove).toHaveBeenCalledWith('f1', undefined)
+})
+
+it.each([{ accountId: 'account-2' }, {}])('所有先が異なるか不明なフォルダは削除しない %o', async (owner) => {
+  folderRemove.mockClear()
+  folderList.value = { success: true, data: [{ id: 'f1', name: '予約', color: null, displayOrder: 0, itemCount: 1, ...owner }], unfiledCount: 0 }
+  await renderList()
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  const dialog = await screen.findByRole('alertdialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+  expect(folderRemove).not.toHaveBeenCalled()
+  expect(dialog.textContent).toContain('フォルダの所有先を確認できません')
+})
+
+it('テンプレートフォルダの閉じた確認は削除しない', async () => {
+  folderRemove.mockClear()
+  folderList.value = { success: true, data: [{ id: 'f1', name: '予約', color: null, displayOrder: 0, itemCount: 1, accountId: 'account-1' }], unfiledCount: 0 }
+  await renderList()
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  const previous = heldFolder.confirm!
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'キャンセル' }))
+  await act(async () => { await previous() })
+  expect(folderRemove).not.toHaveBeenCalled()
 })

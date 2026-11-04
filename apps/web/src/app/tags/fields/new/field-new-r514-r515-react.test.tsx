@@ -10,6 +10,7 @@ const fixture = vi.hoisted(() => ({
   fieldsList: vi.fn(),
   fieldsCreate: vi.fn(),
   foldersList: vi.fn(),
+  foldersCreate: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -28,7 +29,7 @@ vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
     friendFields: { list: fixture.fieldsList, create: fixture.fieldsCreate },
-    folders: { list: fixture.foldersList },
+    folders: { list: fixture.foldersList, create: fixture.foldersCreate },
     featureSettings: {
       visibility: () => Promise.resolve({ success: true, data: { features: {} } }),
     },
@@ -118,4 +119,66 @@ it.each(['https://evil.example/login', 'javascript:alert(1)', '/\\evil.example']
   await waitFor(() => expect(createButton().disabled).toBe(false))
   fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true }))
   expect(fixture.routerPush).toHaveBeenCalledWith('/tags?tab=fields')
+})
+
+it('フォルダ名だけが未保存のとき、キャンセルで確認する', async () => {
+  render(<NewFriendFieldPage />)
+  await waitFor(() => expect(createButton().disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button', { name: '友だち情報欄のフォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成途中' } })
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect(fixture.routerPush).not.toHaveBeenCalled()
+})
+
+it('フォルダ名が未保存のとき、情報欄の保存前に確認する', async () => {
+  render(<React.StrictMode><NewFriendFieldPage /></React.StrictMode>)
+  await waitFor(() => expect(createButton().disabled).toBe(false))
+  fireEvent.change(screen.getByPlaceholderText('例：愛犬のお名前'), { target: { value: '試す名前' } })
+  fireEvent.change(screen.getByPlaceholderText('pet_name'), { target: { value: 'trial_name' } })
+  fireEvent.click(screen.getByRole('button', { name: '友だち情報欄のフォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成途中' } })
+  fireEvent.pointerDown(document.body)
+  fireEvent.click(createButton())
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect(fixture.fieldsCreate).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを破棄して保存' }))
+  await waitFor(() => expect(fixture.fieldsCreate).toHaveBeenCalledTimes(1))
+  expect(fixture.fieldsCreate.mock.calls[0][1]).toMatchObject({ name: '試す名前', fieldKey: 'trial_name' })
+})
+
+it('情報欄とフォルダの両方が未保存でもキャンセル確認は1枚で、編集継続なら両方残る', async () => {
+  render(<NewFriendFieldPage />)
+  await waitFor(() => expect(createButton().disabled).toBe(false))
+  fireEvent.change(screen.getByPlaceholderText('例：愛犬のお名前'), { target: { value: '試す名前' } })
+  fireEvent.click(screen.getByRole('button', { name: '友だち情報欄のフォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成途中' } })
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(screen.getAllByRole('dialog', { name: '保存していない変更があります' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+  expect((screen.getByPlaceholderText('例：愛犬のお名前') as HTMLInputElement).value).toBe('試す名前')
+  if (!screen.queryByRole('textbox', { name: '新しいフォルダの名前' })) {
+    fireEvent.click(screen.getByRole('button', { name: '友だち情報欄のフォルダ' }))
+    fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  }
+  expect((screen.getByRole('textbox', { name: '新しいフォルダの名前' }) as HTMLInputElement).value).toBe('作成途中')
+})
+
+
+it('フォルダ作成中は情報欄の保存を止め、理由を表示する', async () => {
+  fixture.foldersCreate.mockImplementation(() => new Promise(() => {}))
+  render(<NewFriendFieldPage />)
+  await waitFor(() => expect(createButton().disabled).toBe(false))
+  fireEvent.change(screen.getByPlaceholderText('例：愛犬のお名前'), { target: { value: '試す名前' } })
+  fireEvent.change(screen.getByPlaceholderText('pet_name'), { target: { value: 'trial_name' } })
+  fireEvent.click(screen.getByRole('button', { name: '友だち情報欄のフォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成途中' } })
+  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  expect(createButton().disabled).toBe(true)
+  expect(screen.getByText('フォルダを作成中です。完了するまでお待ちください。')).toBeTruthy()
+  expect(fixture.fieldsCreate).not.toHaveBeenCalled()
 })

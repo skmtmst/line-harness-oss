@@ -19,6 +19,9 @@ import Button from '@/components/shared/button'
 import { type ContextMenuItem } from '@/components/shared/context-menu'
 import { InlineDetailHoldingContext, useInlineDetailGuard, useInlineDetailHoldingState } from '@/components/shared/use-inline-detail-guard'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
 import FilterChip from '@/components/shared/filter-chip'
@@ -49,7 +52,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import type { Folder } from '@line-crm/shared'
 import { Bookmark,Braces,Copy,FileText,Folder as FolderIcon,Link2,Mail,Plus,Send,Unlink } from 'lucide-react'
-import { Fragment,useCallback,useEffect,useMemo,useRef,useState } from 'react'
+import { Fragment,useCallback,useContext,useEffect,useMemo,useRef,useState } from 'react'
 import { loadTemplateExamples,type TemplateExample } from './examples'
 import styles from './list.module.css'
 import { useTemplatePanelDetail } from './panel-detail'
@@ -81,9 +84,30 @@ export default function TemplatesListV8() {
   const lockedReason = usePermissionLockReason(canMutateTemplates)
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
-  const detailGuard = useInlineDetailGuard('row')
+  const [moveIds, setMoveIds] = useState<string[] | null>(null)
+  const [moveDraft, setMoveDraft] = useState('')
+  const [moving, setMoving] = useState(false)
+  const moveLock = useRef(false)
+  const [moveError, setMoveError] = useState('')
+  const [panelMove, setPanelMove] = useState(false)
+  const moveDirty = moveIds !== null && moveDraft !== ''
+  const moveGuard = useUnsavedGuard({ dirty: moveDirty, busy: moving && moveIds !== null, subject: 'フォルダの移動先', onDiscard: () => {
+    setMoveIds(null)
+    setPanelMove(false)
+    setMoveDraft('')
+    setMoveError('')
+  } })
+  const detailGuard = useInlineDetailGuard('row', panelMove && (moveDirty || moving))
   const { holding: folderHolding, onHoldingChange: setFolderHolding } = useInlineDetailHoldingState()
   const { id: activeId, setId: setActiveId } = detailGuard
+  const overlayDepth = useContext(OverlayDepthContext)
+  const changeActiveId: typeof setActiveId = next => requestUnsavedAction(() => detailGuard.protect(() => {
+    setActiveId(next)
+    setPanelMove(false)
+    setMoveIds(null)
+    setMoveDraft('')
+    setMoveError('')
+  }))
 
   /*
    * 検索語・フォルダ・札・絞り込み・件数・ページは URL に置く（動きの点検 5 番）。
@@ -131,6 +155,9 @@ export default function TemplatesListV8() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const folderDeleteTicket = useRef<object | null>(null)
+  const renderedFolderDeleteTicket = folderDeleteTicket.current
+  const folderDeleteLock = useRef(false)
   const [folderBusy, setFolderBusy] = useState(false)
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -169,14 +196,6 @@ export default function TemplatesListV8() {
   const [blockedLoading, setBlockedLoading] = useState(false)
   const [blockedLoadError, setBlockedLoadError] = useState(false)
 
-  const [moveIds, setMoveIds] = useState<string[] | null>(null)
-  const [moveDraft, setMoveDraft] = useState('')
-  const [moving, setMoving] = useState(false)
-  const moveLock = useRef(false)
-  const [moveError, setMoveError] = useState('')
-  /* 右から出る詳細パネル。URL（?row=）に今の行を残す。 */
-  /* パネルを開いている1件の移動は、窓ではなくパネルの中で選ぶ。 */
-  const [panelMove, setPanelMove] = useState(false)
   /* 右クリックされた行（「…」と同じ項目を出す）。 */
   const [contextId, setContextId] = useState<string | null>(null)
 
@@ -207,6 +226,7 @@ export default function TemplatesListV8() {
     setUnfiledCount(null)
     setFolderDialogOpen(false)
     setEditingFolder(null)
+    folderDeleteTicket.current = null
     setDeletingFolder(null)
     setFolderError('')
     setPendingDelete(null)
@@ -500,23 +520,38 @@ export default function TemplatesListV8() {
   }
 
   const removeFolder = async () => {
-    if (!deletingFolder) return
+    if (!deletingFolder || folderBusy || folderDeleteLock.current || !renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current || renderedScope !== accountScope.current) return
+    if (deletingFolder.accountId === undefined || (typeof deletingFolder.accountId === 'string' && deletingFolder.accountId !== selectedAccountId)) {
+      setFolderError('フォルダの所有先を確認できません。一覧を読み直してください。')
+      return
+    }
+    folderDeleteLock.current = true
     setFolderBusy(true)
     setFolderError('')
     try {
-      const res = await api.folders.delete(deletingFolder.id, selectedAccountId ?? undefined)
+      const res = await api.folders.delete(deletingFolder.id, deletingFolder.accountId ?? undefined)
       if (!res.success) throw new Error(res.error ?? '削除できませんでした。時間をおいて、もう一度お試しください。')
+      if (renderedFolderDeleteTicket !== folderDeleteTicket.current || renderedScope !== accountScope.current) return
+      folderDeleteTicket.current = null
       setDeletingFolder(null)
       if (selectedCategory === deletingFolder.id) setSelectedCategory('all')
       await loadFolders()
     } catch (saveFailure) {
+      if (renderedFolderDeleteTicket !== folderDeleteTicket.current || renderedScope !== accountScope.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setFolderError('フォルダを削除できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
+      folderDeleteLock.current = false
       setFolderBusy(false)
     }
+  }
+  const cancelFolderDelete = () => {
+    if (folderBusy || folderDeleteLock.current) return
+    folderDeleteTicket.current = null
+    setDeletingFolder(null)
+    setFolderError('')
   }
 
   /*
@@ -753,7 +788,7 @@ export default function TemplatesListV8() {
           onSelect: () => handleDelete(t),
         },
       ] : []),
-    ].map(item => item.onSelect ? { ...item, onSelect: () => detailGuard.protect(() => { void item.onSelect?.() }) } : item)
+    ].map(item => item.onSelect ? { ...item, onSelect: () => requestUnsavedAction(() => detailGuard.protect(() => { void item.onSelect?.() })) } : item)
   }
 
   /* 右から出る詳細パネルの今の行。一覧に無ければ閉じる。 */
@@ -821,7 +856,7 @@ export default function TemplatesListV8() {
       onEdit: canMutateTemplates ? () => detailGuard.protect(() => setEditingFolder(folder)) : undefined,
       onMoveUp: canMutateTemplates && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
       onMoveDown: canMutateTemplates && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
-      onDelete: canMutateTemplates ? () => detailGuard.protect(() => setDeletingFolder(folder)) : undefined,
+      onDelete: canMutateTemplates ? () => detailGuard.protect(() => { if (renderedScope !== accountScope.current) return; folderDeleteTicket.current = {}; setDeletingFolder(folder) }) : undefined,
       deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: 'unfiled', label: '未分類', count: ready ? unfiledCount : null },
@@ -954,7 +989,7 @@ export default function TemplatesListV8() {
 
   /* ===== 一覧の中身（：読込中・読み込めない・空・0件を分ける） ===== */
   const sectionWord = activeSection === 'rich_video' ? 'リッチビデオのテンプレート' : activeSection === 'question' ? '質問のテンプレート' : 'メッセージのテンプレート'
-  const listBody = renderTemplateList({ tokenNames, accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref: createKind.href, createLabel: createKind.title, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete: changeBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view })
+  const listBody = renderTemplateList({ tokenNames, accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref: createKind.href, createLabel: createKind.title, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove: ids => requestUnsavedAction(() => detailGuard.protect(() => openMove(ids))), removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId: changeActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete: changeBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view })
 
   /* ページ送りは型の pagination 枠へ。件数は部品の summary に入れる（絵：左に「26件中 1〜20件」、右に頁。帯の内側は部品の 10・20）。 */
   const showPager = view === 'ready' && filteredTemplates.length > 0
@@ -994,7 +1029,7 @@ export default function TemplatesListV8() {
   const blockedRows = blockedUsage ? usageRows(blockedUsage) : []
   const blockedTotal = blockedDelete ? Math.max(blockedDelete.item.usageCount, blockedRows.length) : 0
 
-  const overlays = <Fragment key={renderedScope.generation}><InlineDetailHoldingContext.Provider value={setFolderHolding}>{renderTemplateDialogs({ deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDeletingFolder, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates, detailGuard })}</InlineDetailHoldingContext.Provider>{detailGuard.dialog}</Fragment>
+  const overlays = <Fragment key={renderedScope.generation}><InlineDetailHoldingContext.Provider value={setFolderHolding}>{renderTemplateDialogs({ moveGuard, folderDeleteAccounts: deletingFolder?.accountId === null ? [] : [{ id: deletingFolder?.accountId ?? '', name: accounts.find(account => account.id === deletingFolder?.accountId)?.name }], cancelFolderDelete, deleteAccounts: targetAccounts(pendingDelete ? [pendingDelete.item] : []), bulkDeleteAccounts: targetAccounts(pendingBulkDelete ?? []), activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete: bulkScope?.scope === accountScope.current ? pendingBulkDelete : null, pendingDelete: deleteScope?.scope === accountScope.current ? pendingDelete : null, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId: changeActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete: changeBulkDelete, setPendingDelete: changePendingDelete, setPickerOpen, templates, detailGuard })}</InlineDetailHoldingContext.Provider>{detailGuard.dialog}<OverlayDepthContext.Provider value={overlayDepth + 2}><UnsavedLeaveDialog open={moveGuard.leaveTarget !== null} busy={moving && moveIds !== null} onConfirm={moveGuard.confirmLeave} onCancel={moveGuard.cancelLeave} /></OverlayDepthContext.Provider></Fragment>
 
   const heading = {
     title: 'テンプレート',

@@ -138,6 +138,23 @@ function unmatchedFixture(resolveStatus = 200) {
 }
 
 describe('外部連携 V8', () => {
+  it('受け取り口と受信数を取得できない時はゼロでなく未取得と表示する', async () => {
+    const base = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/api/webhooks/incoming') || url.includes('/interactions')) return json({ success: false, error: 'unavailable' }, 500)
+      return base(input, init)
+    })
+    await render(<WebhooksIncomingV8 />)
+    await waitFor(() => expect(host.textContent).toContain('受け取り口を読み込めませんでした'))
+    expect(host.textContent).toContain('集計を読み込めませんでした')
+    const band = host.querySelector('[data-kpi-strip]')!
+    for (const label of ['受け取り口', '過去30日 受け取った']) {
+      const card = within(band as HTMLElement).getByText(label).closest('[data-kpi-presentation]')
+      expect(card?.textContent).toContain('—')
+    }
+  })
+
   it('届物は値に余り幅を渡し、複数候補の各結び付けと追加読み込みを保つ', async () => {
     const fixture = unmatchedFixture()
     await render(<WebhooksIncomingV8 />)
@@ -546,4 +563,112 @@ it('管理者は実際の受け取り口の中で、受信後の行動を追加�
   expect(posted.find(call => call.url.includes('/config'))?.body).toMatchObject({ expectedVersion: 1,
     actions: [{ refKind: 'tag', refId: 'tag-new', refVersionId: null }],
   })
+})
+it('受け取りと見本には送信タブの数を表示しない', async () => {
+  await render(<WebhooksIncomingV8 />)
+  expect(host.textContent).toContain('受け取り口')
+  expect(host.textContent).toContain('過去30日 受け取った')
+  expect(host.textContent).not.toContain('直近30日 送った')
+  await render(<WebhooksSamplesV8 />)
+  expect(host.textContent).toContain('こちらで受け取る（どこから来るか）')
+  expect(host.textContent).not.toContain('直近30日 送った')
+})
+
+it('受け取り口の作成中は画面移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/webhooks?tab=incoming')
+  await render(<WebhooksIncomingV8 />)
+  await act(async () => { buttons().find(element => element.textContent?.includes('受け取り口を作る'))!.click() })
+  const input = document.querySelector<HTMLInputElement>('#wh-incoming-name')!
+  await act(async () => { fireEvent.change(input, { target: { value: '新しい受け取り口' } }) })
+  const link = document.createElement('a'); link.href = '/events'; link.textContent = 'イベントへ'; document.body.append(link)
+  await act(async () => link.click())
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  link.remove()
+})
+it('受け取り口の合言葉を編集中は画面移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/webhooks?tab=incoming')
+  await render(<WebhooksIncomingV8 />)
+  await vi.waitFor(() => expect(within(host).getByRole('button', { name: '合言葉を更新する' })).toBeTruthy())
+  await act(async () => { within(host).getByRole('button', { name: '合言葉を更新する' }).click() })
+  const input = within(document.body).getByLabelText('新しい合言葉')
+  await act(async () => { fireEvent.change(input, { target: { value: 'test-secret' } }) })
+  const link = document.createElement('a'); link.href = '/events'; link.textContent = 'イベントへ'; document.body.append(link)
+  await act(async () => link.click())
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  link.remove()
+})
+it('受け取り口の名前を編集中は画面移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/webhooks?tab=incoming')
+  await render(<WebhooksIncomingV8 />)
+  const edit = await vi.waitFor(() => within(host).getByRole('button', { name: '受け取り口の名前を変更する' }))
+  await act(async () => { edit.click() })
+  const input = within(host).getByRole('textbox', { name: '受け取り口の名前' })
+  await act(async () => { fireEvent.change(input, { target: { value: '新しい名前' } }) })
+  const link = document.createElement('a'); link.href = '/events'; link.textContent = 'イベントへ'; document.body.append(link)
+  await act(async () => { fireEvent.blur(input); link.click() })
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  link.remove()
+})
+
+it('編集途中の受け取り口が再読込で消えたら、残った画面の移動を妨げない', async () => {
+  window.history.replaceState(null, '', '/webhooks?tab=incoming')
+  await render(<WebhooksIncomingV8 />)
+  const edit = await vi.waitFor(() => within(host).getByRole('button', { name: '受け取り口の名前を変更する' }))
+  await act(async () => { edit.click() })
+  await act(async () => { fireEvent.change(within(host).getByRole('textbox', { name: '受け取り口の名前' }), { target: { value: '変更中' } }) })
+  const original = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (/\/api\/webhooks\/incoming\/in-1/.test(url) && init?.method === 'PATCH') return json({ success: true, data: INLET })
+    if (url.includes('/api/webhooks/incoming') && !url.includes('/in-1')) return json({ success: true, data: [] })
+    return original(input, init)
+  })
+  await act(async () => { fireEvent.click(within(host).getByRole('switch', { name: '申込フォームを動かす' })) })
+  await vi.waitFor(() => expect(within(host).queryByRole('textbox', { name: '受け取り口の名前' })).toBeNull())
+  const link = document.createElement('a'); link.href = '/events'; link.textContent = 'イベントへ'; document.body.append(link)
+  try {
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+    await act(async () => { link.dispatchEvent(click) })
+    expect(click.defaultPrevented).toBe(false)
+    expect(document.body.textContent).not.toContain('保存していない変更があります')
+  } finally { link.remove() }
+})
+
+it('受け取り口を切り替える前に名前と行うことの両方を確認する', async () => {
+  const original = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/api/webhooks/incoming/in-2')) return json({ success: true, data: { ...INLET, id: 'in-2', name: '二つ目の窓口', version: 1, identityMatching: { methods: [{ kind: 'verified_email', path: '$.email' }], onNotFound: 'do_nothing' }, actions: [], actionExecution: { state: 'not_configured', reason: null }, latestSample: null, templateFields: [], pendingUnmatched: 0, previousSecretUsableUntil: null } })
+    if (url.includes('/api/common-actions/resources')) return json({ success: true, data: { tags: [{ id: 'tag-new', name: '新しいタグ' }], templates: [], scenarios: [], webhooks: [], richMenus: [], commonActions: [], supportMarks: [] } })
+    if (url.includes('/api/webhooks/incoming') && !url.includes('/in-1') && !url.includes('/unmatched')) return json({ success: true, data: [INLET, { ...INLET, id: 'in-2', name: '二つ目の窓口' }] })
+    return original(input, init)
+  })
+  window.history.replaceState(null, '', '/webhooks?tab=incoming')
+  await render(<WebhooksIncomingV8 />)
+  const edit = await vi.waitFor(() => within(host).getByRole('button', { name: '受け取り口の名前を変更する' }))
+  await act(async () => { edit.click() })
+  await act(async () => { fireEvent.change(within(host).getByRole('textbox', { name: '受け取り口の名前' }), { target: { value: '変更中の名前' } }) })
+  const add = await vi.waitFor(() => within(host).getByRole('button', { name: '行うことを足す' }))
+  await act(async () => { add.click() })
+  await act(async () => { within(document.body).getByRole('menuitem', { name: /タグを付ける/ }).click() })
+  const picker = within(document.body).getByRole('dialog', { name: 'タグを付ける対象を選ぶ' })
+  await act(async () => { within(picker).getByRole('radio', { name: '新しいタグ' }).click(); within(picker).getByRole('button', { name: '選ぶ' }).click() })
+  await act(async () => { within(host).getByText('二つ目の窓口').click() })
+  const dialog = within(document.body).getByRole('dialog', { name: '保存していない変更があります' })
+  expect(dialog.textContent).toContain('受け取り口の変更')
+  expect(dialog.textContent).toContain('行うことの変更')
+  await act(async () => { within(dialog).getByRole('button', { name: 'すべて保存せずに移る' }).click() })
+  await vi.waitFor(() => expect(within(document.body).queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull())
+  await vi.waitFor(() => expect(within(host).getByRole('switch', { name: '二つ目の窓口を動かす' })).toBeTruthy())
+})
+
+it('受け取り口の名前に未保存の変更がある間は合言葉の窓を開く前に確認する', async () => {
+  window.history.replaceState(null, '', '/webhooks?tab=incoming')
+  await render(<WebhooksIncomingV8 />)
+  const edit = await vi.waitFor(() => within(host).getByRole('button', { name: '受け取り口の名前を変更する' }))
+  await act(async () => { edit.click() })
+  await act(async () => { fireEvent.change(within(host).getByRole('textbox', { name: '受け取り口の名前' }), { target: { value: '変更中' } }) })
+  await act(async () => { within(host).getByRole('button', { name: '合言葉を更新する' }).click() })
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  expect(within(document.body).queryByLabelText('新しい合言葉')).toBeNull()
 })

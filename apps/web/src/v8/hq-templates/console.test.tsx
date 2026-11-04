@@ -716,13 +716,18 @@ it('一時下書きは取消で捨てられ別種別・別所属には混ざら�
   await waitFor(() => expect(window.sessionStorage.getItem('lh_hq_create_draft_v1:tenant-a:owner:template:message')).toBeNull())
   persistEditorDraft(window.sessionStorage, { tenantId: 'tenant-a', actorId: 'owner' }, 'template', 'coupon', { kind: 'coupon', name: '別種の下書き', payload: {} })
   persistEditorDraft(window.sessionStorage, { tenantId: 'tenant-b', actorId: 'owner' }, 'template', 'message', { kind: 'message', name: '別所属の下書き', messageType: 'text', messageContent: 'x' })
-  window.history.replaceState(null, '', '/hq/templates?mode=create')
+  // 再読込は最後の下書きの種類を復元するため、メッセージを新規作成して混入を調べる。
+  window.history.replaceState(null, '', '/hq/templates')
   cleanup()
   render(<HqTemplatesV8 type="template" />)
-  await waitFor(() => expect(new URLSearchParams(window.location.search).get('mode')).toBe('create'))
+  fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
+  const name = await screen.findByLabelText('テンプレート名') as HTMLInputElement
+  expect(name.value).toBe('')
   expect(screen.queryByDisplayValue('別種の下書き')).toBeNull()
   expect(screen.queryByDisplayValue('別所属の下書き')).toBeNull()
   expect(screen.queryByDisplayValue('捨てる入力')).toBeNull()
+  expect(window.sessionStorage.getItem('lh_hq_create_draft_v1:tenant-a:owner:template:coupon')).toContain('別種の下書き')
+  expect(window.sessionStorage.getItem('lh_hq_create_draft_v1:tenant-b:owner:template:message')).toContain('別所属の下書き')
 })
 it('カルーセルの通常入力は再読込後も一時下書きから復元する（H-18原文）', async () => {
   const { unmount } = render(<HqTemplatesV8 type="template" />)

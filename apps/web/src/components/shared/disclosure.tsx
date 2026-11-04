@@ -61,3 +61,8 @@ export default function Disclosure({
     </details>
   )
 }
+
+/** 開いた欄に添える補足文。 */
+export function DisclosureNote({ children }: { children: ReactNode }) {
+  return <p className={styles.note}>{children}</p>
+}

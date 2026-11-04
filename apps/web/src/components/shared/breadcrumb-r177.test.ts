@@ -27,7 +27,6 @@ describe('R177 パンくずと戻るボタンのはみ出し', () => {
     const field = readFileSync(join(here, '../../v8/tags/field-editor.tsx'), 'utf8')
     expect(field).toContain('usePageCrumbs(')
     expect(field).toContain("href: host ? '/hq/friend-attributes?tab=fields' : '/tags?tab=fields'")
-    expect(field).toContain('onClick={() => guarded(onCancel)}')
     const search = readFileSync(join(here, '../../v8/tag-edit/search-edit.tsx'), 'utf8')
     expect(search).toContain("{ label: '保存した検索', href: '/tags?tab=searches' }")
     expect(search).toContain('<Button href="/tags?tab=searches">キャンセル</Button>')
