@@ -29,9 +29,3 @@ ALTER TABLE account_settings ADD COLUMN confirmation_revision INTEGER NOT NULL D
 
 DROP TRIGGER IF EXISTS rt_menu_change_apply;
 CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status IN ('pending','approved') AND NEW.status='approved' AND (NEW.effective_at IS NULL OR datetime(NEW.effective_at)<=datetime('now')) BEGIN UPDATE rt_menu_items SET price=NEW.after_price,updated_at=datetime('now'),confirmation_revision=confirmation_revision+1 WHERE id=NEW.menu_id AND store_id=NEW.store_id AND price=NEW.before_price; UPDATE rt_menu_change_requests SET status=CASE WHEN changes()=1 THEN 'applied' ELSE 'failed' END,failure_reason=CASE WHEN changes()=1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END,updated_at=datetime('now') WHERE id=NEW.id; END;
-
-DROP TRIGGER IF EXISTS rt_menu_published_insert;
-CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1, confirmation_revision = confirmation_revision + 1 WHERE id = NEW.id; END;
-
-DROP TRIGGER IF EXISTS rt_menu_published_update;
-CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1, confirmation_revision = confirmation_revision + 1 WHERE id = NEW.id; END;

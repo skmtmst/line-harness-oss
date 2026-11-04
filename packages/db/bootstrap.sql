@@ -12839,9 +12839,9 @@ CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_req
 
 CREATE TRIGGER rt_menu_change_review AFTER UPDATE OF status ON rt_approval_requests WHEN NEW.kind = 'menu_change' AND OLD.status = 'pending' AND NEW.status IN ('approved', 'returned') BEGIN UPDATE rt_menu_change_requests SET status = NEW.status, return_reason = CASE WHEN NEW.status = 'returned' THEN NEW.review_comment ELSE NULL END, updated_at = datetime('now') WHERE approval_id = NEW.id AND status = 'pending'; END;
 
-CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1, confirmation_revision = confirmation_revision + 1 WHERE id = NEW.id; END;
+CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
 
-CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1, confirmation_revision = confirmation_revision + 1 WHERE id = NEW.id; END;
+CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
 
 CREATE TRIGGER rt_notice_booking_change AFTER UPDATE OF starts_at,ends_at,guest_count,status ON rt_reservations WHEN NEW.starts_at IS NOT OLD.starts_at OR NEW.ends_at IS NOT OLD.ends_at OR NEW.guest_count IS NOT OLD.guest_count OR (NEW.status IN('cancelled','no_show') AND NEW.status IS NOT OLD.status) BEGIN UPDATE rt_customer_notice_outbox SET valid=0 WHERE reservation_id=NEW.id AND sent_at IS NULL; END;
 
