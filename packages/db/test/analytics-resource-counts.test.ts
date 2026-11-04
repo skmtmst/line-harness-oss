@@ -100,10 +100,10 @@ it('フォームの利用中は現役定義の本番回答だけで、他店の�
     ('own','本番回答あり','[]','active'),('test','テストのみ','[]','active'),('shared','別店のみ','[]','active'),('archived','保管','[]','archived');
     INSERT INTO form_accounts (form_id,line_account_id) VALUES ('own','account-a'),('test','account-a'),('shared','account-a'),('shared','account-b'),('archived','account-a');
     INSERT INTO form_submissions (id,form_id,friend_id,is_test,created_at) VALUES
-    ('real','own','friend-a',0,'2026-10-30'),('test-only','test','friend-a',1,'2026-11-01'),
+    ('real','own','friend-a',0,'2026-10-30 08:30:00'),('test-only','test','friend-a',1,'2026-11-01'),
     ('other','shared','friend-b',0,'2026-11-02'),('archived','archived','friend-a',0,'2026-11-03');`);
   const row = (await getAnalyticsUsageOverview(db, context)).data.categories.find(item => item.key === 'forms');
-  expect(row).toMatchObject({ created: { value: 3 }, inUse: { value: 1 }, unused: { value: 2 }, lastUsedAt: { value: '2026-10-30' } });
+  expect(row).toMatchObject({ created: { value: 3 }, inUse: { value: 1 }, unused: { value: 2 }, lastUsedAt: { value: '2026-10-30T08:30:00.000Z' } });
 });
 
 it('別テナントの店では既定テナントの旧共通欄も見えず、その店の一覧と定義数が一致する', async () => {

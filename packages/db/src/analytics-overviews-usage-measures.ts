@@ -191,10 +191,11 @@ export async function collectFeatureUsage(
           (SELECT COUNT(*) FROM automation_runs r
             WHERE r.line_account_id = ? AND r.is_test = 0
               AND r.status IN ('success', 'partial', 'failed')
-              AND datetime(COALESCE(r.started_at, r.created_at)) >= datetime(?)) AS automations_count,
-          (SELECT MAX(COALESCE(r.started_at, r.created_at)) FROM automation_runs r
+              AND datetime(COALESCE(r.started_at, ${storedTimestamp('r.created_at', 'sql')})) >= datetime(?)) AS automations_count,
+          (SELECT COALESCE(r.started_at, ${storedTimestamp('r.created_at', 'sql')}) FROM automation_runs r
             WHERE r.line_account_id = ? AND r.is_test = 0
-              AND r.status IN ('success', 'partial', 'failed')) AS automations_last,
+              AND r.status IN ('success', 'partial', 'failed')
+            ORDER BY julianday(COALESCE(r.started_at, ${storedTimestamp('r.created_at', 'sql')})) DESC LIMIT 1) AS automations_last,
           (SELECT COUNT(*) FROM webhook_interaction_logs w
             WHERE w.line_account_id = ? AND w.direction = 'outgoing'
               AND datetime(w.started_at) >= datetime(?)) AS external_integrations_count,
