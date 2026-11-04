@@ -965,6 +965,10 @@
       "parentColumn": "id"
     }
   },
+  "broadcast_sender_corrections": {
+    "category": "purge",
+    "scope": {"by": "parent", "column": "broadcast_id", "parent": "broadcasts", "parentColumn": "id"}
+  },
   "broadcasts": {
     "category": "purge",
     "scope": {

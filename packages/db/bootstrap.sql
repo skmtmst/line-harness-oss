@@ -2377,6 +2377,22 @@ CREATE TABLE broadcast_send_claims (
   PRIMARY KEY (broadcast_id, friend_id)
 );
 
+CREATE TABLE broadcast_sender_corrections (
+  broadcast_id TEXT PRIMARY KEY REFERENCES broadcasts(id) ON DELETE CASCADE,
+  sender_id TEXT REFERENCES line_senders(id) ON DELETE SET NULL,
+  sender_snapshot_json TEXT CHECK (sender_snapshot_json IS NULL OR (
+    json_valid(sender_snapshot_json) AND json_type(sender_snapshot_json) = 'object'
+    AND json_type(sender_snapshot_json, '$.name') = 'text'
+    AND json_remove(sender_snapshot_json, '$.name') = '{}'
+  )),
+  sent_by_staff_id TEXT,
+  sent_by_staff_name TEXT,
+  correction_of_broadcast_id TEXT REFERENCES broadcasts(id) ON DELETE RESTRICT,
+  correction_request_key TEXT,
+  CHECK (correction_of_broadcast_id IS NULL OR correction_of_broadcast_id <> broadcast_id),
+  UNIQUE (correction_of_broadcast_id, correction_request_key)
+);
+
 CREATE TABLE broadcast_tracked_links (
   broadcast_id     TEXT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
   tracked_link_id  TEXT NOT NULL REFERENCES tracked_links(id) ON DELETE RESTRICT,
@@ -10039,6 +10055,9 @@ CREATE INDEX idx_broadcast_asset_folders_account
 
 CREATE INDEX idx_broadcast_asset_versions_asset
   ON broadcast_asset_versions(asset_id, version_number DESC);
+
+CREATE INDEX idx_broadcast_correction_origin ON broadcast_sender_corrections(correction_of_broadcast_id)
+  WHERE correction_of_broadcast_id IS NOT NULL;
 
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);
 
