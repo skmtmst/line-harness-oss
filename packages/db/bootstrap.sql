@@ -7405,7 +7405,7 @@ CREATE TABLE rt_floors (
  width REAL NOT NULL DEFAULT 1000 CHECK(width>0), height REAL NOT NULL DEFAULT 700 CHECK(height>0),
  outline_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(outline_json)),
  fixtures_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(fixtures_json)),
- version INTEGER NOT NULL DEFAULT 1, kind TEXT NOT NULL DEFAULT 'floor' CHECK(kind IN ('floor','area')), parent_floor_id TEXT REFERENCES rt_floors(id), sort_order INTEGER NOT NULL DEFAULT 0, UNIQUE(store_id,name)
+ version INTEGER NOT NULL DEFAULT 1, kind TEXT NOT NULL DEFAULT 'floor' CHECK(kind IN ('floor','area')), parent_floor_id TEXT REFERENCES rt_floors(id), sort_order INTEGER NOT NULL DEFAULT 0, archived_at TEXT, archived_name TEXT, UNIQUE(store_id,name)
 );
 
 CREATE TABLE rt_gbp_posts (
@@ -11315,6 +11315,8 @@ CREATE UNIQUE INDEX idx_rt_customer_request ON rt_reservations(store_id,line_uid
 
 CREATE INDEX idx_rt_email_digests_store_date
   ON rt_email_digests (store_id, target_date, media_id);
+
+CREATE INDEX idx_rt_floors_active_store ON rt_floors(store_id,archived_at,sort_order);
 
 CREATE INDEX idx_rt_followup_targets_approval ON rt_store_followup_targets(approval_id);
 
