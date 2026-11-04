@@ -174,5 +174,4 @@
 
 :global(html:root) .actionFooter > :global([data-dialog-actions]) > :global(span:not([data-dialog-action-leading])) {
   grid-column: 2;
-  flex-wrap: nowrap;
 }

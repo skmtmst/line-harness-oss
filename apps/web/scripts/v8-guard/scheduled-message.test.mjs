@@ -33,7 +33,7 @@ for (const width of [1152, 1440]) for (const kind of ['inbox', 'friends']) test(
       await waitForNavigationContent(page, pending, 15000)
       if (kind === 'inbox') {
         await page.getByRole('textbox', { name: 'メッセージを入力', exact: true }).fill(content)
-        await page.getByRole('main').getByRole('button', { name: /^予約(?:\(|$)/ }).click()
+        await page.getByRole('main').getByRole('button', { name: /^(?:送信予約|予約)(?:\(|$)/ }).click()
       } else {
         await page.getByRole('button', { name: /のその他操作$/ }).first().click()
         await page.getByRole('menuitem', { name: '予約して送る', exact: true }).click()

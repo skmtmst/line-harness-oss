@@ -67,6 +67,12 @@ for (const width of [1152, 1440]) test(`店舗数と長い名前でも題を隠�
           // Googleの口だけはdataで包まず返る。省略可能な店舗一覧も同じ実在の模擬店舗で補う。
           const data = body.data ?? body
           if (new URL(path, base).pathname === '/api/restaurant-test/google/connection') data.stores ??= storeFixture
+          // This layout test needs multiple stores belonging to the selected account.
+          // The shared fixture includes other-account and unassigned stores, which
+          // booking-media correctly excludes from its account-scoped picker.
+          if (new URL(path, base).pathname === '/api/restaurant-test/stores' && data.stores) {
+            data.stores = data.stores.map(store => ({ ...store, line_account_id: 'visual-qa-account' }))
+          }
           if (data.stores?.length) {
             data.stores = state === 'single' ? data.stores.slice(0, 1) : data.stores
             if (state === 'long') data.stores = data.stores.map(store => ({ ...store, name: store.name + '・駅前の予約とお食事を承る店舗' }))
