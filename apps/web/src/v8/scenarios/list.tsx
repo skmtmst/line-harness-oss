@@ -463,10 +463,11 @@ export default function ScenariosListV8() {
     })
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (target: ScenarioRow) => {
     if (!requireWrite()) throw new Error(stoppedMessage())
+    if (!target.contentRevision || !isKnownScenarioCount(target.subscriberCount)) throw new Error('シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     try {
-      const res = await api.scenarios.delete(id)
+      const res = await api.scenarios.delete(target.id, { revision: target.contentRevision, activeCount: target.subscriberCount })
       if (!res.success) throw new Error(res.error)
       if (!currentScope()) return
       void loadScenarios()
@@ -692,7 +693,7 @@ export default function ScenariosListV8() {
     setDeleting(true)
     setDeleteError('')
     try {
-      await handleDelete(deleteTarget.id)
+      await handleDelete(deleteTarget)
       if (!currentScope() || deleteRun.current !== ticket) return
       setDeleteTarget(null)
       if (!canWriteHere()) notifyToast('削除しました。変更後の権限で一覧を確認してください。', { tone: 'success' })

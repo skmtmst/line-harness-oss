@@ -22,6 +22,7 @@ vi.hoisted(() => {
 
 const scenario = (id: string, name: string, folderId: string | null, isActive = true) => ({
   id,
+  contentRevision: 7,
   name,
   description: null,
   triggerType: 'friend_add',
@@ -692,6 +693,7 @@ describe('保持した書込操作の実行直前の判定', () => {
     expect(screen.getByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？', exact: true })).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: '削除する', exact: true }))
     await waitFor(() => expect(remove).toHaveBeenCalledTimes(1))
+    expect(remove).toHaveBeenCalledWith('s-filed', { revision: 7, activeCount: 10 })
   })
   test('複製の待機中に画面を離れたら保持した許可も失効する', async () => {
     const response = pending<string>(); duplicate.mockReturnValueOnce(response.promise)
