@@ -24,7 +24,7 @@ export const DAILY_METRICS = [
 
 export type MetricKey = (typeof DAILY_METRICS)[number][1];
 
-/** 1日ぶんの指標。未取得（Googleが値を返さない）は null。0件とは区別する。 */
+/** 1日ぶんの指標。指標自体が応答に無いときは null。0件とは区別する。 */
 export type DailyMetricValues = Record<MetricKey, number | null>;
 
 export function emptyDailyMetrics(): DailyMetricValues {
@@ -61,7 +61,8 @@ function isoDateOf(raw: RawDate | undefined): string | null {
 }
 
 function numberOf(value: string | number | undefined): number | null {
-  if (value === undefined) return null;
+  // Google は datedValues の値が 0 のとき value 自体を省略する。
+  if (value === undefined) return 0;
   const parsed = typeof value === 'number' ? value : Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
@@ -76,7 +77,7 @@ function appendDateParams(url: URL, prefix: 'daily_range.start_date' | 'daily_ra
 
 /**
  * 期間内の日次指標をまとめて取得し、日付（YYYY-MM-DD）→ 指標値の表に正規化する。
- * Google が値を省略した日（未確定・対象機能なし等）は null のまま残る。
+ * Google が指標そのものを返さない場合は null。日付はあり value が無ければ 0 件。
  */
 export async function fetchDailyMetrics(
   options: RequestOptions,
