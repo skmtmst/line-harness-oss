@@ -356,7 +356,7 @@ export function IntakeStopDialog({
         </>
       )}
     >
-      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} store={store ?? { id: '' }} />
+      <div className={styles.targetSummary}><OperationTargetSummary accounts={[{ id: accountId ?? '' }]} store={store ?? { id: '' }} /></div>
       <p className={styles.dialogLead}>
         選んだサービスで新しい注文の受け付けを止めます。すでに受け付けた注文の調理・受け渡しはそのまま続きます。
       </p>

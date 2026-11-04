@@ -103,6 +103,7 @@ vi.mock('./bulk', async (importOriginal) => {
 
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => fixture.role.value,
+  useStaffIdentityLoad: () => ({ failed: false }),
   canManageRole: (role: string | null) => role === 'owner' || role === 'admin',
 }))
 
@@ -978,10 +979,13 @@ it.each(['staff', null] as const)('停止の窓を開いた後に役割が%sな�
   await act(async () => at('/restaurant-test/delivery?tab=all'))
   await act(async () => confirm())
   expect(fixture.stopIntake).not.toHaveBeenCalled()
-  expect(screen.queryByRole('alertdialog')).not.toBeNull()
-  const dialog = within(screen.getByRole('alertdialog'))
-  expect(within(screen.getByRole('alertdialog').querySelector('[data-window-actions]') as HTMLElement).getByText(role === null ? '担当者の確認が終わるまでお待ちください。' : '店舗や権限が変わったため、受付の操作を中止しました。窓を開き直してください。')).toBeTruthy()
-  expect((dialog.getByRole('button', { name: '止める', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+  if (role === null) {
+    const dialog = within(screen.getByRole('alertdialog'))
+    expect(within(screen.getByRole('alertdialog').querySelector('[data-window-actions]') as HTMLElement).getByText('担当者の確認が終わるまでお待ちください。')).toBeTruthy()
+    expect((dialog.getByRole('button', { name: '止める', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+  } else {
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+  }
 })
 
 it('未取得の別の店では、前の店のサービスを使って停止を開かない', async () => {
@@ -1392,11 +1396,12 @@ it('切替先の一覧待ちでは前の店のサービスを表示せず停止�
 
 
 it.each(['success', 'failure'] as const)('停止の%s応答前に切り替えた時は新しい店と知らせに混ぜない', async (outcome) => {
+  fixture.orders.mockImplementation(async (account: string) => ({ ...ordersData([]), store: { id: account, name: account } }))
   let finish!: (value: { stopped: DeliveryService[]; failed: [] }) => void
   let fail!: (error: Error) => void
   fixture.stopIntake.mockImplementationOnce(() => new Promise((resolve, reject) => { finish = resolve; fail = reject }))
   const view = render(<DeliveryPage />)
-  await screen.findByText('#UE-1001')
+  await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByText('受付をまとめて止める'))
   const first = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
   fireEvent.click(first.getByRole('checkbox', { name: /出前館の受付を止める/ }))
@@ -1409,7 +1414,7 @@ it.each(['success', 'failure'] as const)('停止の%s応答前に切り替えた
   view.rerender(<DeliveryPage />)
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   await waitFor(() => expect(fixture.orders).toHaveBeenCalledWith('account-2', { tab: 'new' }))
-  expect((screen.getByRole('button', { name: '受付をまとめて止める' }) as HTMLButtonElement).disabled).toBe(true)
+  expect((screen.getByRole('button', { name: '受付をまとめて止める' }) as HTMLButtonElement).disabled).toBe(false)
   const callsBeforeResponse = fixture.orders.mock.calls.length
   await act(async () => {
     if (outcome === 'success') finish({ stopped: ['demaecan'], failed: [] })

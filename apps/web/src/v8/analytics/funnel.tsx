@@ -363,7 +363,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
           {run && run.state === 'partial' ? <p className={styles.warnText}>{run.stateReason ?? '一部の期間・種類のデータが無いため、実際より少なく数えている可能性があります。'}</p> : null}
           {/* 結果は集計時の版の写し。いまの定義とずれていたら断り、再集計へ誘導する。 */}
           {run && selectedFunnel?.currentVersion && run.versionNumber != null && run.versionNumber !== selectedFunnel.currentVersion.versionNumber
-            ? <p className={styles.warnText} role="status">{`この結果は定義版${run.versionNumber}で集計したものです。いまの定義は版${selectedFunnel.currentVersion.versionNumber}です。「この${funnelDays}日を再集計」で、いまの定義の結果に更新できます。`}</p> : null}
+            ? <p className={styles.warnText} role="status">{`この結果は定義版${run.versionNumber}で集計したものです。いまの定義は版${selectedFunnel.currentVersion.versionNumber}です。${canManage ? `「この${funnelDays}日を再集計」で、いまの定義の結果に更新できます。` : '管理者に再集計を依頼してください。'}`}</p> : null}
 
           {result ? <div className={styles.routesSplit}>
             <section className={styles.funnelFlow} aria-labelledby="funnel-flow-title">

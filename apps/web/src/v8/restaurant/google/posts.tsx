@@ -850,11 +850,11 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       <p className={styles.muted}>Googleに公開される内容と日時を確認してください。</p>
       <OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: storeId, name: storeName }} />
       {sent ? <Notice tone="success">{sent.alreadyPublished ? 'この内容はすでにGoogleに届いていました。送信はしていません。' : post.status === 'published' ? 'Googleに投稿を送信し、公開を確認しました。' : 'Googleに投稿を送信しました。反映を確認できるまで「審査中」と表示します。'}</Notice> : null}
-      {post.status === 'rejected' ? <Notice tone="danger">Googleの審査で公開されませんでした。内容を見直して作り直してください。</Notice> : null}
-      {post.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で予約する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
+      {post.status === 'rejected' ? <Notice tone="danger">Googleの審査で公開されませんでした。{canEdit ? '内容を見直して作り直してください。' : '管理者に内容の確認を依頼してください。'}</Notice> : null}
+      {post.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。{canSend && writeEnabled ? '「この内容で予約する」を押すと、先にGoogle側の状態を照合してから送信します。' : 'Google側の状態を確認してください。'}</Notice> : null}
       {!writeEnabled ? <Notice tone="warn">この環境ではGoogleへの投稿が許可されていません。内容の確認まではできます。</Notice> : null}
       {writeEnabled && !canPublish ? <Notice tone="warn">Googleへの投稿は店舗管理者以上が行います。この下書きは保存されているので、管理者が確認して投稿できます。</Notice> : null}
-      {post.instagram?.status === 'failed' ? <Notice tone="warn">{`Instagram へは出せませんでした${post.instagram.error ? `（${post.instagram.error}）` : ''}。Google への公開はそのまま残っています。投稿一覧の「…」から「Instagram へ再送」でもう一度送れます。`}</Notice> : null}
+      {post.instagram?.status === 'failed' ? <Notice tone="warn">{`Instagram へは出せませんでした${post.instagram.error ? `（${post.instagram.error}）` : ''}。Google への公開はそのまま残っています。${canSend ? '投稿一覧の「…」から「Instagram へ再送」でもう一度送れます。' : '管理者に確認を依頼してください。'}`}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <dl className={styles.facts}>
         <div className={styles.factRow}><dt className={styles.factKey}>投稿先</dt><dd className={styles.factValue}>{storeName}</dd></div>

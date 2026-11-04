@@ -97,3 +97,11 @@ it('読込中・失敗でも通常の本文と同じ共通の段に収め、再�
   await screen.findByText('全員 1,284 人')
   expect(container.firstElementChild?.className).toBe(layoutClass)
 })
+
+it.each([true, false])('RFMの説明は編集可否 %s に合わせる', async canManage => {
+  render(<SegmentsV8 accountId="a" canManage={canManage} />)
+  await screen.findByText('全員 1,284 人')
+  fireEvent.click(screen.getByRole('button', { name: 'RFM の表の説明' }))
+  expect(await screen.findByText(/マスを押すと、その人たちを見/)).toBeTruthy()
+  expect(Boolean(screen.queryByText(/LINE を送れます/))).toBe(canManage)
+})
