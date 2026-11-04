@@ -9,7 +9,7 @@ import type { RichMenuTestApplyItem } from '@/lib/api'
 
 const net = vi.hoisted(() => ({
   role: 'owner', account: { id: 'account-1', name: '店A' },
-  state: { linked: true, linkGuidance: null as string | null,
+  state: { linked: true, confirmationRevision: 4, destinationToken: 'a'.repeat(64), linkGuidance: null as string | null,
     destination: { staffName: '担当者A', lineUserIdMasked: 'U***1234' },
     active: null as RichMenuTestApplyItem | null, recent: [] as RichMenuTestApplyItem[] },
   apply: vi.fn(), revert: vi.fn(), readState: vi.fn(),
@@ -70,7 +70,7 @@ async function confirmApply() {
 beforeEach(() => {
   net.role = 'owner'
   net.account = { id: 'account-1', name: '店A' }
-  net.state = { linked: true, linkGuidance: null, destination: { staffName: '担当者A', lineUserIdMasked: 'U***1234' }, active: null, recent: [] }
+  net.state = { linked: true, confirmationRevision: 4, destinationToken: 'a'.repeat(64), linkGuidance: null, destination: { staffName: '担当者A', lineUserIdMasked: 'U***1234' }, active: null, recent: [] }
   net.readState.mockReset().mockImplementation(async () => ({ success: true, data: { ...net.state } }))
   net.apply.mockReset().mockImplementation(async () => { net.state.active = item('applied'); return { success: true, data: { id: 'apply-1', status: 'applied' } } })
   net.revert.mockReset().mockImplementation(async () => { net.state.active = item('reverted'); return { success: true, data: { ...net.state.active, userMenuAction: 'restored' } } })
@@ -106,6 +106,7 @@ describe('現役V8の本人LINEでのテスト', () => {
     expect(net.apply).toHaveBeenCalledTimes(2)
     expect(net.apply.mock.calls[0][0]).toBe('g1')
     expect(net.apply.mock.calls[0][1]).toEqual(expect.any(String))
+    expect(net.apply.mock.calls[0][2]).toEqual({ expectedConfirmationRevision: 4, expectedDestinationToken: 'a'.repeat(64) })
     expect(net.apply.mock.calls[1][1]).toBe(net.apply.mock.calls[0][1])
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '自分のLINEにこのメニューを出しますか？' })).toBeNull())
     expect(screen.getByRole('button', { name: '元のメニューに戻す' })).toBeTruthy()
