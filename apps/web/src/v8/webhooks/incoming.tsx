@@ -7,7 +7,7 @@ const FIELD_REQUIREMENTS = {
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox, Copy } from 'lucide-react'
 import type { IncomingWebhook } from '@line-crm/shared'
 import { api, ApiError, type IncomingWebhookDetail as DetailType, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem } from '@/lib/api'
@@ -118,6 +118,7 @@ function maskedSampleText(fields: NonNullable<DetailType['latestSample']>['field
 }
 
 export default function WebhooksIncomingV8() {
+  const router = useRouter()
   const saveErrors = useSaveFormErrors()
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -169,6 +170,15 @@ export default function WebhooksIncomingV8() {
   const [showCreate, setShowCreate] = useState(initialSource !== '')
   const [createName, setCreateName] = useState('')
   const [createSource, setCreateSource] = useState<string>(initialSource || SOURCE_PRESETS[0].value)
+  // 見本リンクは一度だけ受け取る。URL に残すと、実アカウントを切り替えて
+  // 画面が再マウントされた際に前のアカウント用の作成窓が再び開いてしまう。
+  useEffect(() => {
+    if (!initialSource) return
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('source') !== initialSource) return
+    url.searchParams.delete('source')
+    router.replace(`${url.pathname}${url.search}${url.hash}`)
+  }, [initialSource, router])
   const [createSourceFree, setCreateSourceFree] = useState('')
   const [createSecret, setCreateSecret] = useState('')
   const [createFieldError, setCreateFieldError] = useState<{ name?: string; secret?: string; form?: string }>({})
