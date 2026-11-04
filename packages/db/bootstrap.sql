@@ -5447,7 +5447,7 @@ CREATE TABLE "mileage_rewards" (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, hq_template_id TEXT, hq_template_version_id TEXT, hq_customized INTEGER NOT NULL DEFAULT 0 CHECK (hq_customized IN (0, 1)));
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, hq_template_id TEXT, hq_template_version_id TEXT, hq_customized INTEGER NOT NULL DEFAULT 0 CHECK (hq_customized IN (0, 1)), hq_stock_cumulative INTEGER NOT NULL DEFAULT 0 CHECK (hq_stock_cumulative IN (0, 1)));
 
 CREATE TABLE mileage_rules (
   id             TEXT PRIMARY KEY,

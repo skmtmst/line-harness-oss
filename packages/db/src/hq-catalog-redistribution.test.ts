@@ -50,6 +50,12 @@ describe('統括カタログの再配布の記録', () => {
     expect(db.pragma('foreign_key_check')).toEqual([]);
   });
 
+  it('統括の保管後も過去の交換を在庫に数える印を残す', () => {
+    db.prepare("UPDATE mileage_rewards SET hq_stock_cumulative=1 WHERE id='reward'").run();
+    db.prepare("UPDATE hq_templates SET archived_at='2026-11-05T00:00:00Z' WHERE id='reward-hq' AND tenant_id='t'").run();
+    expect(db.prepare("SELECT hq_template_id,hq_stock_cumulative FROM mileage_rewards WHERE id='reward'").get()).toEqual({hq_template_id:null,hq_stock_cumulative:1});
+  });
+
   it('判断記録は統括の削除に含まれ、ひな形と店より先に消す', () => {
     expect(RETENTION_TABLES.hq_catalog_update_decisions).toEqual({ category: 'purge', scope: { by: 'tenant', column: 'tenant_id' } });
     const order = purgeTablesChildFirst();

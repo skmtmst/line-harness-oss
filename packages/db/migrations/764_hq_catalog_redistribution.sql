@@ -2,6 +2,8 @@
 ALTER TABLE mileage_rewards ADD COLUMN hq_template_id TEXT;
 ALTER TABLE mileage_rewards ADD COLUMN hq_template_version_id TEXT;
 ALTER TABLE mileage_rewards ADD COLUMN hq_customized INTEGER NOT NULL DEFAULT 0 CHECK (hq_customized IN (0, 1));
+-- 配布元の保管後も、以前の交換を在庫から引き続き数える。
+ALTER TABLE mileage_rewards ADD COLUMN hq_stock_cumulative INTEGER NOT NULL DEFAULT 0 CHECK (hq_stock_cumulative IN (0, 1));
 
 CREATE TRIGGER mileage_reward_hq_origin_insert BEFORE INSERT ON mileage_rewards
 WHEN NEW.hq_template_id IS NOT NULL AND NOT EXISTS (
