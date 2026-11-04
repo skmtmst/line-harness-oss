@@ -5134,5 +5134,9 @@
   "booking_monthly_attempts": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_rights": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_event_applications": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
-  "booking_monthly_operations": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}}
+  "booking_monthly_operations": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
+  "line_account_hq_admin_memberships": {"category":"purge","scope":{"by":"lineAccount","column":"line_account_id"}},
+  "registration_applications": {"category":"retain","scope":{"by":"tenant","column":"tenant_id"}},
+  "staff_passkey_challenges": {"category":"purge","scope":{"by":"parent","column":"staff_id","parent":"staff_members","parentColumn":"id"}},
+  "staff_passkeys": {"category":"purge","scope":{"by":"parent","column":"staff_id","parent":"staff_members","parentColumn":"id"}}
 }

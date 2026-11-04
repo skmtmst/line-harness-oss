@@ -233,3 +233,45 @@ describe('共有の工程記録の退会後削除', () => {
     } finally {sqlite.exec("ROLLBACK TO workflow_retention_test; RELEASE workflow_retention_test");}
   });
 });
+
+
+describe('認証と統括メンバーの保存期限', () => {
+  it('期限切れの統括だけを選び、別の統括と未ログインのチャレンジを残す', () => {
+    sqlite.exec('SAVEPOINT auth_retention');
+    try {
+      sqlite.exec(`
+        INSERT INTO tenants(id,name) VALUES('auth-retention-a','A'),('auth-retention-b','B');
+        INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES
+          ('auth-staff-a','A','admin','auth-key-a','auth-retention-a'),
+          ('auth-staff-b','B','admin','auth-key-b','auth-retention-b');
+        INSERT INTO line_accounts(id,tenant_id,name,channel_id,channel_access_token,channel_secret) VALUES
+          ('auth-account-a','auth-retention-a','A','auth-channel-a','test','test'),
+          ('auth-account-b','auth-retention-b','B','auth-channel-b','test','test');
+        INSERT INTO line_account_hq_admin_memberships(line_account_id,staff_id) VALUES
+          ('auth-account-a','auth-staff-a'),('auth-account-b','auth-staff-b');
+        INSERT INTO staff_passkeys(credential_id,staff_id,public_key,device_type,backed_up,created_at) VALUES
+          ('credential-a','auth-staff-a','test','singleDevice',0,'2026-11-04'),
+          ('credential-b','auth-staff-b','test','singleDevice',0,'2026-11-04');
+        INSERT INTO staff_passkey_challenges(token_hash,challenge,purpose,staff_id,expires_at,created_at) VALUES
+          ('challenge-a','test','register','auth-staff-a','2026-11-05','2026-11-04'),
+          ('challenge-b','test','register','auth-staff-b','2026-11-05','2026-11-04'),
+          ('challenge-login','test','login',NULL,'2026-11-05','2026-11-04');
+      `);
+      for (const table of ['line_account_hq_admin_memberships','staff_passkey_challenges','staff_passkeys']) {
+        sqlite.prepare(`DELETE FROM ${table} WHERE ${tenantScopeCondition(table)}`).run('auth-retention-a');
+      }
+      expect(sqlite.prepare('SELECT staff_id FROM staff_passkeys').all()).toEqual([{staff_id:'auth-staff-b'}]);
+      expect(sqlite.prepare('SELECT staff_id FROM line_account_hq_admin_memberships').all()).toEqual([{staff_id:'auth-staff-b'}]);
+      expect(sqlite.prepare('SELECT token_hash FROM staff_passkey_challenges ORDER BY token_hash').all())
+        .toEqual([{token_hash:'challenge-b'},{token_hash:'challenge-login'}]);
+    } finally { sqlite.exec('ROLLBACK TO auth_retention; RELEASE auth_retention'); }
+  });
+  it('申込の審査記録は削除対象へ含めず、認証の子は担当者より先に処理する', () => {
+    const order=purgeTablesChildFirst();
+    expect(RETENTION_TABLES.registration_applications.category).toBe('retain');
+    expect(order).not.toContain('registration_applications');
+    for(const table of ['staff_passkey_challenges','staff_passkeys']) {
+      expect(order.indexOf(table)).toBeLessThan(order.indexOf('staff_members'));
+    }
+  });
+});
