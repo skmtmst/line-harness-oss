@@ -76,6 +76,7 @@ function baseProps(overrides: Partial<NenCampaignsListProps> = {}): NenCampaigns
     couponOpen: false, onCouponOpenChange: vi.fn(), onCouponChange: vi.fn(), onSaveCoupon: vi.fn(), savingCoupon: false,
     selectedColumnId: null, onSelectColumn: vi.fn(), audienceCount: null, plan: { when: 'now', scheduledAt: '2026-10-10T10:00' }, onPlanChange: vi.fn(),
     introDraft: '', onIntroChange: vi.fn(), onSaveIntro: vi.fn(), savingColumnId: null, onDeliverColumn: vi.fn(), onDuplicateColumn: vi.fn(),
+    onPreviewColumn: vi.fn(async (column: NenColumn) => ({ column, campaign: SETTINGS.find(item => item.campaignKey === 'column')!, recipientCount: 1, confirmationToken: 'a'.repeat(64), messages: [{ type: 'text' as const, text: '紹介文' }, { type: 'flex' as const, altText: 'コラム', contents: { type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [] } } }] })),
     duplicatingColumnId: null, onTestColumn: vi.fn(), onShowDelivery: vi.fn(), onRetryDelivery: vi.fn(), onChangeDeliveryView: vi.fn(),
     ...overrides,
   }

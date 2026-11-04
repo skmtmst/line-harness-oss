@@ -299,6 +299,7 @@ beforeEach(() => {
   fixture.testSend.mockResolvedValue({ success: true, data: { sent: 1 } })
   fixture.getTestRecipients.mockResolvedValue({
     success: true,
+    confirmationRevision: 2,
     data: [
       { id: 'friend-t1', displayName: 'テスト 一郎', pictureUrl: null },
       { id: 'friend-t2', displayName: 'テスト 二郎', pictureUrl: null },
@@ -1374,6 +1375,7 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'テスト受信者 2名へ送信' }))
     await waitFor(() => expect(fixture.testSend).toHaveBeenCalledTimes(1))
+    expect(fixture.testSend.mock.calls[0][0]).toMatchObject({ accountId: 'account-a', expectedRecipientIds: ['friend-t1', 'friend-t2'], expectedConfirmationRevision: 2 })
     await waitFor(() => expect(screen.getByText('テスト受信者 1名へ送信しました。')).toBeTruthy())
   })
 
