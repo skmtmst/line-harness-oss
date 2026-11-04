@@ -212,9 +212,9 @@ export const mediaMethods = {
         `/api/file-scans/${encodeURIComponent(id)}/release`,
         { method: 'POST', body: JSON.stringify({ accountId, reason, expectedConfirmationRevision }) },
       ),
-    remove: (id: string, accountId: string) =>
+    remove: (id: string, accountId: string, expectedConfirmationRevision?: number) =>
       fetchApi<ApiResponse<{ id: string }>>(
-        `/api/file-scans/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
+        `/api/file-scans/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}${expectedConfirmationRevision === undefined ? '' : `&expectedConfirmationRevision=${encodeURIComponent(expectedConfirmationRevision)}`}`,
         { method: 'DELETE' },
       ),
     getConfig: (accountId: string) =>

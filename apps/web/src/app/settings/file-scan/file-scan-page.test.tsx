@@ -481,6 +481,7 @@ describe('ファイルの安全確認の設定画面', () => {
     await waitFor(() => {
       expect(screen.getByText(message)).toBeTruthy()
     })
+    expect(mocks.remove).toHaveBeenCalledWith('scan-1', 'acc-1', 7)
     expect(screen.getByText('「invoice.pdf」を削除しますか？')).toBeTruthy()
     expect(container.querySelector('p[role="alert"]')).toBeNull()
   })

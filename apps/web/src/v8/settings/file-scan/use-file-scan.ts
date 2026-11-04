@@ -198,11 +198,12 @@ export function useFileScan() {
 
   async function remove() {
     if (!canEditRef.current || !selectedAccountId || !deleteTarget || !deleteScope || deleteScope.scope !== scope.current || deleteScope.ticket !== deleteTicket.current || loadedScope.current !== deleteScope.scope || !mounted.current || deleteLock.current) return
+    if (!deleteTarget.confirmationRevision) { setDeleteError('消せませんでした。通信状態を確認して、もう一度お試しください。'); return }
     const current = () => mounted.current && canEditRef.current && deleteScope.scope === scope.current && deleteScope.ticket === deleteTicket.current
     deleteLock.current = true; setDeleteBusy(true)
     setDeleteError('')
     try {
-      const res = await api.fileScan.remove(deleteTarget.id, selectedAccountId)
+      const res = await api.fileScan.remove(deleteTarget.id, selectedAccountId, deleteTarget.confirmationRevision)
       if (!current()) return
       if (!res.success) {
         setDeleteError('消せませんでした。通信状態を確認して、もう一度お試しください。')
@@ -327,7 +328,7 @@ export function useFileScan() {
   const changeDeleteTarget = (item: FileScanItem | null) => {
     if (item) {
       if (!canOpen()) return
-      const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteTarget(item)
+      const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteTarget({ ...item })
     } else if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setDeleteTarget(null) }
   }
   const changeStopExternal = (open: boolean) => {
