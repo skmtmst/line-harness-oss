@@ -131,6 +131,16 @@ async function openTestDialog() {
   await flush()
 }
 
+it('A/B有効時のテスト送信はA案だけと窓に示す', async () => {
+  await renderForm()
+  await fillMinimum()
+  const add = [...container.querySelectorAll('button')].find(b => b.textContent?.trim() === 'B 案を追加')!
+  await act(async () => { add.click() }); await flush()
+  const send = [...container.querySelectorAll('button')].find(b => b.textContent?.trim() === 'テストを送る')!
+  await act(async () => { send.click() }); await flush()
+  expect(dialog().textContent).toContain('テスト送信は A案で送ります')
+})
+
 async function confirmTestSend() {
   const button = [...dialog().querySelectorAll('button')].find((b) => b.textContent?.trim() === 'テストを送る')
   expect(button).toBeDefined()

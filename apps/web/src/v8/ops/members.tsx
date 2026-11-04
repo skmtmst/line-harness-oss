@@ -4,12 +4,13 @@ import { requiredText } from '@/lib/form-requirement'
 const inviteEmailRequirement = requiredText('招待する人のメールアドレスを入れてください')
 import { useUrlTab } from '@/lib/use-url-tab'
 import { UserPlus } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsMember } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import NoticeLineAccountCard from '@/components/ops/notice-line-account-card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import { Field } from '@/components/shared/form-controls'
@@ -71,6 +72,8 @@ export default function OpsMembersV8() {
   const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
   const unknown = access === 'unknown'
   const [pending, setPending] = useState<PendingAction | null>(null)
+  const pendingRef = useRef<PendingAction | null>(null)
+  useEffect(() => () => { pendingRef.current = null }, [])
   const [notice, setNotice] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null)
 
@@ -117,12 +120,13 @@ export default function OpsMembersV8() {
   }
 
   const applyPending = async () => {
-    if (!pending || access !== 'writer') return
+    if (!pending || pendingRef.current !== pending || access !== 'writer') return
+    pendingRef.current = null
     setBusy(true)
     setError('')
     const res = await opsCall(api.ops.setMemberActive(pending.member.staffId, pending.kind === 'resume'))
     setBusy(false)
-    if (!res.success) { setError(res.error || '変更できませんでした。時間をおいて、もう一度お試しください。'); return }
+    if (!res.success) { pendingRef.current = pending; setError(res.error || '変更できませんでした。時間をおいて、もう一度お試しください。'); return }
     setPending(null)
     void load()
   }
@@ -169,9 +173,12 @@ export default function OpsMembersV8() {
                       <GridCell>{totpChip(m)}</GridCell>
                       <GridCell>{stateChip(m)}</GridCell>
                       <GridCell><span className={styles.shortText} title={m.lastLoginAt ? formatDateTime(m.lastLoginAt) : undefined}>{shortDateTime(m.lastLoginAt)}</span></GridCell>
-                      <GridCell align="right">{access === 'writer' && self
-                        ? <RowActions subjectName={m.name} menuButtonProps={{ disabled: true, title: '自分の運営アカウントは停止・取り消しできません' }} menuNote="自分の運営アカウントは停止・取り消しできません" />
-                        : <RowActions subjectName={m.name} menuButtonProps={{ disabled: busy || resendingId !== null }} menuItems={memberRowItems(m, access, invited, () => { void resend(m) }, kind => setPending({ member: m, kind }))} />}
+                      <GridCell align="right">
+                        {access === 'writer' && self ? (
+                          <RowActions subjectName={m.name} menuButtonProps={{ disabled: true, title: '自分の運営アカウントは停止・取り消しできません' }} menuNote="自分の運営アカウントは停止・取り消しできません" />
+                        ) : (
+                          <RowActions subjectName={m.name} menuButtonProps={{ disabled: busy || resendingId !== null }} menuItems={memberRowItems(m, access, invited, () => { void resend(m) }, (kind) => { const action = { member: m, kind }; pendingRef.current = action; setPending(action) })} />
+                        )}
                       </GridCell>
                     </GridRow>
                   })}
@@ -199,9 +206,10 @@ export default function OpsMembersV8() {
         error={error}
         designNode={pending?.kind === 'stop' ? 'VUyYu' : undefined}
         onConfirm={() => applyPending()}
-        onCancel={() => { if (!busy) setPending(null) }}
+        onCancel={() => { if (!busy) { pendingRef.current = null; setPending(null) } }}
       >
         <div className={parts.dialogBody}>
+          <OperationTargetSummary accounts={[{ id: '', name: '不明' }]} externalTarget={{ label: '対象者', name: pending ? `${pending.member.name}（1人）` : '不明' }} />
           <Notice tone="info">
             {pending?.kind === 'resume'
               ? '再開すると、この人はまた運営コンソールに入れるようになります。'

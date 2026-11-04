@@ -25,6 +25,11 @@ vi.mock('@/components/shared/confirm-dialog', async importOriginal => {
     return <actual.default {...props} />
   } }
 })
+vi.mock('@/lib/line-accounts-cache', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/line-accounts-cache')>()),
+  loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '選択中の店' }, { id: 'account-b', name: 'フォルダの所有店' }] })),
+}))
+
 const formImport = vi.hoisted(() => ({ evaluations: 0, props: null as unknown }))
 vi.mock('@/components/broadcasts/broadcast-form', () => {
   formImport.evaluations += 1
@@ -983,6 +988,7 @@ describe('保持した一斉配信一覧の変更操作', () => {
     const dialog = document.querySelector('[role="alertdialog"]')!
     expect(dialog.textContent).toContain('LINEアカウント')
     expect(dialog.textContent).toContain('環境')
+    expect(dialog.textContent).toContain('名前を確認できません')
   })
   it('アカウントを切り替えて戻しても古い配信削除を実行しない', async () => {
     deleteBroadcast.mockClear(); resetUrl()
@@ -1068,6 +1074,63 @@ describe('保持した一斉配信一覧の変更操作', () => {
     await act(async () => retained!())
     expect(deleteFolder).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('権限が変わったため、フォルダの削除を中止しました。')
+  })
+
+  it('折りたたんだフォルダ欄でも削除入口を出す', async () => {
+    resetUrl()
+    listFolders.mockResolvedValue({ success: true, data: [{ id: 'a', name: '分類A', kind: 'broadcast' }], unfiledCount: 2 })
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    act(() => fireEvent.click(host.querySelector('[data-folder-select][title="分類A"]')!)); await flush()
+    expect(document.querySelectorAll('[aria-label="フォルダ「分類A」の操作"]')).toHaveLength(2)
+  })
+
+  it('フォルダに記録された所有先を表示する', async () => {
+    resetUrl()
+    listFolders.mockResolvedValue({ success: true, data: [{ id: 'a', name: '分類A', kind: 'broadcast', accountId: 'account-b' }], unfiledCount: 2 })
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
+    act(() => fireEvent.click(menuItem('消す'))); await flush()
+    await waitFor(() => expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('フォルダの所有店'))
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).not.toContain('選択中の店')
+  })
+
+  it('共通フォルダの削除は共通の対象を示す', async () => {
+    resetUrl()
+    listFolders.mockResolvedValue({ success: true, data: [{ id: 'a', name: '分類A', kind: 'broadcast', accountId: null }], unfiledCount: 2 })
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
+    act(() => fireEvent.click(menuItem('消す'))); await flush()
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('共通（全アカウント）')
+  })
+
+  it('閉じたフォルダ削除の古い確定は実行しない', async () => {
+    resetUrl()
+    listFolders.mockResolvedValue({ success: true, data: [{ id: 'a', name: '分類A', kind: 'broadcast' }], unfiledCount: 2 })
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
+    act(() => fireEvent.click(menuItem('消す'))); await flush()
+    const retained = heldConfirm.folder!
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    act(() => fireEvent.click([...dialog.querySelectorAll('button')].find(b => b.textContent?.trim() === 'キャンセル')!)); await flush()
+    await act(async () => retained())
+    expect(deleteFolder).not.toHaveBeenCalled()
+  })
+
+  it('フォルダ削除は対象と環境を出し、別アカウントに切り替えたら確定できない', async () => {
+    resetUrl()
+    listFolders.mockResolvedValue({ success: true, data: [{ id: 'a', name: '分類A', kind: 'broadcast' }], unfiledCount: 2 })
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
+    act(() => fireEvent.click(menuItem('消す'))); await flush()
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
+    const retained = heldConfirm.folder!
+    account.id = 'account-b'
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    expect(document.querySelector('[role="alertdialog"]')?.getAttribute('data-closing')).toBe('true')
+    await act(async () => retained())
+    expect(deleteFolder).not.toHaveBeenCalled()
   })
 
   it('adminはフォルダの並び順と削除を各1回保存できる', async () => {

@@ -24,7 +24,7 @@ vi.mock('next/navigation', () => ({
 
 import BroadcastDetail, { type BroadcastDetailProps } from './detail'
 import Reserved, { type ReservedProps } from './reserved'
-import type { ApiBroadcast, BroadcastApprovalState } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast, type BroadcastApprovalState } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 
@@ -209,6 +209,44 @@ describe('V8 一斉配信の詳細', () => {
     expect(dialog.querySelector('[title="account-a"]')).toBeTruthy()
     await render(<BroadcastDetail {...detailProps({ broadcast: { ...first, id: 'other' } })} />)
     expect(document.querySelector('[role="alertdialog"], [role="dialog"]')).toBeNull()
+  })
+
+  it('詳細の予約取消は確認時の版を送り、409後は読み直すまで再実行しない', async () => {
+    const cancel = vi.spyOn(api.broadcasts, 'cancelReservation').mockRejectedValueOnce(new ApiError(409))
+    const reload = vi.fn()
+    await render(<BroadcastDetail {...detailProps({ broadcast: broadcast({ status: 'scheduled', scheduledAt: '2026-08-24T01:00:00.000Z', version: 7 }), onReload: reload })} />)
+    await act(async () => { (document.querySelector('[aria-label="配信「未購入者フォロー」の操作"]') as HTMLButtonElement).click() })
+    const item = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(node => node.textContent?.trim() === '予約を取り消す')!
+    await act(async () => item.click())
+    const dialog = document.querySelector('[role="dialog"]')!
+    const confirm = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === '予約を取り消す')!
+    await act(async () => { confirm.click() })
+    expect(cancel).toHaveBeenCalledWith('broadcast-1', 7)
+    expect(dialog.textContent).toContain('ほかの人が予約を変えました。読み直してから、もう一度選んでください')
+    expect(dialog.querySelector('[data-save-conflict]')).not.toBeNull()
+    expect([...dialog.querySelectorAll('button')].some(button => button.textContent?.trim() === '予約を取り消す')).toBe(false)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    const reloadButton = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === '最新を読み込んで続ける')!
+    await act(async () => reloadButton.click())
+    expect(reload).toHaveBeenCalledTimes(1)
+    cancel.mockRestore()
+  })
+
+  it('詳細の取消が409になり閉じたときも最新の予約を読み直す', async () => {
+    const cancel = vi.spyOn(api.broadcasts, 'cancelReservation').mockRejectedValueOnce(new ApiError(409, '', 'VERSION_CONFLICT', { status: 'sending' }))
+    const reload = vi.fn()
+    await render(<BroadcastDetail {...detailProps({ broadcast: broadcast({ status: 'scheduled', scheduledAt: '2026-08-24T01:00:00.000Z' }), onReload: reload })} />)
+    await act(async () => { (document.querySelector('[aria-label="配信「未購入者フォロー」の操作"]') as HTMLButtonElement).click() })
+    const item = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(node => node.textContent?.trim() === '予約を取り消す')!
+    await act(async () => item.click())
+    const dialog = document.querySelector('[role="dialog"]')!
+    const confirm = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === '予約を取り消す')!
+    await act(async () => { confirm.click() })
+    expect(dialog.textContent).toContain('送信が始まったため取り消せません')
+    const close = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === '閉じる')!
+    await act(async () => close.click())
+    expect(reload).toHaveBeenCalledTimes(1)
+    cancel.mockRestore()
   })
 
   it('閲覧のみには変える操作を置かない（押せないボタンも残さない）。CSV は出す', async () => {

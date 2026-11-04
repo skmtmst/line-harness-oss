@@ -1,6 +1,9 @@
 'use client'
 
 import { renderFormDialogs } from './list-dialogs'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { VIEWER_NOTE } from './list-helpers'
 import { loadFormsPage } from './list-load'
 
@@ -13,7 +16,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleCheck,ClipboardList,Inbox,Percent,Plus,TriangleAlert } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { useCallback,useEffect,useMemo,useRef,useState,type MouseEvent as ReactMouseEvent,type ReactNode } from 'react'
+import { useCallback,useContext,useEffect,useMemo,useRef,useState,type MouseEvent as ReactMouseEvent,type ReactNode } from 'react'
 
 import Link from '@/components/shared/list-navigation'
 import { RowNameLink,StatusCell } from '@/components/shared/table'
@@ -105,6 +108,9 @@ export default function FormsListV8() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderDeleteScope, setFolderDeleteScope] = useState<typeof accountScope.current | null>(null)
+  const folderDeleteTicket = useRef<object | null>(null)
+  const renderedFolderDeleteTicket = folderDeleteTicket.current
   /** 消す箱に入っているフォーム数。`null` はまだ数えていない。 */
   const [deletingFolderCount, setDeletingFolderCount] = useState<number | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
@@ -153,6 +159,12 @@ export default function FormsListV8() {
   const [renameRevision, setRenameRevision] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState('')
+  const overlayDepth = useContext(OverlayDepthContext)
+  const renameGuard = useUnsavedGuard({
+    dirty: renameTarget !== null && (renameName !== displayFormName(renameTarget.name) || renaming),
+    busy: renameTarget !== null && renaming,
+    onDiscard: () => { setRenameTarget(null); setRenameError('') },
+  })
   /* 受付を止める。止めるにも編集の版が要るので影響口で読む。 */
   const [stopTarget, setStopTarget] = useState<Form | null>(null)
   const [stopScope, setStopScope] = useState<typeof accountScope.current | null>(null)
@@ -182,7 +194,9 @@ export default function FormsListV8() {
     setActiveFolderId('all')
     setFolderDialogOpen(false)
     setEditingFolder(null)
+    folderDeleteTicket.current = null
     setDeletingFolder(null)
+    setFolderDeleteScope(null)
     setFolderError('')
     setDeleteTarget(null)
     setDeleteImpact(null)
@@ -643,6 +657,11 @@ export default function FormsListV8() {
   }
 
   const openFolderDelete = async (folder: Folder) => {
+    const scope = accountScope.current
+    if (!scope.id) return
+    const ticket = {}
+    folderDeleteTicket.current = ticket
+    setFolderDeleteScope(scope)
     setDeletingFolder(folder)
     setDeletingFolderCount(null)
     setFolderError('')
@@ -652,29 +671,36 @@ export default function FormsListV8() {
       const res = await fetchApi<{ success: boolean; data: FormListResponse }>(
         `/api/forms?${account}&folder_id=${encodeURIComponent(folder.id)}&with_list_summary=1&page=1&limit=1&filter=all&sort=latest-answer`,
       )
-      if (res.success) {
+      if (res.success && scope === accountScope.current && ticket === folderDeleteTicket.current) {
         setDeletingFolderCount(Array.isArray(res.data) ? res.data.length : res.data.total)
       }
     } catch (saveFailure) {
+      if (scope !== accountScope.current || ticket !== folderDeleteTicket.current) return
       saveErrors.capture(saveFailure)
       setDeletingFolderCount(null)
     }
   }
 
   const removeFolder = async () => {
-    if (!deletingFolder || folderBusy || !selectedAccountId)
-
- return
+    if (!deletingFolder || folderBusy || !selectedAccountId || !renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current || folderDeleteScope !== accountScope.current) return
+    if (deletingFolder.accountId === undefined || (typeof deletingFolder.accountId === 'string' && deletingFolder.accountId !== selectedAccountId)) {
+      setFolderError('フォルダの所有先を確認できません。一覧を読み直してください。')
+      return
+    }
+    const scope = folderDeleteScope
     const targetId = deletingFolder.id
     setFolderBusy(true)
     setFolderError('')
     try {
-      const res = await api.folders.delete(targetId, selectedAccountId)
+      const res = await api.folders.delete(targetId, deletingFolder.accountId ?? undefined)
       if (!res.success) throw new Error(res.error)
+      if (scope !== accountScope.current) return
+      folderDeleteTicket.current = null
       setDeletingFolder(null)
       if (activeFolderId === targetId) setActiveFolderId('all')
       await loadForms()
     } catch (saveFailure) {
+      if (scope !== accountScope.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
@@ -850,17 +876,12 @@ export default function FormsListV8() {
       onEdit: canManageFolders ? () => detailGuard.protect(() => { closeDetail(); setEditingFolder(folder) }) : undefined,
       onMoveUp: canManageFolders && index > 0 ? () => detailGuard.protect(() => { void moveFolder(index, -1) }) : undefined,
       onMoveDown: canManageFolders && index < folders.length - 1 ? () => detailGuard.protect(() => { void moveFolder(index, 1) }) : undefined,
-      onDelete: canManageFolders ? () => detailGuard.protect(() => { void openFolderDelete(folder) }) : undefined,
+      onDelete: canManageFolders ? () => detailGuard.protect(() => { if (renderedScope === accountScope.current) void openFolderDelete(folder) }) : undefined,
       deleteNote: '削除しても、中のフォームは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNFILED_VALUE, label: '未分類', count: loading || loadError ? null : unfiledCount },
   ]
 
-  const folderSelectOptions = [
-    { value: 'all', label: 'フォルダ：すべて' },
-    ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` })),
-    { value: UNFILED_VALUE, label: 'フォルダ：未分類' },
-  ]
   const selectFolder = (folderId: string) => {
     setActiveFolderId(folderId)
     updateListState({ page: 1 })
@@ -1194,7 +1215,7 @@ export default function FormsListV8() {
     <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null
 
-  const overlays = <>{renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms, detailGuard })}{detailGuard.dialog}</>
+  const overlays = <>{renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder: folderDeleteScope === accountScope.current ? deletingFolder : null, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder: (value) => { if (value === null) folderDeleteTicket.current = null; setDeletingFolder(value) }, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms, detailGuard })}{detailGuard.dialog}<OverlayDepthContext.Provider value={overlayDepth + 2}><UnsavedLeaveDialog open={renameGuard.leaveTarget !== null} busy={renaming} onConfirm={renameGuard.confirmLeave} onCancel={renameGuard.cancelLeave} /></OverlayDepthContext.Provider></>
 
   return (
     /* 一覧の状態（読込中・失敗・空・表）を外から待てるように出す。箱は作らない（display: contents）。 */

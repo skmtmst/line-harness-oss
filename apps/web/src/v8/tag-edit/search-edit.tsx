@@ -17,6 +17,7 @@ import { StickyBarAction } from '@/components/shared/sticky-bar'
 import { CreatePage } from '@/components/templates'
 import TargetMissing from '@/components/shared/target-missing'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
@@ -513,6 +514,9 @@ export default function SavedSearchEditV8() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const deleteTicket = useRef<object | null>(null)
+  const renderedDeleteTicket = deleteTicket.current
+  const deleteLock = useRef(false)
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [searchMissing, setSearchMissing] = useState(false)
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
@@ -581,6 +585,8 @@ export default function SavedSearchEditV8() {
      * 飛んでいる人数の再計算も今の対象のものではないので無効にする。
      */
     gateRef.current.invalidate()
+    deleteTicket.current = null
+    setDeleteOpen(false)
     setOriginal(null)
     setName('')
     setConditions({ all: [], any: [] })
@@ -781,18 +787,24 @@ export default function SavedSearchEditV8() {
   }
 
   const remove = async () => {
-    if (!selectedAccountId || !id || original?.canDelete !== true || !canManageRole(staffRole)) return
+    if (!selectedAccountId || selectedAccountId !== accountRef.current || original?.lineAccountId !== selectedAccountId || !id || original.canDelete !== true || !canManageRole(staffRole) || !renderedDeleteTicket || renderedDeleteTicket !== deleteTicket.current || deleteLock.current) return false
+    deleteLock.current = true
     try {
       await api.savedSearches.delete(id, selectedAccountId)
+      if (renderedDeleteTicket !== deleteTicket.current || selectedAccountId !== accountRef.current) return false
+      deleteTicket.current = null
       router.push('/tags?tab=searches')
       return true
     } catch (deleteError) {
+      if (renderedDeleteTicket !== deleteTicket.current || selectedAccountId !== accountRef.current) return false
       const fieldFailure = saveErrors.capture(deleteError)
 
       { if (!fieldFailure)
 
       setError(describeApiFailure(deleteError, '削除')) }
       return false
+    } finally {
+      deleteLock.current = false
     }
   }
 
@@ -899,7 +911,7 @@ export default function SavedSearchEditV8() {
         previewTitle="検索結果と使っている所"
         preview={side}
         destructive={(
-          <StickyBarAction destructive label="削除する" icon={Trash2} disabledReason={original.canDelete === true ? undefined : deleteReason} onClick={() => { setError(''); setDeleteOpen(true) }} />
+          <StickyBarAction destructive label="削除する" icon={Trash2} disabledReason={original.canDelete === true ? undefined : deleteReason} onClick={() => { deleteTicket.current = {}; setError(''); setDeleteOpen(true) }} />
         )}
         status={dirty ? '変更内容を確かめて保存してください' : undefined}
         footerActions={(
@@ -987,7 +999,7 @@ export default function SavedSearchEditV8() {
         {/* IDEA-04：印ならタグ・値なら情報欄・条件の保存は保存した検索、という違いを編集の場所でも確かめられる。 */}
         <AttributeKindGuide current="search" />
       </CreatePage>
-      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} error={error || undefined} onSuccess={() => setDeleteOpen(false)} onConfirm={() => remove()} />
+      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => { if (!deleteLock.current) { deleteTicket.current = null; setDeleteOpen(false) } }} error={error || undefined} onSuccess={() => { deleteTicket.current = null; setDeleteOpen(false) }} onConfirm={() => remove()}><OperationTargetSummary accounts={[{ id: original.lineAccountId ?? '', name: original.lineAccountId === selectedAccountId ? selectedAccount?.name : null }]} /></ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="検索条件への変更" busy={saving} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div></SaveErrorScope>
   )

@@ -3,7 +3,8 @@ import { markNameRequirement } from '@/v8/tags/public/mark-requirement/index'
 
 import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import type { FriendField, Folder, HqFriendAttributeDetail, HqFriendAttributeInput, HqFriendAttributeTemplate, HqFriendAttributeType, HqFriendAttributeListStats, HqTemplateFolder, HqMarkDefinition } from '@line-crm/shared'
 import { ClipboardList, List, Flag, History, Loader, Users, CircleDot, Pencil, Plus } from 'lucide-react'
 import { hqFriendAttributesApi as api } from '@/lib/hq-friend-attributes-api'
@@ -62,7 +63,15 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
   const [folderError, setFolderError] = useState('')
+  const depth = useContext(OverlayDepthContext)
+  const folderGuard = useUnsavedGuard({
+    dirty: folderDialog !== null && (folderName !== (folderDialog === 'new' ? '' : folderDialog.name) || folderColor !== (folderDialog === 'new' ? FOLDER_SELECT_COLORS[0].value : folderDisplayColor(folderDialog)) || busy),
+    busy: folderDialog !== null && busy,
+    onDiscard: () => setFolderDialog(null),
+  })
   const [deletingFolder, setDeletingFolder] = useState<HqTemplateFolder | null>(null)
+  const folderDeleteTicket = useRef<object | null>(null)
+  const renderedFolderDeleteTicket = folderDeleteTicket.current
   const [uncertain, setUncertain] = useState(false)
   const [restored, setRestored] = useState<Attempt | null>(null)
   const scopeKey = useRef<string | null>(null)
@@ -202,7 +211,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     onEdit: (id) => open(id), onRemove: (id) => setDeleting(entries.find((entry) => entry.row.id === id) ?? null), onDistribute: (id) => open(id, true), onOrder: order, kpis: band,
     folders: folderRows, foldersFailed, onAddFolder: () => { setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderError(''); setFolderDialog('new') },
     onEditFolder: (id) => { const folder = folders.find((row) => row.id === id); if (folder) { setFolderName(folder.name); setFolderColor(folderDisplayColor(folder)); setFolderError(''); setFolderDialog(folder) } },
-    onRemoveFolder: (id) => setDeletingFolder(folders.find((row) => row.id === id) ?? null),
+    onRemoveFolder: (id) => { const folder = folders.find((row) => row.id === id) ?? null; folderDeleteTicket.current = folder ? {} : null; setDeletingFolder(folder) },
   }
   const notices = <>{role !== null && !canEdit ? <ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice> : null}{error ? <Notice tone="danger" message={error} action={editor && editor !== 'new' ? <Button disabled={busy} onClick={() => open(editor.template.id)} busy={Boolean(busy)} busyLabel="処理中…">最新の内容を読み込む</Button> : undefined} /> : null}</>
   if (distribution && !distribution.saved) return <SaveErrorScope errors={saveErrors}><AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} onClose={() => { setDistribution(null); void load() }} /></SaveErrorScope>
@@ -228,11 +237,12 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     tabs={<AttributeTabs tab={tab} onSelect={onTab} />} overlays={<>
       {distribution?.saved ? <AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} saved onClose={() => { setDistribution(null); void load() }} /> : null}
       <ConfirmDialog open={!!deleting} title="ひな形を削除" deleteName={deleting?.row.name ?? ''} description={`「${deleting?.row.name ?? ''}」を削除します。配布済みのアカウントの情報と履歴は残ります。`} destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeleting(null) }} onConfirm={() => perform(async () => { if (!deleting) return; await api.remove(deleting.row.id, deleting.row.revision); setDeleting(null); await load() })}><OperationTargetSummary accounts={[]} externalTarget={{ label: '統括ひな形', name: deleting?.row.name }} /></ConfirmDialog>
+      <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={folderGuard.leaveTarget !== null} busy={busy} onConfirm={folderGuard.confirmLeave} onCancel={folderGuard.cancelLeave} /></OverlayDepthContext.Provider>
       <FolderEditorDialog open={folderDialog !== null} title={folderDialog === 'new' ? 'フォルダを追加' : 'フォルダを直す'}
         name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor}
         busy={busy} error={folderError || undefined} confirmLabel={folderDialog === 'new' ? '追加する' : '保存する'}
         onCancel={() => { if (!busy) setFolderDialog(null) }} onConfirm={() => saveFolder()} />
-      <ConfirmDialog open={!!deletingFolder} title="フォルダを削除" deleteName={deletingFolder?.name ?? ''} description="中のひな形は未分類に残ります。" destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeletingFolder(null) }} onConfirm={() => perform(async () => { if (!deletingFolder) return; await api.folders.remove(deletingFolder.id, deletingFolder.revision); setDeletingFolder(null); await loadFolders(); await load() })} />
+      <ConfirmDialog open={!!deletingFolder} title="フォルダを削除" deleteName={deletingFolder?.name ?? ''} description="中のひな形は未分類に残ります。" destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy && !lock.current) { folderDeleteTicket.current = null; setDeletingFolder(null) } }} onConfirm={() => { if (!deletingFolder || !renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current) return; return perform(async () => { await api.folders.remove(deletingFolder.id, deletingFolder.revision); if (renderedFolderDeleteTicket !== folderDeleteTicket.current) return; folderDeleteTicket.current = null; setDeletingFolder(null); await loadFolders(); await load() }) }}><OperationTargetSummary accounts={[]} externalTarget={{ label: '統括のフォルダ', name: deletingFolder?.name }} /></ConfirmDialog>
     </>}>
     {notices}
     {type === 'friend_field' ? <FieldsTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: fieldRows }} explanation /> : <MarksTab accountId={null} canEdit={canEdit && !busy} host={{ ...hostBase, items: markRows }} explanation />}

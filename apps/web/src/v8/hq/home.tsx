@@ -8,7 +8,10 @@ import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/sh
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import Link from 'next/link';
 import { Folder as FolderIcon, Inbox, LayoutGrid, List, LogIn, Pencil, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { ListPage, ListPageCards } from '@/components/templates';
 import Card from '@/components/shared/card';
@@ -21,6 +24,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
 import EmptyList from '@/components/shared/empty-list';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
+import OperationTargetSummary from '@/components/shared/operation-target-summary';
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel';
 import ListState from '@/components/shared/list-state';
 import Notice from '@/components/shared/notice';
@@ -115,9 +119,18 @@ export default function HqHomeV8() {
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState<string | null>(null)
   const [deleteFolder, setDeleteFolder] = useState<(Folder & { itemCount?: number }) | null>(null)
+  const folderDeleteTicket = useRef<object | null>(null)
+  const renderedFolderDeleteTicket = folderDeleteTicket.current
+  const folderDeleteLock = useRef(false)
   const [folderError, setFolderError] = useState('')
   const [folderNameError, setFolderNameError] = useState('')
   const [folderSaving, setFolderSaving] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const folderGuard = useUnsavedGuard({
+    dirty: folderDialog !== null && (folderName !== (folderDialog.editing?.name ?? '') || folderColor !== (folderDialog.editing ? folderDisplayColor(folderDialog.editing) : DEFAULT_TAG_FOLDER_COLOR) || folderSaving),
+    busy: folderDialog !== null && folderSaving,
+    onDiscard: () => setFolderDialog(null),
+  })
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -429,12 +442,15 @@ export default function HqHomeV8() {
 
   /* 消す：中のアカウントは消えず未分類へ（API-17 の DELETE）。 */
   const removeFolder = async (target: Folder) => {
-
+    if (!renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current || folderDeleteLock.current) return
+    folderDeleteLock.current = true
     setFolderSaving(true)
     setFolderError('')
     try {
       const response = await api.lineAccountFolders.remove(target.id)
       if (!response.success) throw new Error(response.error)
+      if (renderedFolderDeleteTicket !== folderDeleteTicket.current) return
+      folderDeleteTicket.current = null
       setDeleteFolder(null)
       if (folder === target.id) setFolder(ALL)
       await loadFolders()
@@ -447,6 +463,7 @@ export default function HqHomeV8() {
         if (!fieldFailure) setFolderError(describeApiFailure(caught, '保存', { scope: 'hq' }))
       }
     } finally {
+      folderDeleteLock.current = false
       setFolderSaving(false)
     }
   }
@@ -463,7 +480,7 @@ export default function HqHomeV8() {
       onEdit: canManage ? () => openFolderDialog(f) : undefined,
       onMoveUp: canManage && index > 0 ? () => void moveFolder(index, -1) : undefined,
       onMoveDown: canManage && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
-      onDelete: canManage ? () => { setFolderError(''); setDeleteFolder(f) } : undefined,
+      onDelete: canManage ? () => { folderDeleteTicket.current = {}; setFolderError(''); setDeleteFolder(f) } : undefined,
     })),
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: accountsReadable ? localUnfiled : null },
   ]
@@ -797,6 +814,8 @@ export default function HqHomeV8() {
         onConfirm={() => saveFolder()}
       >{folderUnchanged ? <Notice tone="info" compact>名前か色を変えると保存できます。</Notice> : null}</FolderEditorDialog>
 
+      <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={folderGuard.leaveTarget !== null} busy={folderSaving} onConfirm={folderGuard.confirmLeave} onCancel={folderGuard.cancelLeave} /></OverlayDepthContext.Provider>
+
       {deleteFolder ? (
         <ConfirmDialog
           open
@@ -808,8 +827,8 @@ export default function HqHomeV8() {
           busy={folderSaving}
           error={folderError || undefined}
           onConfirm={() => removeFolder(deleteFolder)}
-          onCancel={() => { if (!folderSaving) setDeleteFolder(null) }}
-        />
+          onCancel={() => { if (!folderSaving && !folderDeleteLock.current) { folderDeleteTicket.current = null; setDeleteFolder(null) } }}
+        ><OperationTargetSummary accounts={[]} externalTarget={{ label: '対象アカウント', name: '未分類へ移るアカウントの名前を確認できません' }} /></ConfirmDialog>
       ) : null}
     </ListPage></SaveErrorScope>
     </KpiValueMotionProvider>

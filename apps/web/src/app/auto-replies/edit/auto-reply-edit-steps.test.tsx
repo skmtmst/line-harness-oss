@@ -15,9 +15,10 @@ import WizardV8 from '../../../v8/auto-replies/edit/wizard'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AutoReplyEditPage from './page'
 
+const wizardSearch = vi.hoisted(() => ({ value: 'step=trigger' }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams('step=trigger'),
+  useSearchParams: () => new URLSearchParams(wizardSearch.value),
 }))
 const accountState = vi.hoisted(() => ({ selectedAccountId: 'a', accounts: [] }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => accountState }))
@@ -54,6 +55,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  wizardSearch.value = 'step=trigger'
   verifiedStaffRole('owner')
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   host = document.createElement('div')
@@ -108,4 +110,16 @@ it('WEB290：曜日の最後の1つは外せず、その欄で理由を伝える
   await act(async () => fireEvent.click(days[6]))
   expect(days[6].getAttribute('aria-pressed')).toBe('true')
   expect(screen.getByText('反応する曜日を1つ以上選んでください。')).toBeTruthy()
+})
+
+
+it('自動応答の名前とフォルダ入力をまとめて確認してからキャンセルする', async () => {
+  wizardSearch.value = 'step=basic'
+  await act(async () => { root.render(<WizardV8 />) }); await flush()
+  await act(async () => { fireEvent.change(screen.getByLabelText(/ルール名/), { target: { value: '編集中' } }) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ', exact: true })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' })) })
+  await act(async () => { fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '分類の途中' } }); fireEvent.pointerDown(document.body) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true })) })
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('作りかけのフォルダ')
 })

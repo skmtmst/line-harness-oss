@@ -716,3 +716,5 @@
     bottom: auto;
   }
 }
+
+:global(:root) .titleRow:has([data-help-reserving]) { align-items: flex-start; }

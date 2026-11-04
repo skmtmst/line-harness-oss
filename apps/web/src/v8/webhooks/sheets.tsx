@@ -7,6 +7,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { SaveErrorField,SaveErrorScope } from '@/components/shared/save-form-errors'
 import { DelayedSkeleton,Skeleton } from '@/components/shared/skeleton'
 import StatusBadge from '@/components/shared/status-badge'
@@ -21,9 +22,7 @@ import styles from './sheets.module.css'
 import {
 ViewerBand,
 WEBHOOKS_DESCRIPTION,
-WebhookBand,
 WebhookTabs,
-overviewBandCells
 } from './shell'
 import { useSheets } from './use-sheets'
 import { shortDateTime } from './words'
@@ -229,13 +228,6 @@ export default function WebhooksSheetsV8() {
       tabs={<WebhookTabs active="sheets" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {!isOwner ? <ViewerBand /> : null}
-        <WebhookBand
-          cells={overviewBandCells({
-            outgoing: overview.outgoingCount === null ? null : overview.outgoing,
-            incomingCount: overview.incomingCount,
-            summary: overview.summary,
-          })}
-        />
       </>}
       overlays={(
         <Dialog
@@ -255,7 +247,8 @@ export default function WebhooksSheetsV8() {
           onConfirm={() => handleDisconnect()}
           onCancel={() => { if (busy !== 'disconnect') setDisconnectFor(null) }}
         >
-          <p>{`「${disconnectFor?.label ?? ''}」の連携設定・同期の記録・Google側の許可を消します。`}</p>
+          <p>このLINEアカウントの連携設定・同期の記録・Google側の許可を消します。</p>
+          <OperationTargetSummary accounts={[{ id: disconnectFor?.id ?? '', name: disconnectFor?.label === disconnectFor?.id ? undefined : disconnectFor?.label }]} />
         </Dialog>
       )}
     >

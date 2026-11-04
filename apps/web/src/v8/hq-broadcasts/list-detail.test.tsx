@@ -13,8 +13,16 @@ const hq = vi.hoisted(() => ({
   list: vi.fn(), get: vi.fn(),
   folders: vi.fn(async () => ({ success: true, data: [] })),
   approvalCandidates: vi.fn(async () => ({ success: true, data: [] })),
-  approval: vi.fn(), updateFolder: vi.fn(), createFolder: vi.fn(),
+  approval: vi.fn(), updateFolder: vi.fn(), createFolder: vi.fn(), deleteFolder: vi.fn(async () => ({ success: true })),
 }))
+const heldFolderConfirm = vi.hoisted(() => ({ current: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.description.startsWith('中の一括配信') && props.onConfirm) heldFolderConfirm.current = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 const params = vi.hoisted(() => ({ value: new URLSearchParams() }))
 vi.mock('@/lib/hq-broadcasts-api', () => ({ hqBroadcastsApi: hq }))
 vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
@@ -129,6 +137,27 @@ describe('統括の一括配信の詳細（M2tJM）', () => {
   })
 })
 
+it('閉じた統括配信フォルダの古い確定は削除しない', async () => {
+  hq.folders.mockResolvedValue({ success: true, data: [{ id: 'f1', name: 'キャンペーン', revision: 1, item_count: 0, color: '#3b82f6' }] } as never)
+  hq.list.mockResolvedValue({ data: [] }); hq.deleteFolder.mockClear()
+  render(<HqBroadcastList />)
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「キャンペーン」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  const held = heldFolderConfirm.current!
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセル' }))
+  await held()
+  expect(hq.deleteFolder).not.toHaveBeenCalled()
+})
+
+it('統括配信のフォルダ削除前に環境を示す', async () => {
+  hq.folders.mockResolvedValue({ success: true, data: [{ id: 'f1', name: 'キャンペーン', revision: 1, item_count: 0, color: '#3b82f6' }] } as never)
+  hq.list.mockResolvedValue({ data: [] })
+  render(<HqBroadcastList />)
+  fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「キャンペーン」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '消す' }))
+  expect(screen.getByRole('alertdialog').textContent).toContain('環境')
+})
+
 it('統括のフォルダは色の保存に失敗しても窓を残し、再試行・読み直し後にも色が残る', async () => {
   let saved = { id: 'f1', name: 'キャンペーン', revision: 1, item_count: 0, color: '#3b82f6' }
   hq.folders.mockImplementation(async () => ({ success: true, data: [saved] } as never))
@@ -178,4 +207,28 @@ it('対象を切り替えたら、前の一括配信の設定を読み込み中�
   expect(screen.queryByRole('complementary', { name: '配信した設定とメッセージ' })).toBeNull()
   finish({ data: run('new-run', '次の配信', [target('b', 'sent', 20, 10)]) })
   expect(await screen.findByRole('heading', { name: /次の配信/ })).toBeTruthy()
+})
+it('統括の一括配信のフォルダ名を編集中は移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/hq/broadcasts')
+  hq.list.mockResolvedValue({ data: [run('r1', 'ある配信', [target('a', 'sent', 100, 50)])] })
+  render(<><HqBroadcastList /><a href="/events">イベントへ</a></>)
+  await screen.findByText('ある配信')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '連絡' } })
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})
+
+it('統括のフォルダ窓をキャンセルすると確認は1回だけで閉じる', async () => {
+  window.history.replaceState(null, '', '/hq/broadcasts')
+  hq.list.mockResolvedValue({ data: [run('r1', 'ある配信', [target('a', 'sent', 100, 50)])] })
+  render(<HqBroadcastList />)
+  await screen.findByText('ある配信')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '連絡' } })
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'フォルダを追加' })).getByRole('button', { name: 'やめる' }))
+  expect(screen.getAllByRole('dialog', { name: '入力を破棄しますか？' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
+  expect(screen.queryByRole('dialog', { name: '入力を破棄しますか？' })).toBeNull()
+  expect(screen.queryByRole('dialog', { name: 'フォルダを追加' })).toBeNull()
 })

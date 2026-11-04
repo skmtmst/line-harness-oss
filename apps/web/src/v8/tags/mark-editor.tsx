@@ -17,6 +17,7 @@ import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import { Field } from '@/components/shared/form-controls';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -150,6 +151,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const [rulesState, setRulesState] = useState<'loading' | 'ready' | 'error' | 'forbidden' | 'not-connected'>('loading')
   const [rulesOpen, setRulesOpen] = useState(false)
   const [stoppingRule, setStoppingRule] = useState<SupportMarkAutomationRule | null>(null)
+  const stopScopeRef = useRef<{ accountId: string | null; generation: number } | null>(null)
+  const stopScope = stopScopeRef.current
   const [ruleBusy, setRuleBusy] = useState(false)
   const [ruleError, setRuleError] = useState('')
 
@@ -274,12 +277,13 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   useEffect(() => { void loadRules() }, [loadRules])
 
   const stopRule = async () => {
-    if (canManageByRole !== true || !selectedAccountId || !stoppingRule) return
+    if (canManageByRole !== true || !stopScope?.accountId || stopScopeRef.current !== stopScope || stopScope.generation !== archiveScope.current.generation || !stoppingRule) return
     setRuleBusy(true)
     setRuleError('')
     try {
-      const res = await api.supportMarks.archiveAutomationRule(stoppingRule.id, selectedAccountId, stoppingRule.version)
+      const res = await api.supportMarks.archiveAutomationRule(stoppingRule.id, stopScope.accountId, stoppingRule.version)
       if (!res.success) throw new Error('failed')
+      stopScopeRef.current = null
       setStoppingRule(null)
       await loadRules()
     } catch (reason) {
@@ -528,7 +532,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                       <IconButton size="small" aria-label={`きまり「${rule.name}」を直す`} title="直す" onClick={() => setRulesOpen(true)}>
                         <Pencil className={styles.wayIcon} aria-hidden="true" />
                       </IconButton>
-                      <IconButton size="small" aria-label={`きまり「${rule.name}」を止める`} title="止める" onClick={() => { setRuleError(''); setStoppingRule(rule) }}>
+                      <IconButton size="small" aria-label={`きまり「${rule.name}」を止める`} title="止める" onClick={() => { stopScopeRef.current = { accountId: selectedAccountId, generation: archiveScope.current.generation }; setRuleError(''); setStoppingRule(rule) }}>
                         <Trash2 className={styles.wayIcon} aria-hidden="true" />
                       </IconButton>
                     </div>
@@ -596,9 +600,13 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         destructive
         busy={ruleBusy}
         error={ruleError || undefined}
-        onCancel={() => { if (!ruleBusy) setStoppingRule(null) }}
+        confirmDisabled={!stopScope?.accountId || stopScope.generation !== archiveScope.current.generation}
+        confirmDisabledReason="対象を確認できないか、表示後に切り替わりました。閉じて確認し直してください。"
+        onCancel={() => { if (!ruleBusy) { stopScopeRef.current = null; setStoppingRule(null) } }}
         onConfirm={() => stopRule()}
-      />
+      >
+        <OperationTargetSummary accounts={[{ id: stopScope?.accountId ?? '' }]} externalTarget={{ label: '対象件数', name: stoppingRule ? '1件' : null }} />
+      </ConfirmDialog>
     </></SaveErrorScope>
   )
 }

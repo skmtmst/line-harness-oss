@@ -274,6 +274,9 @@ export default function BroadcastListV8() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderDeleteScope, setFolderDeleteScope] = useState<typeof accountScope.current | null>(null)
+  const folderDeleteTicket = useRef<object | null>(null)
+  const renderedFolderDeleteTicket = folderDeleteTicket.current
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderActionError, setFolderError] = useState('')
   const folderError = folderActionError || folderLoadError
@@ -359,17 +362,22 @@ export default function BroadcastListV8() {
 
   const removeFolder = async () => {
     if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの削除を中止しました。'); return }
-    if (!deletingFolder || folderBusy) return
+    if (!deletingFolder || folderBusy || !renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current || folderDeleteScope !== accountScope.current) return
+    const scope = folderDeleteScope
+    const ticket = renderedFolderDeleteTicket
     const targetId = deletingFolder.id
     setFolderBusy(true)
     setFolderError('')
     try {
       const res = await api.folders.delete(targetId)
       if (!res.success) throw new Error(res.error)
+      if (scope !== accountScope.current || ticket !== folderDeleteTicket.current) return
+      folderDeleteTicket.current = null
       setDeletingFolder(null)
       if (folderFilter === targetId) setFolderFilter('')
       await loadFolders()
     } catch (saveFailure) {
+      if (scope !== accountScope.current || ticket !== folderDeleteTicket.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
@@ -750,17 +758,13 @@ export default function BroadcastListV8() {
       onMoveDown: index < folders.length - 1 ? () => void moveFolderOrder(index, 1) : undefined,
       onDelete: () => {
         if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの削除を中止しました。'); return }
+        folderDeleteTicket.current = {}
+        setFolderDeleteScope(accountScope.current)
         setDeletingFolder(f)
       },
       deleteNote: '削除しても、中の配信は未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
-  ]
-
-  const folderSelectOptions = [
-    { value: '', label: 'フォルダ：すべて' },
-    ...folders.map((f) => ({ value: f.id, label: `フォルダ：${f.name}` })),
-    { value: UNFILED, label: 'フォルダ：未分類' },
   ]
 
   /** 行の「…」。編集を続ける（下書き・予約）・複製・フォルダへ移す・削除。 */
@@ -970,12 +974,6 @@ export default function BroadcastListV8() {
 
   const sortButton = (
 <ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
-  )
-
-  const folderSelect = (
-    <div className={styles.folderSelect}>
-      <SaveErrorField names={["folderFilter","activeId","folder_filter"]}><Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
-    </div>
   )
 
   /* 道具の段：1440 は「探す・配信日 … 保存した検索（この条件を保存するはこの中）」／「札 … 件数・並び」。1152 は作る・フォルダが前に入り、札は選ぶ欄。 */
@@ -1309,7 +1307,7 @@ menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedR
           )
         })() : null}
         <ConfirmDialog
-          open={deletingFolder !== null}
+          open={deletingFolder !== null && folderDeleteScope === accountScope.current}
           title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
           description={`削除しても、中の配信は未分類に残ります。いまこのフォルダに入っているのは${
             deletingFolder ? broadcasts.filter((b) => b.folderId === deletingFolder.id).length : 0
@@ -1323,10 +1321,11 @@ menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedR
           onConfirm={() => removeFolder()}
           onCancel={() => {
             if (folderBusy) return
+            folderDeleteTicket.current = null
             setDeletingFolder(null)
             setFolderError('')
           }}
-        />
+        >{deletingFolder ? <OperationTargetSummary accounts={deletingFolder.accountId === null ? [] : [{ id: deletingFolder.accountId ?? '' }]} externalTarget={deletingFolder.accountId === null ? { label: 'フォルダの対象', name: '共通（全アカウント）' } : undefined} /> : null}</ConfirmDialog>
         <ConfirmDialog
           open={deleteTarget !== null && renderedDeleteScope?.generation === accountScope.current.generation}
           title={`「${deleteTarget?.title ?? ''}」を削除しますか？`}

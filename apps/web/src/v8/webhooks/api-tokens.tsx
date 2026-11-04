@@ -22,16 +22,14 @@ import { ActionCell,DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/
 import { TextField } from '@/components/shared/text-field'
 import StepUpPrompt from '@/components/step-up-prompt'
 import { ListPage } from '@/components/templates'
-import { Coins,Gift,Wallet,KeyRound,LayoutTemplate,Plus } from 'lucide-react'
+import { KeyRound,LayoutTemplate,Plus } from 'lucide-react'
 import { SCOPES } from './api-token-words'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import styles from './api-tokens.module.css'
 import {
 ViewerBand,
 WEBHOOKS_DESCRIPTION,
-WebhookBand,
 WebhookTabs,
-overviewBandCells
 } from './shell'
 import { useApiTokens } from './use-api-tokens'
 import { McpConnectionsSection } from '@/v8/mcp-connect/public/section/index'
@@ -80,18 +78,6 @@ export default function WebhooksApiTokensV8() {
       tabs={<WebhookTabs active="api-tokens" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {ownership.known && !canManage ? <ViewerBand need="owner" /> : null}
-        <WebhookBand
-          cells={overviewBandCells({
-            outgoing: overview.outgoingCount === null ? null : overview.outgoing,
-            incomingCount: overview.incomingCount,
-            summary: overview.summary,
-          }).map(cell => ({
-            ...cell,
-            icon: cell.key === 'sent' ? <Coins aria-hidden="true" />
-              : cell.key === 'failed' ? <Gift aria-hidden="true" />
-                : cell.key === 'incoming' ? <Wallet aria-hidden="true" /> : cell.icon,
-          }))}
-        />
       </>}
       overlays={<>
         <Dialog
