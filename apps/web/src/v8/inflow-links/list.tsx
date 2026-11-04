@@ -549,10 +549,10 @@ export default function InflowListV8({
       { value: 'unconfigured', label: '動きが未設定', count: routeCountAvailable ? unconfiguredCount : undefined },
     ]} />
   )
-  const presetCounts: Array<[RouteFilter, string, number]> = [
+  const presetCounts: Array<[RouteFilter, string, number | undefined]> = [
     ['all', 'すべて', genreRows.length],
-    ['has-friends', '友だち追加あり', genreRows.filter((row) => matchesFilter(row, 'has-friends', summaryAvailable)).length],
-    ['no-friends', '友だち追加なし', genreRows.filter((row) => matchesFilter(row, 'no-friends', summaryAvailable)).length],
+    ['has-friends', '友だち追加あり', summaryAvailable ? genreRows.filter((row) => matchesFilter(row, 'has-friends', summaryAvailable)).length : undefined],
+    ['no-friends', '友だち追加なし', summaryAvailable ? genreRows.filter((row) => matchesFilter(row, 'no-friends', summaryAvailable)).length : undefined],
     ['unconfigured', '動きが未設定', genreRows.filter(isUnconfigured).length],
   ]
   const presetBox = (

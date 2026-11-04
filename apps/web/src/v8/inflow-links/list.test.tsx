@@ -134,6 +134,12 @@ describe('V8 流入と計測の一覧', () => {
     })
     await render()
     expect(rowOf('ad-summer')?.querySelector('[class*="colFriends"]')?.textContent).toBe('—')
+    const presets = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('よく使う絞り込み'))!
+    await act(async () => { presets.click() })
+    const dialog = host.querySelector('[role="dialog"][aria-label="よく使う絞り込みと並び順"]')!
+    const buttons = [...dialog.querySelectorAll('button')]
+    expect(buttons.find(button => button.textContent?.includes('友だち追加あり'))?.textContent?.trim()).toBe('友だち追加あり')
+    expect(buttons.find(button => button.textContent?.includes('友だち追加なし'))?.textContent?.trim()).toBe('友だち追加なし')
   })
 
   it('アカウントを切り替えて戻しても古い停止確認は実行しない', async () => {
