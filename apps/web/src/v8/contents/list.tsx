@@ -8,7 +8,7 @@ import { loadMediaFolders,loadMediaList,loadMediaSummary } from './list-load'
 
 import { deleteMediaItem } from './list-delete-action'
 import { MediaCardV8 } from './list-media-card'
-import { isKnownUnused,KINDS,MediaDetailFailure,mediaDetailIdFromLocation,MediaDetailPhase,MediaKpis,MediaManagementPermission,MediaSort,MediaView,PAGE_SIZE_OPTIONS,SORT_OPTIONS,UNGROUPED,usableMediaCounts } from './list-model'
+import { isKnownUnused,KINDS,MediaDetailFailure,mediaDetailIdFromLocation,mediaDetailPath,MediaDetailPhase,MediaKpis,MediaManagementPermission,MediaSort,MediaView,PAGE_SIZE_OPTIONS,SORT_OPTIONS,UNGROUPED,usableMediaCounts } from './list-model'
 
 import { describeApiFailure, classifyApiFailure,permissionDeniedMessage } from '@/components/shared/api-error-message'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -218,25 +218,18 @@ export default function MediaLibraryListV8() {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   /** 大きく出している札。押した札の中身を原寸で見せる。 */
   const [preview, setPreview] = useState<MediaItem | null>(null)
-  /*
-    名前変更・削除・フォルダ追加は管理者（owner/admin）だけ（N-197）。
-    staff には押して失敗する口を見せず、理由を添えて無効化する。
-    一覧・ダウンロード・登録・版追加は staff も使えるので混同しない。
-  */
+  /** 管理操作は確認済みの機能権限で判定し、取得失敗時は止める。 */
   const [mediaManagementPermission, setMediaManagementPermission] = useState<MediaManagementPermission>('loading')
   const staffRole = useStaffRole()
   const canRegisterMedia = canManageRole(staffRole) || staffRole === 'staff'
   const mediaEditAccess = useFeatureAccess('contents')
 
   const setDetailUrl = useCallback((id: string | null, mode: 'push' | 'replace' = 'push') => {
-    const url = new URL(window.location.href)
-    if (id) url.searchParams.set('id', id)
-    else url.searchParams.delete('id')
-    const nextUrl = `${url.pathname}${url.search}${url.hash}`
+    const nextUrl = mediaDetailPath(id, selectedAccountId)
     if (mode === 'replace') window.history.replaceState(window.history.state, '', nextUrl)
     else window.history.pushState(window.history.state, '', nextUrl)
     setDetailId(id)
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     const syncFromUrl = () => setDetailId(mediaDetailIdFromLocation())
@@ -269,6 +262,11 @@ export default function MediaLibraryListV8() {
 
   useEffect(() => {
     if (!urlReady || accountLoading) return
+    const targetAccount = new URL(window.location.href).searchParams.get('mediaAccountId')
+    if (detailId && targetAccount && targetAccount !== selectedAccountId) {
+      setDetailUrl(null, 'replace')
+      return
+    }
     const previousAccount = detailAccountRef.current
     detailAccountRef.current = selectedAccountId
     if (previousAccount !== undefined && previousAccount !== selectedAccountId) {

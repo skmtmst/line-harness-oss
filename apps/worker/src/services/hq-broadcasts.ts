@@ -17,7 +17,7 @@ import { parseBroadcastMessageParts, buildMessages, unsupportedMessageVariables 
 import { resolveSendCommonVars } from './interpolation-context.js';
 import { isOperationCapabilityStopped } from '@line-crm/db';
 import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
-import { buildBroadcastAudienceQuery } from '../features/broadcasts/broadcast-audience-query.js';
+import { buildBroadcastAudienceQuery } from '../features/broadcasts/index.js';
 import { scopeStoredBroadcastSegmentQuery } from './segment-query-scope.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { resolveHqBroadcastMaterials } from '../features/hq-broadcasts/hq-broadcast-materials/index.js';

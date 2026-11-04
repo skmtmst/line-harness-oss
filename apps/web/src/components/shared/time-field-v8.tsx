@@ -5,15 +5,14 @@ import { normalizeTimeInput, snapToStep, parseHm, normalizeStep, minuteOptions, 
 export { normalizeTimeInput, snapToStep } from './time-field-input'
 export type { Hm, TimeInputResult } from './time-field-input'
 import { inputPlaceholder } from './input-placeholder'
-import { Clock3 } from 'lucide-react'
+import { Clock3, ChevronDown } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './time-field-v8.module.css'
 import { isImeComposing } from './ime'
 
 /**
- * 時刻の欄（★V8）。Pencil V8.pen の提案「時刻を選ぶ（打つ＋2列から選ぶ）」YCOoR
- * （オーナー 2026-10-08「時間を選ぶものもこういう感じに」で採用）。
+ * 数字を打つ方法と、時・分の2列から選ぶ方法に対応する時刻の欄。
  *
  *   欄   閉じた外形と焦点は choice-field の共通の形。右の時計で時刻を選ぶ。
  *        空は「-- : --」。
@@ -35,6 +34,8 @@ export type TimeFieldV8Props = {
   minuteStep?: number
   /** 終了時刻だけ24:00を使える。通常の時刻入力は0〜23時のまま。 */
   allowEndOfDay?: boolean
+  /** 営業時間Pen：詰めた時刻表記・翌0:00・40pxの欄。 */
+  appearance?: 'business-hours'
   /** 互換の配置名。高さは共通36px、タッチ端末は44px。 */
   size?: TimeFieldSize
   pickerTrigger?: 'clock' | 'field'
@@ -64,6 +65,7 @@ export default function TimeFieldV8({
   onChange,
   minuteStep = 1,
   allowEndOfDay = false,
+  appearance,
   size = 'default',
   pickerTrigger = 'clock',
   disabled = false,
@@ -87,7 +89,8 @@ export default function TimeFieldV8({
   const current = value ?? inner
   const parsed = parseHm(current, allowEndOfDay)
   const hours = allowEndOfDay ? [...HOURS, 24] : HOURS
-  const [text, setText] = useState(() => (parsed ? formatShown(parsed) : ''))
+  const shown = (time: {hours:number;minutes:number}) => appearance === 'business-hours' ? time.hours === 24 ? '翌0:00' : formatValue(time) : formatShown(time)
+  const [text, setText] = useState(() => (parsed ? shown(parsed) : ''))
   const [editing, setEditing] = useState(false)
   const [note, setNote] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
   const [open, setOpen] = useState(false)
@@ -106,7 +109,7 @@ export default function TimeFieldV8({
   // 外から値が替わったら、打っている最中でなければ欄の字を合わせる。
   useEffect(() => {
     if (editing) return
-    setText(parsed ? formatShown(parsed) : '')
+    setText(parsed ? shown(parsed) : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current])
 
@@ -149,11 +152,11 @@ export default function TimeFieldV8({
     setEditing(false)
     if (readOnly) return
     // 触っただけ（字が今の値のまま）なら何もしない。きざみに合わない既存の値を黙って変えない。
-    if (parsed && text === formatShown(parsed)) {
+    if (parsed && text === shown(parsed)) {
       if (note?.kind === 'error') setNote(null)
       return
     }
-    const result = normalizeTimeInput(text, step, allowEndOfDay)
+    const result = normalizeTimeInput(appearance === 'business-hours' && text === '翌0:00' ? '24:00' : text, step, allowEndOfDay)
     if (result.kind === 'empty') {
       setNote(null)
       if (current !== '') emit('')
@@ -165,7 +168,7 @@ export default function TimeFieldV8({
       return
     }
     setNote(result.note ? { kind: 'info', text: result.note } : null)
-    setText(formatShown(result.time))
+    setText(shown(result.time))
     const next = formatValue(result.time)
     if (next !== current) emit(next)
   }
@@ -290,6 +293,7 @@ export default function TimeFieldV8({
         data-open={open || undefined}
         data-invalid={invalid || note?.kind === 'error' || undefined}
         data-disabled={disabled || undefined}
+        data-appearance={appearance}
         data-readonly={readOnly || undefined}
         data-size={size === 'default' ? undefined : size}
       >
@@ -326,7 +330,7 @@ export default function TimeFieldV8({
           onKeyDown={onInputKeyDown}
           onClick={pickerTrigger === 'field' ? () => { if (!open) openPanel() } : undefined}
         />
-        {!readOnly && pickerTrigger === 'field' ? <Clock3 data-choice-chevron aria-hidden="true" /> : null}
+        {!readOnly && pickerTrigger === 'field' ? appearance === 'business-hours' ? <ChevronDown data-choice-chevron aria-hidden="true" /> : <Clock3 data-choice-chevron aria-hidden="true" /> : null}
         {readOnly || pickerTrigger === 'field' ? null : (
         <button
           type="button"

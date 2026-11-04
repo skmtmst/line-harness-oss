@@ -76,7 +76,7 @@ describe('Googleプロフィールの再取得（実Googleへ送らず保留API�
     render(<ProfileBoard accountId="busy-test" go={() => {}} />)
     await screen.findByText('試験用店舗')
     expect(screen.getByRole('button', { name: 'プロフィールを編集する' }).getAttribute('aria-disabled')).toBe('true')
-    expect(screen.getByRole('button', { name: '営業時間を変える' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: 'プロフィールを編集する' }).getAttribute('aria-disabled')).toBe('true')
     expect(document.querySelector('[data-read-only-notice]')).toBeNull() // 帯は親の題の下に1本。
   })
   it('比較できないGoogle項目に管理画面へのリンクを表示する', async () => {

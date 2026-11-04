@@ -288,7 +288,7 @@ export const post__api_restaurant_test_floors_19 = async (c: Context<Env, "/api/
  const kind=b.kind??'floor';
  if(!['floor','area'].includes(kind)||kind==='area'&&typeof b.parentFloorId!=='string'||kind==='floor'&&b.parentFloorId)return inputError(c,{success:false,error:'階・エリアの種類を確認してください'},400,['kind','parentFloorId']);
  const db=dbFor(c.env,b.storeId);
- if(kind==='area'&&!await db.prepare("SELECT id FROM rt_floors WHERE id=? AND store_id=? AND kind='floor'").bind(b.parentFloorId,b.storeId).first())return inputError(c,{success:false,error:'親の階を確認してください'},400,['parentFloorId']);
+ if(kind==='area'&&!await db.prepare("SELECT id FROM rt_floors WHERE id=? AND store_id=? AND kind='floor' AND archived_at IS NULL").bind(b.parentFloorId,b.storeId).first())return inputError(c,{success:false,error:'親の階を確認してください'},400,['parentFloorId']);
  const id=crypto.randomUUID(),saved=await db.prepare('INSERT OR IGNORE INTO rt_floors(id,store_id,name,kind,parent_floor_id,sort_order) VALUES(?,?,?,?,?,(SELECT COUNT(*) FROM rt_floors WHERE store_id=?))').bind(id,b.storeId,b.name.trim(),kind,kind==='area'?b.parentFloorId:null,b.storeId).run();
  if(!saved.meta.changes)return c.json({success:false,error:'同じ名前の階があります'},409);
  return c.json({success:true,data:{id,version:1}},201);
@@ -299,7 +299,7 @@ export const get__api_restaurant_test_floors_20 = async (c: Context<Env, "/api/r
  const org=await organizationFor(c),storeId=c.req.query('storeId')??'';
  if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'店舗がありません'},404);
  const db=dbFor(c.env,storeId);
- const floors=await db.prepare('SELECT * FROM rt_floors WHERE store_id=? ORDER BY sort_order,name,id').bind(storeId).all<Record<string,unknown>>();
+ const floors=await db.prepare('SELECT * FROM rt_floors WHERE store_id=? AND archived_at IS NULL ORDER BY sort_order,name,id').bind(storeId).all<Record<string,unknown>>();
  const tables=await db.prepare('SELECT * FROM rt_tables WHERE store_id=?').bind(storeId).all<Record<string,unknown>>();
  return c.json({success:true,data:floors.results.map(f=>({id:f.id,storeId:f.store_id,name:f.name,kind:f.kind,parentFloorId:f.parent_floor_id,sortOrder:f.sort_order,width:f.width,height:f.height,version:f.version,
  outline:JSON.parse(String(f.outline_json)),fixtures:JSON.parse(String(f.fixtures_json)),tables:tables.results.filter(t=>t.floor_id===f.id).map(t=>({id:t.id,x:t.floor_x,y:t.floor_y,width:t.width,height:t.height,shape:t.shape,rotation:t.rotation,joinGroup:t.join_group,seatType:t.seat_type,seatDetailType:t.seat_detail_type,minCapacity:t.min_capacity,maxCapacity:t.max_capacity,smokingPolicy:t.smoking_policy,partition:t.partition_type,shoesAllowed:Boolean(t.shoes_allowed),acceptsReservations:Boolean(t.is_active),visibleOnMap:Boolean(t.visible_on_map),chairArrangement:t.chair_arrangement,chairSide:t.chair_side}))}))});
@@ -312,6 +312,33 @@ export const put__api_restaurant_test_floors_id_21 = async (c: Context<Env, "/ap
  if(!org||!await storeBelongsTo(c,org.id,body.storeId))return c.json({success:false,error:'店舗がありません'},404);
  if(!await saveRestaurantFloor(dbFor(c.env,body.storeId),body))return c.json({success:false,code:'version_conflict',error:'ほかの人が変更しました。最新を読み込んでください'},409);
  return c.json({success:true,data:{version:body.expectedVersion+1}});
+};
+
+export const delete__api_restaurant_test_floors_id = async (c: Context<Env, "/api/restaurant-test/floors/:id">) => {
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c),body=await c.req.json<{storeId?:string;expectedVersion?:number}>();
+ if(!org||typeof body.storeId!=='string'||!await storeBelongsTo(c,org.id,body.storeId))return c.json({success:false,error:'店舗がありません'},404);
+ if(!Number.isInteger(body.expectedVersion)||!body.expectedVersion||body.expectedVersion<1)return inputError(c,{success:false,error:'座席図の版を確認してください'},400,['expectedVersion']);
+ const db=dbFor(c.env,body.storeId),id=c.req.param('id');
+ const floor=await db.prepare('SELECT kind,version FROM rt_floors WHERE id=? AND store_id=? AND archived_at IS NULL').bind(id,body.storeId).first<{kind:string;version:number}>();
+ if(!floor)return c.json({success:false,error:'階・エリアがありません'},404);
+ if(floor.version!==body.expectedVersion)return c.json({success:false,code:'version_conflict',error:'座席図を読み直してください'},409);
+ const tables=await db.prepare('SELECT COUNT(*) AS count FROM rt_tables WHERE floor_id=? AND store_id=?').bind(id,body.storeId).first<{count:number}>();
+ if((tables?.count??0)>0)return c.json({success:false,error:'卓が残っています。先に卓を移動するか削除してください'},409);
+ const children=await db.prepare('SELECT COUNT(*) AS count FROM rt_floors WHERE parent_floor_id=? AND store_id=? AND archived_at IS NULL').bind(id,body.storeId).first<{count:number}>();
+ if((children?.count??0)>0)return c.json({success:false,error:'エリアが残っています。先に子エリアを削除してください'},409);
+ if(floor.kind==='floor'){
+  const roots=await db.prepare("SELECT COUNT(*) AS count FROM rt_floors WHERE store_id=? AND kind='floor' AND archived_at IS NULL").bind(body.storeId).first<{count:number}>();
+  if((roots?.count??0)<=1)return c.json({success:false,error:'最後の階は削除できません。先に別の階を追加してください'},409);
+ }
+ const saved=await db.prepare(`UPDATE rt_floors SET archived_name=name,name='__archived__'||id,archived_at=datetime('now'),version=version+1
+ WHERE id=? AND store_id=? AND version=? AND archived_at IS NULL
+ AND NOT EXISTS(SELECT 1 FROM rt_tables WHERE floor_id=rt_floors.id AND store_id=rt_floors.store_id)
+ AND NOT EXISTS(SELECT 1 FROM rt_floors child WHERE child.parent_floor_id=rt_floors.id AND child.store_id=rt_floors.store_id AND child.archived_at IS NULL)
+ AND (kind='area' OR (SELECT COUNT(*) FROM rt_floors root WHERE root.store_id=rt_floors.store_id AND root.kind='floor' AND root.archived_at IS NULL)>1)`)
+ .bind(id,body.storeId,body.expectedVersion).run();
+ if(!saved.meta.changes)return c.json({success:false,code:'version_conflict',error:'階・エリアが変わりました。最新の座席図を読み込んでください'},409);
+ return c.json({success:true,data:{id}});
 };
 
 export const get__api_restaurant_test_rotation_22 = async (c: Context<Env, "/api/restaurant-test/rotation">) => {

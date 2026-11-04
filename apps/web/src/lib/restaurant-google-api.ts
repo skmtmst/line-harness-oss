@@ -1,5 +1,6 @@
 import { generateGoogleReviewDraft } from './api/helpers/google-review-draft'
 import { fetchApi } from './api'
+import type { HoursWorkspace, HoursWorkspaceData } from '@line-crm/shared'
 
 /** 飲食店向け「Googleビジネス」のAPI。第1段（設定＋口コミ）★管理画面 GB-1〜GB-3、GB-13、GB-15、GB-16。第2段（プロフィール・営業時間・変更履歴）GB-10〜GB-12、GB-17〜GB-19。 */
 
@@ -94,6 +95,8 @@ export type GoogleProfile = {
   openStatus: string | null
   regularHours: GoogleWeeklyHours
   specialHours: GoogleSpecialDay[]
+  moreHours?: Array<{ hoursTypeId: string; weekly: GoogleWeeklyHours }>
+  moreHoursTypes?: Array<{ id: string; label: string }>
   mapsUri: string | null
 }
 
@@ -120,7 +123,7 @@ export type GoogleProfileData = {
 
 export type GoogleChangeKind = 'special_hours' | 'regular_hours' | 'profile' | 'photo'
 export type GoogleChangeStatus = 'draft' | 'pending_confirm' | 'accepted' | 'applied' | 'failed' | 'conflict' | 'cancelled'
-export type GoogleChangeTarget = { dates: string[] } | { weekdays: GoogleWeekday[] } | { field: 'title' | 'phone' | 'websiteUri' | 'description' | 'address' } | { field: 'photo'; action: 'add' | 'delete' }
+export type GoogleChangeTarget = { dates: string[] } | { weekdays: GoogleWeekday[] } | { field: 'title' | 'phone' | 'websiteUri' | 'description' | 'address' | 'moreHours' } | { field: 'photo'; action: 'add' | 'delete' }
 export type GoogleDayHours = { date: string; closed: boolean; periods: GoogleHoursPeriod[]; /** その日に特別営業時間が登録済みか（変更前の表示用） */ special?: boolean; /** true なら特別営業時間を外して通常に戻す。periods は戻り先の通常時間 */ remove?: boolean }
 
 export type GoogleChange = {
@@ -305,6 +308,9 @@ export const restaurantGoogleApi = {
 
   // 第2段
   profile: (accountId: string) => fetchApi<GoogleProfileData>(withAccount(`${base}/profile`, accountId)),
+  hoursWorkspace: (accountId: string) => fetchApi<HoursWorkspaceData>(withAccount(`${base}/hours/workspace`, accountId)),
+  saveHoursWorkspace: (accountId: string, expectedVersion: number, data: HoursWorkspace, summary = '') => fetchApi<Pick<HoursWorkspaceData, 'version' | 'data' | 'history'>>(withAccount(`${base}/hours/workspace`, accountId), { method: 'PUT', body: JSON.stringify({ expectedVersion, data, summary }) }),
+  reviewHoursWorkspace: (accountId: string, expectedVersion: number) => fetchApi<{ success: true; changes: GoogleChange[]; version: number; holidayManagedDates?: string[] }>(withAccount(`${base}/hours/review`, accountId), { method: 'POST', body: JSON.stringify({ expectedVersion }) }),
   syncProfile: (accountId: string) => fetchApi<GoogleProfileData>(withAccount(`${base}/profile/sync`, accountId), { method: 'POST', body: '{}' }),
   holidays: (accountId: string, days = 30) => fetchApi<{ success: true; today: string; days: number; holidays: GoogleHoliday[] }>(withAccount(`${base}/holidays`, accountId, { days })),
   photos: (accountId: string) => fetchApi<{ success: true; photos: GooglePhoto[] }>(withAccount(`${base}/photos`, accountId)),
