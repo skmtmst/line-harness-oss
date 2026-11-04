@@ -3,6 +3,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../worker-env.js';
 import { fetchQuotaDetails } from '../features/broadcasts/broadcast-quota-guard/index.js';
 import { sendOperationEmail } from './operation-notifications.js';
+import { renderMailHtml } from './mail-html.js';
 
 type OutboxRow = {
   id: string;
@@ -180,6 +181,7 @@ export async function processOperationAlertNotificationOutbox(
           to: row.email,
           subject: '【musubo】運用状態の確認が必要です',
           body: text,
+          html: renderMailHtml({ heading: '運用状態の確認が必要です', paragraphs: [text] }),
         });
       }
       await env.DB.prepare(

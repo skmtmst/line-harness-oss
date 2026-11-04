@@ -86,6 +86,8 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [showTrend, setShowTrend] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncError, setSyncError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -102,16 +104,35 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
 
   useEffect(() => { void load() }, [load])
 
+  const sync = async () => {
+    if (syncing) return
+    setSyncing(true)
+    setSyncError('')
+    try {
+      const result = await restaurantGoogleApi.syncPerformance(accountId)
+      if (result.failed > 0) {
+        setSyncError('Googleから数値を取り込めませんでした。時間をおいて再試行してください。')
+        return
+      }
+      await load()
+    } catch (err) {
+      setSyncError(errorMessage(err, 'Googleから数値を取り込めませんでした。'))
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const range = data ? `${data.range.startDate.replace(/-/g, '/')}–${data.range.endDate.slice(5).replace('-', '/')}` : ''
 
   return (
     <>
-      <ListToolbar filters={<PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} choices={PERIOD_CHOICES} />} />
+      <ListToolbar filters={<PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} choices={PERIOD_CHOICES} />} actions={<Button onClick={() => void sync()} busy={syncing} busyLabel="取り込み中…">いま取り込む</Button>} />
+      {syncError ? <Notice tone="danger">{syncError}</Notice> : null}
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="パフォーマンスを読み込んでいます" /></div> : null}
       {loadError ? <ListState kind="error" title="パフォーマンスを表示できませんでした" description={loadError} onRetry={() => void load()} /> : null}
       {data ? (
         <>
-          {data.lastMetricsSyncedAt === null ? <Notice tone="info">パフォーマンスの自動取得はまだ実行されていません。毎晩の取得のあとに数値が表示されます。</Notice> : null}
+          {data.lastMetricsSyncedAt === null ? <Notice tone="info">パフォーマンスの自動取得はまだ実行されていません。「いま取り込む」を押すか、次回の自動取得を待つと数値が表示されます。</Notice> : null}
           <KpiBand presentation="band" gridClassName="">
             {METRICS.map(({ key, title, icon: Icon }) => (
               <KpiCard

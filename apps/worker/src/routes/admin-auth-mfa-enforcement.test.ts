@@ -855,7 +855,7 @@ describe('N-426: 復旧導線（認証アプリを失くしても詰まない）
       `INSERT INTO auth_email_tokens (id, purpose, token_hash, email, staff_id, expires_at) VALUES ('t1', 'password_reset', ?, 'owner@example.com', 's1', '2999-01-01T00:00:00.000+09:00')`,
     ).bind(await sha256Hex(token)).run();
 
-    const res = await call('POST', '/api/auth/password/reset', { token, password: 'Newpass99' });
+    const res = await call('POST', '/api/auth/password/reset', { token, password: 'Newpass99Secure!' });
     expect(res.status).toBe(200);
     const staff = testDb.raw.prepare('SELECT totp_secret_enc, totp_enabled_at FROM staff_members WHERE id = ?').get('s1') as Record<string, unknown>;
     expect(staff.totp_secret_enc).toBeTruthy();
@@ -864,7 +864,7 @@ describe('N-426: 復旧導線（認証アプリを失くしても詰まない）
     const audit = testDb.raw.prepare(`SELECT COUNT(*) AS n FROM audit_events WHERE action = 'auth.totp_reset' AND actor_principal_id = 's1' AND risk_level = 'high'`).get() as { n: number };
     expect(audit.n).toBe(0);
     // 次のログインも確認用の合言葉へ
-    const login = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Newpass99' });
+    const login = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Newpass99Secure!' });
     expect((await login.json() as { data: { twoFactor?: boolean } }).data.twoFactor).toBe(true);
   });
 });

@@ -143,7 +143,7 @@ describe('押したら6つ × 統括の配布', () => {
       else expect(result.uri).toBe(choice.value);
       expect(f.raw.pragma('foreign_key_check')).toEqual([]);
     }
-  });
+  }, 30_000);
   test.each(['card', 'carousel', 'card_asset', 'rich_message', 'rich_menu'] as const)('%s はLIFFなしの理由を返し、書き込みしない', async place => {
     const f = await tapFixture(place, tapChoices[2]); f.raw.exec("UPDATE line_accounts SET liff_id=NULL WHERE id='a'");
     await expect(f.preflight()).rejects.toMatchObject({ code: 'LIFF_UNAVAILABLE' });

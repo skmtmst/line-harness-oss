@@ -65,7 +65,7 @@ const MENU_ITEM_FIELDS = ['store.id', 'items'] as const;
  *
  * - 注文一覧（板 kDQHr）は頁の題 22/700/32。
  * - 注文履歴（板 OzHLO）と品切れ一括（板 h7OeT）は副題 18/700/27。
- *   `delivery.tsx` の `VIEW_HEAD` が `titleSize: 'sub'` を渡し、
+ *   `delivery.tsx` が履歴・品切れへ `titleSize: 'sub'` を渡し、
  *   `components/templates/page-frame.tsx` が `--tpl-title-size: 18px`
  *   `--tpl-title-lh: 27px` を頭の中だけに流す。
  *

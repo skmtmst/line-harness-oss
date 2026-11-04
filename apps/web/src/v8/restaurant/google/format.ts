@@ -4,6 +4,7 @@
 import { formatDate as polishFormatDate } from '@/lib/format'
 import type { GoogleHoursPeriod, GoogleWeekday } from '@/lib/restaurant-google-api'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { ApiError } from '@/lib/api'
 
 export const STORE_TIME_ZONE = 'Asia/Tokyo'
 export const WEEKDAYS: GoogleWeekday[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
@@ -47,7 +48,17 @@ export function reviewReceivedAt(review: { createTime?: string | null; updateTim
 
 export function errorMessage(error: unknown, fallback: string): string {
   // 「API error: 500」のような内部の文は出さない。日本語の案内だけを出す。
-  return japaneseDetailOf(error) || fallback
+  const detail = japaneseDetailOf(error)
+  if (detail) return detail
+  const hints: Record<string, string> = {
+    encryption_key_missing: 'この環境の設定が足りていません。運営へ連絡してください。',
+    oauth_not_configured: 'この環境にはGoogle接続の設定がありません。運営へ連絡してください。',
+    rate_limited: 'Googleの利用上限に達しました。しばらく待ってから、もう一度お試しください。',
+    ai_unavailable: 'この環境ではこの機能を使えません。',
+    unavailable: 'Googleに接続できませんでした。時間をおいて、もう一度お試しください。',
+  }
+  const hint = error instanceof ApiError && error.code ? hints[error.code] : undefined
+  return hint ? `${fallback}${hint}` : fallback
 }
 
 /** "YYYY-MM-DD" → 曜日。 */

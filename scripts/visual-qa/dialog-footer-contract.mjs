@@ -50,6 +50,11 @@ export function inspectDialogFooters(source, file = 'screen.tsx') {
       return node
     }
     expression = resolved(expression)
+    const hasJsx = (node, seen = new Set()) => {
+      node = resolved(node, seen)
+      if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)) return true
+      return Boolean(ts.forEachChild(node, child => hasJsx(child, seen) || undefined))
+    }
     const inspectStructure = node => {
       node = resolved(node)
       if (ts.isConditionalExpression(node)) { inspectStructure(node.whenTrue); inspectStructure(node.whenFalse); return }
@@ -66,8 +71,11 @@ export function inspectDialogFooters(source, file = 'screen.tsx') {
       if (interactive(node)) { add(node, 'custom-dialog-actions'); return }
       if ((ts.isIdentifier(node) && node.text !== 'undefined') || ts.isCallExpression(node)) { add(node, 'unresolved-dialog-footer'); return }
       if (/^[A-Z]/.test(tag(node))) { add(node, 'unresolved-dialog-footer'); return }
+      const statusText = tag(node) === 'div' && attributes(node).some(attr =>
+        ts.isJsxAttribute(attr) && attr.name.getText(ast) === 'role' &&
+        attr.initializer && ts.isStringLiteral(attr.initializer) && attr.initializer.text === 'status')
       if (ts.isJsxElement(node) || ts.isJsxFragment(node)) for (const child of node.children) {
-        if (ts.isJsxExpression(child) && child.expression) inspectStructure(child.expression)
+        if (ts.isJsxExpression(child) && child.expression && (!statusText || hasJsx(child.expression))) inspectStructure(child.expression)
         else if (ts.isJsxElement(child) || ts.isJsxFragment(child)) inspectStructure(child)
       }
     }
@@ -98,7 +106,12 @@ export function inspectDialogFooters(source, file = 'screen.tsx') {
 
 export function scanDialogFooters(root) {
   const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', 'apps/web/src'], { cwd: root, encoding: 'utf8' }).split('\0')
-  return [...new Set(files)].filter(file => file.endsWith('.tsx') && !/\.(?:test|spec)\.tsx$/.test(file) && !file.includes('/visual-qa/')).flatMap(file => inspectDialogFooters(readFileSync(resolve(root, file), 'utf8'), file))
+  return [...new Set(files)].filter(file => file.endsWith('.tsx') && !/\.(?:test|spec)\.tsx$/.test(file) && !file.includes('/visual-qa/')).flatMap(file => {
+    const source = readFileSync(resolve(root, file), 'utf8')
+    // inspectDialogFooters only checks footer props on direct shared/dialog imports.
+    if (!source.includes('/shared/dialog') || !source.includes('footer')) return []
+    return inspectDialogFooters(source, file)
+  })
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -35,7 +35,7 @@ describe('プール管理の直URL(#860)', () => {
     window.history.replaceState(null, '', '/')
   })
 
-  it('機能offでAPIが403 FEATURE_DISABLEDを返すと、共通ゲートが機能設定への案内へ切り替える', async () => {
+  it('設定内のプール管理で補助APIが403でも、設定画面全体は閉じない', async () => {
     stubFetch((path) => path.startsWith('/api/traffic-pools')
       ? FEATURE_OFF()
       : new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }))
@@ -45,14 +45,13 @@ describe('プール管理の直URL(#860)', () => {
     )
 
     await waitFor(() => {
-      expect(view.getByText('この機能は設定でオフになっています')).toBeTruthy()
-      expect(view.getByText('機能設定を開く')).toBeTruthy()
+      expect(view.getByText('プール一覧を読み込めませんでした')).toBeTruthy()
     })
-    // プールの管理UIは出ない（読み込み中にも留まらない）。
-    expect(view.queryByText('新規プール')).toBeNull()
+    // 設定への導線は残し、補助APIの停止で共通ゲートを発動させない。
+    expect(view.getByText('新規プール')).toBeTruthy()
     expect(view.queryByText('まだプールがありません')).toBeNull()
     expect(view.queryByText('読み込んでいます')).toBeNull()
-    expect(view.container.querySelector('[data-feature-disabled="multi_store_hierarchy"]')).toBeTruthy()
+    expect(view.container.querySelector('[data-feature-disabled="multi_store_hierarchy"]')).toBeNull()
   })
 
   it('機能onなら通常どおり一覧と新規作成口を出す', async () => {

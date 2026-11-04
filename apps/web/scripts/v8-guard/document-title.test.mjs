@@ -93,8 +93,8 @@ for (const width of [1152, 1440]) for (const delay of delays) test(`文書の題
     }, ({ '/conversions': '/affiliates', '/m': '/m/chats', '/booking/staff/shifts': '/booking/menus' })[new URL(route, base).pathname] ?? new URL(route, base).pathname)
     if (!process.env.TITLE_ROUTES) {
       await observe('再表示 テンプレート', () => page.goto(base + '/templates', { waitUntil: 'domcontentloaded' }), '/templates')
-      for (const path of ['/settings', '/ec-commerce']) await observe(`SPA ${path}`, async () => {
-        const link = path === '/settings'
+      for (const path of ['/settings/customer-look', '/ec-commerce']) await observe(`SPA ${path}`, async () => {
+        const link = path === '/settings/customer-look'
           ? page.locator('aside:has(nav[data-sidebar-scroll]):visible').locator(`a[href="${path}"]`).first()
           : page.locator(`a[href="${path}"]:visible`).first()
         await link.waitFor({ state: 'visible' })

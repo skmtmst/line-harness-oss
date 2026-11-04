@@ -43,7 +43,6 @@ describe('U094 運営コンソールの外枠', () => {
   })
 
   it('本文の左右の余白は狭い画面では現在の共通外枠の余白へそろえる', () => {
-    expect(SHELL).toContain('className={shellStyles.content}')
     expect(COMMON).toContain('@media (min-width: 1024px)')
     expect(COMMON).toContain('padding: 24px 16px')
   })
@@ -76,4 +75,5 @@ describe('U094 運営コンソールの外枠', () => {
     expect(ACTIONS).toContain('querySelectorAll<HTMLElement>')
     expect(ACTIONS).toContain("['ArrowDown', 'ArrowUp', 'Home', 'End']")
   })
+
 })

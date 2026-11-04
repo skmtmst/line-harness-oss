@@ -70,7 +70,7 @@ for(const width of [1152,1440])for(const kind of ['dialog','inset','stacked','cu
  try{
   await page.setContent(`<html><style>${css}main{padding:24px}</style><div id="root"></div></html>`);
   await page.addScriptTag({content:compiled.outputFiles[0].text});
-  const outer=page.getByRole('textbox',{name:'窓の外の入力',exact:true});await outer.focus();assert.equal((await ringMetrics(page)).offset,2);
+  const outer=page.getByRole('textbox',{name:'窓の外の入力',exact:true});await outer.focus();assert.equal((await ringMetrics(page)).offset,-2);
    await page.getByRole('button',{name:kind,exact:true}).click();
    const panel=page.locator('[data-design-part="dialog"],[data-design-part="drawer"]');await panel.waitFor();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
    const actions=panel.locator('[data-window-actions]');const before=await actions.boundingBox();
@@ -84,13 +84,13 @@ for(const width of [1152,1440])for(const kind of ['dialog','inset','stacked','cu
    assert.ok(scroll.top>0);assert.equal(scroll.overflow,0);
    if(kind==='inset'){
     const field=page.getByLabel('名前',{exact:true});await field.focus();await field.scrollIntoViewIfNeeded();
-    await panel.evaluate(e=>e.style.setProperty('--polish-focus-offset','2px'));
+    await panel.evaluate(e=>e.style.setProperty('--polish-focus-input-offset','2px'));
     // 本文側の正常値をわざと壊し、同じ切れの検査が落ちることを確かめる。
-    const body=panel.locator('[class*="content"]').first();await body.evaluate(e=>e.style.setProperty('--polish-focus-offset','2px'));
+    const body=panel.locator('[class*="content"]').first();await body.evaluate(e=>e.style.setProperty('--polish-focus-input-offset','2px'));
     const broken=await ringMetrics(page);assert.throws(()=>assertRing(broken));
-    await body.evaluate(e=>e.style.removeProperty('--polish-focus-offset'));await panel.evaluate(e=>e.style.removeProperty('--polish-focus-offset'));assertRing(await ringMetrics(page));
+    await body.evaluate(e=>e.style.removeProperty('--polish-focus-input-offset'));await panel.evaluate(e=>e.style.removeProperty('--polish-focus-input-offset'));assertRing(await ringMetrics(page));
    }
    await panel.getByRole('button',{name:'閉じる',exact:true}).click();await panel.waitFor({state:'hidden'});
-  await outer.focus();assert.equal((await ringMetrics(page)).offset,2);
+  await outer.focus();assert.equal((await ringMetrics(page)).offset,-2);
  }finally{await page.close();await browser.close()}
 });

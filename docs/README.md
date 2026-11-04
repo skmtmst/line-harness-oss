@@ -371,6 +371,8 @@
 
 ## 運用と配備
 
+- [2026-11-03 本番全体更新の候補と停止条件](release-review/2026-11-03-full-production-candidate.md)
+
 - [開発ガイド](development.md)
 - [PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md)
 - [GitHub 設定の運用メモ](../.github/README.md)
@@ -462,6 +464,7 @@
 
 ## 反映履歴
 
+- [無料プラン向け本番配備の本人確認ゲート](release-log/unreleased/2073-masato-production-owner-gate.md)
 - [統括・運営メンバー画面の本人パスキー設定と一覧配置](release-log/unreleased/2026-11-03-masato-hq-ops-passkeys-ui.md)
 - [統括メンバーの本人パスキー設定](release-log/unreleased/2026-11-03-masato-hq-passkeys.md)
 - [統括から引き継いだユーザーの一覧表示](release-log/unreleased/2069-masato-hq-inherited-users.md)
@@ -1150,3 +1153,47 @@
 - [操作対象の確認と画面案内の改善](release-log/unreleased/2066-kenta-operation-safety.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [編集内容の保護と操作確認の改善](release-log/unreleased/2067-kenta-edit-confirmation.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [保存と操作確認の改善](release-log/unreleased/2068-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+
+## 追加された文書
+
+- [本番全体更新の候補](release-log/unreleased/2071-masato-full-production-candidate.md) — 反映履歴、確認 2026-11-03。
+- [instagram app review](instagram-app-review.md)
+- [instagram privacy section draft](instagram-privacy-section-draft.md)
+- [instagram production rollout](instagram-production-rollout.md)
+- [instagram connection](integrations/instagram-connection.md)
+- [google business demo video prompter](manuals/google-business-demo-video-prompter.html)
+- [google business demo video shoot sheet](manuals/google-business-demo-video-shoot-sheet.md)
+- [google business demo video subtitles](manuals/google-business-demo-video-subtitles.srt)
+- [1016 masato production snapshot 20260929](release-log/unreleased/1016-masato-production-snapshot-20260929.md)
+- [1018 masato migrate partial attribution](release-log/unreleased/1018-masato-migrate-partial-attribution.md)
+- [1021 masato d1 migration fixes](release-log/unreleased/1021-masato-d1-migration-fixes.md)
+- [1024 masato migration 500 guard](release-log/unreleased/1024-masato-migration-500-guard.md)
+- [1031 masato musubo admin line channel](release-log/unreleased/1031-masato-musubo-admin-line-channel.md)
+- [1034 masato fix deploy worker script](release-log/unreleased/1034-masato-fix-deploy-worker-script.md)
+- [1035 masato google error message](release-log/unreleased/1035-masato-google-error-message.md)
+- [1041 masato register turnstile and contact](release-log/unreleased/1041-masato-register-turnstile-and-contact.md)
+- [1042 masato google performance sync](release-log/unreleased/1042-masato-google-performance-sync.md)
+- [1058 masato musubo mail from name](release-log/unreleased/1058-masato-musubo-mail-from-name.md)
+- [1130 masato ops admin lockout fix](release-log/unreleased/1130-masato-ops-admin-lockout-fix.md)
+- [1181 masato google business auth keepalive](release-log/unreleased/1181-masato-google-business-auth-keepalive.md)
+- [1221 masato tiktok pnl production](release-log/unreleased/1221-masato-tiktok-pnl-production.md)
+- [1237 claude two factor temporary off](release-log/unreleased/1237-claude-two-factor-temporary-off.md)
+- [1427 masato xserver html mail](release-log/unreleased/1427-masato-xserver-html-mail.md)
+- [1448 masato operations health flapping](release-log/unreleased/1448-masato-operations-health-flapping.md)
+- [1449 masato operations health production](release-log/unreleased/1449-masato-operations-health-production.md)
+- [1453 masato favicon](release-log/unreleased/1453-masato-favicon.md)
+- [1471 masato ops sidebar production](release-log/unreleased/1471-masato-ops-sidebar-production.md)
+- [1472 masato google business production](release-log/unreleased/1472-masato-google-business-production.md)
+- [1488 masato hq sidebar production](release-log/unreleased/1488-masato-hq-sidebar-production.md)
+- [1511 masato hq operator history hidden production](release-log/unreleased/1511-masato-hq-operator-history-hidden-production.md)
+- [1587 masato google business demo video docs](release-log/unreleased/1587-masato-google-business-demo-video-docs.md)
+- [1604 masato google business demo prompter](release-log/unreleased/1604-masato-google-business-demo-prompter.md)
+- [1648 masato google business demo prompter](release-log/unreleased/1648-masato-google-business-demo-prompter.md)
+- [1658 masato google business verification not required](release-log/unreleased/1658-masato-google-business-verification-not-required.md)
+- [1677 masato google business fixes to main](release-log/unreleased/1677-masato-google-business-fixes-to-main.md)
+- [1714 kenta instagram production](release-log/unreleased/1714-kenta-instagram-production.md)
+- [1717 kenta instagram ledger](release-log/unreleased/1717-kenta-instagram-ledger.md)
+- [2002 kenta hotfix broadcast scope](release-log/unreleased/2002-kenta-hotfix-broadcast-scope.md)
+- [2038 masato operation alert prod](release-log/unreleased/2038-masato-operation-alert-prod.md)
+- [2040 masato operation alert quota](release-log/unreleased/2040-masato-operation-alert-quota.md)
+- [musubo product name](release-log/unreleased/musubo-product-name.md)

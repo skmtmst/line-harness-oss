@@ -11,9 +11,9 @@
     // No rootDir: nothing is emitted, and some scripts legitimately import
     // package sources from outside this directory.
     "rootDir": null,
-    "types": ["node"],
+    "types": ["node", "../apps/worker/node_modules/@cloudflare/workers-types"],
     "lib": ["ES2022", "DOM"],
     "allowImportingTsExtensions": true
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "**/*.mts"]
 }

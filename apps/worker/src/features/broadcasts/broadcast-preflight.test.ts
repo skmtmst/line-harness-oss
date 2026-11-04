@@ -12,6 +12,7 @@ function makeDb(row: { total: number | null; hidden: number | null } | null) {
     prepare(sql: string) {
       return {
         bind(...binds: unknown[]) {
+          if (sql.includes('FROM line_accounts')) return { async all() { return { results: [] }; } };
           calls.push({ sql, binds });
           return {
             async first() {

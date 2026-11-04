@@ -1,6 +1,7 @@
 'use client'
 
 import styles from './sidebar-identity.module.css'
+import { brandInitial } from './brand-initial'
 
 /**
  * 共通メニューのいちばん上に置く公式ロゴ。

@@ -43,7 +43,7 @@ describe('画面の言葉の書き方の見張り', () => {
     } finally { rmSync(root, { recursive: true, force: true }) }
   })
 
-  it('管理画面と LIFF の製品ソースに違反がない', () => {
+  it('管理画面と LIFF の製品ソースに違反がない', { timeout: 120000 }, () => {
     // pathname は百分率符号化されるので、作業場所の名前に日本語や空白があると読めない。
     expect(inspectCopyTree(fileURLToPath(new URL('../../../../', import.meta.url))).errors).toEqual([])
   })

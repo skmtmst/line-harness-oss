@@ -131,7 +131,7 @@ export default function RegisterPage() {
           ><LegalWord href={LEGAL_LINKS.terms}>利用規約</LegalWord>と<LegalWord href={LEGAL_LINKS.privacy}>プライバシーポリシー</LegalWord>に同意します</Checkbox>
           {/*
             R169: 文書の公開先が未設定の間は、開けない文書への同意を説明なしに求めない。
-            まだ公開されていないことと、確認の入口（お問い合わせはログイン不要）を添える。
+            まだ公開されていないことを伝え、内容の確認先をこの場合だけ示す。
           */}
           {!LEGAL_LINKS.terms || !LEGAL_LINKS.privacy ? (
             <p className="text-micro text-ink-faint">

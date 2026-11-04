@@ -110,6 +110,7 @@ function instagramBadge(post: GooglePost): { label: string; tone: StatusBadgeTon
   if (!ig) return null
   if (!ig.enabled) return { label: 'Instagram なし', tone: 'neutral' }
   if (ig.status === 'published') return { label: 'Instagram 済み', tone: 'success' }
+  if (ig.status === 'failed' && ig.error === 'instagram_publish_result_unknown') return { label: 'Instagram 要確認', tone: 'warning' }
   if (ig.status === 'failed') return { label: 'Instagram 失敗・もう一度送る', tone: 'danger', title: ig.error ?? undefined }
   return null
 }
@@ -118,6 +119,7 @@ function instagramBadge(post: GooglePost): { label: string; tone: StatusBadgeTon
 function instagramFact(ig: NonNullable<GooglePost['instagram']>): string {
   if (!ig.enabled) return '出しません'
   if (ig.status === 'published') return '出しました'
+  if (ig.status === 'failed' && ig.error === 'instagram_publish_result_unknown') return '公開結果を確認できません（再送できません）'
   if (ig.status === 'failed') return '出せませんでした（再送できます）'
   return ig.caption ? 'Google と同時に出します（Instagram 用の文章あり）' : 'Google と同時に出します（本文をそのまま使います）'
 }
@@ -222,7 +224,7 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
     if (actionable) items.push({ id: 'edit', label: '編集', disabled: !canSync, onSelect: () => { if (canSync) go({ tab: 'posts', view: 'edit', id: post.id }) } })
     if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', group: 'view', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
-    if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
+    if (post.instagram?.status === 'failed' && post.instagram.error !== 'instagram_publish_result_unknown') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
     if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation }); setConfirmRemove(post) } } })
     if (!canView) return items.map(item => ({ ...item, disabled: true, lockedReason: undefined }))
     return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
@@ -847,7 +849,9 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       {post.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で予約する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
       {!writeEnabled ? <Notice tone="warn">この環境ではGoogleへの投稿が許可されていません。内容の確認まではできます。</Notice> : null}
       {writeEnabled && !canPublish ? <Notice tone="warn">Googleへの投稿は店舗管理者以上が行います。この下書きは保存されているので、管理者が確認して投稿できます。</Notice> : null}
-      {post.instagram?.status === 'failed' ? <Notice tone="warn">{`Instagram へは出せませんでした${post.instagram.error ? `（${post.instagram.error}）` : ''}。Google への公開はそのまま残っています。投稿一覧の「…」から「Instagram へ再送」でもう一度送れます。`}</Notice> : null}
+      {post.instagram?.status === 'failed' ? <Notice tone="warn">{post.instagram.error === 'instagram_publish_result_unknown'
+        ? 'Instagramへの公開結果を確認できませんでした。重複投稿を防ぐため再送できません。Instagram上に投稿があるか確認してください。Googleへの公開はそのまま残っています。'
+        : `Instagram へは出せませんでした${post.instagram.error ? `（${post.instagram.error}）` : ''}。Google への公開はそのまま残っています。投稿一覧の「…」から「Instagram へ再送」でもう一度送れます。`}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <dl className={styles.facts}>
         <div className={styles.factRow}><dt className={styles.factKey}>投稿先</dt><dd className={styles.factValue}>{storeName}</dd></div>

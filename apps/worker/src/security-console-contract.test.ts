@@ -127,8 +127,14 @@ function unsafeConsoleCalls(source: string, readDependency: (specifier: string) 
       if(ts.isSpreadAssignment(property)){
         const expression=ts.isParenthesizedExpression(property.expression)?property.expression.expression:property.expression;
         const text=expression.getText(file).replace(/\s+/g,'');
+        const boundedNumber = [
+          'Number.isInteger(metrics.failedCount)&&metrics.failedCount!>=0?{failedCount:metrics.failedCount}:{}',
+          'Number.isInteger(metrics.upstreamCode)&&metrics.upstreamCode!>=0&&metrics.upstreamCode!<=999999999?{upstreamCode:metrics.upstreamCode}:{}',
+          'Number.isInteger(metrics.upstreamSubcode)&&metrics.upstreamSubcode!>=0&&metrics.upstreamSubcode!<=999999999?{upstreamSubcode:metrics.upstreamSubcode}:{}',
+        ].includes(text);
         if(!safeCategorySpread(expression)&&!/^Number\.isInteger\(metrics\.status\).*\?\{status:metrics\.status\}:\{\}$/.test(text)
-          &&!/^Number\.isFinite\(metrics\.durationMs\).*\?\{durationMs:Math\.round\(metrics\.durationMs!\)\}:\{\}$/.test(text))return false;
+          &&!/^Number\.isFinite\(metrics\.durationMs\).*\?\{durationMs:Math\.round\(metrics\.durationMs!\)\}:\{\}$/.test(text)
+          &&!boundedNumber)return false;
         continue;
       }
       if(!ts.isPropertyAssignment(property)&&!ts.isShorthandPropertyAssignment(property))return false;

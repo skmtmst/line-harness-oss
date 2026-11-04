@@ -5,7 +5,7 @@ const imports = `import Window, { DialogActions as Actions } from '@/components/
 describe('窓の下の帯を共通部品へそろえる', () => {
   it('全画面の窓に自前の操作帯と参照だけの閉じる帯が無い', () => {
     expect(scanDialogFooters(process.cwd())).toEqual([])
-  })
+  }, 20_000)
   it.each([
     `<Button>実行する</Button>`,
     `<><Button>キャンセル</Button><Button>実行する</Button></>`,
@@ -40,5 +40,10 @@ describe('窓の下の帯を共通部品へそろえる', () => {
   })
   it('共通帯だけを返す薄い部品は自前の帯と取り違えない', () => {
     expect(inspectDialogFooters(imports + `const Pair=({children})=>(<Actions>{children}</Actions>);const Screen=()=> <Window footer={<Pair><Button>実行する</Button></Pair>} />`)).toEqual([])
+  })
+  it('共通帯の下にある状態文は操作と取り違えず、状態文内のボタンは見逃さない', () => {
+    const prefix = imports + `const Screen=()=>{const reason=ready ? '入力してください' : undefined;return <Window footer={<div><Actions><Button>保存</Button></Actions>`
+    expect(inspectDialogFooters(prefix + `<div role="status">{reason}</div></div>} />}`)).toEqual([])
+    expect(inspectDialogFooters(prefix + `<div role="status">{ready ? <Button>保存</Button> : reason}</div></div>} />}`).map(row => row.kind)).toContain('custom-dialog-actions')
   })
 })

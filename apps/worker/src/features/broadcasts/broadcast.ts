@@ -404,6 +404,7 @@ export async function processBroadcastSend(
       // 自然な送信間隔を保つため、バッチ間に遅延を入れる。
       const now = jstNow();
       const totalBatches = Math.ceil(followingFriends.length / MULTICAST_BATCH_SIZE);
+      const liveScope = scopedFriendIds(await storedBroadcastFriendScope(db, broadcastAccountId));
       // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
       const unit = aggregationUnitFor(broadcast);
       /*
@@ -424,16 +425,25 @@ export async function processBroadcastSend(
         const batch = followingFriends.slice(i, i + MULTICAST_BATCH_SIZE);
         const suppressed = await suppressedFriendIds(db,batch.map(f=>f.id));
         await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
-        const sendable = batch.filter((f) => !blocked.has(f.id)&&!suppressed.has(f.id));
+        let sendable = batch.filter((f) => !blocked.has(f.id)&&!suppressed.has(f.id));
         if (sendable.length === 0) continue;
-        const sendableIds = sendable.map((f) => f.id);
-        const lineUserIds = sendable.map((f) => f.line_user_id);
 
 
         if (batchIndex > 0) {
           const delay = calculateStaggerDelay(followingFriends.length, batchIndex, MULTICAST_BATCH_SIZE);
           await sleep(delay);
         }
+
+        const current = await currentBroadcastRecipients(db, liveScope, sendable, broadcastId);
+        const currentIds = new Set(current.map(friend => friend.id));
+        const unavailableIds = sendable.filter(friend => !currentIds.has(friend.id)).map(friend => friend.id);
+        if (unavailableIds.length > 0) {
+          await settleBroadcastRecipients(db, { broadcastId, friendIds: unavailableIds, state: 'failed', errorCode: 'recipient_unavailable' });
+        }
+        sendable = current;
+        if (sendable.length === 0) continue;
+        const sendableIds = sendable.map((f) => f.id);
+        const lineUserIds = sendable.map((f) => f.line_user_id);
 
 
         const batchMessages = varyTextMessages(messages, batchIndex, totalBatches);
@@ -1144,6 +1154,7 @@ async function processQueuedBroadcastBatches(
   }
   const deliveryBatchSize = personalized ? PERSONALIZED_PUSH_BATCH_SIZE : MULTICAST_BATCH_SIZE;
   const totalBatches = Math.ceil(friends.length / deliveryBatchSize);
+  const deliveryScope = scopedFriendIds(await storedBroadcastFriendScope(db, accountId));
 
   // 時間をかけて配る設定。0（既定）なら一気に送る。
   const spreadMinutes = Number(raw.stealth_spread_minutes ?? 0) || 0;
@@ -1185,16 +1196,6 @@ async function processQueuedBroadcastBatches(
           currentOffset++;
           continue;
         }
-        const alreadyLogged = await db.prepare(
-          `SELECT 1 FROM messages_log
-            WHERE broadcast_id = ? AND friend_id = ? AND direction = 'outgoing'
-              AND COALESCE(delivery_type, '') != 'test'
-            LIMIT 1`,
-        ).bind(broadcast.id, friend.id).first();
-        if (alreadyLogged) {
-          currentOffset++;
-          continue;
-        }
 
         try {
           // 友だち情報欄は人ごとに違うので、ここで引く。本文で使っていなければ引かない。
@@ -1218,13 +1219,24 @@ async function processQueuedBroadcastBatches(
           // 外へ出す**直前**に台帳へ「出す」と書く。書いてから送ると、
           // 送信と記録のあいだで Worker が消えても送達不明として残る。
           // 逆にすると「届いたのに台帳は空」になり、次の試行が再送する。
+          const [currentFriend] = await currentBroadcastRecipients(db, deliveryScope, [friend], broadcast.id);
+          if (!currentFriend) {
+            await settleBroadcastRecipients(db, {
+              broadcastId: broadcast.id,
+              friendIds: [friend.id],
+              state: 'failed',
+              errorCode: 'recipient_unavailable',
+            });
+            currentOffset++;
+            continue;
+          }
           await markBroadcastRecipientsDispatched(db, {
             broadcastId: broadcast.id,
             attemptNo,
             lineAccountId: accountId,
             friendIds: [friend.id],
           });
-          const { requestId: pushRequestId } = await lineClient.pushMessageWithRequestId(friend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
+          const { requestId: pushRequestId } = await lineClient.pushMessageWithRequestId(currentFriend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
 
           await db.batch([
             ...renderedParts.map((part) => db.prepare(
@@ -1309,18 +1321,29 @@ async function processQueuedBroadcastBatches(
      * 失敗分の再送は先頭から歩き直すので、ここで叩いてしまうと送り終えた
      * 相手へ2通目が出る。
      */
-    const sendable = batch.filter((friend) => !blocked.has(friend.id)&&!suppressed.has(friend.id));
+    let sendable = batch.filter((friend) => !blocked.has(friend.id)&&!suppressed.has(friend.id));
+    if (sendable.length === 0) {
+      currentOffset += batch.length;
+      continue;
+    }
+    // Keep the tested staging pacing between multicast batches.
+    if (batchIndex > 0) {
+      const delay = calculateStaggerDelay(friends.length, batchIndex, deliveryBatchSize);
+      await sleep(delay);
+    }
+
+    const current = await currentBroadcastRecipients(db, deliveryScope, sendable, broadcast.id);
+    const currentIds = new Set(current.map(friend => friend.id));
+    const unavailableIds = sendable.filter(friend => !currentIds.has(friend.id)).map(friend => friend.id);
+    if (unavailableIds.length > 0) {
+      await settleBroadcastRecipients(db, { broadcastId: broadcast.id, friendIds: unavailableIds, state: 'failed', errorCode: 'recipient_unavailable' });
+    }
+    sendable = current;
     if (sendable.length === 0) {
       currentOffset += batch.length;
       continue;
     }
     const lineUserIds = sendable.map(f => f.line_user_id);
-
-    // ステルス遅延（最初のバッチ以外）
-    if (batchIndex > 0) {
-      const delay = calculateStaggerDelay(friends.length, batchIndex, deliveryBatchSize);
-      await sleep(delay);
-    }
 
     // テキストメッセージのバリエーションは先頭のテキスト1通だけに付ける。
     const batchMessages = varyTextMessages(messages, batchIndex, totalBatches);
@@ -1434,3 +1457,19 @@ async function processQueuedBroadcastBatches(
  * 呼び出し側が多いので、ここからも取れるようにしておく。
  */
 export { buildMessage };
+
+/** Recheck current ownership immediately before dispatch without reopening settled claims. */
+async function currentBroadcastRecipients<T extends { id: string; line_user_id: string }>(
+  db: D1Database, scope: ReturnType<typeof scopedFriendIds>, candidates: T[], alreadyLoggedBroadcastId?: string,
+): Promise<T[]> {
+  if (candidates.length === 0) return [];
+  const excludeLogged = alreadyLoggedBroadcastId
+    ? " AND NOT EXISTS (SELECT 1 FROM messages_log m WHERE m.broadcast_id = ? AND m.friend_id = f.id AND m.direction = 'outgoing' AND COALESCE(m.delivery_type, '') != 'test')"
+    : '';
+  const rows = await db.prepare(
+    `SELECT f.id, f.line_user_id FROM friends f
+      WHERE f.id IN (SELECT value FROM json_each(?)) AND f.id IN (${scope.sql})${excludeLogged}`,
+  ).bind(JSON.stringify(candidates.map(friend => friend.id)), ...scope.bindings, ...(alreadyLoggedBroadcastId ? [alreadyLoggedBroadcastId] : [])).all<{ id: string; line_user_id: string }>();
+  const current = new Map(rows.results.map(friend => [friend.id, friend.line_user_id]));
+  return candidates.filter(friend => current.has(friend.id)).map(friend => ({ ...friend, line_user_id: current.get(friend.id)! }));
+}

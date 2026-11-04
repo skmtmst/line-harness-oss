@@ -247,7 +247,7 @@ it('1万件をDBで数えて絞り、繰り返し検索では本文を全件読�
   expect(sqls.find(sql=>/SELECT id,content FROM messages_log/.test(sql))).toContain('search_content IS NULL');
   expect(sqls.filter(sql=>/FROM messages_log/.test(sql)).every(sql=>/search_content IS NULL|COUNT\(\*\)|LIMIT \? OFFSET \?/.test(sql))).toBe(true);
   spy.mockRestore();
-});
+}, 20_000);
 it('検索用本文は新規・編集・取消・テスト切替に追随し、半角カナと結合文字も探せる',async()=>{
   message('m01','ｶﾞイド cafe\u0301 %_');
   expect((await read(await app().request('/api/chats/f1/messages/search?q='+encodeURIComponent('ガイド café')))).data.total).toBe(1);

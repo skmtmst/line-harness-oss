@@ -118,6 +118,8 @@ async function openEc(page, waitFor = 'domcontentloaded') {
   await page.route('**/api/settings/features*', (route) => route.fulfill({ json: {
     success: true, data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 },
   } }))
+  await page.route((url) => url.pathname === '/api/dashboard/style',
+    (route) => route.fulfill({ json: { success: true, data: { style: 'ec', styleSelected: true, version: 1 } } }))
   await page.route('**/api/auth/session', (route) => route.fulfill({
     json: {
       success: true,
@@ -150,6 +152,9 @@ async function openEc(page, waitFor = 'domcontentloaded') {
       ],
     },
   }))
+  // 店舗画面は友だち引き継ぎの完了を確認してからECの一覧を描く。
+  await page.route((url) => /^\/api\/line-accounts\/[^/]+\/follower-import$/.test(url.pathname),
+    (route) => route.fulfill({ json: { success: true, data: { phase: 'completed' } } }))
   await page.addInitScript(() => {
     window.sessionStorage.setItem('lh_auth_selection_cleared', '1')
     window.localStorage.setItem('lh_selected_account', 'visual-qa-account')

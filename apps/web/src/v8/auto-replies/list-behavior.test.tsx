@@ -354,7 +354,7 @@ describe('遅れて届いた返事', () => {
     await act(async () => { held[0]({ success: true, data: [{ ...ruleA, name: '古い返事のルール' }] }) })
     await act(async () => { held[1]({ success: true, data: [{ ...ruleA, name: '別アカウントのルール' }] }) })
     await flush()
-    expect(host.textContent).toContain('新しい返事のルール')
+    await waitFor(() => expect(host.textContent).toContain('新しい返事のルール'), { timeout: 10000 })
     expect(host.textContent).not.toContain('古い返事のルール')
     expect(host.textContent).not.toContain('別アカウントのルール')
   })

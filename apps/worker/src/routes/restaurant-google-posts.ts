@@ -61,7 +61,6 @@ import {
   writeEnabled,
   type StoreContext,
 } from './restaurant-google.js';
-
 export const restaurantGooglePosts = new Hono<Env>();
 restaurantGooglePosts.use('/api/restaurant-test/google/*', googleAccessGuard);
 
@@ -484,7 +483,9 @@ async function crossPostToInstagram(c: Context<Env>, store: StoreContext, row: P
     const upstreamCode = /(?:^| )code=([0-9]{1,9})(?= |$)/.exec(detail ?? '');
     const upstreamSubcode = /(?:^| )subcode=([0-9]{1,9})(?= |$)/.exec(detail ?? '');
     const stage = detail?.includes('/media_publish') ? 'publish' : detail?.includes('/media') ? 'container' : 'other';
-    logger.warn(`instagram.cross_post.${stage}.failed`, {
+    logger.warn(stage === 'publish' ? 'instagram.cross_post.publish.failed'
+      : stage === 'container' ? 'instagram.cross_post.container.failed'
+        : 'instagram.cross_post.other.failed', {
       status: status ? Number(status[1]) : undefined,
       upstreamCode: upstreamCode ? Number(upstreamCode[1]) : undefined,
       upstreamSubcode: upstreamSubcode ? Number(upstreamSubcode[1]) : undefined,
@@ -857,6 +858,17 @@ restaurantGooglePosts.post(
       return fail(c, 409, 'まだ Google ビジネスへ公開されていません', { code: 'not_published' });
     if (row.instagram_status !== 'failed' && row.instagram_status !== 'skipped')
       return fail(c, 409, 'Instagram へ再送できる状態ではありません', { code: 'not_retryable' });
+    if (row.instagram_error === 'instagram_publish_result_unknown')
+      return fail(c, 409, '公開結果を確認できないため、Instagram上の投稿を確認してください', { code: 'publish_result_unknown' });
+    const claim = await dbFor(c.env, store.id)
+      .prepare(`UPDATE rt_google_posts SET instagram_status = 'pending', instagram_error = NULL, updated_at = ?
+        WHERE id = ? AND store_id = ? AND instagram_enabled = 1 AND google_post_name IS NOT NULL
+          AND instagram_status IN ('failed', 'skipped')
+          AND (instagram_error IS NULL OR instagram_error != 'instagram_publish_result_unknown')`)
+      .bind(nowIso(), row.id, store.id)
+      .run();
+    if (claim.meta.changes !== 1)
+      return fail(c, 409, 'Instagram への再送はすでに始まっています', { code: 'not_retryable' });
     await crossPostToInstagram(c, store, row);
     const updated = (await postFor(c, store.id, row.id))!;
     auditLog(

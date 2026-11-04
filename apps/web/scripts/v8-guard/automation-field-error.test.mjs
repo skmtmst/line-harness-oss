@@ -30,9 +30,7 @@ test('保存の入力エラーは1440・1152で名前の下へ出し、画面の
         await input.waitFor()
         await page.getByText('保存した下書きを読み込みました。続きを直せます。').last().waitFor()
         await input.fill('入力を残すルール')
-        // 下書きの保存は題の右の「…」の中（下の帯は［キャンセル］［保存］だけ）。
-        await page.getByRole('button', { name: '作成・編集のその他の操作' }).click()
-        await page.getByRole('menuitem', { name: '下書きを保存', exact: true }).click()
+        await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
         const reason = page.getByText('この名前は使われています', { exact: true })
         await reason.waitFor()
         const inputBox = await input.boundingBox(), reasonBox = await reason.boundingBox()

@@ -4,6 +4,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+type Reminder = { id: string; nextScheduledAt: string | null; displayOrder: number | null; createdAt: string; updatedAt: string; name: string }
+type ReminderResponse = { data: { items: Reminder[]; sort: Array<{ field: string }> } }
+
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MOCK_API = join(HERE, 'mock-api.mjs')
 
@@ -54,8 +57,8 @@ describe('ROOT-15 リマインダの並び', () => {
 
   it.each(['next', 'order', 'created', 'updated', 'name'])('ROOT-15 sort=%s を本物と同じ並びとmetaで返す', async sort => {
     const response = await fetch(`${baseUrl}/api/reminders?page=1&limit=200&sort=${sort}`)
-    const { data } = await response.json()
-    const all = (await (await fetch(`${baseUrl}/api/reminders`)).json()).data
+    const { data } = (await response.json()) as ReminderResponse
+    const all = ((await (await fetch(`${baseUrl}/api/reminders`)).json()) as { data: Reminder[] }).data
     const keys: Record<string, string[]> = { next: ['nextScheduledAt', 'id'], order: ['displayOrder', 'createdAt', 'id'], created: ['createdAt', 'id'], updated: ['updatedAt', 'id'], name: ['name', 'id'] }
     const expected = [...all].sort((a, b) => {
       if (sort === 'next') return Number(a.nextScheduledAt == null) - Number(b.nextScheduledAt == null) || String(a.nextScheduledAt ?? '').localeCompare(String(b.nextScheduledAt ?? '')) || a.id.localeCompare(b.id)
@@ -68,7 +71,7 @@ describe('ROOT-15 リマインダの並び', () => {
     expect(data.sort.map((v: { field: string }) => v.field)).toEqual(keys[sort])
   })
   it('sortだけの指定も一覧の器を返す', async () => {
-    const { data } = await (await fetch(`${baseUrl}/api/reminders?sort=next`)).json()
+    const { data } = (await (await fetch(`${baseUrl}/api/reminders?sort=next`)).json()) as ReminderResponse
     expect(data.items).toBeInstanceOf(Array)
   })
   it('未知の並び指定は本物同様400にする', async () => {

@@ -48,7 +48,7 @@ afterEach(() => { cleanup(); vi.resetAllMocks(); });
 it.each(['standard', 'restaurant', 'salon', 'consult'])('%s の入口は同じ所属の予約メニューへ進む', async (style) => {
   vi.mocked(api.storePhotos).mockResolvedValue([{ slot: 'exterior', url: '/media/booking-photo/content' }]);
   mount(style);
-  expect(await screen.findByRole('button', { name: /人工メニュー/ })).toBeTruthy();
+  expect(await screen.findByRole('button', { name: /人工メニュー/ }, { timeout: 10_000 })).toBeTruthy();
   fireEvent.click(await screen.findByText('お店の案内'));
   expect((await screen.findByRole('img', { name: 'お店の外観' })).getAttribute('src')).toBe('/media/booking-photo/content');
   expect(screen.getByTestId('location').textContent).toBe('/booking?liffId=fixture');

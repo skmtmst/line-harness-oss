@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { futureSlot } from '../test-utils/waitlist-fixture.js';
 import { readRestaurantAutomationSource } from './restaurant-automation-source.js';
@@ -7,7 +7,8 @@ import type { RestaurantEvent } from './restaurant-event-types.js';
 let t:SqliteD1;
 const now='2026-11-03T00:00:00Z';
 beforeEach(()=>{
-  t=createTestD1();
+  vi.useFakeTimers();vi.setSystemTime(new Date(now));
+  t=createTestD1({ now: () => new Date(now) });
   t.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','a','店舗','t','s');
     INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','UID','友だち'),('g','a','OTHER','別の人');
     INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','組織');
@@ -17,7 +18,7 @@ beforeEach(()=>{
     INSERT INTO rt_seat_visit_marks(id,reservation_id,store_id,kind,marked_at) VALUES('visit','r','store','visited','2026-11-02T10:00:00Z');
     UPDATE rt_reservations SET status='visited',departed_at='2026-11-02T11:30:00Z',customer_version=customer_version+1 WHERE id='r';`);
 });
-afterEach(()=>t.raw.close());
+afterEach(()=>{t.raw.close();vi.useRealTimers();});
 function event(){return t.raw.prepare("SELECT * FROM rt_reservation_events WHERE event_type='restaurant.departed'").get() as RestaurantEvent;}
 function input(){const e=event();return {eventId:e.id,eventType:e.event_type,lineAccountId:'a',friendId:'f',now};}
 it('保存済みの退店の出来事と本人と予約が現在も一致する時だけ通る',async()=>{

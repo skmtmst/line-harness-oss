@@ -32,7 +32,7 @@ async function fixture(method, path, screen) {
   return {...answer,body:JSON.stringify(data)}
 }
 
-for (const width of [1152,1440]) test(`実際の27種類と埋め込み6の右の面を測る ${width}`, async () => {
+for (const width of [1152,1440]) test(`実際の${detailSurfaceCases.length}種類の右の面を測る ${width}`, async () => {
   assert.ok(existsSync(join(root,'version.json')), 'AIと飲食店の検査用フラグを有効にした本番形式buildが必要')
   const server = createServer((req,res) => {
     const path = resolve(root, `.${new URL(req.url,'http://localhost').pathname}`)

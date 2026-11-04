@@ -40,6 +40,7 @@ vi.mock('@line-crm/db', () => ({
   updateBroadcast: vi.fn(),
   deleteBroadcast: vi.fn(),
   getLineAccountById: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(async () => [{ id: 'accA' }]),
 }));
 vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: vi.fn(async () => ({ allowedAccountIds: ['accA', 'accB'], canSeeUnassigned: true })),
@@ -84,7 +85,8 @@ function countFor(query: string, bindings: unknown[]): number {
     const accountId = hasAccount ? (bindings[1] as string) : null;
     return FRIENDS.filter((f) => f.tags.includes(tagId)
       && f.is_following === 1
-      && (!hasAccount || f.line_account_id === accountId)).length;
+      && (!hasAccount || f.line_account_id === accountId)
+      && (!query.includes('json_each') || JSON.parse(bindings[1] as string).includes(f.line_account_id))).length;
   }
   const hasAccount = query.includes('line_account_id = ?');
   const accountId = hasAccount ? (bindings[0] as string) : null;

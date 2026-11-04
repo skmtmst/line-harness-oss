@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { CONTACT_URL, LEGAL_LINKS, PUBLIC_AUTH_PATHS } from '@/lib/auth-email'
+import AuthCard from '@/components/auth/auth-card'
 
 const SRC = join(__dirname, '..', '..')
 const read = (p: string) => readFileSync(join(SRC, p), 'utf8')
@@ -85,23 +87,27 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
 
   it('文書の公開先が未設定のときは、説明なしに同意だけを求めない（R169）', () => {
     const page = read('app/register/page.tsx')
-    // 開けない文書への同意を求める代わりに、まだ公開されていないことと
-    // ログイン不要の確認口（お問い合わせ）を添える。
+    // 開けない文書への同意を求める代わりに、まだ公開されていないことを添える。
     expect(page).toContain('!LEGAL_LINKS.terms || !LEGAL_LINKS.privacy')
     expect(page).toContain('文書のページはまだ公開されていません')
-    expect(page).toContain('href={CONTACT_URL}')
   })
 
-  it('ログイン前のお問い合わせはサービスサイトの /contact/ へ（監査 m18e）', () => {
-    // /hq/support はログインが要り、未ログインではログイン画面へ戻される。
-    // 新しい公開フォームは作らない。URL は環境変数で変えられる。
-    const lib = read('lib/auth-email.ts')
-    expect(lib).toContain('NEXT_PUBLIC_CONTACT_URL')
-    expect(lib).toContain('/contact/')
-    const card = read('components/auth/auth-card.tsx')
-    expect(card).toContain('CONTACT_URL')
-    expect(card).toContain('target="_blank"')
-    expect(card).not.toContain('href="/hq/support"')
+  it('ログイン前の問い合わせ先は公開サイトに向け、ログイン必須の統括窓口へ送らない', () => {
+    const markup = renderToStaticMarkup(
+      <AuthCard title="ログイン" description="テスト" step={{ current: 1, total: 2 }}>{null}</AuthCard>,
+    )
+    expect(markup).toContain(`href="${CONTACT_URL}"`)
+    expect(markup).toContain('>お問い合わせ</a>')
+    expect(markup).not.toContain('href="/hq/support"')
+    // フッターに残すのは法務の3つだけ。
+    for (const [label, url] of [
+      ['利用規約', LEGAL_LINKS.terms],
+      ['プライバシーポリシー', LEGAL_LINKS.privacy],
+      ['特定商取引法に基づく表記', LEGAL_LINKS.commerce],
+    ]) {
+      expect(markup).toContain(`href="${url}"`)
+      expect(markup).toContain(`>${label}</a>`)
+    }
   })
 })
 

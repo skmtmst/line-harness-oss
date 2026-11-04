@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: required-pr-gate-${{ github.event.pull_request.number || github.ref }}
@@ -26,16 +27,62 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          # The PR merge contains both comparison parents. Avoid fetching every
+          # branch and tag in this large repository for a path-only gate.
+          fetch-depth: 500
+
+      - name: Ensure PR comparison history is available
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             ! git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1; then
+            git fetch --no-tags --unshallow origin
+            git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null
+          fi
 
       - name: Protect command-center owned documents
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "PR差分がない手動実行のため、司令塔の所有パス検査を飛ばします。"
+            exit 0
+          fi
+
+          # 本番昇格は検証済みの開発版そのものだけに限る。
+          # main 宛てというだけで所有パスの検査を免除しない。
+          if [ "$BASE_REF" = "main" ]; then
+            if [[ ! "$HEAD_REF" == codex/masato-production-release-* ]]; then
+              echo "::error::本番昇格専用ブランチではありません。"
+              exit 1
+            fi
+            git fetch --no-tags origin codex/development
+            if ! git merge-base --is-ancestor "$HEAD_SHA" FETCH_HEAD; then
+              echo "::error::PRのHEADが開発版に含まれていません。"
+              exit 1
+            fi
+            stage_runs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-cloudflare-staging.yml/runs?head_sha=$HEAD_SHA&status=success&per_page=100")
+            deployed=false
+            while IFS= read -r run_id; do
+              jobs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")
+              if jq -e '[.jobs[] | select(.name == "deploy") | .steps[]
+                | select(.name == "Deploy Worker to staging" or .name == "Deploy Admin Panel to staging" or .name == "Verify public source revisions")
+                | select(.conclusion == "success")] | length == 3' <<< "$jobs" >/dev/null; then
+                deployed=true
+                break
+              fi
+            done < <(jq -r --arg sha "$HEAD_SHA" '.workflow_runs[] | select(.head_sha == $sha and .event == "workflow_dispatch" and .conclusion == "success") | .id' <<< "$stage_runs")
+            if [ "$deployed" != true ]; then
+              echo "::error::PRのHEADと同じSHAでWorker・管理画面を検証配備した成功記録がありません。"
+              exit 1
+            fi
+            echo "検証済み開発版からの本番昇格を確認しました。"
             exit 0
           fi
 
@@ -266,7 +313,17 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          fetch-depth: 500
+      - name: Ensure PR comparison history is available
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             ! git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1; then
+            git fetch --no-tags --unshallow origin
+            git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null
+          fi
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -316,7 +373,21 @@ jobs:
       # Dependencies were built above; standalone package hooks remain enabled locally.
       - name: Test the setup CLI
         run: pnpm --config.enable-pre-post-scripts=false --filter create-line-harness test
-      - run: pnpm test:scripts
+      - name: Install ripgrep for repository audits
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ripgrep
+          fi
+      - name: Test repository scripts against the PR base
+        env:
+          HONORIFIC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$HONORIFIC_BASE_SHA" ]; then
+            git fetch --no-tags origin \
+              +refs/heads/codex/development:refs/remotes/origin/codex/development
+          fi
+          pnpm test:scripts
       - name: Ratchet code quality against the PR base
         env:
           QUALITY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -344,6 +415,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # monthly-migration.test.ts compares bootstrap.sql against a historical commit.
+          fetch-depth: 0
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -358,7 +432,10 @@ jobs:
           --filter @line-crm/line-sdk
           --filter @line-crm/db
           build
-      - run: pnpm --config.enable-pre-post-scripts=false --filter worker typecheck
+      - name: Typecheck Worker with sufficient Node heap
+        run: pnpm --config.enable-pre-post-scripts=false --filter worker typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
       - run: pnpm --config.enable-pre-post-scripts=false --filter worker test
 
   worker-build:
@@ -419,7 +496,15 @@ jobs:
       - name: Reject restored legacy admin appearance
         run: node apps/web/scripts/verify-v8-only.mjs
       - run: pnpm --config.enable-pre-post-scripts=false --filter web typecheck
-      - run: pnpm --config.enable-pre-post-scripts=false --filter web test
+      # The route-permission matrix expands to thousands of cases. When it shares
+      # a long-lived Vitest fork with the rest of the suite, Node can exhaust its
+      # heap on the hosted runner. Run the matrix in a fresh process.
+      - name: Test Admin except route-permission matrix
+        run: pnpm --filter web exec vitest run --config vitest.config.ts --exclude src/components/view-permission-routes.test.tsx
+      - name: Test route-permission matrix in isolation
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: pnpm --filter web exec vitest run --config vitest.config.ts src/components/view-permission-routes.test.tsx --maxWorkers=1
       # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
       # 専用の設定が無く、**どのワークフローからも一度も呼ばれていなかった**(#704)。
       # #704 で繋いだところ2試験が落ち、原因が画面側の不具合だと分かったので
@@ -614,7 +699,17 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          fetch-depth: 500
+      - name: Ensure PR comparison history is available
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] && \
+             ! git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null 2>&1; then
+            git fetch --no-tags --unshallow origin
+            git merge-base "$BASE_SHA" "$HEAD_SHA" >/dev/null
+          fi
       - name: Decide whether to run the screen guard
         id: scope
         env:

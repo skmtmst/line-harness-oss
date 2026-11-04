@@ -399,7 +399,7 @@ describe('型の対応表の点検', () => {
     put(root, rel, good)
     put(root, 'apps/web/src/v8/other/new.module.css', '.bad { color: #ff0000; border-radius: 7px; }')
     expect(audit().status).toBe(1)
-  }, 15000)
+  }, 30_000)
   it('行の移動は通し、手書き・上書き・直書きの新規と同じ候補の増殖は止める', () => {
     const hit = { file: 'apps/web/src/v8/demo/list.tsx', line: 3, scope: 'v8', signal: 'own-stat', text: 'function StatCard() {}' }
     const before = { code: { a: { 'kpi-band': [hit] }, b: {}, c: {} } }

@@ -26,25 +26,30 @@ async function start(stress: boolean) {
 }
 beforeAll(async () => { normal = await start(false); long = await start(true) }, 15_000)
 afterAll(async () => { await Promise.all(children.map(child => new Promise<void>(done => { child.once('exit', () => done()); child.kill() }))) })
-const get = async (base: string, path: string) => (await (await fetch(base + path)).json()).data
+type MockFriend = { id: string; isFollowing: boolean; displayName: string; tags: Array<{ id: string }>; items?: unknown }
+type MockLinks = { items?: Array<{ originalUrl: string }>; [index: number]: { originalUrl: string } }
+const get = async <T>(base: string, path: string): Promise<T> => {
+  const response = await fetch(base + path)
+  return ((await response.json()) as { data: T }).data
+}
 it('会話だけに登場する相手にも一致するIDの1人分を返し、既知の相手は変えない', async () => {
-  const known = await get(normal, '/api/friends/friend-1')
-  const fallback = await get(normal, '/api/friends/friend-42')
+  const known = await get<MockFriend>(normal, '/api/friends/friend-1')
+  const fallback = await get<MockFriend>(normal, '/api/friends/friend-42')
   expect(fallback).toEqual({ ...known, id: 'friend-42' })
   expect(fallback.items).toBeUndefined()
   expect(Array.isArray(fallback.tags)).toBe(true)
 })
 it('長文化はオンの時だけ名前・URL・タグを加工し、ID・状態と元データを保つ', async () => {
-  const known = await get(normal, '/api/friends/friend-1')
-  const stress = await get(long, '/api/friends/friend-1')
+  const known = await get<MockFriend>(normal, '/api/friends/friend-1')
+  const stress = await get<MockFriend>(long, '/api/friends/friend-1')
   expect(stress.id).toBe(known.id)
   expect(stress.isFollowing).toBe(known.isFollowing)
   expect(stress.displayName.length).toBeGreaterThan(known.displayName.length)
   expect(stress.tags).toHaveLength(10)
   expect(new Set(stress.tags.map((tag: { id: string }) => tag.id)).size).toBe(10)
-  expect(await get(normal, '/api/friends/friend-1')).toEqual(known)
-  const links = await get(normal, '/api/tracked-links')
-  const stressedLinks = await get(long, '/api/tracked-links')
+  expect(await get<MockFriend>(normal, '/api/friends/friend-1')).toEqual(known)
+  const links = await get<MockLinks>(normal, '/api/tracked-links')
+  const stressedLinks = await get<MockLinks>(long, '/api/tracked-links')
   const url = links.items?.[0]?.originalUrl ?? links[0]?.originalUrl
   const stressedUrl = stressedLinks.items?.[0]?.originalUrl ?? stressedLinks[0]?.originalUrl
   expect(url).toBeTruthy()

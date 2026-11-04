@@ -241,13 +241,15 @@ async function openHarness(browser, {
     })
 
     if (path === '/api/auth/session') {
-      return json({ success: true, data: { id: 'staff-1', name: `${role}利用者`, role, permissionKeys: [] }, csrfToken: 'test-csrf' })
+      return json({ success: true, data: { id: 'staff-1', name: `${role}利用者`, role, permissionKeys: role === 'staff' ? [] : ['/form-submissions'], permissionViewKeys: role === 'staff' ? ['/form-submissions'] : [] }, csrfToken: 'test-csrf' })
     }
     // V8 は保存値でなくこの口で役割を読む。既定の空配列では管理者も閲覧用になる。
     if (path === '/api/staff/me' && request.method() === 'GET') {
-      return json({ success: true, data: { id: 'staff-1', name: `${role}利用者`, role, permissionKeys: [] } })
+      return json({ success: true, data: { id: 'staff-1', name: `${role}利用者`, role, permissionKeys: role === 'staff' ? [] : ['/form-submissions'], permissionViewKeys: role === 'staff' ? ['/form-submissions'] : [] } })
     }
     if (path === '/api/line-accounts') return json({ success: true, data: ACCOUNTS })
+    if (path === '/api/dashboard/style') return json({ success: true, data: { style: 'standard', styleSelected: true, version: 1 } })
+    if (/^\/api\/line-accounts\/[^/]+\/follower-import$/.test(path)) return json({ success: true, data: { phase: 'completed' } })
     if (path === '/api/tags') return json({ success: true, data: tags })
     // 左メニューは表示設定を読む。形が違うと画面全体が落ちるので、既定の形で返す。
     if (path === '/api/settings/features') {
@@ -596,13 +598,15 @@ try {
       },
       listDelayMs: { 'account-a': 2_000 },
     })
-    const lateListA = page.waitForResponse((response) =>
-      response.url().includes('/api/forms') && response.url().includes('account_id=account-a'))
+    const startedListA = page.waitForRequest((request) =>
+      request.url().includes('/api/forms') && request.url().includes('account_id=account-a'))
     await page.goto(`${baseUrl}/form-submissions`, { waitUntil: 'domcontentloaded' })
+    await startedListA
     await switchAccount(page, 'account-b')
     await page.getByText('本店フォーム', { exact: true }).waitFor()
-    await lateListA
-    await page.waitForTimeout(500)
+    // 店舗切替ゲートが旧画面を外すと、A の fetch は応答前に中断されることもある。
+    // 応答の有無に依存せず、遅延時間を越えた時点で B の一覧が残ることを確認する。
+    await page.waitForTimeout(2_500)
     assert.equal(await page.getByText('前のアカウントのフォーム', { exact: true }).count(), 0, '切替前の遅い応答を混ぜない')
     assert.equal(await page.getByText('本店フォーム', { exact: true }).count(), 1, '切替後の一覧が残っている')
     await context.close()
@@ -735,7 +739,7 @@ try {
     const action = page.locator('[data-action-row]')
     assert.equal(await action.count(), 1, '対象を確定した行だけ追加する')
     await action.getByRole('button', { name: 'タグ：変える', exact: true }).waitFor()
-    const title = await action.getByRole('button', { name: 'タグ「回答済み」を付ける', exact: true }).boundingBox()
+    const title = await action.locator('[data-action-name]', { hasText: '「回答済み」' }).boundingBox()
     assert.ok(title && title.width > 0 && title.x >= 0 && title.x + title.width <= 390,
       'R26: 行の名前も省略できる幅を保って画面内に表示する')
     for (const right of await action.getByRole('button').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().right))) {
@@ -771,12 +775,23 @@ try {
     await waitForOverlayLayout(linkDialog)
     assert.equal(await linkDialog.getByRole('button', { name: '保存する', exact: true }).count(), 0,
       'V8: 設定の窓に2つ目の保存を置かない')
+    const initialAutosave = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === '/api/forms/form-1' && response.request().method() === 'PUT' && response.ok(),
+    )
     await page.locator('#fe-og-title').fill('ごはんの相談フォーム')
     assert.equal(await page.locator('#fe-og-title').inputValue(), 'ごはんの相談フォーム', 'V8: 最初の入力を窓の描き直しで失わない')
     await page.locator('#fe-og-desc').fill('3分で終わります')
+    // 自動保存の2秒タイマーが画像欄を開く操作と重ならないよう、先の2欄の保存を待つ。
+    await initialAutosave
     // MediaSlot は「URL で入れる」を押してから入力欄を出す。
     assert.equal(await linkDialog.locator('#fe-og-image').count(), 0, 'V8: 画像URLは開く前に出さない')
-    await linkDialog.getByRole('button', { name: 'URL で入れる', exact: true }).click()
+    const urlEntryButton = linkDialog.getByRole('button', { name: 'URL で入れる', exact: true })
+    await urlEntryButton.click()
+    // 初回のポインタ操作がボタンに届かなかった場合だけ再操作する。
+    if (await urlEntryButton.getAttribute('aria-expanded') !== 'true') {
+      await urlEntryButton.click()
+    }
+    assert.equal(await urlEntryButton.getAttribute('aria-expanded'), 'true', 'V8: URL入力を開く')
     await linkDialog.locator('#fe-og-image').fill('https://example.test/ogp.png')
     await linkDialog.getByRole('button', { name: '閉じる', exact: true }).last().click()
     await linkDialog.waitFor({ state: 'detached', timeout: 10_000 })

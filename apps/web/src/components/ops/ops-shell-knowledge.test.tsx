@@ -30,6 +30,7 @@ it.each(['/ops/knowledge', '/ops/support', '/ops/tenants'])('%s はほかの画�
   try {
     await act(async () => { root.render(<OpsShell><p>本文</p></OpsShell>) })
     expect(host.querySelector('[data-knowledge-shell]')).toBeNull()
+    expect(host.querySelector('[data-content-layout="ops"]')).not.toBeNull()
     // 帯ではなく各画面の見出しだけ。外枠自体は見出しを持たない。
     expect(host.textContent).toContain('本文')
   } finally { act(() => root.unmount()); host.remove() }

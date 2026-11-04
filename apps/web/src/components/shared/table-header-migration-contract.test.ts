@@ -68,7 +68,7 @@ describe('共通化済みの表見出しに直書きと重複指定を戻さな�
   })
 
   // 全ソース走査(countDebt)を含むため、CIの並列負荷で5秒を超えることがある。
-  it('登録した詳細・V8専用テーブルだけ直書きthを許す', { timeout: 30000 }, () => {
+  it('登録した詳細・V8専用テーブルだけ直書きthを許す', { timeout: 120000 }, () => {
     for (const path of targets.filter((path) => !nativeHeaderExceptions.has(path) && !(path in v8NativeHeaders))) {
       expect(sources[path]).not.toMatch(/<th\b/)
     }

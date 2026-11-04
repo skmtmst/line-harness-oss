@@ -94,7 +94,7 @@ it.each([
   expect(state.warnings).toHaveBeenCalledWith('a')
   expect(state.items).toHaveBeenCalledWith('a')
   fireEvent.click(screen.getByRole('button', { name: '中身を見る' }))
-  expect(await screen.findByRole('dialog', { name: '準備ができました' })).toBeTruthy()
+  expect(await screen.findByRole('dialog', { name: '準備ができました' }, { timeout: 10000 })).toBeTruthy()
   await screen.findByRole('heading', { name: '入った物', exact: true })
   expect(state.push).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true }))

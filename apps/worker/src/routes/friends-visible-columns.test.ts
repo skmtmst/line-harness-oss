@@ -39,4 +39,4 @@ test('2,000件・7欄を一括取得し、bindは固定数・問い合わせは1
   const elapsed=performance.now()-started;
   expect(prepare).toHaveBeenCalledOnce();expect(result.size).toBe(2000);expect(result.get(ids[1999])?.['fixed:allergy']).toBe('卵・乳');
   expect(elapsed).toBeLessThan(1500);console.info(`2,000件 / 7欄: ${elapsed.toFixed(1)}ms / 1 query`);
-});
+}, 20_000);

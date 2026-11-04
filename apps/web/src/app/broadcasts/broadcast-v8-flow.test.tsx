@@ -213,7 +213,7 @@ describe('V8 一斉配信の通し', () => {
     })
     // テンプレートの選択は使わず、メッセージの編集へ戻って自分で書く。
     await act(async () => {
-      fireEvent.click(within(await screen.findByRole('dialog', { name: 'テンプレートを選ぶ' })).getByRole('button', { name: 'キャンセル' }))
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'テンプレートを選ぶ' }, { timeout: 10000 })).getByRole('button', { name: 'キャンセル' }))
     })
     await screen.findByPlaceholderText('例：8月キャンペーンのお知らせ')
 

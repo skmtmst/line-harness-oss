@@ -110,6 +110,8 @@ async function respond(url, staffMe, role) {
   }
   if (path === '/api/staff/me') return staffMe()
   if (path === '/api/line-accounts') return ok(ACCOUNTS)
+  // 店舗画面の共通入口は、引き継ぎ完了を確認してから内容を描く。
+  if (/^\/api\/line-accounts\/[^/]+\/follower-import$/.test(path)) return ok({ phase: 'completed' })
   if (path === '/api/folders') return ok(FOLDERS)
   if (path === '/api/media') {
     const accountId = url.searchParams.get('accountId') ?? ACCOUNTS[0].id
@@ -137,7 +139,7 @@ async function respond(url, staffMe, role) {
  * `onRequest` で「本当に呼んだか」を数える。
  */
 async function stubApi(page, { role = 'owner', staffMe, onRequest = () => {} } = {}) {
-  const respondStaffMe = staffMe ?? (async () => ok({ id: `${role}-1`, name: `${role} test`, role, email: null }))
+  const respondStaffMe = staffMe ?? (async () => ok({ id: `${role}-1`, name: `${role} test`, role, email: null, permissionViewKeys: role === 'staff' ? ['/contents'] : [] }))
   await page.route(
     (url) => url.pathname.startsWith('/api/'),
     async (route) => {
@@ -239,13 +241,15 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
       onRequest: management.onRequest,
     })
 
-    await openContents(page, 'domcontentloaded')
+    await page.goto(`${BASE}/contents`, { waitUntil: 'domcontentloaded' })
+    await expect(page).toHaveURL(CONTENTS_URL)
+    await expect(page.locator('[data-page-pending="identity"]')).toBeVisible()
     await expect(permissionNote(page)).toHaveCount(0)
-    await expectManagementHidden(page)
+    await expect(page.getByText(MEDIA_NAME, { exact: true })).toHaveCount(0)
     expect(management.requests).toEqual([])
-    await page.keyboard.press('Escape')
 
     releaseRole()
+    await expect(page.getByText(MEDIA_NAME, { exact: true }).first()).toBeVisible()
     await expect(permissionNote(page)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'メディアを登録する', exact: true }).first()).toBeVisible()
     await openUsage(page)
@@ -292,7 +296,7 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
       const management = managementRequestLog()
       await stubApi(page, {
         role: 'staff',
-        staffMe: async () => ok({ id: 'viewer-1', name: 'Viewer', role: 'staff', email: null, ...restriction }),
+        staffMe: async () => ok({ id: 'viewer-1', name: 'Viewer', role: 'staff', email: null, permissionViewKeys: ['/contents'], ...restriction }),
         onRequest: management.onRequest,
       })
       await openContents(page)
@@ -320,11 +324,12 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
         onRequest: management.onRequest,
       })
 
-      await openContents(page)
-      await expect(permissionNote(page)).toContainText('操作権限を確認できないため、安全のため管理操作を止めています')
-      await expectManagementHidden(page)
+      await page.goto(`${BASE}/contents`)
+      await expect(page.locator('[data-page-pending="identity"]')).toBeVisible()
+      await expect(page.locator('[data-page-pending="identity"]')).toContainText('読み込めませんでした')
       expect(management.requests).toEqual([])
       await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toHaveCount(0)
+      await expect(page.getByText(MEDIA_NAME, { exact: true })).toHaveCount(0)
     })
   }
 

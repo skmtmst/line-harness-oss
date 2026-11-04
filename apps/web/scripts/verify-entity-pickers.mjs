@@ -56,8 +56,10 @@ export function inspectPickers(text, file = 'component.tsx') {
       const comparison = /sourceFriendId/.test(options) && /identity-decision-dialog|friends\/compare/.test(file)
       const folderRail = /templates\/list-page\.tsx$/.test(file) && /rows\.map/.test(options)
       const folderPicker = /shared\/entity-picker\.tsx$/.test(file) && /folderRows/.test(options)
+      // The category control narrows a dialog's candidates; it does not choose an entity.
+      const categoryFilter = /shared\/entity-picker\.tsx$/.test(file) && /候補の絞り込み/.test(label) && /categories/.test(options)
       const dynamicEntity = /value\s*(?::|=\{)[^,}\n]*\b\w+\.(?:id|\w+Id)\b/.test(options) || Boolean(identifier && entityWords.test(identifier))
-      if (!folderLabel.test(label) && !comparison && !folderRail && !folderPicker && dynamicEntity) {
+      if (!folderLabel.test(label) && !comparison && !folderRail && !folderPicker && !categoryFilter && dynamicEntity) {
         violations.push({ file, line: source.getLineAndCharacterOfPosition(node.getStart()).line + 1, label, message: '作った物の選択は EntityPickerField / EntitySelect を使ってください。' })
       }
     }

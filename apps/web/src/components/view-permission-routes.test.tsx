@@ -40,7 +40,14 @@ vi.mock('./hq/platform-notices', () => ({ default: () => null }))
 import AppShell from './app-shell'
 import { menuItemForPath } from './view-permission-gate'
 
-afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot(); localStorage.clear() })
+function cleanupCase() {
+  cleanup()
+  forgetStaffIdentity()
+  forgetSessionSnapshot()
+  localStorage.clear()
+  nav.me.mockClear()
+}
+afterEach(cleanupCase)
 
 it('画面の入口を漏らさず、権限表の期待へ登録している', () => {
   const root = resolve(process.cwd(), 'src/app')
@@ -94,23 +101,30 @@ it('メニューから消えた付与可能キーも対照に含む', () => {
   expect(singleKeys).toContain('/line-notifications')
   expect(singleKeys).toContain('access.user.view')
 })
-const keyCases = unlistedRoutes.flatMap(row => singleKeys.flatMap(key => (['view', 'edit', 'read-only'] as const).map(mode => ({ ...row, key, mode }))))
-it.each(keyCases)('$route は $mode の鍵 $key だけを持つ担当者へ明示どおり判定する', ({ route, policy, requiredKey, key, mode }) => {
-  nav.path = route
-  nav.me.mockResolvedValue({ success: false, error: 'unavailable' })
-  rememberStaffIdentity({ role: 'staff', accountScope: 'all', readOnly: mode === 'read-only', permissionKeys: mode === 'edit' ? [key] : [], permissionViewKeys: mode === 'edit' ? [] : [key] } as StaffMember)
-  const creating = /\/(?:new|create)(?:\/|$)/.test(route)
-  const granted = policy === 'self' || policy === 'redirect' || (policy === 'key' && key === requiredKey && (!creating || mode === 'edit'))
-  const expected = granted && !(creating && mode === 'read-only')
-  const mounted = vi.fn()
-  function Probe() { React.useEffect(mounted, []); return <p>鍵を1本だけ持つ担当者の中身</p> }
-  const view = render(<AppShell><Probe /></AppShell>)
-  if (expected) {
-    expect(screen.getByText('鍵を1本だけ持つ担当者の中身')).toBeTruthy()
-    expect(mounted).toHaveBeenCalledTimes(1)
-  } else {
-    expect(screen.queryByText('鍵を1本だけ持つ担当者の中身')).toBeNull()
-    expect(mounted).not.toHaveBeenCalled()
-    expect(view.container.querySelector('[data-target-missing="forbidden"]')).not.toBeNull()
+it.each(unlistedRoutes)('$route は付与可能な全鍵の単独付与を明示どおり判定する', ({ route, policy, requiredKey }) => {
+  for (const key of singleKeys) for (const mode of ['view', 'edit', 'read-only'] as const) {
+    try {
+      nav.path = route
+      nav.me.mockResolvedValue({ success: false, error: 'unavailable' })
+      rememberStaffIdentity({ role: 'staff', accountScope: 'all', readOnly: mode === 'read-only', permissionKeys: mode === 'edit' ? [key] : [], permissionViewKeys: mode === 'edit' ? [] : [key] } as StaffMember)
+      const creating = /\/(?:new|create)(?:\/|$)/.test(route)
+      const granted = policy === 'self' || policy === 'redirect' || (policy === 'key' && key === requiredKey && (!creating || mode === 'edit'))
+      const expected = granted && !(creating && mode === 'read-only')
+      const mounted = vi.fn()
+      function Probe() { React.useEffect(mounted, []); return <p>鍵を1本だけ持つ担当者の中身</p> }
+      const view = render(<AppShell><Probe /></AppShell>)
+      if (expected) {
+        expect(screen.getByText('鍵を1本だけ持つ担当者の中身')).toBeTruthy()
+        expect(mounted).toHaveBeenCalledTimes(1)
+      } else {
+        expect(screen.queryByText('鍵を1本だけ持つ担当者の中身')).toBeNull()
+        expect(mounted).not.toHaveBeenCalled()
+        expect(view.container.querySelector('[data-target-missing="forbidden"]')).not.toBeNull()
+      }
+    } catch (error) {
+      throw new Error(`${route}: ${mode} ${key}`, { cause: error })
+    } finally {
+      cleanupCase()
+    }
   }
 })

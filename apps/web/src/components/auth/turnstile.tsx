@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 import Notice from '@/components/shared/notice'
 
@@ -47,15 +47,33 @@ function loadScript(): Promise<void> {
 
 export type TurnstileHandle = { reset: () => void }
 
+/**
+ * Turnstile のエラー番号を日本語にする。
+ * Cloudflare の枠は「Webサイトに接続できません」としか出さず、番号は開発者コンソールにしか残らない。
+ * 原因が分からないまま登録が止まるのを防ぐため、画面にも番号と対処を出す。
+ */
+function turnstileErrorMessage(code: string | undefined): string {
+  const tail = code ? `（エラー ${code}）` : ''
+  // 1102xx はサイトキーの設定ちがい。利用者が何度押しても直らない。
+  if (code?.startsWith('1102')) {
+    return `このドメインはロボット対策に登録されていないため、確認できません${tail}。運営側の設定が必要です。`
+  }
+  if (code?.startsWith('1106') || code?.startsWith('1104')) {
+    return `ロボット対策の確認に失敗しました${tail}。ページを開き直してもう一度お試しください。`
+  }
+  return `ロボット対策の確認ができませんでした${tail}。通信環境を確かめて、もう一度お試しください。`
+}
+
 export default function Turnstile({
   onToken,
   onError,
   handleRef,
 }: {
   onToken: (token: string | null) => void
-  onError?: () => void
+  onError?: (code?: string) => void
   handleRef?: (handle: TurnstileHandle | null) => void
 }) {
+  const [errorCode, setErrorCode] = useState<string | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const widgetRef = useRef<string | null>(null)
   const onTokenRef = useRef(onToken)
@@ -74,21 +92,29 @@ export default function Turnstile({
           language: 'ja',
           theme: 'light',
           size: 'flexible',
-          callback: (token: string) => onTokenRef.current(token),
+          callback: (token: string) => {
+            setErrorCode(null)
+            onTokenRef.current(token)
+          },
           'expired-callback': () => onTokenRef.current(null),
-          'error-callback': () => {
+          'error-callback': (code?: string) => {
+            setErrorCode(code ?? '')
             onTokenRef.current(null)
-            onErrorRef.current?.()
+            onErrorRef.current?.(code)
           },
         })
         handleRef?.({
           reset: () => {
             if (widgetRef.current && window.turnstile) window.turnstile.reset(widgetRef.current)
+            setErrorCode(null)
             onTokenRef.current(null)
           },
         })
       })
-      .catch(() => onErrorRef.current?.())
+      .catch(() => {
+        setErrorCode('')
+        onErrorRef.current?.()
+      })
     return () => {
       cancelled = true
       handleRef?.(null)
@@ -106,9 +132,18 @@ export default function Turnstile({
   if (!TURNSTILE_SITE_KEY) {
     return (
       <Notice tone="warn" className="w-full">
-        ロボット対策の設定が済んでいないため、この環境では送信できません。運営にお問い合わせください。
+        ロボット対策の設定が済んでいないため、この環境では送信できません。
       </Notice>
     )
   }
-  return <div ref={hostRef} className="w-full" aria-label="ロボットでないことの確認" />
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <div ref={hostRef} className="w-full" aria-label="ロボットでないことの確認" />
+      {errorCode !== null ? (
+        <Notice tone="danger" className="w-full">
+          {turnstileErrorMessage(errorCode || undefined)}
+        </Notice>
+      ) : null}
+    </div>
+  )
 }
