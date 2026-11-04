@@ -21,6 +21,7 @@ vi.mock('../services/account-access.js', () => accountAccessMocks);
 const { richMenuGroups } = await import('./rich-menu-groups.js');
 const {
   acquirePublishLease,
+  renewPublishLease,
   isPublishLeaseHeld,
   setRichMenuPageImage,
 } = await import('@line-crm/db');
@@ -169,6 +170,15 @@ function expireLease() {
 }
 
 describe('実の停止API × 別D1接続の割り込み', () => {
+  test('lease の取得と延長は確認版を進めない', async () => {
+    const revision = () => (sqlite.prepare("SELECT confirmation_revision FROM rich_menu_groups WHERE id='g1'").get() as { confirmation_revision: number }).confirmation_revision;
+    const before = revision();
+    const generation = await acquirePublishLease(db, 'g1', 'publisher', new Date().toISOString());
+    expect(generation).not.toBeNull();
+    expect(revision()).toBe(before);
+    expect(await renewPublishLease(db, 'g1', { owner: 'publisher', generation: generation! }, new Date().toISOString())).toBe(true);
+    expect(revision()).toBe(before);
+  });
   test('画像が変わって元に戻っても公開処理の世代は進む',async()=>{
     sqlite.exec("UPDATE rich_menu_groups SET status='draft',is_default_for_all=0 WHERE id='g1'");
     await setRichMenuPageImage(db,'p1','image-1','image/png');

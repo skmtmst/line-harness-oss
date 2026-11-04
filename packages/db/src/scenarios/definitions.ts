@@ -179,7 +179,7 @@ export async function updateScenario(
       AND (? IS NULL OR NOT EXISTS (SELECT 1 FROM friend_scenarios fs LEFT JOIN friends f ON f.id=fs.friend_id WHERE fs.scenario_id=scenarios.id AND (f.id IS NULL OR (f.line_account_id IS NULL AND ?=0) OR (f.line_account_id IS NOT NULL AND f.line_account_id NOT IN (SELECT value FROM json_each(?))))))` )
     .bind(...values, options?.expectedRevision ?? null, options?.expectedRevision ?? null, expected?.activeCount ?? null, expected?.activeCount ?? null, expected?.rowIdSum ?? null, expected?.rowIdSquareSum ?? null, options?.accountScope ? 1 : null, options?.accountScope?.canSeeUnassigned ? 1 : 0, JSON.stringify(options?.accountScope?.accountIds ?? []))
     .run();
-  if (!updated.meta.changes && (options?.expectedRevision !== undefined || expected !== undefined)) throw new Error('SCENARIO_CONFIRMATION_CONFLICT');
+  if (!updated.meta.changes && (options?.expectedRevision !== undefined || expected !== undefined || options?.accountScope !== undefined)) throw new Error('SCENARIO_CONFIRMATION_CONFLICT');
 
   return db
     .prepare(`SELECT * FROM scenarios WHERE id = ?`)
