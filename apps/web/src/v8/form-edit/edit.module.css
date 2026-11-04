@@ -10,9 +10,6 @@
 /* 1152 の板では右の列の余白が 16。狭い幅の判定は画面（useNarrowViewport）が板の印で渡す。 */
 :global([data-page-template='create'][data-design-node='ITBAB']):has(.root) { --tpl-preview-pad: var(--tpl-fe-rail-narrow-pad); }
 
-/* 競合の帯は左右の列の上に横いっぱい。型の「狭い板の切り替え」の置き場を借りて、そこだけ出す。 */
-:global(:root [data-page-template='create']) > div:has(> .bandSlot) { display: block; padding: 0; }
-.bandSlot { padding: var(--tpl-fe-band-slot-pad); }
 /* 帯そのものは共通の save-conflict（動きの点検 16 番）。 */
 
 .root { display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap-outer); min-width: 0; }

@@ -245,9 +245,10 @@ async function openHarness(browser, {
     }
     // V8 は保存値でなくこの口で役割を読む。既定の空配列では管理者も閲覧用になる。
     if (path === '/api/staff/me' && request.method() === 'GET') {
-      return json({ success: true, data: { id: 'staff-1', name: `${role}利用者`, role, permissionKeys: [] } })
+      return json({ success: true, data: { id: 'staff-1', name: `${role}利用者`, role, permissionKeys: [], permissionViewKeys: ['/form-submissions'] } })
     }
     if (path === '/api/line-accounts') return json({ success: true, data: ACCOUNTS })
+    if (path === '/api/dashboard/style') return json({ success: true, data: { style: 'standard', styleSelected: true } })
     if (path === '/api/tags') return json({ success: true, data: tags })
     // 左メニューは表示設定を読む。形が違うと画面全体が落ちるので、既定の形で返す。
     if (path === '/api/settings/features') {
@@ -596,9 +597,10 @@ try {
       },
       listDelayMs: { 'account-a': 2_000 },
     })
-    const lateListA = page.waitForResponse((response) =>
-      response.url().includes('/api/forms') && response.url().includes('account_id=account-a'))
+    const startedListA = page.waitForRequest((request) =>
+      request.url().includes('/api/forms') && request.url().includes('account_id=account-a'))
     await page.goto(`${baseUrl}/form-submissions`, { waitUntil: 'domcontentloaded' })
+    const lateListA = (await startedListA).response()
     await switchAccount(page, 'account-b')
     await page.getByText('本店フォーム', { exact: true }).waitFor()
     await lateListA
@@ -735,7 +737,7 @@ try {
     const action = page.locator('[data-action-row]')
     assert.equal(await action.count(), 1, '対象を確定した行だけ追加する')
     await action.getByRole('button', { name: 'タグ：変える', exact: true }).waitFor()
-    const title = await action.getByRole('button', { name: 'タグ「回答済み」を付ける', exact: true }).boundingBox()
+    const title = await action.getByRole('button', { name: '「回答済み」', exact: true }).boundingBox()
     assert.ok(title && title.width > 0 && title.x >= 0 && title.x + title.width <= 390,
       'R26: 行の名前も省略できる幅を保って画面内に表示する')
     for (const right of await action.getByRole('button').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().right))) {
@@ -776,7 +778,8 @@ try {
     await page.locator('#fe-og-desc').fill('3分で終わります')
     // MediaSlot は「URL で入れる」を押してから入力欄を出す。
     assert.equal(await linkDialog.locator('#fe-og-image').count(), 0, 'V8: 画像URLは開く前に出さない')
-    await linkDialog.getByRole('button', { name: 'URL で入れる', exact: true }).click()
+    // キーボードからも画像URLの欄を開いて保存できる。
+    await linkDialog.getByRole('button', { name: 'URL で入れる', exact: true }).press('Enter')
     await linkDialog.locator('#fe-og-image').fill('https://example.test/ogp.png')
     await linkDialog.getByRole('button', { name: '閉じる', exact: true }).last().click()
     await linkDialog.waitFor({ state: 'detached', timeout: 10_000 })

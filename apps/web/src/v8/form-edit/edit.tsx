@@ -959,9 +959,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     </>
   )
 
-  /* 競合の帯。左右の列の上に横いっぱいで出す。型の「狭い板の切り替え」の置き場を借りる。 */
+  /* 競合は画面の通知欄へ出し、プレビューの表示幅に依存させない。 */
   const conflictBand = canEdit && conflict ? (
-    <div className={styles.bandSlot} data-fe-band>
       <SaveConflictBand
         designNode="J1pdB"
         title={conflictTitle(conflict.updatedAt, name)}
@@ -969,7 +968,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         onCompare={() => void saveConflict.compare()}
         onReload={() => void saveConflict.reloadLatest()}
       />
-    </div>
   ) : undefined
 
   return (
@@ -984,9 +982,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           <Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, errorCount: tabErrors[t.key], onClick: () => changeTab(t.key) }))} />
         </div>
       )}
-      notice={readOnly ? <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice> : undefined}
+      notice={readOnly ? <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice> : conflictBand}
       preview={preview}
-      previewToggle={conflictBand}
       footerActions={footerActions}
       status={<span className={styles.saveSummary} data-status-line><span>{saveStatus ?? shortState}</span><HelpTip label="公開・配布の状態">{statusLine}</HelpTip></span>} dirty={false}
     >
