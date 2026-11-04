@@ -1,4 +1,4 @@
-import { jstDate as japanDate } from '@line-crm/shared';
+import { jstDate as japanDate, storedTimestamp } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
 /**
@@ -81,6 +81,7 @@ export interface GoogleSheetsIntegrationRow {
 interface SyncCursor {
   after: string;
   lastId: string;
+  timestampOrder?: 'instant-v1';
 }
 
 interface SourceRow {
@@ -207,7 +208,8 @@ const formAnswersSource: DataSource = {
      */
     let where = 'fa.line_account_id = ? AND fr.line_account_id = ?';
     if (cursor) {
-      where += ` AND ${changedAfterClause('s', 'created_at')}`;
+      const timestamp = `julianday(${storedTimestamp('s.created_at', 'sql')})`;
+      where += ` AND (${timestamp} > julianday(?) OR (${timestamp} = julianday(?) AND s.id > ?))`;
       binds.push(cursor.after, cursor.after, cursor.lastId);
     }
     const rows = await db.prepare(
@@ -218,7 +220,7 @@ const formAnswersSource: DataSource = {
          JOIN form_accounts fa ON fa.form_id = fm.id
          LEFT JOIN friends fr ON fr.id = s.friend_id
         WHERE ${where}
-        ORDER BY s.created_at, s.id
+        ORDER BY julianday(${storedTimestamp('s.created_at', 'sql')}), s.id
         LIMIT ${PAGE_SIZE}`,
     ).bind(...binds).all<{
       id: string; created_at: string; data: string; form_name: string;
@@ -231,10 +233,10 @@ const formAnswersSource: DataSource = {
         row.form_name,
         row.friend_display_name,
         row.line_user_id,
-        row.created_at,
+        storedTimestamp(row.created_at),
         row.data,
       ],
-      cursor: { after: row.created_at, lastId: row.id },
+      cursor: { after: storedTimestamp(row.created_at), lastId: row.id, timestampOrder: 'instant-v1' },
     }));
   },
 };
@@ -403,7 +405,12 @@ export function readSyncCursor(integration: GoogleSheetsIntegrationRow, type: Go
   try {
     const parsed = JSON.parse(integration.sync_cursor_json || '{}') as SyncCursorStore;
     const cursor = parsed.targets?.[spreadsheetId]?.[type];
-    if (cursor && typeof cursor.after === 'string' && typeof cursor.lastId === 'string') return cursor;
+    if (cursor && typeof cursor.after === 'string' && typeof cursor.lastId === 'string') {
+      // 旧カーソルは文字列順のため、新しい実時刻順では途中から再開できない。
+      // 一度全件をキーで上書きし、保存済みの新形式から再開する。
+      if (type === 'form_answers' && cursor.timestampOrder !== 'instant-v1') return null;
+      return cursor;
+    }
   } catch {
     // 壊れたカーソルは全件やり直し（upsert なので再実行しても安全）。
   }

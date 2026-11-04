@@ -225,6 +225,38 @@ describe('syncGoogleSheetsIntegration', () => {
     seed(testDb);
   });
 
+  it('回答の旧 UTC と時差なし JST を時差付きでシートへ送る', async () => {
+    testDb.raw.exec("UPDATE form_submissions SET created_at='2026-09-10 00:00:00' WHERE id='sub-1'; UPDATE form_submissions SET created_at='2026-09-11T00:00:00' WHERE id='sub-2'");
+    const integration = await makeIntegration(testDb);
+    const sheet: FakeSheet = { tabs: new Map() };
+    const result = await syncOneDataType(envFor(testDb), integration, 'form_answers', {
+      kind: 'manual', now: NOW, fetch: makeGoogleFetch(sheet).fetch as never, sleep,
+    });
+    expect(result.status).toBe('ok');
+    const answers = sheet.tabs.get('回答')!;
+    expect(answers.find(row => row[0] === 'sub-1')?.[4]).toBe('2026-09-10T00:00:00Z');
+    expect(answers.find(row => row[0] === 'sub-2')?.[4]).toBe('2026-09-11T00:00:00+09:00');
+  });
+
+  it('旧カーソルから一度だけ全件を補い、実時刻順のカーソルで再開する', async () => {
+    testDb.raw.exec("UPDATE form_submissions SET created_at='2026-09-10 17:00:00' WHERE id='sub-1'; UPDATE form_submissions SET created_at='2026-09-11T01:00:00' WHERE id='sub-2'");
+    const integration = await makeIntegration(testDb);
+    integration.sync_cursor_json = JSON.stringify({ targets: { [SPREADSHEET_ID]: { form_answers: { after: '2026-09-11T01:00:00', lastId: 'sub-2' } } } });
+    const sheet: FakeSheet = { tabs: new Map([['回答', [['回答ID'], ['sub-2', '既存']]]]) };
+    const fetch = makeGoogleFetch(sheet).fetch as never;
+    const first = await syncOneDataType(envFor(testDb), integration, 'form_answers', { kind: 'manual', now: NOW, fetch, sleep });
+    expect(first).toMatchObject({ status: 'ok', rowsWritten: 2 });
+    expect(sheet.tabs.get('回答')!.map(row => row[0])).toEqual(['回答ID', 'sub-2', 'sub-1']);
+    const cursor = JSON.parse(integration.sync_cursor_json).targets[SPREADSHEET_ID].form_answers;
+    expect(cursor).toMatchObject({ after: '2026-09-10T17:00:00Z', lastId: 'sub-1', timestampOrder: 'instant-v1' });
+    const second = await syncOneDataType(envFor(testDb), integration, 'form_answers', { kind: 'manual', now: NOW, fetch, sleep });
+    expect(second).toMatchObject({ status: 'ok', rowsWritten: 0 });
+    testDb.raw.exec("INSERT INTO form_submissions(id,form_id,friend_id,data,created_at) VALUES('sub-3','form-1','f1','{}','2026-09-11T02:30:00')");
+    const third = await syncOneDataType(envFor(testDb), integration, 'form_answers', { kind: 'manual', now: NOW, fetch, sleep });
+    expect(third).toMatchObject({ status: 'ok', rowsWritten: 1 });
+    expect(sheet.tabs.get('回答')!.map(row => row[0])).toEqual(['回答ID', 'sub-2', 'sub-1', 'sub-3']);
+  });
+
   it('初回は全件バックフィルしてタブとヘッダを作る', async () => {
     const integration = await makeIntegration(testDb);
     const sheet: FakeSheet = { tabs: new Map() };
