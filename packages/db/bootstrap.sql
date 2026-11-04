@@ -8874,6 +8874,12 @@ CREATE TABLE tenant_data_purge_audit (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE tenant_purge_guard (
+  tenant_id TEXT NOT NULL,
+  table_name TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, table_name)
+);
+
 CREATE TABLE tenants (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -12237,11 +12243,11 @@ WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
 
 CREATE TRIGGER conversion_points_prevent_delete
 BEFORE DELETE ON conversion_points
-WHEN EXISTS (
+WHEN (EXISTS (
   SELECT 1 FROM conversion_events WHERE conversion_point_id = OLD.id
 ) OR EXISTS (
   SELECT 1 FROM conversion_definition_usages WHERE conversion_point_id = OLD.id
-)
+)) AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'conversion_points' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.tenant_id = g.tenant_id)
 BEGIN SELECT RAISE(ABORT, 'conversion point with events or usages cannot be deleted'); END;
 
 CREATE TRIGGER event_booking_transition_version AFTER UPDATE OF status,slot_id,friend_id,line_account_id,participation_mode ON event_bookings WHEN NEW.status IS NOT OLD.status OR NEW.slot_id IS NOT OLD.slot_id OR NEW.friend_id IS NOT OLD.friend_id OR NEW.line_account_id IS NOT OLD.line_account_id OR NEW.participation_mode IS NOT OLD.participation_mode BEGIN  UPDATE event_bookings SET lock_version=OLD.lock_version+1 WHERE id=NEW.id;  INSERT INTO event_booking_transition_runs  (id,line_account_id,event_id,booking_id,booking_id_history,expected_booking_version,booking_version,event_version,operation_key,action,input_snapshot,before_json,after_json,created_at,updated_at)  SELECT lower(hex(randomblob(16))),NEW.line_account_id,NEW.event_id,NEW.id,NEW.id,OLD.lock_version,OLD.lock_version+1,e.current_published_version_id,  'event-transition:'||NEW.id||':'||(OLD.lock_version+1),  CASE WHEN NEW.slot_id<>OLD.slot_id THEN 'change' WHEN NEW.status='cancelled' THEN 'cancel' WHEN NEW.status='rejected' THEN 'reject' ELSE NEW.status END,  json_object('friendId',NEW.friend_id,'recipient',f.line_user_id,'slotId',NEW.slot_id,'startsAt',s.starts_at,'status',NEW.status,'eventName',e.name,'venueName',e.venue_name,'venueUrl',e.venue_url,'cancelledBy',NEW.cancelled_by),  json_object('status',OLD.status,'slotId',OLD.slot_id,'version',OLD.lock_version),  json_object('status',NEW.status,'slotId',NEW.slot_id,'version',OLD.lock_version+1),  strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')  FROM events e JOIN event_slots s ON s.id=NEW.slot_id JOIN friends f ON f.id=NEW.friend_id WHERE e.id=NEW.event_id; END;
@@ -12419,6 +12425,7 @@ BEGIN SELECT RAISE(ABORT,'HQ_TYPE_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_logical_archive_only
 BEFORE DELETE ON hq_templates
+WHEN NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'hq_templates' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.tenant_id = g.tenant_id)
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_USE_LOGICAL_ARCHIVE'); END;
 
 CREATE TRIGGER hq_template_preflight_binding_guard
@@ -12448,6 +12455,7 @@ BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_R2_BINDING_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_r2_no_delete
 BEFORE DELETE ON hq_template_owned_r2_keys
+WHEN NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'hq_template_owned_r2_keys' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.tenant_id = g.tenant_id)
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_R2_RECOVERY_LEDGER_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_r2_state_guard
@@ -12478,6 +12486,7 @@ BEGIN UPDATE hq_template_preflights SET status = 'consumed' WHERE id = NEW.prefl
 
 CREATE TRIGGER hq_template_result_no_delete
 BEFORE DELETE ON hq_template_distribution_results
+WHEN NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'hq_template_distribution_results' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.tenant_id = g.tenant_id)
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RESULT_RECOVERY_LEDGER_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_result_terminal_guard
@@ -12496,6 +12505,7 @@ BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RUN_BINDING_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_run_no_delete
 BEFORE DELETE ON hq_template_distribution_runs
+WHEN NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'hq_template_distribution_runs' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.tenant_id = g.tenant_id)
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RUN_RECOVERY_LEDGER_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_run_terminal_guard
@@ -12966,7 +12976,7 @@ BEGIN SELECT RAISE(ABORT, 'published action score version is immutable'); END;
 
 CREATE TRIGGER trg_action_score_published_version_no_delete
 BEFORE DELETE ON action_score_rule_versions
-WHEN OLD.status = 'published'
+WHEN (OLD.status = 'published') AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'action_score_rule_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.rule_set_id IN (SELECT p_action_score_rule_sets.id FROM action_score_rule_sets p_action_score_rule_sets WHERE p_action_score_rule_sets.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id)))
 BEGIN SELECT RAISE(ABORT, 'published action score version cannot be deleted'); END;
 
 CREATE TRIGGER trg_ad_platforms_account_required_insert
@@ -12991,6 +13001,7 @@ BEGIN SELECT RAISE(ABORT, 'analytics_funnel_run_immutable'); END;
 
 CREATE TRIGGER trg_analytics_funnel_versions_no_delete
 BEFORE DELETE ON analytics_funnel_versions
+WHEN NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'analytics_funnel_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id))
 BEGIN SELECT RAISE(ABORT, 'analytics_funnel_version_immutable'); END;
 
 CREATE TRIGGER trg_analytics_funnel_versions_no_update
@@ -13035,6 +13046,7 @@ BEGIN SELECT RAISE(ABORT, 'analytics_saved_parent_mismatch'); END;
 
 CREATE TRIGGER trg_analytics_saved_versions_no_delete
 BEFORE DELETE ON analytics_saved_analysis_versions
+WHEN NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'analytics_saved_analysis_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id))
 BEGIN SELECT RAISE(ABORT, 'analytics_saved_version_immutable'); END;
 
 CREATE TRIGGER trg_analytics_saved_versions_no_update
@@ -13051,7 +13063,7 @@ BEGIN SELECT RAISE(ABORT, 'analytics_saved_parent_mismatch'); END;
 
 CREATE TRIGGER trg_auto_reply_versions_immutable_delete
 BEFORE DELETE ON auto_reply_versions
-WHEN OLD.status IN ('published', 'retired')
+WHEN (OLD.status IN ('published', 'retired')) AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'auto_reply_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id))
 BEGIN SELECT RAISE(ABORT, 'published auto reply versions cannot be deleted'); END;
 
 CREATE TRIGGER trg_auto_reply_versions_immutable_update
@@ -13074,11 +13086,12 @@ BEGIN SELECT RAISE(ABORT, 'published automation version is immutable'); END;
 
 CREATE TRIGGER trg_automation_published_version_no_delete
 BEFORE DELETE ON automation_versions
-WHEN OLD.status = 'published'
+WHEN (OLD.status = 'published') AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'automation_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.automation_id IN (SELECT p_automation_definitions.id FROM automation_definitions p_automation_definitions WHERE p_automation_definitions.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id)))
 BEGIN SELECT RAISE(ABORT, 'published automation version cannot be deleted'); END;
 
 CREATE TRIGGER trg_common_action_binding_migrations_no_delete
 BEFORE DELETE ON common_action_binding_migration_events
+WHEN NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'common_action_binding_migration_events' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id))
 BEGIN SELECT RAISE(ABORT, 'common action binding migration history cannot be deleted'); END;
 
 CREATE TRIGGER trg_common_action_binding_migrations_no_update
@@ -13092,7 +13105,7 @@ BEGIN SELECT RAISE(ABORT, 'published common action version is immutable'); END;
 
 CREATE TRIGGER trg_common_action_published_version_no_delete
 BEFORE DELETE ON common_action_versions
-WHEN OLD.status = 'published'
+WHEN (OLD.status = 'published') AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'common_action_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.common_action_id IN (SELECT p_common_actions.id FROM common_actions p_common_actions WHERE p_common_actions.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id)))
 BEGIN SELECT RAISE(ABORT, 'published common action version cannot be deleted'); END;
 
 CREATE TRIGGER trg_form_versions_immutable
@@ -13198,7 +13211,7 @@ BEGIN UPDATE forms SET revision = revision + 1 WHERE id IN (OLD.form_id, NEW.for
 
 CREATE TRIGGER trg_friend_add_routing_versions_immutable_delete
 BEFORE DELETE ON friend_add_routing_versions
-WHEN OLD.status IN ('published', 'retired')
+WHEN (OLD.status IN ('published', 'retired')) AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'friend_add_routing_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id))
 BEGIN SELECT RAISE(ABORT, 'published friend-add routing versions cannot be deleted'); END;
 
 CREATE TRIGGER trg_friend_add_routing_versions_immutable_update
@@ -13216,7 +13229,7 @@ BEGIN SELECT RAISE(ABORT, 'published friend-add routing version status cannot mo
 
 CREATE TRIGGER trg_friend_add_rule_versions_immutable_delete
 BEFORE DELETE ON friend_add_rule_versions
-WHEN OLD.status IN ('published', 'retired')
+WHEN (OLD.status IN ('published', 'retired')) AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'friend_add_rule_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.rule_id IN (SELECT p_friend_add_rules.id FROM friend_add_rules p_friend_add_rules WHERE p_friend_add_rules.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id)))
 BEGIN SELECT RAISE(ABORT, 'published friend-add rule versions cannot be deleted'); END;
 
 CREATE TRIGGER trg_friend_add_rule_versions_immutable_update
@@ -13297,14 +13310,17 @@ BEGIN
 
 CREATE TRIGGER trg_mileage_redemption_attempts_no_delete
 BEFORE DELETE ON mileage_redemption_attempts
+WHEN NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'mileage_redemption_attempts' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.redemption_id IN (SELECT p_mileage_redemptions.id FROM mileage_redemptions p_mileage_redemptions WHERE p_mileage_redemptions.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id)))
 BEGIN SELECT RAISE(ABORT, 'mileage redemption attempt history cannot be deleted'); END;
 
 CREATE TRIGGER trg_mileage_redemption_step_deliveries_no_delete
 BEFORE DELETE ON mileage_redemption_step_deliveries
+WHEN NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'mileage_redemption_step_deliveries' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.redemption_id IN (SELECT p_mileage_redemptions.id FROM mileage_redemptions p_mileage_redemptions WHERE p_mileage_redemptions.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id)))
 BEGIN SELECT RAISE(ABORT, 'mileage redemption step delivery history cannot be deleted'); END;
 
 CREATE TRIGGER trg_mileage_redemptions_no_delete
 BEFORE DELETE ON mileage_redemptions
+WHEN NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'mileage_redemptions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id))
 BEGIN SELECT RAISE(ABORT, 'mileage redemption history cannot be deleted'); END;
 
 CREATE TRIGGER trg_mileage_reward_published_version_immutable
@@ -13314,7 +13330,7 @@ BEGIN SELECT RAISE(ABORT, 'published mileage reward version is immutable'); END;
 
 CREATE TRIGGER trg_mileage_reward_published_version_no_delete
 BEFORE DELETE ON mileage_reward_versions
-WHEN OLD.status = 'published'
+WHEN (OLD.status = 'published') AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'mileage_reward_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.reward_id IN (SELECT p_mileage_rewards.id FROM mileage_rewards p_mileage_rewards WHERE p_mileage_rewards.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id)))
 BEGIN SELECT RAISE(ABORT, 'published mileage reward version cannot be deleted'); END;
 
 CREATE TRIGGER trg_mileage_wallet_after_ledger_insert
@@ -13347,7 +13363,7 @@ BEGIN
 
 CREATE TRIGGER trg_reminder_version_steps_immutable_delete
 BEFORE DELETE ON reminder_version_steps
-WHEN COALESCE((SELECT status FROM reminder_versions WHERE id = OLD.reminder_version_id), '') <> 'draft'
+WHEN (COALESCE((SELECT status FROM reminder_versions WHERE id = OLD.reminder_version_id), '') <> 'draft') AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'reminder_version_steps' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.reminder_version_id IN (SELECT p_reminder_versions.id FROM reminder_versions p_reminder_versions WHERE p_reminder_versions.reminder_id IN (SELECT p_reminders.id FROM reminders p_reminders WHERE p_reminders.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id))))
 BEGIN SELECT RAISE(ABORT, 'published reminder version steps are immutable'); END;
 
 CREATE TRIGGER trg_reminder_version_steps_immutable_insert
@@ -13362,7 +13378,7 @@ BEGIN SELECT RAISE(ABORT, 'published reminder version steps are immutable'); END
 
 CREATE TRIGGER trg_reminder_versions_immutable_delete
 BEFORE DELETE ON reminder_versions
-WHEN OLD.status IN ('published', 'superseded')
+WHEN (OLD.status IN ('published', 'superseded')) AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'reminder_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.reminder_id IN (SELECT p_reminders.id FROM reminders p_reminders WHERE p_reminders.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id)))
 BEGIN SELECT RAISE(ABORT, 'published reminder versions cannot be deleted'); END;
 
 CREATE TRIGGER trg_reminder_versions_immutable_update
@@ -13379,8 +13395,8 @@ BEGIN SELECT RAISE(ABORT, 'published reminder version status cannot move backwar
 
 CREATE TRIGGER trg_scenario_versions_immutable_delete
 BEFORE DELETE ON scenario_versions
-WHEN OLD.status IN ('published', 'retired')
- AND EXISTS (SELECT 1 FROM scenarios WHERE id = OLD.scenario_id)
+WHEN (OLD.status IN ('published', 'retired')
+ AND EXISTS (SELECT 1 FROM scenarios WHERE id = OLD.scenario_id)) AND NOT EXISTS (SELECT 1 FROM tenant_purge_guard g JOIN tenants t ON t.id = g.tenant_id WHERE g.table_name = 'scenario_versions' AND t.data_purged_at IS NULL AND (t.plan_status = 'canceled' OR (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL)) AND OLD.scenario_id IN (SELECT p_scenarios.id FROM scenarios p_scenarios WHERE p_scenarios.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = g.tenant_id)))
 BEGIN SELECT RAISE(ABORT, 'published scenario versions cannot be deleted'); END;
 
 CREATE TRIGGER trg_scenario_versions_immutable_update

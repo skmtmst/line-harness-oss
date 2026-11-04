@@ -6,6 +6,7 @@ import {
   purgeTablesChildFirst,
   recordTenantDataPurgeAudit,
   recordAuditEvent,
+  retentionCutoff,
   RETENTION_R2_KEY_COLUMNS,
   tenantScopeCondition,
   toJstString,
@@ -31,6 +32,31 @@ const TENANTS_PER_RUN = 3;
 const ROWS_PER_RUN = 5000;
 /** 1文で消す行数。D1の1文が長くなりすぎないようにする。 */
 const ROWS_PER_STATEMENT = 200;
+
+// migration 759 の保護トリガーと一致させる。
+const GUARDED_PURGE_TABLES = new Set([
+  'action_score_rule_versions',
+  'analytics_funnel_versions',
+  'analytics_saved_analysis_versions',
+  'auto_reply_versions',
+  'automation_versions',
+  'common_action_binding_migration_events',
+  'common_action_versions',
+  'conversion_points',
+  'friend_add_routing_versions',
+  'friend_add_rule_versions',
+  'hq_template_distribution_results',
+  'hq_template_distribution_runs',
+  'hq_template_owned_r2_keys',
+  'hq_templates',
+  'mileage_redemption_attempts',
+  'mileage_redemption_step_deliveries',
+  'mileage_redemptions',
+  'mileage_reward_versions',
+  'reminder_version_steps',
+  'reminder_versions',
+  'scenario_versions',
+]);
 
 /** 表ごとのR2鍵の列。1つの表に複数列ある場合もまとめて扱う。 */
 const R2_KEY_COLUMNS_BY_TABLE = RETENTION_R2_KEY_COLUMNS.reduce<Record<string, string[]>>(
@@ -208,15 +234,26 @@ async function purgeOneTenant(
 
       let deleted: D1Result;
       try {
-        deleted = await env.DB
-          .prepare(
-            `DELETE FROM ${table}
-              WHERE rowid IN (
-                SELECT ${table}.rowid FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?
-              )`,
-          )
-          .bind(...tenantParams, chunk)
-          .run();
+        const statement = env.DB.prepare(
+          `DELETE FROM ${table}
+            WHERE rowid IN (
+              SELECT ${table}.rowid FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?
+            )`,
+        ).bind(...tenantParams, chunk);
+        if (GUARDED_PURGE_TABLES.has(table)) {
+          // 許可は対象統括・表の DELETE と同じ原子的 batch 内だけに存在する。
+          const grant = env.DB.prepare(`INSERT INTO tenant_purge_guard (tenant_id, table_name)
+            VALUES ((SELECT id FROM tenants WHERE id = ? AND data_purged_at IS NULL
+              AND (plan_status = 'canceled' OR (plan_status = 'trialing' AND trial_ends_at IS NOT NULL AND trial_ends_at < ?))
+              AND (purge_requested_at IS NOT NULL OR (retention_anchor_at IS NOT NULL AND retention_anchor_at < ?))), ?)`)
+            .bind(tenant.id, now, retentionCutoff(now), table);
+          const revoke = env.DB.prepare('DELETE FROM tenant_purge_guard WHERE tenant_id = ? AND table_name = ?')
+            .bind(tenant.id, table);
+          const results = await env.DB.batch([grant, statement, revoke]);
+          deleted = results[1];
+        } else {
+          deleted = await statement.run();
+        }
       } catch (error) {
         out.finished = false;
         out.failure = { table, failureCode: deleteFailureCode(error), r2DeletedBeforeFailure };
@@ -259,7 +296,7 @@ async function purgeOneTenant(
       });
     }
   } catch {
-    // 監査できない回を完了扱いにせず、消した件数は他の統括との共通上限に反映する。
+    // 監査に失敗した統括は未完了とし、削除件数を共通上限に反映する。
     out.finished = false;
     out.failure ??= { table: 'tenant_data_purge_audit', failureCode: 'audit_failed', r2DeletedBeforeFailure: 0 };
     logger.error('tenant_data_purge.audit_failed');

@@ -5134,5 +5134,6 @@
   "booking_monthly_attempts": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_rights": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_event_applications": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
-  "booking_monthly_operations": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}}
+  "booking_monthly_operations": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
+  "tenant_purge_guard": {"category":"global"}
 }

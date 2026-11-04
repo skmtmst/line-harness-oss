@@ -91,6 +91,38 @@ describe('tenant data retention purge', () => {
     return (row as { n: number }).n;
   }
 
+  test('契約終了の統括は保護されたテンプレートも消し、許可を残さない', async () => {
+    seedTenant('t1', { anchor: jst(-91) });
+    sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES ('h1', 't1', 'tag', 'test')").run();
+    expect(() => sqlite.raw.prepare("DELETE FROM hq_templates WHERE id = 'h1'").run()).toThrow('HQ_TEMPLATE_USE_LOGICAL_ARCHIVE');
+    const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+    expect(result.completed).toBe(1);
+    expect(count('hq_templates', 'id = ?', 'h1')).toBe(0);
+    expect(count('tenant_purge_guard', '1 = 1')).toBe(0);
+  });
+
+  test('期限切れの試用は保護表を消せるが、契約中は削除要請があっても保護表を消せない', async () => {
+    seedTenant('trial', { planStatus: 'trialing', trialEndsAt: jst(-100), anchor: jst(-99) });
+    seedTenant('active', { planStatus: 'active', requested: jst(-1) });
+    sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES ('trial-h', 'trial', 'tag', 'test'), ('active-h', 'active', 'tag', 'test')").run();
+    const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+    expect(result.completed).toBe(1);
+    expect(result.failedTenants).toBe(1);
+    expect(count('hq_templates', 'id = ?', 'trial-h')).toBe(0);
+    expect(count('hq_templates', 'id = ?', 'active-h')).toBe(1);
+    expect(count('tenant_purge_guard', '1 = 1')).toBe(0);
+  });
+
+  test('保護表の削除が別の理由で失敗しても許可は残らない', async () => {
+    seedTenant('t1', { anchor: jst(-91) });
+    sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES ('h1', 't1', 'tag', 'test')").run();
+    sqlite.raw.exec("CREATE TRIGGER test_purge_guard_failure BEFORE DELETE ON hq_templates BEGIN SELECT RAISE(ABORT, 'test failure'); END");
+    const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+    expect(result.failedTenants).toBe(1);
+    expect(count('tenant_purge_guard', '1 = 1')).toBe(0);
+    expect(count('hq_templates', 'id = ?', 'h1')).toBe(1);
+  });
+
   test('保存期限(90日)が過ぎた統括の顧客データとR2画像を消し、支払の記録は残す', async () => {
     seedTenant('t1', { anchor: jst(-91) });
     seedFriends('t1', 3);
