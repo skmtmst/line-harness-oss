@@ -12,8 +12,8 @@ vi.mock('./shell', async importOriginal => {
   const actual = await importOriginal<typeof import('./shell')>()
   const deliverySummary = { total: 0, failed: 0, pending: 0, lastResult: null, canRetry: false }
   return { ...actual, useWebhookOverview: () => ({
-    incoming: [{ id: 'in-1', name: '申込フォーム', hasSecret: true, isActive: true }], incomingStatus: 'ready',
-    outgoing: [{ id: 'out-1', name: '予約台帳', url: 'https://example.test', hasSecret: true, isActive: true, eventTypes: ['booking_created'], deliverySummary }], outgoingStatus: 'ready',
+    incoming: [{ id: 'in-1', name: '申込フォーム', confirmationRevision: 2, hasSecret: true, isActive: true }], incomingStatus: 'ready',
+    outgoing: [{ id: 'out-1', name: '予約台帳', confirmationRevision: 3, url: 'https://example.test', hasSecret: true, isActive: true, eventTypes: ['booking_created'], deliverySummary }], outgoingStatus: 'ready',
     loadedAccountId: 'a', reload: async () => {}, summary: null,
   }) }
 })
@@ -23,7 +23,7 @@ vi.mock('@/lib/api', async importOriginal => {
     folders: { ...actual.api.folders, list: async () => ({ success: true, data: [] }) },
     webhooks: { ...actual.api.webhooks,
       incoming: { ...actual.api.webhooks.incoming, update,
-        detail: async () => ({ success: true, data: { id: 'in-1', name: '申込フォーム', version: 1, identityMatching: { methods: [] }, actions: [], actionExecution: { state: 'not_configured', reason: null }, latestSample: null, templateFields: [], pendingUnmatched: 0 } }),
+        detail: async () => ({ success: true, data: { id: 'in-1', name: '申込フォーム', confirmationRevision: 2, version: 1, identityMatching: { methods: [] }, actions: [], actionExecution: { state: 'not_configured', reason: null }, latestSample: null, templateFields: [], pendingUnmatched: 0 } }),
         unmatched: async () => ({ success: true, data: [] }),
       },
       outgoing: { ...actual.api.webhooks.outgoing, update },
@@ -48,6 +48,7 @@ it.each(['incoming', 'outgoing'] as const)('%sの合言葉の保存中は×・�
   fireEvent.change(screen.getByPlaceholderText('ランダムな英数字32文字以上'), { target: { value: 'x'.repeat(40) } })
   fireEvent.click(screen.getByRole('button', { name: '保存する', exact: true }))
   expect(update).toHaveBeenCalledTimes(1)
+  expect(update).toHaveBeenCalledWith(kind === 'incoming' ? 'in-1' : 'out-1', 'a', expect.objectContaining({ expectedConfirmationRevision: kind === 'incoming' ? 2 : 3 }), undefined)
   expect(screen.getByRole('button', { name: '閉じる' }).hasAttribute('disabled')).toBe(true)
   fireEvent.keyDown(document, { key: 'Escape' })
   expect(screen.getByRole('dialog')).toBeTruthy()

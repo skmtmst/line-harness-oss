@@ -46,15 +46,15 @@ export const webhooksMethods = {
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
-      update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string; folderId?: string | null }, stepUpToken?: string) =>
+      update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string; folderId?: string | null; expectedConfirmationRevision?: number }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhook & { secret?: string }>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
-      delete: (id: string, lineAccountId: string) =>
+      delete: (id: string, lineAccountId: string, expectedConfirmationRevision?: number) =>
         fetchApi<ApiResponse<null>>(
-          `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}${expectedConfirmationRevision === undefined ? '' : `&expectedConfirmationRevision=${expectedConfirmationRevision}`}`,
           { method: 'DELETE' },
         ),
       /*
@@ -107,7 +107,7 @@ export const webhooksMethods = {
       update: (
         id: string,
         lineAccountId: string,
-        data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string; expectedVersion?: number; folderId?: string | null },
+        data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string; expectedVersion?: number; expectedConfirmationRevision?: number; folderId?: string | null },
         stepUpToken?: string,
       ) =>
         fetchApi<ApiResponse<OutgoingWebhook & { secret?: string }>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
@@ -115,9 +115,9 @@ export const webhooksMethods = {
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
-      delete: (id: string, lineAccountId: string) =>
+      delete: (id: string, lineAccountId: string, expectedConfirmationRevision?: number) =>
         fetchApi<ApiResponse<null>>(
-          `/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          `/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}${expectedConfirmationRevision === undefined ? '' : `&expectedConfirmationRevision=${expectedConfirmationRevision}`}`,
           { method: 'DELETE' },
         ),
       /*
@@ -129,10 +129,10 @@ export const webhooksMethods = {
           `/api/webhooks/outgoing/${id}/restore?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST' },
         ),
-      test: (id: string, lineAccountId: string, expectedVersion?: number) =>
+      test: (id: string, lineAccountId: string, expectedVersion?: number, expectedConfirmationRevision?: number) =>
         fetchApi<ApiResponse<{ delivered: boolean; responseStatus: number | null }>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}/test?lineAccountId=${encodeURIComponent(lineAccountId)}`,
-          { method: 'POST', ...(expectedVersion === undefined ? {} : { body: JSON.stringify({ expectedVersion }) }) },
+          { method: 'POST', ...(expectedVersion === undefined && expectedConfirmationRevision === undefined ? {} : { body: JSON.stringify({ expectedVersion, expectedConfirmationRevision }) }) },
         ),
     },
     interactions: {

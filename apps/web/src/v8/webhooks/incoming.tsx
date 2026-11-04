@@ -175,11 +175,11 @@ export default function WebhooksIncomingV8() {
   const [creating, setCreating] = useState(false)
   const [createdSecret, setCreatedSecret] = useState<{ name: string; secret: string } | null>(null)
 
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; accountId: string; scope: object } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; confirmationRevision?: number; accountId: string; scope: object } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const [rotateTarget, setRotateTarget] = useState<{ id: string; name: string; accountId: string; scope: object } | null>(null)
+  const [rotateTarget, setRotateTarget] = useState<{ id: string; name: string; confirmationRevision?: number; accountId: string; scope: object } | null>(null)
   const [rotateSecret, setRotateSecret] = useState('')
   const [rotateError, setRotateError] = useState('')
   const [rotating, setRotating] = useState(false)
@@ -361,6 +361,7 @@ export default function WebhooksIncomingV8() {
   const runDelete = async () => {
     if (!canManageWebhooksNow(true)) { setDeleteError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     if (!deleteTarget || deleting) return
+    if (!deleteTarget.confirmationRevision) { setDeleteError('この受け取り口を削除できませんでした。状態を読み直してから、もう一度お試しください。'); return }
     const accountId = deleteTarget.accountId
     if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== deleteTarget.scope) {
       setDeleteError('LINEアカウントが切り替わりました。削除する受け取り口を選び直してください。')
@@ -369,7 +370,7 @@ export default function WebhooksIncomingV8() {
     setDeleting(true)
     setDeleteError('')
     try {
-      const res = await api.webhooks.incoming.delete(deleteTarget.id, accountId)
+      const res = await api.webhooks.incoming.delete(deleteTarget.id, accountId, deleteTarget.confirmationRevision)
       if (!res.success) throw new Error(res.error)
       if (accountRef.current !== accountId || accountScopeRef.current !== deleteTarget.scope) return
       setDeleteTarget(null)
@@ -395,6 +396,7 @@ export default function WebhooksIncomingV8() {
     if (rotating) return
     setRotateError('')
     if (!rotateTarget) return
+    if (!rotateTarget.confirmationRevision) { setRotateError('LINEアカウントの一覧を読み直してください'); return }
     const accountId = rotateTarget.accountId
     if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== rotateTarget.scope) {
       setRotateError('LINEアカウントの一覧を読み直してください')
@@ -406,7 +408,7 @@ export default function WebhooksIncomingV8() {
     }
     setRotating(true)
     try {
-      const res = await api.webhooks.incoming.update(rotateTarget.id, accountId, { secret: rotateSecret }, stepUpToken)
+      const res = await api.webhooks.incoming.update(rotateTarget.id, accountId, { secret: rotateSecret, expectedConfirmationRevision: rotateTarget.confirmationRevision }, stepUpToken)
       if (accountRef.current !== accountId || accountScopeRef.current !== rotateTarget.scope) return
       if (!res.success) {
         setRotateError(res.error)
@@ -697,7 +699,7 @@ export default function WebhooksIncomingV8() {
               <span className={styles.fieldLabel}>合言葉（署名）</span>
               <span className={styles.valueBox}>{selected.hasSecret ? '設定済み（再表示しません）' : 'まだ設定していません'}</span>
             </div>
-            {<Button disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true) || !selectedAccountId || loadedAccountId !== selectedAccountId) return; setRotateError(''); setRotateSecret(''); setRotateTarget({ id: selected.id, name: selected.name, accountId: selectedAccountId, scope: accountScopeRef.current }) }}>
+            {<Button disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true) || !selectedAccountId || loadedAccountId !== selectedAccountId) return; setRotateError(''); setRotateSecret(''); setRotateTarget({ id: selected.id, name: selected.name, confirmationRevision: selected.confirmationRevision, accountId: selectedAccountId, scope: accountScopeRef.current }) }}>
                 <RefreshCw size={16} aria-hidden="true" />合言葉を更新する
               </Button>}
           </div>
@@ -847,7 +849,7 @@ export default function WebhooksIncomingV8() {
           </div>
         </Card>
         {<div className={styles.dangerRow}>
-            <Button variant="text" disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true) || !selectedAccountId || loadedAccountId !== selectedAccountId) return; setDeleteError(''); setDeleteTarget({ id: selected.id, name: selected.name, accountId: selectedAccountId, scope: accountScopeRef.current }) }}>
+            <Button variant="text" disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true) || !selectedAccountId || loadedAccountId !== selectedAccountId) return; setDeleteError(''); setDeleteTarget({ id: selected.id, name: selected.name, confirmationRevision: selected.confirmationRevision, accountId: selectedAccountId, scope: accountScopeRef.current }) }}>
               <Trash2 size={16} aria-hidden="true" />この受け取り口を削除する
             </Button>
           </div>}
