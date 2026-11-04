@@ -324,6 +324,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
     setDuplicateRemainder, setDuplicateOpen, discardingDuplicate,
     setDiscardingDuplicate, setDiscardDuplicateError, setDiscardDuplicateOpen,
     deletingScenario, setDeletingScenario, setDeleteScenarioError, deleteConfirmation: currentDeleteConfirmation, deleteConfirmationValid,
+    refreshDeleteConfirmation: () => prepareConfirmation('delete'),
     setDeleteScenarioOpen: closeDeleteConfirmation, router,
   })
   const {

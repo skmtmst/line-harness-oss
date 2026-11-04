@@ -105,11 +105,26 @@ describe('シナリオを止める理由', () => {
     expect(res.status).toBe(409);
   });
 
-  test('削除確認後の配信完了だけでは削除を妨げない', async () => {
-    const data=(await (await app().request('/api/scenarios/sc-1/confirmation?purpose=delete')).json() as {data:{contentRevision:number;totalCount:number;totalRowIdSum:number;totalRowIdSquareSum:number;referrers:[]}}).data;
-    sqlite.raw.prepare("UPDATE friend_scenarios SET status='completed' WHERE id='sub-1'").run();
-    const res=await app().request('/api/scenarios/sc-1',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedContentRevision:data.contentRevision,expectedSubscriptions:{activeCount:data.totalCount,rowIdSum:data.totalRowIdSum,rowIdSquareSum:data.totalRowIdSquareSum},expectedReferrers:data.referrers})});
-    expect(res.status).toBe(200);
+  test.each(['completed','active'] as const)('削除確認後に購読が %s へ変われば409、最新人数で再確認', async (nextStatus) => {
+    if (nextStatus === 'active') sqlite.raw.prepare("UPDATE friend_scenarios SET status='paused' WHERE id='sub-1'").run();
+    type Snapshot = {contentRevision:number;activeCount:number;rowIdSum:number;rowIdSquareSum:number;totalCount:number;totalRowIdSum:number;totalRowIdSquareSum:number;referrers:[]};
+    const snapshot=async()=> (await (await app().request('/api/scenarios/sc-1/confirmation?purpose=delete')).json() as {data:Snapshot}).data;
+    const remove=async(d:Snapshot)=>app().request('/api/scenarios/sc-1',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedContentRevision:d.contentRevision,expectedSubscriptions:{activeCount:d.totalCount,rowIdSum:d.totalRowIdSum,rowIdSquareSum:d.totalRowIdSquareSum},expectedActiveSubscriptions:{activeCount:d.activeCount,rowIdSum:d.rowIdSum,rowIdSquareSum:d.rowIdSquareSum},expectedReferrers:d.referrers})});
+    const before=await snapshot();
+    sqlite.raw.prepare("UPDATE friend_scenarios SET status=? WHERE id='sub-1'").run(nextStatus);
+    expect((await remove(before)).status).toBe(409);
+    const after=await snapshot();
+    expect(after.activeCount).toBe(nextStatus === 'active' ? 1 : 0);
+    expect((await remove(after)).status).toBe(200);
+  });
+
+  test('削除時は表示した稼働中購読の3つの値をそれぞれ照合する', async () => {
+    const d=(await (await app().request('/api/scenarios/sc-1/confirmation?purpose=delete')).json() as {data:{contentRevision:number;activeCount:number;rowIdSum:number;rowIdSquareSum:number;totalCount:number;totalRowIdSum:number;totalRowIdSquareSum:number;referrers:[]}}).data;
+    const active={activeCount:d.activeCount,rowIdSum:d.rowIdSum,rowIdSquareSum:d.rowIdSquareSum};
+    for (const field of ['activeCount','rowIdSum','rowIdSquareSum'] as const) {
+      const body={expectedContentRevision:d.contentRevision,expectedSubscriptions:{activeCount:d.totalCount,rowIdSum:d.totalRowIdSum,rowIdSquareSum:d.totalRowIdSquareSum},expectedActiveSubscriptions:{...active,[field]:active[field]+1},expectedReferrers:d.referrers};
+      expect((await app().request('/api/scenarios/sc-1',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).status,field).toBe(409);
+    }
   });
 
   test.each(['stop','delete'] as const)('%s: 件数だけ・合計だけ・二乗だけが違えばそれぞれ409', async (kind) => {
@@ -150,7 +165,7 @@ describe('シナリオを止める理由', () => {
     const stopMs = performance.now()-start;
     const after = await get();
     start = performance.now();
-    const result = await app().request('/api/scenarios/sc-1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedContentRevision: after.contentRevision, expectedSubscriptions: { activeCount: after.totalCount, rowIdSum: after.totalRowIdSum, rowIdSquareSum: after.totalRowIdSquareSum }, expectedReferrers: after.referrers }) });
+    const result = await app().request('/api/scenarios/sc-1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedContentRevision: after.contentRevision, expectedSubscriptions: { activeCount: after.totalCount, rowIdSum: after.totalRowIdSum, rowIdSquareSum: after.totalRowIdSquareSum }, expectedActiveSubscriptions: { activeCount: after.activeCount, rowIdSum: after.rowIdSum, rowIdSquareSum: after.rowIdSquareSum }, expectedReferrers: after.referrers }) });
     const deleteMs = performance.now()-start;
     console.log(`50000 subscriptions: stop=${stopMs.toFixed(1)}ms delete=${deleteMs.toFixed(1)}ms`);
     expect(result.status).toBe(200);

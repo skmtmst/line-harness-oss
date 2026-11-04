@@ -17,6 +17,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -85,9 +86,11 @@ vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {
     status: number
-    constructor(status: number, message?: string) {
+    code?: string
+    constructor(status: number, message?: string, code?: string) {
       super(message)
       this.status = status
+      this.code = code
     }
   },
   api: {
@@ -360,6 +363,21 @@ describe('シナリオ全体を削除する確認', () => {
     expect(screen.getByRole('alertdialog')).toBeTruthy()
     expect(calls.push).not.toHaveBeenCalled()
     expect(within(dialog).getByRole('button', { name: '削除する' }).hasAttribute('disabled')).toBe(false)
+  })
+
+  it('削除時の409は窓の人数を読み直し、もう一度の確認を求める', async () => {
+    calls.remove.mockRejectedValueOnce(new ApiError(409, 'changed', 'scenario_confirmation_conflict'))
+    await render()
+    const dialog = await openDeleteScenario()
+    expect(dialog.textContent).toContain('現在116 人が購読中です')
+    stubStats(0)
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '削除する' })) })
+    await waitFor(() => expect(screen.getByRole('alertdialog').textContent).toContain('現在購読中の友だちは0人です。'))
+    expect(screen.getByRole('alertdialog').textContent).toContain('確認した内容が変わりました。もう一度確認してください。')
+    expect(calls.remove).toHaveBeenCalledTimes(1)
+    expect(calls.push).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })) })
+    await waitFor(() => expect(calls.remove).toHaveBeenNthCalledWith(2, 'sc-1', expect.objectContaining({ activeCount: 0 })))
   })
 
   it('削除中に二度押しても口へは1回だけ送る', async () => {

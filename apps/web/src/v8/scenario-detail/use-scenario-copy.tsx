@@ -9,7 +9,7 @@ import { type SegmentCondition } from '@/components/shared/condition-builder'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifyToast } from '@/components/shared/toast'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import type { DeliveryMode, ScenarioStep } from '@line-crm/shared'
 import type { Dispatch, SetStateAction } from 'react'
 import { DuplicateAborted, ScenarioWithSteps, stepScheduleForClone } from './detail-model'
@@ -19,7 +19,7 @@ export function useScenarioCopy({
   duplicateRemainder, saveErrors, sortedSteps, deliveryMode,
   id, setDuplicateRemainder, setDuplicateOpen, discardingDuplicate,
   setDiscardingDuplicate, setDiscardDuplicateError, setDiscardDuplicateOpen, deletingScenario,
-  setDeletingScenario, setDeleteScenarioError, deleteConfirmation, deleteConfirmationValid, setDeleteScenarioOpen, router,
+  setDeletingScenario, setDeleteScenarioError, deleteConfirmation, deleteConfirmationValid, refreshDeleteConfirmation, setDeleteScenarioOpen, router,
 }: {
   scenario: ScenarioWithSteps | null
   duplicating: boolean
@@ -39,6 +39,7 @@ export function useScenarioCopy({
   deletingScenario: boolean
   deleteConfirmation: ScenarioConfirmation | null
   deleteConfirmationValid: () => boolean
+  refreshDeleteConfirmation: () => Promise<void>
   setDeletingScenario: Dispatch<SetStateAction<boolean>>
   setDeleteScenarioError: Dispatch<SetStateAction<string>>
   setDeleteScenarioOpen: Dispatch<SetStateAction<boolean>>
@@ -263,6 +264,11 @@ export function useScenarioCopy({
       setDeleteScenarioOpen(false)
       router.push('/scenarios')
     } catch (saveFailure) {
+      if (saveFailure instanceof ApiError && saveFailure.status === 409 && saveFailure.code === 'scenario_confirmation_conflict') {
+        await refreshDeleteConfirmation()
+        setDeleteScenarioError('確認した内容が変わりました。もう一度確認してください。')
+        return
+      }
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)

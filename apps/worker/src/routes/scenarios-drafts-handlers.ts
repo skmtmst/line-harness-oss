@@ -447,17 +447,18 @@ export const get__api_scenarios_id_move_referrers_8 = async (c: Context<Env, "/a
 export const delete__api_scenarios_id_9 = async (c: Context<Env, "/api/scenarios/:id">) => {
   try {
     const id = c.req.param('id');
-    const body = await c.req.json<{ expectedContentRevision?: unknown; expectedSubscriptions?: unknown; expectedReferrers?: unknown }>().catch(() => null);
+    const body = await c.req.json<{ expectedContentRevision?: unknown; expectedSubscriptions?: unknown; expectedActiveSubscriptions?: unknown; expectedReferrers?: unknown }>().catch(() => null);
     const revision = body?.expectedContentRevision;
     const subscriptions = body?.expectedSubscriptions;
+    const activeSubscriptions = body?.expectedActiveSubscriptions;
     const referrers = body?.expectedReferrers;
-    if (revision !== undefined || subscriptions !== undefined || referrers !== undefined) {
-      if (!Number.isSafeInteger(revision) || Number(revision) < 1 || !validSubscriptionSummary(subscriptions)
+    if (revision !== undefined || subscriptions !== undefined || activeSubscriptions !== undefined || referrers !== undefined) {
+      if (!Number.isSafeInteger(revision) || Number(revision) < 1 || !validSubscriptionSummary(subscriptions) || (activeSubscriptions !== undefined && !validSubscriptionSummary(activeSubscriptions))
         || !Array.isArray(referrers) || referrers.some(item => !item || typeof item.id !== 'string' || !item.id || !Number.isSafeInteger(item.revision) || item.revision < 1)
         || new Set(referrers.map(item => item.id)).size !== referrers.length)
-        return inputError(c, { success: false, error: 'invalid_confirmation' }, 400, ['expectedContentRevision', 'expectedSubscriptions', 'expectedReferrers']);
+        return inputError(c, { success: false, error: 'invalid_confirmation' }, 400, ['expectedContentRevision', 'expectedSubscriptions', 'expectedActiveSubscriptions', 'expectedReferrers']);
     }
-    await deleteScenario(c.env.DB, id, revision === undefined ? undefined : { expectedRevision: revision as number, expectedSubscriptions: subscriptions as { activeCount: number; rowIdSum: number; rowIdSquareSum: number }, expectedReferrers: referrers as Array<{id: string; revision: number}> });
+    await deleteScenario(c.env.DB, id, revision === undefined ? undefined : { expectedRevision: revision as number, expectedSubscriptions: subscriptions as { activeCount: number; rowIdSum: number; rowIdSquareSum: number }, expectedActiveSubscriptions: activeSubscriptions as { activeCount: number; rowIdSum: number; rowIdSquareSum: number } | undefined, expectedReferrers: referrers as Array<{id: string; revision: number}> });
     return c.json({ success: true, data: null });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';

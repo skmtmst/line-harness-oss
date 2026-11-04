@@ -153,8 +153,8 @@ export const scenariosMethods = {
         method: 'PUT',
         body: JSON.stringify({ ...data, isActive: false }),
       }),
-    delete: (id: string, confirmation?: Pick<ScenarioConfirmation, 'contentRevision' | 'totalCount' | 'totalRowIdSum' | 'totalRowIdSquareSum' | 'referrers'>) =>
-      fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE', ...(confirmation ? { body: JSON.stringify({ expectedContentRevision: confirmation.contentRevision, expectedSubscriptions: { activeCount: confirmation.totalCount, rowIdSum: confirmation.totalRowIdSum, rowIdSquareSum: confirmation.totalRowIdSquareSum }, expectedReferrers: confirmation.referrers }) } : {}) }),
+    delete: (id: string, confirmation?: Pick<ScenarioConfirmation, 'contentRevision' | 'activeCount' | 'rowIdSum' | 'rowIdSquareSum' | 'totalCount' | 'totalRowIdSum' | 'totalRowIdSquareSum' | 'referrers'>) =>
+      fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE', ...(confirmation ? { body: JSON.stringify({ expectedContentRevision: confirmation.contentRevision, expectedSubscriptions: { activeCount: confirmation.totalCount, rowIdSum: confirmation.totalRowIdSum, rowIdSquareSum: confirmation.totalRowIdSquareSum }, expectedActiveSubscriptions: { activeCount: confirmation.activeCount, rowIdSum: confirmation.rowIdSum, rowIdSquareSum: confirmation.rowIdSquareSum }, expectedReferrers: confirmation.referrers }) } : {}) }),
     /**
      * R250: このシナリオを終了後の移動先にしているシナリオの一覧。
      * 削除の確認窓で「どのシナリオの設定が変わるか」を見せる。
