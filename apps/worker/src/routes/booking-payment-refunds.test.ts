@@ -43,6 +43,27 @@ beforeEach(()=>{
 afterEach(()=>{f.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
 
 describe('模擬の部分返金と監査',()=>{
+  it('確認した版が古い返金は記録せず、同一要求の再送は成功する', async()=>{
+    const confirmed={...input,expectedRevision:1};
+    expect((await request('refund',confirmed)).status).toBe(200);
+    expect(f.raw.prepare("SELECT confirmation_revision FROM booking_payments WHERE id='p'").get()).toEqual({confirmation_revision:2});
+    expect((await request('refund',confirmed)).status).toBe(200);
+    const stale=await request('refund',{...input,idempotencyKey:'stale',expectedRevision:1});
+    expect(stale.status).toBe(409);
+    expect(state()).toEqual({status:'paid',refunded_amount:300});
+    expect(f.raw.prepare('SELECT COUNT(*) n FROM booking_payment_refunds').get()).toEqual({n:1});
+    expect((await request('refund',{...input,idempotencyKey:'next',expectedRevision:2})).status).toBe(200);
+  });
+  it('同じ版を見た別の返金は同時に一つだけ通す',async()=>{
+    const responses=await Promise.all(['one','two'].map(idempotencyKey=>request('refund',{...input,idempotencyKey,expectedRevision:1})));
+    expect(responses.map(r=>r.status).sort()).toEqual([200,409]);
+    expect(f.raw.prepare("SELECT confirmation_revision FROM booking_payments WHERE id='p'").get()).toEqual({confirmation_revision:2});
+    expect(state()).toEqual({status:'paid',refunded_amount:300});
+  });
+  it.each([0,-1,1.5,'1',null])('不正な版 %s は受け付けない',async expectedRevision=>{
+    expect((await request('refund',{...input,expectedRevision})).status).toBe(400);
+    expect(state()).toEqual({status:'paid',refunded_amount:0});
+  });
   it('一部返金・理由・操作した人と通知希望を保存し、再送は一度だけ。全額まで残額を返せる',async()=>{
     const first=await request();expect(first.status).toBe(200);
     expect(await first.json()).toMatchObject({data:{payment:{status:'paid',refunded_amount:300},
@@ -167,6 +188,8 @@ describe('予約連結と本人の支払い表示',()=>{
   it('通知の累計額は順不同・再読込・手動返金後でも重ねず、最後に全額返金となる',async()=>{
     const send=(amount:number,id:string)=>receivePaymentEvent(f.db,'stripe',{providerPaymentId:'pi_test_p',providerEventId:id,status:'refunded',amount:1000,refundedAmount:amount,currency:'JPY'},id);
     expect(await send(300,'e1')).toMatchObject({result:'applied'});
+    expect(f.raw.prepare("SELECT confirmation_revision FROM booking_payments WHERE id='p'").get()).toEqual({confirmation_revision:2});
+    expect((await request('refund',{...input,idempotencyKey:'before-event',expectedRevision:1})).status).toBe(409);
     expect(await send(200,'e0')).toMatchObject({status:'duplicate'});
     expect(state()).toEqual({status:'paid',refunded_amount:300});
     const event=f.raw.prepare("SELECT id FROM booking_payment_events WHERE provider_event_id='e1'").get() as {id:string};
