@@ -92,8 +92,8 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const [history, setHistory] = useState<History>({ state: 'loading' })
   const id = reservation?.id ?? ''
   const storeId = reservation?.store_id ?? ''
-  const confirmationScope = useRef({ accountId, id, storeId, canWrite, status: reservation?.status })
-  if (confirmationScope.current.accountId !== accountId || confirmationScope.current.id !== id || confirmationScope.current.storeId !== storeId || confirmationScope.current.canWrite !== canWrite || confirmationScope.current.status !== reservation?.status) { confirmationScope.current = { accountId, id, storeId, canWrite, status: reservation?.status }; noShowTicket.current = null }
+  const confirmationScope = useRef({ accountId, id, storeId, canWrite, status: reservation?.status, operationScope })
+  if (confirmationScope.current.accountId !== accountId || confirmationScope.current.id !== id || confirmationScope.current.storeId !== storeId || confirmationScope.current.canWrite !== canWrite || confirmationScope.current.status !== reservation?.status || confirmationScope.current.operationScope !== operationScope) { confirmationScope.current = { accountId, id, storeId, canWrite, status: reservation?.status, operationScope }; noShowTicket.current = null }
   const renderedScope = confirmationScope.current
   const phone = reservation?.customer_phone ?? ''
   const lineUid = reservation?.line_uid ?? ''

@@ -225,6 +225,9 @@ export default function HqBroadcastCreate() {
   const [error, setError] = useState('')
   const [errorStep, setErrorStep] = useState<BroadcastStepKey | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const confirmTicket = useRef<object | null>(null)
+  const renderedConfirmTicket = confirmTicket.current
+  const closeConfirm = () => { confirmTicket.current = null; setConfirmOpen(false) }
   const [sending, setSending] = useState(false)
   /* 共通の「送る前の確かめ」の中身は、保存した一括配信に対するサーバーの数え直し（GET /api/hq/broadcasts/:id/send-preview）。 */
   const [sendPreview, setSendPreview] = useState<{ state: 'loading' | 'error' | 'ready'; data: SendConfirmationPreview | null }>({ state: 'loading', data: null })
@@ -420,6 +423,10 @@ export default function HqBroadcastCreate() {
     scheduledAt,
   }
   const key = JSON.stringify(input)
+  const inputScope = useRef({ key })
+  if (inputScope.current.key !== key) inputScope.current = { key }
+  const openedInputScope = useRef<typeof inputScope.current | null>(null)
+  const confirmChanged = confirmOpen && openedInputScope.current !== inputScope.current
   const stale = !!run && !!checks && runKey !== key
   /* 承認の状態（⑤ を開いて確かめたあと。中身を変えると口が承認を外す）。 */
   const approval = useHqApproval(step === 'confirm' && run && !stale ? run : null)
@@ -566,6 +573,8 @@ export default function HqBroadcastCreate() {
     if (nextGate === 'needsRequest') { setApprovalRequestOpen(true); return }
     if (nextGate === 'pending') { setError('承認を待っています。承認されると送れます。'); setErrorStep(null); return }
     setConfirmCount('')
+    openedInputScope.current = inputScope.current
+    confirmTicket.current = {}
     setConfirmOpen(true)
   }
 
@@ -587,13 +596,13 @@ export default function HqBroadcastCreate() {
     try {
       await (gate === 'single' ? hqBroadcastsApi.send(run.id, run.version, Number(confirmCount)) : hqBroadcastsApi.send(run.id, run.version))
       accepted = true
-      setConfirmOpen(false)
+      closeConfirm()
       notifyToast(when === 'now' ? '一括配信を送り始めました' : '一括配信を予約しました')
       setLeaving(true)
       router.push(`/hq/broadcasts/detail?id=${encodeURIComponent(run.id)}`)
       return true
     } catch (caught) {
-      if (accepted) { setConfirmOpen(false); setLeaving(true); notifyToast('送る依頼は受け付けました。配信の記録を確認してください。'); return true }
+      if (accepted) { closeConfirm(); setLeaving(true); notifyToast('送る依頼は受け付けました。配信の記録を確認してください。'); return true }
       saveErrors.capture(caught, fields)
       setRunKey('')
       setError(`${errorText(caught, '送れませんでした。')} 閉じて、送る前の確かめをやり直してください。`)
@@ -1186,11 +1195,11 @@ export default function HqBroadcastCreate() {
         allRecipients={audience === 'all'}
         confirmationFields={<OperationTargetSummary accounts={checks && !stale ? checks.filter((item) => !item.excluded && !item.blockedReasons.length).map((item) => ({ id: item.accountId, name: item.accountName })) : [{ id: '' }]} showAccountCount />}
         hidePrimary={approval.state === null && !stale}
-        primaryDisabled={sending || stale}
+        primaryDisabled={sending || stale || confirmChanged}
         error={error || undefined}
         primaryLabel={sendPreview.data ? `${totals ? `${formatNumber(totals.sendStores)} アカウント ` : ''}${formatNumber(sendPreview.data.recipients)} 人に${when === 'now' ? '送る' : '予約する'}` : '送る'}
-        onConfirm={async () => { await send() }}
-        onBack={() => { if (!sending) setConfirmOpen(false) }}
+        onConfirm={async () => { if (renderedConfirmTicket && renderedConfirmTicket === confirmTicket.current && openedInputScope.current === inputScope.current) await send() }}
+        onBack={() => { if (!sending) closeConfirm() }}
       />
       <ConfirmDialog
         open={confirmOpen && gate === 'single'}
@@ -1198,13 +1207,13 @@ export default function HqBroadcastCreate() {
         description={`${formatNumber(totals?.sendPeople ?? 0)} 人に${when === 'now' ? 'すぐ' : `${sendWhenLabel} に`}送ります。送った LINE は取り消せません。${totals && totals.skipStores ? `外した${formatNumber(totals.skipStores)}アカウントには送りません。` : ''}`}
         confirmLabel={when === 'now' ? '送る' : '予約する'}
         busy={sending}
-        confirmDisabled={stale}
+        confirmDisabled={stale || confirmChanged}
         confirmDisabledReason="閉じて、送る前の確かめをやり直してください。"
         warning
-        onConfirm={gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => send() : undefined}
+        onConfirm={gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => { if (renderedConfirmTicket && renderedConfirmTicket === confirmTicket.current && openedInputScope.current === inputScope.current) return send() } : undefined}
         error={error || undefined}
-        onSuccess={() => setConfirmOpen(false)}
-        onCancel={() => setConfirmOpen(false)}
+        onSuccess={closeConfirm}
+        onCancel={closeConfirm}
       >
         <OperationTargetSummary
           accounts={checks && !stale ? checks.filter((item) => !item.excluded && !item.blockedReasons.length).map((item) => ({ id: item.accountId, name: item.accountName })) : [{ id: '' }]}

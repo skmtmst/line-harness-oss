@@ -110,6 +110,8 @@ function DeliveryInner() {
   const cancelScope = useRef({ key: cancelKey })
   if (cancelScope.current.key !== cancelKey) cancelScope.current = { key: cancelKey }
   const openedCancelScope = useRef<typeof cancelScope.current | null>(null)
+  const cancelTicket = useRef<object | null>(null)
+  const renderedCancelTicket = cancelTicket.current
 
   const meta = PAGE_META[view]
   usePageTitle(meta.title)
@@ -204,9 +206,12 @@ function DeliveryInner() {
   })
   const [stopScope, setStopScope] = useState<object | null>(null)
   const openedStopScope = useRef<typeof intakeScope | null>(null)
+  const stopTicket = useRef<object | null>(null)
+  const renderedStopTicket = stopTicket.current
   useEffect(() => {
     if (!openedStopScope.current || (openedStopScope.current.selectedAccountId === selectedAccountId && (role === null || canManage))) return
     openedStopScope.current = null
+    stopTicket.current = null
     setStopScope(null)
     setStopOpen(false)
     setStopSelected([])
@@ -319,6 +324,7 @@ function DeliveryInner() {
       setDetailAccountId(null)
       setDetailError(null)
       setCancelOpen(false)
+      cancelTicket.current = null
       return
     }
     void loadDetail(orderId)
@@ -513,6 +519,7 @@ function DeliveryInner() {
     try {
       await restaurantDeliveryApi.cancel(selectedAccountId, order.id, cancelReason)
       if (requestScope !== cancelScope.current) return
+      cancelTicket.current = null
       setCancelOpen(false)
       setNotice({ tone: 'success', text: '注文をキャンセルしました。' })
       await loadOrders(true)
@@ -533,6 +540,7 @@ function DeliveryInner() {
       : intakeContextReason(current, intakeScope)
     if (reason || (current.storeId && intakeBusy.current.has(current.storeId))) { setNotice({ tone: 'warn', text: reason ?? '受付の変更が終わるまでお待ちください。' }); return }
     openedStopScope.current = intakeScope
+    stopTicket.current = {}
     setStopScope(intakeScope)
     setStopSelected(service ? [service] : [])
     setStopPreset('')
@@ -549,6 +557,7 @@ function DeliveryInner() {
     if (current.scope !== intakeScope) return
     if (!openedScope || openedScope.selectedAccountId !== current.accountId) {
       setStopOpen(false)
+      stopTicket.current = null
       setStopSelected([])
       setStopPreset('')
       return
@@ -564,6 +573,7 @@ function DeliveryInner() {
     try {
       const result = await restaurantDeliveryApi.stopIntake(accountId, selection.services, selection.preset)
       if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
+      stopTicket.current = null
       setStopOpen(false)
       await reload(true)
       if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
@@ -895,6 +905,7 @@ function DeliveryInner() {
         onHandOver={() => { if (detailOrder) handOverOrder(detailOrder) }}
         onCancelOrder={() => {
           openedCancelScope.current = cancelScope.current
+          cancelTicket.current = {}
           setCancelReason('out_of_stock')
           setCancelError(null)
           setCancelOpen(true)
@@ -914,8 +925,8 @@ function DeliveryInner() {
         busy={cancelBusy}
         error={cancelError}
         onReasonChange={setCancelReason}
-        onClose={() => setCancelOpen(false)}
-        onSubmit={() => { void submitCancel() }}
+        onClose={() => { cancelTicket.current = null; openedCancelScope.current = null; setCancelOpen(false) }}
+        onSubmit={() => { if (renderedCancelTicket && renderedCancelTicket === cancelTicket.current) void submitCancel() }}
       />
 
       <IntakeStopDialog
@@ -934,8 +945,8 @@ function DeliveryInner() {
           setStopError(null)
         }}
         onPresetChange={setStopPreset}
-        onClose={() => setStopOpen(false)}
-        onSubmit={() => { void submitStop() }}
+        onClose={() => { stopTicket.current = null; setStopOpen(false) }}
+        onSubmit={() => { if (renderedStopTicket && renderedStopTicket === stopTicket.current) void submitStop() }}
       />
     </RestaurantPage>
   )
