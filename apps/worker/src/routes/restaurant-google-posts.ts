@@ -483,8 +483,8 @@ async function crossPostToInstagram(c: Context<Env>, store: StoreContext, row: P
     const status = /(?:^| )status=([0-9]{3})(?= |$)/.exec(detail ?? '');
     const upstreamCode = /(?:^| )code=([0-9]{1,9})(?= |$)/.exec(detail ?? '');
     const upstreamSubcode = /(?:^| )subcode=([0-9]{1,9})(?= |$)/.exec(detail ?? '');
-    const stage = detail?.includes('/media_publish') ? 'publish' : detail?.includes('/media') ? 'container' : 'other';
-    logger.warn(`instagram.cross_post.${stage}.failed`, {
+    const event = detail?.includes('/media_publish') ? 'instagram.cross_post.publish.failed' : detail?.includes('/media') ? 'instagram.cross_post.container.failed' : 'instagram.cross_post.other.failed';
+    logger.warn(event, {
       status: status ? Number(status[1]) : undefined,
       upstreamCode: upstreamCode ? Number(upstreamCode[1]) : undefined,
       upstreamSubcode: upstreamSubcode ? Number(upstreamSubcode[1]) : undefined,
