@@ -345,11 +345,11 @@ describe('Instagram のログインから戻ったときの帯', () => {
     expect(await screen.findByText('Instagram とつなげませんでした。ビジネスアカウント（またはクリエイターアカウント）でログインして、もう一度お試しください。')).toBeTruthy()
   })
 
-  it('別のLINEアカウントに接続済みなら解除を案内する', async () => {
-    fixture.search.value = 'instagram=failed&instagram_code=instagram_account_already_connected'
+  it('別の統括で使用中なら管理者への確認を案内する', async () => {
+    fixture.search.value = 'instagram=failed&instagram_code=instagram_account_other_organization'
     setup('disconnected')
 
-    expect(await screen.findByText('このInstagramは別のLINEアカウントに接続済みです。元の接続を解除してから、もう一度お試しください。')).toBeTruthy()
+    expect(await screen.findByText('このInstagramは別の統括で使用されています。統括の管理者に確認してください。')).toBeTruthy()
   })
 
   // その他の診断情報は画面に出さず、通常の失敗案内を保つ。

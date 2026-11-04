@@ -462,6 +462,7 @@
 
 ## 反映履歴
 
+- [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2026-11-04-masato-instagram-shared-accounts.md)
 - [Googleビジネスのパフォーマンス取得](release-log/unreleased/2026-11-04-masato-google-performance-sync.md)
 - [保存前の確認と配信操作の安全修正](release-log/unreleased/2075-kenta-safety.md)
 - [統括・運営メンバー画面の本人パスキー設定と一覧配置](release-log/unreleased/2026-11-03-masato-hq-ops-passkeys-ui.md)
