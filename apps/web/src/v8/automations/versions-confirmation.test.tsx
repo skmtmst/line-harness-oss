@@ -11,7 +11,7 @@ vi.mock('./shell', () => ({ useAutomationManage: () => true }))
 vi.mock('@/lib/use-manual-href', () => ({ useManualHref: () => null }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
-  const detail = { id: 'action-1', name: 'テストアクション', status: 'active', currentDraftVersionId: null, currentPublishedVersionId: 'v1', versions: [{ id: 'v1', versionNumber: 1, status: 'published', actions: [], draftRevision: 1, publishedAt: '2026-01-01' }], bindings: [{ id: 'binding-1', consumerType: 'scenario', consumerId: 'sc1', consumerPath: '人工シナリオ', versionId: 'v0', versionNumber: 0, latestVersionNumber: 1, hasNewerVersion: true, runningCount: 0, waitingCount: 0, olderRunningCount: 0, olderWaitingCount: 0 }] }
+  const detail = { id: 'action-1', name: 'テストアクション', status: 'active', currentDraftVersionId: null, currentPublishedVersionId: 'v1', versions: [{ id: 'v1', versionNumber: 1, status: 'published', actions: [], draftRevision: 1, publishedAt: '2026-01-01' }], bindings: [{ id: 'binding-1', confirmationRevision: 7, consumerType: 'scenario', consumerId: 'sc1', consumerPath: '人工シナリオ', versionId: 'v0', versionNumber: 0, latestVersionNumber: 1, hasNewerVersion: true, runningCount: 0, waitingCount: 0, olderRunningCount: 0, olderWaitingCount: 0 }] }
   return { ...actual, api: { ...actual.api, commonActions: { ...actual.api.commonActions, get: vi.fn(async () => ({ success: true, data: detail })), list: vi.fn(async () => ({ success: true, data: [] })), updateBinding: state.update } } }
 })
 import Versions from './versions'
@@ -30,5 +30,5 @@ it('閉じた利用先の版切替確認から更新しない', async () => {
   expect(state.update).not.toHaveBeenCalled()
   const fresh = screen.getByRole('dialog', { name: 'この利用先を第1版へ更新しますか' })
   fireEvent.click(within(fresh).getByRole('button', { name: '第1版へ更新' }))
-  await waitFor(() => expect(state.update).toHaveBeenCalledExactlyOnceWith('action-1', 'account-1', { bindingId: 'binding-1', versionId: 'v1', expectedVersionId: 'v0' }))
+  await waitFor(() => expect(state.update).toHaveBeenCalledExactlyOnceWith('action-1', 'account-1', { bindingId: 'binding-1', versionId: 'v1', expectedVersionId: 'v0', expectedConfirmationRevision: 7 }))
 })
