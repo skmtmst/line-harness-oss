@@ -153,6 +153,22 @@ describe('processGoogleBusinessHourlyResync', () => {
     expect(connection.average_rating).toBe(4.5);
   });
 
+  it('内容が変わらない定期同期では接続と投稿の確認版を変えない', async () => {
+    await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
+    const connection = () => testDb.raw.prepare("SELECT confirmation_revision FROM rt_google_connections WHERE store_id='store-shibuya'").get();
+    const post = () => testDb.raw.prepare("SELECT confirmation_revision FROM rt_google_posts WHERE store_id='store-shibuya'").get();
+    expect(connection()).toEqual({ confirmation_revision: 1 });
+    const postRevision = post();
+    testDb.raw.exec("UPDATE rt_google_connections SET last_synced_at=NULL,last_posts_synced_at=NULL WHERE store_id='store-shibuya'");
+    await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
+    expect(connection()).toEqual({ confirmation_revision: 1 });
+    expect(post()).toEqual(postRevision);
+    testDb.raw.exec("UPDATE rt_google_posts SET google_state='SCHEDULED', status='scheduled' WHERE store_id='store-shibuya'");
+    testDb.raw.exec("UPDATE rt_google_connections SET last_synced_at=NULL,last_posts_synced_at=NULL WHERE store_id='store-shibuya'");
+    await processGoogleBusinessHourlyResync(env, { now: NOW, fetch: googleFetch(), sleep: noSleep });
+    expect(post()).toEqual({ confirmation_revision: (postRevision as { confirmation_revision: number }).confirmation_revision + 1 });
+  });
+
   it('55分以内に同期済みならGoogleを呼ばない', async () => {
     const recent = '2026-09-28T17:40:00.000Z';
     testDb.raw

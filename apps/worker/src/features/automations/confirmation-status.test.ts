@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from '../../test-utils/d1-sqlite.js';
 import { updateAutomationDefinitionStatus } from './automation-definitions.js';
 import { deleteFolder } from '@line-crm/db';
@@ -16,6 +16,17 @@ describe('自動化の確認版', () => {
     db.raw.prepare("UPDATE automation_definitions SET confirmation_revision=2 WHERE id='d'").run();
     await expect(updateAutomationDefinitionStatus(db.db, { id:'d', lineAccountId:'a', status:'stopped', ...{ expectedConfirmationRevision:1 } })).rejects.toMatchObject({ code:'version_conflict' });
     expect(db.raw.prepare("SELECT status,confirmation_revision FROM automation_definitions WHERE id='d'").get()).toEqual({ status:'active', confirmation_revision:2 });
+  });
+  it('読み取り後の版変更は更新文で拒む', async () => {
+    const d = fixture(), original = d.db.prepare.bind(d.db);
+    const spy = vi.spyOn(d.db, 'prepare').mockImplementation(sql => {
+      if (sql.includes('UPDATE automation_definitions SET status = ?')) d.raw.exec("UPDATE automation_definitions SET confirmation_revision=2 WHERE id='d'");
+      return original(sql);
+    });
+    try {
+      await expect(updateAutomationDefinitionStatus(d.db, { id:'d', lineAccountId:'a', status:'stopped', expectedConfirmationRevision:1 })).rejects.toMatchObject({ code:'version_conflict' });
+      expect(d.raw.prepare("SELECT status,confirmation_revision FROM automation_definitions WHERE id='d'").get()).toEqual({ status:'active', confirmation_revision:2 });
+    } finally { spy.mockRestore(); }
   });
   it('一致する版は一度だけ停止し、次の版へ進む', async () => {
     const db = fixture();

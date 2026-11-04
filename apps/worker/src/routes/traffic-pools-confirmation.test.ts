@@ -20,6 +20,15 @@ describe('所属プール削除の確認', () => {
     expect((await remove(1,[])).status).toBe(409);
     expect(raw.prepare("SELECT count(*) n FROM traffic_pools WHERE id='p'").get()).toEqual({n:1});
   });
+  it.each(['count', 'membership'])('アカウント削除の連鎖で%sが変わると削除しない', async kind => {
+    const { raw,remove } = setup();
+    raw.pragma('foreign_keys = ON');
+    raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('b','b','B','token','secret'),('c','c','C','token','secret'); INSERT INTO pool_accounts(id,pool_id,line_account_id,is_active,created_at) VALUES('pb','p','b',1,'now')");
+    raw.exec("DELETE FROM line_accounts WHERE id='b'");
+    if (kind === 'membership') raw.exec("INSERT INTO pool_accounts(id,pool_id,line_account_id,is_active,created_at) VALUES('pc','p','c',1,'now')");
+    expect((await remove(1,['a','b'])).status).toBe(409);
+    expect(raw.prepare("SELECT count(*) n FROM traffic_pools WHERE id='p'").get()).toEqual({n:1});
+  });
   it('確認した版と所属なら削除する', async () => {
     const { raw,remove } = setup(); expect((await remove(1)).status).toBe(200);
     expect(raw.prepare("SELECT count(*) n FROM traffic_pools WHERE id='p'").get()).toEqual({n:0});

@@ -407,7 +407,7 @@ export async function accessTokenForConnection(env: Env['Bindings'], connection:
     await dbFor(env, connection.store_id)
       .prepare(
         `UPDATE rt_google_connections
-         SET confirmation_revision = confirmation_revision + 1, access_token_enc = ?, access_token_expires_at = ?, refresh_token_enc = ?, updated_at = ?
+         SET access_token_enc = ?, access_token_expires_at = ?, refresh_token_enc = ?, updated_at = ?
          WHERE store_id = ?`,
       )
       .bind(
@@ -973,7 +973,7 @@ export async function recordReviewSyncResult(
   await dbFor(env, storeId)
     .prepare(
       `UPDATE rt_google_connections
-       SET confirmation_revision = confirmation_revision + 1, last_synced_at = ?, last_sync_error = ?, average_rating = COALESCE(?, average_rating),
+       SET confirmation_revision = confirmation_revision + CASE WHEN status IS NOT 'connected' THEN 1 ELSE 0 END, last_synced_at = ?, last_sync_error = ?, average_rating = COALESCE(?, average_rating),
            total_review_count = COALESCE(?, total_review_count), status = 'connected', updated_at = ?
        WHERE store_id = ?`,
     )

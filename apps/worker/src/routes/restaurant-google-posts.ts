@@ -406,15 +406,18 @@ async function setStatusForEnv(env: Env['Bindings'], storeId: string, id: string
     instagram_error: patch.instagramError,
     instagram_published_at: patch.instagramPublishedAt,
   };
+  const visible = new Set(['status', 'error', 'sent_at', 'published_at', 'deleted_at', 'google_post_name', 'google_state', 'search_url', 'origin', 'media_json', 'instagram_status', 'instagram_permalink', 'instagram_error', 'instagram_published_at']);
+  const comparisons: string[] = [], comparisonValues: unknown[] = [];
   for (const [column, value] of Object.entries(columns)) {
     if (value === undefined) continue;
+    if (visible.has(column)) { comparisons.push(`${column} IS NOT ?`); comparisonValues.push(value); }
     sets.push(`${column} = ?`);
     values.push(value);
   }
   values.push(id, storeId);
   await dbFor(env, storeId)
-    .prepare(`UPDATE rt_google_posts SET confirmation_revision = confirmation_revision + 1, ${sets.join(', ')} WHERE id = ? AND store_id = ?`)
-    .bind(...values)
+    .prepare(`UPDATE rt_google_posts SET confirmation_revision = confirmation_revision + CASE WHEN ${comparisons.length ? comparisons.join(' OR ') : '0'} THEN 1 ELSE 0 END, ${sets.join(', ')} WHERE id = ? AND store_id = ?`)
+    .bind(...comparisonValues, ...values)
     .run();
 }
 
@@ -888,12 +891,6 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requi
   const guarded = body.expectedPostRevision !== undefined || body.expectedConnectionRevision !== undefined || body.expectedConnectionId !== undefined;
   if (guarded && (body.expectedPostRevision === undefined || body.expectedConnectionRevision === undefined || body.expectedConnectionId === undefined)) return fail(c, 400, '確認した投稿と接続先の版が必要です');
 
-  let options: RequestOptions;
-  try {
-    options = { fetch, accessToken: await accessTokenFor(c, connection) };
-  } catch (error) {
-    return googleErrorResponse(c, error);
-  }
   const db = dbFor(c.env, store.id);
   const current = async () => {
     const [post, selected] = await Promise.all([
@@ -908,6 +905,14 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requi
       || (body.expectedConnectionRevision !== undefined && body.expectedConnectionRevision !== connection.confirmation_revision)) {
       return c.json({ success: false, error: '対象が変わりました。読み直してください', current: await current() }, 409);
     }
+  }
+  let options: RequestOptions;
+  try {
+    options = { fetch, accessToken: await accessTokenFor(c, connection) };
+  } catch (error) {
+    return googleErrorResponse(c, error);
+  }
+  if (guarded) {
     const claimed = await db.prepare(`UPDATE rt_google_posts SET confirmation_revision = confirmation_revision + 1
     WHERE id = ? AND store_id = ? AND (? IS NULL OR confirmation_revision = ?)
       AND EXISTS (SELECT 1 FROM rt_google_connections WHERE store_id = ? AND (? IS NULL OR id = ?)

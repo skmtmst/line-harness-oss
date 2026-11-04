@@ -27,6 +27,25 @@ describe('引き継ぎの実績からの切り戻し', () => {
     const result=await rollbackHandover(db,'ho',{}); expect(result).toMatchObject({ok:true,restoredCount:1});
     expect(raw.prepare("SELECT id,line_account_id FROM friends ORDER BY id").all()).toEqual([{id:'already',line_account_id:'to'},{id:'moved',line_account_id:'from'}]);
   });
+  it('同じ移動元と先の別の引き継ぎの人は戻さない', async () => {
+    const {raw,db}=setup();
+    raw.exec("INSERT INTO account_handovers(id,from_account_id,to_account_id,code,code_expires_at,status,created_at,completed_at) VALUES('ho2','from','to','TEST2','2099-01-01','completed','2026-01-01',datetime('now')); INSERT INTO account_handover_moves VALUES('ho','moved','from','to','00000000-0000-4000-8000-000000000001','now'),('ho2','already','from','to','00000000-0000-4000-8000-000000000001','now')");
+    expect(await rollbackHandover(db,'ho',{})).toMatchObject({ok:true,restoredCount:1});
+    expect(raw.prepare("SELECT id,line_account_id FROM friends ORDER BY id").all()).toEqual([{id:'already',line_account_id:'to'},{id:'moved',line_account_id:'from'}]);
+  });
+  it('同じ引き継ぎに他の統括の記録が混ざると全員戻さない', async () => {
+    const {raw,db}=setup();
+    raw.exec("INSERT INTO account_handover_moves VALUES('ho','moved','from','to','00000000-0000-4000-8000-000000000001','now'),('ho','already','from','to','other-tenant','now')");
+    expect((await rollbackHandover(db,'ho',{})).ok).toBe(false);
+    expect(raw.prepare("SELECT id,line_account_id FROM friends ORDER BY id").all()).toEqual([{id:'already',line_account_id:'to'},{id:'moved',line_account_id:'to'}]);
+  });
+  it('移動元と移動先の統括が異なれば移動も実績保存もしない', async () => {
+    const {raw,db}=setup();
+    raw.exec("UPDATE friends SET line_account_id='from' WHERE id='moved'; UPDATE account_handovers SET status='executing' WHERE id='ho'; UPDATE line_accounts SET tenant_id='other-tenant' WHERE id='to'");
+    await expect(moveHandoverFriend(db,{handoverId:'ho',friendId:'moved',fromAccountId:'from',toAccountId:'to',targetFriendId:null})).rejects.toThrow();
+    expect(raw.prepare("SELECT line_account_id FROM friends WHERE id='moved'").get()).toEqual({line_account_id:'from'});
+    expect(raw.prepare('SELECT COUNT(*) n FROM account_handover_moves').get()).toEqual({n:0});
+  });
   it('移動元の現在の統括と記録が違えば戻さない', async () => {
     const {raw,db}=setup();
     raw.exec("INSERT INTO account_handover_moves VALUES('ho','moved','from','to','different-tenant','now')");

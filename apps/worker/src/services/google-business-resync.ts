@@ -163,7 +163,7 @@ export async function processGoogleBusinessHourlyResync(
         const googlePosts = await listLocalPosts(options, connection.location_name!);
         await applyGooglePostsSync(env, connection.store_id, googlePosts);
         await dbFor(env, connection.store_id)
-          .prepare(`UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1, last_posts_synced_at = ?, updated_at = ? WHERE store_id = ?`)
+          .prepare(`UPDATE rt_google_connections SET last_posts_synced_at = ?, updated_at = ? WHERE store_id = ?`)
           .bind(input.now, input.now, connection.store_id)
           .run();
         postsSynced += 1;
