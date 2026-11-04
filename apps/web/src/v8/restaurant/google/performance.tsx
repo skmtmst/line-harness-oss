@@ -25,6 +25,7 @@ import {
   type GooglePerformanceTotals,
 } from '@/lib/restaurant-google-api'
 import { errorMessage } from './format'
+import { useGooglePermission } from './use-google-permission'
 import styles from './google.module.css'
 import { formatDate as polishFormatDate, formatNumber as polishFormatNumber } from '@/lib/format'
 
@@ -86,6 +87,9 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [showTrend, setShowTrend] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncError, setSyncError] = useState('')
+  const { allowed: canSync, lockedReason } = useGooglePermission()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -102,16 +106,39 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
 
   useEffect(() => { void load() }, [load])
 
+  const sync = useCallback(async () => {
+    if (!canSync || syncing) return
+    setSyncing(true)
+    setSyncError('')
+    try {
+      const result = await restaurantGoogleApi.syncPerformance(accountId)
+      if (result.synced !== 1) {
+        throw new Error(result.failed > 0
+          ? 'Googleのデータを読み込めませんでした。接続を確認して、もう一度お試しください。'
+          : 'データの取り込みを始められませんでした。機能の設定とGoogleとの接続を確認してください。')
+      }
+      await load()
+    } catch (err) {
+      setSyncError(errorMessage(err, 'Googleのデータを読み込めませんでした。'))
+    } finally {
+      setSyncing(false)
+    }
+  }, [accountId, canSync, load, syncing])
+
   const range = data ? `${data.range.startDate.replace(/-/g, '/')}–${data.range.endDate.slice(5).replace('-', '/')}` : ''
 
   return (
     <>
-      <ListToolbar filters={<PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} choices={PERIOD_CHOICES} />} />
+      <ListToolbar
+        filters={<PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} choices={PERIOD_CHOICES} />}
+        trailing={data?.lastMetricsSyncedAt ? <Button size="compact" onClick={() => void sync()} disabled={!canSync} lockedReason={lockedReason} busy={syncing} busyLabel="取得中…">データを更新</Button> : null}
+      />
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="パフォーマンスを読み込んでいます" /></div> : null}
       {loadError ? <ListState kind="error" title="パフォーマンスを表示できませんでした" description={loadError} onRetry={() => void load()} /> : null}
       {data ? (
         <>
-          {data.lastMetricsSyncedAt === null ? <Notice tone="info">パフォーマンスの自動取得はまだ実行されていません。毎晩の取得のあとに数値が表示されます。</Notice> : null}
+          {syncError ? <Notice tone="danger" action={<Button variant="text" onClick={() => void sync()} disabled={!canSync} lockedReason={lockedReason} busy={syncing} busyLabel="取得中…">もう一度取得</Button>}>{syncError}</Notice> : null}
+          {!syncError && data.lastMetricsSyncedAt === null ? <Notice tone="info" action={<Button size="compact" onClick={() => void sync()} disabled={!canSync} lockedReason={lockedReason} busy={syncing} busyLabel="取得中…">データを取得</Button>}>{syncing ? 'Googleからパフォーマンスを取得しています。' : 'まだデータがありません。Googleからパフォーマンスを取得できます。'}</Notice> : null}
           <KpiBand presentation="band" gridClassName="">
             {METRICS.map(({ key, title, icon: Icon }) => (
               <KpiCard
