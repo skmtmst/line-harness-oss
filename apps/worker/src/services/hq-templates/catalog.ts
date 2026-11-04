@@ -58,11 +58,19 @@ export function catalogSnapshotGuard(accountId:string,type:HqCatalogTemplateType
 type Row=Record<string,string|number|null>;
 interface Snapshot {targets:Row[];versions:Row[];usage:Array<{id:string;n:number}>;tags:Row[];scenarios:Row[];actions:Row[];actionVersions:Row[];programs:Row[]}
 /** 公開中の景品は、必要マイル以外にも条件が変われば店で確認する。 */
-export function catalogRewardNeedsApproval(target: Row, published: Row, settings: Record<string, unknown>): boolean {
+export function catalogRewardNeedsApproval(target: Row, published: Row, settings: Record<string, unknown>, refs: readonly CatalogItem[]): boolean {
  if (Number(settings.requiredMiles) > Number(published.required_miles) || settings.rewardKind !== target.reward_kind) return true;
  const pairs: Array<[string,string]> = [['name','name'],['description','description'],['imageUrl','image_url'],['perFriendLimit','per_friend_limit'],['startsAt','starts_at'],['endsAt','ends_at'],['benefitExpiresDays','benefit_expires_days'],['failurePolicy','failure_policy'],['customerMessage','customer_message']];
+ const action=refs.find(ref=>ref.sourceId==='commonActionName')?.targetId??null;
+ const conditions=settings.targetConditions ? JSON.stringify(remapCatalogConditions(settings.targetConditions,refs)) : null;
  return pairs.some(([key,column]) => (settings[key] ?? null) !== (target[column] ?? published[column] ?? null))
-  || !!settings.commonActionName || !!settings.targetConditions || !!published.common_action_version_id || !!published.target_conditions;
+  || action !== published.common_action_version_id || conditions !== published.target_conditions;
+}
+function remapCatalogConditions(v:unknown,refs:readonly CatalogItem[]):unknown {
+ if(Array.isArray(v))return v.map(item=>remapCatalogConditions(item,refs));
+ if(!own(v))return v;
+ if(typeof v.type==='string'&&['tag_exists','tag_not_exists','tag_all','tag_not_all','scenario_subscribed'].includes(v.type)){const kind=v.type==='scenario_subscribed'?'scenario':'tag',map=(x:unknown)=>refs.find(r=>r.sourceId===`${kind}:${x}`)?.targetId??x;return {...v,value:Array.isArray(v.value)?v.value.map(map):map(v.value)};}
+ return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,remapCatalogConditions(x,refs)]));
 }
 function named(rows:Row[],name:unknown):Row {
  if(typeof name!=='string'||!name.trim())throw new HqTemplateError('REFERENCE_UNAVAILABLE',409);
@@ -107,7 +115,7 @@ export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,sna
  if(redistribution&&origin&&existing?.hq_template_id===origin.templateId&&!adopt){
   const current=snap.versions.find(v=>v.id===existing.current_published_version_id);
   if(type==='mileage_reward'&&existing.status==='published'&&!current)throw new HqTemplateError('VERSION_CONFLICT',409);
-  const needsApproval=existing.hq_customized===1||(type==='mileage_reward'&&existing.status==='published'&&!!current&&catalogRewardNeedsApproval(existing,current,s));
+  const needsApproval=existing.hq_customized===1||(type==='mileage_reward'&&existing.status==='published'&&!!current&&catalogRewardNeedsApproval(existing,current,s,items.slice(1)));
   if(existing.hq_template_version_id===origin.versionId||needsApproval){
    if(needsApproval&&existing.hq_template_version_id!==origin.versionId)add(`INSERT OR IGNORE INTO hq_catalog_update_decisions(id,tenant_id,line_account_id,template_id,template_version_id,${type==='booking_menu'?'menu_id':'reward_id'},decision) SELECT ?,a.tenant_id,a.id,?,?,?,'pending' FROM line_accounts a WHERE a.id=?`,[crypto.randomUUID(),origin.templateId,origin.versionId,id,accountId]);
    return {statements,resolutions:[{...selected,targetId:id},...items.slice(1).map(r=>({sourceId:r.sourceId,itemKind:r.itemKind,mode:'overwrite' as const,targetId:r.targetId??undefined,expectedRevision:r.expectedRevision??undefined}))],counts:{created:0,overwritten:0,aliased:0}};
@@ -124,8 +132,7 @@ export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,sna
   add(`INSERT INTO menu_versions(id,menu_id,version_number,name,category_label,description,duration_minutes,buffer_after_minutes,base_price,price_mode,sort_order,is_active,rules_json) SELECT ?,id,version,name,category_label,description,duration_minutes,buffer_after_minutes,base_price,price_mode,sort_order,is_active,json_object('concurrent_capacity',concurrent_capacity,'booking_window_days',booking_window_days,'cutoff_hours_before',cutoff_hours_before,'cancel_deadline_hours_before',cancel_deadline_hours_before,'intake_question',intake_question) FROM menus WHERE id=? AND line_account_id=?`,[crypto.randomUUID(),id,accountId]);
  } else {
   const actionId=refs.find(r=>r.sourceId==='commonActionName')?.targetId??null;
-  const remap=(v:unknown):unknown=>{if(Array.isArray(v))return v.map(remap);if(!own(v))return v;if(typeof v.type==='string'&&['tag_exists','tag_not_exists','tag_all','tag_not_all','scenario_subscribed'].includes(v.type)){const kind=v.type==='scenario_subscribed'?'scenario':'tag',map=(x:unknown)=>refs.find(r=>r.sourceId===`${kind}:${x}`)?.targetId??x;return {...v,value:Array.isArray(v.value)?v.value.map(map):map(v.value)};}return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,remap(x)]));};
-  const d=validateMileageRewardDraft({...s,commonActionVersionId:actionId,targetConditions:remap(s.targetConditions)} as unknown as MileageRewardDraftInput);
+  const d=validateMileageRewardDraft({...s,commonActionVersionId:actionId,targetConditions:remapCatalogConditions(s.targetConditions,refs)} as unknown as MileageRewardDraftInput);
   const previous=snap.versions.find(v=>v.id===existing?.current_draft_version_id),versionId=previous?String(previous.id):crypto.randomUUID();
   if(existing)add(`UPDATE mileage_rewards SET name=?,description=?,image_url=?,reward_kind=?,current_draft_version_id=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`,[name,d.description,d.imageUrl,d.rewardKind,versionId,id,accountId]);
   else add(`INSERT INTO mileage_rewards(id,line_account_id,program_id,name,description,image_url,reward_kind,status,current_draft_version_id) VALUES (?,?,'default',?,?,?,?,'draft',?)`,[id,accountId,name,d.description,d.imageUrl,d.rewardKind,versionId]);

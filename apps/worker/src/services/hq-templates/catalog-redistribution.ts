@@ -17,7 +17,7 @@ async function source(db: D1Database, authority: HqTemplateAuthority, id: string
 
 async function inspectStore(db: D1Database, id: string, data: CatalogSource, account: { id: string; name: string }): Promise<StorePreview> {
   const snapshot = await catalogSnapshot(db, account.id, data.type);
-  const root = inspectCatalog(data.definition, snapshot, data.type, id)[0];
+  const items = inspectCatalog(data.definition, snapshot, data.type, id), root = items[0];
   const parsed = JSON.parse(snapshot) as { targets: Array<{ id: string; hq_template_id: string | null; hq_template_version_id: string | null; hq_customized: number; status?: string; reward_kind?: string; current_published_version_id?: string }>; versions: Array<{ id:string; required_miles?:number }> };
   const target = parsed.targets.find(row => row.id === root.targetId && row.hq_template_id === id);
   if (!target) throw new HqTemplateError('NOT_FOUND', 404);
@@ -25,7 +25,7 @@ async function inspectStore(db: D1Database, id: string, data: CatalogSource, acc
   const published = parsed.versions.find(version => version.id === target.current_published_version_id);
   const settings = data.definition.settings as {requiredMiles?:number;rewardKind?:string};
   if(data.type==='mileage_reward'&&target.status==='published'&&!published)throw new HqTemplateError('VERSION_CONFLICT',409);
-  const disadvantage = data.type==='mileage_reward'&&target.status==='published'&&!!published&&catalogRewardNeedsApproval(target,published,settings);
+  const disadvantage = data.type==='mileage_reward'&&target.status==='published'&&!!published&&catalogRewardNeedsApproval(target,published,settings,items.slice(1));
   const state = target.hq_template_version_id === data.versionId ? 'current' : decision?.decision === 'kept' ? 'kept'
     : target.hq_customized === 1 || disadvantage ? 'approval_required' : 'update';
   return { accountId: account.id, accountName: account.name, targetId: target.id, snapshot: await digest(snapshot), state };

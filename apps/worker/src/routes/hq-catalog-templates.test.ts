@@ -167,6 +167,16 @@ test('公開中の景品の必要マイルを下げる配り直しは店のコ�
  expect((await redistributeCatalog(f.db,auth,id,preview.templateVersionId,preview.stores)).stores[0].status).toBe('approval_required');
  expect(f.raw.prepare('SELECT required_miles FROM mileage_reward_versions WHERE id=?').get(changed.id)).toEqual({required_miles:90});
 });
+test('同じ動き・対象条件の公開景品でも、必要マイルを下げた版は自動更新する',async()=>{
+ f.raw.exec("INSERT INTO tags(id,name,line_account_id) VALUES('vip','会員','a'); INSERT INTO common_actions(id,line_account_id,name,status) VALUES('action','a','お礼','published'); INSERT INTO common_action_versions(id,common_action_id,version_number,status,action_config) VALUES('action-v1','action',1,'published','[]'); UPDATE common_actions SET current_published_version_id='action-v1' WHERE id='action'");
+ const definition={schemaVersion:1,settings:{name:'会員特典',rewardKind:'tag',requiredMiles:100,commonActionName:'お礼',targetConditions:{operator:'AND',rules:[{type:'tag_exists',value:'会員'}]}}};
+ const id=await create('mileage_reward',definition);expect((await run(id,await check(id))).body.data.status).toBe('completed');
+ const reward=f.raw.prepare('SELECT id FROM mileage_rewards').get() as {id:string};await publishMileageReward(f.db,{id:reward.id,lineAccountId:'a'});
+ const detail=await call<Detail>(`/${id}`);expect((await call(`/${id}`,'PATCH',{name:'新版',definition:{...definition,settings:{...definition.settings,requiredMiles:90}},expectedRevision:detail.body.data.template.revision})).status).toBe(200);
+ const auth={tenantId:'t',actorId:'owner',role:'owner' as const,readOnly:false as const,accountScoped:false as const};
+ const preview=await previewCatalogRedistribution(f.db,auth,id,['a']);expect(preview.stores[0].state).toBe('update');expect((await redistributeCatalog(f.db,auth,id,preview.templateVersionId,preview.stores)).stores[0].status).toBe('updated');
+ expect(f.raw.prepare('SELECT v.required_miles FROM mileage_rewards r JOIN mileage_reward_versions v ON v.id=r.current_published_version_id WHERE r.id=?').get(reward.id)).toEqual({required_miles:90});
+});
 test.each(['booking_menu','mileage_reward'] as const)('%s: 店の維持または採用は確認した版だけを確定する',async type=>{
  const id=await create(type);expect((await run(id,await check(id))).body.data.status).toBe('completed');
  const table=type==='booking_menu'?'menus':'mileage_rewards';
