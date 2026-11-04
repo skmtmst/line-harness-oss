@@ -168,13 +168,14 @@ export async function updateScenario(
   values.push(id);
 
   // 複数の購読が同時に入れ替わると、3つの集計が偶然一致する可能性がある。
+  // 最後の行が削除されると rowid が再利用され、入れ替わりを検知できない場合がある。
   const expected = options?.expectedSubscriptions;
   const updated = await db
     .prepare(`UPDATE scenarios SET content_revision = content_revision + 1, ${fields.join(', ')}
       WHERE id = ? AND (? IS NULL OR content_revision = ?)
-      AND (? IS NULL OR ((SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?
-        AND (SELECT COALESCE(SUM(rowid),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?
-        AND (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?))`)
+      AND (? IS NULL OR ((SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status IN ('active','delivering'))=?
+        AND (SELECT COALESCE(SUM(rowid),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status IN ('active','delivering'))=?
+        AND (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status IN ('active','delivering'))=?))`)
     .bind(...values, options?.expectedRevision ?? null, options?.expectedRevision ?? null, expected?.activeCount ?? null, expected?.activeCount ?? null, expected?.rowIdSum ?? null, expected?.rowIdSquareSum ?? null)
     .run();
   if (!updated.meta.changes && (options?.expectedRevision !== undefined || expected !== undefined)) throw new Error('SCENARIO_CONFIRMATION_CONFLICT');
@@ -224,9 +225,9 @@ export async function deleteScenario(db: D1Database, id: string, confirmation?: 
   const expectedReferrers = confirmation ? JSON.stringify(confirmation.expectedReferrers) : null;
   try { await db.batch([
     confirmation ? db.prepare(`DELETE FROM scenarios WHERE id=? AND content_revision=?
-      AND (SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?
-      AND (SELECT COALESCE(SUM(rowid),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?
-        AND (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?
+      AND (SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=scenarios.id)=?
+      AND (SELECT COALESCE(SUM(rowid),0) FROM friend_scenarios WHERE scenario_id=scenarios.id)=?
+        AND (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=scenarios.id)=?
       AND (SELECT COUNT(*) FROM scenarios ref WHERE ref.on_complete_scenario_id=scenarios.id)=json_array_length(?)
       AND NOT EXISTS (SELECT 1 FROM scenarios ref WHERE ref.on_complete_scenario_id=scenarios.id
         AND NOT EXISTS (SELECT 1 FROM json_each(?) expected WHERE json_extract(expected.value,'$.id')=ref.id

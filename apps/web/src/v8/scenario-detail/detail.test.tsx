@@ -70,7 +70,7 @@ vi.mock('@/lib/api', async importOriginal => ({
       create: createScenario,
       get: getScenario,
       update: updateScenario,
-      confirmation: vi.fn(async () => ({ success: true, data: { contentRevision: 1, activeCount: 116, rowIdSum: 0, rowIdSquareSum: 0, referrers: [] } })),
+      confirmation: vi.fn(async () => ({ success: true, data: { contentRevision: 1, activeCount: 116, rowIdSum: 0, rowIdSquareSum: 0, totalCount: 116, totalRowIdSum: 0, totalRowIdSquareSum: 0, referrers: [] } })),
       simulate: vi.fn(async () => ({ success: true, data: { audience: { newStartPlanned: 116 }, steps: [] } })),
       runs: vi.fn(async () => ({
         success: true,

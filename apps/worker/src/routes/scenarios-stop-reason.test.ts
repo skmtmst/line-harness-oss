@@ -89,12 +89,56 @@ describe('シナリオを止める理由', () => {
     expect((await put({ isActive: false, expectedContentRevision: snap.contentRevision, expectedSubscriptions: { activeCount: snap.activeCount, rowIdSum: snap.rowIdSum, rowIdSquareSum: snap.rowIdSquareSum } })).status).toBe(409);
   });
 
+  test('受け取り中の購読も停止対象に含む', async () => {
+    sqlite.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f2','U2','acc-1'); INSERT INTO friend_scenarios(id,friend_id,scenario_id,current_step_order,status) VALUES('sending','f2','sc-1',0,'delivering');");
+    const snap = (await (await app().request('/api/scenarios/sc-1/confirmation?purpose=stop')).json() as { data: { contentRevision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number } }).data;
+    expect(snap).toMatchObject({activeCount:2,rowIdSum:3,rowIdSquareSum:5});
+    expect((await put({isActive:false,expectedContentRevision:snap.contentRevision,expectedSubscriptions:{activeCount:snap.activeCount,rowIdSum:snap.rowIdSum,rowIdSquareSum:snap.rowIdSquareSum}})).status).toBe(200);
+  });
+
+  test('削除の確認は停止中と完了済みの購読も含む', async () => {
+    sqlite.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f2','U2','acc-1'),('f3','U3','acc-1'); INSERT INTO friend_scenarios(id,friend_id,scenario_id,current_step_order,status) VALUES('paused','f2','sc-1',0,'paused'),('done','f3','sc-1',0,'completed');");
+    const data=(await (await app().request('/api/scenarios/sc-1/confirmation?purpose=delete')).json() as {data:{contentRevision:number;totalCount:number;totalRowIdSum:number;totalRowIdSquareSum:number;referrers:[]}}).data;
+    expect(data).toMatchObject({totalCount:3,totalRowIdSum:6,totalRowIdSquareSum:14});
+    sqlite.raw.prepare("DELETE FROM friend_scenarios WHERE id='done'").run();
+    const res=await app().request('/api/scenarios/sc-1',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedContentRevision:data.contentRevision,expectedSubscriptions:{activeCount:data.totalCount,rowIdSum:data.totalRowIdSum,rowIdSquareSum:data.totalRowIdSquareSum},expectedReferrers:data.referrers})});
+    expect(res.status).toBe(409);
+  });
+
+  test('削除確認後の配信完了だけでは削除を妨げない', async () => {
+    const data=(await (await app().request('/api/scenarios/sc-1/confirmation?purpose=delete')).json() as {data:{contentRevision:number;totalCount:number;totalRowIdSum:number;totalRowIdSquareSum:number;referrers:[]}}).data;
+    sqlite.raw.prepare("UPDATE friend_scenarios SET status='completed' WHERE id='sub-1'").run();
+    const res=await app().request('/api/scenarios/sc-1',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedContentRevision:data.contentRevision,expectedSubscriptions:{activeCount:data.totalCount,rowIdSum:data.totalRowIdSum,rowIdSquareSum:data.totalRowIdSquareSum},expectedReferrers:data.referrers})});
+    expect(res.status).toBe(200);
+  });
+
+  test.each(['stop','delete'] as const)('%s: 件数だけ・合計だけ・二乗だけが違えばそれぞれ409', async (kind) => {
+    const data=(await (await app().request(`/api/scenarios/sc-1/confirmation?purpose=${kind}`)).json() as {data:{contentRevision:number;activeCount:number;rowIdSum:number;rowIdSquareSum:number;totalCount:number;totalRowIdSum:number;totalRowIdSquareSum:number;referrers:[]}}).data;
+    const expected=kind==='stop' ? {activeCount:data.activeCount,rowIdSum:data.rowIdSum,rowIdSquareSum:data.rowIdSquareSum} : {activeCount:data.totalCount,rowIdSum:data.totalRowIdSum,rowIdSquareSum:data.totalRowIdSquareSum};
+    for (const field of ['activeCount','rowIdSum','rowIdSquareSum'] as const) {
+      const body={expectedContentRevision:data.contentRevision,expectedSubscriptions:{...expected,[field]:expected[field]+1},...(kind==='stop'?{isActive:false}:{expectedReferrers:data.referrers})};
+      const res=kind==='stop' ? await put(body) : await app().request('/api/scenarios/sc-1',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      expect(res.status,field).toBe(409);
+    }
+  });
+
+  test.each(['stop','delete'] as const)('%s: 1・4から2・3への入れ替えは二乗の違いで409', async (kind) => {
+    sqlite.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f2','U2','acc-1'),('f3','U3','acc-1'),('f4','U4','acc-1'); INSERT INTO friend_scenarios(rowid,id,friend_id,scenario_id,current_step_order,status) VALUES(2,'s2','f2','sc-2',0,'active'),(3,'s3','f3','sc-2',0,'active'),(4,'s4','f4','sc-1',0,'active');");
+    const data=(await (await app().request(`/api/scenarios/sc-1/confirmation?purpose=${kind}`)).json() as {data:{contentRevision:number;activeCount:number;rowIdSum:number;rowIdSquareSum:number;totalCount:number;totalRowIdSum:number;totalRowIdSquareSum:number;referrers:[]}}).data;
+    expect(data).toMatchObject({activeCount:2,rowIdSum:5,rowIdSquareSum:17,totalCount:2,totalRowIdSum:5,totalRowIdSquareSum:17});
+    sqlite.raw.exec("UPDATE friend_scenarios SET scenario_id='sc-2' WHERE rowid IN (1,4); UPDATE friend_scenarios SET scenario_id='sc-1' WHERE rowid IN (2,3);");
+    const expected=kind==='stop'?{activeCount:data.activeCount,rowIdSum:data.rowIdSum,rowIdSquareSum:data.rowIdSquareSum}:{activeCount:data.totalCount,rowIdSum:data.totalRowIdSum,rowIdSquareSum:data.totalRowIdSquareSum};
+    const body={expectedContentRevision:data.contentRevision,expectedSubscriptions:expected,...(kind==='stop'?{isActive:false}:{expectedReferrers:data.referrers})};
+    const res=kind==='stop'?await put(body):await app().request('/api/scenarios/sc-1',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    expect(res.status).toBe(409);
+  });
+
   test('5万購読の確認付き停止と削除は3秒以内', async () => {
     sqlite.raw.exec(`WITH RECURSIVE n(x) AS (VALUES(2) UNION ALL SELECT x+1 FROM n WHERE x<50000)
       INSERT INTO friends(id,line_user_id,line_account_id) SELECT 'f'||x,'U'||x,'acc-1' FROM n;
       WITH RECURSIVE n(x) AS (VALUES(2) UNION ALL SELECT x+1 FROM n WHERE x<50000)
       INSERT INTO friend_scenarios(rowid,id,friend_id,scenario_id,current_step_order,status) SELECT 20000000+x,'s'||x,'f'||x,'sc-1',0,'active' FROM n;`);
-    const get = async () => (await (await app().request('/api/scenarios/sc-1/confirmation?purpose=delete')).json() as { data: { contentRevision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number; referrers: [] } }).data;
+    const get = async () => (await (await app().request('/api/scenarios/sc-1/confirmation?purpose=delete')).json() as { data: { contentRevision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number; totalCount: number; totalRowIdSum: number; totalRowIdSquareSum: number; referrers: [] } }).data;
     const snapshot = await get();
     const rowIds = Array.from({ length: 49999 }, (_, i) => 20000002 + i);
     const rowIdSum = 1 + rowIds.reduce((sum, id) => sum + id, 0);
@@ -106,7 +150,7 @@ describe('シナリオを止める理由', () => {
     const stopMs = performance.now()-start;
     const after = await get();
     start = performance.now();
-    const result = await app().request('/api/scenarios/sc-1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedContentRevision: after.contentRevision, expectedSubscriptions: { activeCount: after.activeCount, rowIdSum: after.rowIdSum, rowIdSquareSum: after.rowIdSquareSum }, expectedReferrers: after.referrers }) });
+    const result = await app().request('/api/scenarios/sc-1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedContentRevision: after.contentRevision, expectedSubscriptions: { activeCount: after.totalCount, rowIdSum: after.totalRowIdSum, rowIdSquareSum: after.totalRowIdSquareSum }, expectedReferrers: after.referrers }) });
     const deleteMs = performance.now()-start;
     console.log(`50000 subscriptions: stop=${stopMs.toFixed(1)}ms delete=${deleteMs.toFixed(1)}ms`);
     expect(result.status).toBe(200);
@@ -143,22 +187,22 @@ describe('シナリオを止める理由', () => {
 
   test('シナリオ削除は購読の変更を409で拒み、一致と版なしは削除できる', async () => {
     const preview = await app().request('/api/scenarios/sc-1/confirmation');
-    const snapshot = (await preview.json() as { data: { contentRevision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number } }).data;
+    const snapshot = (await preview.json() as { data: { contentRevision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number; totalCount: number; totalRowIdSum: number; totalRowIdSquareSum: number } }).data;
     const remove = (body?: unknown) => app().request('/api/scenarios/sc-1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
-    await pauseFriendScenarioManual(sqlite.db, 'sub-1');
-    expect((await remove({ expectedContentRevision: snapshot.contentRevision, expectedSubscriptions: { activeCount: snapshot.activeCount, rowIdSum: snapshot.rowIdSum, rowIdSquareSum: snapshot.rowIdSquareSum }, expectedReferrers: [] })).status).toBe(409);
+    sqlite.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f2','U2','acc-1'); INSERT INTO friend_scenarios(id,friend_id,scenario_id,current_step_order,status) VALUES('paused','f2','sc-1',0,'paused');");
+    expect((await remove({ expectedContentRevision: snapshot.contentRevision, expectedSubscriptions: { activeCount: snapshot.totalCount, rowIdSum: snapshot.totalRowIdSum, rowIdSquareSum: snapshot.totalRowIdSquareSum }, expectedReferrers: [] })).status).toBe(409);
     expect(sqlite.raw.prepare('SELECT id FROM scenarios WHERE id=?').get('sc-1')).toBeTruthy();
     const now = (await (await app().request('/api/scenarios/sc-1/confirmation')).json() as { data: typeof snapshot }).data;
-    expect((await remove({ expectedContentRevision: now.contentRevision, expectedSubscriptions: { activeCount: now.activeCount, rowIdSum: now.rowIdSum, rowIdSquareSum: now.rowIdSquareSum }, expectedReferrers: [] })).status).toBe(200);
+    expect((await remove({ expectedContentRevision: now.contentRevision, expectedSubscriptions: { activeCount: now.totalCount, rowIdSum: now.totalRowIdSum, rowIdSquareSum: now.totalRowIdSquareSum }, expectedReferrers: [] })).status).toBe(200);
     expect(sqlite.raw.prepare('SELECT id FROM scenarios WHERE id=?').get('sc-1')).toBeUndefined();
     sqlite.raw.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES('sc-legacy','旧','manual','acc-1')").run();
     expect((await app().request('/api/scenarios/sc-legacy', { method: 'DELETE' })).status).toBe(200);
   });
 
   test('削除対象への移動元が増えたら削除も参照解除もしない', async () => {
-    const snapshot = (await (await app().request('/api/scenarios/sc-1/confirmation')).json() as { data: { contentRevision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number; referrers: Array<{ id: string; revision: number }> } }).data;
+    const snapshot = (await (await app().request('/api/scenarios/sc-1/confirmation')).json() as { data: { contentRevision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number; totalCount: number; totalRowIdSum: number; totalRowIdSquareSum: number; referrers: Array<{ id: string; revision: number }> } }).data;
     sqlite.raw.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id,on_complete_mode,on_complete_scenario_id) VALUES('ref','移動元','manual','acc-1','move','sc-1')").run();
-    const response = await app().request('/api/scenarios/sc-1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedContentRevision: snapshot.contentRevision, expectedSubscriptions: { activeCount: snapshot.activeCount, rowIdSum: snapshot.rowIdSum, rowIdSquareSum: snapshot.rowIdSquareSum }, expectedReferrers: snapshot.referrers }) });
+    const response = await app().request('/api/scenarios/sc-1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedContentRevision: snapshot.contentRevision, expectedSubscriptions: { activeCount: snapshot.totalCount, rowIdSum: snapshot.totalRowIdSum, rowIdSquareSum: snapshot.totalRowIdSquareSum }, expectedReferrers: snapshot.referrers }) });
     expect(response.status).toBe(409);
     expect(sqlite.raw.prepare("SELECT on_complete_scenario_id FROM scenarios WHERE id='ref'").get()).toEqual({ on_complete_scenario_id: 'sc-1' });
   });

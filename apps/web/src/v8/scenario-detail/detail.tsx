@@ -217,7 +217,7 @@ export default function ScenarioDetailV8({
     try {
       const result = await api.scenarios.confirmation(id, kind)
       if (confirmationGeneration.current.scope !== scope || confirmationGeneration.current.serial !== serial) return
-      if (!result.success || result.data.contentRevision !== scenario.contentRevision || !Number.isSafeInteger(result.data.activeCount) || result.data.activeCount < 0 || !Number.isSafeInteger(result.data.rowIdSum) || result.data.rowIdSum < 0 || !Number.isSafeInteger(result.data.rowIdSquareSum) || result.data.rowIdSquareSum < 0 || !Array.isArray(result.data.referrers)) { setError('シナリオが変わったか確認できません。画面を読み直してください。'); return }
+      if (!result.success || result.data.contentRevision !== scenario.contentRevision || !Number.isSafeInteger(result.data.activeCount) || result.data.activeCount < 0 || !Number.isSafeInteger(result.data.rowIdSum) || result.data.rowIdSum < 0 || !Number.isSafeInteger(result.data.rowIdSquareSum) || result.data.rowIdSquareSum < 0 || !Number.isSafeInteger(result.data.totalCount) || result.data.totalCount < 0 || !Number.isSafeInteger(result.data.totalRowIdSum) || result.data.totalRowIdSum < 0 || !Number.isSafeInteger(result.data.totalRowIdSquareSum) || result.data.totalRowIdSquareSum < 0 || !Array.isArray(result.data.referrers)) { setError('シナリオが変わったか確認できません。画面を読み直してください。'); return }
       const value = { scope, serial, value: result.data }
       if (kind === 'stop') { setStopConfirmation(value); setStopOpen(true) }
       else { setDeleteConfirmation(value); setDeleteScenarioOpen(true) }
