@@ -1,7 +1,7 @@
 'use client'
 
 import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select'
-import MessageComposer from '@/components/shared/message-composer'
+import MessageComposer, { COMPOSER_TYPES } from '@/components/shared/message-composer'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { type BroadcastBubble,type BroadcastMessageAsset } from '@/lib/api'
 import { type TargetMode } from '@/lib/broadcast-audience'
@@ -39,10 +39,11 @@ type BroadcastMessageStepContext = {
 
 export function BroadcastMessageStep({ ab, assets, bubbles, composerBusy, fields, moveBubble, selectedAccountId, selectedAccountIdRef, setBubbles, setComposerBusy, setComposerTemplateIndex, setComposerTemplateKind, setInlineComposer, setShowTemplatePicker, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, setTemplateSaveName, targetMode, title, updateBubble }: BroadcastMessageStepContext) {
   return (<section id="broadcast-step-message" className={ styles.section}>
-          {targetMode !== 'all' ? <BroadcastAbTabs ab={ab} aBubbles={bubbles} canEdit /> : null}
+          {targetMode !== 'all' || ab.hasB ? <BroadcastAbTabs ab={ab} aBubbles={bubbles} canEdit /> : null}
           {ab.tab === 'B' && ab.b ? (
             <MessageComposer bubbles={ab.b} accountId={selectedAccountId} busy={composerBusy}
-              unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
+              unavailable={Object.fromEntries(COMPOSER_TYPES.filter(([type]) => type !== 'text').map(([type]) => [type, 'B案は今は文字だけ送れます']))}
+              templateDisabledReason="B案は今は文字だけ送れます"
               onChange={(index, bubble) => ab.setB((items) => (items ?? []).map((item, i) => (i === index ? bubble : item)))}
               onMove={(index, direction) => ab.setB((items) => { const next = [...(items ?? [])]; const to = index + direction; if (to < 0 || to >= next.length) return next; [next[index], next[to]] = [next[to], next[index]]; return next })}
               onDelete={(index) => ab.setB((items) => (items ?? []).filter((_, i) => i !== index))}

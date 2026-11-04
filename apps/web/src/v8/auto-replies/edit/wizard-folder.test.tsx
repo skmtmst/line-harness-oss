@@ -9,6 +9,7 @@ import { WizardBasicStep } from './wizard-basic-step'
 import { EMPTY_FORM } from './wizard-model'
 
 const network = vi.hoisted(() => ({ create: vi.fn() }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, folders: { ...actual.api.folders, create: network.create } } }

@@ -72,6 +72,16 @@ afterEach(() => {
 })
 
 describe('質問を作る：保存で欄に知らせる', () => {
+  it('質問と作りかけのフォルダの両方を残して離脱前に確認する', async () => {
+    await act(async () => { fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '質問の名前' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ', exact: true })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' })) })
+    await act(async () => { fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '編集中' } }); fireEvent.pointerDown(document.body) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true })) })
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('作りかけのフォルダ')
+    expect(navigationPush).not.toHaveBeenCalled()
+  })
+
   it('統括では追加処理→返信の既存の順番と、店専用の動きを出さない形を保つ', async () => {
     await act(async () => { root.render(<QuestionNewV8 host={{ description: '配った先で使います', folders: [], folder: '', onFolderChange: vi.fn(), busy: false, onSave: vi.fn(), onCancel: vi.fn() }} />) })
     const extra = screen.getAllByRole('button', { name: '押されたときにあわせて行うことを足す' })[0]

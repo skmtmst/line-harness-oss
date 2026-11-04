@@ -32,9 +32,10 @@ export const broadcastsMethods = {
       { method: 'PUT', body: JSON.stringify(data) },
     ),
     /** 予約中の配信だけを、内容を残した下書きへ安全に戻す。 */
-    cancelReservation: (id: string) =>
+    cancelReservation: (id: string, expectedVersion?: number) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/cancel`, {
         method: 'POST',
+        ...(expectedVersion === undefined ? {} : { body: JSON.stringify({ expectedVersion }) }),
       }),
     list: (params?: {
       accountId?: string

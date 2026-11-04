@@ -1,6 +1,7 @@
 'use client'
 import type { BroadcastSendMode } from './broadcast-schedule'
 import { SEND_TIME_MISSING_MESSAGE } from './broadcast-step-gate'
+import { broadcastAbSendProblem } from './broadcast-ab-send-guard'
 
 import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
@@ -43,6 +44,8 @@ type SaveBroadcastContext = {
 
 export async function saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, deliveryLimited, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, sendProblem, setConfirmOpen, setError, setSaving, submittingRef, validate }: SaveBroadcastContext) {
     if (saving || submittingRef.current) return
+    const abProblem = broadcastAbSendProblem(ab.enabled, audienceCount)
+    if (abProblem) { setError(abProblem); return }
     const scheduleProblem = sendProblem?.()
     if (scheduleProblem) { rejectValidation(scheduleProblem); return }
     if (sendMode === 'unselected' || sendMode === 'optimal') { rejectValidation(SEND_TIME_MISSING_MESSAGE); return }

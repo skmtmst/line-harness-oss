@@ -3,7 +3,7 @@
 import TextLink from '@/components/shared/text-link'
 import { BroadcastAbResult, abStatusDefinition, useAbResult } from '@/v8/broadcast-ab/public/result/index'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useRef, useState, type ReactNode, type RefObject } from 'react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -25,6 +25,7 @@ import {
 import { notifyToast } from '@/components/shared/toast'
 import {
   api,
+  ApiError,
   type ApiBroadcast,
   type BroadcastApprovalCandidate,
   type BroadcastApprovalState,
@@ -52,6 +53,7 @@ import {
   CREATION_STEPS,
   chaseHref,
   displayStatusOf,
+  cancelConflictMessage,
   formatBroadcastDateTime,
   formatMonthDay,
   formatShortDateTime,
@@ -189,6 +191,10 @@ export default function BroadcastDetail({
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [cancelVersion, setCancelVersion] = useState<number | null>(null)
+  const [cancelConflict, setCancelConflict] = useState(false)
+  const cancelTicket = useRef<symbol | null>(null)
+  const renderedCancelTicket = cancelTicket.current
   const [testing, setTesting] = useState(false)
 
   const collision = useSaveConflict<ApiBroadcast>({
@@ -236,16 +242,22 @@ export default function BroadcastDetail({
 
   /* 予約の取り消し。中身は下書きとして残る（予約したあとの画面と同じ決まり）。 */
   const cancelReservation = async () => {
-    if (cancelling) return
+    if (cancelling || cancelConflict || cancelVersion === null) return
     setCancelling(true)
     setCancelError('')
     try {
-      const res = await api.broadcasts.cancelReservation(broadcast.id)
+      const res = await api.broadcasts.cancelReservation(broadcast.id, cancelVersion)
+      if (renderedCancelTicket !== cancelTicket.current || cancelGeneration !== broadcastScope.current.generation) return
       if (!res.success) throw new Error(res.error)
+      cancelTicket.current = null
       setCancelOpen(false)
       onReload()
-    } catch {
-      setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
+    } catch (cause) {
+      if (renderedCancelTicket !== cancelTicket.current || cancelGeneration !== broadcastScope.current.generation) return
+      if (isSaveConflict(cause)) {
+        setCancelConflict(true)
+        setCancelError(cancelConflictMessage(cause instanceof ApiError ? cause.data : undefined))
+      } else setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
     } finally {
       setCancelling(false)
     }
@@ -265,7 +277,7 @@ export default function BroadcastDetail({
     menuItems.push({
       id: 'cancel-reservation',
       label: '予約を取り消す',
-      onSelect: () => { setCancelError(''); setCancelGeneration(broadcastScope.current.generation); setCancelOpen(true) },
+      onSelect: () => { setCancelError(broadcast.version == null ? '予約の版を確認できません。読み直してから、もう一度選んでください' : ''); setCancelConflict(broadcast.version == null); cancelTicket.current = Symbol(); setCancelVersion(broadcast.version ?? null); setCancelGeneration(broadcastScope.current.generation); setCancelOpen(true) },
     })
   }
   menuItems.push({
@@ -430,8 +442,10 @@ export default function BroadcastDetail({
           : '予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。'}
         busy={cancelling}
         error={cancelError}
-        onConfirm={() => { if (cancelGeneration === broadcastScope.current.generation && canEdit) void cancelReservation() }}
-        onClose={() => { if (!cancelling) setCancelOpen(false) }}
+        reviewRequired={cancelConflict}
+        onReload={() => { cancelTicket.current = null; setCancelOpen(false); setCancelConflict(false); onReload() }}
+        onConfirm={() => { if (renderedCancelTicket && renderedCancelTicket === cancelTicket.current && cancelGeneration === broadcastScope.current.generation && canEdit) void cancelReservation() }}
+        onClose={() => { if (!cancelling) { cancelTicket.current = null; setCancelOpen(false); if (cancelConflict) { setCancelConflict(false); onReload() } } }}
       />
     </PageFrame>
   )
@@ -449,6 +463,8 @@ export function CancelReservationDialog({
   description,
   busy,
   error,
+  reviewRequired = false,
+  onReload,
   onConfirm,
   onClose,
 }: {
@@ -459,6 +475,8 @@ export function CancelReservationDialog({
   description: string
   busy: boolean
   error: string
+  reviewRequired?: boolean
+  onReload?: () => void
   onConfirm: () => void
   onClose: () => void
 }) {
@@ -476,24 +494,29 @@ export function CancelReservationDialog({
       designWidth={480}
       designHeaderPadding="24px 24px 0"
       busy={busy}
-      error={error || undefined}
+      error={reviewRequired && onReload ? undefined : error || undefined}
       onCancel={onClose}
       footer={
         <DialogActions>
-          <Button type="button" variant="danger" onClick={() => { if (!target.current.invalid && target.current.key === key) onConfirm() }} disabled={busy} busy={busy} busyLabel="取り消しています…">
-            予約を取り消す
-          </Button>
-          <Button type="button" className={styles.cancelKeep} onClick={onClose} disabled={busy}>
-            やめる
-          </Button>
-          <Button type="button" variant="primary" onClick={onClose} disabled={busy}>
-            <ArrowLeft aria-hidden="true" />
-            予約のまま残す
-          </Button>
+          {reviewRequired && onReload ? <>
+            <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
+          </> : <>
+            <Button type="button" variant="danger" onClick={() => { if (!reviewRequired && !target.current.invalid && target.current.key === key) onConfirm() }} disabled={busy || reviewRequired} busy={busy} busyLabel="取り消しています…">
+              予約を取り消す
+            </Button>
+            <Button type="button" className={styles.cancelKeep} onClick={onClose} disabled={busy}>
+              やめる
+            </Button>
+            <Button type="button" variant="primary" onClick={onClose} disabled={busy}>
+              <ArrowLeft aria-hidden="true" />
+              予約のまま残す
+            </Button>
+          </>}
         </DialogActions>
       }
     >
       <OperationTargetSummary accounts={accounts} />
+      {reviewRequired && onReload ? <SaveConflictBand title={error || '予約が変更されました'} description="最新の状態を確認してから、もう一度選んでください。" reloadVariant="primary" onReload={onReload} /> : null}
     </Dialog>
   )
 }

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { api, type AdPlatform } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -8,6 +8,9 @@ import { Field } from '@/components/shared/form-controls'
 import { focusField } from './focus-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 
 type ConfigField = {key: string; label: string; secret?: boolean}
 export const AD_CONNECTION_FIELDS: Record<string, ConfigField[]> = {
@@ -20,6 +23,9 @@ export default function AdConnectionDialog({provider,platform,accountId,onClose,
   const saveErrors = useSaveFormErrors()
  const [values,setValues]=useState<Record<string,string>>(()=>Object.fromEntries(AD_CONNECTION_FIELDS[provider.key].map(f=>[f.key,f.secret?'':String(platform?.config[f.key]??'')]))), [busy,setBusy]=useState(false),[error,setError]=useState('')
  const persisted=useRef(platform)
+ const baseline=useRef(values)
+ const depth=useContext(OverlayDepthContext)
+ const guard=useUnsavedGuard({dirty:busy||Object.keys(values).some(key=>values[key]!==baseline.current[key]),busy,onDiscard:onClose})
  const [fieldErrors,setFieldErrors]=useState<Record<string,string>>({})
  const current=useRef(true)
  // 付くたびに true へ戻す（開発時の StrictMode の付ける→外す→付けるで false が残らないように）。
@@ -38,10 +44,12 @@ export default function AdConnectionDialog({provider,platform,accountId,onClose,
    const saved=existing ? await api.adPlatforms.update(existing.id,{config,isActive:false}) : await api.adPlatforms.create({name:provider.key,displayName:provider.label,lineAccountId:accountId,config})
    if(!saved.success)throw new Error('save')
    persisted.current=saved.data
+   baseline.current={...values}
    const result=await api.adPlatforms.connect(saved.data.id)
    if(!current.current)return
    if(!result.success){setError('接続を確認できませんでした。入力した項目と広告側の権限を確認してください');return}
    await onSaved()
+   guard.disarm()
    onClose()
   } catch (saveFailure) {
     const fieldFailure = saveErrors.capture(saveFailure);
@@ -52,5 +60,5 @@ if(current.current){ if (!fieldFailure)setError('接続できませんでした�
   <p className="mb-4 text-sm">広告側の費用を読み取って接続を確認します。鍵の値は再表示しません。</p>
   <div className="space-y-3">{AD_CONNECTION_FIELDS[provider.key].map(field=><Field key={field.key} label={field.label} htmlFor={`ad-connect-${field.key}`} error={fieldErrors[field.key]}><SaveErrorField names={["values"]}><TextField aria-label={field.label} type={field.secret?'password':'text'} value={values[field.key]??''} autoComplete={field.secret?'new-password':undefined} placeholder={field.secret&&platform?.secretKeys?.includes(field.key)?'保存済み（空欄なら保持）':''} onChange={e=>{setValues(v=>({...v,[field.key]:e.target.value}));setFieldErrors(v=>({...v,[field.key]:''}))}}/></SaveErrorField></Field>)}</div>
   {error&&<Notice tone="danger" className="mt-3" >{error}</Notice>}
- </Dialog></SaveErrorScope>
+ </Dialog><OverlayDepthContext.Provider value={depth+2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave}/></OverlayDepthContext.Provider></SaveErrorScope>
 }

@@ -39,7 +39,7 @@ vi.mock('./confirm-dialog', async original => {
 
 const folders: Folder[] = ['a', 'b'].map((id, index) => ({
   id, kind: 'scenario', name: `フォルダ${id}`, parentId: null, color: null,
-  displayOrder: index, createdAt: '', updatedAt: '', itemCount: 2,
+  displayOrder: index, createdAt: '', updatedAt: '', itemCount: 2, accountId: 'account-a',
 }))
 const reason = '閲覧のみのため、フォルダは変えられません。'
 const onChanged = vi.fn(), onDeleted = vi.fn(), onSelect = vi.fn()
@@ -55,10 +55,11 @@ function Panel({ canWriteNow, enabled = true, accountId = 'account-a', kind = 's
     activeId="all" onSelect={onSelect} allCount={4} itemLabel="シナリオ" controlRef={control} /><LayoutProbe /></>
 }
 function Rows({ canWriteNow, enabled = true, accountId = 'account-a', kind = 'scenario', lockedReason }: Permission) {
-  const actions = useFolderRowActions({ kind, folders, accountId, enabled, canWriteNow,
+  const scopedFolders = folders.map(folder => ({ ...folder, accountId }))
+  const actions = useFolderRowActions({ kind, folders: scopedFolders, accountId, enabled, canWriteNow,
     lockedReason, itemLabel: 'シナリオ', onChanged, onDeleted })
-  captures.row = actions.rowActions(folders[0], 0)
-  return <><FolderPanel rows={folders.map((folder, index) => ({ ...actions.rowActions(folder, index),
+  captures.row = actions.rowActions(scopedFolders[0], 0)
+  return <><FolderPanel rows={scopedFolders.map((folder, index) => ({ ...actions.rowActions(folder, index),
     id: folder.id, label: folder.name, kind: 'folder' as const }))} activeId="all" onSelect={onSelect} />{actions.dialogs}<LayoutProbe /></>
 }
 function ReadPanel() {
@@ -192,6 +193,36 @@ it.each(['add', 'edit'] as const)('保持した%sの保存確認は最新のcall
   expect(held()).toBe(false)
   rerender(<Panel canWriteNow={() => true} />)
   expect(held()).toBe(true)
+})
+
+it.each(['auto_reply', 'common_action', 'mileage_reward'])('%sの追加・編集は未保存の入力を確認してから閉じる', async kind => {
+  render(<Panel kind={kind} canWriteNow={() => true} />)
+  for (const mode of ['add', 'edit'] as const) {
+    await act(async () => mode === 'add' ? control.current!.startAdd() : control.current!.startEdit(folders[0]))
+    const input = screen.getByRole('textbox', { name: 'フォルダ名' }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: '編集中の名前' } })
+    await click(screen.getByRole('button', { name: 'キャンセル' }))
+    expect(screen.getByRole('dialog', { name: '入力を破棄しますか？' })).toBeTruthy()
+    await click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect(input.value).toBe('編集中の名前')
+    await click(screen.getByRole('button', { name: 'キャンセル' }))
+    await click(screen.getByRole('button', { name: '破棄する' }))
+    expect(screen.queryByRole('textbox', { name: 'フォルダ名' })).toBeNull()
+  }
+  expect(api.folders.create).not.toHaveBeenCalled()
+  expect(api.folders.update).not.toHaveBeenCalled()
+})
+
+it.each(['auto_reply', 'common_action', 'mileage_reward'])('%sの行メニューからの編集も未保存の入力を守る', async kind => {
+  render(<Rows kind={kind} canWriteNow={() => true} />)
+  await menu('名前を変える')
+  const input = screen.getByRole('textbox', { name: 'フォルダ名' }) as HTMLInputElement
+  fireEvent.change(input, { target: { value: '変更した名前' } })
+  await click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(screen.getByRole('dialog', { name: '入力を破棄しますか？' })).toBeTruthy()
+  await click(screen.getByRole('button', { name: '編集を続ける' }))
+  expect(input.value).toBe('変更した名前')
+  expect(api.folders.update).not.toHaveBeenCalled()
 })
 
 it('権限復帰だけでは書かず、明示的な再確認で削除は1回', async () => {

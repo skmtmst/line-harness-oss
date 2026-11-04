@@ -14,7 +14,9 @@ vi.hoisted(() => {
 const fetchApi = vi.hoisted(() => vi.fn())
 const routerPush = vi.hoisted(() => vi.fn())
 const remindersDelete = vi.hoisted(() => vi.fn())
-const account = vi.hoisted(() => ({ id: 'account-a' }))
+const account = vi.hoisted(() => ({ id: 'account-a', rowAccountId: 'account-a' as string | null }))
+
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
 
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '別店舗' }] }) }))
 
@@ -65,6 +67,7 @@ let root: Root
 
 beforeEach(() => {
   account.id = 'account-a'
+  account.rowAccountId = 'account-a'
   routerPush.mockClear()
   remindersDelete.mockResolvedValue({ success: true, data: null })
   fetchApi.mockImplementation(async (url: string) => {
@@ -75,7 +78,7 @@ beforeEach(() => {
       success: true,
       data: {
         items: [{
-          id: 'r-1', name: '予約前のお知らせ', description: null, isActive: true, folderId: null,
+          id: 'r-1', name: '予約前のお知らせ', lineAccountId: account.rowAccountId, description: null, isActive: true, folderId: null,
           lifecycleStatus: 'published', stepCount: 1, displayOrder: 0,
           plannedDeliveries: null, lastSentAt: null,
           createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
@@ -154,6 +157,24 @@ describe('リマインダ一覧の行操作', () => {
     expect(document.body.textContent).toContain('本店')
     expect(document.body.textContent).not.toContain('別店舗')
     expect(document.querySelector('[data-design-node="VsSyu"]')?.textContent).toContain('環境')
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['account-b', '別店舗', '本店'],
+    [null, '不明', '本店'],
+  ])('対象が%sのとき、選択中のアカウントで補わない', async (rowAccountId, expected, excluded) => {
+    account.rowAccountId = rowAccountId
+    await act(async () => { root.render(<RemindersPage />) })
+    await flush()
+    const more = host.querySelector('button[aria-label="リマインダ「予約前のお知らせ」の操作"]') as HTMLButtonElement
+    act(() => { more.click() })
+    const item = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent === '削除する') as HTMLButtonElement
+    await act(async () => { item.click() })
+    await flush()
+    const dialog = document.querySelector('[data-design-node="VsSyu"]')!
+    expect(dialog.textContent).toContain(expected)
+    expect(dialog.textContent).not.toContain(excluded)
     expect(routerPush).not.toHaveBeenCalled()
   })
 

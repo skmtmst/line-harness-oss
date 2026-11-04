@@ -41,6 +41,8 @@ export type TargetMissingProps = {
   kind: TargetMissingKind
   /** 「何が」＋「どうなっているか」の1文。 */
   title: string
+  /** 画面全体の入口で使う場合はページ見出しにする。 */
+  pageHeading?: boolean
   /** 1〜2文。次にすることを書く。 */
   description: string
   /** 戻り先の一覧（`unspecified`・`not-found`）。今のリンク先を使う。 */
@@ -71,6 +73,7 @@ export default function TargetMissing({
   kind,
   permissionScope = 'store',
   title,
+  pageHeading = false,
   description,
   backHref,
   backLabel,
@@ -126,7 +129,7 @@ export default function TargetMissing({
       <div className={styles.mark}>
         <Icon aria-hidden="true" size={20} />
       </div>
-      <p className={styles.title}>{shownTitle}</p>
+      {pageHeading ? <h1 className={styles.title}>{shownTitle}</h1> : <p className={styles.title}>{shownTitle}</p>}
       <p className={styles.description}>
         {failure && !failure.retryable ? failure.description : kind === 'error' ? <LoadFailureContact description={description} /> : description}
         {accountLine ? <span> {accountLine}</span> : null}

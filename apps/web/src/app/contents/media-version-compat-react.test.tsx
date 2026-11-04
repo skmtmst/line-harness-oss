@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import type { MediaItem } from '@line-crm/shared'
 import type { MediaVersionBlocker } from '@/lib/api'
 
@@ -12,6 +13,7 @@ const fixture = vi.hoisted(() => ({
   createdVersions: [] as Array<Record<string, unknown>>,
   usageCount: 0,
   openedReplacement: [] as string[],
+  versionMessages: [] as string[],
 }))
 
 class ApiError extends Error {
@@ -125,7 +127,7 @@ async function renderDialog() {
         canManage
         onClose={() => undefined}
         onOpenReplacement={(item) => { fixture.openedReplacement.push(item.id) }}
-        onVersionCreated={() => undefined}
+        onVersionCreated={(message) => { fixture.versionMessages.push(message) }}
       />,
     )
     await settle()
@@ -166,6 +168,7 @@ beforeEach(() => {
   fixture.canReplace = false
   fixture.usageCount = 0
   fixture.openedReplacement.length = 0
+  fixture.versionMessages.length = 0
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -266,4 +269,26 @@ describe('メディア版追加の内容互換性（N-199）', () => {
       changeReason: '秋の写真へ更新',
     })])
   })
+})
+
+it('版を追加した後、期限と同意の未保存入力を残して編集を続けられる', async () => {
+  fixture.previewBlockers = []
+  fixture.canReplace = true
+  await renderDialog()
+  await clickButton('記録する')
+  const consent = portal().querySelector<HTMLInputElement>('input[id$="-consent"]')!
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(consent, '同意を確認'); consent.dispatchEvent(new Event('input', { bubbles: true })); await settle() })
+  await pickFile()
+  await clickButton('差し替え内容を確認')
+  const reason = document.querySelector<HTMLInputElement>('input[id$="-reason"]')!
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(reason, '写真を更新'); reason.dispatchEvent(new Event('input', { bubbles: true })); await settle() })
+  await clickButton('新しい版を追加する')
+  expect(fixture.createdVersions).toHaveLength(1)
+  expect(fixture.versionMessages).toHaveLength(0)
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  const keep = [...document.querySelectorAll('button')].find(button => button.textContent === '編集を続ける')!
+  await act(async () => { keep.click(); await settle() })
+  expect(consent.value).toBe('同意を確認')
+  expect(document.body.textContent).toContain('第2版を追加しました')
+  expect(fixture.versionMessages).toHaveLength(0)
 })

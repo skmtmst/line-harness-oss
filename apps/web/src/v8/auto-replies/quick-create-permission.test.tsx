@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { DELIVERY_FEATURE_POLICIES, deliveryPermissionKey } from '@line-crm/shared'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
@@ -45,6 +45,13 @@ beforeEach(() => {
   net.me.mockReset().mockImplementation(() => new Promise(() => {}))
 })
 afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot(); delete document.documentElement.dataset.theme })
+
+it('自動応答を有効にする窓に対象アカウントと環境を示す', () => {
+  render(<QuickCreate accountId="account-a" {...callbacks} />)
+  const dialog = screen.getByRole('dialog', { name: '言葉に自動で返す' })
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+})
 
 it.each(['unknown', 'viewer', 'readOnly', 'view_only', 'staff-no-key', 'read-proxy'])('%sへ変わると欄・札の×・作成入口を止め、復帰後だけ保存できる', async kind => {
   render(<QuickCreate accountId="account-a" {...callbacks} />); fill()

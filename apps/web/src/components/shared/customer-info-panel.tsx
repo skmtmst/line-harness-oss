@@ -16,6 +16,8 @@ import AllergyField from './allergy-field'
 import { TextField } from './text-field'
 import { api } from '@/lib/api'
 import { notifyToast } from './toast'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 export type CustomerInfoSection = { key: string; label: string; action?: ReactNode; content: ReactNode }
 /** スクロールの送り幅を左右に等しく確保する顧客欄の置き場。 */
@@ -49,10 +51,18 @@ export default function CustomerInfoPanel({
   const [order, setOrder] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
   const [editing, setEditing] = useState(false)
+  const basicSectionRef = useRef<HTMLElement>(null)
+  const editButtonRef = useRef<HTMLButtonElement>(null)
+  const restoreEditFocus = useRef(false)
+  const editBaseline = useRef<Record<string, string>>({})
+  useEffect(() => { if (!editing && restoreEditFocus.current) { restoreEditFocus.current = false; editButtonRef.current?.focus() } }, [editing])
+  useEffect(() => { if (editing) basicSectionRef.current?.querySelector<HTMLInputElement>('input:not([disabled]):not([readonly])')?.focus() }, [editing])
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saved, setSaved] = useState<Record<string, string>>({})
+  const guard = useUnsavedGuard({ dirty: editing && Object.keys(draft).some(key => draft[key] !== editBaseline.current[key]), busy: saving })
+  const closeEdit = () => { restoreEditFocus.current = true; setEditing(false); setSaveError('') }
   const generation = useRef(0)
   useEffect(() => { generation.current++; return () => { generation.current++ } }, [friendId, canEdit])
   // 既存受信箱の設定を引き継ぎ、概要と同じ好みを使う。顧客の値は保存しない。
@@ -86,10 +96,17 @@ export default function CustomerInfoPanel({
       <span className={styles.profileName} title={profile.name ?? '名前なし'}>{profile.name ?? '名前なし'}</span>
       <span className={styles.profileDate} title={profile.addedAt}>{profile.addedAt.replace(/(\d+)年(\d+)月(\d+)日に友だち追加/, '$1/$2/$3 追加')}</span>
     </div> : null}
-    {!hidden.includes('names') ? <section className={styles.section} aria-label="基本">
+    {!hidden.includes('names') ? <section ref={basicSectionRef} className={styles.section} aria-label="基本" onKeyDown={event => {
+      if (event.key !== 'Escape' || !editing || saving || event.defaultPrevented || !event.currentTarget.contains(event.target as Node) || (event.target as HTMLElement).closest('[aria-expanded="true"]')) return
+      const innerDialog = (event.target as HTMLElement).closest('[role="dialog"], [role="alertdialog"]')
+      if (innerDialog && event.currentTarget.contains(innerDialog)) return
+      event.preventDefault()
+      event.stopPropagation()
+      guard.guarded(closeEdit)
+    }}>
       <div className={styles.head}>
         <h3>基本</h3>
-        {canEdit && state === 'ready' && !editing ? <Button variant="text" size="inline" actionWording={actionWording} onClick={() => { setDraft(Object.fromEntries(shownFields.map(field => [field.id, field.value ?? '']))); setSaveError(''); setEditing(true) }}>編集</Button> : null}
+        {canEdit && state === 'ready' && !editing ? <Button ref={editButtonRef} variant="text" size="inline" actionWording={actionWording} onClick={() => { const values = Object.fromEntries(shownFields.map(field => [field.id, field.value ?? ''])); editBaseline.current = values; setDraft(values); setSaveError(''); setEditing(true) }}>編集</Button> : null}
       </div>
       {state === 'loading' ? <p className={styles.note}>情報欄を読み込んでいます…</p>
         : state === 'error' ? <p className={styles.note} role="alert">情報欄を読み込めませんでした <Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>
@@ -110,7 +127,7 @@ export default function CustomerInfoPanel({
             </div>
           })}
         </dl>}
-      {editing ? <><div className={styles.editActions}><Button disabled={saving} onClick={() => setEditing(false)}>キャンセル</Button><Button variant="primary" busy={saving} onClick={async () => {
+      {editing ? <><div className={styles.editActions}><Button disabled={saving} onClick={() => guard.guarded(closeEdit)}>キャンセル</Button><Button variant="primary" busy={saving} onClick={async () => {
         if (!canEdit || saving) return
         const started = generation.current
         setSaving(true); setSaveError('');
@@ -137,6 +154,7 @@ export default function CustomerInfoPanel({
       {more}
     </div> : null}
     {canEdit ? <Button variant="text" onClick={() => setSettings(true)}><Settings2 aria-hidden="true" />表示項目を編集</Button> : null}
+    <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="基本情報の変更" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     {settings && canEdit ? <DisplayItemsDialog title="表示項目" items={[
       ...choices.map(choice => ({...choice, group:'顧客情報の段'})),
       ...fixedSpecs.map(spec => ({key:`fixed:${spec.key}`,label:spec.label,group:'基本'})),

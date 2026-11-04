@@ -16,6 +16,8 @@ export type ReminderTriggerType = "manual" | "booking" | "event" | "friend_field
 export interface Reminder {
   followupManagement?:RestaurantFollowupManagement;
   id: string;
+  /** 所属先を取得できない古い応答や未所属では null または省略。 */
+  lineAccountId?: string | null;
   name: string;
   description: string | null;
   isActive: boolean;
