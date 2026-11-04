@@ -226,7 +226,7 @@ export async function publishScenarioVersion(
           now,
         ),
         db.prepare(
-          `UPDATE scenarios SET current_published_version_id = ?, updated_at = ?
+          `UPDATE scenarios SET current_published_version_id = ?, content_revision = content_revision + 1, updated_at = ?
             WHERE id = ?`,
         ).bind(id, now, scenarioId),
         db.prepare(

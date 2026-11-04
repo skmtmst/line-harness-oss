@@ -316,7 +316,7 @@ export const post__api_scenarios_id_steps_reorder_3 = async (c: Context<Env, "/a
         )
         .bind(newOrder, scenarioId, -1000 - i),
     );
-    await c.env.DB.batch([...phase1, ...phase2, ...phase3a, ...phase3b]);
+    await c.env.DB.batch([...phase1, ...phase2, ...phase3a, ...phase3b, c.env.DB.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = ?').bind(scenarioId)]);
 
     return c.json({ success: true });
   } catch (err) {

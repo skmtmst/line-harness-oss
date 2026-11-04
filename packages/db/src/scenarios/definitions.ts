@@ -15,7 +15,7 @@ export async function reorderScenarios(db: D1Database, ids: string[]): Promise<v
   if (ids.length === 0) return;
   await db.batch(
     ids.map((id, i) =>
-      db.prepare(`UPDATE scenarios SET display_order = ? WHERE id = ?`).bind(i, id),
+      db.prepare(`UPDATE scenarios SET display_order = ?, content_revision = content_revision + 1 WHERE id = ?`).bind(i, id),
     ),
   );
 }
@@ -163,7 +163,7 @@ export async function updateScenario(
       .first<Scenario>();
   }
 
-  fields.push('updated_at = ?');
+  fields.push('content_revision = content_revision + 1', 'updated_at = ?');
   values.push(now);
   values.push(id);
 
@@ -197,7 +197,7 @@ export async function updateScenario(
  *   mode='pause'（何もしない）へ戻し、整合した設定にする。削除の確認窓で
  *   参照元の名前を見せてから消す（窓側の役目）。
  */
-export async function deleteScenario(db: D1Database, id: string): Promise<void> {
+export async function deleteScenario(db: D1Database, id: string, expected?: { revision: number; activeCount: number; accountIds: string[]; canSeeUnassigned: boolean }): Promise<void> {
   const dependent = await db.prepare(
     `SELECT id FROM affiliate_offers WHERE scenario_id = ? LIMIT 1`,
   ).bind(id).first<{ id: string }>();
@@ -214,7 +214,16 @@ export async function deleteScenario(db: D1Database, id: string): Promise<void> 
   const referrerIds = referrers.results.map((row) => row.id);
 
   await db.batch([
-    db.prepare(`DELETE FROM scenarios WHERE id = ?`).bind(id),
+    expected
+      ? db.prepare(`DELETE FROM scenarios WHERE id = ? AND content_revision = ? AND
+          (SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id = ? AND status = 'active') = ? AND
+          NOT EXISTS (SELECT 1 FROM friend_scenarios fs LEFT JOIN friends f ON f.id = fs.friend_id
+            WHERE fs.scenario_id = scenarios.id AND (f.id IS NULL OR
+              (f.line_account_id IS NULL AND ? = 0) OR
+              (f.line_account_id IS NOT NULL AND f.line_account_id NOT IN (SELECT value FROM json_each(?)))))`)
+        .bind(id, expected.revision, id, expected.activeCount, expected.canSeeUnassigned ? 1 : 0, JSON.stringify(expected.accountIds))
+      : db.prepare(`DELETE FROM scenarios WHERE id = ?`).bind(id),
+    ...(expected ? [db.prepare("SELECT json(CASE WHEN changes() = 1 THEN '{}' ELSE 'SCENARIO_CONFIRMATION_CONFLICT' END)")] : []),
     db.prepare(`DELETE FROM scenario_publish_keys WHERE scenario_id = ?`).bind(id),
     db.prepare(`DELETE FROM scenario_versions WHERE scenario_id = ?`).bind(id),
     db.prepare(
@@ -237,7 +246,7 @@ export async function deleteScenario(db: D1Database, id: string): Promise<void> 
     ...(referrerIds.length > 0
       ? [
         db.prepare(
-          `UPDATE scenarios SET on_complete_mode = 'pause', on_complete_scenario_id = NULL WHERE id IN (${sqlIdSet(referrerIds).sql})`,
+          `UPDATE scenarios SET on_complete_mode = 'pause', on_complete_scenario_id = NULL, content_revision = content_revision + 1 WHERE id IN (${sqlIdSet(referrerIds).sql})`,
         ).bind(...(referrerIds.length ? sqlIdSet(referrerIds).binds : [])),
       ]
       : []),

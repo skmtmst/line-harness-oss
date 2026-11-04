@@ -179,6 +179,7 @@ export async function applyMediaReplacementPlan(
   const pairs = mediaReferenceReplacePairs(sourceId, sourceKeys, plan.replacement);
 
   const statements: D1PreparedStatement[] = [];
+  const scenarioRevisionUpdates: D1PreparedStatement[] = [];
   for (const [kind, refIds] of idsByKind) {
     const target = REPLACEMENT_TARGET_KINDS[kind]!;
     for (let index = 0; index < refIds.length; index += USAGE_TARGET_ID_CHUNK) {
@@ -197,9 +198,15 @@ export async function applyMediaReplacementPlan(
         idSubqueryBinds: [sourceId, ...chunk],
         pairs,
       }));
+      if (kind === 'scenario_step') scenarioRevisionUpdates.push(db.prepare(
+        `UPDATE scenarios SET content_revision=content_revision+1 WHERE line_account_id=? AND id IN (
+          SELECT scenario_id FROM scenario_steps WHERE id IN (${idSubquery})
+        )`,
+      ).bind(lineAccountId, sourceId, ...chunk));
     }
   }
   const contentStatementCount = statements.length;
+  statements.push(...scenarioRevisionUpdates);
 
   // 台帳の付け替えも対象だけに絞る。置換不可の使用先は元メディアを
   // 指し続けるので、ここで消したり移したりしない。

@@ -11,7 +11,7 @@ export async function createScenarioStep(
   const id = crypto.randomUUID();
   const now = jstNow();
 
-  await db
+  const insert = db
     .prepare(
       `INSERT INTO scenario_steps
        (id, scenario_id, step_order, delay_minutes, message_type, message_content,
@@ -42,8 +42,8 @@ export async function createScenarioStep(
       input.questionJson ?? null,
       input.isDraft ? 1 : 0,
       now,
-    )
-    .run();
+    );
+  await db.batch([insert, db.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = ? AND changes() > 0').bind(input.scenarioId)]);
 
   const created = (await db
     .prepare(`SELECT * FROM scenario_steps WHERE id = ?`)
@@ -134,10 +134,10 @@ export async function updateScenarioStep(
 
   if (fields.length > 0) {
     values.push(id);
-    await db
-      .prepare(`UPDATE scenario_steps SET ${fields.join(', ')} WHERE id = ?`)
-      .bind(...values)
-      .run();
+    await db.batch([
+      db.prepare(`UPDATE scenario_steps SET ${fields.join(', ')} WHERE id = ?`).bind(...values),
+      db.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = (SELECT scenario_id FROM scenario_steps WHERE id = ?) AND changes() > 0').bind(id),
+    ]);
   }
 
   const updated = await db
@@ -154,7 +154,10 @@ export async function deleteScenarioStep(db: D1Database, id: string): Promise<vo
     .prepare(`SELECT scenario_id FROM scenario_steps WHERE id = ?`)
     .bind(id)
     .first<{ scenario_id: string }>();
-  await db.prepare(`DELETE FROM scenario_steps WHERE id = ?`).bind(id).run();
+  await db.batch([
+    db.prepare(`DELETE FROM scenario_steps WHERE id = ?`).bind(id),
+    db.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = ? AND changes() > 0').bind(target?.scenario_id ?? null),
+  ]);
   // 467: 消えた手順の参照を数え直す。
   if (target) await refreshScenarioReferences(db, target.scenario_id);
 }

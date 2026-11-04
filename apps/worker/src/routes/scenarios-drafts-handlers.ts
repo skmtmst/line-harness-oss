@@ -283,7 +283,7 @@ export const post__api_scenarios_6 = async (c: Context<Env, "/api/scenarios">) =
 
 
     if (body.lineAccountId) {
-      await c.env.DB.prepare(`UPDATE scenarios SET line_account_id = ? WHERE id = ?`)
+      await c.env.DB.prepare(`UPDATE scenarios SET line_account_id = ?, content_revision = content_revision + 1 WHERE id = ?`)
         .bind(body.lineAccountId, scenario.id).run();
     }
 
@@ -432,12 +432,26 @@ export const get__api_scenarios_id_move_referrers_8 = async (c: Context<Env, "/a
 export const delete__api_scenarios_id_9 = async (c: Context<Env, "/api/scenarios/:id">) => {
   try {
     const id = c.req.param('id');
-    await deleteScenario(c.env.DB, id);
+    const body = await c.req.json<{ expectedContentRevision?: unknown; expectedActiveCount?: unknown }>().catch(() => null);
+    const revision = body?.expectedContentRevision;
+    const count = body?.expectedActiveCount;
+    if ((revision !== undefined || count !== undefined) && (!Number.isSafeInteger(revision) || Number(revision) < 1 || !Number.isSafeInteger(count) || Number(count) < 0)) {
+      return c.json({ success: false, error: '確認した版または人数が正しくありません' }, 400);
+    }
+    const scope = revision === undefined ? null : await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    await deleteScenario(c.env.DB, id, revision === undefined ? undefined : { revision: Number(revision), activeCount: Number(count), accountIds: scope!.allowedAccountIds, canSeeUnassigned: scope!.canSeeUnassigned });
     return c.json({ success: true, data: null });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
+    if (/malformed JSON/i.test(code)) {
+      const scenario = await getScenarioById(c.env.DB, c.req.param('id'));
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const count = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM friend_scenarios fs JOIN friends f ON f.id=fs.friend_id WHERE fs.scenario_id = ? AND fs.status = 'active' AND (f.line_account_id IN (SELECT value FROM json_each(?)) OR (f.line_account_id IS NULL AND ? = 1))").bind(c.req.param('id'), JSON.stringify(scope.allowedAccountIds), scope.canSeeUnassigned ? 1 : 0).first<{ n: number }>();
+      return c.json({ success: false, error: 'シナリオの内容または人数が変わりました。読み直してください', current: scenario ? { ...serializeScenario(scenario), activeCount: count?.n ?? 0 } : null }, 409);
+    }
     if (code === 'SCENARIO_HAS_DEPENDENTS' || /FOREIGN KEY/i.test(code)) {
-      return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
+      const scenario = await getScenarioById(c.env.DB, c.req.param('id'));
+      return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。', current: scenario ? serializeScenario(scenario) : null }, 409);
     }
     throw err;
   }

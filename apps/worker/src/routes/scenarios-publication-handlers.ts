@@ -132,7 +132,7 @@ export const post__api_scenarios_id_actions_3 = async (c: Context<Env, "/api/sce
     }
 
     const id = crypto.randomUUID();
-    await c.env.DB.prepare(
+    const insertAction = c.env.DB.prepare(
       `INSERT INTO scenario_actions
          (id, scenario_id, hook, step_id, choice_index, sort_order,
           action_type, config_json, condition_json, repeat_on_refire)
@@ -149,8 +149,8 @@ export const post__api_scenarios_id_actions_3 = async (c: Context<Env, "/api/sce
         JSON.stringify(body.config),
         conditionCheck.json,
         body.repeatOnRefire === false ? 0 : 1,
-      )
-      .run();
+      );
+    await c.env.DB.batch([insertAction, c.env.DB.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = ? AND changes() > 0').bind(scenarioId)]);
 
     const row = await c.env.DB.prepare(
       `SELECT id, scenario_id, hook, step_id, choice_index, sort_order,
@@ -218,11 +218,10 @@ export const put__api_scenarios_id_actions_actionId_4 = async (c: Context<Env, "
     }
 
     values.push(actionId);
-    await c.env.DB.prepare(
-      `UPDATE scenario_actions SET ${fields.join(', ')} WHERE id = ?`,
-    )
-      .bind(...values)
-      .run();
+    await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE scenario_actions SET ${fields.join(', ')} WHERE id = ?`).bind(...values),
+      c.env.DB.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = ? AND changes() > 0').bind(scenarioId),
+    ]);
 
     const row = await c.env.DB.prepare(
       `SELECT id, scenario_id, hook, step_id, choice_index, sort_order,
@@ -239,9 +238,10 @@ export const put__api_scenarios_id_actions_actionId_4 = async (c: Context<Env, "
 
 export const delete__api_scenarios_id_actions_actionId_5 = async (c: Context<Env, "/api/scenarios/:id/actions/:actionId">) => {
   try {
-    await c.env.DB.prepare(`DELETE FROM scenario_actions WHERE id = ? AND scenario_id = ?`)
-      .bind(c.req.param('actionId'), c.req.param('id'))
-      .run();
+    await c.env.DB.batch([
+      c.env.DB.prepare(`DELETE FROM scenario_actions WHERE id = ? AND scenario_id = ?`).bind(c.req.param('actionId'), c.req.param('id')),
+      c.env.DB.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = ? AND changes() > 0').bind(c.req.param('id')),
+    ]);
     return c.json({ success: true });
   } catch (err) {
     throw err;

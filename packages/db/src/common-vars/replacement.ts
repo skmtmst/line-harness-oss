@@ -181,6 +181,11 @@ export async function applyCommonVarReplacementPlan(
       plan.source.line_account_id, plan.source.version,
     ),
     ...updates,
+    ...plan.targets.filter(target => target.table === 'scenario_steps' || target.table === 'scenario_actions').map(target =>
+      db.prepare(`UPDATE scenarios SET content_revision=content_revision+1
+        WHERE id=(SELECT scenario_id FROM ${target.table} WHERE id=?) AND EXISTS (
+          SELECT 1 FROM common_vars WHERE id=? AND replacement_run_id=? AND version=?
+        )`).bind(target.id, plan.source.id, runId, archivedVersion)),
     db.prepare(
       `INSERT INTO common_var_versions
          (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
