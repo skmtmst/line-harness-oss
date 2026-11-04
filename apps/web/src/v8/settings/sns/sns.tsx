@@ -46,6 +46,7 @@ const FLASH: Record<string, { tone: 'success' | 'danger'; text: string }> = {
   connected: { tone: 'success', text: 'Instagram とつながりました。Googleビジネスの投稿を Instagram にも出せます。' },
   failed: { tone: 'danger', text: 'Instagram とつなげませんでした。ビジネスアカウント（またはクリエイターアカウント）でログインして、もう一度お試しください。' },
 }
+const ACCOUNT_OTHER_ORGANIZATION = { tone: 'danger', text: 'このInstagramは別の統括で使用されています。統括の管理者に確認してください。' } as const
 
 const GOOGLE_FLASH: Record<string, { tone: 'success' | 'warn' | 'danger'; text: string }> = {
   connected: { tone: 'success', text: 'Googleアカウントを接続しました。口コミを取得します。' },
@@ -85,7 +86,9 @@ export default function SnsSettingsPage() {
   if (accountScope.current.id !== accountId) accountScope.current = { id: accountId }
   const renderedAccountScope = accountScope.current
   const confirmScope = useRef(accountScope.current)
-  const flash = FLASH[searchParams.get('instagram') ?? ''] ?? null
+  const flash = searchParams.get('instagram') === 'failed' && searchParams.get('instagram_code') === 'instagram_account_other_organization'
+    ? ACCOUNT_OTHER_ORGANIZATION
+    : FLASH[searchParams.get('instagram') ?? ''] ?? null
   const googleFlash = GOOGLE_FLASH[searchParams.get('google') ?? ''] ?? (searchParams.has('google') ? { tone: 'danger' as const, text: 'Googleとの接続に失敗しました。もう一度お試しください。' } : null)
 
   useEffect(() => {
