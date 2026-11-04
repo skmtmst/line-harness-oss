@@ -79,6 +79,12 @@ it('飲食以外の翌日は実行開始の日本時間で固定し、実行の�
   expect(await processAutomationRun(t.db, id, { now: '2026-03-11T05:00:00.000Z' })).toBe('waiting');
   expect(runState(id)).toEqual({ status: 'waiting', resume_at: '2026-03-11T01:00:00.000Z' });
 });
+it('時差なし JST の実行開始も同じ日本時間の日を起点にする', async () => {
+  const id = await startWait({ mode: 'next_day', sendAtTime: '10:00' });
+  t.raw.prepare('UPDATE automation_runs SET created_at=? WHERE id=?').run('2026-03-09T23:30:00', id);
+  expect(await processAutomationRun(t.db, id, { now: '2026-03-10T02:00:00.000Z' })).toBe('waiting');
+  expect(runState(id)).toEqual({ status: 'waiting', resume_at: '2026-03-10T01:00:00.000Z' });
+});
 it('飲食の翌日は保存済みの出来事と店の暦を使い、夏時間も処理の遅れも基準を変えない', async () => {
   origin();
   const id = await startWait({ mode: 'next_day', sendAtTime: '02:30' }, 'restaurant.departed', 'event', '2026-03-07T22:00:00.000Z');

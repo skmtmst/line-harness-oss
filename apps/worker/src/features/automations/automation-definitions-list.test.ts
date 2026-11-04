@@ -87,4 +87,16 @@ describe('listAutomationDefinitions のページ送り', () => {
       active: 0, stopped: 0, executionCount30d: 0, failureCount30d: 0,
     });
   });
+
+  it('定義と最終実行の日時を実時刻で並べて表示する', async () => {
+    testDb.raw.exec(`UPDATE automation_definitions SET priority=50, created_at='2099-10-01 17:00:00', updated_at='2099-10-01 17:00:00' WHERE id='d1';
+      UPDATE automation_definitions SET priority=50, created_at='2099-10-02T01:00:00', updated_at='2099-10-02T01:00:00' WHERE id='d2';
+      UPDATE automation_runs SET created_at='2099-10-01 17:00:00' WHERE id='r1';
+      UPDATE automation_runs SET created_at='2099-10-02T01:00:00' WHERE id='r2';`);
+    const result = await listAutomationDefinitions(testDb.db, ['account-1']);
+    expect(result.items.slice(0, 2).map(({ id, updatedAt }) => [id, updatedAt])).toEqual([
+      ['d1', '2099-10-01T17:00:00Z'], ['d2', '2099-10-02T01:00:00+09:00'],
+    ]);
+    expect(result.items[0]).toMatchObject({ createdAt: '2099-10-01T17:00:00Z', lastRunAt: '2099-10-01T17:00:00.000Z' });
+  });
 });

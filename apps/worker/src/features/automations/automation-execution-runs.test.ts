@@ -3,6 +3,19 @@ import { getAutomationExecutionRuns } from '@line-crm/db'
 import { createTestD1 } from '../../test-utils/d1-sqlite'
 
 describe('既存automation_runsの読み取り', () => {
+  it('旧 UTC と時差なし JST の実行時刻で一覧と期間を判定する', async () => {
+    const testDb = createTestD1();
+    try {
+      testDb.raw.exec(`INSERT INTO line_accounts(id, channel_id, name, channel_access_token, channel_secret) VALUES ('a','ca','A','fixture','fixture');
+        INSERT INTO automation_definitions(id, line_account_id, name) VALUES ('d','a','rule');
+        INSERT INTO automation_versions(id, automation_id, version_number, status, trigger_type) VALUES ('v','d',1,'published','message_received');
+        INSERT INTO automation_runs(id, line_account_id, automation_id, automation_version_id, source_event_id, idempotency_key, status, created_at) VALUES
+          ('before','a','d','v','e1','k1','queued','2026-10-02T01:00:00'),
+          ('inside','a','d','v','e2','k2','queued','2026-10-01 17:00:00')`);
+      const result = await getAutomationExecutionRuns(testDb.db, { allowedAccountIds:['a'], from:'2026-10-01T16:30:00Z', to:'2026-10-01T17:30:00Z', limit:20, offset:0 });
+      expect(result.rows.map(({ id, created_at }) => [id, created_at])).toEqual([['inside','2026-10-01T17:00:00Z']]);
+    } finally { testDb.raw.close(); }
+  });
   it('条件外・部分成功・未取得を壊さず一覧と集計へ返す', async () => {
     const testDb = createTestD1()
     testDb.raw.prepare(

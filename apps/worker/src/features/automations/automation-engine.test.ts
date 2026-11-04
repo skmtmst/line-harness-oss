@@ -75,6 +75,14 @@ describe('オートメーション実行エンジン', () => {
     testDb = createTestD1();
   });
 
+  it('実行待ちは作成された実時刻が早い順に処理する', async () => {
+    const setup = addPublishedAutomation(testDb.raw, { actions:[action('record')] });
+    const first = await start(testDb.db, setup, { sourceEventId:'first', idempotencyKey:'first', now:'2026-10-02T01:00:00' });
+    const later = await start(testDb.db, setup, { sourceEventId:'later', idempotencyKey:'later', now:'2026-10-01 17:00:00' });
+    const result = await processDueAutomationRuns(testDb.db, { now:'2026-10-03T00:00:00Z', executors:{ record:async()=>({}) } });
+    expect(result.results.map(({ runId }) => runId)).toEqual([first.runId, later.runId]);
+  });
+
   it('開始時の公開版を固定し、公開先が変わっても実行内容を変えない', async () => {
     const setup = addPublishedAutomation(testDb.raw, { actions: [action('v1-step')] });
     const created = await start(testDb.db, setup);

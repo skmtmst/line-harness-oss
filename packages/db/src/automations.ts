@@ -1,4 +1,5 @@
 import { sqlIdSet } from './id-queries.js';
+import { storedTimestamp } from '@line-crm/shared';
 import { boundedListLimit, jstNow } from './utils.js';
 // アクション自動化 (IF-THEN ルール) クエリヘルパー
 
@@ -98,8 +99,8 @@ function automationRunWhere(input: AutomationExecutionRunsQuery, includeFilters:
   if (input.allowedAccountIds.length === 0) return { sql: '1 = 0', binds: [] as unknown[] };
   const clauses = [
     `r.line_account_id IN (${sqlIdSet(input.allowedAccountIds).sql})`,
-    'datetime(r.created_at) >= datetime(?)',
-    'datetime(r.created_at) < datetime(?)',
+    `datetime(${storedTimestamp('r.created_at', 'sql')}) >= datetime(?)`,
+    `datetime(${storedTimestamp('r.created_at', 'sql')}) < datetime(?)`,
   ];
   const binds: unknown[] = [...(input.allowedAccountIds.length ? sqlIdSet(input.allowedAccountIds).binds : []), input.from, input.to];
   // テスト実行は一覧・集計・CSVすべてで既定除外。切替時だけ含める。
@@ -137,7 +138,7 @@ export async function getAutomationExecutionRuns(
               v.version_number, r.is_test,
               d.current_published_version_id, cv.version_number AS current_version_number,
               r.friend_id, f.display_name AS friend_name, r.source_event_id,
-              v.trigger_type, r.status, r.started_at, r.completed_at, r.created_at,
+              v.trigger_type, r.status, r.started_at, r.completed_at, ${storedTimestamp('r.created_at', 'sql')} AS created_at,
               CASE WHEN r.started_at IS NOT NULL AND r.completed_at IS NOT NULL
                    THEN MAX(0, ROUND((julianday(r.completed_at) - julianday(r.started_at)) * 86400000))
                    ELSE NULL END AS duration_ms,
@@ -155,7 +156,7 @@ export async function getAutomationExecutionRuns(
          LEFT JOIN automation_run_steps s ON s.automation_run_id = r.id
         WHERE ${filtered.sql}
         GROUP BY r.id
-        ORDER BY datetime(r.created_at) DESC, r.id DESC
+        ORDER BY julianday(${storedTimestamp('r.created_at', 'sql')}) DESC, r.id DESC
         LIMIT ? OFFSET ?`,
     ).bind(...filtered.binds, input.limit, input.offset).all<AutomationExecutionRunRow>(),
     db.prepare(`SELECT COUNT(*) AS total FROM automation_runs r
@@ -207,7 +208,7 @@ export async function getAutomationExecutionRun(
             v.version_number, r.is_test,
             d.current_published_version_id, cv.version_number AS current_version_number,
             r.friend_id, f.display_name AS friend_name, r.source_event_id,
-            v.trigger_type, r.status, r.started_at, r.completed_at, r.created_at,
+            v.trigger_type, r.status, r.started_at, r.completed_at, ${storedTimestamp('r.created_at', 'sql')} AS created_at,
             CASE WHEN r.started_at IS NOT NULL AND r.completed_at IS NOT NULL
                  THEN MAX(0, ROUND((julianday(r.completed_at) - julianday(r.started_at)) * 86400000))
                  ELSE NULL END AS duration_ms,

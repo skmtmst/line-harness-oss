@@ -9,7 +9,7 @@ import {
 } from './automation-drafts.js';
 import { createAutomationActionExecutors } from './automation-action-executors.js';
 import { buildSegmentWhere, parseCondition } from '../../services/segment-query.js';
-import { type SegmentCondition } from '@line-crm/shared';
+import { storedTimestamp, type SegmentCondition } from '@line-crm/shared';
 
 export class AutomationDefinitionError extends Error {
   constructor(
@@ -120,7 +120,7 @@ export async function listAutomationDefinitions(
          JOIN automation_definitions d ON d.id = r.automation_id
         WHERE d.line_account_id IN (${placeholders}) ${paging?.includeArchived ? '' : "AND d.status <> 'archived'"}
           AND r.is_test = 0 AND r.status IN ('success', 'partial', 'failed')
-          AND datetime(r.created_at) >= datetime('now', '-30 days')`,
+          AND datetime(${storedTimestamp('r.created_at', 'sql')}) >= datetime('now', '-30 days')`,
     ).bind(...(lineAccountIds.length ? sqlIdSet(lineAccountIds).binds : [])).first<{ executions: number; failures: number | null }>(),
   ]);
   const limit = paging?.limit === undefined ? null
@@ -134,14 +134,14 @@ export async function listAutomationDefinitions(
             (SELECT COUNT(*) FROM automation_runs r
               WHERE r.automation_id = d.id AND r.is_test = 0
                 AND r.status IN ('success', 'partial', 'failed')
-                AND datetime(r.created_at) >= datetime('now', '-30 days')) AS execution_count_30d,
+                AND datetime(${storedTimestamp('r.created_at', 'sql')}) >= datetime('now', '-30 days')) AS execution_count_30d,
             (SELECT COUNT(*) FROM automation_runs r
               WHERE r.automation_id = d.id AND r.is_test = 0
                 AND r.status IN ('partial', 'failed')
-                AND datetime(r.created_at) >= datetime('now', '-30 days')) AS failure_count_30d,
-            (SELECT MAX(r.created_at) FROM automation_runs r
+                AND datetime(${storedTimestamp('r.created_at', 'sql')}) >= datetime('now', '-30 days')) AS failure_count_30d,
+            (SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('r.created_at', 'sql')})) FROM automation_runs r
               WHERE r.automation_id = d.id AND r.is_test = 0) AS last_run_at,
-            d.created_at, d.updated_at
+            ${storedTimestamp('d.created_at', 'sql')} AS created_at, ${storedTimestamp('d.updated_at', 'sql')} AS updated_at
        FROM automation_definitions d
        JOIN automation_versions v
          ON v.id = CASE
@@ -151,7 +151,7 @@ export async function listAutomationDefinitions(
             END
         AND v.automation_id = d.id
       WHERE d.line_account_id IN (${placeholders}) ${paging?.includeArchived ? '' : "AND d.status <> 'archived'"}
-      ORDER BY d.priority DESC, d.updated_at DESC, d.id DESC${limit === null ? '' : ' LIMIT ? OFFSET ?'}`,
+      ORDER BY d.priority DESC, julianday(${storedTimestamp('d.updated_at', 'sql')}) DESC, d.id DESC${limit === null ? '' : ' LIMIT ? OFFSET ?'}`,
   ).bind(...(lineAccountIds.length ? sqlIdSet(lineAccountIds).binds : []), ...(limit === null ? [] : [limit, offset])).all<DefinitionListRow>();
   const items = (result.results ?? []).map((row): AutomationDefinitionSummary => ({
     id: row.id,

@@ -1,7 +1,7 @@
 import type { EventDispatcher } from '../../services/event-payload.js';
 import { logger } from '@line-crm/shared/server';
 import { accountFeatureOffExclusionSql } from '@line-crm/db';
-import type { SegmentCondition } from '@line-crm/shared';
+import { storedTimestamp, type SegmentCondition } from '@line-crm/shared';
 import { matchesCondition, parseCondition } from '../../services/segment-query.js';
 import { processAutomationRun, startAutomationRun, type AutomationActionExecutor } from './automation-engine.js';
 import { type RunStatus } from './run-types.js';
@@ -279,7 +279,7 @@ export async function dispatchAutomationEvent(
          ON v.id = d.current_published_version_id
         AND v.automation_id = d.id AND v.status = 'published'
       WHERE d.line_account_id = ? AND d.status = 'active' AND v.trigger_type = ?
-      ORDER BY d.priority DESC, d.created_at ASC
+      ORDER BY d.priority DESC, julianday(${storedTimestamp('d.created_at', 'sql')}) ASC
       LIMIT ?`,
     ).bind(input.lineAccountId, input.eventType, limit).all<AutomationCandidate>(),
     db.prepare(
@@ -290,7 +290,7 @@ export async function dispatchAutomationEvent(
           AND v.automation_id = d.id AND v.status = 'published'
         WHERE d.line_account_id = ? AND d.status = 'active'
           AND v.trigger_type = 'support_mark_change'
-        ORDER BY d.priority DESC, d.created_at ASC
+        ORDER BY d.priority DESC, julianday(${storedTimestamp('d.created_at', 'sql')}) ASC
         LIMIT ?`,
     ).bind(input.lineAccountId, limit).all<AutomationCandidate>(),
   ]);
@@ -461,7 +461,7 @@ export async function processScheduledAutomationTriggers(
          JOIN line_accounts a ON a.id = d.line_account_id AND a.is_active = 1
         WHERE d.status = 'active' AND v.trigger_type IN ('datetime', 'daily', 'weekly')
           AND NOT ${accountFeatureOffExclusionSql('d.line_account_id', 'automations')}
-        ORDER BY d.priority DESC, d.created_at ASC, d.id ASC
+        ORDER BY d.priority DESC, julianday(${storedTimestamp('d.created_at', 'sql')}) ASC, d.id ASC
         LIMIT ? OFFSET ?`,
     ).bind(pageSize, offset).all<ScheduledCandidate>();
 

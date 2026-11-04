@@ -1,4 +1,5 @@
 import { jstCalendar } from '@line-crm/shared';
+import { storedTimestamp } from '@line-crm/shared';
 import { accountFeatureOffExclusionSql } from './account-settings.js';
 
 /**
@@ -47,17 +48,17 @@ export async function purgeExpiredAutomationRuns(
   for (;;) {
     const targets = await db.prepare(`
       SELECT r.id, r.line_account_id, r.automation_id,
-             date(r.created_at, '+9 hours') AS day, r.status,
+             date(${storedTimestamp('r.created_at', 'sql')}, '+9 hours') AS day, r.status,
              COALESCE(step_counts.cnt, 0) AS step_count
         FROM automation_runs r
         LEFT JOIN (
           SELECT automation_run_id, COUNT(*) AS cnt FROM automation_run_steps
            GROUP BY automation_run_id
         ) step_counts ON step_counts.automation_run_id = r.id
-       WHERE datetime(r.created_at) < datetime(?, '-${AUTOMATION_RUN_DETAIL_RETENTION_DAYS} days')
+       WHERE datetime(${storedTimestamp('r.created_at', 'sql')}) < datetime(?, '-${AUTOMATION_RUN_DETAIL_RETENTION_DAYS} days')
          AND r.status IN (${TERMINAL_RUN_STATUSES.map(() => '?').join(',')})
          ${offAutomations('r')}
-       ORDER BY r.created_at, r.id LIMIT ?
+       ORDER BY julianday(${storedTimestamp('r.created_at', 'sql')}), r.id LIMIT ?
     `).bind(nowIso, ...TERMINAL_RUN_STATUSES, PURGE_BATCH_SIZE).all<{
       id: string; line_account_id: string; automation_id: string; day: string;
       status: string; step_count: number;
@@ -65,7 +66,7 @@ export async function purgeExpiredAutomationRuns(
     if (targets.results.length === 0) break;
     const idsJson = JSON.stringify(targets.results.map((row) => row.id));
     const eligible = `r.id IN (SELECT value FROM json_each(?))
-      AND datetime(r.created_at) < datetime(?, '-${AUTOMATION_RUN_DETAIL_RETENTION_DAYS} days')
+      AND datetime(${storedTimestamp('r.created_at', 'sql')}) < datetime(?, '-${AUTOMATION_RUN_DETAIL_RETENTION_DAYS} days')
       AND r.status IN (${TERMINAL_RUN_STATUSES.map(() => '?').join(',')})
       ${offAutomations('r')}`;
     const bindings = [idsJson, nowIso, ...TERMINAL_RUN_STATUSES];
@@ -75,11 +76,11 @@ export async function purgeExpiredAutomationRuns(
       db.prepare(`
         INSERT INTO automation_run_daily_counts
           (line_account_id, automation_id, day, status, run_count, step_count, created_at, updated_at)
-        SELECT r.line_account_id, r.automation_id, date(r.created_at, '+9 hours'), r.status,
+        SELECT r.line_account_id, r.automation_id, date(${storedTimestamp('r.created_at', 'sql')}, '+9 hours'), r.status,
                COUNT(*), SUM((SELECT COUNT(*) FROM automation_run_steps s WHERE s.automation_run_id = r.id)),
                ?, ?
           FROM automation_runs r WHERE ${eligible}
-         GROUP BY r.line_account_id, r.automation_id, date(r.created_at, '+9 hours'), r.status
+         GROUP BY r.line_account_id, r.automation_id, date(${storedTimestamp('r.created_at', 'sql')}, '+9 hours'), r.status
         ON CONFLICT(line_account_id, automation_id, day, status) DO UPDATE SET
           run_count = automation_run_daily_counts.run_count + excluded.run_count,
           step_count = automation_run_daily_counts.step_count + excluded.step_count,

@@ -15,7 +15,7 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
  * 固定し、外部処理は注入された executor に同じ stepExecutionId を渡す。
 */
 
-import type { SegmentCondition } from '@line-crm/shared';
+import { storedTimestamp, type SegmentCondition } from '@line-crm/shared';
 import { matchesCondition } from '../../services/segment-query.js';
 import { AutomationActionError } from './automation-action-error.js';
 import { addMinutes, expireNextDayWait, scheduleAutomationWait } from './automation-wait.js';
@@ -838,7 +838,7 @@ export async function processDueAutomationRuns(
       WHERE status = 'queued'
          OR (status = 'waiting' AND resume_at <= ?)
          OR (status = 'running' AND lease_expires_at <= ?)
-      ORDER BY created_at ASC
+      ORDER BY julianday(${storedTimestamp('created_at', 'sql')}) ASC
       LIMIT ?`,
   ).bind(now, now, limit).all<{ id: string }>();
   const results: Array<{ runId: string; status: string }> = [];

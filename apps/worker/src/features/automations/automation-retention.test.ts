@@ -52,6 +52,21 @@ describe('オートメーション履歴の保持期間', () => {
     `).run();
   });
 
+  it('時差なし JST の実行は実時刻で保持期限を判定する', async () => {
+    seedRun(testDb, 'expired', 'success', 100);
+    seedRun(testDb, 'retained', 'success', 100);
+    const cutoff = NOW.getTime() - 90 * 86_400_000;
+    const jstWithoutOffset = (time: number) => new Date(time + 9 * 3_600_000).toISOString().slice(0, 19);
+    testDb.raw.prepare('UPDATE automation_runs SET created_at=? WHERE id=?').run(jstWithoutOffset(cutoff - 2_000), 'expired');
+    testDb.raw.prepare('UPDATE automation_runs SET created_at=? WHERE id=?').run(jstWithoutOffset(cutoff + 2_000), 'retained');
+    const result = await purgeExpiredAutomationRuns(testDb.db, NOW);
+    expect(result.runs).toBe(1);
+    expect(testDb.raw.prepare('SELECT id FROM automation_runs').all()).toEqual([{ id:'retained' }]);
+    expect(testDb.raw.prepare('SELECT day, run_count FROM automation_run_daily_counts').all()).toEqual([
+      { day:jstWithoutOffset(cutoff - 2_000).slice(0, 10), run_count:1 },
+    ]);
+  });
+
   it('90日を超えた確定済み明細を日別に畳んで消す', async () => {
     seedRun(testDb, 'run-old-success', 'success', 100);
     seedRun(testDb, 'run-old-failed', 'failed', 120);

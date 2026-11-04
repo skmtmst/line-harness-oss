@@ -80,6 +80,40 @@ describe('オートメーションのきっかけ接続', () => {
     executors = { record };
   });
 
+  it('同じ優先度の自動化は作成された実時刻が早い順に始める', async () => {
+    addAutomation(testDb.raw, { id:'first', triggerType:'message_received' });
+    addAutomation(testDb.raw, { id:'later', triggerType:'message_received' });
+    testDb.raw.exec(`UPDATE automation_definitions SET created_at='2026-10-02T01:00:00' WHERE id='first';
+      UPDATE automation_definitions SET created_at='2026-10-01 17:00:00' WHERE id='later';`);
+    const result = await dispatchAutomationEvent(testDb.db, {
+      lineAccountId:'account-1', eventType:'message_received', sourceEventId:'order-test',
+      friendId:'friend-1', eventData:{ text:'test' },
+    }, { now:NOW, executors });
+    expect(result.map((item) => item.automationId)).toEqual(['first','later']);
+  });
+
+  it('同じ優先度の対応マークは作成された実時刻が早いものを選ぶ', async () => {
+    for (const id of ['first','later']) addAutomation(testDb.raw, {
+      id, triggerType:'support_mark_change', triggerConfig:{ kind:'support_mark_rule', event:'message_received' },
+    });
+    testDb.raw.exec(`UPDATE automation_definitions SET created_at='2026-10-02T01:00:00' WHERE id='first';
+      UPDATE automation_definitions SET created_at='2026-10-01 17:00:00' WHERE id='later';`);
+    const result = await dispatchAutomationEvent(testDb.db, {
+      lineAccountId:'account-1', eventType:'message_received', sourceEventId:'mark-order', friendId:'friend-1', eventData:{},
+    }, { now:NOW, executors });
+    expect(result.map((item) => item.automationId)).toEqual(['first']);
+  });
+
+  it('同じ優先度の定時実行は作成された実時刻が早い順に始める', async () => {
+    for (const id of ['first','later']) addAutomation(testDb.raw, {
+      id, triggerType:'daily', triggerConfig:{ time:'09:00', friendIds:['friend-1'] },
+    });
+    testDb.raw.exec(`UPDATE automation_definitions SET created_at='2026-10-02T01:00:00' WHERE id='first';
+      UPDATE automation_definitions SET created_at='2026-10-01 17:00:00' WHERE id='later';`);
+    const result = await processScheduledAutomationTriggers(testDb.db, { now:NOW, executors });
+    expect(result.results.map((item) => item.automationId)).toEqual(['first','later']);
+  });
+
   it('フォームIDが一致する公開版だけを開始し、同じ回答を二重実行しない', async () => {
     addAutomation(testDb.raw, {
       id: 'form-match', triggerType: 'form_submitted', triggerConfig: { formId: 'form-1' },
