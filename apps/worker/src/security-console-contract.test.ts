@@ -119,6 +119,10 @@ function unsafeConsoleCalls(source: string, readDependency: (specifier: string) 
       &&guard.arguments.length===1&&guard.arguments[0].getText(file)===input&&closedSet(guard.expression.expression.text);
   }
   // 共通serializerだけは、自由な文を含まない厳密な構造と採番元を検査する。
+  function safeIntegerMetric(text:string):boolean {
+    const match=/^Number\.isInteger\(metrics\.(failedCount|upstreamCode|upstreamSubcode)\)&&metrics\.\1!>=0(?:&&metrics\.\1!<=999999999)?\?\{\1:metrics\.\1\}:\{\}$/.exec(text);
+    return !!match && (match[1]==='failedCount' || text.includes('<=999999999'));
+  }
   function safeEnvelope(node:ts.Expression,at:ts.Node):boolean {
     if(ts.isIdentifier(node)){const value=binding(node.text,at);return !!value&&safeEnvelope(value,at);}
     if(!ts.isObjectLiteralExpression(node))return false;
@@ -127,7 +131,7 @@ function unsafeConsoleCalls(source: string, readDependency: (specifier: string) 
       if(ts.isSpreadAssignment(property)){
         const expression=ts.isParenthesizedExpression(property.expression)?property.expression.expression:property.expression;
         const text=expression.getText(file).replace(/\s+/g,'');
-        if(!safeCategorySpread(expression)&&!/^Number\.isInteger\(metrics\.status\).*\?\{status:metrics\.status\}:\{\}$/.test(text)
+        if(!safeCategorySpread(expression)&&!safeIntegerMetric(text)&&!/^Number\.isInteger\(metrics\.status\).*\?\{status:metrics\.status\}:\{\}$/.test(text)
           &&!/^Number\.isFinite\(metrics\.durationMs\).*\?\{durationMs:Math\.round\(metrics\.durationMs!\)\}:\{\}$/.test(text))return false;
         continue;
       }
@@ -264,4 +268,14 @@ it('S14 production console calls carry fixed codes, route templates and proven s
   }
   for(const directory of ['apps/worker/src','apps/web/src','apps/liff/src','packages/db/src','packages/line-sdk/src','packages/shared/src','packages/sdk/src','packages/mcp-server/src'])walk(join(root,directory));
   expect(findings).toEqual([]);
+});
+
+it('integer diagnostic metrics retain bounds and cannot copy arbitrary input',()=>{
+  const envelope=(spread:string)=>`function write(level,code,metrics){const context=currentInvocation();const event={timestamp:new Date().toISOString(),level:level==='log'?'info':level,code:/^[a-zA-Z][a-zA-Z0-9_.-]{0,95}$/.test(code)?code:'invalid_log_event',requestId:context?.requestId??null,invocationId:context?.invocationId??null,source:context?.source??'background',...(${spread})};console.error(JSON.stringify(event));}`;
+  for(const field of ['failedCount','upstreamCode','upstreamSubcode']) {
+    const bounded=`Number.isInteger(metrics.${field}) && metrics.${field}! >= 0 && metrics.${field}! <= 999999999 ? {${field}:metrics.${field}} : {}`;
+    expect(unsafeConsoleCalls(envelope(bounded))).toEqual([]);
+    expect(unsafeConsoleCalls(envelope(bounded.replace(`metrics.${field}! >= 0 && `,'')))).toHaveLength(1);
+    expect(unsafeConsoleCalls(envelope(bounded.replace(`{${field}:metrics.${field}}`,`{${field}:body.value}`)))).toHaveLength(1);
+  }
 });

@@ -21,6 +21,7 @@ vi.mock('@/lib/restaurant-google-api', () => ({
 vi.mock('@/v8/restaurant/google/reviews',()=>({ReviewDraft:()=> <div>現役の子画面</div>,ReviewsBoard:()=> <div>現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/posts',()=>({PostEditor:()=> <div>現役の子画面</div>,PostConfirm:()=> <div>現役の子画面</div>,PostsBoard:()=> <div>現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/performance',()=>({default:()=> <div>現役の子画面</div>}))
+vi.mock('@/v8/restaurant/google/hours',()=>({default:()=> <div data-design-node="tYbl8">現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/profile',()=>({default:()=> <div>現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/profile-confirm',()=>({ChangeConfirmScreen:()=> <div>現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/profile-history',()=>({HistoryScreen:()=> <div>現役の子画面</div>}))
@@ -66,14 +67,14 @@ describe('Googleビジネス子板の印', () => {
   it.each([
     ['performance', null, 'SrmVs'],
     ['profile', null, 'JUTGz'],
-    ['profile', 'hours', 'JUTGz'],
+    ['profile', 'hours', 'tYbl8'],
     ['profile', 'confirm', 'JUTGz'],
     ['profile', 'history', 'JUTGz'],
     ['profile', 'edit', 'JUTGz'],
     ['posts', null, 'Cfed0'],
     ['posts', 'new', 'T1j2Sw'],
     ['posts', 'confirm', 'T1j2Sw'],
-    ['settings', null, 'CuHXG'],
+    ['hours', null, 'tYbl8'],
     ['reviews', 'draft', 'x9HIR'],
   ])('tab=%s view=%s → %s', async (tab, view, node) => {
     search.tab = tab
@@ -83,13 +84,13 @@ describe('Googleビジネス子板の印', () => {
     expect(document.querySelector(`[data-design-node="${node}"]`)).not.toBeNull()
   })
 
-  it('未接続は設定の印 CuHXG', async () => {
+  it('未接続はSNS連携への案内を表示する', async () => {
     search.tab = null
     search.view = null
     fixture.connection.mockResolvedValue({ ...connectionData, connection: { ...connectionData.connection, status: 'new' } })
     render(<GoogleV8 />)
-    await screen.findByText('現役の子画面')
-    expect(document.querySelector('[data-design-node="CuHXG"]')).not.toBeNull()
+    await screen.findByText('Googleビジネスは未接続です')
+    expect(screen.getByRole('link', { name: 'SNS連携を開く' }).getAttribute('href')).toBe('/settings/sns')
   })
 
   it('編集の子画面が書きかけを持つとき、タブ移動は共有の確認を通してから実行する', async () => {

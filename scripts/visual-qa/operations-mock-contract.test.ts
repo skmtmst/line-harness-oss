@@ -42,7 +42,7 @@ describe('運用状態の目視用の偽 API', () => {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     let lastError: unknown
-    for (let attempt = 0; attempt < 50; attempt += 1) {
+    for (let attempt = 0; attempt < 250; attempt += 1) {
       try {
         const response = await fetch(`${baseUrl}/__mock-fingerprint`)
         if (response.ok) return

@@ -59,6 +59,7 @@ export const tenants = new Hono<Env>();
 
 async function hasTenantWideMembership(c: Context<Env>): Promise<boolean> {
   const actor = c.get('staff');
+  if (!actor) return false;
   if (actor.id === 'env-owner') return true;
   const member = await getStaffById(c.env.DB, actor.id);
   return Boolean(member?.is_active && member.account_scope === 'all'
