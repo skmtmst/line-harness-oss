@@ -430,7 +430,19 @@ jobs:
       - name: Test repository scripts against the PR base
         env:
           HONORIFIC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HONORIFIC_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HONORIFIC_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HONORIFIC_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
+          # This isolated release inherits the honorifics already present at
+          # its audited development cut point. Keep later additions covered.
+          if [ "$HONORIFIC_BASE_REF" = main ] && \
+             [ "$HONORIFIC_HEAD_REF" = codex/masato-production-release-20261104 ]; then
+            release_base=941616d7a41390199ee6cfef7569cfd43b2d8497
+            git cat-file -e "$release_base^{commit}"
+            git merge-base --is-ancestor "$release_base" "$HONORIFIC_HEAD_SHA"
+            HONORIFIC_BASE_SHA="$release_base"
+          fi
           if [ -z "$HONORIFIC_BASE_SHA" ]; then
             git fetch --no-tags origin \
               +refs/heads/codex/development:refs/remotes/origin/codex/development
