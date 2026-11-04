@@ -744,6 +744,7 @@ describe('一括変更', () => {
     expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledTimes(1);
     expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledWith(expect.anything(), {
       fieldId: 'ff-1',
+      fieldType: 'text',
       entries: [
         { friendId: 'f-1', value: 'ポチ' },
         { friendId: 'f-2', value: 'ポチ' },
@@ -965,8 +966,8 @@ describe('値の型検証（N-042 単票）', () => {
     expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), {
       friendId: 'f-1',
       entries: [
-        { fieldId: 'ff-num', value: '1000' },
-        { fieldId: 'ff-sel', value: 'opt-1' },
+        { fieldId: 'ff-num', value: '1000', type: 'number' },
+        { fieldId: 'ff-sel', value: 'opt-1', type: 'select' },
       ],
       updatedBy: 'u-1',
       now: '2026-09-14T00:00:00.000+09:00',
@@ -1015,7 +1016,7 @@ describe('値の型検証（N-042 単票）', () => {
     expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledTimes(2);
     expect(mocks.setFriendFieldValuesForFriend).toHaveBeenLastCalledWith(expect.anything(), {
       friendId: 'f-1',
-      entries: [{ fieldId: 'ff-num', value: '1000' }],
+      entries: [{ fieldId: 'ff-num', value: '1000', type: 'number' }],
       updatedBy: 'u-1',
       now: '2026-09-14T00:00:00.000+09:00',
     });
@@ -1030,7 +1031,7 @@ describe('値の型検証（N-042 単票）', () => {
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
     expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), {
       friendId: 'f-1',
-      entries: [{ fieldId: 'ff-1', value: null }],
+      entries: [{ fieldId: 'ff-1', value: null, type: 'text' }],
       updatedBy: 'u-1',
       now: '2026-09-14T00:00:00.000+09:00',
     });
@@ -1064,6 +1065,7 @@ describe('値の型検証（N-042 一括）', () => {
     expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledTimes(1);
     expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledWith(expect.anything(), {
       fieldId: 'ff-num',
+      fieldType: 'number',
       entries: [
         { friendId: 'f-1', value: '1000' },
         { friendId: 'f-2', value: '1000' },
@@ -1080,6 +1082,7 @@ describe('値の型検証（N-042 一括）', () => {
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
     expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledWith(expect.anything(), {
       fieldId: 'ff-sel',
+      fieldType: 'select',
       entries: [
         { friendId: 'f-1', value: 'opt-1' },
         { friendId: 'f-2', value: 'opt-1' },
@@ -1172,7 +1175,7 @@ describe('個人情報の個別権限（N-045）', () => {
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
     expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       friendId: 'f-1',
-      entries: [{ fieldId: 'ff-2', value: '080-0000-0000' }],
+      entries: [{ fieldId: 'ff-2', value: '080-0000-0000', type: 'text' }],
     }));
   });
 
@@ -1191,7 +1194,7 @@ describe('個人情報の個別権限（N-045）', () => {
     expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledTimes(1);
     expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       friendId: 'f-1',
-      entries: [{ fieldId: 'ff-2', value: '080-0000-0000' }],
+      entries: [{ fieldId: 'ff-2', value: '080-0000-0000', type: 'text' }],
     }));
   });
 

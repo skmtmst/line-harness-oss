@@ -4,7 +4,21 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { asD1 } from '../d1-test-helper.js';
 import { RETENTION_TABLES, tenantScopeCondition } from '../../src/data-retention-tables.js';
-import { beginMediaObjectDeletion, claimMediaDeletion, finishMediaDeletion, releaseMediaDeletionLease, releaseUnstartedMediaDeletion } from '../../src/media/deletion-jobs.js';
+import { beginMediaObjectDeletion, claimMediaDeletion, finishMediaDeletion, releaseMediaDeletionLease, releaseUnstartedMediaDeletion, purgeExpiredMediaDeletionChecks } from '../../src/media/deletion-jobs.js';
+
+it('期限切れの確認だけ掃除し、削除途中と期限内の確認を残す', async () => {
+  const raw = new Database(':memory:');
+  try {
+    raw.exec('CREATE TABLE banner_images(media_id TEXT,tenant_id TEXT)');
+    raw.exec(readFileSync(new URL('../../migrations/762_media_deletion_jobs.sql', import.meta.url), 'utf8'));
+    raw.exec(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,lease_owner,lease_expires_at,created_at,updated_at) VALUES
+      ('expired','a','[]','checking','x','2026-01-01T00:00:00Z','now','now'),
+      ('active','a','[]','checking','x','2026-01-01T00:02:00Z','now','now'),
+      ('deleting','a','[]','deleting','x','2026-01-01T00:00:00Z','now','now')`);
+    await purgeExpiredMediaDeletionChecks(asD1(raw),'2026-01-01T00:01:00Z');
+    expect(raw.prepare('SELECT media_id FROM media_deletion_jobs ORDER BY media_id').all()).toEqual([{media_id:'active'},{media_id:'deleting'}]);
+  } finally { raw.close(); }
+});
 
 describe('media deletion job claim', () => {
   it('keys are captured once and an expired owner cannot start object deletion', async () => {

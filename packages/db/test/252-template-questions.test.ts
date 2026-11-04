@@ -32,7 +32,8 @@ function setup() {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
-    CREATE TABLE line_accounts (id TEXT PRIMARY KEY);
+    CREATE TABLE line_accounts (id TEXT PRIMARY KEY, tenant_id TEXT);
+    CREATE TABLE banner_images (id TEXT, media_id TEXT, tenant_id TEXT, created_at TEXT);
     CREATE TABLE auto_replies (template_id TEXT, line_account_id TEXT);
     CREATE TABLE scenarios (id TEXT PRIMARY KEY, line_account_id TEXT);
     CREATE TABLE scenario_steps (template_id TEXT, scenario_id TEXT);
@@ -63,6 +64,7 @@ function setup() {
   `)
   sqlite.exec(migration)
   sqlite.exec(migration347)
+  sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'migrations', '762_media_deletion_jobs.sql'), 'utf8'))
   sqlite.exec('ALTER TABLE templates ADD COLUMN deleted_at TEXT')
   return sqlite
 }

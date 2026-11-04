@@ -974,8 +974,10 @@ export function friendMediaIdGuards(db:D1Database, entries:Array<{value:string|n
   const ids=[...new Set(entries.filter(entry=>entry.value && (entry.type==='image'||entry.type==='pdf') && !/^(?:https?:\/\/|\/|media\/|images\/)/i.test(entry.value))
     .map(entry=>entry.value!))];
   if (!ids.length) return [];
-  return [db.prepare(`INSERT INTO media_deletion_guards(blocked) SELECT 1 WHERE EXISTS(SELECT 1 FROM json_each(?) ids
-    WHERE NOT EXISTS(SELECT 1 FROM media m WHERE m.id=ids.value) OR EXISTS(SELECT 1 FROM media_deletion_jobs j WHERE j.media_id=ids.value))`).bind(JSON.stringify(ids))];
+  return [db.prepare(`INSERT INTO media_tenant_guards(blocked) SELECT 1 WHERE EXISTS(SELECT 1 FROM json_each(?) ids
+    WHERE NOT EXISTS(SELECT 1 FROM media m WHERE m.id=ids.value))`).bind(JSON.stringify(ids)),
+    db.prepare(`INSERT INTO media_deletion_guards(blocked) SELECT 1 WHERE EXISTS(SELECT 1 FROM json_each(?) ids
+    WHERE EXISTS(SELECT 1 FROM media_deletion_jobs j WHERE j.media_id=ids.value AND j.status IN ('checking','deleting')))` ).bind(JSON.stringify(ids))];
 }
 
 export async function friendFieldValueStatements(
@@ -999,7 +1001,7 @@ export async function friendFieldValueStatements(
           source_type = excluded.source_type, source_id = excluded.source_id`)
         .bind(input.friendId,input.fieldId,value,input.updatedBy,now,input.sourceType ?? null,input.sourceId ?? null);
   return [statement, ...friendFieldReminderTargetStatements(db, [{ friendId: input.friendId, fieldId: input.fieldId, value }], now),
-    ...await mediaContentDeletionGuard(db,[mediaValue]), ...friendMediaIdGuards(db,[{value,type:fieldType}]), ...mediaTenantGuardByQuery(db,[mediaValue], 'SELECT line_account_id AS account_id FROM friends WHERE id=?',[input.friendId])];
+    ...mediaTenantGuardByQuery(db,[mediaValue], 'SELECT line_account_id AS account_id FROM friends WHERE id=?',[input.friendId]), ...friendMediaIdGuards(db,[{value,type:fieldType}]), ...await mediaContentDeletionGuard(db,[mediaValue])];
 }
 
 
@@ -1044,8 +1046,8 @@ export async function setFriendFieldValuesBulk(
   const mediaValues = input.entries.map(entry=>friendMediaCandidate(entry.value,input.fieldType));
   await db.batch([...statements, ...friendFieldReminderTargetStatements(db,
     input.entries.map(entry => ({ ...entry, fieldId: input.fieldId })), input.now),
-    ...await mediaContentDeletionGuard(db,mediaValues), ...friendMediaIdGuards(db,input.entries.map(entry=>({value:entry.value,type:input.fieldType}))),
-    ...mediaTenantGuardByQuery(db,mediaValues, 'SELECT DISTINCT line_account_id AS account_id FROM friends WHERE id IN (SELECT value FROM json_each(?))', [JSON.stringify(input.entries.map(entry=>entry.friendId))])]);
+    ...mediaTenantGuardByQuery(db,mediaValues, 'SELECT DISTINCT line_account_id AS account_id FROM friends WHERE id IN (SELECT value FROM json_each(?))', [JSON.stringify(input.entries.map(entry=>entry.friendId))]),
+    ...friendMediaIdGuards(db,input.entries.map(entry=>({value:entry.value,type:input.fieldType}))), ...await mediaContentDeletionGuard(db,mediaValues)]);
   return statements.length;
 }
 
@@ -1082,8 +1084,8 @@ export async function setFriendFieldValuesForFriend(
   const mediaValues = input.entries.map(entry=>friendMediaCandidate(entry.value,entry.type));
   await db.batch([...statements, ...friendFieldReminderTargetStatements(db,
     input.entries.map(entry => ({ ...entry, friendId: input.friendId })), input.now),
-    ...await mediaContentDeletionGuard(db,mediaValues), ...friendMediaIdGuards(db,input.entries),
-    ...mediaTenantGuardByQuery(db,mediaValues, 'SELECT line_account_id AS account_id FROM friends WHERE id=?',[input.friendId])]);
+    ...mediaTenantGuardByQuery(db,mediaValues, 'SELECT line_account_id AS account_id FROM friends WHERE id=?',[input.friendId]),
+    ...friendMediaIdGuards(db,input.entries), ...await mediaContentDeletionGuard(db,mediaValues)]);
   return statements.length;
 }
 

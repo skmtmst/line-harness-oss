@@ -340,7 +340,7 @@ export const post__api_restaurant_test_menu_10 = async (c: Context<Env, "/api/re
   const id = crypto.randomUUID();
   const db = dbFor(c.env, body.storeId);
   const write = db.prepare('INSERT INTO rt_menu_items (id, store_id, kind, name, price, allergens_json, service_periods_json, status, description, image_media_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, body.storeId, body.kind, body.name.trim(), price, JSON.stringify(body.allergens || []), JSON.stringify(body.servicePeriods || ['dinner']), status, body.description?.trim() || null, body.imageMediaId ?? null);
-  try { await db.batch([...mediaDeletionGuardStatements(db, [body.imageMediaId ?? null]), ...mediaTenantGuardByQuery(db, [body.imageMediaId ?? null], 'SELECT line_account_id AS account_id FROM rt_stores WHERE id=?', [body.storeId]), write]); }
+  try { await db.batch([...mediaTenantGuardByQuery(db, [body.imageMediaId ?? null], 'SELECT line_account_id AS account_id FROM rt_stores WHERE id=?', [body.storeId]), ...mediaDeletionGuardStatements(db, [body.imageMediaId ?? null]), write]); }
   catch (error) {
     if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
     throw error;

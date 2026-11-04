@@ -172,6 +172,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), inputJson
     }
 
     const link = await createTrackedLink(c.env.DB, {
+      tenantId: c.get('staff').tenantId,
       name: body.name,
       originalUrl: body.originalUrl,
       tagId: body.tagId ?? null,
@@ -213,7 +214,7 @@ trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requ
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
 
-    const link = await updateTrackedLink(c.env.DB, id, body);
+    const link = await updateTrackedLink(c.env.DB, id, {...body,tenantId:c.get('staff').tenantId});
     if (!link) {
       return fail(c, 404, 'TRACKED_LINK_NOT_FOUND');
     }

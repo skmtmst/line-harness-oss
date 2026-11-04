@@ -97,9 +97,9 @@ describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
     expect(raw.prepare('SELECT * FROM media_usages').all()).toEqual([]);
   });
   it.each(['other', 'shared', 'archived', 'video', 'missing'])('%sは写真にできず、全保存経路で何も書かない', async mediaId => {
-    expect((await menuSave(mediaId)).status).toBe(400);
-    expect((await request('/api/booking/admin/staff/s/photo', { expectedVersion: 1, mediaId })).status).toBe(400);
-    expect((await storeSave(photos(mediaId))).status).toBe(400);
+    expect((await menuSave(mediaId)).status).toBe(404);
+    expect((await request('/api/booking/admin/staff/s/photo', { expectedVersion: 1, mediaId })).status).toBe(404);
+    expect((await storeSave(photos(mediaId))).status).toBe(404);
     expect(raw.prepare('SELECT version,photo_media_id FROM menus WHERE id=\'m\'').get()).toEqual({ version: 1, photo_media_id: null });
     expect(raw.prepare('SELECT * FROM booking_settings').all()).toEqual([]);
     expect(raw.prepare('SELECT * FROM media_usages').all()).toEqual([]);

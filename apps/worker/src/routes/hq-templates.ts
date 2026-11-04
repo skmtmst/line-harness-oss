@@ -43,7 +43,7 @@ async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
 }
 const reasons: Record<string, string> = {
   media_deletion_in_progress: '削除中の画像は使用できません。別の画像を選んでください。',
-  media_cross_tenant_reference: '別の統括の画像は使用できません。別の画像を選んでください。',
+  media_unavailable: '使えない画像です。',
   PUBLIC_IMAGE_REFERENCE_UNSUPPORTED: '登録画像を参照するフォームは、画像の各店への複製にまだ対応していないため配れません。画像の参照を外して確認してください',
   FORM_STORE_REFERENCE_UNAVAILABLE: '配り先のお店に同じキーの公開できる共通情報がありません。お店の情報の参照を確認してください',
   INVALID_MEDIA: '動画はMP4、音声はM4Aで選んでください。ファイルの長さを読み取れるか確認してください',
@@ -270,7 +270,7 @@ hqTemplates.post('/api/hq/templates/:id/distribute', inputJsonBoundary(), async 
     : await distributeTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.preflightId, input.resolutions as DistributionSelection[], c.env.IMAGES, c.env.WORKER_URL || new URL(c.req.url).origin);
   c.set('auditRecorded', true);
   if (data.stores.some(store => store.reason === MEDIA_DELETION_DISTRIBUTION_REASON)) return c.json({ success: false, code: 'media_deletion_in_progress', reason: MEDIA_DELETION_DISTRIBUTION_REASON, data }, 409);
-  if (data.stores.some(store => store.reason === MEDIA_TENANT_DISTRIBUTION_REASON)) return c.json({ success: false, code: 'media_cross_tenant_reference', reason: MEDIA_TENANT_DISTRIBUTION_REASON, data }, 409);
+  if (data.stores.some(store => store.reason === MEDIA_TENANT_DISTRIBUTION_REASON)) return c.json({ success: false, code: 'media_unavailable', reason: MEDIA_TENANT_DISTRIBUTION_REASON, data }, 404);
   return c.json({ success: true, data });
 });
 hqTemplates.get('/api/hq/templates/:id/distributions/:runId', async c => {

@@ -64,6 +64,7 @@ export async function createScheduledChatSend(
     id: string;
     friendId: string;
     lineAccountId: string | null;
+    tenantId?: string | null;
     staffId: string;
     messageType: string;
     content: string;
@@ -112,7 +113,7 @@ export async function createScheduledChatSend(
       input.quotedMessageId,
       scheduledAt,
     );
-  const [result] = await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.content], input.lineAccountId ? [input.lineAccountId] : [])]);
+  const [result] = await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.content], input.lineAccountId ? [input.lineAccountId] : [],input.tenantId)]);
   if ((result.meta?.changes ?? 0) === 1) {
     const row = await getScheduledChatSend(db, input.id);
     if (!row) throw new Error('scheduled send record unavailable');
@@ -142,6 +143,7 @@ export async function findInFlightScheduledChatSend(
   db: D1Database,
   input: {
     friendId: string;
+    tenantId?: string | null;
     lineAccountId: string | null;
     messageType: string;
     content: string;
@@ -250,6 +252,7 @@ export async function updateScheduledChatSend(
   input: {
     id: string;
     friendId: string;
+    tenantId?: string | null;
     scheduledAt?: string;
     content?: string;
     now?: string;
@@ -268,7 +271,7 @@ export async function updateScheduledChatSend(
         WHERE id = ? AND friend_id = ? AND status = 'scheduled' AND line_account_id IS ?`,
     )
     .bind(scheduledAt, input.content ?? null, now, input.id, input.friendId, existing?.line_account_id ?? null);
-  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [input.content], existing?.line_account_id ? [existing.line_account_id] : [])]);
+  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [input.content], existing?.line_account_id ? [existing.line_account_id] : [],input.tenantId)]);
   if ((result.meta?.changes ?? 0) === 1) return 'updated';
   const row = await getScheduledChatSend(db, input.id);
   return !row || row.friend_id !== input.friendId ? 'not_found' : 'locked';

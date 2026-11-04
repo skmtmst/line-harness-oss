@@ -153,6 +153,23 @@ describe('tenant data retention purge', () => {
     expect(IMAGES.delete).toHaveBeenCalledWith(['images/retired.png']);
   });
 
+  test('旧版の削除中に止まっても別統括バナーは画像なしとして残る', async () => {
+    seedTenant('t1',{requested:jst(-1)}); seedTenant('t2',{planStatus:'active'}); seedMedia('t1','images/shared.png');
+    sqlite.raw.exec(`INSERT INTO media_versions(id,media_id,version_no,r2_key,mime_type,size_bytes) VALUES('v1','media-t1',1,'images/shared.png','image/png',10);
+      INSERT INTO banner_projects(id,tenant_id,name) VALUES('p2','t2','仮');
+      INSERT INTO banner_images(id,tenant_id,project_id,media_id) VALUES('b2','t2','p2','media-t1');`);
+    const IMAGES=createR2();
+    IMAGES.delete.mockImplementationOnce(async () => {
+      const row=sqlite.raw.prepare("SELECT m.r2_key FROM banner_images b JOIN media m ON m.id=b.media_id WHERE b.id='b2'").get() as {r2_key:string};
+      expect(row.r2_key).toMatch(/^missing-banner\//);
+      throw new Error('offline');
+    });
+    expect((await processTenantDataPurge({DB:sqlite.db,IMAGES},{now:NOW})).completed).toBe(0);
+    expect(count('banner_images','id=?','b2')).toBe(1);
+    expect((await processTenantDataPurge({DB:sqlite.db,IMAGES},{now:NOW})).completed).toBe(1);
+    expect(count('audit_events',"action=? AND reason=?",'media_removed_cross_tenant','CROSS_TENANT_MEDIA_REMOVED')).toBeGreaterThan(0);
+  });
+
   test('旧版の画像を消せなかったときは記録せず、再試行で1件だけ記録する', async () => {
     seedTenant('t1', { requested:jst(-1) }); seedTenant('t2', { planStatus:'active' });
     seedMedia('t1','images/current.png');

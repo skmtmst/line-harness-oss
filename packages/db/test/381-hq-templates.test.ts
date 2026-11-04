@@ -136,9 +136,10 @@ describe('migration 381: 統括ひな形の基盤', () => {
       contentHash: 'sha256:content',
       expectedTemplateRevision: 1,
     });
-    expect(plan.statements).toHaveLength(2);
+    expect(plan.statements).toHaveLength(3);
     expect(plan.statements[0].sql).toContain('archived_at IS NULL');
     expect(plan.statements[1].sql).toContain('revision = ?');
+    expect(plan.statements[2].sql).toContain('media_deletion_guards');
   });
 
   test('preflight CASはtenant/fingerprint/snapshotを横断更新せず、解決選択を店舗snapshotへ固定する', async () => {

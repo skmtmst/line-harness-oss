@@ -35,7 +35,7 @@ lineSenders.post('/api/line-accounts/:id/senders',async c=>{
    const write=c.env.DB.prepare(`INSERT INTO line_senders(id,account_id,name,icon_media_id,icon_url,visibility,owner_staff_id,created_by,updated_at,idempotency_key,request_json)
     VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,idempotency_key) DO NOTHING`).bind(crypto.randomUUID(),account,String(b.name).trim(),icon?.id??null,icon?.url??null,b.visibility,owner,staff.id,new Date().toISOString(),key,canonical);
    await c.env.DB.batch([...mediaDeletionGuardStatements(c.env.DB,[icon?.id??null],[account]),write]);
-  } catch(e) {if(isMediaDeletionConflict(e)) throw new GapError('media_deletion_in_progress',409);if(isMediaTenantConflict(e))throw new GapError('別の統括の画像は使用できません',409);if(String(e).includes('sender_limit')) throw new GapError('sender_limit',409);throw e;}
+  } catch(e) {if(isMediaDeletionConflict(e)) throw new GapError('media_deletion_in_progress',409);if(isMediaTenantConflict(e))throw new GapError('使えない画像です',404);if(String(e).includes('sender_limit')) throw new GapError('sender_limit',409);throw e;}
   row=await c.env.DB.prepare('SELECT * FROM line_senders WHERE account_id=? AND idempotency_key=?').bind(account,key).first<SenderRow>();
  }
  if(!row||row.request_json!==canonical) throw new GapError('idempotency_conflict',409);
@@ -53,7 +53,7 @@ lineSenders.on(['PUT','DELETE'],'/api/line-accounts/:id/senders/:senderId',async
  .bind(remove?r.name:String(b.name).trim(),remove?r.icon_media_id:icon?.id??null,remove?r.icon_url:icon?.url??null,remove?'inactive':r.status,new Date().toISOString(),r.id,account,version);
  let result:D1Result;
  try {const writes=await c.env.DB.batch([...mediaDeletionGuardStatements(c.env.DB,[remove?null:icon?.id??null],[account]),write]);result=writes[writes.length-1]!;}
- catch(e) {if(isMediaDeletionConflict(e)) throw new GapError('media_deletion_in_progress',409);if(isMediaTenantConflict(e))throw new GapError('別の統括の画像は使用できません',409);throw e;}
+ catch(e) {if(isMediaDeletionConflict(e)) throw new GapError('media_deletion_in_progress',409);if(isMediaTenantConflict(e))throw new GapError('使えない画像です',404);throw e;}
  if(!result.meta.changes) throw new GapError('version_conflict',409);
  return c.json({success:true,data:senderResponse((await c.env.DB.prepare('SELECT * FROM line_senders WHERE id=?').bind(r.id).first<SenderRow>())!)});
 });

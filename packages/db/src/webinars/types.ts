@@ -138,6 +138,7 @@ export interface WebinarFormFunnelStats {
 }
 
 export interface WebinarCreateInput {
+  tenantId?: string | null;
   accountId?: string | null;
   title: string;
   slug: string;

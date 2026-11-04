@@ -252,6 +252,7 @@ describe('PUT /api/broadcasts/:id', () => {
         stealth_spread_minutes: 45,
       }),
       3,
+      undefined,
     );
   });
 

@@ -45,7 +45,7 @@ companySettings.put('/api/settings/company', requireRole('owner', 'admin'), inpu
   const db = dbFor(c.env), staff = c.get('staff')!, tenantId = staff.tenantId!;
   const logoMediaId = input.logoMediaId;
   const logoDeleting = async () => logoMediaId && Boolean(await db.prepare(`SELECT 1 FROM media_deletion_jobs j
-    JOIN line_accounts a ON a.id=j.line_account_id WHERE j.media_id=? AND a.tenant_id=?`)
+    JOIN line_accounts a ON a.id=j.line_account_id WHERE j.media_id=? AND a.tenant_id=? AND j.status IN ('checking','deleting')`)
     .bind(logoMediaId, tenantId).first());
   const deletingResponse = () => c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
   if (await logoDeleting()) return deletingResponse();

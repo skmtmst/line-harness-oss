@@ -150,9 +150,9 @@ test('配布中に画像が別統括へ移れば残りを止めて理由を残�
   return result;
  }) as D1Database['batch'];
  const result=await run(id,p);
- expect(result.status).toBe(409);
+ expect(result.status).toBe(404);
  expect(result.body.data.stores.map(s=>s.status)).toEqual(['succeeded','failed','failed']);
- expect((result.body.data.stores[1] as {reason?:string}).reason).toContain('別の統括');
- expect((result.body.data.stores[2] as {reason?:string}).reason).toContain('別の統括');
+ expect((result.body.data.stores[1] as {reason?:string}).reason).toContain('使えない画像です');
+ expect((result.body.data.stores[2] as {reason?:string}).reason).toContain('使えない画像です');
  expect(f.raw.prepare('SELECT line_account_id FROM mileage_rewards ORDER BY line_account_id').all()).toEqual([{line_account_id:'a'}]);
 });

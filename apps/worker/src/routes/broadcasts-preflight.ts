@@ -319,6 +319,7 @@ export const post__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">)
   let broadcast: DbBroadcast;
   try {
     broadcast = await createBroadcast(c.env.DB, {
+      tenantId: c.get('staff').tenantId,
       id: newBroadcastId,
       title,
       stealthSpreadMinutes: body.stealthSpreadMinutes ?? 0,

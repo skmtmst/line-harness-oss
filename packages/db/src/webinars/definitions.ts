@@ -251,7 +251,7 @@ export async function createWebinar(db: D1Database, input: WebinarCreateInput): 
       input.folderId ?? null, input.publicationStartsAt ?? null, input.publicationEndsAt ?? null,
       now, now,
     );
-  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.videoPrefix], input.accountId ? [input.accountId] : [])]);
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.videoPrefix], input.accountId ? [input.accountId] : [],input.tenantId)]);
   return (await getWebinarById(db, id))!;
 }
 
@@ -289,7 +289,7 @@ export async function updateWebinar(
       jstNow(), id, ...(expectedVersion === undefined ? [] : [expectedVersion]),
     );
   const accountId = patch.accountId !== undefined ? patch.accountId : existing.account_id;
-  if (expectedVersion === undefined) await db.batch([update, ...await mediaContentDeletionGuard(db, [patch.videoPrefix ?? existing.video_prefix], accountId ? [accountId] : [])]);
+  if (expectedVersion === undefined) await db.batch([update, ...await mediaContentDeletionGuard(db, [patch.videoPrefix ?? existing.video_prefix], accountId ? [accountId] : [],patch.tenantId)]);
   else {
     const result = await db.batch([
       db.prepare(`INSERT OR IGNORE INTO webinar_editor_settings (webinar_id,version,created_at,updated_at) VALUES (?,0,?,?)`).bind(id,jstNow(),jstNow()),
@@ -305,7 +305,7 @@ export async function updateWebinar(
           'publicPageTest',CASE WHEN public_page_test_json IS NULL THEN NULL ELSE json(public_page_test_json) END),?
         FROM webinar_editor_settings WHERE webinar_id=? AND version=? AND changes()=1`)
         .bind(crypto.randomUUID(),jstNow(),id,expectedVersion+1),
-      ...await mediaContentDeletionGuard(db, [patch.videoPrefix ?? existing.video_prefix], accountId ? [accountId] : []),
+      ...await mediaContentDeletionGuard(db, [patch.videoPrefix ?? existing.video_prefix], accountId ? [accountId] : [],patch.tenantId),
     ]);
     if (Number(result[1].meta?.changes ?? 0) !== 1) return null;
   }

@@ -489,19 +489,19 @@ friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'adm
       return c.json({ success: false, code: 'PREVIEW_STALE', error: '事前確認後に値または使用先が変わりました。やり直してください' }, 409);
     }
     if ((target.type === 'image' || target.type === 'pdf') && await c.env.DB.prepare(
-      `SELECT 1 FROM field_migration_items i
-        WHERE i.run_id = ? AND i.status = 'convertible' AND (EXISTS(SELECT 1 FROM media_deletion_jobs j WHERE j.media_id=i.converted_value) OR NOT EXISTS(SELECT 1 FROM media m WHERE m.id=i.converted_value)) LIMIT 1`,
+      `SELECT 1 FROM field_migration_items i JOIN friends f ON f.id=i.friend_id
+         LEFT JOIN media m ON m.id=i.converted_value LEFT JOIN line_accounts owner ON owner.id=m.line_account_id
+         LEFT JOIN line_accounts target_account ON target_account.id=f.line_account_id
+       WHERE i.run_id=? AND i.status='convertible' AND (m.id IS NULL OR NOT COALESCE(owner.id=target_account.id OR
+         (owner.tenant_id IS NOT NULL AND target_account.tenant_id IS NOT NULL AND owner.tenant_id=target_account.tenant_id),0)) LIMIT 1`,
     ).bind(run.id).first()) {
-      return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像が含まれているため移行できません。事前確認をやり直してください。' }, 409);
+      return c.json({ success:false, code:'media_unavailable', error:'使えない画像です。' },404);
     }
     if ((target.type === 'image' || target.type === 'pdf') && await c.env.DB.prepare(
-      `SELECT 1 FROM field_migration_items i JOIN friends f ON f.id=i.friend_id
-         JOIN media m ON m.id=i.converted_value LEFT JOIN line_accounts owner ON owner.id=m.line_account_id
-         LEFT JOIN line_accounts target_account ON target_account.id=f.line_account_id
-       WHERE i.run_id=? AND i.status='convertible' AND NOT COALESCE(owner.id=target_account.id OR
-         (owner.tenant_id IS NOT NULL AND target_account.tenant_id IS NOT NULL AND owner.tenant_id=target_account.tenant_id),0) LIMIT 1`,
+      `SELECT 1 FROM field_migration_items i WHERE i.run_id=? AND i.status='convertible' AND EXISTS
+       (SELECT 1 FROM media_deletion_jobs j WHERE j.media_id=i.converted_value AND j.status IN ('checking','deleting')) LIMIT 1`,
     ).bind(run.id).first()) {
-      return c.json({ success:false, code:'media_cross_tenant_reference', error:'別の統括の画像が含まれているため移行できません。事前確認をやり直してください。' },409);
+      return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像が含まれているため移行できません。事前確認をやり直してください。' }, 409);
     }
     if (!await queueFieldMigration(c.env.DB, run.id, idempotencyKey)) {
       /*

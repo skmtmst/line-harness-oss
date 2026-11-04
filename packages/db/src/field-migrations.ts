@@ -269,17 +269,16 @@ export async function executeFieldMigration(
               SET status = 'succeeded', migrated_at = ?, reason = NULL
             WHERE run_id = ? AND friend_id = ?`,
         ).bind(now, runId, item.friend_id),
-        ...(typed.mediaId ? [db.prepare(`INSERT INTO media_deletion_guards(blocked)
-          SELECT 1 WHERE EXISTS (SELECT 1 FROM media_deletion_jobs WHERE media_id = ?) OR NOT EXISTS (SELECT 1 FROM media WHERE id = ?)`)
-          .bind(typed.mediaId, typed.mediaId)] : []),
         ...(typed.mediaId ? mediaTenantGuardByQuery(db,[typed.mediaId], 'SELECT line_account_id AS account_id FROM friends WHERE id=?', [item.friend_id]) : []),
+        ...(typed.mediaId ? [db.prepare(`INSERT INTO media_tenant_guards(blocked) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM media WHERE id = ?)`).bind(typed.mediaId),
+          db.prepare(`INSERT INTO media_deletion_guards(blocked) SELECT 1 WHERE EXISTS (SELECT 1 FROM media_deletion_jobs WHERE media_id = ? AND status IN ('checking','deleting'))`).bind(typed.mediaId)] : []),
       ]);
     } catch (error) {
       await db.prepare(
         `UPDATE field_migration_items SET status = 'failed', reason = ?
           WHERE run_id = ? AND friend_id = ?`,
       ).bind(String(error).includes('media_cross_tenant_reference')
-        ? '別の統括の画像のため保存しませんでした。'
+        ? '使えない画像のため保存しませんでした。'
         : String(error).includes('media_deletion_in_progress')
         ? 'この画像は削除中のため登録できません。'
         : error instanceof Error ? error.message.slice(0, 300) : '保存に失敗しました', runId, item.friend_id).run();

@@ -235,6 +235,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
     try {
       await claimMediaForSend(c.env.DB, {
         claimId: mediaClaimId, accountId: friend.line_account_id ?? '',
+        tenantId: c.get('staff').tenantId,
         content: JSON.stringify(messages), expiresAt: new Date(mediaClaimDeadline).toISOString(),
       });
       mediaSendClaimId = mediaClaimId;
@@ -493,6 +494,7 @@ export const post__api_chats_id_schedule_2 = async (c: Context<Env, "/api/chats/
       id: crypto.randomUUID(),
       friendId: friend.id,
       lineAccountId: friend.line_account_id ?? null,
+      tenantId: c.get('staff').tenantId,
       staffId: c.get('staff').id,
       messageType,
       content: validatedContent,
@@ -598,6 +600,7 @@ export const patch__api_chats_id_scheduled_scheduleId_4 = async (c: Context<Env,
     const result = await updateScheduledChatSend(c.env.DB, {
       id: scheduleId,
       friendId: chat.friend_id,
+      tenantId: c.get('staff').tenantId,
       scheduledAt: updates.scheduledAt,
       content: updates.content,
       now: new Date().toISOString(),

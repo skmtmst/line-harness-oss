@@ -20,6 +20,7 @@ type DbState = {
 
 function database(state: DbState): D1Database {
   return {
+    async batch(statements: D1PreparedStatement[]) { return Promise.all(statements.map(statement => statement.run())); },
     prepare(sql: string) {
       state.preparedSql.push(sql);
       let values: unknown[] = [];

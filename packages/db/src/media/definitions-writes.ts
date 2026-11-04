@@ -59,7 +59,7 @@ export async function createMedia(
       now, input.uploadedBy ?? null, now, now,
     ),
     ...(input.sourceMedia ? [db.prepare(`INSERT INTO media_deletion_guards(blocked)
-      SELECT 1 WHERE EXISTS(SELECT 1 FROM media_deletion_jobs WHERE media_id=?)
+      SELECT 1 WHERE EXISTS(SELECT 1 FROM media_deletion_jobs WHERE media_id=? AND status IN ('checking','deleting'))
         OR NOT EXISTS(SELECT 1 FROM media WHERE id=? AND r2_key=?)`)
       .bind(input.sourceMedia.id,input.sourceMedia.id,input.sourceMedia.r2Key)] : []),
     ...(input.sourceMedia ? mediaTenantGuard(db, [input.sourceMedia.id], input.lineAccountId ? [input.lineAccountId] : []) : []),

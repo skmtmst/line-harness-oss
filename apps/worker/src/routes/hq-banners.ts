@@ -723,7 +723,7 @@ hqBanners.post('/api/hq/banners/images/:id/deliver', inputJsonBoundary(), async 
       }
       const source = await getPinnedMediaObject(c.env.IMAGES, image.media.r2_key, sourceGate.etag);
       if (!source) {
-        const deleting = await c.env.DB.prepare('SELECT 1 FROM media_deletion_jobs WHERE media_id=?').bind(image.media.id).first();
+        const deleting = await c.env.DB.prepare("SELECT 1 FROM media_deletion_jobs WHERE media_id=? AND status IN ('checking','deleting')").bind(image.media.id).first();
         return c.json({ success: false, error: deleting ? '画像が削除中のため使用できません。' : '画像の実体が見つかりません。もう一度生成してください' }, 409);
       }
       const bytes = new Uint8Array(await source.arrayBuffer());

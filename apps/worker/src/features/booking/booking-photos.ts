@@ -79,13 +79,13 @@ export async function getBookingPhotos(db: D1Database, accountId: string, origin
 
 async function checkMedia(db: D1Database, accountId: string, mediaId: string | null): Promise<void> {
   if (mediaId === null) return;
-  if (await db.prepare(`SELECT 1 FROM media_deletion_jobs WHERE media_id=? AND line_account_id=?`).bind(mediaId, accountId).first()) {
+  if (await db.prepare(`SELECT 1 FROM media_deletion_jobs WHERE media_id=? AND line_account_id=? AND status IN ('checking','deleting')`).bind(mediaId, accountId).first()) {
     throw new BookingPhotoError('media_deletion_in_progress', 409);
   }
   if (!await db.prepare(`SELECT id FROM media WHERE id=? AND line_account_id=? AND kind='image' AND archived_at IS NULL`)
     .bind(mediaId, accountId).first()) {
-    if (await db.prepare(`SELECT 1 FROM media_deletion_jobs WHERE media_id=? AND line_account_id=?`).bind(mediaId, accountId).first()) throw new BookingPhotoError('media_deletion_in_progress', 409);
-    throw new BookingPhotoError('booking_photo_media_unavailable');
+    if (await db.prepare(`SELECT 1 FROM media_deletion_jobs WHERE media_id=? AND line_account_id=? AND status IN ('checking','deleting')`).bind(mediaId, accountId).first()) throw new BookingPhotoError('media_deletion_in_progress', 409);
+    throw new BookingPhotoError('使えない画像です', 404);
   }
 }
 
@@ -108,7 +108,7 @@ export async function saveBookingPhoto(db: D1Database, accountId: string, owner:
     result = writes[writes.length - 1]!;
   } catch (error) {
     if (isMediaDeletionConflict(error)) throw new BookingPhotoError('media_deletion_in_progress', 409);
-    if (isMediaTenantConflict(error)) throw new BookingPhotoError('media_cross_tenant_reference', 409);
+    if (isMediaTenantConflict(error)) throw new BookingPhotoError('使えない画像です', 404);
     throw error;
   }
   if (!result.meta.changes) throw new BookingPhotoError('version_conflict', 409);
@@ -138,7 +138,7 @@ export async function saveBookingStorePhotos(db: D1Database, accountId: string, 
   try { saved = (await db.batch(statements))[guards.length]; }
   catch (error) {
     if (isMediaDeletionConflict(error)) throw new BookingPhotoError('media_deletion_in_progress', 409);
-    if (isMediaTenantConflict(error)) throw new BookingPhotoError('media_cross_tenant_reference', 409);
+    if (isMediaTenantConflict(error)) throw new BookingPhotoError('使えない画像です', 404);
     throw error;
   }
   if (saved?.meta.changes) return input.expectedVersion + 1;

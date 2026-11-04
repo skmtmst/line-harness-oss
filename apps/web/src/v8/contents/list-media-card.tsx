@@ -124,7 +124,7 @@ export function MediaCardV8({
             : []),
           // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
           ...(canManageMedia && !item.archivedAt
-            ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: onDeleteStart }]
+            ? [{ id: 'delete', ...(item.deletionInProgress ? { label: '削除を再試行' } : { label: '削除する' }), tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: onDeleteStart }]
             : []),
           ...(canManageMedia && !item.archivedAt
             ? [{ id: 'replace', label: '別のメディアに差し替える', onSelect: onReplaceStart }]
@@ -204,6 +204,7 @@ export function MediaCardV8({
             <p className={styles.meta} title={formatMediaDetails(item)}>
               {`${kindLabel}・${formatMediaSize(item.sizeBytes)}`}
             </p>
+            {item.deletionInProgress ? <p className={styles.usage}>削除が途中です・再試行</p> : null}
             <p className={item.usageCount === undefined || item.usageCount === 0 ? `${styles.usage} ${styles.usageIdle}` : `${styles.usage} ${styles.usageUsed}`}>
               {item.usageCount === undefined
                 ? '使用先：確かめられません'

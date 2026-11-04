@@ -106,7 +106,7 @@ export const put__api_webinars_id_2 = async (c: Context<Env, "/api/webinars/:id"
     const dupe = await getWebinarBySlug(c.env.DB, body.slug);
     if (dupe) return c.json({ success: false, error: 'slug_taken' }, 409);
   }
-  const updated = await updateWebinar(c.env.DB, id, input as Parameters<typeof updateWebinar>[2], body.expectedVersion);
+  const updated = await updateWebinar(c.env.DB, id, {...input,tenantId:c.get('staff').tenantId} as Parameters<typeof updateWebinar>[2], body.expectedVersion);
   if (!updated) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
   return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, updated!) });
 };

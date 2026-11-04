@@ -488,7 +488,7 @@ export async function createMediaVersionFromUpload(
           WHERE id = ? AND line_account_id = ? AND status = 'verified'`,
       ).bind(input.mediaId, now, session.id, input.lineAccountId),
       db.prepare(`INSERT INTO media_deletion_guards(blocked)
-        SELECT 1 WHERE EXISTS (SELECT 1 FROM media_deletion_jobs WHERE media_id = ?)`)
+        SELECT 1 WHERE EXISTS (SELECT 1 FROM media_deletion_jobs WHERE media_id = ? AND status IN ('checking','deleting'))`)
         .bind(input.mediaId),
       ...await mediaDeletedKeyFingerprintGuard(db, [session.r2_key], {checkLiveIds:false}),
     ]);

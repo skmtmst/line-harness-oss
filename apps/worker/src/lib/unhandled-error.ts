@@ -17,7 +17,7 @@ export class UnexpectedRouteError extends HTTPException {
  */
 export const unhandledWorkerError: ErrorHandler<Env> = (error, c) => {
   if (String(error).includes('media_cross_tenant_reference')) {
-    return c.json({ success: false, code: 'media_cross_tenant_reference', error: '別の統括の画像は使用できません。別の画像を選んでください。' }, 409);
+    return c.json({ success: false, code: 'media_unavailable', error: '使えない画像です。' }, 404);
   }
   if (isMediaDeletionConflict(error)) {
     return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);

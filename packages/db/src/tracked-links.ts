@@ -94,6 +94,7 @@ export function generateShortCode(): string {
 }
 
 export interface CreateTrackedLinkInput {
+  tenantId?: string | null;
   name: string;
   originalUrl: string;
   tagId?: string | null;
@@ -150,7 +151,7 @@ export async function createTrackedLink(
           now,
           now,
         );
-      await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.ogImageUrl], input.lineAccountId ? [input.lineAccountId] : [])]);
+      await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.ogImageUrl], input.lineAccountId ? [input.lineAccountId] : [],input.tenantId)]);
       break;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -257,6 +258,7 @@ async function reactivateIfNeeded(
 }
 
 export interface UpdateTrackedLinkInput {
+  tenantId?: string | null;
   name?: string;
   tagId?: string | null;
   scenarioId?: string | null;
@@ -301,7 +303,7 @@ export async function updateTrackedLink(
        WHERE id = ?`,
     )
     .bind(name, tagId, scenarioId, introTemplateId, rewardTemplateId, lineAccountId, isActive, ogTitle, ogDescription, ogImageUrl, now, id);
-  await db.batch([update, ...await mediaContentDeletionGuard(db, [ogImageUrl], lineAccountId ? [lineAccountId] : [])]);
+  await db.batch([update, ...await mediaContentDeletionGuard(db, [ogImageUrl], lineAccountId ? [lineAccountId] : [],input.tenantId)]);
 
   return getTrackedLinkById(db, id);
 }

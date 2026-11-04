@@ -1,5 +1,6 @@
 /** メディアライブラリの1件 */
 export interface MediaItem {
+  deletionInProgress?: boolean;
   revision?: number;
   id: string;
   lineAccountId: string | null;

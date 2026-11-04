@@ -44,7 +44,7 @@ async function batch(db: D1Database, statements: HqTemplateStatement[], tenantId
   const fingerprintGuards: D1PreparedStatement[] = [];
   for (const statement of statements) if (statement.sql === MEDIA_DELETION_TEXT_GUARD_SQL) {
     fingerprintGuards.push(...await mediaDeletedKeyFingerprintGuard(db, JSON.parse(String(statement.bindings[0])) as string[]));
-    fingerprintGuards.push(...mediaTenantGuardByQuery(db, JSON.parse(String(statement.bindings[0])) as string[], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenantId]));
+    fingerprintGuards.push(...mediaTenantGuardByQuery(db, JSON.parse(String(statement.bindings[0])) as string[], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenantId],tenantId));
   }
   return db.batch([...statements.map(s => db.prepare(s.sql).bind(...s.bindings)), ...fingerprintGuards]);
 }
@@ -118,7 +118,7 @@ export async function saveTemplate(db: D1Database, authority: HqTemplateAuthorit
   try { await batch(db, statements, authority.tenantId); }
   catch (error) {
     if (isMediaDeletionConflict(error)) throw new HqTemplateError('media_deletion_in_progress', 409);
-    if (isMediaTenantConflict(error)) throw new HqTemplateError('media_cross_tenant_reference', 409);
+    if (isMediaTenantConflict(error)) throw new HqTemplateError('media_unavailable', 404);
     if (type === 'form') {
       const valid = await db.prepare(`SELECT ${validRestaurantCoursesSql} AS valid`).bind(json, null).first<{valid:number}>();
       if (!valid?.valid) throw new HqTemplateError('restaurant_course_unavailable', 409);
@@ -241,7 +241,7 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
   return { preflightId, expiresAt, stores };
 }
 export const MEDIA_DELETION_DISTRIBUTION_REASON = '画像が削除中のため止めました。画像を差し替えて、もう一度配布してください。';
-export const MEDIA_TENANT_DISTRIBUTION_REASON = '別の統括の画像が含まれるため止めました。画像を差し替えて、もう一度配布してください。';
+export const MEDIA_TENANT_DISTRIBUTION_REASON = '使えない画像です。画像を差し替えて、もう一度配布してください。';
 function resultReason(status: string, errorCode: string | null): string | null {
   if (status === 'failed' && errorCode === 'MEDIA_DELETION_IN_PROGRESS') return MEDIA_DELETION_DISTRIBUTION_REASON;
   if (status === 'failed' && errorCode === 'MEDIA_CROSS_TENANT_REFERENCE') return MEDIA_TENANT_DISTRIBUTION_REASON;

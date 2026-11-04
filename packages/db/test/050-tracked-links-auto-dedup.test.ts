@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { asD1 } from './d1-test-helper.js';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -53,40 +54,6 @@ function setupDb(): Database.Database {
   }
   migratedSnapshot = db.serialize();
   return db;
-}
-
-function asD1(sqlite: Database.Database): D1Database {
-  return {
-    prepare(query: string) {
-      return {
-        bind(...params: unknown[]) {
-          const stmt = sqlite.prepare(query);
-          return {
-            async run() {
-              stmt.run(...params);
-              return { results: [], success: true, meta: {} };
-            },
-            async first<T>() {
-              return (stmt.get(...params) as T) ?? null;
-            },
-            async all<T>() {
-              return { results: stmt.all(...params) as T[], success: true, meta: {} };
-            },
-          };
-        },
-        async run() {
-          sqlite.prepare(query).run();
-          return { results: [], success: true, meta: {} };
-        },
-        async first<T>() {
-          return (sqlite.prepare(query).get() as T) ?? null;
-        },
-        async all<T>() {
-          return { results: sqlite.prepare(query).all() as T[], success: true, meta: {} };
-        },
-      };
-    },
-  } as unknown as D1Database;
 }
 
 function insertLineAccount(sqlite: Database.Database, id: string): void {
@@ -207,6 +174,7 @@ describe('getOrCreateAutoTrackedLink', () => {
     // delivery inserts the row before our INSERT runs.
     let selectCount = 0;
     const raced = {
+      batch: db.batch.bind(db),
       prepare(query: string) {
         const inner = (db as unknown as { prepare(q: string): unknown }).prepare(query);
         if (/SELECT \* FROM tracked_links WHERE dedup_key = \?/.test(query)) {

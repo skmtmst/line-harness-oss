@@ -12,6 +12,9 @@ export async function checkRestaurantMenuMedia({ testDb, seedRestaurantFixture, 
   requestWithMethod: (path: string, method: string, body?: unknown) => Response | Promise<Response>;
 }): Promise<void> {
     seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES
+      ('account-2','media-channel-2','店A','x','x','00000000-0000-4000-8000-000000000001'),
+      ('account-3','media-channel-3','店B','x','x','00000000-0000-4000-8000-000000000001')`);
     testDb.raw.prepare(`INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES('menu-photo','account-2','image','dish.png','image/png',100,'fake/menu.png')`).run();
     const response = await request('/api/restaurant-test/menu?account_id=account-1', { storeId:'store-ginza', kind:'course', name:'架空のコース', price:1000, status:'draft', description:'季節の料理', imageMediaId:'menu-photo' });
     expect(response.status).toBe(201);

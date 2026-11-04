@@ -134,6 +134,9 @@ describe('実DB: 新規は未公開で始まり、初回公開で版1になる',
 });
 
 function seedMedia(id: string, accountId: string, key: string): void {
+  store.raw.exec(`INSERT OR IGNORE INTO tenants(id,name) VALUES('template-tenant-a','A'),('template-tenant-b','B');
+    INSERT OR IGNORE INTO line_accounts(id,tenant_id,channel_id,name,channel_access_token,channel_secret) VALUES
+    ('account-1','template-tenant-a','template-channel-1','A','x','x'),('account-2','template-tenant-b','template-channel-2','B','x','x')`);
   store.raw.prepare(`
     INSERT INTO media
       (id, line_account_id, kind, filename, mime_type, size_bytes, r2_key, created_at)

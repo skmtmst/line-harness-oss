@@ -247,7 +247,7 @@ styles.put(
           tenant,
           current.version,
         );
-      const [r] = await c.env.DB.batch([statement, ...await mediaDeletionTextGuardStatements(c.env.DB, [JSON.stringify(definition)]), ...mediaTenantGuardByQuery(c.env.DB, [JSON.stringify(definition)], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenant])]);
+      const [r] = await c.env.DB.batch([statement, ...await mediaDeletionTextGuardStatements(c.env.DB, [JSON.stringify(definition)]), ...mediaTenantGuardByQuery(c.env.DB, [JSON.stringify(definition)], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenant], tenant)]);
       if (!r.meta.changes) throw new StyleError('version_conflict', 409);
     } else
       await c.env.DB.batch([c.env.DB.prepare(
@@ -262,7 +262,7 @@ styles.put(
           now,
           c.get('staff').id,
           Number(autoInsert),
-        ), ...await mediaDeletionTextGuardStatements(c.env.DB, [JSON.stringify(definition)]), ...mediaTenantGuardByQuery(c.env.DB, [JSON.stringify(definition)], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenant])]);
+        ), ...await mediaDeletionTextGuardStatements(c.env.DB, [JSON.stringify(definition)]), ...mediaTenantGuardByQuery(c.env.DB, [JSON.stringify(definition)], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenant], tenant)]);
     return c.json({
       success: true,
       data: { id, version: (current?.version ?? 0) + 1, autoInsert },

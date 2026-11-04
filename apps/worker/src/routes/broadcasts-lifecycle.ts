@@ -330,7 +330,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   };
   let updated;
   try {
-    updated = await updateBroadcast(c.env.DB, id, updates, body.expectedVersion);
+    updated = await updateBroadcast(c.env.DB, id, updates, body.expectedVersion, c.get('staff').tenantId);
   } catch (error) {
     if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     logger.error("broadcasts.update_approval_definition_failed");

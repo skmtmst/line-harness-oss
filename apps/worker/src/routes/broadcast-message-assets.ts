@@ -312,6 +312,7 @@ broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner'
     catch (error) { return inputError(c, {success:false,error:error instanceof Error ? error.message : '画像を準備できませんでした'}, 422, ["kind"]); }
   }
   const row = await createBroadcastMessageAsset(c.env.DB, {
+    tenantId: c.get('staff').tenantId,
     lineAccountId: body.lineAccountId,
     kind: body.kind,
     name: body.name.trim(),
@@ -356,6 +357,7 @@ broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('own
     }
     // 名前・置き場・下書き本文を1文で書く。CAS敗北時は全面不変。
     const row = await saveBroadcastMessageAssetDraft(c.env.DB, existing.id, {
+      tenantId: c.get('staff').tenantId,
       name: body.name.trim(),
       folderId: folder.folderId,
       payloadJson: JSON.stringify(body.payload),
@@ -402,6 +404,7 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/:id/publish', require
     if (payloadError) return inputError(c, { success: false, error: payloadError }, 422, ["payload"]);
     const staff = c.get('staff') as unknown as { id?: string };
     const result = await publishBroadcastMessageAsset(c.env.DB, id, {
+      tenantId: c.get('staff').tenantId,
       expectedVersion,
       expectedDraftRevision,
       idempotencyKey: requestKey,

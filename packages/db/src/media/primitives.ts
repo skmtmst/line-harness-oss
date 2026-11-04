@@ -27,6 +27,7 @@ export const MEDIA_REF_KINDS = [
 export type MediaRefKind = (typeof MEDIA_REF_KINDS)[number];
 
 export interface Media {
+  deletion_in_progress?: number;
   revision?: number;
   id: string;
   line_account_id: string | null;

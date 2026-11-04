@@ -464,7 +464,7 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
   }
   try {
     const mediaId = body.imageMediaId !== current.image_media_id ? body.imageMediaId ?? null : null;
-    await db.batch([...mediaDeletionGuardStatements(db, [mediaId]), ...mediaTenantGuardByQuery(db, [mediaId], 'SELECT line_account_id AS account_id FROM rt_stores WHERE id=?', [current.store_id]), ...writes]);
+    await db.batch([...mediaTenantGuardByQuery(db, [mediaId], 'SELECT line_account_id AS account_id FROM rt_stores WHERE id=?', [current.store_id]), ...mediaDeletionGuardStatements(db, [mediaId]), ...writes]);
   } catch (error) {
     if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
     if (/unique constraint/i.test(String(error))) return c.json({ success: false, error: 'このメニューには以前の価格変更申請が残っています。メニュー一覧の申請中から確認してください' }, 409);

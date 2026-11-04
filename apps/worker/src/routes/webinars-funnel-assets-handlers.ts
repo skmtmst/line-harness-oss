@@ -200,7 +200,7 @@ export const post__api_webinars_5 = async (c: Context<Env, "/api/webinars">) => 
   const existing = await getWebinarBySlug(c.env.DB, body.slug!);
   if (existing) return c.json({ success: false, error: 'slug_taken' }, 409);
   const created = await createWebinar(
-    c.env.DB, input as unknown as Parameters<typeof createWebinar>[1],
+    c.env.DB, {...input,tenantId:c.get('staff').tenantId} as unknown as Parameters<typeof createWebinar>[1],
   );
   await saveWebinarEditorSettings(c.env.DB, created.id, 0, {
     deliveryKind: body.deliveryKind,
@@ -320,7 +320,7 @@ export const post__api_webinars_id_publish_11 = async (c: Context<Env, "/api/web
   }
   const published = await publishWebinarEditorVersion(c.env.DB, id, Number(body.expectedVersion));
   if (!published) return c.json({ success: false, error: 'version_conflict' }, 409);
-  const updated = await updateWebinar(c.env.DB, id, { status: 'active' });
+  const updated = await updateWebinar(c.env.DB, id, { status: 'active', tenantId:c.get('staff').tenantId });
   auditLog(c, 'webinar.publish', { kind: 'webinar', id });
   return c.json({ success: true, data: { webinar: serializeWebinar(updated!), validation } });
 };
@@ -419,7 +419,7 @@ export const post__api_webinars_id_pause_16 = async (c: Context<Env, "/api/webin
   if (!Number.isInteger(body.expectedVersion) || settings?.version !== Number(body.expectedVersion)) {
     return c.json({ success: false, error: 'version_conflict' }, 409);
   }
-  const updated = await updateWebinar(c.env.DB, id, { status: 'draft' });
+  const updated = await updateWebinar(c.env.DB, id, { status: 'draft', tenantId:c.get('staff').tenantId });
   auditLog(c, 'webinar.pause', { kind: 'webinar', id });
   return c.json({ success: true, data: serializeWebinar(updated!) });
 };
@@ -435,6 +435,7 @@ export const post__api_webinars_id_duplicate_17 = async (c: Context<Env, "/api/w
   }
   const suffix = crypto.randomUUID().slice(0, 8);
   const duplicate = await createWebinar(c.env.DB, {
+    tenantId: c.get('staff').tenantId,
     accountId: row.account_id,
     title: `${row.title}（複製）`,
     slug: `${row.slug.slice(0, 54)}-${suffix}`,

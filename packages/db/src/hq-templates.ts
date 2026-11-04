@@ -143,7 +143,7 @@ export async function executeHqTemplatePlan(
   const fingerprintGuards: D1PreparedStatement[] = [];
   for (const statement of plan.statements) if (statement.sql === MEDIA_CONTENT_DELETION_GUARD_SQL) {
     fingerprintGuards.push(...await mediaDeletedKeyFingerprintGuard(db, JSON.parse(String(statement.bindings[0])) as string[]));
-    fingerprintGuards.push(...mediaTenantGuardByQuery(db, JSON.parse(String(statement.bindings[0])) as string[], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenantId]));
+    fingerprintGuards.push(...mediaTenantGuardByQuery(db, JSON.parse(String(statement.bindings[0])) as string[], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenantId],tenantId));
   }
   return db.batch([...prepareHqTemplatePlan(db, plan), ...fingerprintGuards]);
 }

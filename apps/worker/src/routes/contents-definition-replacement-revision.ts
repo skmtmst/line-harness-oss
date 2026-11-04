@@ -148,6 +148,7 @@ export function serializeMedia(row: Media, workerUrl: string, uploaderNames?: Ma
   return {
     revision: row.revision ?? 1,
     id: row.id,
+    deletionInProgress: row.deletion_in_progress === 1,
     lineAccountId: row.line_account_id,
     folderId: row.folder_id,
     kind: row.kind,

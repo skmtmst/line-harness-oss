@@ -12,6 +12,9 @@ it('全件検索の総数はページ位置で変わらず、配布先が複数�
     const db = asD1(raw), tenantId = 't'
     raw.prepare('INSERT INTO tenants(id,name) VALUES (?,?)').run(tenantId,'試験')
     const project = await createBannerProject(db, { tenantId, name: '秋の画像' })
+    raw.exec("INSERT INTO tenants(id,name) VALUES('other','別'); INSERT INTO line_accounts(id,tenant_id,channel_id,name,channel_access_token,channel_secret) VALUES('foreign','other','foreign','別','x','x')")
+    const foreign = await createMedia(db, {kind:'image',lineAccountId:'foreign',filename:'x.png',mimeType:'image/png',sizeBytes:1,r2Key:'foreign/key'})
+    await expect(createBannerImage(db,{tenantId,projectId:project.id,mediaId:foreign.id,generationId:null,sequence:1,source:'upload'})).rejects.toThrow('media_cross_tenant_reference')
     for (let i = 0; i < 3; i++) {
       const media = await createMedia(db, { kind: 'image', lineAccountId: null, filename: `image-${i}.png`, mimeType: 'image/png', sizeBytes: 10, r2Key: `test/${i}` })
       await createBannerImage(db, { tenantId, projectId: project.id, mediaId: media.id, generationId: null, sequence: i + 1, source: 'upload' })

@@ -82,7 +82,7 @@ styleStarterDistribution.post(path + '/reset', requireRole('owner', 'admin'), as
       'UPDATE style_starter_sets SET definition_json=?,version=version+1,updated_at=?,updated_by=? WHERE id=? AND tenant_id=? AND version=? AND archived_at IS NULL',
     ).bind(JSON.stringify(definition), now, c.get('staff').id, current.id, tenant, current.version),
     ...await mediaDeletionTextGuardStatements(c.env.DB,[current.definition_json,JSON.stringify(definition)]),
-    ...mediaTenantGuardByQuery(c.env.DB,[current.definition_json,JSON.stringify(definition)],'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?',[tenant]),
+    ...mediaTenantGuardByQuery(c.env.DB,[current.definition_json,JSON.stringify(definition)],'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?',[tenant],tenant),
   ]);
   // 読んだ後にほかの人が保存していたら、写しも作られていない。上書きせずに知らせる。
   if (!updated?.meta.changes) throw new StyleError('version_conflict', 409);

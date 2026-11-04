@@ -175,3 +175,18 @@ describe(`実行時SQLの compound SELECT が D1 の上限(${D1_MAX_COMPOUND_SEL
     expect(Math.max(...blocks.map((b) => b.terms))).toBe(4);
   });
 });
+
+test('画像の使用先と保存期限の影響を調べる実行 SQL も D1 の上限を守る', async () => {
+  const { createTestD1 } = await import('../test-utils/d1-sqlite.js');
+  const { findDirectMediaUsages } = await import('../features/media/direct-media-usages.js');
+  const { captureMediaPurgeImpacts } = await import('../services/tenant-media-impact.js');
+  const fixture = createTestD1({ foreignKeys: false });
+  const queries: string[] = [];
+  const db = { ...fixture.db, prepare(sql: string) { queries.push(sql); return fixture.db.prepare(sql); } } as D1Database;
+  try {
+    await findDirectMediaUsages(db, { id: 'media', r2_key: 'media/image.png' }, 'account');
+    await captureMediaPurgeImpacts(db, 'tenant', [{ key: 'media/image.png', mediaId: 'media', ownerAccount: 'account', includeLive: true }], '2026-11-04T00:00:00Z');
+    expect(queries.length).toBeGreaterThan(5);
+    expect(queries.flatMap(analyzeCompoundBlocks).filter(block => block.terms > D1_MAX_COMPOUND_SELECT_TERMS)).toEqual([]);
+  } finally { fixture.raw.close(); }
+});

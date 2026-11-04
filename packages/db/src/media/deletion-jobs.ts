@@ -8,6 +8,11 @@ export type MediaDeletionJob = {
   lease_expires_at: string | null;
 };
 
+/** A failed pre-deletion check is safe to abandon after its lease expires. */
+export async function purgeExpiredMediaDeletionChecks(db: D1Database, now: string): Promise<void> {
+  await db.prepare(`DELETE FROM media_deletion_jobs WHERE status='checking' AND lease_expires_at IS NOT NULL AND lease_expires_at<=?`).bind(now).run();
+}
+
 /**
  * Capture every current object key and claim the operation in one D1 batch.
  * Existing unfinished jobs can be reclaimed after their lease expires; their

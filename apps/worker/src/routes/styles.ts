@@ -23,7 +23,7 @@ export const styles = new Hono<Env>();
 
 styles.onError((e, c) => {
   if (isMediaDeletionConflict(e)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '画像が削除中のため保存できません。' }, 409);
-  if (isMediaTenantConflict(e)) return c.json({ success: false, code: 'media_cross_tenant_reference', error: '別の統括の画像は使用できません。' }, 409);
+  if (isMediaTenantConflict(e)) return c.json({ success: false, code: 'media_unavailable', error: '使えない画像です。' }, 404);
   if (String(e).includes('style_mode_capacity_full'))
     return c.json({ success: false, code: 'mode_capacity_full' }, 409);
   if (

@@ -32,7 +32,7 @@ function app() {
   for (const route of [ecAutoLine, nenCampaigns, supportInbox]) a.route('/', route);
   return a;
 }
-const db = { prepare: mocks.prepare } as unknown as D1Database;
+const db = { prepare: mocks.prepare, batch: async (statements: D1PreparedStatement[]) => Promise.all(statements.map(statement => statement.run())) } as unknown as D1Database;
 function request(route: typeof routes[number], body = JSON.stringify(route.body), headers: Record<string, string> = {}) {
   return app().request(route.path, {
     method: 'POST', body,

@@ -23,7 +23,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import FilterChip from '@/components/shared/filter-chip'
 import { type FolderDotFolder } from '@/components/shared/folder-dot'
 import FolderSelect,{ folderById,folderCreator } from '@/components/shared/folder-select'
-import { Field } from '@/components/shared/form-controls'
+import { Field, FieldError } from '@/components/shared/form-controls'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState, { LOADING_MESSAGE } from '@/components/shared/list-state'
@@ -1256,7 +1256,7 @@ export default function MediaLibraryListV8() {
         <p>
           削除を止める使用先があるものは、はじめから選べません。消したあとは元に戻せません。
         </p>
-        {bulkImpactError ? <p role="alert">削除したときの影響を確かめられませんでした。窓を閉じて読み直してください。</p> : bulkImpacts === null ? <p>送信済みトークへの影響を確認しています…</p> : bulkImpacts.filter(item => item.count > 0).map(item => (
+        {bulkImpactError ? <FieldError id="bulk-impact-error">削除したときの影響を確かめられませんでした。窓を閉じて読み直してください。</FieldError> : bulkImpacts === null ? <p>送信済みトークへの影響を確認しています…</p> : bulkImpacts.filter(item => item.count > 0).map(item => (
           <p key={item.id}>「{item.filename}」は送信済みのトーク {item.count} 件で画像が表示されなくなることがあります。</p>
         ))}
         {bulkBusy && bulkProgress ? (

@@ -39,7 +39,7 @@ const { nenCampaigns } = await import('./nen-campaigns.js');
 function app() {
   const instance = new Hono<{ Bindings: { DB: D1Database } }>();
   instance.use('*', async (c, next) => {
-    c.env = { DB: { prepare: mocks.prepare } as unknown as D1Database };
+    c.env = { DB: { prepare: mocks.prepare, batch: async (statements: D1PreparedStatement[]) => Promise.all(statements.map(statement => statement.run())) } as unknown as D1Database };
     c.set('staff' as never, { id: 'staff-1', role: 'owner', tenantId: 'tenant-a' } as never);
     await next();
   });

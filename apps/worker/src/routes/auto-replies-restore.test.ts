@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -63,6 +64,7 @@ describe('B 元に戻す: 削除した自動応答の復活', () => {
     testDb.raw.prepare("UPDATE auto_replies SET response_content = ? WHERE id = 'rule-1'").run('https://worker.test/images/deleted-key');
     testDb.raw.exec(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
       VALUES('media-deleted','account-1','["deleted-key"]','completed','now','now')`);
+    testDb.raw.prepare('INSERT INTO media_deleted_key_fingerprints(sha256) VALUES(?)').run(createHash('sha256').update('deleted-key').digest('hex'));
     const response = await restore(target, 'rule-1');
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ code: 'media_deletion_in_progress' });

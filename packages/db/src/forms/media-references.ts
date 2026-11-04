@@ -1,4 +1,4 @@
-import { mediaTenantGuardByQueries, mediaTenantGuardByQuery } from '../media/deletion-guard.js';
+import { mediaTenantGuardByQuery } from '../media/deletion-guard.js';
 
 /** 下書きと現在公開版の使用先。統括の原子的な計画にも同じSQLを使う。 */
 export function formMediaUsageQueries(formId: string): Array<{ sql: string; bindings: string[] }> {
@@ -29,12 +29,6 @@ export function formMediaUsageQueries(formId: string): Array<{ sql: string; bind
 export function formMediaUsageStatements(db: D1Database, formId: string): D1PreparedStatement[] {
   return formMediaUsageQueries(formId).map(query => db.prepare(query.sql).bind(...query.bindings));
 }
-export function formMediaTenantGuard(db: D1Database, formId: string): D1PreparedStatement[] {
-  return mediaTenantGuardByQueries(db, 'SELECT line_account_id AS account_id FROM form_accounts WHERE form_id=?', [formId],
-    `SELECT json_array(fields,layout,on_submit_message_content,og_image_url) AS value FROM forms WHERE id=?
-     UNION ALL SELECT json_array(fields,layout,on_submit_message_content,og_image_url) AS value FROM form_versions WHERE form_id=?`, [formId, formId]);
-}
-
 export function formMediaValuesGuard(db: D1Database, formId: string, values: Array<string | null | undefined>): D1PreparedStatement[] {
   return mediaTenantGuardByQuery(db, values, 'SELECT line_account_id AS account_id FROM form_accounts WHERE form_id=?', [formId]);
 }

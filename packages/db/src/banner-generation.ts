@@ -453,7 +453,7 @@ export async function createBannerImage(
       jstNow(),
     );
   await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.mediaId]),
-    ...mediaTenantGuardByQuery(db, [input.mediaId], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [input.tenantId])]);
+    ...mediaTenantGuardByQuery(db, [input.mediaId], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [input.tenantId], input.tenantId)]);
   return (await getBannerImage(db, id, input.tenantId))!;
 }
 

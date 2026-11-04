@@ -182,7 +182,7 @@ export async function getMedia(
   values.push(opts.limit ?? 200, opts.offset ?? 0);
   const result = await db
     .prepare(
-      `SELECT m.*,
+      `SELECT m.*, EXISTS(SELECT 1 FROM media_deletion_jobs j WHERE j.media_id=m.id AND j.status='deleting') AS deletion_in_progress,
               (SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) + COALESCE(menu_uses.usage_count, 0) AS usage_count
          FROM media m
          LEFT JOIN (SELECT image_media_id, COUNT(*) AS usage_count FROM rt_menu_items WHERE image_media_id IS NOT NULL GROUP BY image_media_id) menu_uses ON menu_uses.image_media_id = m.id

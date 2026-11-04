@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { asD1 } from '../d1-test-helper.js';
@@ -21,6 +22,7 @@ it.each(['checking', 'completed'])('保存と使用台帳のbatchで削除状態
     const race = { ...actual, batch: async (statements: D1PreparedStatement[]) => {
       sqlite.prepare(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
         VALUES('m','account','["old-key"]',?,'now','now')`).run(status);
+      if (status === 'completed') sqlite.prepare('INSERT INTO media_deleted_key_fingerprints(sha256) VALUES(?)').run(createHash('sha256').update('old-key').digest('hex'));
       return actual.batch(statements);
     } } as D1Database;
     await expect(applyMediaUsageMutation(race, {

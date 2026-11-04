@@ -1046,7 +1046,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
     }
     if (statements.length > 0) {
       const values=mediaEntries.map(entry=>friendMediaCandidate(entry.value,entry.type));
-      await c.env.DB.batch([...statements,...await mediaContentDeletionGuard(c.env.DB,values),...friendMediaIdGuards(c.env.DB,mediaEntries),...mediaTenantGuard(c.env.DB,values,[job.line_account_id])]);
+      await c.env.DB.batch([...statements,...mediaTenantGuard(c.env.DB,values,[job.line_account_id]),...friendMediaIdGuards(c.env.DB,mediaEntries),...await mediaContentDeletionGuard(c.env.DB,values)]);
     }
     await c.env.DB.prepare(`UPDATE friend_import_jobs SET status = 'completed', executed_at = ? WHERE id = ? AND status = 'previewed'`)
       .bind(now, job.id).run();

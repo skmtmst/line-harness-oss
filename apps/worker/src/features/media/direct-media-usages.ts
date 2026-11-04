@@ -38,36 +38,42 @@ export async function findDirectMediaUsages(db: D1Database, media: { id: string;
 
     .bind(media.id, media.id, media.id, tokens, media.id, tokens, media.id, media.id, tokens, media.id, media.id, accountId, tokens, tokens, tokens, accountId)
     .first<{logos:number;senders:number;posts:number;profile_photos:number;fields:number;stamp_photos:number;banners:number;other_replies:number;other_stamps:number}>();
-  const settings = await db.prepare(`SELECT kind, COUNT(*) AS count FROM (
-    SELECT 'マイレージ特典' AS kind, image_url AS url FROM mileage_rewards UNION ALL
-    SELECT 'EC通知' AS kind, image_url FROM ec_notification_settings UNION ALL
-    SELECT 'EC通知（店舗）' AS kind, image_url FROM ec_notification_account_settings UNION ALL
-    SELECT 'キャンペーン通知' AS kind, image_url FROM nen_campaign_settings UNION ALL
-    SELECT 'アカウントの共有画像' AS kind, og_default_image_url FROM line_accounts UNION ALL
-    SELECT 'アカウントの画像' AS kind, icon_url FROM line_accounts UNION ALL
-    SELECT 'LINEプロフィール画像' AS kind, line_picture_url FROM line_accounts UNION ALL
-    SELECT 'リンクの共有画像' AS kind, og_image_url FROM tracked_links UNION ALL
-    SELECT '予約メニュー画像' AS kind, image_url FROM menus UNION ALL
-    SELECT '予約スタッフ画像' AS kind, profile_image_url FROM staff
-    UNION ALL SELECT '統括テンプレートの版' AS kind, definition_json FROM hq_template_versions
-    UNION ALL SELECT '初期セット' AS kind, definition_json FROM style_starter_sets
-    UNION ALL SELECT '初期セットの保存内容' AS kind, json_array(source_snapshot,pending_update) FROM style_starter_items
-    UNION ALL SELECT '初期セットの配布記録' AS kind, source_snapshot FROM style_starter_catalog_resources
-    UNION ALL SELECT 'Google投稿（旧）' AS kind, media_url FROM rt_gbp_posts
-    UNION ALL SELECT '共通情報' AS kind, json_array(value,fallback_value) FROM common_vars
-    UNION ALL SELECT '共通情報の変更予約' AS kind, value FROM common_var_schedules
-    UNION ALL SELECT '共通情報の版' AS kind, value FROM common_var_versions
-    UNION ALL SELECT '予約したチャット送信' AS kind, content FROM scheduled_chat_sends WHERE status IN ('scheduled','sending','failed')
-    UNION ALL SELECT '顧客通知の下書き' AS kind, draft_config_json FROM customer_notification_definitions
-    UNION ALL SELECT '顧客通知の公開版' AS kind, json_array(config_json,line_template_json) FROM customer_notification_versions
-    UNION ALL SELECT '配信素材の公開版' AS kind, payload_json FROM broadcast_asset_versions
-    UNION ALL SELECT '配信素材の公開記録' AS kind, payload_json FROM broadcast_asset_publish_keys
-    UNION ALL SELECT '配信の比較案' AS kind, messages_json FROM broadcast_variants
-    UNION ALL SELECT 'シナリオの公開版' AS kind, json_array(steps_snapshot,actions_snapshot) FROM scenario_versions
-    UNION ALL SELECT 'イベントの公開版' AS kind, snapshot_json FROM event_versions
-    UNION ALL SELECT 'イベント予約の保存内容' AS kind, event_snapshot_json FROM event_bookings
-  ) source WHERE EXISTS (SELECT 1 FROM json_each(?) token WHERE instr(source.url, token.value) > 0)
-    GROUP BY kind ORDER BY kind`).bind(tokens).all<{kind:string;count:number}>();
+  const settingSources = [
+    `SELECT 'マイレージ特典' AS kind, image_url AS url FROM mileage_rewards`,
+    `SELECT 'EC通知' AS kind, image_url FROM ec_notification_settings`,
+    `SELECT 'EC通知（店舗）' AS kind, image_url FROM ec_notification_account_settings`,
+    `SELECT 'キャンペーン通知' AS kind, image_url FROM nen_campaign_settings`,
+    `SELECT 'アカウントの共有画像' AS kind, og_default_image_url FROM line_accounts`,
+    `SELECT 'アカウントの画像' AS kind, icon_url FROM line_accounts`,
+    `SELECT 'LINEプロフィール画像' AS kind, line_picture_url FROM line_accounts`,
+    `SELECT 'リンクの共有画像' AS kind, og_image_url FROM tracked_links`,
+    `SELECT '予約メニュー画像' AS kind, image_url FROM menus`,
+    `SELECT '予約スタッフ画像' AS kind, profile_image_url FROM staff`,
+    `SELECT '統括テンプレートの版' AS kind, definition_json FROM hq_template_versions`,
+    `SELECT '初期セット' AS kind, definition_json FROM style_starter_sets`,
+    `SELECT '初期セットの保存内容' AS kind, json_array(source_snapshot,pending_update) FROM style_starter_items`,
+    `SELECT '初期セットの配布記録' AS kind, source_snapshot FROM style_starter_catalog_resources`,
+    `SELECT 'Google投稿（旧）' AS kind, media_url FROM rt_gbp_posts`,
+    `SELECT '共通情報' AS kind, json_array(value,fallback_value) FROM common_vars`,
+    `SELECT '共通情報の変更予約' AS kind, value FROM common_var_schedules`,
+    `SELECT '共通情報の版' AS kind, value FROM common_var_versions`,
+    `SELECT '予約したチャット送信' AS kind, content FROM scheduled_chat_sends WHERE status IN ('scheduled','sending')`,
+    `SELECT '顧客通知の下書き' AS kind, draft_config_json FROM customer_notification_definitions`,
+    `SELECT '顧客通知の公開版' AS kind, json_array(config_json,line_template_json) FROM customer_notification_versions`,
+    `SELECT '配信素材の公開版' AS kind, payload_json FROM broadcast_asset_versions`,
+    `SELECT '配信素材の公開記録' AS kind, payload_json FROM broadcast_asset_publish_keys`,
+    `SELECT '配信の比較案' AS kind, messages_json FROM broadcast_variants`,
+    `SELECT 'シナリオの公開版' AS kind, json_array(steps_snapshot,actions_snapshot) FROM scenario_versions`,
+    `SELECT 'イベントの公開版' AS kind, snapshot_json FROM event_versions`,
+    `SELECT 'イベント予約の保存内容' AS kind, event_snapshot_json FROM event_bookings`,
+  ];
+  const settings: Array<{kind:string;count:number}> = [];
+  for (let i=0; i<settingSources.length; i+=5) {
+    const rows = await db.prepare(`WITH source(kind,url) AS (${settingSources.slice(i,i+5).join(" UNION ALL ")}) SELECT kind, COUNT(*) AS count FROM source
+      WHERE EXISTS (SELECT 1 FROM json_each(?) token WHERE instr(source.url, token.value) > 0)
+      GROUP BY kind ORDER BY kind`).bind(tokens).all<{kind:string;count:number}>();
+    settings.push(...rows.results);
+  }
   const additional: DirectMediaUsage[] = [];
   for (const [refKind, label, count] of [
     ['company_logo', '会社ロゴ', extra?.logos ?? 0],
@@ -82,7 +88,7 @@ export async function findDirectMediaUsages(db: D1Database, media: { id: string;
   ] as const) {
     if (count > 0) additional.push({ refKind, refId: `${refKind}:${label}:${count}`, name: `${label}（${count}件）`, href: null });
   }
-  for (const row of settings.results) additional.push({ refKind:'other_image_setting', refId:`other_image_setting:${row.kind}:${row.count}`, name:`${row.kind}（${row.count}件）`, href:null });
+  for (const row of settings) additional.push({ refKind:'other_image_setting', refId:`other_image_setting:${row.kind}:${row.count}`, name:`${row.kind}（${row.count}件）`, href:null });
   return [
     ...replies.results.map(row => ({ refKind:'auto_reply' as const, refId:row.id, name:row.name, href:`/auto-replies/edit?id=${encodeURIComponent(row.id)}` })),
     ...stamps.results.map(row => ({ refKind:'visit_stamp_card' as const, refId:row.id, name:row.name, href:'/visit-stamps' })),
@@ -91,11 +97,11 @@ export async function findDirectMediaUsages(db: D1Database, media: { id: string;
 }
 
 /** 送信済み履歴は削除を止めず、匿名の件数だけを確認画面へ返す。 */
-export async function countSentMediaMessages(db: D1Database, media: { id: string; r2_key: string }): Promise<number> {
+export async function countSentMediaMessages(db: D1Database, media: { id: string; r2_key: string }, accountId: string): Promise<number> {
   const tokens = JSON.stringify([...new Set([media.r2_key, ...await getMediaUsageMatchTokens(db, media.id)])].filter(Boolean));
   const row = await db.prepare(`SELECT COUNT(*) AS count FROM messages_log message
-    WHERE message.direction = 'outgoing' AND message.unsent_at IS NULL
+    WHERE message.line_account_id = ? AND message.direction = 'outgoing' AND message.unsent_at IS NULL
       AND EXISTS (SELECT 1 FROM json_each(?) token WHERE instr(message.content, token.value) > 0)`)
-    .bind(tokens).first<{ count: number }>();
+    .bind(accountId,tokens).first<{ count: number }>();
   return row?.count ?? 0;
 }

@@ -46,14 +46,14 @@ export async function saveCatalogStarter(db: D1Database, tenant: string, actor: 
   else {
     const previous=await starter(db,tenant,style);
     statements.push(...await mediaDeletionTextGuardStatements(db, [JSON.stringify(previous.definition)]));
-    statements.push(...mediaTenantGuardByQuery(db, [JSON.stringify(previous.definition)], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenant]));
+    statements.push(...mediaTenantGuardByQuery(db, [JSON.stringify(previous.definition)], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenant], tenant));
     statements.push(db.prepare('INSERT INTO style_starter_sets(id,tenant_id,style,name,definition_json,version,archived_at,updated_at,updated_by,auto_insert) VALUES(?,?,?,?,?,?,?,?,?,?)')
       .bind(crypto.randomUUID(),tenant,style,style,JSON.stringify(previous.definition),previous.version,now,now,actor,Number(previous.autoInsert)));
     statements.push(db.prepare('INSERT INTO style_starter_sets(id,tenant_id,style,name,definition_json,version,updated_at,updated_by,auto_insert) VALUES(?,?,?,?,?,?,?,?,?)')
     .bind(id, tenant, style, style, JSON.stringify(definition), version, now, actor, Number(autoInsert)));
   }
   statements.push(...await mediaDeletionTextGuardStatements(db, [JSON.stringify(definition), current?.definition_json]));
-  statements.push(...mediaTenantGuardByQuery(db, [JSON.stringify(definition), current?.definition_json], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenant]));
+  statements.push(...mediaTenantGuardByQuery(db, [JSON.stringify(definition), current?.definition_json], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenant], tenant));
   try { await db.batch(statements); }
   catch (error) { if (String(error).includes('malformed JSON')) throw new StyleError('version_conflict', 409); throw error; }
   return { id, version, autoInsert };

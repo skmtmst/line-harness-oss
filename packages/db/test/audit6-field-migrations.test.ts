@@ -86,7 +86,7 @@ describe('PKG66: 項目移行の参照切替を100 bind以内で確定する', (
     await executeFieldMigration(db,'run','image','staff');
     expect(sqlite.prepare("SELECT friend_id,media_id FROM friend_field_values WHERE field_id='target'").all()).toEqual([{friend_id:'friend-2',media_id:'image-ok'}]);
     expect(sqlite.prepare("SELECT status,reason FROM field_migration_items WHERE run_id='run' AND friend_id='friend'").get())
-      .toEqual({status:'failed',reason:'別の統括の画像のため保存しませんでした。'});
+      .toEqual({status:'failed',reason:'使えない画像のため保存しませんでした。'});
   });
   it('受付後に削除中となった画像の項目だけを失敗にし、残りは移行する', async () => {
     sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'migrations/762_media_deletion_jobs.sql'), 'utf8'));

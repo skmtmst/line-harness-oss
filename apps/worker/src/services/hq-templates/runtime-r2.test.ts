@@ -176,7 +176,7 @@ describe('DB-bound R2 store executor',()=>{
     const f=await fixture(),c=await f.preflight();const r=await Promise.all([f.execute(c),f.execute(c)]);expect(r.some(x=>x.status==='succeeded')).toBe(true);expect(f.bucket.put).toHaveBeenCalledTimes(2);expect((await f.execute(c)).status).toBe('succeeded');expect(f.bucket.put).toHaveBeenCalledTimes(2);
   });
   test('lost successful DB response preserves images and recovers committed result',async()=>{
-    const f=await fixture(),c=await f.preflight();const db={prepare:f.db.prepare.bind(f.db),batch:async(s:D1PreparedStatement[])=>{await f.db.batch(s);throw new Error('lost response')}}as unknown as D1Database;
+    const f=await fixture(),c=await f.preflight();const db={prepare:f.db.prepare.bind(f.db),batch:async(s:D1PreparedStatement[])=>{const result=await f.db.batch(s);if ((f.raw.prepare("SELECT COUNT(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get() as {n:number}).n) throw new Error('lost response');return result}}as unknown as D1Database;
     expect((await f.execute(c,db)).status).toBe('succeeded');expect(f.bucket.delete).not.toHaveBeenCalled();expect(f.raw.prepare("SELECT COUNT(*) n FROM hq_template_owned_r2_keys WHERE state='committed'").get()).toEqual({n:2});
   });
   test('unknown DB failure retries, becomes terminal, and cleans owned images',async()=>{

@@ -538,7 +538,7 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), i
         failureReason: 'CLONE_TRANSACTION_FAILED',
       });
       if (isMediaDeletionConflict(err)) return c.json({success:false,error:'画像が削除中のため使用できません。'},409);
-      if (isMediaTenantConflict(err)) return c.json({success:false,code:'media_cross_tenant_reference',error:'別の統括の画像は使用できません。'},409);
+      if (isMediaTenantConflict(err)) return c.json({success:false,code:'media_unavailable',error:'使えない画像です。'},404);
       throw new UnexpectedRouteError(c, {
         success: false,
         error: '作れませんでした。何も作られていません',

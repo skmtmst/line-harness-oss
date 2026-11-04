@@ -182,7 +182,7 @@ it('削除記録の消去後も固定URLとライブURLを登録しない', asyn
     const {app,env}=makeApp(db);
     for (const image_url of ['https://example.test/images/media/other/final/old.png','https://example.test/media/deleted-id/content']) {
       const response=await app.request('/api/events/admin/events?account_id=account-1',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer key-owner'},body:JSON.stringify({name:'保存しない',image_url})},env);
-      expect(response.status).toBe(409);
+      expect(response.status).toBe(image_url.includes('/media/deleted-id/content') ? 404 : 409);
     }
     expect(raw.prepare("SELECT COUNT(*) AS n FROM events WHERE name='保存しない'").get()).toEqual({n:0});
   } finally {raw.close();}
@@ -200,8 +200,8 @@ it('別統括が持つ画像のURLはイベントに登録できない', async (
     const {app,env}=makeApp(db);
     for (const image_url of ['https://example.test/images/foreign/known-image.png', 'https://example.test/media/foreign-media/content']) {
       const response=await app.request('/api/events/admin/events?account_id=account-1',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer key-owner'},body:JSON.stringify({name:'架空イベント',image_url})},env);
-      expect(response.status).toBe(409);
-      expect(await response.json()).toMatchObject({code:'media_cross_tenant_reference'});
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({code:'media_unavailable',error:'使えない画像です。'});
     }
     expect(raw.prepare("SELECT image_url FROM events WHERE name='架空イベント'").get()).toBeUndefined();
     raw.exec("UPDATE line_accounts SET tenant_id='tenant-a' WHERE id='account-2'");

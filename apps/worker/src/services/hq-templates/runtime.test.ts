@@ -197,7 +197,7 @@ describe('form runtime and atomic store execution', () => {
     expect(await executeFormStore(options(c))).toEqual({status:'succeeded',reused:true});expect(count('forms')).toBe(1);expect(fixture.raw.prepare('SELECT attempt_count FROM hq_template_distribution_results').get()).toEqual({attempt_count:2});
   });
   test('lost successful batch response recovers success, not another creation',async()=>{
-    const c=await preflight('a');const db={prepare:fixture.db.prepare.bind(fixture.db),batch:async(s:D1PreparedStatement[])=>{await fixture.db.batch(s);throw new Error('response lost')}}as unknown as D1Database;
+    const c=await preflight('a');const db={prepare:fixture.db.prepare.bind(fixture.db),batch:async(s:D1PreparedStatement[])=>{const result=await fixture.db.batch(s);if ((fixture.raw.prepare("SELECT COUNT(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get() as {n:number}).n) throw new Error('response lost');return result}}as unknown as D1Database;
     expect((await executeFormStore(options(c,db))).status).toBe('succeeded');await executeFormStore(options(c));expect(count('forms')).toBe(1);
     expect(fixture.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='hq_template.distributed'").get()).toEqual({n:1});
   });

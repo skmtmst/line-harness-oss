@@ -1,5 +1,4 @@
-export type { FeatureJobEnforcement, FeatureJobMetadata } from './feature-job-types.js';
-import type { FeatureJobEnforcement, FeatureJobMetadata } from './feature-job-types.js';
+export type { FeatureJobEnforcement, FeatureJobMetadata } from './feature-job-types.js'; import type { FeatureJobEnforcement, FeatureJobMetadata } from './feature-job-types.js';
 import {recordFeatureExecutionSkipped} from './feature-skip-audit.js';
 export {recordFeatureExecutionSkipped} from './feature-skip-audit.js';
 import {
@@ -36,6 +35,7 @@ type FeatureSettingsBundle = {
  * 照合するため、判定を消したり移したりすると必ずテストが落ちる。
  */
 export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
+  {name:'expired media send claims',classification:{kind:'core',reason:'期限切れの画像送信・削除確認の一時記録を整理する'},enforcement:{mode:'exempt',reason:'外部送信を行わず、機能の停止中も一時記録の期限を守る'}},
   {name:'operator push digest',classification:{kind:'core',reason:'受信箱の運用者通知'},enforcement:{mode:'exempt',reason:'基本受信箱の通知で個別機能に属さない。送信直前に本人の停止・店の範囲・会話権限を確認する'}},
   {name:'makeup credit expiry',classification:{kind:'core',reason:'保存済みの振替券の期限の後始末'},enforcement:{mode:'exempt',reason:'送信や新規予約を行わず、予約機能の停止中も保存済みの期限を守る'}},
   {name:'AB test decisions (test transport)',classification:{kind:'feature',featureId:'broadcasts'},enforcement:{mode:'gated',sources:['apps/worker/src/features/broadcasts/broadcast-ab.ts'],markers:["gate.canRun(db,t.line_account_id,'broadcasts','AB test decisions (test transport)')"]}},

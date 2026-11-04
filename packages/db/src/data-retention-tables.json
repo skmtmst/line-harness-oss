@@ -2050,7 +2050,8 @@
     "reason": "削除済みR2キーのSHA-256のみを保持し、削除済み画像の再登録を防ぐため"
   },
   "media_deletion_guards": {
-    "category": "global"
+    "category": "global",
+    "reason": "削除中の画像参照を拒否するための空の制約表"
   },
   "media_tenant_guards": {
     "category": "global",

@@ -149,7 +149,7 @@ describe('N-023 個別送信失敗台帳', () => {
     const db = {
       prepare: (sql: string) => sqlite.db.prepare(sql),
       batch: async (statements: D1PreparedStatement[]) => {
-        if (failBatch) {
+        if (failBatch && mocks.pushMessage.mock.calls.length > 0) {
           failBatch = false;
           throw new Error('database unavailable');
         }

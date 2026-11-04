@@ -66,14 +66,15 @@ it('削除中の画像を顧客通知の下書きに登録しない', async () =
 it('送信済みは削除を妨げず、取消済みを除き匿名の件数だけを返す', async () => {
   const fixture = createTestD1({ foreignKeys: false });
   try {
-    fixture.raw.exec(`INSERT INTO messages_log(id,friend_id,direction,message_type,content,unsent_at) VALUES
-      ('sent1','private-friend','outgoing','image','https://example.test/object-key',NULL),
-      ('sent2','private-friend','outgoing','image','https://example.test/media/m/content',NULL),
-      ('unsent','private-friend','outgoing','image','https://example.test/object-key','now'),
-      ('received','private-friend','incoming','image','https://example.test/object-key',NULL);`);
+    fixture.raw.exec(`INSERT INTO messages_log(id,friend_id,line_account_id,direction,message_type,content,unsent_at) VALUES
+      ('sent1','private-friend','a','outgoing','image','https://example.test/object-key',NULL),
+      ('sent2','private-friend','a','outgoing','image','https://example.test/media/m/content',NULL),
+      ('foreign','private-friend','b','outgoing','image','https://example.test/object-key',NULL),
+      ('unsent','private-friend','a','outgoing','image','https://example.test/object-key','now'),
+      ('received','private-friend','a','incoming','image','https://example.test/object-key',NULL);`);
     const media = { id: 'm', r2_key: 'object-key' };
     expect(await findDirectMediaUsages(fixture.db, media, 'a')).toEqual([]);
-    expect(await countSentMediaMessages(fixture.db, media)).toBe(2);
+    expect(await countSentMediaMessages(fixture.db, media, 'a')).toBe(2);
   } finally { fixture.raw.close(); }
 });
 
@@ -87,6 +88,8 @@ it('送信予約と送信中は削除を止め、送信済みになれば使用�
       f.raw.prepare('UPDATE scheduled_chat_sends SET status=?').run(status);
       expect((await findDirectMediaUsages(f.db,media,'a')).map(row=>row.name)).toContain('予約したチャット送信（1件）');
     }
+    f.raw.exec("UPDATE scheduled_chat_sends SET status='failed'");
+    expect((await findDirectMediaUsages(f.db,media,'a')).map(row=>row.name)).not.toContain('予約したチャット送信（1件）');
     f.raw.exec("UPDATE scheduled_chat_sends SET status='sent'");
     expect(await findDirectMediaUsages(f.db,media,'a')).toEqual([]);
   } finally { f.raw.close(); }
@@ -113,6 +116,23 @@ it('削除の確保後は画像を使うチャットの予約を追加できな�
     const {createScheduledChatSend}=await import('@line-crm/db');
     await expect(createScheduledChatSend(f.db,{id:'schedule',friendId:'f',lineAccountId:'a',staffId:'staff',messageType:'image',content:'https://cdn.test/object-key',quotedMessageId:null,idempotencyKey:'key',scheduledAt:'2027-01-01T00:00:00.000Z'})).rejects.toThrow('media_deletion_in_progress');
     expect(f.raw.prepare('SELECT count(*) n FROM scheduled_chat_sends').get()).toEqual({n:0});
+  } finally {f.raw.close();}
+});
+
+it('削除中の画像を送信予約の作成と変更に使えず、既存内容も残る', async () => {
+  const f=createTestD1({foreignKeys:false});
+  try {
+    f.raw.exec(`INSERT INTO tenants(id,name) VALUES('t','仮');
+      INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a','a','仮','x','x','t');
+      INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES('m','a','image','x','image/png',1,'object-key');`);
+    const {createScheduledChatSend,updateScheduledChatSend}=await import('@line-crm/db');
+    const input={id:'schedule',friendId:'f',lineAccountId:'a',staffId:'staff',messageType:'image',content:'safe',quotedMessageId:null,idempotencyKey:'key',scheduledAt:'2027-01-01T00:00:00.000Z'};
+    await createScheduledChatSend(f.db,input);
+    f.raw.exec(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at) VALUES('m','a','["object-key"]','checking','now','now')`);
+    await expect(createScheduledChatSend(f.db,{...input,id:'other',idempotencyKey:'other',content:'https://cdn.test/object-key'})).rejects.toThrow('media_deletion_in_progress');
+    await expect(updateScheduledChatSend(f.db,{id:'schedule',friendId:'f',content:'https://cdn.test/object-key'})).rejects.toThrow('media_deletion_in_progress');
+    expect(f.raw.prepare("SELECT content FROM scheduled_chat_sends WHERE id='schedule'").get()).toEqual({content:'safe'});
+    expect(f.raw.prepare('SELECT count(*) n FROM scheduled_chat_sends').get()).toEqual({n:1});
   } finally {f.raw.close();}
 });
 

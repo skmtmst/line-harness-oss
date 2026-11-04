@@ -59,16 +59,16 @@ export async function captureMediaPurgeImpacts(db: D1Database, ownerTenant: stri
     `SELECT 'common_var' kind,id reference_id,line_account_id account_id,json_array(value,fallback_value) content FROM common_vars`,
     `SELECT 'common_var' kind,v.id reference_id,v.line_account_id account_id,s.value content FROM common_var_schedules s JOIN common_vars v ON v.id=s.var_id`,
     `SELECT 'common_var' kind,v.id reference_id,v.line_account_id account_id,s.value content FROM common_var_versions s JOIN common_vars v ON v.id=s.common_var_id`,
-    `SELECT 'scheduled_chat' kind,id reference_id,line_account_id account_id,content FROM scheduled_chat_sends WHERE status IN ('scheduled','sending','failed')`,
+    `SELECT 'scheduled_chat' kind,id reference_id,line_account_id account_id,content FROM scheduled_chat_sends WHERE status IN ('scheduled','sending')`,
     `SELECT 'starter_item' kind,item_key reference_id,line_account_id account_id,json_array(source_snapshot,pending_update) content FROM style_starter_items`,
     `SELECT 'starter_resource' kind,target_id reference_id,line_account_id account_id,source_snapshot content FROM style_starter_catalog_resources`,
   ];
-  const sourceSql = `WITH target AS (SELECT ? AS owner_tenant),
+  const sourceSql = (group: string[], includeGlobal: boolean) => `WITH target AS (SELECT ? AS owner_tenant),
     event_accounts AS (
       SELECT e.id,e.image_url,e.og_image_url,e.line_account_id AS account_id FROM events e
       UNION SELECT e.id,e.image_url,e.og_image_url,accounts.value AS account_id
         FROM events e,json_each(CASE WHEN json_valid(e.account_ids) THEN e.account_ids ELSE '[]' END) accounts
-    ), account_sources AS (${accountSources.join(' UNION ALL ')}), global_sources AS (
+    ), account_sources AS (${group.join(' UNION ALL ')}), global_sources AS (
       SELECT 'ec_notification_settings' AS kind,event_type AS reference_id,image_url AS content FROM ec_notification_settings
       UNION ALL SELECT 'nen_campaign_settings',campaign_key,image_url FROM nen_campaign_settings
       UNION ALL SELECT 'style_starter_set',id,definition_json FROM style_starter_sets WHERE tenant_id IS NULL
@@ -77,32 +77,30 @@ export async function captureMediaPurgeImpacts(db: D1Database, ownerTenant: stri
       SELECT a.tenant_id,a.id AS account_id,r.kind,CAST(r.reference_id AS TEXT) AS reference_id,r.content FROM account_sources r
         JOIN line_accounts a ON a.id=r.account_id, target t
        WHERE a.tenant_id IS NOT NULL AND a.tenant_id<>t.owner_tenant AND r.content IS NOT NULL
-      UNION ALL SELECT s.tenant_id,NULL,'style_starter_set',s.id,s.definition_json FROM style_starter_sets s,target t WHERE s.tenant_id IS NOT NULL AND s.tenant_id<>t.owner_tenant
-      UNION ALL SELECT v.tenant_id,NULL,'hq_template_version',v.id,v.definition_json FROM hq_template_versions v,target t WHERE v.tenant_id<>t.owner_tenant
-      UNION ALL SELECT b.tenant_id,NULL,'banner_image',b.id,b.media_id FROM banner_images b,target t WHERE b.tenant_id<>t.owner_tenant AND b.deleted_at IS NULL
-      UNION ALL SELECT n.id,NULL,'company_logo',n.id,n.logo_media_id FROM tenants n,target t WHERE n.id<>t.owner_tenant AND n.logo_media_id IS NOT NULL
-      UNION ALL SELECT NULL,NULL,g.kind,CAST(g.reference_id AS TEXT),g.content FROM global_sources g WHERE g.content IS NOT NULL
-    ) SELECT tenant_id,account_id,kind,reference_id,json_group_array(content) AS contents FROM sources
-      WHERE reference_id IS NOT NULL AND (COALESCE(tenant_id,''),COALESCE(account_id,''),kind,reference_id)>(?,?,?,?)
-      GROUP BY tenant_id,account_id,kind,reference_id
-      ORDER BY COALESCE(tenant_id,''),COALESCE(account_id,''),kind,reference_id LIMIT 1000`;
+      UNION ALL SELECT s.tenant_id,NULL,'style_starter_set',s.id,s.definition_json FROM style_starter_sets s,target t WHERE ${includeGlobal ? '1' : '0'} AND s.tenant_id IS NOT NULL AND s.tenant_id<>t.owner_tenant
+      UNION ALL SELECT v.tenant_id,NULL,'hq_template_version',v.id,v.definition_json FROM hq_template_versions v,target t WHERE ${includeGlobal ? '1' : '0'} AND v.tenant_id<>t.owner_tenant
+      UNION ALL SELECT b.tenant_id,NULL,'banner_image',b.id,b.media_id FROM banner_images b,target t WHERE ${includeGlobal ? '1' : '0'} AND b.tenant_id<>t.owner_tenant AND b.deleted_at IS NULL
+      UNION ALL SELECT n.id,NULL,'company_logo',n.id,n.logo_media_id FROM tenants n,target t WHERE ${includeGlobal ? '1' : '0'} AND n.id<>t.owner_tenant AND n.logo_media_id IS NOT NULL
+    ), global_scope AS (SELECT NULL AS tenant_id,NULL AS account_id,g.kind,CAST(g.reference_id AS TEXT) AS reference_id,g.content FROM global_sources g WHERE g.content IS NOT NULL ${includeGlobal ? '' : "AND g.kind LIKE 'unscoped_%'"}), combined AS (SELECT * FROM sources UNION ALL SELECT * FROM global_scope)
+    SELECT tenant_id,account_id,kind,reference_id,json_group_array(content) AS contents FROM combined
+      WHERE reference_id IS NOT NULL GROUP BY tenant_id,account_id,kind,reference_id`;
   type Row={tenant_id:string|null;account_id:string|null;kind:string;reference_id:string;contents:string};
   type Aggregate={index:number;tenantId:string|null;accountId:string|null;kind:string;count:number};
   const aggregates = new Map<string,Aggregate>();
-  let cursor=['','','',''];
-  for (;;) {
-    const page = await db.prepare(sourceSql).bind(ownerTenant,...cursor).all<Row>();
+  const seen = new Set<string>();
+  for (let offset=0; offset<accountSources.length; offset+=5) {
+    const page = await db.prepare(sourceSql(accountSources.slice(offset,offset+5), offset===0)).bind(ownerTenant).all<Row>();
     for (const row of page.results) {
       for (const index of matcher.match(row.contents)) {
+        const reference=JSON.stringify([index,row.tenant_id,row.account_id,row.kind,row.reference_id]);
+        if (seen.has(reference)) continue;
+        seen.add(reference);
         const key=JSON.stringify([index,row.tenant_id,row.account_id,row.kind]);
         const previous=aggregates.get(key);
         if (previous) previous.count++;
         else aggregates.set(key,{index,tenantId:row.tenant_id,accountId:row.account_id,kind:row.kind,count:1});
       }
     }
-    if (page.results.length<1000) break;
-    const last=page.results[page.results.length-1];
-    cursor=[last.tenant_id ?? '',last.account_id ?? '',last.kind,last.reference_id];
   }
   const writes = await Promise.all([...aggregates.values()].map(async row => {
     const item=items[row.index], keyHash=hashes[row.index];

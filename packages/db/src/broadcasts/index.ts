@@ -4,19 +4,13 @@ export {markInsightFailed} from '../broadcast-insight-retry.js';
 import { sqlIdSet } from '../id-queries.js';
 import { refreshBroadcastReferences, removeConsumerReferences } from '../template-versions.js';
 import { jstNow } from '../utils.js';
-import { mediaContentDeletionGuard, mediaTenantGuardByQueries, mediaTenantGuardByQuery } from '../media/deletion-guard.js';
+import { mediaContentDeletionGuard, mediaTenantGuardByQuery } from '../media/deletion-guard.js';
 
-function broadcastMediaValuesGuard(db: D1Database, id: string, values: Array<string | null | undefined>): D1PreparedStatement[] {
+function broadcastMediaValuesGuard(db: D1Database, id: string, values: Array<string | null | undefined>, tenantId?: string | null): D1PreparedStatement[] {
   return mediaTenantGuardByQuery(db, values, `SELECT line_account_id AS account_id FROM broadcasts WHERE id=?
-    UNION SELECT ids.value AS account_id FROM broadcasts b, json_each(CASE WHEN json_valid(b.account_ids) THEN b.account_ids ELSE '[]' END) ids WHERE b.id=?`, [id,id]);
+    UNION SELECT ids.value AS account_id FROM broadcasts b, json_each(CASE WHEN json_valid(b.account_ids) THEN b.account_ids ELSE '[]' END) ids WHERE b.id=?`, [id,id],tenantId);
 }
 
-function broadcastMediaTenantGuard(db: D1Database, id: string): D1PreparedStatement[] {
-  return mediaTenantGuardByQueries(db,
-    `SELECT line_account_id AS account_id FROM broadcasts WHERE id=?
-     UNION SELECT ids.value AS account_id FROM broadcasts b, json_each(CASE WHEN json_valid(b.account_ids) THEN b.account_ids ELSE '[]' END) ids WHERE b.id=?`, [id, id],
-    `SELECT json_array(message_content,message_bubbles_json,draft_payload_json) AS value FROM broadcasts WHERE id=?`, [id]);
-}
 // 'segment' は 029 の CHECK では前から許されていたが、型だけ落ちていた。
 // 絞り込み条件（segment_conditions）で宛先を決める配信で使う。
 export type BroadcastTargetType = 'all' | 'tag' | 'segment' | 'multi-account-dedup';
@@ -257,6 +251,7 @@ WHERE b.id = ?`,
 }
 
 export interface CreateBroadcastInput {
+  tenantId?: string | null;
   id?: string;
   title: string;
   messageType: BroadcastMessageType;
@@ -342,7 +337,7 @@ export async function createBroadcast(
       input.afterActionVersionId ?? null,
       now,
     );
-  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.messageContent, input.messageBubblesJson, input.draftPayloadJson]), ...broadcastMediaTenantGuard(db, id), ...broadcastMediaValuesGuard(db,id,[input.messageContent,input.messageBubblesJson,input.draftPayloadJson])]);
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.messageContent, input.messageBubblesJson, input.draftPayloadJson]), ...broadcastMediaValuesGuard(db,id,[input.messageContent,input.messageBubblesJson,input.draftPayloadJson],input.tenantId)]);
 
   // 467: 保存で参照表を書き換える。吹き出しの templateId を読む。
   await refreshBroadcastReferences(db, id, input.messageBubblesJson ?? null);
@@ -387,6 +382,7 @@ export async function updateBroadcast(
   id: string,
   updates: UpdateBroadcastInput,
   expectedVersion: number,
+  tenantId?: string | null,
 ): Promise<Broadcast | null> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -490,8 +486,7 @@ export async function updateBroadcast(
     const batch = [statement];
     if (updates.resetDeliveryAttempt) batch.push(db.prepare('DELETE FROM broadcast_insights WHERE broadcast_id = ? AND changes() > 0').bind(id));
     batch.push(...await mediaContentDeletionGuard(db, [updates.message_content, updates.message_bubbles_json, updates.draft_payload_json]));
-    batch.push(...broadcastMediaTenantGuard(db, id));
-    batch.push(...broadcastMediaValuesGuard(db,id,[updates.message_content,updates.message_bubbles_json,updates.draft_payload_json]));
+    batch.push(...broadcastMediaValuesGuard(db,id,[updates.message_content,updates.message_bubbles_json,updates.draft_payload_json],tenantId));
     const result = (await db.batch(batch))[0]!;
     if (!result.meta.changes) return null;
   } else {

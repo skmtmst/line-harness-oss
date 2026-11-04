@@ -290,8 +290,14 @@ async function deleteR2Objects(
         await releaseLeases(); return {deleted:0,failed:keys.length};
       }
     }
+    if (table === 'media_versions') {
+      // バナーが参照する現行キーが旧版と同じ場合も、画像を消す前に影響を固定する。
+      const live = await env.DB.prepare(`SELECT id,line_account_id,r2_key FROM media WHERE id IN (SELECT value FROM json_each(?))`)
+        .bind(JSON.stringify(lockedMedia)).all<{id:string;line_account_id:string|null;r2_key:string}>();
+      await captureMediaPurgeImpacts(env.DB,tenantId,live.results.map(row=>({key:row.r2_key,mediaId:row.id,ownerAccount:row.line_account_id ?? tenantJobOwner(tenantId),includeLive:true})),now);
+    }
+    if (table === 'media' || table === 'media_versions') await preserveForeignBanners(env.DB,tenantId,lockedMedia);
     await env.IMAGES.delete(keys);
-    if (table === 'media') await preserveForeignBanners(env.DB, tenantId, lockedMedia);
     await finishMediaPurgeImpacts(env.DB, impacts, now);
     return { deleted: keys.length, failed: 0 };
   } catch (error) {

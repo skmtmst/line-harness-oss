@@ -33,6 +33,19 @@ describe('createBroadcast', () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS n FROM broadcasts WHERE id='foreign-broadcast'").get()).toEqual({n:0});
   });
 
+  test('共通欄が空でも複数店の統括と画像を照合する', async () => {
+    sqlite.exec(`INSERT INTO tenants(id,name) VALUES('t1','A'),('t2','B');
+      INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id)
+        VALUES('a','a','A','x','x','t1'),('a2','a2','A2','x','x','t1'),('b','b','B','x','x','t2');
+      INSERT INTO media(id,line_account_id,r2_key,filename,mime_type,size_bytes,kind)
+        VALUES('m','a','media/own.png','own.png','image/png',1,'image'),('foreign','b','media/other.png','other.png','image/png',1,'image');`);
+    const base={title:'仮',messageType:'text' as const,targetType:'multi-account-dedup' as const,lineAccountId:null,accountIds:['a','a2'],tenantId:'t1'};
+    const saved=await createBroadcast(db,{...base,id:'same',messageContent:'https://cdn.test/media/own.png'});
+    expect(saved.id).toBe('same');
+    await expect(createBroadcast(db,{...base,id:'foreign',messageContent:'https://cdn.test/media/other.png'})).rejects.toThrow('media_cross_tenant_reference');
+    await expect(updateBroadcast(db,'same',{message_content:'https://cdn.test/media/other.png'},1,'t1')).rejects.toThrow('media_cross_tenant_reference');
+  });
+
   test('persists a caller-supplied stable id and account fields atomically', async () => {
     const id = '11111111-2222-4333-8444-555555555555';
     const result = await createBroadcast(db, {

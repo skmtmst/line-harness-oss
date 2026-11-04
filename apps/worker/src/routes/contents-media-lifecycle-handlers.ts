@@ -274,7 +274,7 @@ export const get__api_media_id_delete_impact_5 = async (c: Context<Env, "/api/me
     if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
     const { impact, usages } = snapshot;
     const direct = await findDirectMediaUsages(c.env.DB, existing, accountId);
-    const sentMessageCount = existing.kind === 'image' ? await countSentMediaMessages(c.env.DB, existing) : 0;
+    const sentMessageCount = existing.kind === 'image' ? await countSentMediaMessages(c.env.DB, existing, accountId) : 0;
     const directReferences = direct.map(row => ({ kind: row.refKind, name: row.name, href: row.href, state: 'available' as const, scannedAt: checkedAt, refKind: row.refKind, refId: row.refId, reference: null }));
     /*
       R34: 版の表が無い環境では版の一覧が読めない。全体を503にせず、

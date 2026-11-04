@@ -229,6 +229,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
     try {
       await claimMediaForSend(c.env.DB, {
         claimId: mediaClaimId, accountId: friend.line_account_id ?? '',
+        tenantId: c.get('staff').tenantId,
         content: JSON.stringify([message, renewalMessage].filter(Boolean)), expiresAt: new Date(mediaClaimDeadline).toISOString(),
       });
       mediaSendClaimId = mediaClaimId;

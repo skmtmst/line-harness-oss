@@ -29,7 +29,7 @@ import MediaLibraryListV8 from './list'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-type Media = { id: string; filename: string; usageCount: number; lineAccountId?: string | null }
+type Media = { id: string; filename: string; usageCount: number; lineAccountId?: string | null; deletionInProgress?: boolean }
 type Impact = {
   usageCount: number
   canDelete: boolean
@@ -39,9 +39,9 @@ type Impact = {
   references?: Array<{ kind: string; name: string | null; href: string | null; state: 'available' | 'unavailable' }>
 }
 
-const item = ({ id, filename, usageCount, lineAccountId = account.id }: Media) => ({
+const item = ({ id, filename, usageCount, lineAccountId = account.id, deletionInProgress = false }: Media) => ({
   id, lineAccountId, folderId: null, filename, kind: 'image', mimeType: 'image/png', sizeBytes: 1000,
-  width: 10, height: 10, durationMs: null, usageCount, archivedAt: null, archiveReason: null,
+  width: 10, height: 10, durationMs: null, usageCount, archivedAt: null, archiveReason: null, deletionInProgress,
   url: `https://example.test/${id}.png`, createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-02T00:00:00.000Z',
 })
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
@@ -153,6 +153,13 @@ const deferred = <T,>() => {
 }
 
 describe('1件ずつの削除確認（YfTfJ）', () => {
+  it('削除途中の画像には再試行の案内を出す', async () => {
+    media=[{id:'m-1',filename:'秋の新商品.png',usageCount:0,deletionInProgress:true}]
+    await render()
+    expect(host.textContent).toContain('削除が途中です・再試行')
+    await click(host.querySelector('button[aria-label="秋の新商品.pngのその他操作"]'))
+    expect(menuItem('削除を再試行')).toBeDefined()
+  })
   it('送信済みトークは匿名の件数を伝え、削除を止めない', async () => {
     impacts.set('m-1', { usageCount: 0, canDelete: true, sentMessageCount: 2 })
     await render(); await openDeleteFor('秋の新商品.png')

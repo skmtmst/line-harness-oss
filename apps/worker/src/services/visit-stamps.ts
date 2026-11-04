@@ -150,7 +150,7 @@ export async function saveStampCard(db:D1Database,tenantId:string,input:VisitSta
   let result:D1Result[];
   try { result=await db.batch(statements); } catch (error) {
     if (isMediaDeletionConflict(error)) throw new StampError('削除中の画像は使用できません。別の画像を選んでください。',409);
-    if (isMediaTenantConflict(error)) throw new StampError('別の統括の画像は使用できません。別の画像を選んでください。',409);
+    if (isMediaTenantConflict(error)) throw new StampError('使えない画像です。',404);
     throw error;
   }
   if(!result[0].meta.changes)throw new StampError('カードが更新されました。読み直してください',409);
@@ -322,7 +322,7 @@ export async function requestPaperStamps(db:D1Database,cardId:string,friendId:st
   const insert=db.prepare(`INSERT OR IGNORE INTO visit_stamp_paper_requests(id,card_id,friend_id,line_account_id,photo_url,stamps,submitted_friend_id) VALUES(?,?,?,?,?,?,?)`).bind(id,cardId,friendId,accountId,url,count,submittedFriendId);
   let res:D1Result;
   try { [res]=await db.batch([insert,...await mediaDeletionTextGuardStatements(db,[url],[accountId])]); }
-  catch(error) { if(isMediaDeletionConflict(error))throw new StampError('削除中の画像は使用できません。別の画像を選んでください。',409);if(isMediaTenantConflict(error))throw new StampError('別の統括の画像は使用できません。別の画像を選んでください。',409);throw error; }
+  catch(error) { if(isMediaDeletionConflict(error))throw new StampError('削除中の画像は使用できません。別の画像を選んでください。',409);if(isMediaTenantConflict(error))throw new StampError('使えない画像です。',404);throw error; }
   if(!res.meta.changes)throw new StampError('申請済みまたは移行済みです',409);return {id,status:'pending' as const};
 }
 
