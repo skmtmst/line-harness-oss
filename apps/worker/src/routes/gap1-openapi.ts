@@ -29,3 +29,6 @@ export const gap1Paths:Record<string,Record<string,ReturnType<typeof operation>>
 (gap1Paths["/api/booking/admin/staff/{id}/meeting-url"]??={}).put=operation("PUT","/api/booking/admin/staff/{id}/meeting-url","会議URLの手入力・固定URLの反映。外部の会議は作成しない。");
 (gap1Paths["/api/inbox/routing-settings"]??={}).put=operation("PUT","/api/inbox/routing-settings","受信箱の自動担当割当の設定。");
 (gap1Paths["/api/line-accounts/{id}/senders/{senderId}"]??={}).put=operation("PUT","/api/line-accounts/{id}/senders/{senderId}","送信者名・画像の登録、編集、保管。実送信なし。");
+(gap1Paths['/api/broadcasts/{id}/sender']??={}).get=operation('GET','/api/broadcasts/{id}/sender','配信の送り手の控えを読む。');
+(gap1Paths['/api/broadcasts/{id}/sender']??={}).put=operation('PUT','/api/broadcasts/{id}/sender','模擬配信の送り手を版と権限を確かめて保存する。');
+(gap1Paths['/api/broadcasts/{id}/correction']??={}).post=operation('POST','/api/broadcasts/{id}/correction','送達済みを対象に模擬の訂正下書きを作る。');

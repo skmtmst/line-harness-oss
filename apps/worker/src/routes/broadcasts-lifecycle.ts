@@ -62,6 +62,11 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     confirmedRecipientCount?: unknown;
   }>();
 
+  const correction = await c.env.DB.prepare('SELECT correction_of_broadcast_id FROM broadcast_sender_corrections WHERE broadcast_id=?').bind(id).first<{correction_of_broadcast_id:string|null}>();
+  if (correction?.correction_of_broadcast_id && ((body.targetType !== undefined && body.targetType !== 'all') || body.targetTagId || body.segmentConditions || (body.lineAccountId !== undefined && body.lineAccountId !== existing.line_account_id) || body.accountIds?.length)) {
+    return c.json({success:false,error:'correction_audience_fixed'},409);
+  }
+
   // 版を必須化する。認可・境界・存在の判定は上で済ませてあるため、
   // 他アカウントIDは従来どおり404のまま、ここへは来ない。
   if (body.expectedVersion === undefined) {

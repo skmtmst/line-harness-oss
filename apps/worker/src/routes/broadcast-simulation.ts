@@ -15,5 +15,5 @@ broadcastSimulation.get('/api/broadcasts/:id/simulation',async c=>{
 });
 broadcastSimulation.post('/api/broadcasts/:id/simulate-send',requirePermission(BROADCAST_DEFINITION_PUBLISH_KEY),async c=>{
  gapWrite(c);const a=await gapAccount(c);if(!await c.env.DB.prepare('SELECT id FROM broadcasts WHERE id=? AND line_account_id=?').bind(c.req.param('id'),a).first())throw new GapError('not_found',404);
- const b=await gapBody(c),result=await scheduleSimulation(c.env.DB,c.req.param('id'),b,gapKey(c));await processBroadcastSimulation(c.env.DB,c.req.param('id'));return c.json({success:true,data:{...result,...await simulationPreview(c.env.DB,c.req.param('id'))}});
+ const b=await gapBody(c),result=await scheduleSimulation(c.env.DB,c.req.param('id'),b,gapKey(c),undefined,c.get('staff'));await processBroadcastSimulation(c.env.DB,c.req.param('id'));return c.json({success:true,data:{...result,...await simulationPreview(c.env.DB,c.req.param('id'))}});
 });

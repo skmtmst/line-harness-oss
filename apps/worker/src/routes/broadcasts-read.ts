@@ -1,7 +1,7 @@
 import { scopeSegmentQuery, scopedFriendIds } from '../services/segment-query-scope.js';
 import { buildOffsetListResponse, buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
-import { simulationContext } from '../features/broadcasts/broadcast-simulation/index.js';
+import { simulationContext, simulationPreview } from '../features/broadcasts/broadcast-simulation/index.js';
 import { broadcastSendPreview } from '../services/gap-send-preview.js';
 import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -213,10 +213,12 @@ export const get__api_broadcasts_id_8 = async (c: Context<Env, "/api/broadcasts/
   }
 
   const view = await broadcastStatusView(c.env.DB, broadcast as unknown as Record<string, unknown>);
+  const correction = await c.env.DB.prepare('SELECT correction_of_broadcast_id FROM broadcast_sender_corrections WHERE broadcast_id=?').bind(id).first<{correction_of_broadcast_id:string|null}>();
   return c.json({
     success: true,
     data: {
       ...serializeBroadcast(broadcast),
+      correctionOfBroadcastId: correction?.correction_of_broadcast_id ?? null,
       displayStatus: view.displayStatus,
       displayStatusLabel: view.displayStatusLabel,
       ledger: view.ledger,
@@ -348,8 +350,17 @@ export const get__api_broadcasts_id_activity_10 = async (c: Context<Env, "/api/b
 export const get__api_broadcasts_id_send_preview_11 = async (c: Context<Env, "/api/broadcasts/:id/send-preview">) => {
   const b=await getBroadcastById(c.env.DB,c.req.param('id'));
   if(!b || !await canAccessBroadcast(c.env.DB,c.get('staff'),b)) return c.json({success:false,error:'not_found'},404);
-  try { return c.json({success:true,data:await broadcastSendPreview(c.env.DB,b)}); }
-  catch { return c.json({success:false,error:'send_preview_unavailable'},503); }
+  try {
+    const baseline = await broadcastSendPreview(c.env.DB,b);
+    const sender = await c.env.DB.prepare('SELECT sender_snapshot_json,correction_of_broadcast_id FROM broadcast_sender_corrections WHERE broadcast_id=?').bind(b.id)
+      .first<{ sender_snapshot_json:string|null; correction_of_broadcast_id:string|null }>();
+    const snapshot = sender?.sender_snapshot_json ? JSON.parse(sender.sender_snapshot_json) : null;
+    if (!await simulationContext(c.env.DB,b.id)) return c.json({success:true,data:{...baseline,sender:snapshot}});
+    const sim = await simulationPreview(c.env.DB,b.id);
+    const { getBroadcastApprovalThreshold } = await import('../features/broadcasts/broadcast-approval/index.js');
+    return c.json({success:true,data:{...baseline,recipients:sim.recipients,excluded:{blocked:sim.blocked,hidden:sim.hidden,missingDestination:sim.missingDestination,optedOut:sim.optedOut,duplicate:0},
+      purpose:sim.purpose,needsApproval:sim.recipients>=await getBroadcastApprovalThreshold(c.env.DB,b),sender:snapshot,expectedVersion:sim.version,testMode:true}});
+  } catch { return c.json({success:false,error:'send_preview_unavailable'},503); }
 };
 
 export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/api/broadcasts/:id/preview-count">) => {

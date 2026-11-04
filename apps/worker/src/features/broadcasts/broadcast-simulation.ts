@@ -21,6 +21,12 @@ export function simulationDraftInput(b:Record<string,unknown>){
 export async function saveSimulationDraft(db:D1Database,a:string,actor:string,key:string,b:Record<string,unknown>,id?:string){
  if(deliveryLimitFromOptions(b.messageOptions))throw new GapError('人数の上限とシミュレーションは併用できません。',409);
  const content=simulationDraftInput(b),request=JSON.stringify(content),fingerprint=await sha256Hex(request);
+ if(id){
+ const correction=await db.prepare(`SELECT m.correction_of_broadcast_id,COALESCE(x.purpose,'marketing') purpose FROM broadcast_sender_corrections m
+ JOIN broadcasts b ON b.id=m.broadcast_id AND b.line_account_id=? LEFT JOIN broadcast_execution_contexts x ON x.broadcast_id=m.correction_of_broadcast_id
+ WHERE m.broadcast_id=? AND m.correction_of_broadcast_id IS NOT NULL`).bind(a,id).first<{correction_of_broadcast_id:string;purpose:BroadcastPurpose}>();
+ if(correction && (content.targetTagId || content.purpose!==correction.purpose))throw new GapError('correction_audience_or_purpose_fixed',409);
+ }
  if(content.targetTagId&&!await db.prepare('SELECT id FROM tags WHERE id=? AND line_account_id=? AND archived_at IS NULL').bind(content.targetTagId,a).first())throw new GapError('invalid_tag');
  if(!id){
  const prior=await db.prepare('SELECT broadcast_id,request_fingerprint FROM broadcast_execution_contexts WHERE account_id=? AND created_by=? AND request_key=?').bind(a,actor,key).first<{broadcast_id:string;request_fingerprint:string}>();
@@ -32,7 +38,7 @@ export async function saveSimulationDraft(db:D1Database,a:string,actor:string,ke
  await db.batch([db.prepare("INSERT INTO broadcast_approval_events(id,broadcast_id,actor_staff_id,action,reason,created_at) SELECT ?,id,?,'cancelled','内容の変更',? FROM broadcasts WHERE id=? AND line_account_id=? AND lock_version=? AND approval_status IN('pending','approved')").bind(crypto.randomUUID(),actor,new Date().toISOString(),id,a,b.expectedVersion),db.prepare("UPDATE broadcasts SET title=?,message_content=?,target_type=?,target_tag_id=?,lock_version=lock_version+1,approval_status='none' WHERE id=? AND line_account_id=? AND status='draft' AND lock_version=? AND EXISTS(SELECT 1 FROM broadcast_execution_contexts x WHERE x.broadcast_id=broadcasts.id AND x.state='draft')").bind(content.title,content.text,content.targetTagId?'tag':'all',content.targetTagId,id,a,b.expectedVersion),assertChanged(db),db.prepare('UPDATE broadcast_execution_contexts SET purpose=? WHERE broadcast_id=?').bind(content.purpose,id),clearAssertions(db)]);
  return {id,replayed:false};
 }
-export async function scheduleSimulation(db:D1Database,id:string,b:Record<string,unknown>,key:string,now=new Date()){
+export async function scheduleSimulation(db:D1Database,id:string,b:Record<string,unknown>,key:string,now=new Date(),actor?:{id:string;name:string;role:string}){
  if(b.testMode!==true)throw new GapError('test_mode_required',409);
  if(!/^[-\w:]{1,128}$/.test(key))throw new GapError('idempotency_key_required');
  const x=await simulationContext(db,id);if(!x)throw new GapError('not_found',404);
@@ -46,8 +52,17 @@ export async function scheduleSimulation(db:D1Database,id:string,b:Record<string
  if(b.scheduledAt!==undefined&&(typeof b.scheduledAt!=='string'||!Number.isFinite(Date.parse(b.scheduledAt))||Date.parse(b.scheduledAt)<now.getTime()))throw new GapError('invalid_schedule');
  const at=typeof b.scheduledAt==='string'?b.scheduledAt:now.toISOString(),shift=await broadcastQuietHoursShift(db,String(x.account_id),at),scheduled=shift??at;
  try{await db.batch([
- db.prepare("UPDATE broadcasts SET status='scheduled',scheduled_at=?,lock_version=lock_version+1,total_count=?,success_count=0 WHERE id=? AND lock_version=? AND status='draft' AND stopped_at IS NULL").bind(scheduled,preview.recipients,id,b.expectedVersion),assertChanged(db),
+ db.prepare(`UPDATE broadcasts SET status='scheduled',scheduled_at=?,lock_version=lock_version+1,total_count=?,success_count=0
+ WHERE id=? AND lock_version=? AND status='draft' AND stopped_at IS NULL AND NOT EXISTS(
+ SELECT 1 FROM broadcast_sender_corrections m WHERE m.broadcast_id=broadcasts.id AND m.sender_snapshot_json IS NOT NULL
+ AND (m.sender_id IS NULL OR NOT EXISTS(SELECT 1 FROM line_senders s WHERE s.id=m.sender_id AND s.account_id=broadcasts.line_account_id
+ AND s.status='active' AND s.name=json_extract(m.sender_snapshot_json,'$.name') AND (s.visibility='all' OR s.owner_staff_id=? OR ? IN ('owner','admin')))))
+ AND ?=(SELECT COUNT(*) FROM friends f JOIN broadcasts b ON b.id=broadcasts.id JOIN broadcast_execution_contexts x ON x.broadcast_id=b.id WHERE ${audience} AND ${permitted})`).bind(scheduled,preview.recipients,id,b.expectedVersion,actor?.id??null,actor?.role??null,preview.recipients),assertChanged(db),
  db.prepare("UPDATE broadcast_execution_contexts SET state='scheduled',execution_key=?,execution_request_json=?,confirmed_count=? WHERE broadcast_id=? AND state='draft'").bind(key,request,preview.recipients,id),assertChanged(db),
+ ...(actor ? [db.prepare(`INSERT INTO broadcast_sender_corrections(broadcast_id,sent_by_staff_id,sent_by_staff_name) VALUES(?,?,?)
+ ON CONFLICT(broadcast_id) DO UPDATE SET sent_by_staff_id=excluded.sent_by_staff_id,sent_by_staff_name=excluded.sent_by_staff_name,
+ sender_snapshot_json=CASE WHEN broadcast_sender_corrections.sender_id IS NULL THEN NULL ELSE
+ (SELECT json_object('name',s.name) FROM line_senders s WHERE s.id=broadcast_sender_corrections.sender_id) END`).bind(id,actor.id,actor.name)] : []),
  db.prepare(`INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state,error_code) SELECT b.id,f.id,f.line_account_id,'claimed','simulation_pending' FROM broadcasts b JOIN broadcast_execution_contexts x ON x.broadcast_id=b.id JOIN friends f ON ${audience} WHERE b.id=? AND ${permitted}`).bind(id),clearAssertions(db)]);}catch(e){const saved=await simulationContext(db,id);if(saved?.execution_key===key&&saved.execution_request_json===request)return {scheduled:true,replayed:true,testMode:true,sent:false};if(/CHECK constraint/.test(String(e)))throw new GapError('version_conflict',409);throw e;}
  return {scheduled:true,scheduledAt:scheduled,quietHoursShiftTo:shift,testMode:true,sent:false,replayed:false};
 }

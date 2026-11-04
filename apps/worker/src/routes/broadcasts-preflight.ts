@@ -1,3 +1,4 @@
+import { simulationPreview } from '../features/broadcasts/broadcast-simulation/index.js';
 import { deliveryLimitFromOptions, limitedDeliveryPlan, optionsWithDeliveryConfirmation } from '../features/broadcasts/broadcast-delivery-limit/index.js';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -28,6 +29,7 @@ export const post__api_broadcasts_preflight_1 = async (c: Context<Env, "/api/bro
     scheduledAt?: unknown;
     messageCount?: unknown;
     deliveryLimit?: unknown;
+    draftId?: unknown;
   }>();
 
   let deliveryLimit: ReturnType<typeof parseBroadcastDeliveryLimit>;
@@ -41,6 +43,20 @@ export const post__api_broadcasts_preflight_1 = async (c: Context<Env, "/api/bro
     : [body.lineAccountId == null ? null : String(body.lineAccountId)];
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
+  if (typeof body.draftId === 'string' && body.draftId) {
+    const saved = await getBroadcastById(c.env.DB, body.draftId);
+    if (!saved || !await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[saved.line_account_id]) || saved.line_account_id !== body.lineAccountId) return c.json({success:false,error:'BROADCAST_NOT_FOUND'},404);
+    const correction = await c.env.DB.prepare('SELECT correction_of_broadcast_id FROM broadcast_sender_corrections WHERE broadcast_id=?').bind(saved.id).first<{correction_of_broadcast_id:string|null}>();
+    if (correction?.correction_of_broadcast_id) {
+      if (targetType !== 'all' || body.targetTagId || body.segmentConditions || deliveryLimit) return c.json({success:false,error:'correction_audience_fixed'},409);
+      const sim = await simulationPreview(c.env.DB,saved.id);
+      const exclusions = {blocked:sim.blocked,hidden:sim.hidden,missingDestination:sim.missingDestination,duplicate:0,paused:sim.optedOut,total:sim.blocked+sim.hidden+sim.missingDestination+sim.optedOut};
+      return c.json({success:true,data:{audienceCount:sim.recipients,hiddenExcluded:sim.hidden,consentExcluded:sim.optedOut,
+        warnings:[{level:'info',message:'これは模擬の確認です。お客さまには送られません。'}],
+        audience:{matched:sim.matched+sim.blocked+sim.hidden+sim.missingDestination,sendable:sim.recipients,evaluatedAt:new Date().toISOString(),representatives:[]},exclusions,
+        quota:{unlimited:false,monthlyUsed:null,monthlyLimit:null,remaining:null,planned:sim.recipients,state:'unavailable',reason:'模擬のため実際の送信枠は使いません。'},concurrentBroadcasts:[]}});
+    }
   }
   /*
    * 条件が読めないときは数えない。
