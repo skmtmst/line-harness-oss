@@ -3,6 +3,7 @@ import { jstNow } from '@line-crm/db';
 import { isFinalMediaKey } from './media-upload-storage.js';
 import { imageDimensions } from '../features/media/media-metadata/index.js';
 import { allowedFileScanEndpoint, isFileScanSecretRef } from '../lib/file-scan-policy.js';
+import { UNLOCKED_SCAN_SQL } from './file-deletion-lock.js';
 
 /*
  * 危険なファイルの検査。
@@ -376,14 +377,15 @@ export async function isMediaUsable(db: ScanDb, mediaId: string): Promise<boolea
   return row?.status === 'clean';
 }
 
-export async function markFileScanClean(db: ScanDb, id: string): Promise<void> {
+export async function markFileScanClean(db: ScanDb, id: string): Promise<boolean> {
   const now = jstNow();
-  await db.prepare(
+  const changed = await db.prepare(
     `UPDATE media_file_scans
         SET status = 'clean', confirmation_revision=confirmation_revision+1, reason_code = NULL, reason_detail = NULL,
             scanned_at = ?, next_retry_at = NULL, updated_at = ?
-      WHERE id = ?`,
+      WHERE id = ? AND ${UNLOCKED_SCAN_SQL}`,
   ).bind(now, now, id).run();
+  return Number(changed.meta.changes ?? 0) === 1;
 }
 
 export async function markFileScanRejected(
@@ -394,7 +396,7 @@ export async function markFileScanRejected(
     `UPDATE media_file_scans
         SET status = 'rejected', confirmation_revision=confirmation_revision+1, reason_code = ?, reason_detail = ?,
             scanned_at = ?, next_retry_at = NULL, updated_at = ?
-      WHERE id = ?`,
+      WHERE id = ? AND ${UNLOCKED_SCAN_SQL}`,
   ).bind(reasonCode, detail, now, now, id).run();
 }
 
@@ -406,21 +408,21 @@ export async function markFileScanQuarantined(
     `UPDATE media_file_scans
         SET status = 'quarantined', confirmation_revision=confirmation_revision+1, reason_code = ?, reason_detail = ?,
             scanned_at = ?, quarantined_at = ?, next_retry_at = NULL, updated_at = ?
-      WHERE id = ? AND status != 'quarantined'`,
+      WHERE id = ? AND status != 'quarantined' AND ${UNLOCKED_SCAN_SQL}`,
   ).bind(reasonCode, detail, now, now, now, id).run();
 }
 
 export async function markFileScanPendingRetry(db: ScanDb, id: string, attempts: number, maxAttempts?: number): Promise<FileScanStatus> {
   const now = jstNow();
   if (maxAttempts !== undefined && attempts + 1 >= maxAttempts) {
-    await db.prepare(`UPDATE media_file_scans SET attempts = ?, confirmation_revision=confirmation_revision+1 WHERE id = ?`).bind(attempts + 1, id).run();
+    await db.prepare(`UPDATE media_file_scans SET attempts = ?, confirmation_revision=confirmation_revision+1 WHERE id = ? AND ${UNLOCKED_SCAN_SQL}`).bind(attempts + 1, id).run();
     await markFileScanRejected(db, id, 'scan_attempts_exhausted', `検査を${maxAttempts}回試しても終わりませんでした`);
     return 'rejected';
   }
   await db.prepare(
     `UPDATE media_file_scans
         SET status = 'pending', confirmation_revision=confirmation_revision+1, attempts = ?, next_retry_at = ?, updated_at = ?
-      WHERE id = ?`,
+      WHERE id = ? AND ${UNLOCKED_SCAN_SQL}`,
   ).bind(attempts + 1, nextFileScanRetryAt(attempts, Date.now()), now, id).run();
   return 'pending';
 }
@@ -435,7 +437,9 @@ export async function runBuiltinScanAndStore(
 ): Promise<FileScanRow> {
   const result = builtinFileScan(bytes, input, overrides);
   if (result.verdict === 'clean') {
-    await markFileScanClean(db, scan.id);
+    if (!await markFileScanClean(db, scan.id)) {
+      return await db.prepare('SELECT * FROM media_file_scans WHERE id=?').bind(scan.id).first<FileScanRow>() ?? { ...scan, status: 'pending' };
+    }
     return { ...scan, status: 'clean', scanned_at: jstNow() };
   }
   if (result.verdict === 'quarantined') {

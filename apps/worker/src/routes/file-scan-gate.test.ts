@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { createMediaVersionFromUpload, verifyMediaUploadSession } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { fileScan } from './file-scan.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { runBuiltinScanAndStore, type FileScanRow } from '../services/file-scan.js';
+import { claimFileDeletion, mediaDeletionLockId, releaseFileDeletion } from '../services/file-deletion-lock.js';
 
 /**
  * 危険なファイルの検査の管理口。
@@ -14,6 +17,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 let testDb: SqliteD1;
 let allowedPairs = 'example.com=FILE_SCAN_SECRET_PRIMARY';
+const deletedObjects = vi.fn(async (_key: string | string[]): Promise<void> => {});
 
 function insertAccount(id: string, tenantId: string = DEFAULT_TENANT_ID): void {
   testDb.raw.prepare(`INSERT INTO line_accounts
@@ -77,7 +81,7 @@ function app() {
 function environment(): Env['Bindings'] {
   return {
     DB: testDb.db,
-    IMAGES: { delete: async () => undefined } as unknown as R2Bucket,
+    IMAGES: { delete: deletedObjects } as unknown as R2Bucket,
     WORKER_URL: 'https://api.example.com',
     API_KEY: 'env-key-unused',
     FILE_SCAN_ALLOWED_PAIRS: allowedPairs,
@@ -112,6 +116,7 @@ function post(path: string, staffId: string, body: unknown): Promise<Response> {
 }
 
 beforeEach(() => {
+  deletedObjects.mockClear();
   allowedPairs = 'example.com=FILE_SCAN_SECRET_PRIMARY';
   testDb = createTestD1({ loginPolicy: 'off' });
   insertAccount('acc-1');
@@ -235,6 +240,90 @@ describe('誤りなので戻す', () => {
 });
 
 describe('消す', () => {
+  it('古い確認では記録も実体も消さず 409、正しい版なら消す', async () => {
+    const scan = insertScan({ subject_kind: 'generic_image', subject_id: 'fixture/test-image', media_id: null });
+    testDb.raw.prepare('UPDATE media_file_scans SET confirmation_revision=2 WHERE id=?').run(scan.id);
+    const stale = await call(`/api/file-scans/${scan.id}?accountId=acc-1&expectedConfirmationRevision=1`, 'owner-1', { method: 'DELETE' });
+    expect(stale.status).toBe(409);
+    expect(deletedObjects).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare('SELECT status FROM media_file_scans WHERE id=?').get(scan.id)).toEqual({ status: 'quarantined' });
+    const fresh = await call(`/api/file-scans/${scan.id}?accountId=acc-1&expectedConfirmationRevision=2`, 'owner-1', { method: 'DELETE' });
+    expect(fresh.status).toBe(200);
+    expect(deletedObjects).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare('SELECT id FROM media_file_scans WHERE id=?').get(scan.id)).toBeUndefined();
+  });
+  it('削除中の別操作と同じ確認の二重押しは通さない', async () => {
+    const scan = insertScan({ subject_kind: 'generic_image', subject_id: 'fixture/locked-image', media_id: null });
+    let finish!: () => void;
+    deletedObjects.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    const path = `/api/file-scans/${scan.id}?accountId=acc-1&expectedConfirmationRevision=1`;
+    const first = call(path, 'owner-1', { method: 'DELETE' });
+    await vi.waitFor(() => expect(deletedObjects).toHaveBeenCalledTimes(1));
+    const retry = await post(`/api/file-scans/${scan.id}/retry`, 'owner-1', { accountId: 'acc-1' });
+    expect(retry.status).toBe(409);
+    expect((await call(path, 'owner-1', { method: 'DELETE' })).status).toBe(409);
+    finish();
+    expect((await first).status).toBe(200);
+    expect(deletedObjects).toHaveBeenCalledTimes(1);
+  });
+  it('削除中は古い検査処理が使える状態を返さない', async () => {
+    const row = insertScan({ subject_kind: 'generic_image', subject_id: 'fixture/scanner-race', media_id: null });
+    const scan = testDb.raw.prepare('SELECT * FROM media_file_scans WHERE id=?').get(row.id) as FileScanRow;
+    const lock = await claimFileDeletion(testDb.db, `file-scan-delete:scan:${row.id}`, 'owner-1', { id: row.id, accountId: 'acc-1', expected: 1 });
+    expect(lock).not.toBeNull();
+    try {
+      const png = Uint8Array.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0,0,0,0x0d,0x49,0x48,0x44,0x52,0,0,0,1,0,0,0,1,0,0,0,0,0x49,0x45,0x4e,0x44,0xae,0x42,0x60,0x82]);
+      const result = await runBuiltinScanAndStore(testDb.db, { ...scan, status: 'pending' }, png, { filename: 'safe.png', mimeType: 'image/png', sizeBytes: png.length, width: 1, height: 1 });
+      expect(result.status).toBe('quarantined');
+      expect(testDb.raw.prepare('SELECT status FROM media_file_scans WHERE id=?').get(row.id)).toEqual({ status: 'quarantined' });
+    } finally { await releaseFileDeletion(testDb.db, lock!); }
+  });
+  it('削除中は同じ素材の別削除とアップロード先の変更を受け付けない', async () => {
+    testDb.raw.prepare("INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES ('lock-media','acc-1','image','a.png','image/png',100,'fixture/old')").run();
+    testDb.raw.prepare("INSERT INTO media_upload_sessions(id,line_account_id,target_media_id,filename,kind,expected_mime,expected_size,r2_key,status,expires_at) VALUES ('lock-session','acc-1','lock-media','a.png','image','image/png',100,'fixture/staged','pending','2099-01-01')").run();
+    const scan = insertScan({ subject_kind: 'upload_session', subject_id: 'lock-session', media_id: 'lock-media' });
+    const lock = await claimFileDeletion(testDb.db, mediaDeletionLockId('lock-media'), 'owner-1', { id: scan.id, accountId: 'acc-1', expected: 1 });
+    expect(lock).not.toBeNull();
+    try {
+      expect(await claimFileDeletion(testDb.db, mediaDeletionLockId('lock-media'), 'owner-1')).toBeNull();
+      const session = await verifyMediaUploadSession(testDb.db, 'lock-session', 'acc-1', 'etag', null, false, 'fixture/new');
+      expect(session?.status).toBe('pending');
+      expect(session?.r2_key).toBe('fixture/staged');
+    } finally { await releaseFileDeletion(testDb.db, lock!); }
+  });
+  it('削除中の素材差し替えを拒み、差し替え後は古い削除確認を拒む', async () => {
+    testDb.raw.prepare("INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,width,height,r2_key) VALUES ('version-media','acc-1','image','a.png','image/png',100,1,1,'fixture/version-old')").run();
+    testDb.raw.prepare("INSERT INTO media_versions(id,media_id,version_no,r2_key,mime_type,size_bytes,width,height,published_at) VALUES ('version-old','version-media',1,'fixture/version-old','image/png',100,1,1,'now')").run();
+    testDb.raw.prepare("INSERT INTO media_upload_sessions(id,line_account_id,target_media_id,filename,kind,expected_mime,expected_size,width,height,r2_key,status,expires_at) VALUES ('version-session','acc-1','version-media','a.png','image','image/png',100,1,1,'fixture/version-new','verified','2099-01-01')").run();
+    const scan = insertScan({ subject_kind: 'media', subject_id: 'version-media', media_id: 'version-media' });
+    const input = { mediaId: 'version-media', lineAccountId: 'acc-1', uploadSessionId: 'version-session', expectedVersionNo: 1, changeReason: '差し替え' };
+    const lock = await claimFileDeletion(testDb.db, mediaDeletionLockId('version-media'), 'owner-1', { id: scan.id, accountId: 'acc-1', expected: 1 });
+    expect(lock).not.toBeNull();
+    try {
+      await expect(createMediaVersionFromUpload(testDb.db, input)).rejects.toThrow();
+      expect(testDb.raw.prepare("SELECT r2_key FROM media WHERE id='version-media'").get()).toEqual({ r2_key: 'fixture/version-old' });
+    } finally { await releaseFileDeletion(testDb.db, lock!); }
+    await createMediaVersionFromUpload(testDb.db, input);
+    const stale = await call(`/api/file-scans/${scan.id}?accountId=acc-1&expectedConfirmationRevision=1`, 'owner-1', { method: 'DELETE' });
+    expect(stale.status).toBe(409);
+    expect(deletedObjects).not.toHaveBeenCalled();
+  });
+  it('実体の削除に失敗したら記録を残して読み直し後に再試行できる', async () => {
+    const scan = insertScan({ subject_kind: 'generic_image', subject_id: 'fixture/retry-image', media_id: null });
+    deletedObjects.mockRejectedValueOnce(new Error('fixture storage failure'));
+    const path = `/api/file-scans/${scan.id}?accountId=acc-1&expectedConfirmationRevision=`;
+    expect((await call(`${path}1`, 'owner-1', { method: 'DELETE' })).status).toBe(503);
+    expect(testDb.raw.prepare('SELECT status,confirmation_revision FROM media_file_scans WHERE id=?').get(scan.id)).toEqual({ status: 'quarantined', confirmation_revision: 2 });
+    expect((await call(`${path}2`, 'owner-1', { method: 'DELETE' })).status).toBe(200);
+  });
+  it('別アカウントの実体を参照している不正な記録では削除しない', async () => {
+    testDb.raw.prepare("INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES ('foreign-media','acc-2','image','a.png','image/png',100,'fixture/foreign')").run();
+    const scan = insertScan({ subject_kind: 'media', subject_id: 'foreign-media', media_id: 'foreign-media' });
+    const res = await call(`/api/file-scans/${scan.id}?accountId=acc-1&expectedConfirmationRevision=1`, 'owner-1', { method: 'DELETE' });
+    expect(res.status).toBe(409);
+    expect(deletedObjects).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare('SELECT confirmation_revision FROM media_file_scans WHERE id=?').get(scan.id)).toEqual({ confirmation_revision: 1 });
+  });
   it('しまったものは消せる', async () => {
     const scan = insertScan();
     const res = await call(`/api/file-scans/${scan.id}?accountId=acc-1`, 'owner-1', { method: 'DELETE' });

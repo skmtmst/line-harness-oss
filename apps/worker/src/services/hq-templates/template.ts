@@ -740,6 +740,7 @@ export async function planMessageTemplateDistribution(input: {
       dbCommit.push(conflictGuard(
         `SELECT 1 FROM media m JOIN media_versions v ON v.media_id = m.id
           WHERE m.id = ? AND m.line_account_id = ? AND m.r2_key = ?
+            AND NOT EXISTS (SELECT 1 FROM operation_audit l WHERE l.id='file-scan-delete:media:' || m.id AND l.action='deleting')
             AND v.version_no = (SELECT MAX(v2.version_no) FROM media_versions v2 WHERE v2.media_id = m.id)
             AND (v.created_at || ':' || COALESCE(v.content_hash, '') || ':' || v.r2_key) = ?`,
         [targetId, context.targetAccountId, target.r2Key, item.expectedRevision],
@@ -750,6 +751,7 @@ export async function planMessageTemplateDistribution(input: {
         bindings: [filename, media.kind, media.mimeType, media.sizeBytes, media.width, media.height,
           media.durationMs, targetR2Key, targetPublicUrl, targetId, context.targetAccountId, target.r2Key],
       });
+      dbCommit.push({ sql: "UPDATE media_file_scans SET confirmation_revision=confirmation_revision+1 WHERE line_account_id=? AND (media_id=? OR (subject_kind='media' AND subject_id=?))", bindings: [context.targetAccountId, targetId, targetId] });
     } else {
       dbCommit.push({
         sql: `INSERT INTO media
