@@ -96,6 +96,21 @@ describe('MJoJR メニュー管理', () => {
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived', expectedVersion: 1 }))
   })
 
+  it.each(['停止', '再開'] as const)('%s に失敗したら保存失敗を知らせる', async (operation) => {
+    fixture.updateMenu.mockRejectedValueOnce(new Error('network'))
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    if (operation === '停止') {
+      openMenu('秋の鹿肉コース')
+      fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
+      fireEvent.click(screen.getByRole('button', { name: '停止する' }))
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: '再開', exact: true }))
+    }
+    expect((await screen.findAllByText('保存に失敗しました。時間をおいて、もう一度お試しください。')).length).toBeGreaterThan(0)
+    expect(fixture.updateMenu).toHaveBeenCalledTimes(1)
+  })
+
   it('停止の競合後は最新の内容で確認窓を作り直す', async () => {
     const latest = snapshotOf()
     latest.menuItems = latest.menuItems.map(item => item.id === 'm1' ? {...item, name:'更新後のコース', confirmation_revision:2} : item)

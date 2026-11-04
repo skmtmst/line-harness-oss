@@ -348,7 +348,7 @@ describe('Google のカード', () => {
     const card = within(await screen.findByRole('region', { name: 'Google ビジネス' }))
     fireEvent.click(await card.findByText('渋谷店'))
     fireEvent.click(card.getByRole('button', { name: 'この店舗を接続する' }))
-    await waitFor(() => expect(fixture.googleSelectLocation).toHaveBeenCalledWith('acc-1', 'accounts/1/locations/2', false))
+    await waitFor(() => expect(fixture.googleSelectLocation).toHaveBeenCalledWith('acc-1', 'accounts/1/locations/2', false, undefined))
   })
 })
 

@@ -10,9 +10,10 @@ beforeEach(() => { request.mockReset(); request.mockResolvedValue({ success: tru
 
 describe('確認時の値をAPIへ渡す', () => {
   it('リッチメニューの取り下げに確認した公開世代を付ける', async () => {
-    await Reflect.apply(richMenusMethods.richMenuGroups.unpublish, null, ['group', 7])
+    const confirmation = { expectedVersion: 3, expectedPublishGeneration: 7, expectedIsDefaultForAll: true, expectedPages: [{ id: 'page', orderIndex: 0, lineRichMenuId: 'line-menu' }] }
+    await richMenusMethods.richMenuGroups.unpublish('group', confirmation)
     expect(request).toHaveBeenCalledWith('/api/rich-menu-groups/group/unpublish', {
-      method: 'POST', body: JSON.stringify({ expectedPublicationGeneration: 7 }),
+      method: 'POST', body: JSON.stringify(confirmation),
     })
   })
   it('LINE通知のテスト送信に確認した宛先を付ける', async () => {

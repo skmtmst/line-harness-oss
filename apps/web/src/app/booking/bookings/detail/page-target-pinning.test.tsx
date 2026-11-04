@@ -110,7 +110,7 @@ describe('DEEP-18: 詳細と操作対象の固定', () => {
     await waitFor(() => expect(m.confirmation).toBeTypeOf('function'))
     const oldConfirm = m.confirmation!, oldCancel = m.cancel!
     const dialog = screen.getByRole('dialog')
-    fireEvent.click(withinDialogButton(dialog, 'キャンセル'))
+    fireEvent.click(withinDialogButton(dialog, '戻る'))
     fireEvent.click(screen.getByRole('button', { name: '承認する' }))
     act(() => { oldCancel() })
     expect(screen.getByRole('dialog')).toBeTruthy()
