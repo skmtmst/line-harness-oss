@@ -1,8 +1,15 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
-const fixture = vi.hoisted(() => ({ allowed: true, account: 'account-a', remove: vi.fn(), crumbs: [] as unknown[], confirm: null as null | (() => unknown) }))
+const fixture = vi.hoisted(() => ({ allowed: true, account: 'account-a', remove: vi.fn(), crumbs: [] as unknown[], confirm: null as null | (() => unknown), openTanaka: null as null | (() => void) }))
+vi.mock('@/components/shared/row-actions', async original => {
+  const actual = await original<typeof import('@/components/shared/row-actions')>()
+  return { ...actual, RowActions: (props: React.ComponentProps<typeof actual.RowActions>) => {
+    if (props.subjectName === '田中' && props.destructiveItem?.onSelect) fixture.openTanaka = props.destructiveItem.onSelect
+    return <actual.RowActions {...props} />
+  } }
+})
 vi.mock('@/components/shared/confirm-dialog', async original => {
   const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
   return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
@@ -20,7 +27,7 @@ vi.mock('@/lib/api', async original => ({ ...(await original<typeof import('@/li
   deleteStaff: (...args: unknown[]) => fixture.remove(...args),
 } }))
 import StaffPage from './page'
-beforeEach(() => { verifiedStaffRole('owner'); fixture.allowed = true; fixture.account = 'account-a'; fixture.crumbs = []; fixture.confirm = null; fixture.remove.mockReset().mockResolvedValue({ ok: true }) })
+beforeEach(() => { verifiedStaffRole('owner'); fixture.allowed = true; fixture.account = 'account-a'; fixture.crumbs = []; fixture.confirm = null; fixture.openTanaka = null; fixture.remove.mockReset().mockResolvedValue({ ok: true }) })
 afterEach(() => { cleanup(); verifiedStaffRole(null) })
 
 it('どのスタッフにもシフト1つとメニュー1つ、編集と最後の削除を保つ', async () => {
@@ -122,4 +129,22 @@ it('閉じた佐藤の確認を田中の確認中に実行しても削除しな�
   expect(fixture.remove).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: '削除する' }))
   await waitFor(() => expect(fixture.remove).toHaveBeenCalledExactlyOnceWith('account-a', 's1'))
+})
+
+it('前の削除が成功しても、次に開いたスタッフの確認を閉じない', async () => {
+  let finish!: (value: unknown) => void
+  fixture.remove.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  render(<StaffPage />)
+  await screen.findByText('佐藤')
+  expect(fixture.openTanaka).toBeTypeOf('function')
+  const openNext = fixture.openTanaka!
+  fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+  fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+  await waitFor(() => expect(fixture.remove).toHaveBeenCalledExactlyOnceWith('account-a', 's0'))
+  act(() => openNext())
+  expect(screen.getByRole('alertdialog').textContent).toContain('田中')
+  await act(async () => finish({ ok: true }))
+  expect(screen.getByRole('alertdialog').textContent).toContain('田中')
+  expect(fixture.remove).toHaveBeenCalledTimes(1)
 })
