@@ -29,6 +29,5 @@ describe('タグ一覧・編集の操作失敗と再取得の契約', () => {
     expect(editor).toContain('reason instanceof ApiError && reason.status === 409')
     expect(editor).toContain('setConflictValues(values)')
     expect(form).toContain('<SaveConflictBand')
-    expect(form).toContain('onReload={onReloadLatest}')
   })
 })

@@ -6,7 +6,10 @@ import { RowNameLink } from '@/components/shared/table';
 import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Activity, Archive, Copy, CircleCheck, CircleHelp, FilePen, Lock, MessageSquareMore, Pause, Pencil, Plus, Send, UserPlus } from 'lucide-react';
@@ -213,6 +216,13 @@ function FriendAddList() {
   const [editingFolder, setEditingFolder] = useState<FriendAddRuleFolder | null>(null)
   const [folderError, setFolderError] = useState('')
   const [folderBusy, setFolderBusy] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const closeFolder = () => { setFolderDialogOpen(false); setFolderName(''); setEditingFolder(null) }
+  const folderGuard = useUnsavedGuard({
+    dirty: folderDialogOpen && (folderName !== (editingFolder?.name ?? '') || folderColor !== (editingFolder ? folderDisplayColor(editingFolder) : FOLDER_SELECT_COLORS[0].value) || folderBusy),
+    busy: folderDialogOpen && folderBusy,
+    onDiscard: closeFolder,
+  })
   const folderKey = useRef(crypto.randomUUID())
   const requestSequence = useRef(0)
 
@@ -947,8 +957,9 @@ function FriendAddList() {
           description="設定を分けてしまう箱です。"
           name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} maxLength={50}
           confirmLabel={editingFolder ? '保存する' : '追加する'} busy={folderBusy} error={folderError || undefined}
-          onCancel={() => { if (!folderBusy) { setFolderDialogOpen(false); setFolderName(''); setEditingFolder(null) } }}
+          onCancel={closeFolder}
           onConfirm={() => createFolder()} />
+        <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={folderGuard.leaveTarget !== null} busy={folderBusy} onConfirm={folderGuard.confirmLeave} onCancel={folderGuard.cancelLeave} /></OverlayDepthContext.Provider>
       </>}
     >
       {listBody}

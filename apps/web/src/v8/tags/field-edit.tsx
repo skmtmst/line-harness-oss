@@ -74,7 +74,7 @@ export default function FieldEdit() {
 
   useEffect(() => {
     let cancelled = false
-    if (!selectedAccountId) { setLoading(false); return }
+    if (!id || !selectedAccountId) { setLoading(false); return }
     setLoading(true)
     setError('')
     setField(null)
@@ -210,11 +210,11 @@ export default function FieldEdit() {
     return JSON.stringify(current) === JSON.stringify(latest ?? null) ? [] : [{ text: `${label}：編集中 ${JSON.stringify(current)} → 最新 ${JSON.stringify(latest ?? null)}` }]
   }) : null
 
-  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (!id) {
     return (
       <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="unspecified"
+        pageHeading
         title="編集する友だち情報欄が指定されていません"
         description="一覧から編集する項目を選び直してください。"
         backHref="/tags?tab=fields"
@@ -222,6 +222,7 @@ export default function FieldEdit() {
       /></SaveErrorScope>
     )
   }
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (!selectedAccountId) return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="上部でLINE公式アカウントを選んでください" /></SaveErrorScope>
   if (notFound || (!error && !field)) {
     return (

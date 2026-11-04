@@ -5,11 +5,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import RemindersList from './list'
 
-const net = vi.hoisted(() => ({ read: vi.fn(), update: vi.fn(), folders: vi.fn(), stats: vi.fn(), hold: false, account: 'account-a' }))
+const net = vi.hoisted(() => ({ read: vi.fn(), update: vi.fn(), remove: vi.fn(), folders: vi.fn(), stats: vi.fn(), hold: false, account: 'account-a' }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, fetchApi: net.read, api: { ...actual.api,
-    reminders: { ...actual.api.reminders, update: net.update },
+    reminders: { ...actual.api.reminders, update: net.update, delete: net.remove },
     folders: { ...actual.api.folders, list: net.folders }, listStats: { get: net.stats },
   } }
 })
@@ -26,7 +26,7 @@ vi.mock('@/lib/undoable', async original => {
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: net.account, loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }), useSearchParams: () => new URLSearchParams(''), usePathname: () => '/reminders' }))
-const rows = ['r1', 'r2'].map((id, index) => ({ id, name: `お知らせ${index + 1}`, isActive: true, lifecycleStatus: 'published', folderId: null, stepCount: 1, displayOrder: index, createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z', plannedDeliveries: 1 }))
+const rows = ['r1', 'r2'].map((id, index) => ({ id, lineAccountId: 'account-a', name: `お知らせ${index + 1}`, isActive: true, lifecycleStatus: 'published', folderId: null, stepCount: 1, displayOrder: index, createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z', plannedDeliveries: 1 }))
 beforeEach(() => {
   vi.clearAllMocks(); net.hold = false; net.account = 'account-a'; verifiedStaffRole('owner')
   window.history.replaceState(null, '', '/reminders')
@@ -79,6 +79,61 @@ it('窓の中で元に戻すと送信0で閉じ、選んだ行を残す', async 
 vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: async () => ({ version: '2.7.0', deploy_env: 'staging' }) }))
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '二号店' }] }) }))
 
+it('一件の停止確認は選択中ではなく記録の所属先を示す', async () => {
+  net.read.mockResolvedValue({ success: true, data: { items: rows.map(row => ({ ...row, lineAccountId: 'account-b' })), total: 2, limit: 20, sort: [] } })
+  render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '一時停止する' }))
+  const dialog = await screen.findByRole('dialog')
+  expect(await within(dialog).findByText('二号店')).toBeTruthy()
+  expect(within(dialog).queryByText('本店')).toBeNull()
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する' })) })
+  expect(net.update).toHaveBeenCalledWith('r1', { isActive: false })
+})
+
+it('一括停止は選んだ各記録の所属先を示し、未取得を選択中の店で補わない', async () => {
+  net.read.mockResolvedValue({ success: true, data: { items: rows.map((row, i) => ({ ...row, lineAccountId: i ? null : 'account-b' })), total: 2, limit: 20, sort: [] } })
+  render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  rows.forEach(row => fireEvent.click(within(screen.getByText(row.name).closest('tr')!).getByRole('checkbox')))
+  fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
+  const dialog = await screen.findByRole('dialog', { name: '2件のリマインダを停止しますか？' })
+  expect(await within(dialog).findByText('二号店')).toBeTruthy()
+  expect(within(dialog).getByText('不明')).toBeTruthy()
+  expect(within(dialog).queryByText('本店')).toBeNull()
+})
+
+it('一括停止も切替後の古い確認では送れない', async () => {
+  const view = render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  rows.forEach(row => fireEvent.click(within(screen.getByText(row.name).closest('tr')!).getByRole('checkbox')))
+  fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
+  const dialog = await screen.findByRole('dialog', { name: '2件のリマインダを停止しますか？' })
+  const button = within(dialog).getByRole('button', { name: '停止する' })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+  net.account = 'account-b'; view.rerender(<RemindersList />)
+  net.account = 'account-a'; view.rerender(<RemindersList />)
+  await act(async () => old())
+  expect(net.update).not.toHaveBeenCalled()
+})
+
+it('一件の停止確認を開いた後でアカウントを切り替えると古い確認では送れない', async () => {
+  const view = render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '一時停止する' }))
+  const dialog = await screen.findByRole('dialog')
+  const button = within(dialog).getByRole('button', { name: '一時停止する' })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+  net.account = 'account-b'; view.rerender(<RemindersList />)
+  net.account = 'account-a'; view.rerender(<RemindersList />)
+  await act(async () => old())
+  expect(net.update).not.toHaveBeenCalled()
+})
+
 it('一括停止の窓は操作先を示し、アカウント切替で閉じて古い対象を送らない', async () => {
   const view = render(<RemindersList />)
   await screen.findByText('お知らせ1')
@@ -91,4 +146,56 @@ it('一括停止の窓は操作先を示し、アカウント切替で閉じて�
   view.rerender(<RemindersList />)
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(net.update).not.toHaveBeenCalled()
+})
+
+it('一件の停止窓は所属不明と環境を示し、切替後の古い確認を断る', async () => {
+  net.read.mockResolvedValue({ success: true, data: { items: rows.map(row => ({ ...row, lineAccountId: null })), total: 2, limit: 20, sort: [] } })
+  const view = render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '一時停止する' }))
+  const dialog = await screen.findByRole('dialog')
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('不明')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+  const button = within(dialog).getByRole('button', { name: '一時停止する' })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+  net.account = 'account-b'; view.rerender(<RemindersList />)
+  net.account = 'account-a'; view.rerender(<RemindersList />)
+  await act(async () => old())
+  expect(net.update).not.toHaveBeenCalled()
+})
+it('削除の窓は選択中ではなく記録の所属先を示す', async () => {
+  net.read.mockResolvedValue({ success: true, data: { items: rows.map(row => ({ ...row, lineAccountId: 'account-b' })), total: 2, limit: 20, sort: [] } })
+  render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '削除する' }))
+  const dialog = await screen.findByRole('alertdialog')
+  expect(await within(dialog).findByText('二号店')).toBeTruthy()
+  expect(within(dialog).queryByText('本店')).toBeNull()
+})
+it('削除の窓を開いて店を往復した後は古い確定を実行できない', async () => {
+  const view = render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '削除する' }))
+  const dialog = await screen.findByRole('alertdialog')
+  const button = within(dialog).getByRole('button', { name: '削除する' })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+  net.account = 'account-b'; view.rerender(<RemindersList />)
+  net.account = 'account-a'; view.rerender(<RemindersList />)
+  await act(async () => old())
+  expect(net.remove).not.toHaveBeenCalled()
+})
+it('確認した一件のリマインダを停止する', async () => {
+  render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '一時停止する' }))
+  const dialog = await screen.findByRole('dialog')
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する' })) })
+  expect(net.update).toHaveBeenCalledWith('r1', { isActive: false })
 })

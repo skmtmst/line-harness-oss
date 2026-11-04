@@ -14,12 +14,16 @@ vi.hoisted(() => {
 
 const state = vi.hoisted(() => ({
   accountId: 'account-a',
+  ownerId: 'account-a' as string | null,
   role: 'owner' as string,
   tab: '' as string,
   updates: [] as Array<Record<string, unknown>>,
+  deletes: [] as string[],
+  retry: vi.fn(),
   plannedTotal: 2,
   onlyPlanned: false,
   omitId: false,
+  urlId: 'reminder-1',
   management:false,
 }))
 
@@ -33,7 +37,7 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/reminders/detail',
-  useSearchParams: () => new URLSearchParams(`${state.omitId ? '' : 'id=reminder-1'}${state.tab ? `${state.omitId ? '' : '&'}tab=${state.tab}` : ''}`),
+  useSearchParams: () => new URLSearchParams(`${state.omitId ? '' : `id=${state.urlId}`}${state.tab ? `${state.omitId ? '' : '&'}tab=${state.tab}` : ''}`),
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -72,7 +76,7 @@ vi.mock('@/lib/api', () => {
         runs: vi.fn(async (_id: string, params?: { status?: string }) => ({
           success: true,
           data: {
-            reminder: { id: 'reminder-1', name: '予約前日のご案内', isActive: true, lifecycleStatus: 'published', stopConditions: null, hasPublishedVersion: true },
+            reminder: { id: 'reminder-1', lineAccountId: state.ownerId, name: '予約前日のご案内', isActive: true, lifecycleStatus: 'published', stopConditions: null, hasPublishedVersion: true },
             summary: { sent: 3, scheduled: 2, stopped: 0, errors: 2, targetCount: 186, nextScheduledAt: soon(), sentThisMonth: 386, scheduledNext7Days: 124 },
             steps: [{ id: 'st1', stepNumber: 1, offsetMinutes: -1440, messageType: 'text', messageContent: '明日のご案内です。', sent: 212, openRate: null, errors: 1 }],
             items: params?.status === 'planned'
@@ -88,6 +92,8 @@ vi.mock('@/lib/api', () => {
           state.updates.push(body)
           return { success: true, data: null }
         }),
+        delete: vi.fn(async (id: string) => { state.deletes.push(id); return { success: true, data: null } }),
+        retryRun: state.retry,
         registrants: {
           list: vi.fn(async () => ({
             success: true,
@@ -103,6 +109,7 @@ vi.mock('@/lib/api', () => {
 })
 
 import ReminderDetailV8Page from './detail'
+import { api } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -111,13 +118,17 @@ let host: HTMLDivElement
 
 beforeEach(() => {
   state.accountId = 'account-a'
+  state.ownerId = 'account-a'
   document.documentElement.dataset.theme = 'v8'
   state.role = 'owner'
   state.tab = ''
   state.updates = []
+  state.deletes = []
+  state.retry.mockReset()
   state.plannedTotal = 2
   state.onlyPlanned = false
   state.omitId = false
+  state.urlId = 'reminder-1'
   state.management=false
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -140,6 +151,108 @@ const buttonByText = (text: string) =>
   [...document.querySelectorAll('button')].find((el) => el.textContent?.trim() === text) as HTMLButtonElement | undefined
 
 describe('V8 リマインダの詳細', () => {
+  it('実行結果を表示中にURLを変えた後、古い結果が遅れても再送できない', async () => {
+    state.tab = 'runs'
+    const runs = vi.mocked(api.reminders.runs), get = vi.mocked(api.reminders.get)
+    const originalRuns = runs.getMockImplementation()!, originalGet = get.getMockImplementation()!
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    runs.mockImplementation(async (id, params) => {
+      const res = await originalRuns(id, params)
+      if (id === 'reminder-1' && params?.limit === 20) await pending
+      if (!res.success) return res
+      return { ...res, data: { ...res.data, reminder: { ...res.data.reminder, id }, items: res.data.items.map(item => ({ ...item, friendName: id === 'reminder-1' ? '古いお客さま' : '新しいお客さま', canRetry: true })) } }
+    })
+    get.mockImplementation(async id => { const res = await originalGet(id); return res.success ? { ...res, data: { ...res.data, id } } : res })
+    try {
+      await render()
+      state.urlId = 'reminder-2'; await render()
+      expect(host.textContent).toContain('新しいお客さま')
+      await act(async () => { release(); await pending })
+      expect(host.textContent).toContain('新しいお客さま')
+      expect(host.textContent).not.toContain('古いお客さま')
+      expect(state.retry).not.toHaveBeenCalled()
+    } finally { runs.mockImplementation(originalRuns); get.mockImplementation(originalGet) }
+  })
+  it('実行結果の応答が別のリマインダなら行を表示せず再送できない', async () => {
+    state.tab = 'runs'
+    const runs = vi.mocked(api.reminders.runs)
+    const original = runs.getMockImplementation()!
+    runs.mockImplementation(async (id, params) => {
+      const res = await original(id, params)
+      if (!res.success || params?.limit !== 20) return res
+      return { ...res, data: { ...res.data, reminder: { ...res.data.reminder, id: 'old-id' }, items: res.data.items.map(item => ({ ...item, friendName: '古いお客さま', canRetry: true })) } }
+    })
+    try {
+      await render()
+      expect(host.textContent).not.toContain('古いお客さま')
+      expect(buttons()).not.toContain('再試行する')
+      expect(host.textContent).toContain('実行結果を読み込めませんでした')
+      expect(state.retry).not.toHaveBeenCalled()
+    } finally { runs.mockImplementation(original) }
+  })
+  it('停止の返事が遅れても、移動後の別リマインダを停止中にしない', async () => {
+    const runs = vi.mocked(api.reminders.runs), get = vi.mocked(api.reminders.get), update = vi.mocked(api.reminders.update)
+    const originalRuns = runs.getMockImplementation()!, originalGet = get.getMockImplementation()!, originalUpdate = update.getMockImplementation()!
+    let release!: () => void
+    const pending = new Promise<void>(resolve => { release = resolve })
+    runs.mockImplementation(async (id, params) => { const res = await originalRuns(id, params); return res.success ? { ...res, data: { ...res.data, reminder: { ...res.data.reminder, id, name: id === 'reminder-2' ? '新しい対象' : '古い対象' } } } : res })
+    get.mockImplementation(async id => { const res = await originalGet(id); return res.success ? { ...res, data: { ...res.data, id } } : res })
+    update.mockImplementation(async () => { await pending; return { success: true, data: null } as never })
+    try {
+      await render()
+      await act(async () => { buttonByText('一時停止する')!.click() })
+      const dialog = document.querySelector('[data-design-node="RwVo5"]')!
+      const confirm = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === '一時停止する') as HTMLButtonElement
+      await act(async () => { confirm.click() })
+      state.urlId = 'reminder-2'; await render()
+      expect(host.textContent).toContain('新しい対象')
+      await act(async () => { release(); await pending })
+      expect(host.textContent).toContain('新しい対象')
+      expect(buttonByText('一時停止する')).toBeTruthy()
+      expect(host.textContent).not.toContain('リマインダを一時停止しました')
+    } finally { runs.mockImplementation(originalRuns); get.mockImplementation(originalGet); update.mockImplementation(originalUpdate) }
+  })
+  it('URLを変更した後に古い応答が届いても現在の対象を保つ', async () => {
+    const runs = vi.mocked(api.reminders.runs)
+    const get = vi.mocked(api.reminders.get)
+    const originalRuns = runs.getMockImplementation()!
+    const originalGet = get.getMockImplementation()!
+    let release!: () => void
+    const oldResponse = new Promise<void>(resolve => { release = resolve })
+    runs.mockImplementation(async (id, params) => {
+      const result = await originalRuns(id, params)
+      if (id === 'reminder-1' && !params?.status) await oldResponse
+      if (!result.success) return result
+      return { ...result, data: { ...result.data, reminder: { ...result.data.reminder, id, name: id === 'reminder-2' ? '新しい対象' : '古い対象' } } }
+    })
+    get.mockImplementation(async id => {
+      const result = await originalGet(id)
+      return result.success ? { ...result, data: { ...result.data, id } } : result
+    })
+    try {
+      await render()
+      state.urlId = 'reminder-2'
+      await render()
+      expect(host.textContent).toContain('新しい対象')
+      await act(async () => { release(); await oldResponse })
+      expect(host.textContent).toContain('新しい対象')
+      expect(host.textContent).not.toContain('古い対象')
+    } finally {
+      runs.mockImplementation(originalRuns)
+      get.mockImplementation(originalGet)
+    }
+  })
+  it('応答のIDがURLと違うとき、古い対象と操作を表示せず読み直せる', async () => {
+    state.urlId = 'reminder-2'
+    await render()
+    expect(host.textContent).not.toContain('予約前日のご案内')
+    expect(buttons()).not.toContain('一時停止する')
+    expect(host.querySelector('[aria-label*="その他の操作"]')).toBeNull()
+    expect(host.textContent).toContain('読み込めませんでした')
+    expect(buttons()).toContain('もう一度読み込む')
+    expect(state.updates).toEqual([])
+  })
   it('削除確認を開いて別のアカウントに切り替えたら古い窓を閉じる', async () => {
     await render()
     const more = [...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label')?.includes('その他の操作')) as HTMLButtonElement
@@ -151,15 +264,30 @@ describe('V8 リマインダの詳細', () => {
     await render()
     expect(document.querySelector('[role="alertdialog"]')).toBeNull()
   })
+  it('削除確認を開いた後で店を往復しても古い確定は送れない', async () => {
+    await render()
+    const more = [...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label')?.includes('その他の操作')) as HTMLButtonElement
+    await act(async () => { more.click() })
+    const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('削除する')) as HTMLElement
+    await act(async () => { remove.click() })
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    const confirm = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === '削除する') as HTMLButtonElement
+    const key = Object.keys(confirm).find(k => k.startsWith('__reactProps$'))!
+    const old = (confirm as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    state.accountId = 'account-b'; await render()
+    state.accountId = 'account-a'; await render()
+    await act(async () => old())
+    expect(state.deletes).toEqual([])
+  })
   it('削除確認は所属が取れない場合に不明と環境を示す', async () => {
-    state.accountId = 'unknown'
+    state.ownerId = null
     await render()
     const more = [...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label')?.includes('その他の操作')) as HTMLButtonElement
     await act(async () => { more.click() })
     const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('削除する')) as HTMLElement
     await act(async () => { remove.click() })
     const dialog = document.querySelector('[role="alertdialog"]')
-    expect(dialog?.textContent).toContain('名前を確認できません')
+    expect(dialog?.textContent).toContain('不明')
     expect(dialog?.textContent).toContain('環境')
   })
   it('削除確認に操作対象の店名を示す', async () => {
@@ -203,6 +331,38 @@ describe('V8 リマインダの詳細', () => {
     expect(state.updates).toEqual([{ isActive: false }])
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)) })
     expect(document.querySelector('[data-design-node="RwVo5"]')).toBeNull()
+  })
+
+  it('一時停止の対象は選択中の店ではなくリマインダの所属先を示す', async () => {
+    state.ownerId = 'account-b'
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    const dialog = document.querySelector('[data-design-node="RwVo5"]')
+    await waitFor(() => expect(dialog?.textContent).toContain('別店舗'))
+    expect(dialog?.textContent).not.toContain('本店')
+  })
+
+  it('停止の窓は所属が不明なら不明と環境を示す', async () => {
+    state.ownerId = null
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    const dialog = document.querySelector('[data-design-node="RwVo5"]')!
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('不明')
+    expect(dialog.textContent).toContain('環境')
+  })
+
+  it('停止確認を開いた後でアカウントを切り替えると古い確認では送れない', async () => {
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    const dialog = document.querySelector('[data-design-node="RwVo5"]')!
+    const button = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === '一時停止する') as HTMLButtonElement
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    state.accountId = 'account-b'; await act(async () => { root.render(<ReminderDetailV8Page />) })
+    state.accountId = 'account-a'; await act(async () => { root.render(<ReminderDetailV8Page />) })
+    await act(async () => old())
+    expect(state.updates).toEqual([])
   })
 
   it('閲覧のみ：一時停止・編集・複製・削除を置かず、書き出しだけ残す', async () => {

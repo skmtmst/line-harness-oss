@@ -13,11 +13,12 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/tags/marks/edit',
 }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a> }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc', loading: false }) }))
+const account = vi.hoisted(() => ({ id: 'acc' }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.id, loading: false }) }))
 const chrome = vi.hoisted(() => ({ title: vi.fn() }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: (...args: unknown[]) => chrome.title(...args), usePageCrumbs: () => undefined }))
 
-const net = vi.hoisted(() => ({ list: vi.fn(), update: vi.fn(), create: vi.fn() }))
+const net = vi.hoisted(() => ({ list: vi.fn(), update: vi.fn(), create: vi.fn(), rules: vi.fn(async () => ({ success: true, data: [] as unknown[] })), stopRule: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -29,7 +30,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
         list: (...args: unknown[]) => net.list(...args),
         update: (...args: unknown[]) => net.update(...args),
         create: (...args: unknown[]) => net.create(...args),
-        automationRules: async () => ({ success: true, data: [] }),
+        automationRules: net.rules,
+        archiveAutomationRule: net.stopRule,
       },
     },
   }
@@ -92,3 +94,21 @@ test('編集画面の題は「対応マークを編集」', async () => {
   expect(chrome.title).toHaveBeenLastCalledWith('対応マークを編集')
 })
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+
+test('きまりを止める窓に対象を示し、アカウント切替後の古い確認を拒否する', async () => {
+  account.id = 'acc'
+  net.list.mockReset().mockResolvedValue({ success: true, data: [{ id: 'mk1', name: '至急', color: '#d33', displayOrder: 0, isDefault: false }] })
+  net.rules.mockResolvedValue({ success: true, data: [{ id: 'r1', name: '自動のきまり', version: 1, isActive: true }] })
+  const view = render(<MarkEditor markId="mk1" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'きまり「自動のきまり」を止める' }))
+  const dialog = await screen.findByRole('alertdialog')
+  expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+  expect(within(dialog).getByText('環境')).toBeTruthy()
+  const button = within(dialog).getByRole('button', { name: '止める' })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+  account.id = 'other'; view.rerender(<MarkEditor markId="mk1" />)
+  account.id = 'acc'; view.rerender(<MarkEditor markId="mk1" />)
+  old()
+  expect(net.stopRule).not.toHaveBeenCalled()
+})

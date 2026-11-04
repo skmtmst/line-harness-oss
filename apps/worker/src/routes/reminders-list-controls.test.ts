@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { publicReminder } from './reminder-display.js';
 
 const ACC_A = 'acc-a';
 const ACC_B = 'acc-b';
@@ -164,6 +165,36 @@ beforeEach(async () => {
   sqlite = createTestD1({ loginPolicy: 'off' });
   seed(sqlite.raw);
   ({ reminders: remindersRoute } = await import('./reminders.js'));
+});
+
+test('一覧と詳細は各リマインダの実際の所属先を返す', async () => {
+  const paged = await list('limit=20');
+  expect(paged.status).toBe(200);
+  const pagedBody = await paged.json() as { data: { items: Array<{ id: string; lineAccountId: string | null }> } };
+  expect(pagedBody.data.items.find(row => row.id === 'r-1')?.lineAccountId).toBe(ACC_A);
+  expect(pagedBody.data.items.find(row => row.id === 'r-b')?.lineAccountId).toBe(ACC_B);
+  const legacy = await list('');
+  const legacyBody = await legacy.json() as { data: Array<{ id: string; lineAccountId: string | null }> };
+  expect(legacyBody.data.find(row => row.id === 'r-b')?.lineAccountId).toBe(ACC_B);
+  for (const suffix of ['', '/runs']) {
+    const response = await app().request(`/api/reminders/r-b${suffix}`, { headers: { Authorization: `Bearer ${KEY_OWNER}` } }, env());
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { lineAccountId?: string; reminder?: { lineAccountId: string } } };
+    expect(suffix ? body.data.reminder?.lineAccountId : body.data.lineAccountId).toBe(ACC_B);
+    const forbidden = await app().request(`/api/reminders/r-1${suffix}`, { headers: { Authorization: `Bearer ${KEY_STAFF_B}` } }, env());
+    expect(forbidden.status).toBe(404);
+  }
+});
+
+test('所属先のないリマインダは null とし、権限がなければ表示しない', async () => {
+  sqlite.raw.prepare('UPDATE reminders SET line_account_id = NULL WHERE id = ?').run('r-1');
+  const row = sqlite.raw.prepare('SELECT * FROM reminders WHERE id = ?').get('r-1') as Parameters<typeof publicReminder>[0];
+  expect(publicReminder(row).lineAccountId).toBeNull();
+  const paged = await list('limit=20');
+  const body = await paged.json() as { data: { items: Array<{ id: string; lineAccountId: string | null }> } };
+  expect(body.data.items.find(item => item.id === 'r-1')).toBeUndefined();
+  const detail = await app().request('/api/reminders/r-1', { headers: { Authorization: `Bearer ${KEY_OWNER}` } }, env());
+  expect(detail.status).toBe(404);
 });
 
 describe('一覧の検索 (N-077)', () => {

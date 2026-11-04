@@ -288,6 +288,7 @@ export default function ManagedFolderPanel({
         reserveCreateSpace={reserveCreateSpace}
         onAddFolder={editable ? startAdd : undefined}
         addFolderLabel="フォルダを追加"
+        hideNarrowAdd={!canManage}
         addFolderLockedReason={managed ? permissionReason : undefined}
         addFolderDisabled={managed && !editable && !permissionReason}
         disabled={disabled}

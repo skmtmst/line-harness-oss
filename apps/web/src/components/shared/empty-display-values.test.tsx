@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest'
+vi.mock('next/navigation', async original => ({ ...await original<typeof import('next/navigation')>(), useRouter: () => ({ push: vi.fn(), back: vi.fn() }) }))
 import { cleanup, render } from '@testing-library/react'
 import { Zap } from 'lucide-react'
 import type { FriendField, ReservationBoardEntry } from '@line-crm/shared'

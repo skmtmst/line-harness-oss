@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { IndustryStyle, StyleBooking, StyleSchedule, StyleSnapshot } from '@line-crm/shared'
 import type { eventsApi } from '@/lib/api'
@@ -213,7 +213,16 @@ it.each(['list', 'board'])('検索結果0は%sでも予約なしとせず、検�
   state.search = 'view=' + view
   render(<StyleDashboard style="salon" />)
   await screen.findByRole('searchbox')
-  fireEvent.change(screen.getByRole('searchbox'), { target: { value: '検索に一致しない名前' } })
+  // SearchField は入力後 300ms に絞り込む。実時間と CPU 負荷に依存させず、通知まで進める。
+  vi.useFakeTimers()
+  try {
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '検索に一致しない名前' } })
+    await act(async () => { await vi.advanceTimersByTimeAsync(299) })
+    expect(screen.queryByRole('button', { name: '検索を外す', exact: true })).toBeNull()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+  } finally {
+    vi.useRealTimers()
+  }
   const clear = await screen.findByRole('button', { name: '検索を外す', exact: true })
   expect(screen.queryByText('今日の予約はありません')).toBeNull()
   fireEvent.click(clear)

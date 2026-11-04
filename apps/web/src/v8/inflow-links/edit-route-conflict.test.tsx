@@ -61,3 +61,17 @@ it('開いた版を送信し、409では入力を残して最新と比較・読�
   expect(net.update).toHaveBeenLastCalledWith('route-1', expect.objectContaining({ expectedUpdatedAt: '2026-10-19T00:00:00Z' }))
   expect(net.saved).toHaveBeenCalledTimes(1)
 })
+it('流入リンクの編集窓から移動する前に未保存の入力を確認する', async () => {
+  window.history.replaceState(null, '', '/inflow-links')
+  await act(async () => { root.render(<><EditRouteModal surface="dialog" route={route} pools={[]} scenarios={[]} templates={[]} tags={[]} existingGenres={[]} poolMemberNames={{}} onClose={() => {}} onSaved={net.saved} /><a href="/events">イベントへ</a></>) })
+  await act(async () => { fireEvent.change(document.getElementById('route-name')!, { target: { value: '下書き' } }) })
+  await act(async () => { fireEvent.click(screen.getByRole('link', { name: 'イベントへ' })) })
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})
+it('流入リンク詳細の編集欄から移動する前にも未保存を確認する', async () => {
+  window.history.replaceState(null, '', '/inflow-links/detail')
+  await act(async () => { root.render(<><EditRouteModal surface="inline" route={route} pools={[]} scenarios={[]} templates={[]} tags={[]} existingGenres={[]} poolMemberNames={{}} onClose={() => {}} onSaved={net.saved} /><a href="/events">イベントへ</a></>) })
+  await act(async () => { fireEvent.change(document.getElementById('route-name')!, { target: { value: '下書き' } }) })
+  await act(async () => { fireEvent.click(screen.getByRole('link', { name: 'イベントへ' })) })
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})

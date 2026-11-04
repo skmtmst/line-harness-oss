@@ -28,7 +28,7 @@ import { TextField } from '@/components/shared/text-field';
 import { tagNameProblem } from '@/v8/tags/public/tag-name/index'
 import { formatNumber } from '@/lib/format'
 import Select from '@/components/shared/select';
-import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select';
+import FolderSelect, { type FolderSelectCreate, type FolderDraftGuard } from '@/components/shared/folder-select';
 import Toggle from '@/components/shared/toggle';
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide';
 import LinkedActionList from '@/components/friend-fields/linked-action-list';
@@ -38,6 +38,7 @@ import { emptyValue } from '@/components/shared/empty-value';
 import NumberInput from '@/components/shared/number-field';
 import { SaveErrorField, useSaveErrorReveal } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice';
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 export function TagEditForm({
   tag,
@@ -59,6 +60,9 @@ export function TagEditForm({
   onDelete,
   host,
 }: TagEditFormProps) {
+  const folderDraftGuard = useRef<FolderDraftGuard | null>(null)
+  const [folderCreating, setFolderCreating] = useState(false)
+  const guardFolder = (action: () => void) => { if (folderDraftGuard.current) folderDraftGuard.current(action); else action() }
   const [name, setName] = useState(tag.name ?? '')
   const [nameError, setNameError] = useState('')
   const nameRef = useRef<HTMLInputElement>(null)
@@ -168,7 +172,7 @@ export function TagEditForm({
         reloadVariant="primary" designNode="xn95q"
         compareBusy={compareBusy}
         onCompare={onCompare}
-        onReload={onReloadLatest}
+        onReload={() => requestUnsavedAction(onReloadLatest)}
       />
     </div>
   ) : null
@@ -221,14 +225,14 @@ export function TagEditForm({
         previewLabel="使用状況を見る"
         previewTitle="使っている所"
         preview={host ? host.preview(values) : side}
-        destructive={host || readOnly ? undefined : <StickyBarAction destructive label="タグを削除する" icon={Trash2} onClick={onDelete} />}
+        destructive={host || readOnly ? undefined : <StickyBarAction destructive label="タグを削除する" icon={Trash2} disabledReason={folderCreating ? "フォルダを作成中です。" : undefined} onClick={() => requestUnsavedAction(onDelete)} />}
         footerActions={(
           <>
-            <Button onClick={onCancel}>キャンセル</Button>
+            <Button disabled={folderCreating} disabledReason={folderCreating ? "フォルダを作成中です。" : undefined} onClick={() => requestUnsavedAction(onCancel)}>キャンセル</Button>
             {/* 閲覧のみには押せない操作を置かない（隠す）。 */}
-            {readOnly ? null : <>{host?.onSaveDraft ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveDraft?.(values)}>下書きを保存</Button> : null}{host ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveAnother(values)}><Plus size={16} aria-hidden="true" />保存して続けて作る</Button> : null}</>}
+            {readOnly ? null : <>{host?.onSaveDraft ? <Button busy={folderCreating} busyLabel="フォルダ作成中" disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => guardFolder(() => host.onSaveDraft?.(values))}>下書きを保存</Button> : null}{host ? <Button busy={folderCreating} busyLabel="フォルダ作成中" disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => guardFolder(() => host.onSaveAnother(values))}><Plus size={16} aria-hidden="true" />保存して続けて作る</Button> : null}</>}
             {readOnly ? null : (
-              <Button variant="primary" onClick={conflict ? onCompare : requestSave} busy={saving} disabled={Boolean(host) && !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined}>
+              <Button variant="primary" onClick={() => guardFolder(() => { if (conflict) onCompare(); else void requestSave() })} busy={saving || folderCreating} busyLabel={folderCreating ? "フォルダ作成中" : "保存中…"} disabled={Boolean(host) && !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined}>
                 {conflict ? <GitCompare size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
                 {conflict ? '比べてから保存' : host ? host.saveLabel ?? 'タグを作る' : 'タグを保存する'}
               </Button>
@@ -248,7 +252,7 @@ export function TagEditForm({
               <div className={styles.folderBox}>
                 {readOnly
                   ? <span className={styles.roValue}>{groups.find((group) => group.id === groupId)?.name ?? '未分類'}</span>
-                  : <SaveErrorField names={["groupId", "group_id", "folderId", "tag.folderId", "definition.tag.folderId"]}><FolderSelect aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))} onCreate={onCreateGroup} size="full" /></SaveErrorField>}
+                  : <SaveErrorField names={["groupId", "group_id", "folderId", "tag.folderId", "definition.tag.folderId"]}><FolderSelect draftGuardRef={folderDraftGuard} onCreatingChange={setFolderCreating} aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))} onCreate={onCreateGroup} size="full" /></SaveErrorField>}
               </div>
             </div>
             <div className={styles.switchRow}>
