@@ -31,6 +31,8 @@ export interface Scenario {
   lineAccountId: string | null;
   /** 有効/無効フラグ */
   isActive: boolean;
+  /** 確認時点の設定と通の版。 */
+  contentRevision?: number;
   /** 最後の停止理由（200字まで）。停止記録が無い・理由未入力なら null。 */
   stoppedReason?: string | null;
   /** 最後に止めた担当者ID。停止記録が無いなら null。 */

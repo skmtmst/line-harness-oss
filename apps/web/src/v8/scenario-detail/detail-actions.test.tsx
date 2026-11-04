@@ -39,6 +39,7 @@ const calls = vi.hoisted(() => ({
   folders: vi.fn(),
   friends: vi.fn(),
   stats: vi.fn(),
+  confirmation: vi.fn(),
   scenario: vi.fn(),
 }))
 
@@ -49,6 +50,7 @@ const base = vi.hoisted(() => ({
   triggerType: 'friend_add',
   triggerTagId: null,
   isActive: true,
+  contentRevision: 1,
   allowConcurrent: true,
   folderId: null as string | null,
   deliveryMode: 'absolute_time',
@@ -93,6 +95,7 @@ vi.mock('@/lib/api', () => ({
       create: calls.create,
       get: calls.get,
       update: calls.update,
+      confirmation: calls.confirmation,
       delete: calls.remove,
       reorderSteps: calls.reorderSteps,
       addStep: calls.addStep,
@@ -197,6 +200,7 @@ function stubScenario(patch: Partial<typeof base>) {
 }
 
 function stubStats(activeNow: number | undefined) {
+  calls.confirmation.mockResolvedValue(activeNow === undefined ? { success: false, error: 'offline' } : ok({ contentRevision: 1, activeCount: activeNow, subscriptions: [], referrers: [] }))
   calls.stats.mockResolvedValue(activeNow === undefined
     ? { success: false, error: 'offline' }
     : ok({ enrolledTotal: 40, activeNow, completed: 12, paused: 0, steps: [] }))
@@ -286,7 +290,7 @@ describe('シナリオ全体を削除する確認', () => {
   it('配信停止と通の削除に操作先と環境を示す', async () => {
     await render()
     fireEvent.click(screen.getByRole('button', { name: '一時停止する' }))
-    const stop = screen.getByRole('alertdialog', { name: '配信を止めますか' })
+    const stop = await screen.findByRole('alertdialog', { name: '配信を止めますか' })
     expect(within(stop).getByText('LINEアカウント')).toBeTruthy()
     expect(within(stop).getByText('環境')).toBeTruthy()
     fireEvent.click(within(stop).getByRole('button', { name: 'キャンセル' }))
@@ -312,8 +316,14 @@ describe('シナリオ全体を削除する確認', () => {
   })
 
   it('購読中の人数を、取れない・0人・N人で分けて、消えるものと残るものと一緒に読ませる', async () => {
+    stubStats(undefined)
+    await render()
+    fireEvent.click(screen.getByRole('button', { name: 'このシナリオのその他操作' }))
+    await chooseMenuItem('このシナリオを削除')
+    await waitFor(() => expect(host.textContent).toContain('確認できません'))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(calls.remove).not.toHaveBeenCalled()
     for (const [activeNow, sentence] of [
-      [undefined, '購読中の人数は確認できません。'],
       [0, '現在購読中の友だちは0人です。'],
       [116, '現在116 人が購読中です。途中の人は続きを受け取れません。'],
     ] as const) {
@@ -335,7 +345,7 @@ describe('シナリオ全体を削除する確認', () => {
     await render()
     const dialog = await openDeleteScenario()
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '削除する' })) })
-    await waitFor(() => expect(calls.remove).toHaveBeenCalledWith('sc-1'))
+    await waitFor(() => expect(calls.remove).toHaveBeenCalledWith('sc-1', { contentRevision: 1, activeCount: 116, subscriptions: [], referrers: [] }))
     await waitFor(() => expect(calls.push).toHaveBeenCalledWith(expect.stringMatching(/^\/scenarios(\?|$)/)))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   })

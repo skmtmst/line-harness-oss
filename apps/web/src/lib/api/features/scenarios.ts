@@ -4,6 +4,7 @@ import type {
   ScenarioFriendPlan,
   ScenarioDraftV6,
   ScenarioUpdateInput,
+  ScenarioConfirmation,
   ScenarioStopInput,
   FriendScenarioSubscription,
   ScenarioDraftActionV6,
@@ -152,8 +153,8 @@ export const scenariosMethods = {
         method: 'PUT',
         body: JSON.stringify({ ...data, isActive: false }),
       }),
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE' }),
+    delete: (id: string, confirmation?: Pick<ScenarioConfirmation, 'contentRevision' | 'subscriptions' | 'referrers'>) =>
+      fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE', ...(confirmation ? { body: JSON.stringify({ expectedContentRevision: confirmation.contentRevision, expectedSubscriptions: confirmation.subscriptions, expectedReferrers: confirmation.referrers }) } : {}) }),
     /**
      * R250: このシナリオを終了後の移動先にしているシナリオの一覧。
      * 削除の確認窓で「どのシナリオの設定が変わるか」を見せる。
@@ -209,9 +210,10 @@ export const scenariosMethods = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    deleteStep: (id: string, stepId: string) =>
+    confirmation: (id: string, purpose: 'stop' | 'delete') => fetchApi<ApiResponse<ScenarioConfirmation>>(`/api/scenarios/${id}/confirmation?purpose=${purpose}`),
+    deleteStep: (id: string, stepId: string, expectedContentRevision?: number) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}/steps/${stepId}`, {
-        method: 'DELETE',
+        method: 'DELETE', ...(expectedContentRevision === undefined ? {} : { body: JSON.stringify({ expectedContentRevision }) }),
       }),
     reorderSteps: (id: string, orders: { stepId: string; stepOrder: number }[]) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}/steps/reorder`, {
