@@ -2797,6 +2797,9 @@
       "column": "line_account_id"
     }
   },
+  "registration_applications": {
+    "category": "global"
+  },
   "reminder_delivery_runs": {
     "category": "purge",
     "scope": {
