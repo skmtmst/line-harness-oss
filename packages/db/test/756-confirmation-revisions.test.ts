@@ -8,6 +8,7 @@ const tables = [
   'rt_seat_waitlist', 'rt_tables', 'templates', 'traffic_pools',
   'account_handovers', 'friend_scenarios', 'scenarios', 'media_file_scans',
   'file_scan_configs', 'webhook_interaction_logs', 'booking_payments',
+  'meet_consultations', 'rich_menu_groups', 'outgoing_webhooks', 'incoming_webhooks',
 ] as const;
 const revision = (table: string) => table === 'scenarios' ? 'content_revision' : 'confirmation_revision';
 const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;

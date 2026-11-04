@@ -17,3 +17,7 @@ ALTER TABLE media_file_scans ADD COLUMN confirmation_revision INTEGER NOT NULL D
 ALTER TABLE file_scan_configs ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE webhook_interaction_logs ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE booking_payments ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE meet_consultations ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rich_menu_groups ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE outgoing_webhooks ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE incoming_webhooks ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
