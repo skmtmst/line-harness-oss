@@ -102,6 +102,6 @@ export default function RestaurantFloorEditor({accountId,storeId,resources,canEd
     <div className={styles.batchPreview}><strong>配置プレビュー</strong><div>{Array.from({length:Math.min(count,8)},(_,i)=><span key={i}>{modal==='pattern'?patterns[pattern].max:draft?.tables.find(t=>t.id===source)?.maxCapacity??2}名</span>)}</div><p>卓番と表示名は自動で付けます。作成後は「停止中」から始まります。</p></div>
    </>}
   </div><footer><button type="button" onClick={()=>setModal(null)}>キャンセル</button><button type="button" className={styles.primary} disabled={busy} onClick={()=>void(modal==='add'?addFloor():createMany())}><Plus size={16}/>{modal==='add'?'追加する':count+'卓を作る'}</button></footer></div></div>:null}
-  <UnsavedLeaveDialog open={guard.leaveTarget!==null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} subject="座席図の変更"/>
+  <UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} subject="座席図の変更"/>
  </div></SaveErrorScope>
 }
