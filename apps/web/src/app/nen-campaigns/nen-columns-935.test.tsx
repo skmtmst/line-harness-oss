@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
-import type { NenCampaignSetting, NenColumn } from '../../lib/api'
+import type { NenCampaignSetting, NenColumn, NenColumnDeliveryPreview } from '../../lib/api'
 import NenOverview from '@/v8/nen-campaigns/list'
 import { type ColumnDeliveryPlan, type NenTab } from '@/v8/nen-campaigns/display'
 
@@ -73,7 +73,7 @@ function renderColumns(input: {
   selectedColumnId?: string | null
   plan?: ColumnDeliveryPlan
   onDeliverColumn?: (column: NenColumn, scheduledAt?: string) => void
-  onPreviewColumn?: (column: NenColumn) => Promise<any>
+  onPreviewColumn?: (column: NenColumn) => Promise<NenColumnDeliveryPreview>
   onSelectColumn?: (id: string | null) => void
   introDraft?: string
 }) {
@@ -199,8 +199,8 @@ describe('配信確認の文言と実態の一致（#935 N-303）', () => {
     expect(bodyText()).not.toContain('今すぐ配信しますか？')
   })
   it('確認の読込み中に別のコラムを選べば古い確認は開かない', async () => {
-    let finish!: (value: any) => void
-    const preview = vi.fn(() => new Promise<any>((resolve) => { finish = resolve }))
+    let finish!: (value: NenColumnDeliveryPreview) => void
+    const preview = vi.fn(() => new Promise<NenColumnDeliveryPreview>((resolve) => { finish = resolve }))
     const first=column('c1'),second=column('c2')
     renderColumns({columns:[first,second],selectedColumnId:'c1',onPreviewColumn:preview})
     click(primaryButton('配信を予約する'))
