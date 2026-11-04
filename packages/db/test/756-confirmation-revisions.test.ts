@@ -9,18 +9,20 @@ const tables = [
   'account_handovers', 'friend_scenarios', 'scenarios', 'media_file_scans',
   'file_scan_configs', 'webhook_interaction_logs', 'booking_payments',
   'meet_consultations', 'rich_menu_groups', 'outgoing_webhooks', 'incoming_webhooks',
+  'bookings', 'event_bookings', 'rt_reservations',
 ] as const;
 const revision = (table: string) => table === 'scenarios' ? 'content_revision' : 'confirmation_revision';
 const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;
 type Column = { name: string; type: string; notnull: number; dflt_value: string | null; pk: number; hidden: number };
 type SchemaObject = { type: string; name: string; sql: string };
 
-it('既存行を保ち、指定した版の列だけを初期値 1 で追加する', () => {
+it('既存行を保ち、指定した版の列と購読の検索索引を追加する', () => {
   const db = new Database(':memory:');
   try {
     db.exec(readFileSync(new URL('../bootstrap.sql', import.meta.url), 'utf8'));
     db.pragma('foreign_keys = OFF');
     db.pragma('ignore_check_constraints = ON');
+    db.exec('DROP INDEX idx_friend_scenarios_scenario_status');
     // 最新 bootstrap から対象列を外し、直前の実スキーマを再現する。
     for (const table of tables) db.exec(`ALTER TABLE ${quote(table)} DROP COLUMN ${quote(revision(table))}`);
     const triggers = db.prepare("SELECT type, name, sql FROM sqlite_master WHERE type = 'trigger' AND sql IS NOT NULL").all() as SchemaObject[];
@@ -43,7 +45,14 @@ it('既存行を保ち、指定した版の列だけを初期値 1 で追加す�
     const beforeOtherTables = otherTables();
     db.exec(readFileSync(new URL('../migrations/756_confirmation_revisions.sql', import.meta.url), 'utf8'));
     expect(otherTables()).toEqual(beforeOtherTables);
-    expect(otherObjects()).toEqual(beforeOtherObjects);
+    const afterOtherObjects = otherObjects() as SchemaObject[];
+    const addedIndex = afterOtherObjects.filter((object) => object.name === 'idx_friend_scenarios_scenario_status');
+    expect(addedIndex).toHaveLength(1);
+    expect(addedIndex[0].type).toBe('index');
+    expect(db.pragma('index_info(idx_friend_scenarios_scenario_status)')).toMatchObject([{ name: 'scenario_id' }, { name: 'status' }]);
+    expect(afterOtherObjects.filter((object) => object.name !== 'idx_friend_scenarios_scenario_status')).toEqual(beforeOtherObjects);
+    const plan = db.prepare("EXPLAIN QUERY PLAN SELECT id FROM friend_scenarios WHERE scenario_id = ? AND status = ?").all('scenario', 'active');
+    expect(plan).toEqual(expect.arrayContaining([expect.objectContaining({ detail: expect.stringContaining('idx_friend_scenarios_scenario_status') })]));
     for (const table of tables) {
       const columns = db.pragma(`table_xinfo(${quote(table)})`) as Column[];
       const added = columns.find((column) => column.name === revision(table));
