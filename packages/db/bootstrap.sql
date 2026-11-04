@@ -212,7 +212,7 @@ CREATE TABLE account_settings (
   key             TEXT NOT NULL,
   value           TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), confirmation_revision INTEGER NOT NULL DEFAULT 1,
   UNIQUE(line_account_id, key)
 );
 

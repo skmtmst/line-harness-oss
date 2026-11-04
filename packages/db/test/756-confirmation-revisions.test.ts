@@ -9,7 +9,7 @@ const tables = [
   'account_handovers', 'friend_scenarios', 'scenarios', 'media_file_scans',
   'file_scan_configs', 'webhook_interaction_logs', 'booking_payments',
   'meet_consultations', 'rich_menu_groups', 'outgoing_webhooks', 'incoming_webhooks',
-  'bookings', 'event_bookings', 'rt_reservations',
+  'bookings', 'event_bookings', 'rt_reservations', 'account_settings',
 ] as const;
 const revision = (table: string) => table === 'scenarios' ? 'content_revision' : 'confirmation_revision';
 const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;
