@@ -33,6 +33,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
+import CatalogUpdate from '@/v8/hq-templates/catalog-update'
 
 /* ① メニュー（settings-v8.tsx から分割。見た目・動きは変えない） */
 
@@ -349,6 +350,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                     {menu.category_label ? <TagPill name={menu.category_label} color={FOLDER_SELECT_COLORS[0].value} size="sm" aria-label={`分類「${menu.category_label}」`} /> : null}
                   </span>
                   {menu.description ? <span className={styles.menuDesc} title={menu.description}>{menu.description}</span> : null}
+                  <CatalogUpdate key={`${accountId}:${menu.id}`} accountId={accountId} targetId={menu.id} kind="booking_menu" canEdit={canEdit} onChanged={onReload} />
                 </Td>
                 <Td data-list-number className={styles.colTime}>
                   <span className={styles.cellNum}>{menu.duration_minutes}分</span>

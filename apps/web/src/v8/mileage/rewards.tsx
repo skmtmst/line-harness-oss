@@ -49,6 +49,8 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import CatalogUpdate from '@/v8/hq-templates/catalog-update'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 
 /*
  * ★V8 マイル「使い道」（板 、状態は見本帳 ）。
@@ -144,6 +146,7 @@ const PRESETS: Array<{ value: string; label: string }> = [
 ]
 
 export default function RewardsTab() {
+  const staffRole = useStaffRole()
   const saveErrors = useSaveFormErrors()
   const { readonly: roleReadonly, narrow, setCount, balanceSource } = useMileageShell()
   const readonly = roleReadonly || balanceSource === 'ec'
@@ -739,6 +742,7 @@ export default function RewardsTab() {
                   <FolderDotName folder={folderDotFor(folders, reward.folderId)}>
                     <span title={reach ? `今すぐ届く人 ${formatNumber(reach.reachableFriendCount)} 人` : '届く人数は未取得'}><TruncatedText value={String(reward.name ?? '')} /></span>
                   </FolderDotName>
+                  {accountId && <CatalogUpdate key={`${accountId}:${reward.id}`} accountId={accountId} targetId={reward.id} kind="mileage_reward" canEdit={!readonly && staffRole !== null && canManageRole(staffRole)} onChanged={() => void load()} />}
 
                 </Td>
                 <Td align="right" className={styles.colNeed}>

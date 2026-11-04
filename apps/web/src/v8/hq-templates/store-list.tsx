@@ -169,7 +169,7 @@ export default function HqStoreList(props: HqStoreListProps) {
           count: kindCounts?.[tab.kind],
           current: kind === tab.kind,
           onClick: () => { onKindChange(tab.kind); setPage(1) },
-        })), STARTER_SET_TAB]}
+        })), STARTER_SET_TAB, { label: '予約メニュー', href: '/hq/templates?type=booking_menu' }, { label: 'マイルの景品', href: '/hq/templates?type=mileage_reward' }]}
       />
   ) : undefined
 
