@@ -567,33 +567,27 @@ export default function ScenariosListV8() {
 
   /* ===== フォルダ移動の窓 ===== */
 
-  const confirmedStops = useRef<{ ids: string[] | null; done: Set<string> }>({ ids: null, done: new Set() })
+  const confirmedStops = useRef<Array<{ id: string; revision: number }> | null>(null)
   const [stopBusy, setStopBusy] = useState(false)
   const [stopError, setStopError] = useState('')
   useEffect(() => { setStopError('') }, [pendingStop])
   const runConfirmedStop = async () => {
     const ids = pendingStop
     if (!ids?.length || stopWindow.current !== renderedStopWindow || stopWindowScope.current !== renderedScope || !requireWrite('publish') || toggleBusyRef.current) return
-    if (confirmedStops.current.ids !== ids) confirmedStops.current = { ids, done: new Set() }
     const attempt = confirmedStops.current
+    if (!attempt || attempt.length !== ids.length) { setStopError('停止できませんでした。'); return false }
     const current = () => currentScope() && stopWindow.current === renderedStopWindow && confirmedStops.current === attempt
     toggleBusyRef.current = true; setStopBusy(true); setStopError('')
     try {
-      for (const id of ids) {
-        if (attempt.done.has(id)) continue
-        if (!current()) return
-        if (!canWriteHere('publish')) { setStopError(stoppedMessage(attempt.done.size, ids.length)); return false }
-        try {
-          const response = await api.scenarios.update(id, { isActive: false })
-          if (!response.success) throw new Error(response.error)
-          attempt.done.add(id)
-        } catch (failure) {
-          if (!current()) return
-          saveErrors.capture(failure)
-          const saved = attempt.done.size
-          setStopError(`全 ${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件の保存を確認しました。${formatNumber(saved + 1)} 件目で止めました。未送信は ${formatNumber(ids.length - saved - 1)} 件です。理由：${describeApiFailure(failure, '停止')}`)
-          return false
-        }
+      if (!canWriteHere('publish')) { setStopError(stoppedMessage(0, ids.length)); return false }
+      try {
+        const response = await api.scenarios.bulkStop(attempt)
+        if (!response.success) throw new Error(response.error)
+      } catch (failure) {
+        if (!current()) return false
+        saveErrors.capture(failure)
+        setStopError(describeApiFailure(failure, '停止'))
+        return false
       }
       if (!current()) return
       setSelectedIds(new Set()); setOptimisticRows(null)
@@ -1179,7 +1173,7 @@ export default function ScenariosListV8() {
               disabled={!publishAccess.allowed || !scenarioList.loaded || stoppableIds.length === 0}
               lockedReason={publishAccess.reason}
               disabledReason={publishAccess.allowed && stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
-              onClick={() => { if (requireWrite('publish')) { stopWindow.current = {}; stopWindowScope.current = renderedScope; setStopAccountTargets(scenarioAccountTargets(stoppableIds, [...selectionRows, ...scenarios])); setPendingStop(stoppableIds) } }}
+              onClick={() => { if (requireWrite('publish')) { const rows = [...scenarios, ...selectionRows]; const snapshots = stoppableIds.map(id => rows.find(row => row.id === id)).filter((row): row is ScenarioRow => !!row && !!row.contentRevision).map(row => ({ id: row.id, revision: row.contentRevision! })); confirmedStops.current = snapshots; stopWindow.current = {}; stopWindowScope.current = renderedScope; setStopAccountTargets(scenarioAccountTargets(stoppableIds, rows)); setPendingStop(stoppableIds) } }}
             >
               <Square size={16} aria-hidden="true" />
               止める

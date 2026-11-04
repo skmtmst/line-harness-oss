@@ -152,6 +152,8 @@ export const scenariosMethods = {
         method: 'PUT',
         body: JSON.stringify({ ...data, isActive: false }),
       }),
+    bulkStop: (items: Array<{ id: string; revision: number }>) =>
+      fetchApi<ApiResponse<{ stopped: number }>>('/api/scenarios/bulk-stop', { method: 'POST', body: JSON.stringify({ items }) }),
     delete: (id: string, confirmation?: { revision: number; activeCount: number }) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE', ...(confirmation ? { body: JSON.stringify({ expectedContentRevision: confirmation.revision, expectedActiveCount: confirmation.activeCount }) } : {}) }),
     /**
