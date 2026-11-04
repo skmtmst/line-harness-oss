@@ -288,6 +288,7 @@ export /** 購読行を共有の応答形式へ変換する。 */
 function serializeFriendScenario(row: DbFriendScenario) {
   return {
     id: row.id,
+    confirmationRevision: row.confirmation_revision,
     friendId: row.friend_id,
     scenarioId: row.scenario_id,
     currentStepOrder: row.current_step_order,
@@ -508,7 +509,7 @@ type FriendScenarioOp = 'pause' | 'resume' | 'move' | 'retry';
 
 export interface FriendOpOutcome {
   status: 200 | 201 | 400 | 404 | 409 | 422;
-  body: { success: boolean; data?: unknown; error?: string };
+  body: { success: boolean; data?: unknown; error?: string; current?: unknown };
 }
 
 export /**

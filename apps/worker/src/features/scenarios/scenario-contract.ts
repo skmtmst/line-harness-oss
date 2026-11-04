@@ -622,7 +622,7 @@ export async function getScenarioRuns(
   );
   const subscriptions = await db.prepare(
     `SELECT fs.id, fs.friend_id, f.display_name, fs.status, fs.current_step_order,
-            fs.started_at, fs.next_delivery_at, fs.updated_at, fs.pause_reason, fs.published_version_id
+            fs.started_at, fs.next_delivery_at, fs.updated_at, fs.pause_reason, fs.published_version_id, fs.confirmation_revision
        FROM friend_scenarios fs
        JOIN friends f ON f.id = fs.friend_id AND f.line_account_id = ?
       WHERE fs.scenario_id = ?${statusSql}
@@ -630,7 +630,7 @@ export async function getScenarioRuns(
   ).bind(input.lineAccountId, input.scenarioId, ...statusBinds, limit, offset).all<{
     id: string; friend_id: string; display_name: string; status: string;
     current_step_order: number; started_at: string; next_delivery_at: string | null; updated_at: string;
-    pause_reason: string | null; published_version_id: string | null;
+    pause_reason: string | null; published_version_id: string | null; confirmation_revision: number;
   }>();
   const testSends = await db.prepare(
     `SELECT MIN(ml.id) AS id, ml.friend_id, f.display_name,
@@ -709,6 +709,7 @@ export async function getScenarioRuns(
     subscriptions: (subscriptions.results ?? []).map((row) => ({
       id: row.id,
       friendId: row.friend_id,
+      confirmationRevision: row.confirmation_revision,
       friendName: row.display_name,
       status: row.status,
       currentStepOrder: row.current_step_order,

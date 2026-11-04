@@ -8,7 +8,7 @@
  *   - scenario.subscription.edit / scenario.step_run.retry の権限キーと
  *     アカウント範囲（他アカウントの購読は 404 で隠す）
  */
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
@@ -243,6 +243,39 @@ describe('友だち単位の購読操作（#949 N-054）', () => {
     expect(body.data.scenarioId).toBe('sc-move');
     expect(body.data.status).toBe('active');
     expect(sub('sub-move')!.status).toBe('completed');
+  });
+
+  test('古い確認では元も移し先も変えず、正しい版だけ移す', async () => {
+    const stale = await post('sub-move','move',subEditStaff,{targetScenarioId:'sc-move',expectedConfirmationRevision:2});
+    expect(stale.status).toBe(409);
+    expect(sub('sub-move')!.status).toBe('active');
+    expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM friend_scenarios WHERE friend_id='f-move' AND scenario_id='sc-move'").get()).toEqual({n:0});
+    const current = await post('sub-move','move',subEditStaff,{targetScenarioId:'sc-move',expectedConfirmationRevision:1});
+    expect(current.status).toBe(200);
+    expect(sqlite.raw.prepare("SELECT status,confirmation_revision FROM friend_scenarios WHERE id='sub-move'").get()).toEqual({status:'completed',confirmation_revision:2});
+  });
+
+  test('照合後の変更を更新文で検出し、移し先を作らない', async () => {
+    const original = sqlite.db.batch.bind(sqlite.db);
+    const spy = vi.spyOn(sqlite.db, 'batch').mockImplementation((statements) => {
+      if (statements.some((s) => (s as unknown as { sql?: string }).sql?.includes("status='completed'"))) {
+        sqlite.raw.prepare("UPDATE friend_scenarios SET confirmation_revision=confirmation_revision+1 WHERE id='sub-move'").run();
+      }
+      return original(statements);
+    });
+    try {
+      const res = await post('sub-move', 'move', subEditStaff, { targetScenarioId: 'sc-move', expectedConfirmationRevision: 1, expectedStatus: 'active' });
+      expect(res.status).toBe(409);
+      expect(sub('sub-move')!.status).toBe('active');
+      expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM friend_scenarios WHERE friend_id='f-move' AND scenario_id='sc-move'").get()).toEqual({ n: 0 });
+    } finally { spy.mockRestore(); }
+  });
+
+  test('移し先の登録に失敗したら元の購読も戻す', async () => {
+    sqlite.raw.exec("CREATE TRIGGER fail_scenario_move BEFORE INSERT ON friend_scenarios WHEN NEW.scenario_id='sc-move' BEGIN SELECT RAISE(ABORT, 'fixture failure'); END");
+    const res = await post('sub-move', 'move', subEditStaff, { targetScenarioId: 'sc-move', expectedConfirmationRevision: 1, expectedStatus: 'active' });
+    expect(res.status).toBe(500);
+    expect(sqlite.raw.prepare("SELECT status,confirmation_revision FROM friend_scenarios WHERE id='sub-move'").get()).toEqual({ status: 'active', confirmation_revision: 1 });
   });
 
   test('移し先が無い・停止中・別アカウント・同じシナリオは断る', async () => {

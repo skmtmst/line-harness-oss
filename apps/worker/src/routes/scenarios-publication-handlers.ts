@@ -432,7 +432,7 @@ export const post__api_scenario_subscriptions_subscriptionId_retry_14 = async (c
 export const post__api_scenario_subscriptions_subscriptionId_move_15 = async (c: Context<Env, "/api/scenario-subscriptions/:subscriptionId/move">) => {
     try {
       return await runFriendScenarioOp(c, 'move', async (subscription) => {
-        const body = await c.req.json<{ targetScenarioId?: unknown }>().catch(() => null);
+        const body = await c.req.json<{ targetScenarioId?: unknown; expectedConfirmationRevision?: unknown; expectedStatus?: unknown }>().catch(() => null);
         const targetScenarioId = typeof body?.targetScenarioId === 'string'
           ? body.targetScenarioId.trim()
           : '';
@@ -442,6 +442,9 @@ export const post__api_scenario_subscriptions_subscriptionId_move_15 = async (c:
             body: { success: false, error: '移し先のシナリオを選んでください' },
           };
         }
+        const revision = body?.expectedConfirmationRevision;
+        if (revision !== undefined && (!Number.isSafeInteger(revision) || Number(revision)<1 || (body?.expectedStatus !== undefined && typeof body.expectedStatus !== 'string'))) return { status:400,body:{success:false,error:'確認した版が正しくありません'} };
+        if (revision !== undefined && (revision !== subscription.confirmation_revision || (body?.expectedStatus !== undefined && body.expectedStatus !== subscription.status))) return { status:409,body:{success:false,error:'購読の状態が変わりました。読み直してください',current:serializeFriendScenario(subscription)} };
         if (subscription.status === 'delivering') {
           return {
             status: 409,
@@ -475,11 +478,11 @@ export const post__api_scenario_subscriptions_subscriptionId_move_15 = async (c:
           };
         }
 
-        const moved = await moveFriendScenarioTo(c.env.DB, subscription.id, targetScenarioId);
+        const moved = await moveFriendScenarioTo(c.env.DB, subscription.id, targetScenarioId, revision === undefined ? undefined : { revision:Number(revision),status:typeof body?.expectedStatus === 'string' ? body.expectedStatus : subscription.status });
         if (!moved) {
           return {
             status: 409,
-            body: { success: false, error: 'この友だちは移し先にすでに入っているか、移し先が受け付けません' },
+            body: { success: false, error: 'この友だちは移し先にすでに入っているか、移し先が受け付けません', current: serializeFriendScenario(await getFriendScenarioById(c.env.DB,subscription.id) ?? subscription) },
           };
         }
         return { status: 200, body: { success: true, data: serializeFriendScenario(moved) } };

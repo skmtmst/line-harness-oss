@@ -38,7 +38,7 @@ export async function claimFriendScenarioForDelivery(
   const result = await db
     .prepare(
       `UPDATE friend_scenarios
-       SET status = 'delivering', updated_at = ?
+       SET status = 'delivering', confirmation_revision=confirmation_revision+1, updated_at = ?
        WHERE id = ? AND status = 'active' AND current_step_order = ?`,
     )
     .bind(now, id, expectedStepOrder)
@@ -56,7 +56,7 @@ export async function recoverStuckDeliveries(db: D1Database): Promise<number> {
   // 動かさず delivering のまま残し、再オンの tick で回収する。
   const result = await db
     .prepare(
-      `UPDATE friend_scenarios SET status = 'active', updated_at = ?
+      `UPDATE friend_scenarios SET status = 'active', confirmation_revision=confirmation_revision+1, updated_at = ?
        WHERE status = 'delivering' AND updated_at < ?
          AND NOT EXISTS (
            SELECT 1 FROM scenarios s
@@ -84,7 +84,7 @@ export async function pauseFriendScenarioDelivery(
   await db
     .prepare(
       `UPDATE friend_scenarios
-          SET status = 'paused', pause_reason = 'delivery_failed', updated_at = ?
+          SET status = 'paused', confirmation_revision=confirmation_revision+1, pause_reason = 'delivery_failed', updated_at = ?
        WHERE id = ? AND status = 'delivering'`,
     )
     .bind(jstNow(), id)
@@ -107,7 +107,7 @@ export async function advanceFriendScenario(
   await db
     .prepare(
       `UPDATE friend_scenarios
-       SET current_step_order = ?,
+       SET current_step_order = ?, confirmation_revision=confirmation_revision+1,
            next_delivery_at = ?,
            status = 'active',
            pause_reason = NULL,
