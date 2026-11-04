@@ -723,10 +723,10 @@ export default function InflowListV8({
                       <span className={styles.cellSub} title={becameSecond}>{becameSecond}</span>
                     </Td>
                     <Td align="right" className={styles.colFriends}>
-                      {summaryAvailable && r.stats ? (
+                      {summaryAvailable ? (
                         <>
-                          <span className={styles.cellMain}>{`${formatNumber(r.stats.friendCount)} 人`}</span>
-                          <span className={styles.cellSub}>{`累計 ${formatNumber(r.stats.friendCount)} 人`}</span>
+                          <span className={styles.cellMain}>{`${formatNumber(r.stats?.friendCount ?? 0)} 人`}</span>
+                          <span className={styles.cellSub}>{`累計 ${formatNumber(r.stats?.friendCount ?? 0)} 人`}</span>
                         </>
                       ) : (
                         <span className={styles.cellMain}>{emptyValue('unknown')}</span>
