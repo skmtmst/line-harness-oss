@@ -30,6 +30,7 @@ const TENANTS_PER_RUN = 3;
 const ROWS_PER_RUN = 5000;
 /** 1文で消す行数。D1の1文が長くなりすぎないようにする。 */
 const ROWS_PER_STATEMENT = 200;
+const EXPIRED_CHALLENGES_PER_RUN = 200;
 
 /** 表ごとのR2鍵の列。1つの表に複数列ある場合もまとめて扱う。 */
 const R2_KEY_COLUMNS_BY_TABLE = RETENTION_R2_KEY_COLUMNS.reduce<Record<string, string[]>>(
@@ -63,6 +64,13 @@ export async function processTenantDataPurge(
   options: { now?: string } = {},
 ): Promise<TenantDataPurgeResult> {
   const now = options.now ? toJstString(new Date(options.now)) : toJstString(new Date());
+
+  // 所属不明のチャレンジも、期限後は次回の定時処理で回収する。
+  // 作成時と同じUTC表記で比較し、未期限のログイン・登録は残す。
+  const challengeCutoff = new Date(options.now ?? Date.now()).toISOString();
+  await env.DB.prepare(`DELETE FROM staff_passkey_challenges WHERE rowid IN (
+    SELECT rowid FROM staff_passkey_challenges WHERE expires_at <= ? ORDER BY expires_at, rowid LIMIT ?
+  )`).bind(challengeCutoff, EXPIRED_CHALLENGES_PER_RUN).run();
 
   // 無料体験の終了はStripeから通知が来ないので、ここで拾って起点を入れる。
   const anchoredTrials = await markExpiredTrialRetentionAnchors(env.DB, now);
