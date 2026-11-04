@@ -1148,6 +1148,8 @@
 - [座席図の形・階と入口の操作改善](release-log/unreleased/2081-masato-restaurant-floor-layout.md) — 反映履歴、確認 2026-11-04。
 - [座席図の保存ボタンを見つけやすくする](release-log/unreleased/2083-masato-seat-save-visible.md) — 反映履歴、確認 2026-11-04。
 - [座席図の幅と保存操作をPenにそろえる](release-log/unreleased/2084-masato-seat-map-pen-proportion.md) — 反映履歴、確認 2026-11-04。
+- [座席図の保存ボタンを読みやすくする](release-log/unreleased/2085-masato-seat-save-contrast.md) — 反映履歴、確認 2026-11-04。
+- [検証管理画面の配備先を現在のPagesへそろえる](release-log/unreleased/2087-masato-staging-admin-target.md) — 反映履歴、確認 2026-11-04。
 - [担当者・登録・未保存の保護と利用数の改善](release-log/unreleased/2060-kenta-assignee-registration-guards.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [操作案内と予約・LIFFの改善](release-log/unreleased/2061-kenta-operations-reservations.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [操作案内と予約・配信の改善](release-log/unreleased/2062-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
