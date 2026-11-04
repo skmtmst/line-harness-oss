@@ -44,7 +44,7 @@ export type DrawerProps = {
    * 'editor' は 540 の編集の引き出し（ダッシュボード編集 ：頭 16/20・閉じるは枠つき 30・
    * 中 12/20・下 14/20・開くのは 200ms）。v8 だけで効く。
    */
-  width?: 'narrow' | 'editor' | 'order' | 'composer'
+  width?: 'narrow' | 'editor' | 'order' | 'composer' | 'hours'
   /** V8は480・540の2段。旧指定は共通部品で段へそろえる。 */
   designWidth?: number
   /** 編集の引き出しを画面の下端まで伸ばす。省略時は内容の高さ。 */
@@ -143,7 +143,7 @@ export default function Drawer({
       data-design-width=""
       data-height-mode={heightMode}
       data-viewport-inset={viewportInset || undefined}
-      style={{ '--drawer-design-width': `${width === 'composer' ? 1160 : width === 'editor' ? 540 : drawerWidth(designWidth ?? (width === 'order' ? 540 : 480))}px` } as CSSProperties}
+      style={{ '--drawer-design-width': `${width === 'composer' ? 1160 : width === 'hours' ? 520 : width === 'editor' ? 540 : drawerWidth(designWidth ?? (width === 'order' ? 540 : 480))}px` } as CSSProperties}
       tabIndex={-1}
       data-initial-focus={initialFocus}
       data-closing={leaving || undefined}
@@ -176,7 +176,7 @@ export default function Drawer({
   )
   const discardDialog = discard.confirming ? <Dialog open title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null
   if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}{discardDialog}</OverlayDepthContext.Provider>
-  const overlay = <div className={styles.overlay} role="presentation" data-closing={leaving || undefined} style={{ zIndex: layer }} onMouseDown={(event) => {
+  const overlay = <div className={styles.overlay} data-width={width} role="presentation" data-closing={leaving || undefined} style={{ zIndex: layer }} onMouseDown={(event) => {
     if (!busy && event.target === event.currentTarget) discard.requestClose()
   }}>{panel}</div>
   return <OverlayDepthContext.Provider value={depth + 1}>{discardDialog}{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>

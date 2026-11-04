@@ -641,3 +641,7 @@
 .crumbHome::before, .crumbFromLink::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton { position: relative; }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton::before { content: ''; position: absolute; inset: -2px; }
+
+@media(min-width:1024px){
+ :global(body:has([data-google-hours-page])) .root[data-v8-chrome='shell']{height:56px;min-height:56px;}
+}

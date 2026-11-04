@@ -40,8 +40,9 @@ it('閲覧のみのプロフィールでは変更操作を灰色にし、営業�
     holidays: [], closed: false, googleUpdates: null, photoCount: null,
   })
   render(<ProfileBoard accountId="a" go={vi.fn()} />)
-  expect(await screen.findByText(/11:00.*20:00/)).toBeTruthy()
-  for (const name of ['営業時間を変える', '今日を休みにする', '今日は早く閉める', 'プロフィールを編集する']) {
+  expect(await screen.findByRole('button', {name:'営業時間を開く'})).toHaveProperty('disabled',false)
+  expect(screen.queryByText('本日の営業時間')).toBeNull()
+  for (const name of ['プロフィールを編集する']) {
     expect(screen.getByRole('button', { name }).getAttribute('aria-disabled')).toBe('true')
   }
 })

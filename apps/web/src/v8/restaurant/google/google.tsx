@@ -8,6 +8,7 @@ import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -25,7 +26,7 @@ import ProfileBoard from './profile'
 import { ChangeConfirmScreen } from './profile-confirm'
 import { HistoryScreen } from './profile-history'
 import { ProfileEditScreen } from './profile-edit'
-import { HoursEditor } from './profile-hours'
+import HoursPage from './hours'
 import styles from './google.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -40,7 +41,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 
 export type { MediaUploadHelpers } from './posts'
 
-export const TAB_LABELS = { reviews: '口コミ', posts: '投稿', performance: 'パフォーマンス', profile: 'プロフィール' } as const
+export const TAB_LABELS = { reviews: '口コミ', posts: '投稿', hours: '営業時間', performance: 'パフォーマンス', profile: 'プロフィール' } as const
 export type GoogleTab = keyof typeof TAB_LABELS
 
 /** 口コミの一覧の帯だけ、返信が実際に Google に届くことを知らせる。 */
@@ -54,6 +55,7 @@ const TAB_HELP: Record<GoogleTab, string> = {
   posts: `${HELP_BASE}投稿は Google に出す最新情報・イベント・特典・お知らせです。行の「…」から、中身を見る・Google から削除・Instagram へもう一度送るができます。削除は元に戻せません（確認の窓が出ます）。Instagram が失敗した投稿は再送でき、Google への公開はそのまま残ります。時刻はすべて日本時間（Asia/Tokyo）です。`,
   performance: `${HELP_BASE}Google の検索・地図でどれだけ見られたかを出します。数字は Google ビジネス プロフィールの集計です（前日までの分。2〜3日遅れることがあります）。`,
   profile: HELP_BASE,
+  hours: HELP_BASE,
 }
 
 const REVIEWS_BANNER_NOTE = 'Google への返信は、つないだ設定で実際に Google に届きます。送れない設定のときは送信ボタンを出しません'
@@ -112,7 +114,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
 
   const connected = data?.connection.status === 'connected' || data?.connection.status === 'expired' || data?.connection.status === 'no_permission'
   const requestedTab = searchParams.get('tab') as GoogleTab | null
-  const tab: GoogleTab = requestedTab && requestedTab in TAB_LABELS ? requestedTab : 'reviews'
+  const tab: GoogleTab = requestedTab === 'profile' && searchParams.get('view') === 'hours' ? 'hours' : requestedTab && requestedTab in TAB_LABELS ? requestedTab : 'reviews'
   const { allowed: canManage } = useGooglePermission('manager')
   const view = searchParams.get('view')
   const id = searchParams.get('id')
@@ -128,6 +130,21 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
         : tab === 'profile' ? 'JUTGz'
           : 'j0Wcg'
 
+  const googleTabs = <Tabs
+          actions={tab === 'hours' && data?.connection.locationMapsUrl ? <Button variant="text" size="compact" href={data.connection.locationMapsUrl} external>Google マップで見る</Button> : undefined}
+          size="compact"
+          spacing={boardId === 'j0Wcg' ? 'compact' : undefined}
+          label="Googleビジネスの機能"
+          items={(Object.keys(TAB_LABELS) as GoogleTab[]).map((key) => {
+            const count = !connected ? 0 : key === 'reviews' ? data!.summary.storedCount : key === 'posts' ? data!.summary.postsAttentionCount : 0
+            return {
+              label: count ? `${TAB_LABELS[key]} ${count}` : TAB_LABELS[key],
+              current: tab === key,
+              onClick: () => requestUnsavedAction(() => samePageUrl.replace(`/restaurant-test/google?tab=${key}`)),
+            }
+          })}
+        />
+
   const body = (() => {
     if (accountLoading || loading) return <div className={styles.stateBox}><ListState kind="loading" title="Googleビジネスを読み込んでいます" /></div>
     if (!selectedAccountId) {
@@ -138,19 +155,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     if (!connected) return <ListState kind="empty" title="Googleビジネスは未接続です" description="設定のSNS連携からGoogleアカウントを接続してください。" action={<Link href="/settings/sns">SNS連携を開く</Link>} />
     return (
       <>
-        <Tabs
-          size="compact"
-          spacing={boardId === 'j0Wcg' ? 'compact' : undefined}
-          label="Googleビジネスの機能"
-          items={(Object.keys(TAB_LABELS) as GoogleTab[]).map((key) => {
-            const count = !connected ? 0 : key === 'reviews' ? data.summary.storedCount : key === 'posts' ? data.summary.postsAttentionCount : 0
-            return {
-              label: count ? `${TAB_LABELS[key]} ${count}` : TAB_LABELS[key],
-              current: tab === key,
-              onClick: () => requestUnsavedAction(() => samePageUrl.replace(`/restaurant-test/google?tab=${key}`)),
-            }
-          })}
-        />
+        {googleTabs}
         {draftOpen && id ? (
           <ReviewDraft key={id} accountId={accountId} reviewId={id} data={data} go={go} onPublished={() => { void load() }} />
         ) : postsView === 'new' || postsView === 'edit' ? (
@@ -167,8 +172,6 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
           <HistoryScreen key={`${accountId}-${searchParams.get('result') ?? ''}`} accountId={accountId} initialResult={(['all', 'applied', 'pending', 'failed'] as const).find((value) => value === searchParams.get('result'))} go={go} />
         ) : tab === 'profile' && view === 'edit' ? (
           <ProfileEditScreen key={accountId} accountId={accountId} go={go} />
-        ) : tab === 'profile' && view === 'hours' ? (
-          <HoursEditor key={`${accountId}-${searchParams.get('mode') ?? 'text'}-${searchParams.get('date') ?? ''}`} accountId={accountId} mode={searchParams.get('mode') === 'calendar' ? 'calendar' : searchParams.get('mode') === 'weekly' ? 'weekly' : 'text'} initialDate={searchParams.get('date')} go={go} />
         ) : tab === 'profile' ? (
           <ProfileBoard accountId={accountId} go={go} />
         ) : (
@@ -177,6 +180,10 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       </>
     )
   })()
+
+  if (tab === 'hours' && connected && selectedAccountId && !loading && !error) {
+    return <SaveErrorScope errors={saveErrors}><HoursPage key={selectedAccountId} accountId={selectedAccountId} tabs={googleTabs} initialMode={searchParams.get('mode')} initialDate={searchParams.get('date')} /></SaveErrorScope>
+  }
 
   return (
     <SaveErrorScope errors={saveErrors}><RestaurantPage

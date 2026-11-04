@@ -409,3 +409,13 @@ html:root .panel .footer { display: flex; flex-wrap: wrap; align-items: center; 
 html:root .panel .title { display: flex; align-items: center; min-width: 0; }
 .titleText { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
 .actionFooter { flex: none; height: var(--detail-footer-height); border-top: 1px solid var(--color-hairline); }
+
+html:root .panel[data-width='hours'] { background: var(--color-canvas); }
+html:root .panel[data-width='hours'] .body { padding: var(--space-24); }
+html:root .panel[data-width='hours'] .footer { padding: var(--space-16) var(--space-24); }
+
+html:root .overlay[data-width='hours'] { background: var(--hours-editor-backdrop, #1018283d); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html:root .panel[data-width='hours'] { border-radius: 0; }
+html:root .panel[data-width='hours'] .header { min-height: var(--hours-editor-header-height, 80px); padding: 0 var(--space-24); align-items: center; }
+html:root .panel[data-width='hours'] .title { font-size: var(--text-title); }
+html:root .panel[data-width='hours'] .footer { min-height: var(--hours-editor-footer-height, 92px); }

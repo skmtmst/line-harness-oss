@@ -579,3 +579,7 @@
 :root .deliveryItem .itemLabel { flex: 0 1 auto; font-size: 13px; }
 .comingSoon { flex: none; margin-left: auto; font-size: 9px; line-height: 18px; color: #64748b; white-space: nowrap; }
 :root .desktop[data-collapsed] .comingSoon { display: none; }
+
+@media(min-width:1024px){
+ :global(body:has([data-google-hours-page])) .desktop:not([data-collapsed]){width:256px;flex-basis:256px;}
+}

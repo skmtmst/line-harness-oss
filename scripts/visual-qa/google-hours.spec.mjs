@@ -1,0 +1,54 @@
+import { test, expect } from '@playwright/test'
+import { emptyHoursWorkspace, HOURS_WEEKDAYS, hoursDateRange } from '../../packages/shared/dist/index.js'
+import { mkdirSync } from 'node:fs'
+const base=process.env.VISUAL_QA_BASE??'http://127.0.0.1:3118',mock=process.env.VISUAL_QA_MOCK??'http://127.0.0.1:8898'
+if(!['127.0.0.1','localhost'].includes(new URL(base).hostname))throw new Error('ローカルのUI検証専用です')
+const output=process.env.HOURS_QA_OUTPUT??'/tmp/musubo-google-hours-visual'
+mkdirSync(output,{recursive:true})
+const weekly=Object.fromEntries(HOURS_WEEKDAYS.map(d=>[d,d==='WEDNESDAY'?[]:['TUESDAY','THURSDAY'].includes(d)?[{open:'17:00',close:'00:00'}]:[{open:'11:00',close:'15:00'},{open:'17:00',close:'00:00'}]]))
+const holidays=[{date:'2026-11-23',name:'勤労感謝の日'},{date:'2027-01-01',name:'元日'},{date:'2027-01-11',name:'成人の日'},{date:'2027-04-29',name:'昭和の日'},{date:'2027-05-03',name:'憲法記念日'},{date:'2027-05-04',name:'みどりの日'},{date:'2027-05-05',name:'こどもの日'}]
+let state,profile,version,failSend=false,changes=[]
+async function seed(page,request){
+ const fixture=await(await request.get(`${mock}/api/restaurant-test/google/profile`)).json()
+ profile={...fixture,writeEnabled:true,profile:{...fixture.profile,title:'THE SHED Bistro & Bar',regularHours:weekly,specialHours:[],moreHours:[],moreHoursTypes:[{id:'LUNCH',label:'ランチ'},{id:'DINNER',label:'ディナー'},{id:'TAKEOUT',label:'テイクアウト'}]},today:{date:'2026-11-04',weekday:'WEDNESDAY',closed:true,periods:[],special:false,holidayName:null},googleUpdates:null}
+ state=emptyHoursWorkspace();version=1;failSend=false;changes=[]
+ state.holiday={mode:'custom',periods:[{open:'11:00',close:'22:00'}],overrideClosedWeekday:true}
+ state.draft.days=hoursDateRange('2026-12-30','2027-01-03').map(date=>({date,closed:true,periods:[]}));for(const d of state.draft.days)state.notes[d.date]='年末年始の休業'
+ state.services=['lunch','dinner','takeout'].map((kind,i)=>({id:kind,kind,label:['ランチ','ディナー','テイクアウト'][i],googleTypeId:['LUNCH','DINNER','TAKEOUT'][i],sameWeekdays:true,weekdays:HOURS_WEEKDAYS,periods:[{open:i?'17:00':'11:00',close:i?'22:00':'15:00'}],orderDeadline:kind==='takeout'?'21:30':'',menu:kind==='takeout'?'テイクアウトメニュー':''}))
+ await page.addInitScript(()=>{localStorage.setItem('lh_selected_account','visual-qa-account');localStorage.setItem('lh_auth_selection_cleared','1');sessionStorage.setItem('lh_auth_selection_cleared','1')})
+ await page.route('**/api/**',async route=>{
+  const url=new URL(route.request().url()),path=url.pathname,method=route.request().method()
+  if(path.endsWith('/google/profile'))return route.fulfill({json:profile})
+  if(path.endsWith('/hours/workspace')){
+   if(method==='PUT'){const body=route.request().postDataJSON();if(body.expectedVersion!==version)return route.fulfill({status:409,json:{error:'ほかの人が変更しました'}});state=body.data;version++}
+   return route.fulfill({json:{success:true,version,data:state,history:[{at:'2026-11-04T03:48:00Z',summary:'年末年始の休業を追加',staffName:'店舗管理者'}],holidays:holidays.filter(h=>h.date>=profile.today.date),serviceTypes:profile.profile.moreHoursTypes}})
+  }
+  if(path.endsWith('/hours/review')){changes=[{id:'hours-proposal',kind:'special_hours',status:'draft',target:{dates:state.draft.days.map(d=>d.date)},before:state.draft.days.map(d=>({...d,closed:false,periods:[{open:'17:00',close:'00:00'}]})),after:state.draft.days,reservationImpactCount:0}];return route.fulfill({json:{success:true,changes,version}})}
+  if(path.endsWith('/hours/propose')){return route.fulfill({json:{success:true,change:{id:'text-proposal',summary:'12月30日–1月3日の5日間を休業',kind:'special_hours',target:{dates:state.draft.days.map(d=>d.date)},before:[],after:state.draft.days,status:'draft',reservationImpactCount:0}}})}
+  if(path.match(/\/changes\/[^/]+\/send$/)){if(failSend){failSend=false;return route.fulfill({status:502,json:{success:false,error:'Googleに送信できませんでした。入力した内容は残っています。'}})}return route.fulfill({json:{success:true,change:{...changes[0],status:'applied'}}})}
+  if(path.match(/\/changes\/[^/]+$/))return route.fulfill({json:{success:true,change:{...changes[0],status:'pending_confirm'}}})
+  return route.fulfill({response:await route.fetch({url:`${mock}${path}${url.search}`})})
+ })
+ await page.goto(`${base}/restaurant-test/google?tab=hours`)
+ await expect(page.getByRole('heading',{name:'毎週の営業時間',exact:true})).toBeVisible({timeout:120000})
+}
+async function shot(page,name){await page.screenshot({path:`${output}/${name}.png`,fullPage:true,animations:'disabled'})}
+async function fits(page){expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);const broken=await page.locator('button:visible').evaluateAll(items=>items.filter(n=>{const r=n.getBoundingClientRect();return r.width>0&&(r.left< -2||r.right>innerWidth+2)}).map(n=>n.textContent));expect(broken).toEqual([])}
+for(const width of [1152,1440,1920])test(`営業時間の主要操作と表示 ${width}`,async({page,request})=>{
+ test.setTimeout(180000);await page.setViewportSize({width,height:1080});const errors=[];page.on('pageerror',e=>errors.push(e.message));await seed(page,request)
+ await expect(page.getByRole('tab',{name:'営業時間',exact:true})).toHaveAttribute('aria-selected','true');await fits(page);await shot(page,`${width}-01-list`)
+ await page.getByRole('button',{name:'開く',exact:true}).click();await shot(page,`${width}-02-services`)
+ await page.getByRole('button',{name:'カレンダーで営業予定を見る',exact:true}).click();await expect(page.getByRole('heading',{name:'営業予定',exact:true})).toBeVisible();await page.getByRole('button',{name:'2026-11-14',exact:true}).click();await fits(page);await shot(page,`${width}-10-calendar`);await page.getByRole('button',{name:'営業時間に戻る',exact:true}).click()
+ await page.getByRole('button',{name:'変更履歴',exact:true}).click();const history=page.getByRole('dialog',{name:'営業時間の変更履歴'});await expect(history).toBeVisible();await shot(page,`${width}-11-history`);await history.getByRole('button',{name:'閉じる',exact:true}).last().click()
+ await page.getByRole('button',{name:'編集',exact:true}).last().click();const service=page.getByRole('dialog',{name:'サービスの営業時間'});await expect(service).toBeVisible();await fits(page);await shot(page,`${width}-12-service`);await service.getByRole('button',{name:'サービスの種類'}).click();await shot(page,`${width}-13-service-kind`);await page.keyboard.press('Escape');await service.getByRole('button',{name:'閉じる',exact:true}).last().click()
+ await page.getByRole('button',{name:'文章で入力',exact:true}).click();const text=page.getByRole('dialog',{name:'文章で入力',exact:true});await expect(text).toBeVisible();await text.getByRole('textbox').fill('12月30日から1月3日まで年末年始のため休業');await text.getByRole('button',{name:'変更案を作る',exact:true}).click();await expect(text.getByRole('heading',{name:'読み取った変更案'})).toBeVisible();await fits(page);await shot(page,`${width}-14-text`);await text.getByRole('button',{name:'日付や時間を直す'}).click();await expect(page.getByRole('dialog',{name:'特別営業日の変更'})).toBeVisible();await page.getByRole('dialog',{name:'特別営業日の変更'}).getByRole('button',{name:'閉じる',exact:true}).last().click()
+ profile.today={...profile.today,date:'2027-04-30',weekday:'FRIDAY',closed:false,periods:weekly.FRIDAY};await page.reload();await expect(page.getByRole('button',{name:'連休をまとめて設定'})).toBeVisible();await fits(page);await shot(page,`${width}-15-holiday-group`);await page.getByRole('button',{name:'連休をまとめて設定'}).click();const group=page.getByRole('dialog',{name:'連休の営業時間'});await expect(group).toBeVisible();await shot(page,`${width}-16-group-edit`);await group.getByRole('button',{name:'閉じる',exact:true}).last().click();profile.today={...profile.today,date:'2026-11-04',weekday:'WEDNESDAY',closed:true,periods:[]};await page.reload();await expect(page.getByRole('heading',{name:'毎週の営業時間'})).toBeVisible()
+ await page.getByRole('button',{name:'まとめて編集',exact:true}).click();const weeklyDialog=page.getByRole('dialog',{name:'毎週の営業時間を編集'});await expect(weeklyDialog).toBeVisible();await fits(page);await expect.poll(async()=>Math.round((await weeklyDialog.boundingBox()).width)).toBe(520);await shot(page,`${width}-03-weekly`);await weeklyDialog.getByRole('button',{name:'閉じる',exact:true}).last().click()
+ await page.getByRole('button',{name:'変更',exact:true}).click();const holiday=page.getByRole('dialog',{name:'祝日の営業時間'});await expect(holiday).toBeVisible();await shot(page,`${width}-04-holiday`);await holiday.getByRole('button',{name:'閉じる',exact:true}).last().click()
+ await page.getByRole('button',{name:'日付を指定',exact:true}).click();const date=page.getByRole('dialog',{name:'特別営業日の変更'});await expect(date).toBeVisible();await expect(date.getByRole('button',{name:'変更内容を確認'})).toBeDisabled();await shot(page,`${width}-05-empty`)
+ await date.getByRole('button',{name:'期間で選ぶ',exact:true}).click();await date.getByRole('button',{name:'2026-11-20',exact:true}).click();await date.getByRole('button',{name:'2026-11-23',exact:true}).click();await shot(page,`${width}-17-range`);await date.getByRole('button',{name:'日付を選ぶ',exact:true}).click()
+ await date.getByRole('button',{name:'2026-11-14',exact:true}).click();await date.getByRole('button',{name:'2026-11-18',exact:true}).click();await expect(date.getByRole('button',{name:'変更内容を確認'})).toBeEnabled();const circle=await date.getByRole('button',{name:'2026-11-14',exact:true}).evaluate(n=>({radius:getComputedStyle(n).borderRadius,width:n.offsetWidth,selected:n.getAttribute('aria-pressed'),background:getComputedStyle(n).backgroundColor,color:getComputedStyle(n).color}));expect(circle).toEqual({radius:'50%',width:40,selected:'true',background:'rgb(8, 122, 62)',color:'rgb(255, 255, 255)'});await fits(page);await shot(page,`${width}-06-multiple`)
+ await date.getByRole('button',{name:'変更内容を確認'}).click();await expect(page.getByRole('heading',{name:/選択した.*日の営業時間/})).toBeVisible();await fits(page);await shot(page,`${width}-07-confirm`)
+ failSend=true;await page.getByRole('button',{name:'Googleに反映する'}).click();await expect(page.getByText('Googleに送信できませんでした。入力した内容は残っています。',{exact:false})).toBeVisible();await shot(page,`${width}-08-error`)
+ await page.getByRole('button',{name:'Googleに反映する'}).click();await expect(page.getByText('Googleに営業時間の変更を送信しました',{exact:true})).toBeVisible();await shot(page,`${width}-09-sent`);expect(errors).toEqual([])
+})

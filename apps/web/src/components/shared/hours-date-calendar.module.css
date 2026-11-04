@@ -1,0 +1,19 @@
+@layer components {
+.calendar{min-width:0;width:100%;}
+.heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-12);font-size:var(--text-body);}
+.grid{display:flex;flex-direction:column;gap:var(--space-8);}
+.weekdays,.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:var(--space-4);}
+.weekdays{color:var(--color-ink-secondary);font-size:var(--text-caption);text-align:center;padding-block:var(--space-8);}
+.weekdays [data-weekend=sat]{color:var(--color-success);}.weekdays [data-weekend=sun]{color:var(--color-danger);}
+.cell{display:flex;flex-direction:column;align-items:center;min-width:0;gap:var(--space-4);padding-block:var(--space-4);}
+.day{display:grid;place-items:center;flex:none;width:40px;height:40px;border:0;border-radius:50%;background:transparent;color:var(--color-ink);font:inherit;font-size:var(--text-body);cursor:pointer;}
+html:root .day[aria-pressed=true]{background:var(--color-success);color:var(--color-canvas);font-weight:600;}
+.day:disabled{opacity:.3;cursor:default;}.day:hover:not(:disabled):not([aria-pressed=true]){background:var(--color-action-soft);}.day:focus-visible{outline:2px solid var(--color-success);outline-offset:2px;}
+.cell[data-outside]{opacity:.35;}.detail{font-size:var(--text-micro);color:var(--color-ink-secondary);text-align:center;white-space:pre-line;overflow-wrap:normal;word-break:normal;}
+.grid[data-detailed] .cell{min-height:100px;border-bottom:1px solid var(--color-hairline);}
+@media(max-width:600px){.day{width:36px;height:36px;}.grid[data-detailed] .cell{min-height:85px;}}
+}
+
+.weekdayButtons{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:var(--space-8);}
+html:root .weekdayChoice{width:100%;height:var(--space-40,40px);border:1px solid var(--color-hairline);border-radius:var(--radius-segment,8px);background:var(--color-canvas);color:var(--color-ink);font:inherit;font-size:var(--text-body);cursor:pointer;}
+html:root .weekdayChoice[aria-pressed=true]{background:var(--color-selection-bg);color:var(--color-success);border-color:var(--color-success);}

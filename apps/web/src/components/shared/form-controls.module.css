@@ -207,3 +207,5 @@ html:root .labelRow > :not(.label) { flex-shrink: 0; }
 
 /* 認証の欄は取り込み前の間を保持する。指定なしのinput密度は変えない。 */
 html:root .field[data-density='input'][data-field-content-gap] { gap: var(--field-content-gap); }
+
+html:root .optional[data-appearance='parentheses'] { padding: 0; margin-left: 0; background: transparent; color: inherit; font-size: inherit; border-radius: 0; }
