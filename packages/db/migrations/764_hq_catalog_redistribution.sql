@@ -23,7 +23,7 @@ BEGIN SELECT RAISE(ABORT,'hq_origin_account_mismatch'); END;
 
 CREATE TRIGGER mileage_reward_hq_local_edit AFTER UPDATE OF name,description,image_url,reward_kind,current_draft_version_id ON mileage_rewards
 WHEN OLD.hq_template_id IS NOT NULL AND NEW.hq_template_version_id IS OLD.hq_template_version_id
-AND (OLD.name IS NOT NEW.name OR OLD.description IS NOT NEW.description OR OLD.image_url IS NOT NEW.image_url OR OLD.reward_kind IS NOT NEW.reward_kind OR OLD.current_draft_version_id IS NOT NEW.current_draft_version_id)
+AND (OLD.name IS NOT NEW.name OR OLD.description IS NOT NEW.description OR OLD.image_url IS NOT NEW.image_url OR OLD.reward_kind IS NOT NEW.reward_kind OR (NEW.current_draft_version_id IS NOT NULL AND OLD.current_draft_version_id IS NOT NEW.current_draft_version_id))
 BEGIN UPDATE mileage_rewards SET hq_customized=1 WHERE id=NEW.id; END;
 
 CREATE TRIGGER mileage_reward_hq_local_version_edit AFTER UPDATE OF required_miles,stock_limit,per_friend_limit,starts_at,ends_at,benefit_expires_days,common_action_version_id,failure_policy,customer_message,target_conditions ON mileage_reward_versions
