@@ -174,7 +174,7 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
                     <Field label="未対応の上限"><NumberInput min={1} max={1000} value={target.cap} onChange={(event)=>setDraft({...draft,targets:(draft.targets ?? []).map((item)=>item.staffId===target.staffId?{...item,cap:Number(event.target.value)}:item)})} /></Field>
                   </div>)}
                   <p className={styles.note}>今の未割り当て {settings?.unassignedCount ?? 0} 件</p>
-                  <Button onClick={()=>void startAssignment()} disabled={dirty || starting || !(draft.targets ?? []).length || Boolean(run && ['queued','running','waiting','preparing'].includes(run.status))}>今の未割り当てにも当てる</Button>
+                  <Button onClick={()=>void startAssignment()} disabled={dirty || starting || !(draft.targets ?? []).length || Boolean(run && ['queued','running','waiting','preparing'].includes(run.status))} disabledReason={dirty ? '設定を保存してから実行してください' : starting || Boolean(run && ['queued','running','waiting','preparing'].includes(run.status)) ? '割り当てを実行中です' : !(draft.targets ?? []).length ? '対象の人を選んでください' : undefined}>今の未割り当てにも当てる</Button>
                   {run && error ? <Button onClick={() => { setError(''); void gap3InboxApi.assignmentRun(accountId,run.id).then((res)=>setRun(res.data),(caught)=>setError(describeApiFailure(caught,'進み具合の読み込み'))) }}>進み具合を読み直す</Button> : null}
                   {run ? <Notice tone="info">{['queued','running','waiting','preparing'].includes(run.status) ? `割り当て中（${run.assigned + run.skipped} / ${run.total} 件）` : `${run.assigned} 件当てました・${run.skipped} 件は当てられませんでした${run.failed ? `・${run.failed} 件失敗` : ''}`}</Notice> : null}
                 </> : null}

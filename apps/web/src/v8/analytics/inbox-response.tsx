@@ -16,6 +16,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import { gap3InboxApi,type InboxResponseAnalysis } from '@/lib/api/helpers/gap3'
+import { usePermissionAccess } from '@/lib/use-feature-access'
 
 function todayJst() {
  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date())
@@ -23,6 +24,7 @@ function todayJst() {
  return `${get('year')}-${get('month')}-${get('day')}`
 }
 export default function InboxResponse({accountId}:{accountId:string}) {
+ const canViewChats=usePermissionAccess('/chats',true)
  const [days,setDays]=useState<'7'|'28'|'91'>('28')
  const [data,setData]=useState<InboxResponseAnalysis|null>(null)
  const [error,setError]=useState<unknown>(null)
@@ -56,7 +58,7 @@ export default function InboxResponse({accountId}:{accountId:string}) {
   catch(caught){if(request===listRequestId.current)setListError(caught)}finally{if(request===listRequestId.current)setListLoading(false)}
  }
  return <ListPageSection>
-  <Notice tone="info">記録を始めた後の返信だけを週単位で集計します。それ以前の返信は含みません。最初の返事までの時間は、削除された会話を除いて計算します。</Notice>
+  <Notice tone="info">担当者ごとに、記録を始めた後の返信だけを週単位で集計します。それ以前の返信は含みません。最初の返事までの時間は、削除された会話を除いて計算します。</Notice>
   <ListToolbarRow><SegmentedControl aria-label="集計期間" value={days} onChange={setDays} options={[{value:'7',label:'今週'},{value:'28',label:'過去4週'},{value:'91',label:'過去13週'}]} /></ListToolbarRow>
   {loading ? <ListState kind="loading" title="返事の速さを読み込んでいます" /> : error ? <ListState kind="error" error={error} onRetry={()=>void load()} /> : data ? <>
    <ListPageStats><KpiBand>
@@ -69,8 +71,8 @@ export default function InboxResponse({accountId}:{accountId:string}) {
     <Card variant="form" padding="roomy" layout="vertical" gap="normal"><CardHeader title="担当ごと" />
    {data.byStaff.length===0 && !(data.automatic?.count) ? <ListState kind="empty" title="この期間の会話はありません" /> : <DataTable columnWeights={[1,1.25,0.8,1.9]}>
     <thead><TableHeadRow><Th grow>担当</Th><Th align="right">最初の返事まで</Th><Th align="right">期限内</Th><Th align="right">件数</Th></TableHeadRow></thead>
-    <tbody>{data.byStaff.map(row=><Tr key={row.staffId ?? (row.staffDeleted?'deleted':'unassigned')}><Td grow>{row.staffName}</Td><Td align="right">{row.medianFirstResponseMinutes === null ? '—' : `${row.medianFirstResponseMinutes} 分`}</Td><Td align="right">{row.withinSlaRate === null ? '—' : `${row.withinSlaRate}%`}</Td><Td align="right"><Button variant="text" onClick={()=>void showConversations(row)}>{row.count} 件</Button>{row.deletedCount>0 ? <StatusBadge size="annotation" dot={false}>一部は削除済み</StatusBadge> : null}</Td></Tr>)}
-     {data.automatic ? <Tr><Td grow title="自動の返事">自動</Td><Td align="right">—</Td><Td align="right">—</Td><Td align="right"><Button variant="text" onClick={()=>void showConversations({staffId:null,staffDeleted:false,staffName:'自動の返事',count:data.automatic!.count,deletedCount:data.automatic!.deletedCount,medianFirstResponseMinutes:null,withinSlaRate:null,kind:'automatic'})}>{data.automatic.count} 件</Button>{data.automatic.deletedCount>0 ? <StatusBadge size="annotation" dot={false}>一部は削除済み</StatusBadge> : null}{data.automatic.unavailableCount>0 ? <StatusBadge size="annotation" dot={false}>一部は会話を表示できません</StatusBadge> : null}</Td></Tr> : null}</tbody>
+    <tbody>{data.byStaff.map(row=><Tr key={row.staffId ?? (row.staffDeleted?'deleted':'unassigned')}><Td grow>{row.staffName}</Td><Td align="right">{row.medianFirstResponseMinutes === null ? '—' : `${row.medianFirstResponseMinutes} 分`}</Td><Td align="right">{row.withinSlaRate === null ? '—' : `${row.withinSlaRate}%`}</Td><Td align="right"><Button variant="text" lockedReason={!canViewChats ? 'トークを見る権限がありません' : undefined} onClick={()=>void showConversations(row)}>{row.count} 件</Button>{row.deletedCount>0 ? <StatusBadge size="annotation" dot={false}>一部は削除済み</StatusBadge> : null}</Td></Tr>)}
+     {data.automatic ? <Tr><Td grow title="自動の返事">自動</Td><Td align="right">—</Td><Td align="right">—</Td><Td align="right"><Button variant="text" lockedReason={!canViewChats ? 'トークを見る権限がありません' : undefined} onClick={()=>void showConversations({staffId:null,staffDeleted:false,staffName:'自動の返事',count:data.automatic!.count,deletedCount:data.automatic!.deletedCount,medianFirstResponseMinutes:null,withinSlaRate:null,kind:'automatic'})}>{data.automatic.count} 件</Button>{data.automatic.deletedCount>0 ? <StatusBadge size="annotation" dot={false}>一部は削除済み</StatusBadge> : null}{data.automatic.unavailableCount>0 ? <StatusBadge size="annotation" dot={false}>一部は会話を表示できません</StatusBadge> : null}</Td></Tr> : null}</tbody>
    </DataTable>}
     </Card>
     <Card variant="form" padding="roomy" layout="vertical" gap="normal"><CardHeader title="週ごとの推移" />
