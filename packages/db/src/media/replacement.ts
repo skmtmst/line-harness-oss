@@ -38,7 +38,7 @@ export function usageReplaceStatements(
       .join(', ');
     const binds = opts.columns.flatMap(() => opts.pairs.flatMap(([from, to]) => [from, to]));
     return [db.prepare(
-      `UPDATE ${opts.table} SET ${setClause}
+      `UPDATE ${opts.table} SET ${opts.table === 'templates' ? 'confirmation_revision=confirmation_revision+1, ' : ''}${setClause}
         WHERE ${opts.scopeSql} AND id IN (${opts.idSubquery})`,
     ).bind(...binds, ...opts.scopeBinds, ...opts.idSubqueryBinds)];
   }
@@ -53,7 +53,7 @@ export function usageReplaceStatements(
       // 誤ってワイルドカード扱いしなくなる利点もある。
       const guard = chunk.map(() => `instr(${column}, ?) > 0`).join(' OR ');
       statements.push(db.prepare(
-        `UPDATE ${opts.table} SET ${column} = ${expression}
+        `UPDATE ${opts.table} SET ${opts.table === 'templates' ? 'confirmation_revision=confirmation_revision+1, ' : ''}${column} = ${expression}
           WHERE ${opts.scopeSql} AND id IN (${opts.idSubquery}) AND (${guard})`,
       ).bind(
         ...chunk.flatMap(([from, to]) => [from, to]),

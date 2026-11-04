@@ -796,7 +796,7 @@ export async function planMessageTemplateDistribution(input: {
       [targetTemplateId, context.targetAccountId, rootItem.expectedRevision],
     ));
     dbCommit.push({
-      sql: `UPDATE templates SET name=?,category=?,message_type=?,message_content=?,carousel_actions_json=?,
+      sql: `UPDATE templates SET confirmation_revision=confirmation_revision+1, name=?,category=?,message_type=?,message_content=?,carousel_actions_json=?,
             carousel_tap_limit_mode=?,carousel_tap_limit_text=?,question_json=?,question_status=?,
             published_version=published_version+1,published_at=?,draft_message_type=NULL,draft_message_content=NULL,
             draft_carousel_actions_json=NULL,draft_carousel_tap_limit_mode=NULL,draft_carousel_tap_limit_text=NULL,
@@ -844,7 +844,7 @@ export async function planMessageTemplateDistribution(input: {
   }
   if(!definition.asset) {
     const bubbles=definition.messageBubbles ? replaceExactLocators(JSON.stringify(replaceLiffActionLocators(definition.messageBubbles,dependencies.liffTargets ?? {})),replacements) : null;
-    dbCommit.push({sql:'UPDATE templates SET message_bubbles_json=?,draft_message_bubbles_json=NULL WHERE id=? AND line_account_id=?',bindings:[bubbles,targetTemplateId,context.targetAccountId]});
+    dbCommit.push({sql:'UPDATE templates SET confirmation_revision=confirmation_revision+1, message_bubbles_json=?,draft_message_bubbles_json=NULL WHERE id=? AND line_account_id=?',bindings:[bubbles,targetTemplateId,context.targetAccountId]});
     if (!dependencies.initialDraft) dbCommit.push({sql:`INSERT INTO template_versions(id,template_id,version_number,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json,created_at,hq_template_version_id)
       SELECT ?,id,published_version,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json,?,? FROM templates WHERE id=? AND line_account_id=?`,bindings:[crypto.randomUUID(),now,source.version.templateVersionId,targetTemplateId,context.targetAccountId]});
   }
@@ -852,7 +852,7 @@ export async function planMessageTemplateDistribution(input: {
     if (rootResolution.mode === 'overwrite') throw new TemplateHqTemplateError('VERSION_CONFLICT', 409);
     dbCommit.push(definition.asset
       ? { sql: `UPDATE broadcast_message_assets SET draft_payload_json=payload_json,draft_revision=1,published_version=0,published_at=NULL WHERE id=? AND line_account_id=?`, bindings: [targetTemplateId, context.targetAccountId] }
-      : { sql: `UPDATE templates SET draft_message_type=message_type,draft_message_content=message_content,
+      : { sql: `UPDATE templates SET confirmation_revision=confirmation_revision+1, draft_message_type=message_type,draft_message_content=message_content,
         draft_carousel_actions_json=carousel_actions_json,draft_carousel_tap_limit_mode=carousel_tap_limit_mode,draft_carousel_tap_limit_text=carousel_tap_limit_text,
         draft_question_json=question_json,draft_question_status=question_status,draft_message_bubbles_json=message_bubbles_json,
         draft_revision=1,published_version=0,published_at=NULL WHERE id=? AND line_account_id=?`, bindings: [targetTemplateId, context.targetAccountId] });
