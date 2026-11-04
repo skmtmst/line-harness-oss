@@ -207,10 +207,10 @@ export const mediaMethods = {
         `/api/file-scans/${encodeURIComponent(id)}/retry`,
         { method: 'POST', body: JSON.stringify({ accountId }) },
       ),
-    release: (id: string, accountId: string, reason: string) =>
+    release: (id: string, accountId: string, reason: string, expectedConfirmationRevision?: number) =>
       fetchApi<ApiResponse<{ id: string; status: string }>>(
         `/api/file-scans/${encodeURIComponent(id)}/release`,
-        { method: 'POST', body: JSON.stringify({ accountId, reason }) },
+        { method: 'POST', body: JSON.stringify({ accountId, reason, expectedConfirmationRevision }) },
       ),
     remove: (id: string, accountId: string) =>
       fetchApi<ApiResponse<{ id: string }>>(

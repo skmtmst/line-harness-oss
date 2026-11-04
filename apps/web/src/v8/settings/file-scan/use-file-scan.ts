@@ -168,11 +168,12 @@ export function useFileScan() {
       setReleaseError('理由を入力してください')
       return
     }
+    if (!releaseTarget.confirmationRevision) { setReleaseError('戻せませんでした。通信状態を確認して、もう一度お試しください。'); return }
     const current = () => mounted.current && canEditRef.current && releaseScope.scope === scope.current && releaseScope.ticket === releaseTicket.current
     releaseLock.current = true; setReleaseBusy(true)
     setReleaseError('')
     try {
-      const res = await api.fileScan.release(releaseTarget.id, selectedAccountId, releaseReason.trim())
+      const res = await api.fileScan.release(releaseTarget.id, selectedAccountId, releaseReason.trim(), releaseTarget.confirmationRevision)
       if (!current()) return
       if (!res.success) {
         setReleaseError('戻せませんでした。通信状態を確認して、もう一度お試しください。')
@@ -318,7 +319,7 @@ export function useFileScan() {
   const changeReleaseTarget = (item: FileScanItem | null) => {
     if (item) {
       if (!canOpen()) return
-      const ticket = {}; releaseTicket.current = ticket; setReleaseScope({ scope: renderedScope, ticket }); setReleaseTarget(item)
+      const ticket = {}; releaseTicket.current = ticket; setReleaseScope({ scope: renderedScope, ticket }); setReleaseTarget({ ...item })
     } else if (releaseScope?.ticket === releaseTicket.current) { releaseTicket.current = null; setReleaseTarget(null) }
   }
   const changeDeleteTarget = (item: FileScanItem | null) => {

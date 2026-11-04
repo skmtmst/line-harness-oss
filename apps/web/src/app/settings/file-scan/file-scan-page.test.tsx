@@ -73,6 +73,7 @@ afterEach(() => {
 
 const scanOf = (overrides: Partial<FileScanItem> = {}): FileScanItem => ({
   id: 'scan-1',
+  confirmationRevision: 7,
   lineAccountId: 'acc-1',
   subjectKind: 'media',
   subjectId: 'md-1',
@@ -298,6 +299,7 @@ describe('ファイルの安全確認の設定画面', () => {
     expect(mocks.release).not.toHaveBeenCalled()
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '使えるように戻す' }))
     await waitFor(() => expect(mocks.release).toHaveBeenCalledTimes(1))
+    expect(mocks.release).toHaveBeenCalledWith('scan-1', 'acc-1', '安全を確認したため', 7)
   })
 
   test('51件以上あるときページ送りが出て、先のページを取りに行く (監査R132)', async () => {
