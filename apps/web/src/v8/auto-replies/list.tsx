@@ -262,7 +262,7 @@ export default function AutoRepliesListV8() {
   const openPendingToggle = (target: PendingToggle) => {
     if (!canRunList()) return
     const targets = target.ids.map(id => rules.find(rule => rule.id === id)?.lineAccountId)
-    const next: PendingToggle = { ...target, generation: renderedScope.generation, allAccounts: targets.some(id => id === null), targetAccountIds: [...new Set(targets.filter(id => id !== null).map(id => id ?? ''))] }
+    const next: PendingToggle = { ...target, versions: Object.fromEntries(target.ids.flatMap(id => { const version = rules.find(rule => rule.id === id)?.confirmationRevision; return Number.isSafeInteger(version) && Number(version) > 0 ? [[id, Number(version)]] : [] })), generation: renderedScope.generation, allAccounts: targets.some(id => id === null), targetAccountIds: [...new Set(targets.filter(id => id !== null).map(id => id ?? ''))] }
     pendingToggleRef.current = next
     setPendingToggle(next)
   }

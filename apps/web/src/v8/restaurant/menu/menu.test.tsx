@@ -270,7 +270,7 @@ describe('mauOC コースの編集ページ', () => {
     await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/restaurant-test/menu'))
   })
 
-  it('版が変わったら編集内容を最新に読み直し、再確認を求める', async () => {
+  it('版が変わっても入力を残し、操作で最新を読み直す', async () => {
     nav.params = new URLSearchParams('id=m1')
     const latest = snapshotOf()
     latest.menuItems = latest.menuItems.map(item => item.id === 'm1' ? {...item, name:'別の担当が変更', confirmation_revision:2} : item)
@@ -279,8 +279,10 @@ describe('mauOC コースの編集ページ', () => {
     render(<MenuEditPage />)
     fireEvent.change(await screen.findByLabelText('メニュー名'), {target:{value:'確認した変更'}})
     fireEvent.click(screen.getByRole('button', {name:/保存する/}))
-    expect(await screen.findByText('メニューが変わりました。最新の内容を確認してやり直してください。')).toBeTruthy()
-    expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('別の担当が変更')
+    expect(await screen.findByText(/ほかの人が変更しました。最新を読み込むと入力は消えます/)).toBeTruthy()
+    expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('確認した変更')
+    fireEvent.click(screen.getByRole('button', {name:'最新を読み込む'}))
+    await waitFor(() => expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('別の担当が変更'))
     expect(fixture.updateMenu.mock.calls[0][2]).toEqual(expect.objectContaining({expectedVersion:1}))
     expect(nav.push).not.toHaveBeenCalled()
   })

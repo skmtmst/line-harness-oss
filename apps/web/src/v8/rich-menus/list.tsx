@@ -687,7 +687,8 @@ export default function RichMenusListV8() {
       if (e instanceof ApiError && e.status === 409) {
         if(action==='unpublish'&&e.code==='RICH_MENU_CONFIRMATION_CHANGED'){
           setDeleteTarget(null)
-          notifyToast('公開内容が変わりました。一部の取り下げが進んだ可能性があります。最新の状態を確認してください。',{tone:'error'})
+          const partial = Boolean(e.data && typeof e.data === 'object' && 'partial' in e.data && e.data.partial === true)
+          notifyToast(partial ? '公開内容が変わりました。一部の取り下げが進んだ可能性があります。最新の状態を確認してください。' : '公開内容が変わりました。最新の状態を確認してください。',{tone:'error'})
           void reload()
           return
         }

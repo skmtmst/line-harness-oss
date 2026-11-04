@@ -90,6 +90,7 @@ function MenuEditBody() {
   const [saved, setSaved] = useState<Draft>(draftOf(null))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [menuConflict, setMenuConflict] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmingPrice, setConfirmingPrice] = useState(false)
   const [confirmingPublish, setConfirmingPublish] = useState(false)
@@ -108,6 +109,7 @@ function MenuEditBody() {
       setStoreIdentity(nextStoreId ? { accountId: selectedAccountId, id: nextStoreId, name: response.data.stores.find(store => store.id === nextStoreId)?.name ?? null } : null)
       setStoreAccountId(response.data.stores.find(store => store.id === nextStoreId)?.line_account_id ?? null)
       setDraft(draftOf(found)); setSaved(draftOf(found))
+      setMenuConflict(false); setError(null)
       setState('ready')
     } catch {
       if (sequence === loadSequence.current && currentContext.current === contextKey) setState('error')
@@ -146,10 +148,10 @@ function MenuEditBody() {
   const currentConfirmationScope = JSON.stringify([contextKey, confirmationVersion.current.generation])
   const mutationContext = useRef<{ key: string; menuSignature: string | null }>({ key: contextKey, menuSignature: null })
   if (mutationContext.current.key !== contextKey) mutationContext.current = { key: contextKey, menuSignature: null }
-  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setError(null) }, [contextKey])
+  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setMenuConflict(false); setError(null) }, [contextKey])
 
   async function save(version = confirmedRevision) {
-    if (!canEdit || !selectedAccountId || !valid) return
+    if (!canEdit || !selectedAccountId || !valid || menuConflict) return
     if (editing && (!dirty || !Number.isSafeInteger(version) || !version)) return
     const isCurrent = captureResource()
     if (!isCurrent()) return
@@ -188,9 +190,8 @@ function MenuEditBody() {
       if (!stillHere()) return
       if (cause instanceof ApiError && cause.code === 'menu_confirmation_conflict') {
         setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setConfirmedRevision(null)
-        await load()
-        if (!stillHere()) return false
-        setError('メニューが変わりました。最新の内容を確認してやり直してください。')
+        setMenuConflict(true)
+        setError('ほかの人が変更しました。最新を読み込むと入力は消えます。')
         return false
       }
       /* お支払いの版が古い（409）ときは共通の帯と比べる窓で選んでもらう。ページの中身は保存済み。 */
@@ -205,7 +206,7 @@ function MenuEditBody() {
   }
 
   async function remove() {
-    if (!editing || !selectedAccountId || !Number.isSafeInteger(confirmedRevision) || !confirmedRevision) return
+    if (menuConflict || !editing || !selectedAccountId || !Number.isSafeInteger(confirmedRevision) || !confirmedRevision) return
     const isCurrent = captureResource()
     if (!isCurrent()) return
     const attempt = mutationContext.current
@@ -221,9 +222,8 @@ function MenuEditBody() {
     } catch (error) {
       if (!stillHere()) return
       if (error instanceof ApiError && error.code === 'menu_confirmation_conflict') {
-        setDeleting(false); setConfirmedRevision(null); await load()
-        if (!stillHere()) return false
-        setError('メニューが変わりました。最新の内容を確認してやり直してください。')
+        setDeleting(false); setConfirmedRevision(null); setMenuConflict(true)
+        setError('ほかの人が変更しました。最新を読み込むと入力は消えます。')
         return false
       }
       setError(japaneseDetailOf(error) || '削除できませんでした。')
@@ -258,13 +258,13 @@ function MenuEditBody() {
         preview={side}
         previewSurface="plain"
         previewToggle={<PreviewLauncher title="お支払いの説明" label="お支払いの説明を見る">{side}</PreviewLauncher>}
-        destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing.confirmation_revision); setError(null); setDeleting(true) }} disabled={busy}>削除する</Button> : undefined}
+        destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing.confirmation_revision); setError(null); setDeleting(true) }} disabled={busy || menuConflict}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button variant="primary" busy={busy} disabled={menuConflict || !valid || (Boolean(editing) && !dirty)} disabledReason={!valid ? priceError ? '値段を確認してください。' : '名前と値段を入力してください。' : editing && !dirty ? '変更していません' : undefined} onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing?.confirmation_revision ?? null); setError(null); if ((!editing || draftItem) && draft.status === 'active') setConfirmingPublish(true); else if (priceChanged) setConfirmingPrice(true); else void save(editing?.confirmation_revision ?? null) }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
-        {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
+        {error ? <Notice tone="danger" role="alert">{error}{menuConflict ? <Button onClick={() => { void load() }}>最新を読み込む</Button> : null}</Notice> : null}
         {canEdit ? (
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="基本" />
