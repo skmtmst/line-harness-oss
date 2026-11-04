@@ -38,6 +38,7 @@ type Group = {
   accountId: string
   name: string
   status: string
+  version?: number
   isDefaultForAll: boolean
   targetingEnabled: boolean
   updatedAt?: string
@@ -359,7 +360,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const failed = progress?.failed === true
   const menuItems: ActionMenuItem[] = [
     { id: 'duplicate', label: '複製する', onSelect: () => { setDialogError(''); setDuplicateOpen(true) } },
-    { id: 'unpublish', label: 'LINEから取り下げる', onSelect: () => { if (!group.accountId || group.id !== groupId || groupGeneration.current !== scope.current.generation || !operationPermission.current) return; setDialogError(''); setUnpublishImpact(null); const generation = scope.current.generation; const request = ++unpublishRequest.current; setUnpublishScope({ groupId, accountId: group.accountId, generation }); setUnpublishOpen(true); void api.richMenuGroups.deleteImpact(groupId).then(result => { if (!alive.current || generation !== scope.current.generation || request !== unpublishRequest.current) return; if (result.success && result.data.group.id === groupId && result.data.group.accountId === group.accountId && result.data.group.status === 'published' && result.data.group.version === group.version && Number.isSafeInteger(result.data.group.version) && Number.isSafeInteger(result.data.group.publishingGeneration) && typeof result.data.lineResources.isDefaultForAll === 'boolean' && Array.isArray(result.data.lineResources.pages)) setUnpublishImpact(result.data); else setDialogError('公開内容を確認できません。閉じてもう一度お試しください。') }).catch(() => { if (alive.current && generation === scope.current.generation && request === unpublishRequest.current) setDialogError('公開内容を確認できません。閉じてもう一度お試しください。') }) } },
+    { id: 'unpublish', label: 'LINEから取り下げる', onSelect: () => { if (!group.accountId || group.id !== groupId || groupGeneration.current !== scope.current.generation || !operationPermission.current) return; setDialogError(''); setUnpublishImpact(null); const generation = scope.current.generation; const request = ++unpublishRequest.current; setUnpublishScope({ groupId, accountId: group.accountId, generation }); setUnpublishOpen(true); void api.richMenuGroups.deleteImpact(groupId).then(result => { if (!alive.current || generation !== scope.current.generation || request !== unpublishRequest.current) return; if (result.success && result.data.group.version !== group.version) { setDialogError('公開内容が変わりました。画面を読み直してからもう一度お試しください。'); return }; if (result.success && result.data.group.id === groupId && result.data.group.accountId === group.accountId && result.data.group.status === 'published' && result.data.group.version === group.version && Number.isSafeInteger(result.data.group.version) && Number.isSafeInteger(result.data.group.publishingGeneration) && typeof result.data.lineResources.isDefaultForAll === 'boolean' && Array.isArray(result.data.lineResources.pages)) setUnpublishImpact(result.data); else setDialogError('公開内容を確認できません。閉じてもう一度お試しください。') }).catch(() => { if (alive.current && generation === scope.current.generation && request === unpublishRequest.current) setDialogError('公開内容を確認できません。閉じてもう一度お試しください。') }) } },
     { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, disabled: true, disabledReason: '公開中は消せません。先にLINEから取り下げてください', onSelect: () => {} },
   ]
 

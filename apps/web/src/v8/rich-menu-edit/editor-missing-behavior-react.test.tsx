@@ -164,6 +164,13 @@ describe('現役V8へ残す旧編集の動き', () => {
     expect(net.get).toHaveBeenCalledTimes(2)
     expect(net.push).not.toHaveBeenCalled()
   })
+  it('詳細の表示より新しい版の影響が返ったら取り下げない', async () => {
+    net.deleteImpact.mockResolvedValueOnce({ success: true, data: { group: { id: 'g1', accountId: 'account-1', status: 'published', version: 2, publishingGeneration: 0 }, lineResources: { isDefaultForAll: false, pages: [] } } })
+    const dialog = await openUnpublish()
+    await within(dialog).findByText('公開内容が変わりました。画面を読み直してからもう一度お試しください。')
+    expect(within(dialog).getByRole('button', { name: 'LINEから取り下げる' })).toHaveProperty('disabled', true)
+    expect(net.unpublish).not.toHaveBeenCalled()
+  })
   it('取り下げ失敗は確認を残して再試行できる', async () => {
     net.unpublish.mockRejectedValueOnce(new Error('down'))
     const dialog = await openUnpublish()
