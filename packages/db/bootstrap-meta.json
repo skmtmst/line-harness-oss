@@ -665,9 +665,10 @@
     "750_chat_assignee_staff.sql",
     "751_nen_ec_member_rank_name.sql",
     "752_restaurant_menu_media.sql",
+    "754_conversion_approval_revision.sql",
     "755_restaurant_store_group_member_version.sql",
     "756_confirmation_revisions.sql",
     "757_account_handover_moves.sql"
   ],
-  "migrationCount": 668
+  "migrationCount": 669
 }
