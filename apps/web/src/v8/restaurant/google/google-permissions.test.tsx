@@ -269,8 +269,8 @@ it('閲覧のみでも送信済み投稿の中身とGoogleの表示先を読め�
 })
 
 it('Google投稿の削除確認に対象アカウントと環境を表示する', async () => {
- fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published' }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
- render(<PostsBoard accountId="a" go={vi.fn()} store={{ id: 's', name: '合成店' }} googleLocation="Google 合成店" />)
+ fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published', confirmationRevision: 3 }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+ render(<PostsBoard accountId="a" go={vi.fn()} store={{ id: 's', name: '合成店' }} googleLocation="Google 合成店" connection={{ id: 'connection-1', confirmationRevision: 5 }} />)
  fireEvent.click(await screen.findByRole('button', { name: '投稿「合成の投稿」の操作' }))
  fireEvent.click(await screen.findByRole('menuitem', { name: 'Google から削除' }))
  const dialog = screen.getByRole('alertdialog')
@@ -278,6 +278,8 @@ it('Google投稿の削除確認に対象アカウントと環境を表示する'
  expect(within(dialog).getByText('合成店')).toBeTruthy()
  expect(within(dialog).getByText('Google 合成店')).toBeTruthy()
  expect(within(dialog).getByText('環境')).toBeTruthy()
+ fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+ await waitFor(() => expect(fixture.removePost).toHaveBeenCalledWith('a', post.id, { expectedPostRevision: 3, expectedConnectionRevision: 5, expectedConnectionId: 'connection-1' }))
 })
 it('Google投稿の古い削除確定はアカウントを切り替えて戻しても送らない', async () => {
  fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published' }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })

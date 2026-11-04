@@ -122,7 +122,7 @@ function instagramFact(ig: NonNullable<GooglePost['instagram']>): string {
   return ig.caption ? 'Google と同時に出します（Instagram 用の文章あり）' : 'Google と同時に出します（本文をそのまま使います）'
 }
 
-export function PostsBoard({ accountId, go, store, googleLocation }: { accountId: string; go: GoogleNav; store?: { id: string; name?: string | null }; googleLocation?: string | null }) {
+export function PostsBoard({ accountId, go, store, googleLocation, connection }: { accountId: string; go: GoogleNav; store?: { id: string; name?: string | null }; googleLocation?: string | null; connection?: { id?: string; confirmationRevision?: number } }) {
   const scope = useRef({ id: accountId, generation: 0 })
   if (scope.current.id !== accountId) scope.current = { id: accountId, generation: scope.current.generation + 1 }
   const loadedScope = useRef(-1)
@@ -137,7 +137,7 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
   const [loadError, setLoadError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<GooglePost | null>(null)
-  const [removeScope, setRemoveScope] = useState<{ id: string; generation: number; store?: { id: string; name?: string | null }; googleLocation?: string | null } | null>(null)
+  const [removeScope, setRemoveScope] = useState<{ id: string; generation: number; store?: { id: string; name?: string | null }; googleLocation?: string | null; connectionId?: string; connectionRevision?: number } | null>(null)
   const [actionError, setActionError] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const { allowed: canPublish, lockedReason: publishReason, canView } = useGooglePermission('manager', data?.permissions?.canPublish ?? false)
@@ -187,7 +187,8 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
     setBusyId(confirmRemove.id)
     setActionError('')
     try {
-      await restaurantGoogleApi.removePost(accountId, confirmRemove.id)
+      if (!Number.isSafeInteger(confirmRemove.confirmationRevision) || !Number.isSafeInteger(removeScope?.connectionRevision) || !removeScope?.connectionId) throw new Error('確認した版がありません')
+      await restaurantGoogleApi.removePost(accountId, confirmRemove.id, { expectedPostRevision: confirmRemove.confirmationRevision!, expectedConnectionRevision: removeScope.connectionRevision!, expectedConnectionId: removeScope.connectionId })
       setConfirmRemove(null)
       await load()
       return true
@@ -223,7 +224,7 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
     if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', group: 'view', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
-    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation }); setConfirmRemove(post) } } })
+    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation, connectionId: connection?.id, connectionRevision: connection?.confirmationRevision }); setConfirmRemove(post) } } })
     if (!canView) return items.map(item => ({ ...item, disabled: true, lockedReason: undefined }))
     return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
   }
