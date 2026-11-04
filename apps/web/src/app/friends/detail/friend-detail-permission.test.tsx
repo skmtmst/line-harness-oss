@@ -3,6 +3,7 @@ import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 // @vitest-environment happy-dom
 
 /**
@@ -217,6 +218,7 @@ function setRole(role: string | null, permissions: string[] = [], viewPermission
 }
 
 beforeEach(async () => {
+  clearToastsForTest()
   forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   net.calls.length = 0
@@ -242,6 +244,7 @@ afterEach(async () => {
     root.unmount()
   })
   host.remove()
+  clearToastsForTest()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -249,7 +252,7 @@ afterEach(async () => {
 async function render(tab = 'info') {
   routing.params = new URLSearchParams(`id=friend-1&tab=${tab}`)
   await act(async () => {
-    root.render(React.createElement(FriendDetailPage))
+    root.render(<><FriendDetailPage /><ToastHost /></>)
   })
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -443,6 +446,7 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
       expect(call!.args[1]).toEqual({ status: 'resolved', operatorId: 'op-2', notes: '折り返し予定', revision: 3 })
     })
     await eventually(() => expect(document.body.textContent).toContain('対応状況とメモを更新しました'))
+    expect(document.querySelectorAll('[data-toast]')).toHaveLength(1)
   })
 
   it('「未割り当て」を選ぶと operatorId=null で送る', async () => {

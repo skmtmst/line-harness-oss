@@ -91,6 +91,7 @@ const group = (id: string, name: string, extra: Record<string, unknown> = {}) =>
   defaultPageId: null,
   isDefaultForAll: false,
   status: 'draft',
+  version: 7,
   publishingAt: null,
   targetingCondition: { operator: 'AND', rules: [] },
   targetingPriority: 0,
@@ -250,7 +251,7 @@ describe('失敗の文', () => {
     fireEvent.click(await within(dialog).findByRole('button', { name: '削除する' }))
     await waitFor(() => expect(dialog.textContent).toContain(richMenuError(new ApiError(409, 'Conflict'), 'delete')))
     expect(dialog.textContent).toContain('使用中のため削除できませんでした')
-    expect(mocks.remove).toHaveBeenCalledWith('g-1')
+    expect(mocks.remove).toHaveBeenCalledWith('g-1', 7)
     expect(mocks.unpublish).not.toHaveBeenCalled()
     expect(document.body.textContent).not.toContain('D1_ERROR')
   })

@@ -212,7 +212,7 @@ CREATE TABLE account_settings (
   key             TEXT NOT NULL,
   value           TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), confirmation_revision INTEGER NOT NULL DEFAULT 1,
   UNIQUE(line_account_id, key)
 );
 
@@ -235,7 +235,7 @@ CREATE TABLE account_styles (
  selected_at TEXT,
 settings_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(settings_json)),
  version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL, updated_by TEXT
-, selection_mode TEXT NOT NULL DEFAULT 'configured' CHECK(selection_mode IN ('configured','later','manual')), metrics_json TEXT CHECK(metrics_json IS NULL OR json_valid(metrics_json)));
+, selection_mode TEXT NOT NULL DEFAULT 'configured' CHECK(selection_mode IN ('configured','later','manual')), metrics_json TEXT CHECK(metrics_json IS NULL OR json_valid(metrics_json)), first_selected_at TEXT, first_starter_at TEXT);
 
 CREATE TABLE action_score_rule_sets (
   id                           TEXT PRIMARY KEY,
@@ -2697,7 +2697,7 @@ CREATE TABLE conversion_events (
   value_snapshot       REAL,
   idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, point_version_snapshot INTEGER, tenant_id TEXT REFERENCES tenants(id), approval_amount_minor INTEGER, approval_formula TEXT, approval_commission_rate REAL, approval_base_amount REAL, approval_fixed_reward INTEGER, approval_reward_miles INTEGER, approval_notified_generation TEXT);
+, point_version_snapshot INTEGER, tenant_id TEXT REFERENCES tenants(id), approval_amount_minor INTEGER, approval_formula TEXT, approval_commission_rate REAL, approval_base_amount REAL, approval_fixed_reward INTEGER, approval_reward_miles INTEGER, approval_notified_generation TEXT, approval_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE conversion_ingestion_events (
   id                  TEXT PRIMARY KEY,
@@ -8040,7 +8040,7 @@ CREATE TABLE rt_store_group_members (
  group_id TEXT NOT NULL REFERENCES rt_store_groups(id) ON DELETE CASCADE,
  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
  referral_enabled INTEGER NOT NULL DEFAULT 0 CHECK(referral_enabled IN(0,1)),
- max_distance REAL NOT NULL DEFAULT 5 CHECK(max_distance>=0 AND max_distance<=1000),
+ max_distance REAL NOT NULL DEFAULT 5 CHECK(max_distance>=0 AND max_distance<=1000), version INTEGER NOT NULL DEFAULT 1,
  PRIMARY KEY(group_id,store_id)
 );
 
@@ -12835,7 +12835,7 @@ CREATE TRIGGER rt_membership_login_scope_add AFTER INSERT ON staff_account_scope
 
 CREATE TRIGGER rt_membership_login_scope_remove AFTER DELETE ON staff_account_scopes BEGIN UPDATE rt_memberships SET store_id=CASE WHEN (SELECT account_scope FROM staff_members WHERE id=OLD.staff_id)='all' THEN NULL ELSE COALESCE((SELECT s.id FROM rt_stores s JOIN staff_account_scopes a ON a.line_account_id=s.line_account_id WHERE a.staff_id=OLD.staff_id AND s.organization_id=rt_memberships.organization_id AND s.id=rt_memberships.store_id LIMIT 1),(SELECT s.id FROM rt_stores s JOIN staff_account_scopes a ON a.line_account_id=s.line_account_id WHERE a.staff_id=OLD.staff_id AND s.organization_id=rt_memberships.organization_id ORDER BY s.code LIMIT 1)) END,updated_at=datetime('now') WHERE staff_id=OLD.staff_id; END;
 
-CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status IN ('pending','approved') AND NEW.status='approved' AND (NEW.effective_at IS NULL OR datetime(NEW.effective_at)<=datetime('now')) BEGIN UPDATE rt_menu_items SET price=NEW.after_price,updated_at=datetime('now') WHERE id=NEW.menu_id AND store_id=NEW.store_id AND price=NEW.before_price; UPDATE rt_menu_change_requests SET status=CASE WHEN changes()=1 THEN 'applied' ELSE 'failed' END,failure_reason=CASE WHEN changes()=1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END,updated_at=datetime('now') WHERE id=NEW.id; END;
+CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status IN ('pending','approved') AND NEW.status='approved' AND (NEW.effective_at IS NULL OR datetime(NEW.effective_at)<=datetime('now')) BEGIN UPDATE rt_menu_items SET price=NEW.after_price,updated_at=datetime('now'),confirmation_revision=confirmation_revision+1 WHERE id=NEW.menu_id AND store_id=NEW.store_id AND price=NEW.before_price; UPDATE rt_menu_change_requests SET status=CASE WHEN changes()=1 THEN 'applied' ELSE 'failed' END,failure_reason=CASE WHEN changes()=1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END,updated_at=datetime('now') WHERE id=NEW.id; END;
 
 CREATE TRIGGER rt_menu_change_review AFTER UPDATE OF status ON rt_approval_requests WHEN NEW.kind = 'menu_change' AND OLD.status = 'pending' AND NEW.status IN ('approved', 'returned') BEGIN UPDATE rt_menu_change_requests SET status = NEW.status, return_reason = CASE WHEN NEW.status = 'returned' THEN NEW.review_comment ELSE NULL END, updated_at = datetime('now') WHERE approval_id = NEW.id AND status = 'pending'; END;
 

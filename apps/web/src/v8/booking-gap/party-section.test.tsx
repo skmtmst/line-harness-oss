@@ -177,3 +177,16 @@ test('組の版が同じでも個別予約の版が変わると再確認まで�
   expect(screen.getByRole('alertdialog').textContent).toContain('最新の内容を確認してください')
   expect(cancelGroup).not.toHaveBeenCalled()
 })
+
+test('閉じた組の取消確認を保持しても取り消さない', () => {
+  render(<PartySection party={party} canOperate accountId="account-1" currentBookingId="b1" />)
+  fireEvent.click(screen.getByRole('button', { name: '組をまとめて取り消す' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '取り消す理由' }), { target: { value: '予定の変更' } })
+  const button = screen.getByRole('button', { name: 'まとめて取り消す' })
+  const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+  const held = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
+  held()
+  expect(cancelGroup).not.toHaveBeenCalled()
+})

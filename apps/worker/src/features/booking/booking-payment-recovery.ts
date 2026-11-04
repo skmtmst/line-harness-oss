@@ -82,7 +82,7 @@ export function paidBookingPaymentStatements(
   const statements: D1PreparedStatement[] = [];
   if (applyPaid) {
     statements.push(db.prepare(`UPDATE booking_payments
-      SET status = 'paid', paid_at = COALESCE(paid_at, ?), updated_at = ?
+      SET confirmation_revision=confirmation_revision+1, status = 'paid', paid_at = COALESCE(paid_at, ?), updated_at = ?
       WHERE id = ? AND status IN ('unpaid', 'pending', 'expired') AND (${gate.sql})`).bind(nowIso, nowIso, row.id, ...gate.args));
   }
   if (row.booking_id !== null) {
@@ -134,7 +134,7 @@ export async function reconcileExpiredBookingPayment(
 ): Promise<void> {
   const nowIso = now.toISOString();
   await db.batch([
-    db.prepare(`UPDATE booking_payments SET status = 'expired', updated_at = ?
+    db.prepare(`UPDATE booking_payments SET confirmation_revision=confirmation_revision+1, status = 'expired', updated_at = ?
       WHERE id = ? AND status IN ('unpaid', 'pending') AND hold_until <= ?`)
       .bind(nowIso, paymentId, nowIso),
     db.prepare(`UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = 'expired', decided_at = ?, updated_at = ?

@@ -119,7 +119,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
           <Button variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</Button>
         ) : null}
         flush
-        help={<HelpTip label="メニュー一覧の説明">「…」から変更・停止・再開・削除ができます。参照中のメニューは削除できません。</HelpTip>}
+        help={<HelpTip label="メニュー一覧の説明">{canEdit ? '「…」から変更・停止・再開・削除ができます。参照中のメニューは削除できません。' : 'メニューの内容と価格を確認できます。'}</HelpTip>}
       >
         {legacyPending ? <Notice tone="warn">以前の価格変更申請が残っています。{canEdit ? <Button onClick={() => router.push('/restaurant-test/approvals')}>以前の申請を確認する</Button> : '管理者に確認を依頼してください。'}</Notice> : null}
         <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>

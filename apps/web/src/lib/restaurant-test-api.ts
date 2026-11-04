@@ -19,7 +19,7 @@ export type RestaurantMembership = {
 }
 export type RestaurantStoreGroup = {
   id: string; organization_id: string; name: string;
-  members: Array<{ group_id: string; store_id: string; referral_enabled: 0 | 1; max_distance: number }>
+  members: Array<{ group_id: string; store_id: string; referral_enabled: 0 | 1; max_distance: number; version: number }>
 }
 export type RestaurantApproval = {
   id: string; store_id: string | null; kind: 'gbp_post' | 'line_message' | 'menu_change'; title: string;
@@ -107,7 +107,7 @@ const withOptionalAccount = (path: string, accountId: string | null) =>
 
 export const restaurantTestApi = {
   storeGroups: (accountId: string) => fetchApi<{ success: true; data: RestaurantStoreGroup[] }>(withAccount('/api/restaurant-test/store-groups', accountId)),
-  updateStoreGroupMember: (accountId: string, groupId: string, storeId: string, body: { referralEnabled: boolean; maxDistance: number }) => fetchApi<{ success: true; data: { updated: true } }>(withAccount(`/api/restaurant-test/store-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(storeId)}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
+  updateStoreGroupMember: (accountId: string, groupId: string, storeId: string, body: { referralEnabled: boolean; maxDistance: number; expectedVersion?: number }) => fetchApi<{ success: true; data: { updated: true } }>(withAccount(`/api/restaurant-test/store-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(storeId)}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
   closures: (accountId:string,storeId:string,month?:string)=>fetchApi<{success:true;data:RestaurantClosure[]}>(withAccount(`/api/restaurant-test/closures?${new URLSearchParams({storeId,...(month?{month}:{})})}`,accountId)),
   closureContactStatus:(accountId:string,id:string)=>fetchApi<{success:true;data:RestaurantClosurePreview}>(withAccount(`/api/restaurant-test/closures/${encodeURIComponent(id)}/contact-status`,accountId)),
   previewClosure: (accountId:string,body:RestaurantClosureInput & {excludeId?:string})=>fetchApi<{success:true;data:RestaurantClosurePreview}>(withAccount('/api/restaurant-test/closures/preview',accountId),{method:'POST',body:JSON.stringify(body)}),

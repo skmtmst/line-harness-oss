@@ -216,6 +216,28 @@ describe('V8 会員（src/v8/nen-members）', () => {
     expect(onRetry).toHaveBeenCalled()
   })
 
+  it('ランク削除の窓を閉じた後は古い確定を受け付けない', async () => {
+    await render('ranks')
+    await click(byLabel('ランク「シルバー」のその他操作'))
+    await click(byText('ランクを削除する'))
+    const button = byText('削除する')!
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+    await click([...document.querySelector('[role="alertdialog"]')!.querySelectorAll('button')].find(el => el.textContent?.trim() === 'キャンセル'))
+    await act(async () => { oldClick({ preventDefault() {}, stopPropagation() {} }) })
+    expect(fetchApi.mock.calls.some(([path, options]) => String(path).startsWith('/api/nen/rank-settings/r-sv') && options?.method === 'DELETE')).toBe(false)
+  })
+
+  it('確認中にランク設定の版が変わると窓を閉じる', async () => {
+    await render('ranks')
+    await click(byLabel('ランク「シルバー」のその他操作'))
+    await click(byText('ランクを削除する'))
+    await act(async () => { root.render(<MembersV8 accountId="acc-1" tab="ranks" status="ready" settings={{ ...SETTINGS, rules: { ...SETTINGS.rules!, version: 4 } }} onRetry={() => {}} onSaved={() => {}} onChangeTab={() => {}} />) })
+    await settle()
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(fetchApi.mock.calls.some(([path, options]) => String(path).startsWith('/api/nen/rank-settings/r-sv') && options?.method === 'DELETE')).toBe(false)
+  })
+
   it('消すときに版が違う（409）と、タブの下に競合の帯が出る', async () => {
     await render('ranks')
     await click(byLabel('ランク「シルバー」のその他操作'))

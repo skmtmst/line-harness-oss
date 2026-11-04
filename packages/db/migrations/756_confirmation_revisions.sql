@@ -25,3 +25,7 @@ ALTER TABLE bookings ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1
 ALTER TABLE event_bookings ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE rt_reservations ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
 CREATE INDEX IF NOT EXISTS idx_friend_scenarios_scenario_status ON friend_scenarios(scenario_id, status);
+ALTER TABLE account_settings ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+
+DROP TRIGGER IF EXISTS rt_menu_change_apply;
+CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status IN ('pending','approved') AND NEW.status='approved' AND (NEW.effective_at IS NULL OR datetime(NEW.effective_at)<=datetime('now')) BEGIN UPDATE rt_menu_items SET price=NEW.after_price,updated_at=datetime('now'),confirmation_revision=confirmation_revision+1 WHERE id=NEW.menu_id AND store_id=NEW.store_id AND price=NEW.before_price; UPDATE rt_menu_change_requests SET status=CASE WHEN changes()=1 THEN 'applied' ELSE 'failed' END,failure_reason=CASE WHEN changes()=1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END,updated_at=datetime('now') WHERE id=NEW.id; END;
