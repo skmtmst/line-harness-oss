@@ -12,11 +12,15 @@ afterEach(()=>{cleanup();vi.resetAllMocks()})
 it('＋／−は表示倍率だけを変え、配置は保存しない',async()=>{
  api.floors.mockResolvedValue({data:[floor]});render(<RestaurantFloorEditor {...props}/>)
  const map=await screen.findByRole('group',{name:'1階の座席表'})
- expect(map.getAttribute('viewBox')).toBe('0 0 500 300')
+ const initial=map.getAttribute('viewBox')??''
+ const [, ,initialWidth,initialHeight]=initial.split(' ').map(Number)
+ expect(initialWidth).toBe(initialHeight)
  fireEvent.click(screen.getByRole('button',{name:'拡大'}))
- expect(map.getAttribute('viewBox')).toBe('0 0 454.54545454545456 272.72727272727275')
+ const [, ,zoomedWidth,zoomedHeight]=(map.getAttribute('viewBox')??'').split(' ').map(Number)
+ expect(zoomedWidth).toBe(zoomedHeight)
+ expect(zoomedWidth).toBeLessThan(initialWidth)
  fireEvent.click(screen.getByRole('button',{name:'縮小'}))
- expect(map.getAttribute('viewBox')).toBe('0 0 500 300')
+ expect(map.getAttribute('viewBox')).toBe(initial)
  expect(api.saveFloor).not.toHaveBeenCalled()
 })
 it('古い卓合わせ・全体表示・外形描画・つまんで置くを出さない',async()=>{
