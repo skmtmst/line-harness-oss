@@ -7405,7 +7405,7 @@ CREATE TABLE rt_floors (
  width REAL NOT NULL DEFAULT 1000 CHECK(width>0), height REAL NOT NULL DEFAULT 700 CHECK(height>0),
  outline_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(outline_json)),
  fixtures_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(fixtures_json)),
- version INTEGER NOT NULL DEFAULT 1, UNIQUE(store_id,name)
+ version INTEGER NOT NULL DEFAULT 1, kind TEXT NOT NULL DEFAULT 'floor' CHECK(kind IN ('floor','area')), parent_floor_id TEXT REFERENCES rt_floors(id), sort_order INTEGER NOT NULL DEFAULT 0, UNIQUE(store_id,name)
 );
 
 CREATE TABLE rt_gbp_posts (
@@ -8100,7 +8100,7 @@ CREATE TABLE rt_tables (
   join_group TEXT,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')), floor_id TEXT REFERENCES rt_floors(id), shape TEXT NOT NULL DEFAULT 'rectangle' CHECK(shape IN ('rectangle','circle','long','counter','sofa')), width REAL NOT NULL DEFAULT 80 CHECK(width>0), height REAL NOT NULL DEFAULT 64 CHECK(height>0), rotation REAL NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), floor_id TEXT REFERENCES rt_floors(id), shape TEXT NOT NULL DEFAULT 'rectangle' CHECK(shape IN ('rectangle','circle','long','counter','sofa')), width REAL NOT NULL DEFAULT 80 CHECK(width>0), height REAL NOT NULL DEFAULT 64 CHECK(height>0), rotation REAL NOT NULL DEFAULT 0, smoking_policy TEXT NOT NULL DEFAULT 'non_smoking' CHECK(smoking_policy IN ('non_smoking','smoking','heated_tobacco')), partition_type TEXT NOT NULL DEFAULT 'open' CHECK(partition_type IN ('open','semi_private','private')), shoes_allowed INTEGER NOT NULL DEFAULT 1 CHECK(shoes_allowed IN (0,1)), visible_on_map INTEGER NOT NULL DEFAULT 1 CHECK(visible_on_map IN (0,1)), chair_arrangement TEXT NOT NULL DEFAULT 'both' CHECK(chair_arrangement IN ('both','one','all')), chair_side TEXT CHECK(chair_side IN ('top','right','bottom','left')), seat_detail_type TEXT CHECK(seat_detail_type IN ('table','counter','horigotatsu','zashiki','private_room','terrace')),
   UNIQUE(store_id, code)
 );
 
