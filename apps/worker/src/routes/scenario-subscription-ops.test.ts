@@ -213,6 +213,12 @@ describe('友だち単位の購読操作（#949 N-054）', () => {
     expect(await res.json()).toEqual({ success: false, error: 'シナリオが見つかりません' });
     expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1 });
   });
+  test('一括停止の入口は公開権限なしの編集担当を403で拒む', async () => {
+    const editor = { ...noKeyStaff, permissionKeys: ['/scenarios', 'scenario.definition.edit'] };
+    const res = await app(editor).request('/api/scenarios/bulk-stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: snapshot([{ id: 'sc-1', revision: 1 }]) }) });
+    expect(res.status).toBe(403);
+    expect(sqlite.raw.prepare("SELECT is_active, content_revision FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1, content_revision: 1 });
+  });
   test('一括停止は配信停止の権限なしでは送らない', async () => {
     // 共通ミドルウェアの権限拒否を通さず、各シナリオの境界確認を単独で試す。
     const direct = new Hono<Env>();
