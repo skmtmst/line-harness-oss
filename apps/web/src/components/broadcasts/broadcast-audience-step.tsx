@@ -24,6 +24,7 @@ import styles from './broadcast-form-v8.module.css'
 import TextLink from '@/components/shared/text-link'
 
 type BroadcastAudienceStepContext = {
+  correctionLocked?: boolean
   audienceDisplayCount: number | null
   audienceNotice: { memberCount: number; expiresAt: string; label?: string; } | null
   condition: SegmentCondition | null
@@ -50,9 +51,10 @@ type BroadcastAudienceStepContext = {
   targetMode: TargetMode
 }
 
-export function BroadcastAudienceStep({ audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }: BroadcastAudienceStepContext) {
+export function BroadcastAudienceStep({ correctionLocked, audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }: BroadcastAudienceStepContext) {
   // 押せない除外の理由（form-action-reason）は、見える文を aria-describedby で結ぶ。
   const recentExclusionNoteId = useId()
+  if (correctionLocked) return <section id="broadcast-step-audience" className={shows('audience') ? styles.section : 'hidden'}><h3>配信対象</h3><Notice tone="info" message="訂正は元の配信で送れた人を対象にします。対象は変更できません。" /></section>
   return (<section id="broadcast-step-audience" className={shows('audience') ? styles.section : 'hidden'}>
           <h3>配信対象</h3>
           <SaveErrorField names={["broadcast-target-mode","value","mode.value","targetMode"]}><RadioCardGroup legend="配信対象" className={styles.audienceCards}>

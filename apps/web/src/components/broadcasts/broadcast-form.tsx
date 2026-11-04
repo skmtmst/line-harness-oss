@@ -132,6 +132,7 @@ export default function BroadcastForm({
    */
   const appliedDraftFrom = useRef<string | null>(null)
   const [editingDraft, setEditingDraft] = useState<ApiBroadcast | null>(null)
+  const [correctionOrigin, setCorrectionOrigin] = useState<string | null>(null)
   const [draftError, setDraftError] = useState('')
   const [draftReloadKey, setDraftReloadKey] = useState(0)
   const [draftReloadId, setDraftReloadId] = useState<string | null>(null)
@@ -149,7 +150,7 @@ export default function BroadcastForm({
       setDraftReloadKey((key) => key + 1)
     },
   })
-  useEffect(() => { saveConflict.clear(); setDraftReloadId(null) }, [selectedAccountId, saveConflict.clear])
+  useEffect(() => { saveConflict.clear(); setDraftReloadId(null); setCorrectionOrigin(null) }, [selectedAccountId, saveConflict.clear])
   const [title, setTitle] = useState(visualQaAugustCampaign ? '8月キャンペーンのお知らせ' : '')
   const [internalMemo, setInternalMemo] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'new' | 'template' | 'duplicate'>('new')
@@ -428,6 +429,7 @@ export default function BroadcastForm({
         setDraftError('この下書きは別のLINEアカウントで作られています。アカウントを切り替えて開き直してください。')
         return
       }
+      setCorrectionOrigin((draft as ApiBroadcast & { correctionOfBroadcastId?: string | null }).correctionOfBroadcastId ?? null)
       setTitle(draft.title)
       setInternalMemo(draft.internalMemo ?? '')
       setTrackLinks(draft.trackLinks)
@@ -711,6 +713,7 @@ export default function BroadcastForm({
    * 送信の経路が別（キューに載せずにその場で送る）で、少人数のときに速い。
    */
   const targetPayload = useCallback(() => {
+    if (correctionOrigin) return { targetType: 'all' as const, targetTagId: null, segmentConditions: undefined }
     if (!audience) return { targetType: 'tag' as const, targetTagId: '', segmentConditions: undefined }
     if (targetMode === 'tag' && tagId && !excludeTagId) {
       return { targetType: 'tag' as const, targetTagId: tagId, segmentConditions: undefined }
@@ -720,7 +723,7 @@ export default function BroadcastForm({
       targetTagId: null,
       segmentConditions: audience,
     }
-  }, [audience, tagId, targetMode, excludeTagId])
+  }, [audience, tagId, targetMode, excludeTagId, correctionOrigin])
   /*
    * 宛先か本文が変わったら、少し待ってから自動で確かめる。
    *
@@ -745,7 +748,7 @@ export default function BroadcastForm({
     return () => clearTimeout(timer)
     // runPreflight は毎回作り直されるので依存に入れない。見たいのは中身の変化。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bubbles, tagId, excludeTagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode, effectiveSpreadMinutes, limitToQuota, recipientLimitInput])
+  }, [bubbles, tagId, excludeTagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode, effectiveSpreadMinutes, limitToQuota, recipientLimitInput, correctionOrigin])
 
   /*
    * BC-01: 型を切り替えると `emptyBubble` で中身が空になるが、
@@ -856,6 +859,7 @@ export default function BroadcastForm({
     const target = targetPayload()
     return {
       targetType: target.targetType,
+      ...(correctionOrigin && draftSession.current.draftId ? { draftId: draftSession.current.draftId } : {}),
       targetTagId: target.targetTagId,
       // 条件を渡さないと、絞り込みを無視した人数（＝全員）が返る。
       segmentConditions: target.segmentConditions ?? null,
@@ -925,13 +929,14 @@ export default function BroadcastForm({
   const currentPreflightKey = JSON.stringify(preflightRequestBody())
   const preflight = preflightResult !== null && preflightKey === currentPreflightKey ? preflightResult : null
   const {
-    audienceCount, audienceDisplayCount, confirmAudienceLabel, exclusionNote,
+    audienceCount, audienceDisplayCount, confirmAudienceLabel: normalAudienceLabel, exclusionNote,
     quota, quotaInsufficient, quotaNote, evaluatedAtLabel, concurrentBroadcasts,
     scheduledLabel, sendWhenLabel,
   } = broadcastPreflightSummary({
     preflight, targetMode, tags, tagId, scenarios, scenariosStatus, audience,
     excludeTagId, sendMode, scheduledDate, scheduledTime, spreadMinutes: effectiveSpreadMinutes,
   })
+  const confirmAudienceLabel = correctionOrigin ? '元の配信で送れた人' : normalAudienceLabel
   const stepProblems = () => broadcastStepProblems({
     ...stepCheckInput(),
     lengthProblem: lengthNotice.tone === 'error' ? lengthNotice.description : null,
@@ -1003,7 +1008,7 @@ export default function BroadcastForm({
   const testScope = useRef<{ accountId: string; generation: number } | null>(null)
   const renderedTestScope = testScope.current
   const testScopeCurrent = () => renderedTestScope !== null && renderedTestScope === testScope.current && renderedTestScope.generation === accountGenerationRef.current
-  const handleTestSend = () => testScopeCurrent() ? testBroadcast({ isCurrent: testScopeCurrent, onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, setTestRetryBlocked, validate }) : Promise.resolve()
+  const handleTestSend = () => !correctionOrigin && testScopeCurrent() ? testBroadcast({ isCurrent: testScopeCurrent, onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, setTestRetryBlocked, validate }) : Promise.resolve()
 
   /**
    * テスト送信の前に、実際に登録されている送信先を読み合わせる。
@@ -1014,8 +1019,8 @@ export default function BroadcastForm({
   const afterActionChoices = [{ id: 'common_action', label: '共通アクションを実行する', make: () => '', picker: {
     title: '公開済みの共通アクションを選ぶ', items: publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` })), apply: (_: string, ids: string[]) => ids[0],
   } }]
-  const testBlockReason = bubblesError(bubbles) || messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })
-  const openTestDialog = async () => { if (!selectedAccountId) return; testScope.current = { accountId: selectedAccountId, generation: accountGenerationRef.current }; return openBroadcastTest({ rejectValidation, saveErrors, selectedAccountId, setTestDialogOpen, setTestRecipients, setTestRecipientState, testRecipientsGeneration, validate }) }
+  const testBlockReason = (correctionOrigin ? '訂正の模擬では実際のテスト送信はできません。' : '') || bubblesError(bubbles) || messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })
+  const openTestDialog = async () => { if (!selectedAccountId || correctionOrigin) return; testScope.current = { accountId: selectedAccountId, generation: accountGenerationRef.current }; return openBroadcastTest({ rejectValidation, saveErrors, selectedAccountId, setTestDialogOpen, setTestRecipients, setTestRecipientState, testRecipientsGeneration, validate }) }
 
 
   /**
@@ -1251,7 +1256,7 @@ export default function BroadcastForm({
     { key: 'message', label: 'メッセージ', value: `${formatNumber(bubbles.length)}件・${bubblesError(bubbles) || (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}`, done: !bubblesError(bubbles) && previewConfirmed, step: 'message', actionLabel: 'メッセージへ戻る' },
     { key: 'schedule', label: '送信設定', value: sendWhenLabel ?? '配信日時が未設定です', done: broadcastStepPassed(stepProblems(), 'schedule'), step: 'schedule', actionLabel: '送信設定へ戻る' },
     { key: 'quota', label: '送信枠', value: quotaNote ?? '送信枠は未確認です', done: quota?.state === 'available', step: 'schedule', actionLabel: '送信枠を確認する' },
-    { key: 'test', label: 'テスト送信', value: testResult?.kind === 'success' ? 'テスト送信が届きました' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです', done: testResult?.kind === 'success', action: openTestDialog, actionLabel: 'テスト送信する' },
+    { key: 'test', label: 'テスト送信', value: correctionOrigin ? '訂正の模擬では送信しません' : testResult?.kind === 'success' ? 'テスト送信が届きました' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです', done: Boolean(correctionOrigin) || testResult?.kind === 'success', action: correctionOrigin ? undefined : openTestDialog, actionLabel: 'テスト送信する' },
     ...(preflight?.warnings ?? []).filter(warning => warning.level === 'warning').map((warning, index) => ({ key: `warning-${index}`, label: '追加の確認', value: warning.message, done: false })),
     ...(concurrentBroadcasts.length > 0 ? [{ key: 'concurrent', label: '同じ時刻の配信', value: `同じ時刻の前後1時間に別の予約配信があります。対象が重なる場合は間隔を空けてください。${concurrentBroadcasts.map(item => `${formatScheduleTime(item.scheduledAt)} ${item.title}`).join('・')}`, done: false }] : []),
   ]
@@ -1372,7 +1377,7 @@ export default function BroadcastForm({
           </section>
         ) : null}
         <BroadcastBasicStep {...{ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, recentState, retryRecent, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }} />
-        <BroadcastAudienceStep {...{ audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }} />
+        <BroadcastAudienceStep correctionLocked={Boolean(correctionOrigin)} {...{ audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }} />
         <div className={shows('message') ? 'contents' : 'hidden'}>{messageVisited && <>
         <BroadcastMessageStep {...{ ab, assets, bubbles, composerBusy, fields, moveBubble, selectedAccountId, selectedAccountIdRef, setBubbles, setComposerBusy, setComposerTemplateIndex, setComposerTemplateKind, setInlineComposer, setShowTemplatePicker, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, setTemplateSaveName, targetMode, title, updateBubble }} />
         {showTemplatePicker && (
@@ -1438,7 +1443,7 @@ export default function BroadcastForm({
     </div>
     <BroadcastLengthNotice visible={shows('message')} notice={lengthNotice} />
       </StepContent>
-      <BroadcastPreviewRail reviewKey={visualQaAugustCampaign ? 'visual-example' : JSON.stringify([bubbles, ab.hasB, ab.b, messageButtons, selectedAccountId, scheduledDate, scheduledTime, sendMode, effectiveSpreadMinutes])} {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
+      <BroadcastPreviewRail correctionLocked={Boolean(correctionOrigin)} reviewKey={visualQaAugustCampaign ? 'visual-example' : JSON.stringify([bubbles, ab.hasB, ab.b, messageButtons, selectedAccountId, scheduledDate, scheduledTime, sendMode, effectiveSpreadMinutes])} {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
     </CreateColumns>
 
     <StickyBar className={styles.footer} status={currentStep && footerReason ? <span id="broadcast-footer-reason" role="note">{footerReason}</span> : undefined} actions={(
@@ -1464,7 +1469,7 @@ export default function BroadcastForm({
       ) : (
         <>
           <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => requestUnsavedAction(onCancel)}>キャンセル</Button>
-          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => openTestDialog()} busy={testSending} busyLabel="送信中…" widthReserve="idle">{'テストを送る'}</Button>}
+          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || Boolean(testBlockReason) || lengthNotice.tone === 'error'} title={testBlockReason || (lengthNotice.tone === 'error' ? lengthNotice.description : undefined)}  onClick={() => openTestDialog()} busy={testSending} busyLabel="送信中…" widthReserve="idle">{'テストを送る'}</Button>}
           <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (stepProblems().schedule || (ab.b !== null && sendMode !== 'scheduled') ? void saveDraftNow() : sendMode === 'scheduled' ? openConfirm() : void save())} busy={saving} busyLabel="保存中…" widthReserve="idle">{sendMode === 'scheduled' && !liveStepProblems.schedule ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
       )}

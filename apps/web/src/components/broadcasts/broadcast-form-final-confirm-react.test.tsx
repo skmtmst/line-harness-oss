@@ -115,6 +115,21 @@ beforeEach(() => {
 })
 afterEach(() => { if (root) act(() => root.unmount()); container?.remove(); vi.useRealTimers() })
 
+it('訂正では元の宛先を事前確認し、実際のテスト送信を開けない', async () => {
+  mocks.params = 'draft=correction'
+  mocks.get.mockResolvedValue({ success: true, data: { id: 'correction', version: 1, status: 'draft', lineAccountId: 'acc-1', title: '訂正', messageType: 'text', messageContent: '訂正します', targetType: 'all', draftPayload: { draftTargetMode: 'all' }, correctionOfBroadcastId: 'original' } })
+  await render()
+  expect(mocks.preflight).toHaveBeenCalledWith(expect.objectContaining({ draftId: 'correction', targetType: 'all' }))
+  expect(container.textContent).toContain('元の配信で送れた人')
+  expect(container.textContent).not.toContain('届く人の一覧へ')
+  const testButton = button('テストを送る', container)
+  expect(testButton.disabled).toBe(true)
+  expect(testButton.title).toBe('訂正の模擬では実際のテスト送信はできません。')
+  await act(async () => { fireEvent.click(testButton) })
+  expect(dialog()).toBeNull()
+  expect(mocks.send).not.toHaveBeenCalled()
+})
+
 describe('予約は確認を通し、下書き保存は通さない（段の無い作成画面）', () => {
   it('配信前の窓で操作するLINEアカウントと環境を確認できる', async () => {
     await render({ step: null, scheduled: true })

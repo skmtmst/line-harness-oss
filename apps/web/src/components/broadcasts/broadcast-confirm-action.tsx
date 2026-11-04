@@ -21,7 +21,10 @@ export async function confirmBroadcastMessage({ onSuccess, scheduledAtIso, sendP
     setError('')
     try {
       const at = scheduledAtIso()
-      await chatSafetyApi.confirmBroadcast(broadcast.id, { expectedVersion: Number(data.expectedVersion), confirmedRecipientCount: data.recipients, ...(at ? { scheduledAt: at } : {}) })
+      const simulation = (data as SendConfirmationPreview & { testMode?: boolean }).testMode === true
+      const input = { expectedVersion: Number(data.expectedVersion), confirmedRecipientCount: data.recipients, ...(at ? { scheduledAt: at } : {}) }
+      if (simulation) await chatSafetyApi.confirmBroadcast(broadcast.id, { ...input, testMode: true }, `simulation:${broadcast.id}:${data.expectedVersion}`)
+      else await chatSafetyApi.confirmBroadcast(broadcast.id, input)
       setConfirmOpen(false)
       /* 送ったあとの状態を読み直す。読めなくても、確定は済んでいるので先へ進む。 */
       const latest = await api.broadcasts.get(broadcast.id).catch(() => null)

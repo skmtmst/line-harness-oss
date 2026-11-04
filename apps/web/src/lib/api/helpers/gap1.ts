@@ -6,7 +6,7 @@ const account=(path:string,id:string)=>`${path}?account_id=${e(id)}`;
 const senders=(id:string)=>`/api/line-accounts/${e(id)}/senders`;
 const json=(method:string,body:unknown,key?:string)=>({method,body:JSON.stringify(body),...(key?{headers:{'Idempotency-Key':key}}:{})});
 export const chatSafetyApi={
- confirmBroadcast:(id:string,input:{expectedVersion:number;confirmedRecipientCount:number;scheduledAt?:string})=>fetchApi<Result<{scheduled?:boolean;scheduledAt?:string}>>(`/api/broadcasts/${e(id)}/send`,{...json('POST',input),headers:{'X-Confirm-Irreversible':'broadcast-send'}}),
+ confirmBroadcast:(id:string,input:{expectedVersion:number;confirmedRecipientCount:number;scheduledAt?:string;testMode?:true},key?:string)=>fetchApi<Result<{scheduled?:boolean;scheduledAt?:string}>>(`/api/broadcasts/${e(id)}/send`,{...json('POST',input),headers:{'X-Confirm-Irreversible':'broadcast-send',...(key?{'Idempotency-Key':key}:{})}}),
  sendPreview:(id:string)=>fetchApi<Result<SendConfirmationPreview>>(`/api/broadcasts/${e(id)}/send-preview`),
  hqSendPreview:(id:string)=>fetchApi<Result<SendConfirmationPreview>>(`/api/hq/broadcasts/${e(id)}/send-preview`),
  send:(id:string,input:{content:string;messageType?:string;revision?:number;correctionOfMessageId?:string;senderId?:string},key:string)=>fetchApi<Result<{sent:true;messageId:string;revision:number}>>(`/api/chats/${e(id)}/send`,{...json('POST',input,key),headers:{'Idempotency-Key':key,'X-Line-Harness-Source':'manual'}}),

@@ -1,5 +1,8 @@
 'use client'
 import { DetailContent, DetailField } from '@/components/shared/detail-content'
+import { BroadcastSenderControl } from './sender-control'
+import { broadcastCorrectionApi } from '@/lib/api/features/broadcast-corrections'
+import { readPermissionSessionSnapshot } from '@/lib/session-snapshot'
 import ListDateTime from '@/components/shared/list-date-time'
 import { canChangeBroadcastNow, canEditBroadcastNow, canManageBroadcastListNow, captureBroadcastWriteAccess, isFromHeadquarters, useBroadcastEditAccess, useBroadcastManagementAccess } from './write-access'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
@@ -232,6 +235,8 @@ export default function BroadcastListV8() {
   if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
   /* かんたんに送る（板 ）の窓。 */
   const [quickSendOpen, setQuickSendOpen] = useState(false)
+  const correctionKeys = useRef(new Map<string, string>())
+  const correctionBusy = useRef(false)
   const staffRole = useStaffRole()
   const narrow = useNarrowViewport()
   /*
@@ -857,6 +862,24 @@ export default function BroadcastListV8() {
   const panelIndex = visibleBroadcasts.findIndex((b) => b.id === panelId)
   const panelRow = panelIndex >= 0 ? visibleBroadcasts[panelIndex] : null
 
+  const correctionReason = readPermissionSessionSnapshot()?.impersonation ? '代理ログイン中は訂正を作れません。' : editAccess.reason ?? (!canEdit ? '操作する権限を確認しています。' : undefined)
+  async function makeCorrection(row: ApiBroadcast) {
+    if (correctionBusy.current || !canEditBroadcastNow() || readPermissionSessionSnapshot()?.impersonation) return
+    const scope = accountScope.current, validAccess = captureBroadcastWriteAccess()
+    const key = correctionKeys.current.get(row.id) ?? crypto.randomUUID()
+    correctionKeys.current.set(row.id, key); correctionBusy.current = true
+    try {
+      const result = await broadcastCorrectionApi.create(row.id, key)
+      if (accountScope.current !== scope || !validAccess(row) || readPermissionSessionSnapshot()?.impersonation) return
+      router.push(`/broadcasts/new?draft=${encodeURIComponent(result.data.broadcastId)}`)
+    } catch (error) {
+      if (accountScope.current === scope) {
+        const fieldFailure = saveErrors.capture(error)
+        if (!fieldFailure) notifyToast('訂正の下書きを作れませんでした。元の配信と送達記録を確認してください。', { tone: 'error' })
+      }
+    } finally { correctionBusy.current = false }
+  }
+
   /* ===== 部品（広い板・1152 で同じものを並べ替えて使う） ===== */
   /* 作る口は同じ場所に残し、権限の理由と入力の状態を分ける。 */
   const createButton = (full: boolean) => (
@@ -1296,12 +1319,13 @@ secondary: ((canResume) ? <Button
                    busyLabel="移動中…">
                     編集を続ける
                   </Button> : null),
-menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))},
+menuItems: [...(panelRow.status === 'sent' && !fromHq ? [{ id: 'correction', label: '訂正を作る', disabled: !canEdit, lockedReason: correctionReason, onSelect: () => void makeCorrection(panelRow) }] : []), {id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))},
 ...((!(fromHq)) ? [{id: 'detail-1', label: "削除する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}] : [])]}}
              status={<StatusBadge broadcast={panelRow} />}>
 <DetailContent>
 <DetailField label={panelRow.status === 'sent' ? '送信日時' : '送る日時'}>{panelRow.status === 'sent' ? (panelRow.sentAt ? formatDateTime(panelRow.sentAt) : '送信済み') : (panelRow.scheduledAt ? formatDateTime(panelRow.scheduledAt) : '下書き')}</DetailField>
 {panelRow.status === 'sent' ? <DetailField label="届いた人数">{insight?.delivered != null ? formatNumber(insight.delivered) + ' 人に届いた' : acceptedCountText(panelRow.successCount)}</DetailField> : null}
+<DetailField label="送り手"><BroadcastSenderControl key={panelRow.id} id={panelRow.id} accountId={panelRow.lineAccountId ?? null} isDraft={panelRow.status === 'draft' && !fromHq} allowed={canEdit && !correctionReason} lockedReason={correctionReason} /></DetailField>
 </DetailContent>
 </DetailPanel>
           )

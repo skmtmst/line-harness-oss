@@ -26,6 +26,7 @@ import { bubblesError } from './broadcast-form-model'
 import styles from './broadcast-form-v8.module.css'
 
 type BroadcastPreviewRailContext = {
+  correctionLocked?: boolean
   ab: ReturnType<typeof useBroadcastAb>
   afterActionVersionId: string
   audienceDisplayCount: number | null
@@ -55,7 +56,7 @@ type BroadcastPreviewRailContext = {
   testBlockReason: string
 }
 
-export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, reviewKey, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }: BroadcastPreviewRailContext) {
+export function BroadcastPreviewRail({ correctionLocked, ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, reviewKey, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }: BroadcastPreviewRailContext) {
   const review = usePreviewReview(reviewKey, ab.hasB, previewConfirmed, setPreviewConfirmed)
   const previewOpened = useCallback(() => review.markVariant(ab.hasB ? ab.tab : 'A'), [review.markVariant, ab.hasB, ab.tab])
   const previousKey = useRef(reviewKey)
@@ -91,7 +92,7 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
               ['ブロック中で除く', blocked === undefined ? null : blocked === 0 ? '0 人' : `− ${formatNumber(blocked)} 人`],
               ['除くタグ', tags.find((tag) => tag.id === excludeTagId)?.name ?? 'なし'],
             ] as Array<[string, string | null]>).map(([label, value]) => <div key={label}><dt title={label}>{label}</dt><dd title={value ?? undefined}>{value ?? <EmptyValue kind="unknown" />}</dd></div>)}</dl>
-            <TextLink href="/friends">届く人の一覧へ</TextLink>
+            {!correctionLocked && <TextLink href="/friends">届く人の一覧へ</TextLink>}
           </Card>
         </> : <>
         <div className={styles.previewHead}><h3>LINE の見え方</h3><SegmentedControl aria-label="プレビューの端末" size="small" fit="content" value={previewDevice} options={[{ value: 'phone', label: 'スマホ' }, { value: 'pc', label: 'PC' }]} onChange={setPreviewDevice} />{closeButton}</div>

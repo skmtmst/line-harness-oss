@@ -30,7 +30,7 @@ type BuildBroadcastDraftContext = {
   scheduledDate?: string
   scheduledTime?: string
   targetMode?: TargetMode
-  targetPayload: () => { targetType: "tag"; targetTagId: string; segmentConditions: undefined; } | { targetType: "segment"; targetTagId: null; segmentConditions: SegmentCondition; }
+  targetPayload: () => { targetType: "all"; targetTagId: null; segmentConditions: undefined; } | { targetType: "tag"; targetTagId: string; segmentConditions: undefined; } | { targetType: "segment"; targetTagId: null; segmentConditions: SegmentCondition; }
   title: string
   trackLinks: boolean
 }

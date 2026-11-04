@@ -168,7 +168,7 @@ export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, c
       onRetry={() => (currentStep ? setPreviewSeq((value) => value + 1) : void runPreflight())}
       recipients={currentStep ? (sendPreview.data?.recipients ?? null) : audienceCount}
       recipientsNote={currentStep && sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : exclusionNote ?? undefined}
-      purpose="marketing"
+      purpose={(sendPreview.data as unknown as { purpose?: 'transaction' | 'notice' | 'marketing' } | null)?.purpose ?? 'marketing'}
       whenLabel={currentStep && sendPreview.data?.quietHoursShiftTo
         ? `${shiftedWhen(sendPreview.data.quietHoursShiftTo)} に送る`
         : sendWhenLabel ?? '送る時間は未設定'}
@@ -180,8 +180,8 @@ export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, c
       sender={currentStep ? sendPreview.data?.sender ?? null : null}
       bodyHead={(currentStep && sendPreview.data?.firstText) || String(bubbles.find((b) => b.type === 'text')?.content.text ?? '') || `${TYPE_LABELS[bubbles[0]?.type ?? 'text'] ?? 'メッセージ'}を送ります`}
       bubbleCount={bubbles.length}
-      allRecipients={targetMode === 'all' && !sendPreview.data?.stoppable}
-      extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}
+      allRecipients={targetMode === 'all' && !sendPreview.data?.stoppable && !(sendPreview.data as SendConfirmationPreview & { testMode?: boolean } | null)?.testMode}
+      extraCaution={(sendPreview.data as SendConfirmationPreview & { testMode?: boolean } | null)?.testMode ? 'これは模擬の確認です。お客さまには送られません。' : quotaInsufficient ? (quotaNote ?? undefined) : undefined}
       approval={needsApproval && approvalConfig ? { note: `${formatNumber(approvalConfig.threshold)} 人以上は承認が要る店です。承認されたら${sendMode === 'scheduled' && scheduledDate ? ` ${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime} に` : ''}送ります` } : null}
       confirmationFields={confirmationFields}
       approvalFields={needsApproval && approvalConfig && audienceCount !== null ? (
@@ -198,7 +198,7 @@ export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, c
         />
       ) : undefined}
       primaryDisabled={!canConfirm || confirmationBlocked || (needsApproval && approverId === '')}
-      primaryLabel={needsApproval ? '承認を依頼する' : (() => {
+      primaryLabel={needsApproval ? '承認を依頼する' : (sendPreview.data as SendConfirmationPreview & { testMode?: boolean } | null)?.testMode ? '模擬で確かめる' : (() => {
         const n = currentStep ? sendPreview.data?.recipients ?? null : audienceCount
         const shifted = currentStep ? sendPreview.data?.quietHoursShiftTo : null
         if (n !== null && shifted) return `${shiftedShort(shifted)} に ${formatNumber(n)} 人へ送る`

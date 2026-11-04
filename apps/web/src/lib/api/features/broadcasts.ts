@@ -87,6 +87,7 @@ export const broadcastsMethods = {
      */
     preflight: (data: {
       targetType: string
+      draftId?: string
       targetTagId?: string | null
       lineAccountId?: string | null
       accountIds?: string[]

@@ -35,6 +35,9 @@ vi.mock('@/components/broadcasts/broadcast-form', () => {
   formImport.evaluations += 1
   return { default: (props: unknown) => { formImport.props = props; return <div data-loaded-broadcast-form /> } }
 })
+const createCorrection = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/features/broadcast-corrections', () => ({ broadcastCorrectionApi: { create: createCorrection } }))
+vi.mock('./sender-control', () => ({ BroadcastSenderControl: () => <span>送り手の控え</span> }))
 const listBroadcasts = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const deleteFolder = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
@@ -145,6 +148,8 @@ const base = {
 const rowB = { ...base, id: 'bc-2', title: '未購入者フォロー', messageContent: 'まだお買い物していない方へ', status: 'draft', displayStatus: 'draft', displayStatusLabel: '下書き', scheduledAt: null }
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/broadcasts')
   account.id = 'account-a'
   updateBroadcast.mockClear()
   heldConfirm.broadcast = null; heldConfirm.folder = null
@@ -175,6 +180,8 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount())
+  flushListUrlState()
+  window.history.replaceState(null, '', '/broadcasts')
   host.remove()
   delete document.documentElement.dataset.theme
   forgetStaffIdentity(); forgetSessionSnapshot()
@@ -202,6 +209,38 @@ describe('V8 一斉配信一覧の結果の列', () => {
     const rowOf = (title: string) => [...host.querySelectorAll('tbody tr')].find((tr) => tr.textContent?.includes(title)) as HTMLTableRowElement
     return { sent: rowOf('新商品発売のお知らせ'), unsent: rowOf('8月キャンペーンのお知らせ'), draft: rowOf('未購入者フォロー'), heads: [...host.querySelectorAll('thead th')].map((th) => th.textContent?.trim()) }
   }
+
+  it('送信済みの訂正は下書きを一つ作り、二重操作でも二重に作らない', async () => {
+    let resolve!: (value: { success: true; data: { broadcastId: string; testMode: true } }) => void
+    createCorrection.mockReset().mockImplementation(() => new Promise(done => { resolve = done }))
+    const { sent } = await renderRows()
+    act(() => fireEvent.click(sent)); await flush()
+    const panel = document.querySelector('[data-design-part="detail-panel"]')!
+    const item = await findDetailMenuItem('訂正を作る', panel)
+    act(() => { fireEvent.click(item); fireEvent.click(item) })
+    expect(createCorrection).toHaveBeenCalledTimes(1)
+    expect(createCorrection).toHaveBeenCalledWith('bc-3', expect.any(String))
+    await act(async () => resolve({ success: true, data: { broadcastId: 'correction-1', testMode: true } }))
+    await flush()
+    const destination = new URL(routerPush.mock.calls.at(-1)![0], 'http://localhost')
+    expect(destination.pathname).toBe('/broadcasts/new')
+    expect(destination.searchParams.get('draft')).toBe('correction-1')
+    expect(destination.searchParams.get('returnTo')).toBe('/broadcasts?broadcast=bc-3')
+  })
+
+  it('閲覧のみの訂正操作は理由付きで残し、押しても作らない', async () => {
+    createCorrection.mockReset()
+    const { sent } = await renderRows()
+    act(() => fireEvent.click(sent)); await flush()
+    act(() => { role.current = verifiedStaffRole('viewer') }); await flush()
+    const item = await findDetailMenuItem('訂正を作る', document.querySelector('[data-design-part="detail-panel"]')!)
+    expect(item.getAttribute('aria-disabled')).toBe('true')
+    expect(item.hasAttribute('data-permission-locked')).toBe(true)
+    act(() => fireEvent.focus(item))
+    expect(document.querySelector('[role="tooltip"]')?.textContent).toMatch(/閲覧|権限/)
+    act(() => fireEvent.click(item))
+    expect(createCorrection).not.toHaveBeenCalled()
+  })
 
   it('広い幅は届いた・開封・クリックの3列に右そろえで、送っていない行は — で数を作らない', async () => {
     narrow.value = false
