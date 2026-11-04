@@ -285,6 +285,32 @@ describe('止まっている時の表示', () => {
 });
 
 describe('外の検査の設定', () => {
+  it('古い確認の停止では外部検査の設定を変えず 409', async () => {
+    const initial = { accountId: 'acc-1', externalProvider: 'example', externalEndpointUrl: 'https://example.com/scan', externalSecretRef: 'FILE_SCAN_SECRET_PRIMARY' };
+    expect((await putConfig('/api/file-scans/config', 'owner-1', initial)).status).toBe(200);
+    testDb.raw.prepare("UPDATE file_scan_configs SET confirmation_revision=2 WHERE line_account_id='acc-1'").run();
+    const res = await putConfig('/api/file-scans/config', 'owner-1', { accountId: 'acc-1', externalProvider: null, externalEndpointUrl: null, externalSecretRef: null, expectedConfirmationRevision: 1 });
+    expect(res.status).toBe(409);
+    expect((await res.json() as { current: { confirmationRevision: number } }).current.confirmationRevision).toBe(2);
+    expect(testDb.raw.prepare("SELECT external_provider FROM file_scan_configs WHERE line_account_id='acc-1'").get()).toEqual({ external_provider: 'example' });
+    expect(testDb.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='file_scan.config.update'").get()).toEqual({ n: 1 });
+    const fresh = await putConfig('/api/file-scans/config', 'owner-1', { accountId: 'acc-1', externalProvider: null, externalEndpointUrl: null, externalSecretRef: null, expectedConfirmationRevision: 2 });
+    expect(fresh.status).toBe(200);
+    expect(testDb.raw.prepare("SELECT external_provider,confirmation_revision FROM file_scan_configs WHERE line_account_id='acc-1'").get()).toEqual({ external_provider: null, confirmation_revision: 3 });
+  });
+  it('版なしの従来の設定変更も版を進めて保存する', async () => {
+    const body = { accountId: 'acc-1', externalProvider: null, externalEndpointUrl: null, externalSecretRef: null };
+    expect((await putConfig('/api/file-scans/config', 'owner-1', body)).status).toBe(200);
+    expect((await putConfig('/api/file-scans/config', 'owner-1', body)).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT confirmation_revision FROM file_scan_configs WHERE line_account_id='acc-1'").get()).toEqual({ confirmation_revision: 2 });
+  });
+  it('同じ確認で停止を二度送っても一度だけ保存する', async () => {
+    const body = { accountId: 'acc-1', externalProvider: null, externalEndpointUrl: null, externalSecretRef: null };
+    expect((await putConfig('/api/file-scans/config', 'owner-1', body)).status).toBe(200);
+    const responses = await Promise.all([putConfig('/api/file-scans/config', 'owner-1', { ...body, expectedConfirmationRevision: 1 }), putConfig('/api/file-scans/config', 'owner-1', { ...body, expectedConfirmationRevision: 1 })]);
+    expect(responses.map(res => res.status).sort()).toEqual([200, 409]);
+    expect(testDb.raw.prepare("SELECT confirmation_revision FROM file_scan_configs WHERE line_account_id='acc-1'").get()).toEqual({ confirmation_revision: 2 });
+  });
   it('http の宛先は断る', async () => {
     const res = await putConfig('/api/file-scans/config', 'owner-1', {
       accountId: 'acc-1',
@@ -393,7 +419,7 @@ describe('S01 設定の保存境界と監査', () => {
     expect(audit.created_at).toBeTruthy();
     const getRes = await get('/api/file-scans/config?accountId=acc-1', 'admin-1');
     const body = await getRes.json() as { data: { config: Record<string, unknown> } };
-    expect(Object.keys(body.data.config).sort()).toEqual(['externalEndpointUrl', 'externalProvider', 'externalSecretRef', 'externalEnabled', 'externalTimeoutMs', 'maxBytesOverride', 'maxPixelsOverride', 'updatedAt'].sort());
+    expect(Object.keys(body.data.config).sort()).toEqual(['confirmationRevision', 'externalEndpointUrl', 'externalProvider', 'externalSecretRef', 'externalEnabled', 'externalTimeoutMs', 'maxBytesOverride', 'maxPixelsOverride', 'updatedAt'].sort());
     expect(body.data.config.externalEnabled).toBe(true);
     expect(body.data.config.updatedAt).toBe(audit.created_at);
   });

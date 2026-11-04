@@ -45,6 +45,7 @@ export interface FileScanRow {
 
 export interface FileScanConfig {
   line_account_id: string;
+  confirmation_revision?: number;
   external_provider: string | null;
   external_endpoint_url: string | null;
   external_secret_ref: string | null;

@@ -25,6 +25,7 @@ import {
   resolveExternalScanner,
   runScanForStoredObject,
   ScanRetryableError,
+  type FileScanConfig,
   type FileScanRow,
   type FileScanStatus,
   type FileScanSubjectKind,
@@ -66,6 +67,20 @@ function serializeScan(row: FileScanRow) {
     releaseReason: row.release_reason,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function serializeConfig(config: FileScanConfig, env: Env['Bindings']) {
+  return {
+    confirmationRevision: config.confirmation_revision,
+    externalProvider: config.external_provider,
+    externalEndpointUrl: config.external_endpoint_url,
+    externalSecretRef: config.external_secret_ref,
+    externalEnabled: resolveExternalScanner(env as unknown as Record<string, string | undefined>, config) !== null,
+    externalTimeoutMs: config.external_timeout_ms,
+    maxBytesOverride: config.max_bytes_override,
+    maxPixelsOverride: config.max_pixels_override,
+    updatedAt: config.updated_at,
   };
 }
 
@@ -430,18 +445,7 @@ fileScan.get('/api/file-scans/config', requireRole('owner', 'admin'), async (c) 
   return c.json({
     success: true,
     data: {
-      config: config ? {
-        externalProvider: config.external_provider,
-        externalEndpointUrl: config.external_endpoint_url,
-        // 鍵そのものは返さない。名前だけ。
-        externalSecretRef: config.external_secret_ref,
-        // 許可境界だけを判定する。鍵の値や実在、通信の健康状態は返さない。
-        externalEnabled: resolveExternalScanner(c.env as unknown as Record<string, string | undefined>, config) !== null,
-        externalTimeoutMs: config.external_timeout_ms,
-        maxBytesOverride: config.max_bytes_override,
-        maxPixelsOverride: config.max_pixels_override,
-        updatedAt: config.updated_at,
-      } : null,
+      config: config ? serializeConfig(config, c.env) : null,
     },
   });
 });
@@ -455,9 +459,12 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
     externalTimeoutMs?: unknown;
     maxBytesOverride?: unknown;
     maxPixelsOverride?: unknown;
+    expectedConfirmationRevision?: unknown;
   }>().catch(() => null);
   const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
   if (!accountId) return inputError(c, { success: false, error: 'accountId が必要です' }, 400, ["accountId"]);
+  const expected = body?.expectedConfirmationRevision;
+  if (expected !== undefined && (!Number.isSafeInteger(expected) || Number(expected) < 1)) return c.json({ success: false, error: '確認した版が正しくありません' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -499,7 +506,9 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
   const auditHost = endpointHost && (endpointHost.length > 200 || /[A-Za-z0-9_-]{32,}|[0-9-]{6,}/.test(endpointHost))
     ? { endpointHostParts: [endpointHost.slice(0, 150).match(/.{1,3}/g)!, ...(endpointHost.length > 150 ? [endpointHost.slice(150).match(/.{1,3}/g)!] : [])] }
     : { endpointHost };
-  const statement = c.env.DB.prepare(
+  const args = [provider, endpoint, secretRef, Number.isSafeInteger(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
+    numOrNull(body?.maxBytesOverride), numOrNull(body?.maxPixelsOverride), c.get('staff')?.id ?? null, now];
+  const statement = expected === undefined ? c.env.DB.prepare(
     `INSERT INTO file_scan_configs
       (line_account_id, external_provider, external_endpoint_url, external_secret_ref,
        external_timeout_ms, max_bytes_override, max_pixels_override, updated_by, updated_at)
@@ -511,16 +520,16 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
        external_timeout_ms = excluded.external_timeout_ms,
        max_bytes_override = excluded.max_bytes_override,
        max_pixels_override = excluded.max_pixels_override,
+       confirmation_revision = file_scan_configs.confirmation_revision + 1,
        updated_by = excluded.updated_by,
        updated_at = excluded.updated_at`,
   ).bind(
-    accountId, provider, endpoint, secretRef,
-    Number.isSafeInteger(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
-    numOrNull(body?.maxBytesOverride), numOrNull(body?.maxPixelsOverride),
-    c.get('staff')?.id ?? null, now,
-  );
+    accountId, ...args,
+  ) : c.env.DB.prepare(`UPDATE file_scan_configs SET external_provider=?, external_endpoint_url=?, external_secret_ref=?,
+    external_timeout_ms=?, max_bytes_override=?, max_pixels_override=?, updated_by=?, updated_at=?,
+    confirmation_revision=confirmation_revision+1 WHERE line_account_id=? AND confirmation_revision=?`).bind(...args, accountId, expected);
   // 設定と監査を同じbatchで確定。宛先のパス・クエリ・鍵の値は記録しない。
-  await c.env.DB.batch([statement, auditEventStatement(c.env.DB, {
+  try { await c.env.DB.batch([statement, ...(expected === undefined ? [] : [c.env.DB.prepare("SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'FILE_SCAN_CONFIG_CONFLICT' END)")]), auditEventStatement(c.env.DB, {
     tenantId: c.get('staff')?.tenantId,
     lineAccountId: accountId,
     category: 'business',
@@ -532,7 +541,13 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
     result: 'success',
     after: auditHost,
     createdAt: now,
-  })]);
+  })]); } catch (error) {
+    if (expected !== undefined && /malformed JSON/i.test(String(error))) {
+      const current = await getFileScanConfig(c.env.DB, accountId);
+      return c.json({ success: false, error: '設定が変わりました。読み直してください', current: current ? serializeConfig(current, c.env) : null }, 409);
+    }
+    throw error;
+  }
   return c.json({ success: true, data: { lineAccountId: accountId } });
 });
 
