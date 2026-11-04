@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { readFolderAssignment, FolderAssignmentError } from '../folder-assignment.js';
 import { type ReportLedgers, type ConversionDefinitionScope, type ReportRow, type ConversionReport, type ConversionDefinitionRange, type ConversionDefinitionListInput, type ConversionDefinitionListItem, type DefinitionRow } from './types.js';
 import { accountWhere, metricsCte, definitionWhere, selectDefinitionsSql, orderBy, serializeDefinition, ConversionDefinitionError } from './reads.js';
@@ -58,7 +59,7 @@ export async function reportRows(
       COALESCE(SUM(CASE WHEN ${cancelledSql} THEN COALESCE(ce.value_snapshot, 0) ELSE 0 END), 0) AS cancelled_value
     FROM conversion_points cp
     LEFT JOIN conversion_events ce ON ce.conversion_point_id = cp.id
-      AND substr(ce.created_at, 1, 10) >= ? AND substr(ce.created_at, 1, 10) <= ?
+      AND date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') >= ? AND date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') <= ?
     WHERE ${account.sql}
     GROUP BY cp.id
     ORDER BY total_count DESC, cp.id ASC`)
@@ -135,14 +136,14 @@ export async function getConversionDefinitionReport(
   // 保存された暦日の先頭10文字で日単位に比較する。
   const friendAccount = accountWhere('f.', input.scope, input.lineAccountId);
   const [dailyRows, routeRows, audienceRows] = await Promise.all([
-    db.prepare(`SELECT substr(ce.created_at, 1, 10) AS day, cp.id AS conversion_point_id,
+    db.prepare(`SELECT date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') AS day, cp.id AS conversion_point_id,
                        cp.name AS conversion_point_name, COUNT(*) AS total_count,
                        COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS total_value,
                        COALESCE(SUM(CASE WHEN ${cancelledSql} THEN 1 ELSE 0 END), 0) AS cancelled_count,
                        COALESCE(SUM(CASE WHEN ${cancelledSql} THEN COALESCE(ce.value_snapshot, 0) ELSE 0 END), 0) AS cancelled_value
                   FROM conversion_events ce
                   JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-                 WHERE substr(ce.created_at, 1, 10) >= ? AND substr(ce.created_at, 1, 10) <= ? AND ${account.sql}
+                 WHERE date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') >= ? AND date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') <= ? AND ${account.sql}
                  GROUP BY day, cp.id ORDER BY day ASC, cp.id ASC`)
       .bind(input.range.from.slice(0, 10), input.range.to.slice(0, 10), ...account.values)
       .all<{ day: string; conversion_point_id: string; conversion_point_name: string; total_count: number; total_value: number; cancelled_count: number; cancelled_value: number }>(),
@@ -153,7 +154,7 @@ export async function getConversionDefinitionReport(
                        COALESCE(SUM(CASE WHEN ${cancelledSql} THEN COALESCE(ce.value_snapshot, 0) ELSE 0 END), 0) AS cancelled_value
                   FROM conversion_events ce
                   JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-                 WHERE substr(ce.created_at, 1, 10) >= ? AND substr(ce.created_at, 1, 10) <= ? AND ${account.sql}
+                 WHERE date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') >= ? AND date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') <= ? AND ${account.sql}
                  GROUP BY ce.conversion_point_id, route_key ORDER BY total_count DESC, route_key ASC`)
       .bind(input.range.from.slice(0, 10), input.range.to.slice(0, 10), ...account.values)
       .all<{ conversion_point_id: string; route_key: string; total_count: number; total_value: number; cancelled_count: number; cancelled_value: number }>(),
@@ -297,7 +298,7 @@ export async function getConfirmedConversionCount(db: D1Database, input: {lineAc
     JOIN friends f ON f.id = ce.friend_id
     WHERE cp.line_account_id = ? AND f.line_account_id = ?
       AND (ce.approval_status IS NULL OR ce.approval_status = 'approved')
-      AND julianday(ce.created_at) >= julianday(?) AND julianday(ce.created_at) < julianday(?, '+1 day')
+      AND julianday(${storedTimestamp('ce.created_at', 'sql')}) >= julianday(?) AND julianday(${storedTimestamp('ce.created_at', 'sql')}) < julianday(?, '+1 day')
       AND NOT ${cancelled}`)
     .bind(input.lineAccountId, input.lineAccountId, `${input.from}T00:00:00+09:00`, `${input.to}T00:00:00+09:00`).first<{count: number}>();
   return Number(row?.count ?? 0);

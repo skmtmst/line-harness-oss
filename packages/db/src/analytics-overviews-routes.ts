@@ -64,7 +64,7 @@ export async function getAnalyticsRoutesOverview(
          JOIN conversion_points cp ON cp.id = ce.conversion_point_id
          JOIN entry_routes er ON er.ref_code = ce.attributed_ref_code
         WHERE f.line_account_id = ?
-          ${analyticsWindowWhere('ce.created_at')}
+          ${analyticsWindowWhere('ce.created_at', false, true)}
         GROUP BY er.id
      )
      SELECT er.id, er.ref_code, er.name,

@@ -1,4 +1,4 @@
-import { jstCalendar, jstDateOffset as japanDateOffset } from '@line-crm/shared';
+import { jstCalendar, jstDateOffset as japanDateOffset, storedTimestamp } from '@line-crm/shared';
 import { sqlIdSet } from './id-queries.js';
 import { followTimeSql } from './utils.js';
 import { jstDate, nextDate, latestDashboardTime, periodStart } from './dashboard-freshness.js';
@@ -278,7 +278,7 @@ export async function conversionSummary(
     db,
     `SELECT COUNT(*) AS n FROM conversion_events ce
       JOIN friends f ON f.id = ce.friend_id
-     WHERE ce.created_at >= ? AND ${account.sql}`,
+     WHERE date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') >= date(?) AND ${account.sql}`,
     start, ...account.binds,
   );
   const byPoint = await db
@@ -287,7 +287,7 @@ export async function conversionSummary(
          FROM conversion_events c
          JOIN conversion_points cp ON cp.id = c.conversion_point_id
          JOIN friends f ON f.id = c.friend_id
-        WHERE c.created_at >= ? AND ${account.sql}
+        WHERE date(${storedTimestamp('c.created_at', 'sql')}, '+9 hours') >= date(?) AND ${account.sql}
         GROUP BY cp.id
         ORDER BY count DESC
         LIMIT 5`,

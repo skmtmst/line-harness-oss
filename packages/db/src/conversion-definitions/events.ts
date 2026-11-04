@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { type ConversionDefinitionScope, type ConversionDefinitionEventItem, type DefinitionEventRow } from './types.js';
 import { currentDefinitionForMutation } from './revisions.js';
 
@@ -76,7 +77,7 @@ export async function listConversionDefinitionEvents(
          FROM conversion_events ce
          LEFT JOIN friends f ON f.id = ce.friend_id
         WHERE ce.conversion_point_id = ?
-        ORDER BY ce.created_at DESC, ce.id DESC
+        ORDER BY julianday(${storedTimestamp('ce.created_at', 'sql')}) DESC, ce.id DESC
         LIMIT ?`,
     )
     .bind(input.id, limit)
@@ -100,7 +101,7 @@ export async function listConversionDefinitionEvents(
       value: row.value_snapshot,
       source,
       sourceEventId,
-      createdAt: row.created_at,
+      createdAt: storedTimestamp(row.created_at),
     };
   });
 }

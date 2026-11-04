@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { getConversionEvents, getConversionReport } from '../src/conversions/index.js';
 import { listConversionDefinitions } from '../src/conversion-definitions/index.js';
+import { estimateWindowDedupCount } from '../src/conversion-definitions/preview.js';
 import { applyConversionTestSchema } from './conversion-test-schema.js';
 import { asD1 } from './d1-test-helper.js';
 
@@ -32,6 +33,31 @@ function setup(): Database.Database {
 }
 
 describe('終了日の境界', () => {
+  it('重複判定で UTC・JST・時差付きの実時刻を比べる', () => {
+    expect(estimateWindowDedupCount([
+      { friend_id: 'f', created_at: '2026-09-14 15:00:00' },
+      { friend_id: 'f', created_at: '2026-09-16T00:30:00' },
+      { friend_id: 'f', created_at: '2026-09-17T00:30:01+09:00' },
+    ], 1)).toBe(3);
+  });
+  it('UTC 旧形式と JST 形式を同じ日本時間の日に表示・集計する', async () => {
+    const sqlite = setup();
+    sqlite.exec(`INSERT INTO conversion_events (id, conversion_point_id, friend_id, value_snapshot, created_at) VALUES
+      ('utc-before','point-high','friend-1',9000,'2026-09-14 14:59:59'),
+      ('utc-start','point-high','friend-1',9000,'2026-09-14 15:00:00'),
+      ('jst-end','point-high','friend-2',9000,'2026-09-15T23:59:59'),
+      ('utc-next','point-high','friend-1',9000,'2026-09-15 15:00:00');`);
+    const db = asD1(sqlite);
+    const events = await getConversionEvents(db, { scope, conversionPointId:'point-high', startDate:'2026-09-15', endDate:'2026-09-15' });
+    expect(events.map(row => [row.id, row.created_at])).toEqual([
+      ['jst-end','2026-09-15T23:59:59+09:00'], ['utc-start','2026-09-14T15:00:00Z'],
+    ]);
+    const report = await getConversionReport(db, { startDate:'2026-09-15', endDate:'2026-09-15' });
+    expect(report.find(row => row.conversionPointId === 'point-high')).toMatchObject({ totalCount:2, totalValue:18000 });
+    const definitions = await listConversionDefinitions(db, { scope, range: { ...range, from:'2026-09-15', to:'2026-09-15' }, cursor:0, limit:20 });
+    expect(definitions.items.find(row => row.id === 'point-high')).toMatchObject({ metrics: { recordedCount:2 } });
+  });
+
   it('一覧が終了日当日の成果を含め、前日と翌日を除く', async () => {
     const events = await getConversionEvents(asD1(setup()), {
       scope, startDate: '2026-09-15', endDate: '2026-09-15',

@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
 import {
   advanceAnalyticsReportSchedule,
@@ -255,14 +256,14 @@ async function dailyConversionCounts(
        FROM conversion_events ce JOIN friends f ON f.id = ce.friend_id
       WHERE f.line_account_id = ?
         AND COALESCE(ce.approval_status, 'approved') != 'rejected'
-        AND julianday(ce.created_at) >= julianday(?) AND julianday(ce.created_at) < julianday(?)
+        AND julianday(${storedTimestamp('ce.created_at', 'sql')}) >= julianday(?) AND julianday(${storedTimestamp('ce.created_at', 'sql')}) < julianday(?)
       LIMIT ?`,
   ).bind(lineAccountId, fromISO, toExclusiveISO, CONVERSION_LOOKUP_CAP + 1).all<{ created_at: string }>();
   if (rows.results.length > CONVERSION_LOOKUP_CAP) return null;
   const format = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
   const days = new Map<string, number>();
   for (const row of rows.results) {
-    const day = format.format(new Date(row.created_at));
+    const day = format.format(new Date(storedTimestamp(row.created_at)));
     days.set(day, (days.get(day) ?? 0) + 1);
   }
   return days;
@@ -284,7 +285,7 @@ async function evaluateConversionStreak(
          FROM conversion_events ce JOIN friends f ON f.id = ce.friend_id
         WHERE f.line_account_id = ?
           AND COALESCE(ce.approval_status, 'approved') != 'rejected'
-          AND julianday(ce.created_at) >= julianday(?) AND julianday(ce.created_at) < julianday(?)`,
+          AND julianday(${storedTimestamp('ce.created_at', 'sql')}) >= julianday(?) AND julianday(${storedTimestamp('ce.created_at', 'sql')}) < julianday(?)`,
     ).bind(schedule.lineAccountId, previousContext.from, previousContext.toExclusive).first<{ c: number }>(),
   ]);
   if (!days) return { ...base, outcome: 'skipped', reason: '成果が多く数え切れないため比べません' };

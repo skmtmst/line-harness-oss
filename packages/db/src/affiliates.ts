@@ -466,13 +466,13 @@ export async function getAffiliateReport(
   const cvDateBinds: unknown[] = [];
   if (opts.startDate) {
     clickDateCond += ` AND julianday(${storedTimestamp('rt.created_at', 'sql')}) >= julianday(?)`;
-    cvDateCond += ` AND ce.created_at >= ?`;
+    cvDateCond += ` AND julianday(${storedTimestamp('ce.created_at', 'sql')}) >= julianday(?)`;
     clickDateBinds.push(opts.startDate);
     cvDateBinds.push(opts.startDate);
   }
   if (opts.endDate) {
     clickDateCond += ` AND julianday(${storedTimestamp('rt.created_at', 'sql')}) <= julianday(?)`;
-    cvDateCond += ` AND ce.created_at <= ?`;
+    cvDateCond += ` AND julianday(${storedTimestamp('ce.created_at', 'sql')}) <= julianday(?)`;
     clickDateBinds.push(opts.endDate);
     cvDateBinds.push(opts.endDate);
   }

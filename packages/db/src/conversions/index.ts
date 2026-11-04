@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '../id-queries.js';
 import { queueMappedAdConversion } from '../ad-event-mappings.js';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, storedTimestamp } from '@line-crm/shared';
 import { boundedListLimit, jstNow, nonNegativeListOffset, toJstString } from '../utils.js';
 import {
   explainAffiliateAttribution,
@@ -878,12 +878,12 @@ export async function getConversionEvents(
     values.push(opts.affiliateCode);
   }
   if (opts.startDate) {
-    conditions.push('ce.created_at >= ?');
+    conditions.push(`date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') >= date(?)`);
     values.push(opts.startDate);
   }
   if (opts.endDate) {
     // endDate は暦日なので、当日の成果も拾えるよう翌日0時を排他上限にする。
-    conditions.push(`ce.created_at < date(?, '+1 day')`);
+    conditions.push(`date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') <= date(?)`);
     values.push(opts.endDate);
   }
 
@@ -897,11 +897,11 @@ export async function getConversionEvents(
     .prepare(
       `SELECT ce.* FROM conversion_events ce
        JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-       ${where} ORDER BY ce.created_at DESC LIMIT ? OFFSET ?`,
+       ${where} ORDER BY julianday(${storedTimestamp('ce.created_at', 'sql')}) DESC, ce.id DESC LIMIT ? OFFSET ?`,
     )
     .bind(...values)
     .all<ConversionEvent>();
-  return result.results;
+  return result.results.map(row => ({ ...row, created_at: storedTimestamp(row.created_at) }));
 }
 
 /*

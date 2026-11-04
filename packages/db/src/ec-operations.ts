@@ -1,7 +1,7 @@
 import { maskSensitiveString } from './ec-identity-mask.js';
 import { reverseSourceConversions } from './conversion-event-sources.js';
 import { sqlIdSet } from './id-queries.js';
-import { REVENUE_IMPACT_KEYS, type EcIdentityCandidateSummary, type EcIdentityDuplicateSignal } from '@line-crm/shared';
+import { REVENUE_IMPACT_KEYS, storedTimestamp, type EcIdentityCandidateSummary, type EcIdentityDuplicateSignal } from '@line-crm/shared';
 
 
 
@@ -1123,7 +1123,7 @@ export async function getEcOrderDetail(
    */
   const conversions = await db.prepare(
     `SELECT ce.id, ce.conversion_point_id, ce.point_name_snapshot, ce.approval_status,
-            ce.value_snapshot, ce.created_at,
+            ce.value_snapshot, ${storedTimestamp('ce.created_at', 'sql')} AS created_at,
             CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT) AS order_number,
             json_extract(ce.metadata, '$.ecEventId') AS ec_event_id,
             a.name AS affiliate_name,
@@ -1156,7 +1156,7 @@ export async function getEcOrderDetail(
           CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT) = ?
           ${externalIds.length ? `OR json_extract(ce.metadata, '$.ecEventId') IN (${sqlIdSet(externalIds).sql})` : ''}
         )
-      ORDER BY ce.created_at ASC`,
+      ORDER BY julianday(${storedTimestamp('ce.created_at', 'sql')}) ASC`,
   ).bind(input.lineAccountId, order.orderNumber, ...sqlIdSet(externalIds).binds).all<Record<string, unknown>>();
 
   const mileage = externalIds.length

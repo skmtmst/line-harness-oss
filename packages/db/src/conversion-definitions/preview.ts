@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { exclusionWhere, readConversionExclusion } from '../conversion-exclusions.js';
 import { type PreviewConversionDefinitionInput, type ConversionDefinitionRange } from './types.js';
 import { accountWhere } from './reads.js';
@@ -19,7 +20,7 @@ export function estimateWindowDedupCount(
   const lastCounted = new Map<string, number>();
   let count = 0;
   for (const row of rows) {
-    const at = new Date(`${row.created_at.replace(' ', 'T')}+09:00`).getTime();
+    const at = new Date(storedTimestamp(row.created_at)).getTime();
     if (Number.isNaN(at)) continue;
     const last = lastCounted.get(row.friend_id);
     if (last === undefined || at - last > windowMs) {
@@ -73,9 +74,8 @@ export async function previewConversionDefinition(
    * - それ以外の起点: 対象URLを持たない地点の成果だけを数える
    *   (URL条件のある地点の成果を混ぜない)。
    */
-  // 暦日は先頭10文字で比較する(ISOの'T'が空白より大きく、
-  // 文字列の大小比較だと期間末の行が抜けるため)。
-  const conditions = [`cp.event_type = ?`, `substr(ce.created_at, 1, 10) >= ?`, `substr(ce.created_at, 1, 10) <= ?`];
+  // 保存形式を実時刻にそろえてから日本時間の暦日で比較する。
+  const conditions = [`cp.event_type = ?`, `date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') >= ?`, `date(${storedTimestamp('ce.created_at', 'sql')}, '+9 hours') <= ?`];
   const values: unknown[] = [input.sourceType, input.range.from.slice(0, 10), input.range.to.slice(0, 10)];
   if (input.measureMethod === 'url_reach' || input.targetUrl) {
     conditions.push(`cp.target_url = ?`);
@@ -145,7 +145,7 @@ export async function previewConversionDefinition(
       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
       ${joinFriends}
       WHERE ${where}
-      ORDER BY ce.friend_id ASC, ce.created_at ASC, ce.id ASC`)
+      ORDER BY ce.friend_id ASC, julianday(${storedTimestamp('ce.created_at', 'sql')}) ASC, ce.id ASC`)
       .bind(...values)
       .all<{ friend_id: string; created_at: string }>();
     estimatedCount = estimateWindowDedupCount(rows.results, input.deduplicationWindowDays as number);

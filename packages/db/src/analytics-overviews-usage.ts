@@ -1,5 +1,5 @@
 import { getAttributeResourceUsage } from './analytics-resource-usage.js';
-import { FEATURE_IDS } from '@line-crm/shared';
+import { FEATURE_IDS, storedTimestamp } from '@line-crm/shared';
 import { type AnalyticsOverviewContext } from './analytics-overviews-types.js';
 import { FEATURE_USAGE_WINDOW_DAYS, collectFeatureUsage, FEATURE_USAGE_DEFINITIONS } from './analytics-overviews-usage-measures.js';
 import { collectUsageReferenceHealth, usageCategory, metric, envelope } from './analytics-overviews-metrics.js';
@@ -66,9 +66,9 @@ export async function getAnalyticsUsageOverview(
          (SELECT COUNT(DISTINCT ce.conversion_point_id) FROM conversion_events ce JOIN friends f ON f.id = ce.friend_id
            WHERE f.line_account_id = ?) AS in_use,
          MAX(last_used_at) AS last_used_at FROM (
-           SELECT MAX(c.clicked_at) AS last_used_at FROM link_clicks c JOIN tracked_links l ON l.id = c.tracked_link_id
+           SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('c.clicked_at', 'sql')})) AS last_used_at FROM link_clicks c JOIN tracked_links l ON l.id = c.tracked_link_id
             WHERE l.line_account_id = ?
-           UNION ALL SELECT MAX(ce.created_at) FROM conversion_events ce JOIN friends f ON f.id = ce.friend_id
+           UNION ALL SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('ce.created_at', 'sql')})) FROM conversion_events ce JOIN friends f ON f.id = ce.friend_id
             WHERE f.line_account_id = ?
          )`,
     ).bind(...Array(6).fill(context.lineAccountId))

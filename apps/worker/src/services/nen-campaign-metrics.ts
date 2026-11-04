@@ -116,8 +116,8 @@ export async function getNenFlowMetrics(
               MAX(COALESCE(ce.value_snapshot, 0)) AS amount
          FROM nen_delivery_jobs j
          JOIN conversion_events ce ON ce.friend_id = j.friend_id
-          AND datetime(ce.created_at) >= datetime(j.sent_at)
-          AND datetime(ce.created_at) < datetime(j.sent_at, '+7 days')
+          AND datetime(${storedTimestamp('ce.created_at', 'sql')}) >= datetime(j.sent_at)
+          AND datetime(${storedTimestamp('ce.created_at', 'sql')}) < datetime(j.sent_at, '+7 days')
          JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
         WHERE j.line_account_id = ? AND j.status = 'sent' AND j.sent_at IS NOT NULL
           AND datetime(j.sent_at) >= datetime(?) AND datetime(j.sent_at) < datetime(?)
@@ -226,8 +226,8 @@ export async function getNenColumnMetrics(
               MAX(COALESCE(ce.value_snapshot, 0)) AS amount
          FROM nen_delivery_jobs j
          JOIN conversion_events ce ON ce.friend_id = j.friend_id
-          AND datetime(ce.created_at) >= datetime(j.sent_at)
-          AND datetime(ce.created_at) < datetime(j.sent_at, '+7 days')
+          AND datetime(${storedTimestamp('ce.created_at', 'sql')}) >= datetime(j.sent_at)
+          AND datetime(${storedTimestamp('ce.created_at', 'sql')}) < datetime(j.sent_at, '+7 days')
          JOIN conversion_points cp ON cp.id = ce.conversion_point_id AND cp.line_account_id = ?
         WHERE j.line_account_id = ? AND j.campaign_key = 'column' AND j.status = 'sent'
           AND j.source_key LIKE 'column:%'

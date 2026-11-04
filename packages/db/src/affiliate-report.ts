@@ -229,11 +229,11 @@ export async function getAffiliateReportV2(
   ];
   const cvBinds: unknown[] = [affiliateId, lineAccountId, lineAccountId];
   if (startDate) {
-    cvConds.push('julianday(ce.created_at) >= julianday(?)');
+    cvConds.push(`julianday(${storedTimestamp('ce.created_at', 'sql')}) >= julianday(?)`);
     cvBinds.push(startDate);
   }
   if (endDate) {
-    cvConds.push('julianday(ce.created_at) <= julianday(?)');
+    cvConds.push(`julianday(${storedTimestamp('ce.created_at', 'sql')}) <= julianday(?)`);
     cvBinds.push(endDate);
   }
   const cvWhere = cvConds.join(' AND ');
@@ -598,7 +598,7 @@ export async function getFriendJourney(
           WHERE fs.friend_id = ?
          UNION ALL
          -- conversions
-         SELECT ce.created_at AS at, 'conversion' AS type, ce.attributed_ref_code AS ref_code,
+         SELECT ${storedTimestamp('ce.created_at', 'sql')} AS at, 'conversion' AS type, ce.attributed_ref_code AS ref_code,
                 ce.affiliate_id AS affiliate_id, cp.name AS label, NULL AS detail
            FROM conversion_events ce
            LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
@@ -716,9 +716,9 @@ export async function getAffiliateJourneys(
          -- newest event across all sources, as an ISO string, chosen by real instant
          (SELECT ev_at FROM (
             SELECT at.added_at AS ev_at
-            UNION ALL SELECT rt.created_at FROM ref_tracking rt WHERE rt.friend_id = at.friend_id
-            UNION ALL SELECT fs.created_at FROM form_submissions fs WHERE fs.friend_id = at.friend_id
-            UNION ALL SELECT ce.created_at FROM conversion_events ce WHERE ce.friend_id = at.friend_id
+            UNION ALL SELECT ${storedTimestamp('rt.created_at', 'sql')} FROM ref_tracking rt WHERE rt.friend_id = at.friend_id
+            UNION ALL SELECT ${storedTimestamp('fs.created_at', 'sql')} FROM form_submissions fs WHERE fs.friend_id = at.friend_id
+            UNION ALL SELECT ${storedTimestamp('ce.created_at', 'sql')} FROM conversion_events ce WHERE ce.friend_id = at.friend_id
           ) ORDER BY julianday(ev_at) DESC LIMIT 1) AS last_event_at
        FROM attributed at
        ORDER BY julianday(at.added_at) DESC, at.friend_id DESC
@@ -899,7 +899,7 @@ export async function getConversionApprovalQueue(
        )
        SELECT
          ce.id AS event_id,
-         ce.created_at AS created_at,
+         ${storedTimestamp('ce.created_at', 'sql')} AS created_at,
          ce.friend_id AS friend_id,
          friends.display_name AS friend_name,
          ce.affiliate_id AS affiliate_id,
@@ -965,7 +965,7 @@ export async function getConversionApprovalQueue(
       WHERE ce.affiliate_id IS NOT NULL
         AND ce.approval_status = ?
         AND ${scopeCondition}
-      ORDER BY julianday(ce.created_at) DESC, ce.id DESC
+      ORDER BY julianday(${storedTimestamp('ce.created_at', 'sql')}) DESC, ce.id DESC
       LIMIT ? OFFSET ?`,
     )
     .bind(status, ...(opts.scope.allowedAccountIds.length ? sqlIdSet(opts.scope.allowedAccountIds).binds : []), limit, offset)

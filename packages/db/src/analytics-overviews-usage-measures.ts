@@ -163,8 +163,8 @@ export async function collectFeatureUsage(
           (SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('c.clicked_at', 'sql')})) FROM link_clicks c JOIN tracked_links l ON l.id = c.tracked_link_id
             WHERE l.line_account_id = ?) AS inflow_tracking_last,
           (SELECT COUNT(*) FROM conversion_events e JOIN friends f ON f.id = e.friend_id
-            WHERE f.line_account_id = ? AND datetime(e.created_at) >= datetime(?)) AS affiliates_count,
-          (SELECT MAX(e.created_at) FROM conversion_events e JOIN friends f ON f.id = e.friend_id
+            WHERE f.line_account_id = ? AND datetime(${storedTimestamp('e.created_at', 'sql')}) >= datetime(?)) AS affiliates_count,
+          (SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('e.created_at', 'sql')})) FROM conversion_events e JOIN friends f ON f.id = e.friend_id
             WHERE f.line_account_id = ?) AS affiliates_last,
           (SELECT COUNT(*) FROM mileage_ledger l JOIN friends f ON f.id = l.beneficiary_friend_id
             WHERE f.line_account_id = ? AND datetime(l.occurred_at) >= datetime(?)) AS mileage_count,

@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { sqlIdSet } from '../id-queries.js';
 import { type ConversionDefinitionUsageKind, type ConversionDefinitionScope, type ConversionDefinitionFilter, type ConversionDefinitionListInput, type ConversionDefinitionRange, type ConversionDefinitionSort, type CancellationMetric, type DefinitionRow, type ConversionDefinitionState, type ConversionDefinitionListItem, type UsageRow, type ConversionDefinitionUsage } from './types.js';
 
@@ -166,7 +167,7 @@ export function metricsCte(range: ConversionDefinitionRange, where: { sql: strin
              COALESCE(SUM(COALESCE(value_snapshot, 0)), 0) AS net_value
         FROM conversion_events
        WHERE conversion_point_id IN (SELECT id FROM scoped_points)
-         AND created_at >= ? AND created_at < ?
+         AND date(${storedTimestamp('created_at', 'sql')}, '+9 hours') >= ? AND date(${storedTimestamp('created_at', 'sql')}, '+9 hours') <= ?
        GROUP BY conversion_point_id
     ), usage_counts AS (
       SELECT conversion_point_id, COUNT(*) AS usage_count
@@ -174,7 +175,7 @@ export function metricsCte(range: ConversionDefinitionRange, where: { sql: strin
        WHERE conversion_point_id IN (SELECT id FROM scoped_points)
        GROUP BY conversion_point_id
     )`,
-    values: [...where.values, ...calendarRangeBinds(range.from, range.to)],
+    values: [...where.values, range.from.slice(0, 10), range.to.slice(0, 10)],
   };
 }
 

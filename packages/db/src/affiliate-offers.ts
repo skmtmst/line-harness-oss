@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from './id-queries.js';
@@ -1085,8 +1086,8 @@ export async function getOfferCapStatus(
            FROM conversion_events ce
            JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
           WHERE al.offer_id = ? AND ce.affiliate_id = ?
-            AND julianday(ce.created_at) >= julianday(?)
-            AND julianday(ce.created_at) < julianday(?)`,
+            AND julianday(${storedTimestamp('ce.created_at', 'sql')}) >= julianday(?)
+            AND julianday(${storedTimestamp('ce.created_at', 'sql')}) < julianday(?)`,
       )
       .bind(offerId, opts.affiliateId, start, end)
       .first<{ used: number }>();
