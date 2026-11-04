@@ -1,5 +1,5 @@
 import { jstNow } from './utils.js';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, storedTimestamp } from '@line-crm/shared';
 // =============================================================================
 // Users — Internal UUID Cross-Account System
 // =============================================================================
@@ -31,6 +31,10 @@ export interface UserAccessScope {
   tenantId: string;
   allowedAccountIds: string[];
   includeUnlinked: boolean;
+}
+
+function normalizeUserTime(user: User | null): User | null {
+  return user ? { ...user, created_at: storedTimestamp(user.created_at), updated_at: storedTimestamp(user.updated_at) } : null;
 }
 
 const ACCESSIBLE_USER_PREDICATE = `
@@ -122,9 +126,9 @@ export async function getUserByIdForAccess(
   id: string,
   scope: UserAccessScope,
 ): Promise<User | null> {
-  return db.prepare(
+  return normalizeUserTime(await db.prepare(
     `SELECT u.* FROM users u WHERE u.id = ? AND ${ACCESSIBLE_USER_PREDICATE}`,
-  ).bind(id, ...accessBindings(scope)).first<User>();
+  ).bind(id, ...accessBindings(scope)).first<User>());
 }
 
 export async function getUsersForAccess(
@@ -132,9 +136,9 @@ export async function getUsersForAccess(
   scope: UserAccessScope,
 ): Promise<User[]> {
   const result = await db.prepare(
-    `SELECT u.* FROM users u WHERE ${ACCESSIBLE_USER_PREDICATE} ORDER BY u.created_at DESC`,
+    `SELECT u.* FROM users u WHERE ${ACCESSIBLE_USER_PREDICATE} ORDER BY julianday(${storedTimestamp('u.created_at', 'sql')}) DESC`,
   ).bind(...accessBindings(scope)).all<User>();
-  return result.results;
+  return result.results.map((user) => normalizeUserTime(user)!);
 }
 
 export async function getUserByEmailForAccess(
@@ -142,9 +146,9 @@ export async function getUserByEmailForAccess(
   email: string,
   scope: UserAccessScope,
 ): Promise<User | null> {
-  return db.prepare(
+  return normalizeUserTime(await db.prepare(
     `SELECT u.* FROM users u WHERE u.email = ? AND ${ACCESSIBLE_USER_PREDICATE}`,
-  ).bind(email, ...accessBindings(scope)).first<User>();
+  ).bind(email, ...accessBindings(scope)).first<User>());
 }
 
 export async function getUserByPhoneForAccess(
@@ -152,43 +156,43 @@ export async function getUserByPhoneForAccess(
   phone: string,
   scope: UserAccessScope,
 ): Promise<User | null> {
-  return db.prepare(
+  return normalizeUserTime(await db.prepare(
     `SELECT u.* FROM users u WHERE u.phone = ? AND ${ACCESSIBLE_USER_PREDICATE}`,
-  ).bind(phone, ...accessBindings(scope)).first<User>();
+  ).bind(phone, ...accessBindings(scope)).first<User>());
 }
 
 export async function getUserById(
   db: D1Database,
   id: string,
 ): Promise<User | null> {
-  return db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first<User>();
+  return normalizeUserTime(await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first<User>());
 }
 
 export async function getUsers(db: D1Database): Promise<User[]> {
   const result = await db
-    .prepare(`SELECT * FROM users ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM users ORDER BY julianday(${storedTimestamp('created_at', 'sql')}) DESC`)
     .all<User>();
-  return result.results;
+  return result.results.map((user) => normalizeUserTime(user)!);
 }
 
 export async function getUserByEmail(
   db: D1Database,
   email: string,
 ): Promise<User | null> {
-  return db
+  return normalizeUserTime(await db
     .prepare(`SELECT * FROM users WHERE email = ?`)
     .bind(email)
-    .first<User>();
+    .first<User>());
 }
 
 export async function getUserByPhone(
   db: D1Database,
   phone: string,
 ): Promise<User | null> {
-  return db
+  return normalizeUserTime(await db
     .prepare(`SELECT * FROM users WHERE phone = ?`)
     .bind(phone)
-    .first<User>();
+    .first<User>());
 }
 
 export type UpdateUserInput = Partial<

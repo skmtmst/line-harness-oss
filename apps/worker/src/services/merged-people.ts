@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import type {
   MergedPersonDeliveryPriority,
   MergedPersonDeliveryPriorityInput,
@@ -371,7 +372,7 @@ export async function listMergedPeople(
        JOIN line_accounts la ON la.id = f.line_account_id
       WHERE COALESCE(la.tenant_id, '00000000-0000-4000-8000-000000000001') = ?
         AND (u.tenant_id = ? OR u.tenant_id IS NULL)
-      ORDER BY u.updated_at DESC, u.id, f.id`,
+      ORDER BY julianday(${storedTimestamp('u.updated_at', 'sql')}) DESC, u.id, f.id`,
   ).bind(tenantId, tenantId).all<{
     id: string;
     status: MergedPersonStatus;
@@ -394,7 +395,7 @@ export async function listMergedPeople(
         || row.friend_display_name || '統合ユーザー',
       linkedFriendCount: 0,
       lineAccounts: [],
-      updatedAt: row.updated_at,
+      updatedAt: storedTimestamp(row.updated_at),
       accountIds: new Set<string>(),
     };
     current.linkedFriendCount += 1;
@@ -456,8 +457,8 @@ export async function getMergedPerson(
       reason: row.reason,
     })),
     history,
-    createdAt: user.created_at,
-    updatedAt: user.updated_at,
+    createdAt: storedTimestamp(user.created_at),
+    updatedAt: storedTimestamp(user.updated_at),
     archivedAt: user.archived_at,
   };
 }
