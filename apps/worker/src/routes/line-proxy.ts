@@ -1,3 +1,4 @@
+import { refreshInboxSlaForChat } from '../services/inbox-sla.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { getFriendsByLineUserIds, readProxyPushRecipient } from './line-proxy-recipients.js';
 import { hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
@@ -307,6 +308,9 @@ async function insertLogRows(
 /** 1:1 push は operator 手動送信と同じ扱いでチャットを更新する (chats.ts:608 と同型)。 */
 async function touchChat(db: D1Database, friendId: string, manualReply: boolean): Promise<void> {
   const chat = (await getChatByFriendId(db, friendId)) ?? (await createChat(db, { friendId }));
+  if (manualReply) {
+    try { await refreshInboxSlaForChat(db, chat.id); } catch { logger.error('inbox_sla.deadline_snapshot_failed'); }
+  }
   await updateChat(db, chat.id, { status: 'in_progress', lastMessageAt: jstNow(), manualReply });
 }
 

@@ -9,14 +9,14 @@ function utc(tz:string,date:string,time:string) {
  for(let i=0;i<4;i++) {const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(guess).map(p=>[p.type,p.value]));guess+=desired-Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);}
  return guess;
 }
-export async function businessWindows(db:D1Database,account:string,from:string) {
+export async function businessWindows(db:D1Database,account:string,from:string,days=370) {
  const settings=await db.prepare('SELECT id,business_hours_configured FROM booking_settings WHERE line_account_id=?').bind(account).first<{id:string;business_hours_configured:number}>();
  const hours=settings?.business_hours_configured ? (await db.prepare('SELECT weekday,start_time,end_time FROM booking_business_hours WHERE booking_settings_id=?').bind(settings.id).all<{weekday:number;start_time:string;end_time:string}>()).results
   : Array.from({length:7},(_,weekday)=>({weekday,start_time:'09:00',end_time:'18:00'}));
  const holidays=new Set((await db.prepare('SELECT date FROM style_holidays WHERE line_account_id=?').bind(account).all<{date:string}>()).results.map(r=>r.date));
  const exceptions=(await db.prepare("SELECT date_from,date_to,kind,hours_json FROM booking_availability_exceptions WHERE line_account_id=? AND scope_kind='store'").bind(account).all<{date_from:string;date_to:string;kind:string;hours_json:string}>()).results;
  const tz=await getAccountTimeZone(db,account),day=Date.parse(`${tzDateStr(tz,new Date(from))}T00:00:00Z`),windows:Array<[number,number]>=[];
- for(let n=0;n<370;n++) {const d=new Date(day+n*86400000),date=d.toISOString().slice(0,10);if(holidays.has(date))continue;
+ for(let n=0;n<days;n++) {const d=new Date(day+n*86400000),date=d.toISOString().slice(0,10);if(holidays.has(date))continue;
   const ex=exceptions.find(e=>e.date_from<=date&&date<=e.date_to);if(ex?.kind==='closed')continue;
   const intervals=ex?.kind==='custom_hours' ? (JSON.parse(ex.hours_json) as Array<{start:string;end:string}>).map(h=>({start_time:h.start,end_time:h.end})) : hours.filter(h=>h.weekday===d.getUTCDay());
   for(const h of intervals) windows.push([utc(tz,date,h.start_time),utc(tz,date,h.end_time)]);
@@ -44,6 +44,16 @@ export async function refreshInboxSla(db:D1Database,account:string) {
  const windows=settings.businessHoursOnly?await businessWindows(db,account,earliest):null;
  await db.batch(rows.map(r=>db.prepare('UPDATE chats SET sla_due_at=? WHERE id=? AND pending_since=? AND first_response_at IS NULL AND sla_due_at IS NULL')
   .bind(slaDeadline(r.pending_since,settings.firstResponseMinutes,windows),r.id,r.pending_since)));
+}
+/** Snapshot a deadline even when a person replies before the periodic refresh. */
+export async function refreshInboxSlaForChat(db:D1Database,chatId:string) {
+ const row=await db.prepare(`SELECT f.line_account_id AS account,c.pending_since FROM chats c JOIN friends f ON f.id=c.friend_id
+   WHERE c.id=? AND c.pending_since IS NOT NULL AND c.first_response_at IS NULL AND c.sla_due_at IS NULL`).bind(chatId).first<{account:string|null;pending_since:string}>();
+ if(!row?.account)return;
+ const settings=await inboxSlaSettings(db,row.account);if(!settings.enabled)return;
+ const windows=settings.businessHoursOnly?await businessWindows(db,row.account,row.pending_since):null;
+ await db.prepare('UPDATE chats SET sla_due_at=? WHERE id=? AND pending_since=? AND first_response_at IS NULL AND sla_due_at IS NULL')
+  .bind(slaDeadline(row.pending_since,settings.firstResponseMinutes,windows),chatId,row.pending_since).run();
 }
 export async function processInboxSla(db:D1Database,now=new Date()) {
  const accounts=(await db.prepare(`SELECT s.account_id FROM inbox_routing_settings s JOIN line_accounts a ON a.id=s.account_id WHERE s.sla_enabled=1 AND a.is_active=1`).all<{account_id:string}>()).results;

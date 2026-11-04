@@ -10,8 +10,11 @@ beforeEach(()=>{d=gapFixture();d.raw.exec("UPDATE line_accounts SET channel_acce
 afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
 test('SLA-12 SLA-13: Proxyの自動pushで時計を止めず、manualヘッダの返信だけで止める',async()=>{
  const uid='U'+'a'.repeat(32);d.raw.prepare("UPDATE friends SET line_user_id=? WHERE id='f'").run(uid);
- const chat=await upsertChatOnMessage(d.db,'f'),a=new Hono<Env>();a.route('/',lineProxy);
+ d.raw.exec("INSERT INTO inbox_routing_settings(account_id,sla_enabled,sla_first_response_minutes,sla_business_hours_only,updated_at) VALUES('a',1,30,0,'now')");
+ const chat=await upsertChatOnMessage(d.db,'f'),a=new Hono<Env>();d.raw.prepare("UPDATE chats SET assignee_staff_id='s' WHERE id=?").run(chat.id);a.route('/',lineProxy);
  const send=(manual=false)=>a.request('/line-api/v2/bot/message/push',{method:'POST',headers:{Authorization:'Bearer test-token','Content-Type':'application/json','X-Line-Account-Id':'a',...(manual?{'X-Line-Harness-Source':'manual'}:{})},body:JSON.stringify({to:uid,messages:[{type:'text',text:'返信'}]})},{DB:d.db} as Env['Bindings']);
- expect((await send()).status).toBe(200);expect(d.raw.prepare('SELECT first_response_at,last_operator_message_at FROM chats WHERE id=?').get(chat.id)).toEqual({first_response_at:null,last_operator_message_at:null});
+ expect((await send()).status).toBe(200);expect(d.raw.prepare('SELECT count(*) n FROM inbox_response_samples').get()).toEqual({n:0});expect(d.raw.prepare('SELECT first_response_at,last_operator_message_at FROM chats WHERE id=?').get(chat.id)).toEqual({first_response_at:null,last_operator_message_at:null});
  expect((await send(true)).status).toBe(200);const row=d.raw.prepare('SELECT first_response_at,last_operator_message_at FROM chats WHERE id=?').get(chat.id) as any;expect(row.first_response_at).toBeTruthy();expect(row.first_response_at).toBe(row.last_operator_message_at);
+ const sample=d.raw.prepare('SELECT staff_id,due_at,pending_since,is_first_response FROM inbox_response_samples').get() as {staff_id:string;due_at:string;pending_since:string;is_first_response:number};
+ expect(sample.staff_id).toBe('s');expect(sample.is_first_response).toBe(1);expect(Date.parse(sample.due_at)-Date.parse(sample.pending_since)).toBe(30*60*1000);
 });

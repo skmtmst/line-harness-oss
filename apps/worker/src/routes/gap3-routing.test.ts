@@ -97,3 +97,14 @@ test('一括割当は 300 件を分割して処理し、別の店からは進捗
  expect(d.raw.prepare("SELECT status,success_count FROM friend_bulk_runs WHERE id=?").get(id)).toEqual({status:'success',success_count:300});
  expect((await gapCall(app(),`/api/inbox/routing/apply-unassigned/${id}?account_id=b`)).status).toBe(404);
 });
+
+test('営業時間の開始後に未割当を再試行し、同じ営業時間の巡回では台帳を重複しない',async()=>{
+ const {retryInboxAssignmentAtOpening}=await import('../services/inbox-assignment-runs.js');
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ await retryInboxAssignmentAtOpening(d.db,new Date('2026-10-15T23:59:00Z'));
+ expect(d.raw.prepare('SELECT count(*) n FROM friend_bulk_runs').get()).toEqual({n:0});
+ await retryInboxAssignmentAtOpening(d.db,new Date('2026-10-16T00:01:00Z'));
+ await retryInboxAssignmentAtOpening(d.db,new Date('2026-10-16T00:02:00Z'));
+ expect(d.raw.prepare('SELECT count(*) n FROM friend_bulk_runs').get()).toEqual({n:1});
+ expect(d.raw.prepare('SELECT count(*) n FROM friend_bulk_run_items').get()).toEqual({n:1});
+});

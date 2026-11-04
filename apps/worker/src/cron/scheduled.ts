@@ -76,6 +76,10 @@ export async function scheduled(
         const {processAutoLineMock}=await import('../features/ec-commerce/ec-auto-line/index.js');
         await processAutoLineMock(env.DB,new Date(event.scheduledTime));
       }},
+      {name:'inbox retry at opening',run:async()=>{
+        const {retryInboxAssignmentAtOpening}=await import('../services/inbox-assignment-runs.js');
+        await retryInboxAssignmentAtOpening(env.DB,new Date(event.scheduledTime));
+      }},
       {name:'inbox first response deadlines',run:async()=>{
         const {processInboxSla}=await import('../services/inbox-sla.js');
         await processInboxSla(env.DB,new Date(event.scheduledTime));

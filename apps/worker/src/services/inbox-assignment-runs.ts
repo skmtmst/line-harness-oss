@@ -32,3 +32,20 @@ export async function getInboxAssignmentRun(db:D1Database,account:string,tenant:
  if(!row)throw new GapError('not_found',404);
  return result(row);
 }
+
+/** Once per opening window, retry waiting unassigned conversations through the durable ledger. */
+export async function retryInboxAssignmentAtOpening(db:D1Database,now:Date) {
+ const accounts=(await db.prepare(`SELECT a.id,a.tenant_id,
+  (SELECT m.id FROM staff_members m WHERE m.tenant_id=a.tenant_id AND m.is_active=1 AND m.access_level!='read_only' AND m.role IN ('owner','admin') ORDER BY CASE m.role WHEN 'owner' THEN 0 ELSE 1 END,m.id LIMIT 1) AS actor
+  FROM line_accounts a JOIN inbox_assignment_settings s ON s.account_id=a.id
+  WHERE a.is_active=1 AND s.strategy!='none' AND EXISTS(SELECT 1 FROM chats c JOIN friends f ON f.id=c.friend_id
+   WHERE f.line_account_id=a.id AND c.status!='resolved' AND c.assignee_staff_id IS NULL AND c.operator_id IS NULL AND c.pending_since IS NOT NULL AND c.first_response_at IS NULL)`)
+  .all<{id:string;tenant_id:string|null;actor:string|null}>()).results;
+ const {businessWindows}=await import('./inbox-sla.js');
+ for(const account of accounts){
+  if(!account.actor)continue;
+  const windows=await businessWindows(db,account.id,now.toISOString(),1);
+  const window=windows.find(([start,end])=>start<=now.getTime() && now.getTime()<end);
+  if(window)await createInboxAssignmentRun(db,account.id,account.actor,account.tenant_id,`r5-open:${account.id}:${window[0]}`);
+ }
+}

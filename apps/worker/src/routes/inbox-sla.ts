@@ -1,3 +1,5 @@
+import {addDays,jstDate} from '@line-crm/shared';
+import { inboxResponseAnalytics, inboxResponsePeriod } from '../services/inbox-response-analytics.js';
 import { createInboxAssignmentRun, getInboxAssignmentRun } from '../services/inbox-assignment-runs.js';
 import { routingSettings,routingInput } from '../services/inbox-assignment.js';
 import {Hono} from 'hono';
@@ -39,6 +41,34 @@ inboxSla.get('/api/inbox/routing/apply-unassigned/:id',async c=>{
  const account=await gapAccount(c),staff=c.get('staff');
  if(!['owner','admin'].includes(staff.role)||staff.readOnly)throw new GapError('forbidden',403);
  return c.json({success:true,data:await getInboxAssignmentRun(c.env.DB,account,staff.tenantId,c.req.param('id'))});
+});
+inboxSla.get('/api/analytics/inbox-response',async c=>{
+ const account=await gapAccount(c),staff=c.get('staff');
+ const today=jstDate(),day=new Date(`${today}T00:00:00Z`).getUTCDay();
+ const end=c.req.query('to')??addDays(today,(7-day)%7);
+ const endAt=Date.parse(`${end}T00:00:00Z`);
+ const from=c.req.query('from')??(Number.isFinite(endAt)?addDays(end,-27):end);
+ const own=staff.readOnly||!['owner','admin'].includes(staff.role)?staff.id:null;
+ return c.json({success:true,data:await inboxResponseAnalytics(c.env.DB,account,from,end,own)});
+});
+inboxSla.get('/api/analytics/inbox-response/conversations',async c=>{
+ const account=await gapAccount(c),staff=c.get('staff');
+ if(staff.role==='staff' && ![...(staff.permissionKeys??[]),...(staff.viewPermissionKeys??[])].includes('/chats'))throw new GapError('forbidden',403);
+ const target=c.req.query('staffId'),deleted=c.req.query('staffDeleted')==='1',automatic=c.req.query('kind')==='automatic';
+ if(target===undefined)throw new GapError('staff_required');
+ const own=staff.readOnly||!['owner','admin'].includes(staff.role)?staff.id:null;
+ if(own!==null && (target!==own || deleted || automatic))throw new GapError('forbidden',403);
+ const from=c.req.query('from')??'',to=c.req.query('to')??'',{start,end}=inboxResponsePeriod(from,to);
+ const offset=Number(c.req.query('offset')??0);
+ if(!Number.isSafeInteger(offset)||offset<0)throw new GapError('invalid_offset');
+ const results=await c.env.DB.prepare(`SELECT s.id AS sampleId,s.responded_at AS respondedAt,c.id AS chatId,f.id AS friendId,f.display_name AS friendName
+  FROM inbox_response_samples s JOIN chats c ON c.id=s.chat_id JOIN friends f ON f.id=c.friend_id
+  WHERE s.account_id=? AND f.line_account_id=? AND s.reply_kind=? AND (?=1 OR s.is_first_response=1)
+   AND julianday(s.responded_at)>=julianday(?) AND julianday(s.responded_at)<julianday(?)
+   AND s.staff_id IS ? AND s.staff_deleted=?
+  ORDER BY julianday(s.responded_at) DESC,s.id LIMIT 51 OFFSET ?`)
+  .bind(account,account,automatic?'automatic':'manual',automatic?1:0,start,end,target||null,deleted?1:0,offset).all<{sampleId:string;respondedAt:string;chatId:string;friendId:string;friendName:string|null}>();
+ return c.json({success:true,data:{items:results.results.slice(0,50),hasMore:results.results.length>50}});
 });
 inboxSla.put('/api/me/presence',async c=>{
  gapWrite(c);const b=await gapBody(c);if(typeof b.away!=='boolean')throw new GapError('invalid_presence');
