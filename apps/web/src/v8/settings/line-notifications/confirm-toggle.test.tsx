@@ -84,7 +84,7 @@ test('テスト送信は窓に表示した宛先IDを固定して送る', async 
       writes.push(JSON.parse(String(init.body)))
       return json({ success: true, data: { sent: 1 } })
     }
-    if (url.pathname === '/api/account-settings/test-recipients') return json({ success: true, data: [{ id: 'friend-1', displayName: '受信者', pictureUrl: null }] })
+    if (url.pathname === '/api/account-settings/test-recipients') return json({ success: true, confirmationRevision: 2, data: [{ id: 'friend-1', displayName: '受信者', pictureUrl: null }] })
     if (url.pathname === '/api/ec-commerce/settings') return json({ success: true, data: [setting('注文')] })
     if (url.pathname === '/api/line-notifications/customer-definitions') return json({ success: true, data: [] })
     if (url.pathname === '/api/ec-commerce/overview') return json({ success: true, data: { total: 0, processed: 0, identityPending: 0, failed: 0, skipped: 0, last24h: 0, lastReceivedAt: null, byType: [], subscriptions: 0 } })
@@ -99,5 +99,5 @@ test('テスト送信は窓に表示した宛先IDを固定して送る', async 
   expect(writes).toHaveLength(0)
   fireEvent.click(within(dialog).getByRole('button', { name: 'テスト受信者 1名へ送信' }))
   await waitFor(() => expect(writes).toHaveLength(1))
-  expect(writes[0]).toMatchObject({ expectedRecipientIds: ['friend-1'] })
+  expect(writes[0]).toMatchObject({ expectedRecipientIds: ['friend-1'], expectedConfirmationRevision: 2 })
 })
