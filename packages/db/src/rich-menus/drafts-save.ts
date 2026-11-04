@@ -60,14 +60,14 @@ export async function saveRichMenuGroupDraft(
     stmts.push(
       db
         .prepare(
-          `UPDATE rich_menu_groups SET ${metaBuilt.sets.join(', ')}, version = version + 1, updated_at = ? WHERE id = ?`,
+          `UPDATE rich_menu_groups SET ${metaBuilt.sets.join(', ')}, version = version + 1, confirmation_revision = confirmation_revision + 1, updated_at = ? WHERE id = ?`,
         )
         .bind(...metaBuilt.vals, now, groupId),
     );
   } else {
     stmts.push(
       db
-        .prepare(`UPDATE rich_menu_groups SET version = version + 1, updated_at = ? WHERE id = ?`)
+        .prepare(`UPDATE rich_menu_groups SET version = version + 1, confirmation_revision = confirmation_revision + 1, updated_at = ? WHERE id = ?`)
         .bind(now, groupId),
     );
   }
@@ -109,12 +109,13 @@ export async function setRichMenuPageImage(
   imageR2Key: string,
   imageContentType: string,
 ): Promise<void> {
-  await db
-    .prepare(
+  await db.batch([
+    db.prepare(
       `UPDATE rich_menu_pages SET image_r2_key = ?, image_content_type = ?, updated_at = ? WHERE id = ?`,
     )
-    .bind(imageR2Key, imageContentType, jstNow(), pageId)
-    .run();
+    .bind(imageR2Key, imageContentType, jstNow(), pageId),
+    db.prepare(`UPDATE rich_menu_groups SET confirmation_revision = confirmation_revision + 1 WHERE id = (SELECT group_id FROM rich_menu_pages WHERE id = ?)`).bind(pageId),
+  ]);
 }
 
 export async function pageBelongsToGroup(

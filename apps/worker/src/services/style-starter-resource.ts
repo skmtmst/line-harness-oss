@@ -212,7 +212,7 @@ export async function overwriteResource(
     const statements = [
       db
         .prepare(
-          `UPDATE rich_menu_groups SET name=?,status='draft',version=version+1,updated_at=? WHERE id=? AND account_id=?`,
+          `UPDATE rich_menu_groups SET name=?,status='draft',version=version+1,confirmation_revision=confirmation_revision+1,updated_at=? WHERE id=? AND account_id=?`,
         )
         .bind(name, now, id, account),
       db

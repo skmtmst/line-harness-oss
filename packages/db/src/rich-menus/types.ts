@@ -15,6 +15,7 @@
 
 export interface RichMenuGroup {
   id: string;
+  confirmation_revision?: number;
   account_id: string;
   name: string;
   chat_bar_text: string;
