@@ -143,6 +143,14 @@ async function connect() {
   );
   return state;
 }
+async function connectAccount(lineAccountId: string, staff = admin) {
+  const start = await app(staff).request(`/api/instagram/oauth/start?lineAccountId=${lineAccountId}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+  });
+  const state = new URL(((await start.json()) as Payload).data.url).searchParams.get('state')!;
+  const response = await app(staff).request('/api/instagram/oauth/callback?' + new URLSearchParams({ state, code: 'mock_code' }));
+  return new URL(response.headers.get('location')!);
+}
 it('設定なしは未設定。Metaへ接続せず画面の読取を返す', async () => {
   expect(
     (
@@ -186,22 +194,39 @@ it('Instagramログイン→暗号化保存→更新→新着同期→切断を�
     db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
   ).toEqual({ n: 0 });
 });
-it('同じInstagramが別のLINEアカウントに接続済みなら元の接続を守って理由を返す', async () => {
+it('同じ統括の2つのLINEアカウントへ同じInstagramを接続でき、別統括には共有しない', async () => {
   db.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a3','3','3','','','t1')");
   await connect();
-  const start = await app().request('/api/instagram/oauth/start?lineAccountId=a3', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: '{}',
-  });
-  const state = new URL(((await start.json()) as Payload).data.url).searchParams.get('state')!;
-  const callback = await req('/api/instagram/oauth/callback?' + new URLSearchParams({ state, code: 'mock_code' }));
-  const back = new URL(callback.headers.get('location')!);
+  const back = await connectAccount('a3');
 
-  expect(back.searchParams.get('instagram')).toBe('failed');
-  expect(back.searchParams.get('instagram_code')).toBe('instagram_account_already_connected');
-  expect(db.raw.prepare('SELECT line_account_id FROM instagram_connections').get()).toEqual({ line_account_id: 'a1' });
+  expect(back.searchParams.get('instagram')).toBe('connected');
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections WHERE instagram_id=?').get('20')).toEqual({ n: 2 });
+  const otherStaff = { ...admin, tenantId: 't2' };
+  const otherBack = await connectAccount('a2', otherStaff);
+  expect(otherBack.searchParams.get('instagram')).toBe('failed');
+  expect(otherBack.searchParams.get('instagram_code')).toBe('instagram_account_other_organization');
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get()).toEqual({ n: 2 });
+  expect(() => db.raw.prepare("INSERT INTO instagram_connections(line_account_id,page_id,instagram_id,page_name,page_token_encrypted,user_token_encrypted,expires_at,refreshed_at,connected_by) VALUES('a2','20','20','other','encrypted','encrypted','2030-01-01','2026-01-01','staff')").run()).toThrow('instagram_cross_tenant');
   expect(db.raw.prepare('SELECT COUNT(*) AS n FROM instagram_oauth_states').get()).toEqual({ n: 0 });
+});
+it('別のInstagramアカウントも別のLINEアカウントへ接続できる', async () => {
+  db.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a3','3','3','','','t1')");
+  await connect();
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal('fetch', vi.fn(async (url: URL | string, init?: RequestInit) => {
+    const path = new URL(String(url)).pathname;
+    if (path.endsWith('/oauth/access_token')) return Response.json({ data: [{
+      access_token: 'other_short', user_id: '21',
+      permissions: 'instagram_business_basic,instagram_business_content_publish',
+    }] });
+    if (path.endsWith('/me')) return Response.json({ id: '21', username: 'other_ig' });
+    return original(url, init);
+  }));
+  expect((await connectAccount('a3')).searchParams.get('instagram')).toBe('connected');
+  expect(db.raw.prepare('SELECT line_account_id,instagram_id FROM instagram_connections ORDER BY line_account_id').all()).toEqual([
+    { line_account_id: 'a1', instagram_id: '20' },
+    { line_account_id: 'a3', instagram_id: '21' },
+  ]);
 });
 it('閲覧のみ・別アカウント・偽state・再利用・期限切れを拒否する', async () => {
   expect(
@@ -550,6 +575,31 @@ it('Webhookの確認・署名・宛先・重複を検査し、審査前の返信
   expect(
     db.raw.prepare('SELECT COUNT(*) n FROM instagram_messages').get(),
   ).toEqual({ n: 0 });
+});
+
+it('共有したInstagramのWebhookを同じ統括の各アカウントへ保存し、解除もそれぞれ独立する', async () => {
+  db.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a3','3','3','','','t1')");
+  await connect();
+  await connectAccount('a3');
+  const raw = JSON.stringify({ object: 'instagram', entry: [{ id: '20', messaging: [{
+    sender: { id: '30' }, recipient: { id: '20' }, timestamp: Date.now(),
+    message: { mid: 'shared-mid', text: '共通の受信' },
+  }] }] });
+  const response = await app().request('/api/instagram/webhook', {
+    method: 'POST', body: raw,
+    headers: { 'X-Hub-Signature-256': await signed(raw) },
+  });
+  expect(response.status).toBe(200);
+  expect(db.raw.prepare('SELECT line_account_id FROM instagram_messages ORDER BY line_account_id').all()).toEqual([
+    { line_account_id: 'a1' }, { line_account_id: 'a3' },
+  ]);
+  const disconnect = await app().request('/api/instagram/connection?lineAccountId=a3', {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedVersion: 1 }),
+  });
+  expect(disconnect.status).toBe(200);
+  expect(db.raw.prepare('SELECT line_account_id FROM instagram_connections').all()).toEqual([{ line_account_id: 'a1' }]);
+  expect(db.raw.prepare('SELECT line_account_id FROM instagram_messages').all()).toEqual([{ line_account_id: 'a1' }]);
 });
 
 it('壊れた設定・署名済みの壊れた本文・期限切れのstateを外へ進めない', async () => {
