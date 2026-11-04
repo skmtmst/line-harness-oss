@@ -3,6 +3,7 @@ import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js'
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
 import { getFriendById, jstNow } from '@line-crm/db';
+import { storedTimestamp } from '@line-crm/shared';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
@@ -53,7 +54,7 @@ export const get__api_friends_id_timeline_1 = async (c: Context<Env, "/api/frien
               WHERE ml.friend_id = ? AND (ml.delivery_type IS NULL OR ml.delivery_type != 'test')
              UNION ALL
              SELECT fs.id, 'form_submitted', '回答フォームへ回答しました', NULL,
-                    'form_submission', fs.id, fs.form_id, NULL, fs.created_at, f.line_account_id
+                    'form_submission', fs.id, fs.form_id, NULL, strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('fs.created_at', 'sql')}), f.line_account_id
                FROM form_submissions fs JOIN friends f ON f.id = fs.friend_id
               WHERE fs.friend_id = ?
              UNION ALL

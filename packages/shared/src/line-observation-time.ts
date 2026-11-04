@@ -3,7 +3,7 @@ export function storedTimestamp(value: string, mode: 'value' | 'sql' = 'value'):
   if (mode === 'sql') {
     if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(value)) throw new Error('Invalid timestamp column');
     return `(CASE WHEN substr(${value},-1) IN ('Z','z') OR substr(${value},-6,1) IN ('+','-') OR substr(${value},-5,1) IN ('+','-') THEN ${value}
-      WHEN length(${value})=19 AND substr(${value},11,1)=' ' THEN ${value} || 'Z'
+      WHEN length(${value})=19 AND substr(${value},11,1)=' ' THEN substr(${value},1,10) || 'T' || substr(${value},12) || 'Z'
       WHEN length(${value})=10 THEN ${value} || 'T00:00:00+09:00'
       ELSE ${value} || '+09:00' END)`;
   }

@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import type { DashboardActivityItem } from '@line-crm/shared';
+import { storedTimestamp, type DashboardActivityItem } from '@line-crm/shared';
 
 /** 通知センターとは別に、実際の記録から最近起きたことをまとめる。 */
 export async function getDashboardActivity(
@@ -20,7 +20,7 @@ export async function getDashboardActivity(
       '/events/detail?id=', b.event_id FROM event_bookings b WHERE b.line_account_id = ?
     UNION ALL
     SELECT 'form:' || fs.id, 'form_submitted', 'フォーム「' || f.name || '」に回答がありました',
-      fs.created_at, '/form-submissions/responses?id=', f.id
+      strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('fs.created_at', 'sql')}), '/form-submissions/responses?id=', f.id
     FROM form_submissions fs JOIN forms f ON f.id = fs.form_id
     LEFT JOIN friends fr ON fr.id = fs.friend_id
     WHERE fs.is_test = 0 AND COALESCE(

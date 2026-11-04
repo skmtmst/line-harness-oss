@@ -51,6 +51,17 @@ describe('ダッシュボードの最近の動き', () => {
     const body = await (await get('account_id=a1')).json() as { data: { items: { kind: string }[] } };
     expect(body.data.items.map(i => i.kind)).toEqual(['friend_added', 'form_submitted']);
   });
+  test('フォーム回答の旧 UTC と時差なし JST を実時刻で並べて返す', async () => {
+    db.raw.prepare(`INSERT INTO forms (id, name) VALUES ('clock-form', '申込')`).run();
+    db.raw.prepare(`INSERT INTO form_accounts (form_id, line_account_id) VALUES ('clock-form', 'a1')`).run();
+    db.raw.prepare(`INSERT INTO form_submissions (id, form_id, friend_id, created_at) VALUES
+      ('utc', 'clock-form', 'f-a1', '2026-10-01 15:00:00'),
+      ('jst', 'clock-form', 'f-a1', '2026-10-02T01:00:00')`).run();
+    const body = await (await get('account_id=a1')).json() as { data: { items: { id: string; occurredAt: string }[] } };
+    expect(body.data.items.map(({ id, occurredAt }) => [id, occurredAt])).toEqual([
+      ['form:jst', '2026-10-01T16:00:00.000Z'], ['form:utc', '2026-10-01T15:00:00.000Z'],
+    ]);
+  });
   test('予約日時ではなく予約が入った日時を返す', async () => {
     db.raw.prepare(`INSERT INTO bookings (id, line_account_id, staff_id, menu_id, friend_id,
       starts_at, ends_at, block_ends_at, status, price_at_booking, requested_at)

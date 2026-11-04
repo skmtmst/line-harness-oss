@@ -23,6 +23,7 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Env } from '../worker-env.js';
+import { storedTimestamp } from '@line-crm/shared';
 
 const TIMELINE_SOURCE_TS = join(process.cwd(), 'src/routes/friends-timeline-handlers.ts');
 
@@ -36,7 +37,7 @@ function extractTimelineQuery(): string {
         'クエリの書き方を変えたなら、この抽出パターンも合わせて直してください。',
     );
   }
-  return match[1];
+  return match[1].replace("${storedTimestamp('fs.created_at', 'sql')}", storedTimestamp('fs.created_at', 'sql'));
 }
 
 vi.mock('../services/account-access.js', async (importOriginal) => ({
@@ -196,6 +197,16 @@ afterEach(() => {
 });
 
 describe('GET /api/friends/:id/timeline（10ソースを3CTEへ割った問い合わせ）', () => {
+  test('フォーム回答の UTC と JST を実時刻で履歴に並べる', async () => {
+    sqlite.prepare(`INSERT INTO form_submissions (id, form_id, friend_id, data, created_at) VALUES
+      ('clock-utc', 'form-1', 'friend-1', '{}', '2030-10-01 15:00:00'),
+      ('clock-jst', 'form-1', 'friend-1', '{}', '2030-10-02T01:00:00')`).run();
+    const body = await fetchTimeline(createApp(asD1(sqlite)));
+    expect(body.data.items.slice(0, 2).map(({ id, occurredAt }) => [id, occurredAt])).toEqual([
+      ['clock-jst', '2030-10-01T16:00:00.000Z'], ['clock-utc', '2030-10-01T15:00:00.000Z'],
+    ]);
+  });
+
   test('どのcompound SELECTもD1の上限（5項）に収まる形を保つ', () => {
     // group_a(4項=UNION ALL×3) + group_b(4項=×3) + group_c(2項=×1)
     // + 外側(3項=×2)。ソースを足すときはこの形のままにする。

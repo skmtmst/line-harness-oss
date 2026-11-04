@@ -8,5 +8,11 @@ it('SQLも空白UTC・時差なしTのJST・明示時差を同じ瞬間に変換
     ('2026-11-04 10:00:00'), ('2026-11-04T19:00:00.000'), ('2026-11-04T12:00:00+02:00');`);
   const rows = db.prepare(`SELECT strftime('%Y-%m-%dT%H:%M:%SZ', ${storedTimestamp('at', 'sql')}) AS instant FROM t`).all();
   expect(rows).toEqual(Array.from({ length: 3 }, () => ({ instant: '2026-11-04T10:00:00Z' })));
+  const values = db.prepare(`SELECT ${storedTimestamp('at', 'sql')} AS value FROM t`).all();
+  expect(values).toEqual([
+    { value: '2026-11-04T10:00:00Z' },
+    { value: '2026-11-04T19:00:00.000+09:00' },
+    { value: '2026-11-04T12:00:00+02:00' },
+  ]);
   db.close();
 });
