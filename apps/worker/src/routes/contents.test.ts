@@ -1,4 +1,4 @@
-import { deletionMocks } from './contents-media-test-mocks.js';
+import { deletionMocks, expectNoMediaDeletion } from './contents-media-test-mocks.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -994,8 +994,7 @@ describe('メディアの削除', () => {
     expect(body.code).toBe('media_delete_blocked');
     expect(body.data.usageCount).toBe(5);
     expect(body.data.verified).toBe(true);
-    expect(deletionMocks.finish).not.toHaveBeenCalled();
-    expect(env.IMAGES.delete).not.toHaveBeenCalled();
+    expectNoMediaDeletion(env.IMAGES);
   });
 
   it('force=1 を付けても使用中は消さない', async () => {
@@ -1010,8 +1009,7 @@ describe('メディアの削除', () => {
     });
     const res = await req('/api/media/md-1?accountId=account-1&force=1', 'DELETE');
     expect(res.status).toBe(409);
-    expect(deletionMocks.finish).not.toHaveBeenCalled();
-    expect(env.IMAGES.delete).not.toHaveBeenCalled();
+    expectNoMediaDeletion(env.IMAGES);
   });
 
   it('R34: 読み残しがあるときは未確認として止め、確かめられないものは消さない', async () => {
@@ -1023,21 +1021,18 @@ describe('メディアの削除', () => {
     expect(body.code).toBe('media_delete_unverified');
     expect(body.data.verified).toBe(false);
     expect(body.data.canDelete).toBe(false);
-    expect(deletionMocks.finish).not.toHaveBeenCalled();
-    expect(env.IMAGES.delete).not.toHaveBeenCalled();
+    expectNoMediaDeletion(env.IMAGES);
   });
 
   it('削除時に影響を読み直せなければ削除しない', async () => {
     scanMocks.scanSingleMediaUsage.mockRejectedValueOnce(new Error('D1 unavailable'));
     const res = await req('/api/media/md-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(503);
-    expect(deletionMocks.finish).not.toHaveBeenCalled();
-    expect(env.IMAGES.delete).not.toHaveBeenCalled();
+    expectNoMediaDeletion(env.IMAGES);
   });
 
   it('実体を消してからDBの削除を確定する', async () => {
-    const result = await req('/api/media/md-1?accountId=account-1', 'DELETE');
-    expect(result.status).toBe(200);
+    expect((await req('/api/media/md-1?accountId=account-1', 'DELETE')).status).toBe(200);
     expect(env.IMAGES.delete).toHaveBeenCalledWith(['key-1']);
     expect(deletionMocks.finish).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', expect.any(String), expect.any(String));
     expect(vi.mocked(env.IMAGES.delete).mock.invocationCallOrder.at(-1)).toBeLessThan(deletionMocks.finish.mock.invocationCallOrder.at(-1)!);
@@ -1111,8 +1106,7 @@ describe('#667 N-197 編集・削除のAPIはowner/adminのみ', () => {
   it('staffの削除は403で止める', async () => {
     const res = await req('/api/media/md-1?accountId=account-1', 'DELETE', undefined, 'staff');
     expect(res.status).toBe(403);
-    expect(deletionMocks.finish).not.toHaveBeenCalled();
-    expect(env.IMAGES.delete).not.toHaveBeenCalled();
+    expectNoMediaDeletion(env.IMAGES);
   });
 
   it('staffの影響確認は403で止める', async () => {
