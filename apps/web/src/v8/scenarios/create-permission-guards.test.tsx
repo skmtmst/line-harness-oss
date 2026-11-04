@@ -269,6 +269,9 @@ it('ownerの情報保存とfolder作成は通常どおり進む', async () => {
 it.each(['owner', 'staff'] as const)('%sの下書き接続は通常のGETと保存を維持する', async role => {
   person(role, role === 'staff' ? { permissionKeys: ['/scenarios', 'scenario.definition.edit'] } : {})
   await ready()
+  await waitFor(() => expect(calls.draftGet).toHaveBeenCalled())
+  // 下書きの読取が終わるまでは自動保存が始まらない。タイマーより先に読取を完了させる。
+  await act(async () => { await calls.draftGet.mock.results.at(-1)?.value.catch(() => {}) })
   vi.useFakeTimers()
   fireEvent.change(name(), { target: { value: '書きかけ' } })
   await act(async () => { await vi.advanceTimersByTimeAsync(2200) })
