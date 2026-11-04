@@ -12,6 +12,7 @@
  * - 解除は ConfirmDialog を通す（口側は confirmed 必須）
  */
 import React, { act } from 'react'
+import { renderHook } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -34,6 +35,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 }))
 
 import GoogleSheetsPanel from '@/v8/webhooks/sheets'
+import { useSheets } from '@/v8/webhooks/use-sheets'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -420,6 +422,7 @@ describe('#838 Google Sheets 連携パネル', () => {
     await act(async () => { button('接続を解除')!.click() })
     await settle()
     expect(dialogText()).toContain('一号店')
+    expect(dialogText()).toContain('環境')
 
     // 窓を開いたまま別アカウントへ切り替える → 確認窓は閉じる
     accountState.selectedAccountId = 'acc-2'
@@ -429,6 +432,25 @@ describe('#838 Google Sheets 連携パネル', () => {
     expect(dialogText()).not.toContain('接続を解除しますか')
     // acc-2 の解除は送られていない
     expect(calls.some((c) => c.path === '/api/integrations/google-sheets/disconnect')).toBe(false)
+  })
+
+  it.each([false, true])('切替後%sで古い解除操作を実行しない', async (backToOriginal) => {
+    handler = async (path, method) => {
+      if (path.startsWith('/api/integrations/google-sheets/connection')) return connectionBody('connected')
+      if (path.startsWith('/api/integrations/google-sheets/runs')) return { success: true, data: { runs: [] } }
+      if (path === '/api/integrations/google-sheets/disconnect' && method === 'POST') return { success: true, data: { revoked: true } }
+      return { success: false, error: 'unhandled' }
+    }
+    const view = renderHook(useSheets)
+    await settle()
+    await act(async () => { view.result.current.setDisconnectFor({ id: 'acc-1', label: '一号店' }) })
+    const oldConfirm = view.result.current.handleDisconnect
+    accountState.selectedAccountId = 'acc-2'
+    view.rerender()
+    if (backToOriginal) { accountState.selectedAccountId = 'acc-1'; view.rerender() }
+    await act(async () => { await oldConfirm() })
+    expect(calls.some((call) => call.path === '/api/integrations/google-sheets/disconnect')).toBe(false)
+    view.unmount()
   })
 })
 

@@ -113,14 +113,24 @@ export function useFolderRowActions({
     if (!sameDialog() || deleting !== latest.current.deleting) return
     if (!canActNow()) { if (usesLivePermission()) setError(interrupted); return }
     if (!deleting || !Number.isSafeInteger(deleting.revision) || (deleting.revision ?? 0) < 1 || latest.current.busy || latest.current.conflict) return
+    if (deleting.accountId === undefined) {
+      setError('フォルダの所有先を確認できません。一覧を読み直してください。')
+      return
+    }
+    if (typeof deleting.accountId === 'string' && deleting.accountId !== accountId) {
+      setError('フォルダのアカウントが現在の選択と異なります。一覧を読み直してください。')
+      return
+    }
     changeBusy(true)
     setError('')
     try {
-      const res = await api.folders.delete(deleting.id, accountId ?? undefined, deleting.revision)
+      const res = await api.folders.delete(deleting.id, deleting.accountId ?? undefined, deleting.revision)
       if (!sameDialog() || deleting !== latest.current.deleting) return
       if (!res.success) throw new Error(res.error)
-      onDeleted?.(deleting.id)
+      dialogEpoch.current = {}
+      latest.current.deleting = null
       setDeleting(null)
+      onDeleted?.(deleting.id)
       await onChanged()
     } catch (caught) {
       if (!sameDialog() || deleting !== latest.current.deleting) return
@@ -128,8 +138,10 @@ export function useFolderRowActions({
       const failure = describeFolderFailure(caught, 'delete')
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
-        onDeleted?.(deleting.id)
+        dialogEpoch.current = {}
+        latest.current.deleting = null
         setDeleting(null)
+        onDeleted?.(deleting.id)
         await onChanged()
         return
       }
@@ -204,6 +216,7 @@ export function useFolderRowActions({
           if (!sameDialog()) return
           if (!busy) {
             dialogEpoch.current = {}
+            latest.current.deleting = null
             setDeleting(null); setError('')
           }
         }}

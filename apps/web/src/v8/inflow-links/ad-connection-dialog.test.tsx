@@ -3,10 +3,19 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const create = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api', () => ({ api: { adPlatforms: { create, connect: async () => ({ success: true }) } } }))
+const connect = vi.hoisted(() => vi.fn(async () => ({ success: true })))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/lib/api', () => ({ api: { adPlatforms: { create, connect } } }))
 import AdConnection from './ad-connection-dialog'
 import { scrollMotion } from '@/components/shared/overlay-utils'
 afterEach(cleanup)
+it('接続情報の編集中は移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/inflow-links/ads')
+  render(<><AdConnection provider={{ key: 'meta', label: 'Meta' }} accountId="a" onClose={vi.fn()} onSaved={async () => {}} /><a href="/events">イベントへ</a></>)
+  fireEvent.change(screen.getByLabelText('アクセストークン'), { target: { value: 'test-value' } })
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})
 it('不足する接続欄を赤くして最初の欄へ移り、保存を呼ばない', () => {
   create.mockClear()
   render(<AdConnection provider={{ key: 'meta', label: 'Meta' }} accountId="a" onClose={vi.fn()} onSaved={async () => {}} />)
@@ -64,4 +73,18 @@ it('StrictMode の下でも、つないだら閉じ、失敗したら文を出�
   expect(screen.getByRole('alert').textContent).toContain('接続できませんでした')
   expect(screen.getByRole('button', { name: '接続を確認してつなぐ' }).hasAttribute('disabled')).toBe(false)
   expect(close).toHaveBeenCalledTimes(1)
+})
+
+it('接続確認が失敗しても保存済みの入力だけなら移動確認を重ねない', async () => {
+  window.history.replaceState(null, '', '/inflow-links/ads')
+  create.mockResolvedValueOnce({ success: true, data: { id: 'p1' } })
+  connect.mockResolvedValueOnce({ success: false } as never)
+  render(<><AdConnection provider={{ key: 'meta', label: 'Meta' }} accountId="a" onClose={vi.fn()} onSaved={async () => {}} /><a href="/events">イベントへ</a></>)
+  for (const [label, value] of [['広告アカウントID', 'account'], ['ピクセルID', 'pixel'], ['アクセストークン', 'secret']]) {
+    fireEvent.change(screen.getByLabelText(label), { target: { value } })
+  }
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '接続を確認してつなぐ' })) })
+  expect(screen.getByText(/接続を確認できませんでした/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
 })

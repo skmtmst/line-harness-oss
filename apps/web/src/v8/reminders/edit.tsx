@@ -531,7 +531,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         error={testIssue}
         onConfirm={() => sendTest()}
         onCancel={() => setTestConfirm(false)}
-      ><OperationTargetSummary accounts={[{ id: subjectSettings.lineAccountId }]} /></ConfirmDialog>
+      ><OperationTargetSummary accounts={[{ id: subjectDraft.settings.lineAccountId }]} /></ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="この手順への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <ConfirmDialog
         open={compareTarget !== null || compareError !== ''}
