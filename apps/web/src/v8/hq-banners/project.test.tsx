@@ -62,6 +62,8 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import HqBannerProjectV8 from './project'
+import { Thumb } from './project-tiles'
+import type { BannerImage } from '@/lib/hq-banners'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -121,6 +123,12 @@ const buttonNamed = (name: string) =>
   Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.replace(/\s+/g, '') === name.replace(/\s+/g, ''))
 
 describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）の動き', () => {
+  it('保存期限で失われた画像は壊れた画像を出さず理由を表示する', () => {
+    const missing = image(1, { media: { id:'missing', filename:'画像がありません', mimeType:'image/png', sizeBytes:0, width:null, height:null, url:'' } }) as BannerImage
+    act(() => { root.render(<Thumb image={missing} />) })
+    expect(host.textContent).toContain('画像がありません')
+    expect(host.querySelector('img')).toBeNull()
+  })
   it('題・説明・札の数・画像の札が出る', async () => {
     act(() => { root.render(<HqBannerProjectV8 />) })
     await flush()

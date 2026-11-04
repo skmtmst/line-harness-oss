@@ -111,7 +111,7 @@ export function BannerImageDetailV8({
             </button>
           ) : null}
           <span className={styles.spacer} />
-          {canManage && onUseAsReference ? (
+          {canManage && onUseAsReference && image.media.url ? (
             <Button onClick={onUseAsReference} disabled={busy}>
               <ImagePlus aria-hidden="true" className={styles.icon} />参照画像にする
             </Button>
@@ -128,15 +128,15 @@ export function BannerImageDetailV8({
         <div className={styles.top}>
           <div className={styles.left}>
             <div className={styles.preview}>
-              {previewFailed ? null : (
+              {!image.media.url ? '画像がありません' : previewFailed ? null : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img width={1200} height={628} src={image.media.url} alt="" onError={() => setPreviewFailed(true)} />
               )}
             </div>
             <div className={styles.buttons}>
-              <Button href={image.media.url} target="_blank" rel="noreferrer" download={image.media.filename}>
+              {image.media.url ? <Button href={image.media.url} target="_blank" rel="noreferrer" download={image.media.filename}>
                 <Download aria-hidden="true" className={styles.icon} />ダウンロード
-              </Button>
+              </Button> : null}
               {canManage ? (
                 <Button onClick={onToggleFavorite} disabled={busy} aria-pressed={image.isFavorite}>
                   <Star aria-hidden="true" className={image.isFavorite ? `${styles.icon} ${styles.starOn}` : styles.icon} />お気に入り
@@ -158,7 +158,7 @@ export function BannerImageDetailV8({
                 <span className={styles.spacer} />
                 <Button
                   variant="primary"
-                  disabled={busy || selected.length === 0}
+                  disabled={busy || selected.length === 0 || !image.media.url}
                   title={selected.length === 0 ? '配るアカウントを選んでください。' : undefined}
                   onClick={() => void onDeliver(selected).then((ok) => { if (ok) setSelected([]) })}
                   busy={busy}

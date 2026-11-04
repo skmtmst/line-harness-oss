@@ -438,7 +438,7 @@ function Thumb({ image }: { image: BannerImage | null }) {
   const [failed, setFailed] = useState(false)
   return (
     <span className={styles.thumb}>
-      {image && !failed ? (
+      {image && !image.media.url ? '画像がありません' : image && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img width={240} height={126} src={image.media.url} alt="" loading="lazy" onError={() => setFailed(true)} />
       ) : null}
