@@ -1042,7 +1042,7 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
        updated_at = excluded.updated_at`,
   ).bind(lineAccountId, eventType, body.isEnabled ? 1 : 0, title, introText, outroText,
     buttonLabel || null, buttonUrl || null, imageUrl || null, now, now);
-  try { await c.env.DB.batch([write, ...await mediaDeletionTextGuardStatements(c.env.DB, [imageUrl])]); }
+  try { await c.env.DB.batch([write, ...await mediaDeletionTextGuardStatements(c.env.DB, [imageUrl], [lineAccountId])]); }
   catch (error) { if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409); throw error; }
   return c.json({ success: true });
 });

@@ -10,6 +10,9 @@ import {
   toJstString,
   type TenantRetention,
 } from '@line-crm/db';
+import { captureMediaPurgeImpacts, finishMediaPurgeImpacts, type PurgeMediaKey } from './tenant-media-impact.js';
+import { beginPurgeMedia, lockPurgeMedia, renewPurgeMedia } from './tenant-purge-media-lock.js';
+import { preserveForeignBanners } from './tenant-purge-banner-placeholder.js';
 
 
 /**
@@ -30,6 +33,15 @@ const TENANTS_PER_RUN = 3;
 const ROWS_PER_RUN = 5000;
 /** 1文で消す行数。D1の1文が長くなりすぎないようにする。 */
 const ROWS_PER_STATEMENT = 200;
+
+/** A banner without a store belongs to the tenant of its oldest banner record. */
+function tenantMediaCondition(table: 'media' | 'media_versions'): string {
+  const owner = `(media.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=?)
+    OR (media.line_account_id IS NULL AND (SELECT tenant_id FROM banner_images b WHERE b.media_id=media.id ORDER BY b.created_at,b.id LIMIT 1)=?))`;
+  return table === 'media' ? owner : `media_versions.media_id IN (SELECT media.id FROM media WHERE ${owner})`;
+}
+
+function tenantJobOwner(tenantId: string): string { return `tenant-purge:${tenantId}`; }
 
 /** 表ごとのR2鍵の列。1つの表に複数列ある場合もまとめて扱う。 */
 const R2_KEY_COLUMNS_BY_TABLE = RETENTION_R2_KEY_COLUMNS.reduce<Record<string, string[]>>(
@@ -54,7 +66,7 @@ export interface TenantDataPurgeResult {
   completed: number;
   deletedRows: number;
   deletedObjects: number;
-  /** R2の削除に失敗した画像の数。行は消すので次回は拾えない。 */
+  /** R2の削除に失敗し、次回の再試行に残した画像の数。 */
   failedObjects: number;
 }
 
@@ -130,17 +142,26 @@ async function purgeOneTenant(
     finished: true,
   };
   let remaining = budget;
+  const purgeOwner = crypto.randomUUID();
+  // Keep send claims and deletion jobs until their media have been processed.
+  const tablesInOrder = purgeTablesChildFirst().filter(table => table !== 'media_send_claims' && table !== 'media_deletion_jobs' && table !== 'media_purge_impact_pending');
+  const accountsIndex = tablesInOrder.indexOf('line_accounts');
+  tablesInOrder.splice(accountsIndex < 0 ? tablesInOrder.length : accountsIndex, 0, 'media_send_claims', 'media_deletion_jobs', 'media_purge_impact_pending');
 
   // 子が先、親が後。親を先に消すと子が親をたどれなくなって消し残る。
-  tables: for (const table of purgeTablesChildFirst()) {
+  tables: for (const table of tablesInOrder) {
     if (remaining <= 0) {
       out.finished = false;
       break;
     }
     // 回答フォームだけ統括またぎの使い回しを守る条件にする（? が1つ増える）。
     const sharedForm = table === 'forms';
-    const condition = sharedForm ? formsPurgeCondition() : tenantScopeCondition(table);
-    const tenantParams = sharedForm ? [tenant.id, tenant.id] : [tenant.id];
+    const tenantMedia = table === 'media' || table === 'media_versions';
+    const tenantJob = table === 'media_deletion_jobs' || table === 'media_purge_impact_pending';
+    const ownerColumn = table === 'media_deletion_jobs' ? 'line_account_id' : 'owner_line_account_id';
+    const condition = sharedForm ? formsPurgeCondition() : tenantMedia ? tenantMediaCondition(table) : tenantJob
+      ? `(${tenantScopeCondition(table)} OR ${table}.${ownerColumn}=?)` : tenantScopeCondition(table);
+    const tenantParams = sharedForm || tenantMedia ? [tenant.id, tenant.id] : tenantJob ? [tenant.id,tenantJobOwner(tenant.id)] : [tenant.id];
     const keyColumns = R2_KEY_COLUMNS_BY_TABLE[table] ?? [];
 
     for (;;) {
@@ -153,10 +174,10 @@ async function purgeOneTenant(
       // 行を消す前に、同じ行のR2鍵を読んで画像の実体を消す。
       // 読む順と消す順を rowid で揃えるので、両者は必ず同じ行を指す。
       if (keyColumns.length > 0) {
-        const objects = await deleteR2Objects(env, table, condition, keyColumns, tenant.id, chunk);
+        const objects = await deleteR2Objects(env, table, condition, keyColumns, tenant.id, tenantParams, chunk, purgeOwner, now);
         out.deletedObjects += objects.deleted;
         out.failedObjects += objects.failed;
-        if (table === 'form_submission_files' && objects.failed > 0) {
+        if (['form_submission_files', 'media', 'media_versions'].includes(table) && objects.failed > 0) {
           // 次回も削除を再試行できるよう、R2 キーと親行への参照を保つ。
           out.finished = false;
           break tables;
@@ -210,34 +231,73 @@ async function deleteR2Objects(
   condition: string,
   columns: string[],
   tenantId: string,
+  tenantParams: string[],
   chunk: number,
+  purgeOwner: string,
+  now: string,
 ): Promise<{ deleted: number; failed: number }> {
   const selected = await env.DB
     .prepare(
-      `SELECT ${columns.map((column) => `${table}.${column}`).join(', ')}
+      `SELECT ${columns.map((column) => `${table}.${column}`).join(', ')}${table === 'media' ? ', media.id AS impact_media_id, media.line_account_id AS impact_account_id' : table === 'media_versions' ? ', media_versions.media_id AS impact_media_id, (SELECT line_account_id FROM media WHERE id=media_versions.media_id) AS impact_account_id' : ''}
          FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?`,
     )
-    .bind(tenantId, chunk)
+    .bind(...tenantParams, chunk)
     .all<Record<string, string | null>>();
 
   const keys = (selected.results ?? [])
     .flatMap((row) => columns.map((column) => row[column]))
     .filter((key): key is string => typeof key === 'string' && key.length > 0);
   if (keys.length === 0) return { deleted: 0, failed: 0 };
-  if (table === 'media' || table === 'media_versions') {
-    // The purge removes the original account and keys, so retain only their
-    // non-reversible fingerprints before the first object can be removed.
-    const hashes = await Promise.all(keys.map(async key => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key))), byte => byte.toString(16).padStart(2, '0')).join('')));
-    await env.DB.prepare(`INSERT OR IGNORE INTO media_deleted_key_fingerprints(sha256) SELECT value FROM json_each(?)`).bind(JSON.stringify(hashes)).run();
-  }
   if (!env.IMAGES) return { deleted: 0, failed: keys.length };
+  const lockedMedia: string[] = [];
+  const releaseLeases = async () => {
+    if (!lockedMedia.length) return;
+    await env.DB.prepare(`UPDATE media_deletion_jobs SET lease_owner=NULL,lease_expires_at=NULL,updated_at=?
+      WHERE lease_owner=? AND media_id IN (SELECT value FROM json_each(?))`)
+      .bind(now,purgeOwner,JSON.stringify(lockedMedia)).run();
+  };
+  if (table === 'media' || table === 'media_versions') {
+    const media = new Map<string, string>();
+    for (const row of selected.results ?? []) {
+      if (!row.impact_media_id) return { deleted: 0, failed: keys.length };
+      media.set(row.impact_media_id, row.impact_account_id ?? tenantJobOwner(tenantId));
+    }
+    const instant = new Date().toISOString();
+    const leaseUntil = new Date(Date.now() + 300_000).toISOString();
+    const entries = [...media].map(([id,accountId])=>({id,accountId}));
+    if (!await lockPurgeMedia(env.DB,{media:entries,tenantId,tenantMarker:tenantJobOwner(tenantId),owner:purgeOwner,now:instant,leaseUntil})) return {deleted:0,failed:keys.length};
+    lockedMedia.push(...media.keys());
+    if (!await beginPurgeMedia(env.DB,{mediaIds:lockedMedia,owner:purgeOwner,now:instant})) {
+      await releaseLeases(); return {deleted:0,failed:keys.length};
+    }
+  }
 
   try {
+    const mediaKeys: PurgeMediaKey[] = [];
+    if (table === 'media' || table === 'media_versions') {
+      for (const row of selected.results ?? []) {
+        for (const column of columns) {
+          const key = row[column];
+          if (key && row.impact_media_id) mediaKeys.push({key,mediaId:row.impact_media_id,
+            ownerAccount:row.impact_account_id ?? tenantJobOwner(tenantId), includeLive:table === 'media'});
+        }
+      }
+    }
+    const impacts = await captureMediaPurgeImpacts(env.DB,tenantId,mediaKeys,now);
+    if (lockedMedia.length) {
+      const instant = new Date().toISOString();
+      if (!await renewPurgeMedia(env.DB,{mediaIds:lockedMedia,owner:purgeOwner,now:instant,leaseUntil:new Date(Date.now()+300_000).toISOString()})) {
+        await releaseLeases(); return {deleted:0,failed:keys.length};
+      }
+    }
     await env.IMAGES.delete(keys);
+    if (table === 'media') await preserveForeignBanners(env.DB, tenantId, lockedMedia);
+    await finishMediaPurgeImpacts(env.DB, impacts, now);
     return { deleted: keys.length, failed: 0 };
   } catch (error) {
-    // 画像が消せなくても行の削除は進める。顧客データを残し続ける方が重い。
+    // 再試行に必要なキーと親行を残す。
     logger.error("tenant_data_purge.delete_r2_objects_failed");
+    await releaseLeases();
     return { deleted: 0, failed: keys.length };
   }
 }

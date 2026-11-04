@@ -135,3 +135,24 @@ test('配布中に画像が削除中になれば残りを止め、結果を残�
  expect(retry.body.data.stores.map(store=>store.status)).toEqual(['succeeded','succeeded']);
  expect(f.raw.prepare("SELECT line_account_id FROM mileage_rewards ORDER BY line_account_id").all()).toEqual([{line_account_id:'a'},{line_account_id:'b'},{line_account_id:'c'}]);
 });
+
+test('配布中に画像が別統括へ移れば残りを止めて理由を残す', async () => {
+ const imageUrl='https://example.invalid/media/p/content';
+ f.raw.exec("INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES('p','a','image','p.png','image/png',1,'media/a/p.png'); INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id) VALUES('c','Store3','c','x','x','t')");
+ const id=await create('mileage_reward',{schemaVersion:1,settings:{...defs.mileage_reward.settings,imageUrl}});
+ const p=await check(id,['a','b','c']);
+ const original=f.db.batch.bind(f.db); let interrupted=false;
+ f.db.batch=(async statements=>{
+  const result=await original(statements);
+  if(!interrupted && (f.raw.prepare("SELECT COUNT(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get() as {n:number}).n===1){
+   interrupted=true; f.raw.prepare("UPDATE media SET line_account_id='other' WHERE id='p'").run();
+  }
+  return result;
+ }) as D1Database['batch'];
+ const result=await run(id,p);
+ expect(result.status).toBe(409);
+ expect(result.body.data.stores.map(s=>s.status)).toEqual(['succeeded','failed','failed']);
+ expect((result.body.data.stores[1] as {reason?:string}).reason).toContain('別の統括');
+ expect((result.body.data.stores[2] as {reason?:string}).reason).toContain('別の統括');
+ expect(f.raw.prepare('SELECT line_account_id FROM mileage_rewards ORDER BY line_account_id').all()).toEqual([{line_account_id:'a'}]);
+});

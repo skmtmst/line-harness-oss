@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { mediaTenantGuardByQuery } from './media/deletion-guard.js';
 import { validateFriendFieldValue } from './friend-fields.js';
 import type { FriendFieldScope, FriendFieldType, FriendFieldUsageTarget } from './friend-fields.js';
 
@@ -271,12 +272,15 @@ export async function executeFieldMigration(
         ...(typed.mediaId ? [db.prepare(`INSERT INTO media_deletion_guards(blocked)
           SELECT 1 WHERE EXISTS (SELECT 1 FROM media_deletion_jobs WHERE media_id = ?) OR NOT EXISTS (SELECT 1 FROM media WHERE id = ?)`)
           .bind(typed.mediaId, typed.mediaId)] : []),
+        ...(typed.mediaId ? mediaTenantGuardByQuery(db,[typed.mediaId], 'SELECT line_account_id AS account_id FROM friends WHERE id=?', [item.friend_id]) : []),
       ]);
     } catch (error) {
       await db.prepare(
         `UPDATE field_migration_items SET status = 'failed', reason = ?
           WHERE run_id = ? AND friend_id = ?`,
-      ).bind(String(error).includes('media_deletion_in_progress')
+      ).bind(String(error).includes('media_cross_tenant_reference')
+        ? '別の統括の画像のため保存しませんでした。'
+        : String(error).includes('media_deletion_in_progress')
         ? 'この画像は削除中のため登録できません。'
         : error instanceof Error ? error.message.slice(0, 300) : '保存に失敗しました', runId, item.friend_id).run();
     }

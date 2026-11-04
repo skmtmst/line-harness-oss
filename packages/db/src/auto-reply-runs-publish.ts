@@ -165,7 +165,7 @@ export async function publishAutoReplyDraftVersion(
       ...snapshotGuardBinds,
       ...stopGuardBinds,
     ),
-    ...await mediaContentDeletionGuard(db, [draft.definition_snapshot]),
+    ...await mediaContentDeletionGuard(db, [draft.definition_snapshot], settings.lineAccountId ? [settings.lineAccountId] : []),
   ]);
   const published = await getAutoReplyVersionById(db, draft.id);
   const ruleAfter = await db.prepare(`SELECT * FROM auto_replies WHERE id = ?`)
@@ -262,7 +262,7 @@ export async function ensureAutoReplyPublishedVersion(
       `UPDATE auto_replies SET current_published_version_id = ?, lifecycle_status = 'published'
         WHERE id = ?`,
     ).bind(id, rule.id),
-    ...await mediaContentDeletionGuard(db, [snapshotToSave]),
+    ...await mediaContentDeletionGuard(db, [snapshotToSave], rule.line_account_id ? [rule.line_account_id] : []),
   ]);
 
   const saved = await db

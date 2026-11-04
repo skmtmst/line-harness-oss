@@ -494,6 +494,15 @@ friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'adm
     ).bind(run.id).first()) {
       return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像が含まれているため移行できません。事前確認をやり直してください。' }, 409);
     }
+    if ((target.type === 'image' || target.type === 'pdf') && await c.env.DB.prepare(
+      `SELECT 1 FROM field_migration_items i JOIN friends f ON f.id=i.friend_id
+         JOIN media m ON m.id=i.converted_value LEFT JOIN line_accounts owner ON owner.id=m.line_account_id
+         LEFT JOIN line_accounts target_account ON target_account.id=f.line_account_id
+       WHERE i.run_id=? AND i.status='convertible' AND NOT COALESCE(owner.id=target_account.id OR
+         (owner.tenant_id IS NOT NULL AND target_account.tenant_id IS NOT NULL AND owner.tenant_id=target_account.tenant_id),0) LIMIT 1`,
+    ).bind(run.id).first()) {
+      return c.json({ success:false, code:'media_cross_tenant_reference', error:'別の統括の画像が含まれているため移行できません。事前確認をやり直してください。' },409);
+    }
     if (!await queueFieldMigration(c.env.DB, run.id, idempotencyKey)) {
       /*
        * D036: 前の試しが途中で止まった分は続けられる。実行は「まだの行だけ」を
@@ -911,7 +920,7 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
     if (pending.length > 0) {
       await setFriendFieldValuesForFriend(c.env.DB, {
         friendId,
-        entries: pending.map((item) => ({ fieldId: item.fieldId, value: item.value })),
+        entries: pending.map((item) => ({ fieldId: item.fieldId, value: item.value, type:item.field.type })),
         updatedBy: staff?.id ?? 'unknown',
         now: jstNow(),
       });
@@ -1007,6 +1016,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
     await setFriendFieldValuesBulk(c.env.DB, {
       fieldId: field.id,
       entries: friendIds.map((friendId) => ({ friendId, value: checked.value })),
+      fieldType: field.type,
       updatedBy: staff?.id ?? 'unknown',
       now: jstNow(),
     });

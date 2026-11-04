@@ -1,4 +1,4 @@
-import { mediaDeletedKeyFingerprintGuard } from './deletion-guard.js';
+import { mediaDeletedKeyFingerprintGuard, mediaTenantGuard } from './deletion-guard.js';
 import { jstNow } from '../utils.js';
 import { type MediaKind, type Media } from './primitives.js';
 import { getMediaById } from './definitions-reads.js';
@@ -62,6 +62,7 @@ export async function createMedia(
       SELECT 1 WHERE EXISTS(SELECT 1 FROM media_deletion_jobs WHERE media_id=?)
         OR NOT EXISTS(SELECT 1 FROM media WHERE id=? AND r2_key=?)`)
       .bind(input.sourceMedia.id,input.sourceMedia.id,input.sourceMedia.r2Key)] : []),
+    ...(input.sourceMedia ? mediaTenantGuard(db, [input.sourceMedia.id], input.lineAccountId ? [input.lineAccountId] : []) : []),
     ...await mediaDeletedKeyFingerprintGuard(db, [input.r2Key, input.sourceMedia?.r2Key], {checkLiveIds:false}),
   ]);
   return (await getMediaById(db, id, input.lineAccountId))!;

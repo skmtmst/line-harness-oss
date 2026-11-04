@@ -105,7 +105,7 @@ booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY)
       b.staff_member_id ?? null,
       b.nominationFee??0,
     );
-  try { await c.env.DB.batch([insert, ...await mediaDeletionTextGuardStatements(c.env.DB, [b.profile_image_url])]); }
+  try { await c.env.DB.batch([insert, ...await mediaDeletionTextGuardStatements(c.env.DB, [b.profile_image_url], [accountId])]); }
   catch (error) { if (isMediaDeletionConflict(error)) return c.json({ code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409); throw error; }
   return c.json({ id }, 201);
 });
@@ -164,7 +164,7 @@ booking.put('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTINGS_K
       WHERE id = ? AND line_account_id = ?`,
   ).bind(...values, id, accountId);
   let result:D1Result;
-  try { [result] = await c.env.DB.batch([update, ...await mediaDeletionTextGuardStatements(c.env.DB, [parsed.value.profile_image_url])]); }
+  try { [result] = await c.env.DB.batch([update, ...await mediaDeletionTextGuardStatements(c.env.DB, [parsed.value.profile_image_url], [accountId])]); }
   catch (error) { if (isMediaDeletionConflict(error)) return c.json({ code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409); throw error; }
   if (result.meta.changes === 0) return c.json({ error: 'staff_not_found' }, 404);
   return c.json({ ok: true });

@@ -232,7 +232,7 @@ export async function insertStyleStarterItems(
     } else if (item.kind === 'form') {
       if(!item.formTarget) throw new StyleError('invalid_initial_form');
       const definition=await initialFormLayout(db,account,style,item.formTarget),layout=JSON.stringify(definition);
-      statements.push(...initialFormScopeGuards(db,account,definition), ...await mediaDeletionTextGuardStatements(db,[layout]));
+      statements.push(...initialFormScopeGuards(db,account,definition), ...await mediaDeletionTextGuardStatements(db,[layout],[account]));
       statements.push(db.prepare(`INSERT INTO forms(id,name,description,fields,layout,is_active,save_to_metadata) VALUES(?,?,?,'[]',?,0,0)`)
         .bind(id,item.name,null,layout),
         db.prepare('INSERT INTO form_accounts(form_id,line_account_id) VALUES(?,?)').bind(id,account), ...formMediaUsageStatements(db, id));
@@ -394,7 +394,7 @@ export async function insertStyleStarterItems(
           .bind(answers.image.resourceId, account)
           .first<{ image_r2_key: string; image_content_type: string | null }>();
         if (!image) throw new StyleError('image_not_found', 404);
-        statements.push(...await mediaDeletionTextGuardStatements(db,[image.image_r2_key]));
+        statements.push(...await mediaDeletionTextGuardStatements(db,[image.image_r2_key],[account]));
         statements.push(
           db
             .prepare(
@@ -467,7 +467,7 @@ export async function insertStyleStarterItems(
     );
     statements.push(
       recordSnapshot(db, account, style, item.key, item.kind, id),
-      ...await mediaDeletionTextGuardStatements(db,[JSON.stringify(item)]),
+      ...await mediaDeletionTextGuardStatements(db,[JSON.stringify(item)],[account]),
     );
     inserted.push({
       key: item.key,

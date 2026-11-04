@@ -1,4 +1,5 @@
 import { isMediaDeletionConflict, mediaDeletionGuardStatements, mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
+import { mediaTenantGuardByQuery } from '@line-crm/db/src/media/deletion-guard.js';
 import { restaurantMenuImageDeleting, validRestaurantMenuDescription, validRestaurantMenuImage } from './restaurant-menu-media.js';
 import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
 import { normalizePhone } from '@line-crm/shared';
@@ -339,7 +340,7 @@ export const post__api_restaurant_test_menu_10 = async (c: Context<Env, "/api/re
   const id = crypto.randomUUID();
   const db = dbFor(c.env, body.storeId);
   const write = db.prepare('INSERT INTO rt_menu_items (id, store_id, kind, name, price, allergens_json, service_periods_json, status, description, image_media_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, body.storeId, body.kind, body.name.trim(), price, JSON.stringify(body.allergens || []), JSON.stringify(body.servicePeriods || ['dinner']), status, body.description?.trim() || null, body.imageMediaId ?? null);
-  try { await db.batch([...mediaDeletionGuardStatements(db, [body.imageMediaId ?? null]), write]); }
+  try { await db.batch([...mediaDeletionGuardStatements(db, [body.imageMediaId ?? null]), ...mediaTenantGuardByQuery(db, [body.imageMediaId ?? null], 'SELECT line_account_id AS account_id FROM rt_stores WHERE id=?', [body.storeId]), write]); }
   catch (error) {
     if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
     throw error;
@@ -463,7 +464,7 @@ export const put__api_restaurant_test_followups_storeId_steps_stepId_messages_16
    WHERE id=? AND EXISTS(SELECT 1 FROM rt_store_followup_templates t WHERE t.store_id=? AND t.scenario_id=scenario_steps.scenario_id AND t.template_version=?)`)
    .bind(JSON.stringify(body.messageBubbles),parts[0].messageType,parts[0].messageContent,stepId,storeId,body.expectedVersion);
  let changed: D1Result;
- try { [changed]=await db.batch([update,...await mediaDeletionTextGuardStatements(db,[JSON.stringify(body.messageBubbles)])]); }
+ try { [changed]=await db.batch([update,...await mediaDeletionTextGuardStatements(db,[JSON.stringify(body.messageBubbles)],[target.line_account_id])]); }
  catch(error) { if(isMediaDeletionConflict(error))return c.json({success:false,error:'画像が削除中のため使用できません。'},409);throw error; }
  if(!changed.meta.changes)return c.json({success:false,error:'version_conflict'},409);
  await refreshScenarioReferences(db,target.scenario_id);

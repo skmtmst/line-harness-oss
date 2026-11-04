@@ -1,5 +1,5 @@
 import { jstNow } from '../utils.js';
-import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
+import { mediaContentDeletionGuard, mediaTenantGuardByQuery } from '../media/deletion-guard.js';
 import { type SaveRichMenuGroupDraftInput, type SaveRichMenuGroupDraftResult } from './types.js';
 import { buildMetaSets } from './drafts-groups.js';
 import { loadPageKeepMeta, buildPageReplaceStatements } from './drafts-pages.js';
@@ -115,7 +115,8 @@ export async function setRichMenuPageImage(
       `UPDATE rich_menu_pages SET image_r2_key = ?, image_content_type = ?, updated_at = ? WHERE id = ?`,
     )
     .bind(imageR2Key, imageContentType, jstNow(), pageId);
-  await db.batch([update, ...await mediaContentDeletionGuard(db, [imageR2Key])]);
+  await db.batch([update, ...await mediaContentDeletionGuard(db, [imageR2Key]),
+    ...mediaTenantGuardByQuery(db, [imageR2Key], 'SELECT g.account_id FROM rich_menu_groups g JOIN rich_menu_pages p ON p.group_id=g.id WHERE p.id=?', [pageId])]);
 }
 
 export async function pageBelongsToGroup(

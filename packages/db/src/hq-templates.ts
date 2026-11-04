@@ -1,5 +1,5 @@
 import { validRestaurantCoursesSql } from './forms/course-guard.js';
-import { MEDIA_CONTENT_DELETION_GUARD_SQL, mediaDeletedKeyFingerprintGuard } from './media/deletion-guard.js';
+import { MEDIA_CONTENT_DELETION_GUARD_SQL, mediaDeletedKeyFingerprintGuard, mediaTenantGuardByQuery } from './media/deletion-guard.js';
 import type { HqTemplateVersion } from './hq-template-version-types.js';
 export type { HqTemplateVersion } from './hq-template-version-types.js';
 import type { HqTemplateArchiveStatus } from '@line-crm/shared';
@@ -138,10 +138,12 @@ export function prepareHqTemplatePlan(
 export async function executeHqTemplatePlan(
   db: D1Database,
   plan: HqTemplateStatementPlan,
+  tenantId: string,
 ) {
   const fingerprintGuards: D1PreparedStatement[] = [];
   for (const statement of plan.statements) if (statement.sql === MEDIA_CONTENT_DELETION_GUARD_SQL) {
     fingerprintGuards.push(...await mediaDeletedKeyFingerprintGuard(db, JSON.parse(String(statement.bindings[0])) as string[]));
+    fingerprintGuards.push(...mediaTenantGuardByQuery(db, JSON.parse(String(statement.bindings[0])) as string[], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenantId]));
   }
   return db.batch([...prepareHqTemplatePlan(db, plan), ...fingerprintGuards]);
 }
@@ -418,7 +420,7 @@ export async function createHqTemplateVersion(
   db: D1Database,
   input: Parameters<typeof buildCreateHqTemplateVersionPlan>[0],
 ): Promise<{ kind: 'created'; version: HqTemplateVersion } | { kind: 'conflict_or_missing' }> {
-  const results = await executeHqTemplatePlan(db, buildCreateHqTemplateVersionPlan(input));
+  const results = await executeHqTemplatePlan(db, buildCreateHqTemplateVersionPlan(input), input.tenantId);
   if ((results[0]?.meta.changes ?? 0) !== 1 || (results[1]?.meta.changes ?? 0) !== 1) {
     return { kind: 'conflict_or_missing' };
   }

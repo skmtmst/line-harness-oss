@@ -1,4 +1,5 @@
 import { mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
+import { mediaTenantGuardByQuery } from '@line-crm/db/src/media/deletion-guard.js';
 import { catalogDetails } from '../services/style-starter-catalog-details.js';
 import type { StarterCatalogKind } from '@line-crm/shared';
 import { listStarterCatalog, saveCatalogStarter } from '../services/style-starter-catalog-save.js';
@@ -246,7 +247,7 @@ styles.put(
           tenant,
           current.version,
         );
-      const [r] = await c.env.DB.batch([statement, ...await mediaDeletionTextGuardStatements(c.env.DB, [JSON.stringify(definition)])]);
+      const [r] = await c.env.DB.batch([statement, ...await mediaDeletionTextGuardStatements(c.env.DB, [JSON.stringify(definition)]), ...mediaTenantGuardByQuery(c.env.DB, [JSON.stringify(definition)], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenant])]);
       if (!r.meta.changes) throw new StyleError('version_conflict', 409);
     } else
       await c.env.DB.batch([c.env.DB.prepare(
@@ -261,7 +262,7 @@ styles.put(
           now,
           c.get('staff').id,
           Number(autoInsert),
-        ), ...await mediaDeletionTextGuardStatements(c.env.DB, [JSON.stringify(definition)])]);
+        ), ...await mediaDeletionTextGuardStatements(c.env.DB, [JSON.stringify(definition)]), ...mediaTenantGuardByQuery(c.env.DB, [JSON.stringify(definition)], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [tenant])]);
     return c.json({
       success: true,
       data: { id, version: (current?.version ?? 0) + 1, autoInsert },

@@ -2,9 +2,9 @@ import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { asD1 } from '../../test/d1-test-helper.js';
-import { RETENTION_TABLES, tenantScopeCondition } from '../data-retention-tables.js';
-import { beginMediaObjectDeletion, claimMediaDeletion, finishMediaDeletion, releaseMediaDeletionLease, releaseUnstartedMediaDeletion } from './deletion-jobs.js';
+import { asD1 } from '../d1-test-helper.js';
+import { RETENTION_TABLES, tenantScopeCondition } from '../../src/data-retention-tables.js';
+import { beginMediaObjectDeletion, claimMediaDeletion, finishMediaDeletion, releaseMediaDeletionLease, releaseUnstartedMediaDeletion } from '../../src/media/deletion-jobs.js';
 
 describe('media deletion job claim', () => {
   it('keys are captured once and an expired owner cannot start object deletion', async () => {
@@ -14,6 +14,7 @@ describe('media deletion job claim', () => {
         CREATE TABLE media_versions(media_id TEXT,r2_key TEXT);
         INSERT INTO media VALUES('m','a','current');
         INSERT INTO media_versions VALUES('m','previous'),('m','current');`);
+      raw.exec('CREATE TABLE banner_images(media_id TEXT,tenant_id TEXT)');
       raw.exec(readFileSync(new URL('../../migrations/762_media_deletion_jobs.sql', import.meta.url), 'utf8'));
       const db = asD1(raw);
       const claim = (owner: string, now: string, leaseUntil: string) => claimMediaDeletion(db, { mediaId: 'm', accountId: 'a', owner, now, leaseUntil });
@@ -50,7 +51,8 @@ it('使用中で削除をやめた場合は指紋を残さない', async () => {
   const raw=new Database(':memory:');
   try {
     raw.exec("CREATE TABLE media(id TEXT PRIMARY KEY,line_account_id TEXT,r2_key TEXT); CREATE TABLE media_versions(media_id TEXT,r2_key TEXT); INSERT INTO media VALUES('m','a','key')");
-    raw.exec(readFileSync(new URL('../../migrations/762_media_deletion_jobs.sql',import.meta.url),'utf8'));
+    raw.exec('CREATE TABLE banner_images(media_id TEXT,tenant_id TEXT)');
+      raw.exec(readFileSync(new URL('../../migrations/762_media_deletion_jobs.sql',import.meta.url),'utf8'));
     const db=asD1(raw);
     expect(await claimMediaDeletion(db,{mediaId:'m',accountId:'a',owner:'o',now:'2026-01-01T00:00:00Z',leaseUntil:'2026-01-01T00:01:00Z'})).not.toBeNull();
     expect(await releaseUnstartedMediaDeletion(db,'m','a','o')).toBe(true);
@@ -61,7 +63,8 @@ it('使用中で削除をやめた場合は指紋を残さない', async () => {
 it('送信中の参照はアカウントの保存期限で消せる', async () => {
   const raw = new Database(':memory:');
   try {
-    raw.exec(readFileSync(new URL('../../migrations/762_media_deletion_jobs.sql', import.meta.url), 'utf8'));
+    raw.exec('CREATE TABLE banner_images(media_id TEXT,tenant_id TEXT)');
+      raw.exec(readFileSync(new URL('../../migrations/762_media_deletion_jobs.sql', import.meta.url), 'utf8'));
     raw.exec("CREATE TABLE line_accounts(id TEXT PRIMARY KEY,tenant_id TEXT); INSERT INTO line_accounts VALUES('a','tenant-a'),('b','tenant-b'); INSERT INTO media_send_claims VALUES('first','m','a','later'),('second','m','b','later')");
     expect(RETENTION_TABLES.media_send_claims.category).toBe('purge');
     raw.prepare(`DELETE FROM media_send_claims WHERE ${tenantScopeCondition('media_send_claims')}`).run('tenant-a');

@@ -366,7 +366,7 @@ export async function retargetMediaUsageReference(
   if (statements.length === (mediaUpdateStatement ? 1 : 0)) {
     throw new MediaUsageReferenceError('media_reference_stale');
   }
-  statements.push(...await mediaContentDeletionGuard(db, [input.media.id]));
+  statements.push(...await mediaContentDeletionGuard(db, [input.media.id], [input.lineAccountId]));
   const results = await db.batch(statements);
   if (mediaUpdateStatement && Number(results[0].meta?.changes ?? 0) !== 1) throw new MediaUsageReferenceError('media_metadata_conflict');
   const changed = results.some((result) => Number(result.meta?.changes ?? 0) > 0);

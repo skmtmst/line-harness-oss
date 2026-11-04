@@ -126,7 +126,7 @@ export async function updateLineAccount(
   const update = db
     .prepare(`UPDATE line_accounts SET ${fields.join(', ')} WHERE id = ?`)
     .bind(...values);
-  await db.batch([update, ...await mediaContentDeletionGuard(db, [updates.og_default_image_url, updates.icon_url])]);
+  await db.batch([update, ...await mediaContentDeletionGuard(db, [updates.og_default_image_url, updates.icon_url], [id])]);
 
   return getLineAccountById(db, id, encryptionKey);
 }
@@ -240,7 +240,7 @@ export async function updateLineAccountFields(
   const update = db
     .prepare(`UPDATE line_accounts SET ${sets.join(', ')} WHERE id = ?`)
     .bind(...binds);
-  await db.batch([update, ...await mediaContentDeletionGuard(db, [input.ogDefaultImageUrl, input.iconUrl, input.linePictureUrl])]);
+  await db.batch([update, ...await mediaContentDeletionGuard(db, [input.ogDefaultImageUrl, input.iconUrl, input.linePictureUrl], [id])]);
 
   return getLineAccountById(db, id, encryptionKey);
 }

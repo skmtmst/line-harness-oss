@@ -188,7 +188,7 @@ it('削除記録の消去後も固定URLとライブURLを登録しない', asyn
   } finally {raw.close();}
 });
 
-it('別統括が持つ画像のURLも、現状はイベントに登録できる', async () => {
+it('別統括が持つ画像のURLはイベントに登録できない', async () => {
   const {db,raw}=createTestD1({loginPolicy:'off'});
   try {
     seed(raw);
@@ -198,8 +198,14 @@ it('別統括が持つ画像のURLも、現状はイベントに登録できる'
       INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key)
         VALUES('foreign-media','account-2','image','image.png','image/png',1,'foreign/known-image.png');`);
     const {app,env}=makeApp(db);
-    const response=await app.request('/api/events/admin/events?account_id=account-1',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer key-owner'},body:JSON.stringify({name:'架空イベント',image_url:'https://example.test/images/foreign/known-image.png'})},env);
-    expect(response.status).toBe(201);
-    expect(raw.prepare("SELECT image_url FROM events WHERE name='架空イベント'").get()).toEqual({image_url:'https://example.test/images/foreign/known-image.png'});
+    for (const image_url of ['https://example.test/images/foreign/known-image.png', 'https://example.test/media/foreign-media/content']) {
+      const response=await app.request('/api/events/admin/events?account_id=account-1',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer key-owner'},body:JSON.stringify({name:'架空イベント',image_url})},env);
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({code:'media_cross_tenant_reference'});
+    }
+    expect(raw.prepare("SELECT image_url FROM events WHERE name='架空イベント'").get()).toBeUndefined();
+    raw.exec("UPDATE line_accounts SET tenant_id='tenant-a' WHERE id='account-2'");
+    const sameTenant=await app.request('/api/events/admin/events?account_id=account-1',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer key-owner'},body:JSON.stringify({name:'同じ統括',image_url:'https://example.test/images/foreign/known-image.png'})},env);
+    expect(sameTenant.status).toBe(201);
   } finally {raw.close();}
 });

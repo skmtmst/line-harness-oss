@@ -160,7 +160,7 @@ export async function updateCommonVar(
         input.actorId ?? null,
         now,
       ),
-      ...await mediaContentDeletionGuard(db, [input.value ?? existing.value, input.fallbackValue]),
+      ...await mediaContentDeletionGuard(db, [input.value ?? existing.value, input.fallbackValue], [lineAccountId]),
     ]);
     if (Number(results[0]?.meta.changes ?? 0) === 0) {
       throw new CommonVarVersionConflictError(

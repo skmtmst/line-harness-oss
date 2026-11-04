@@ -114,7 +114,7 @@ export async function applyMediaUsageMutation(
        VALUES ${chunk.map(() => '(?, ?, ?, ?)').join(',')}`,
     ).bind(...chunk.flatMap((row) => [row.id, input.refKind, input.refId, scannedAt])));
   }
-  statements.push(...await mediaContentDeletionGuard(db, content));
+  statements.push(...await mediaContentDeletionGuard(db, content, input.lineAccountId ? [input.lineAccountId] : []));
   return db.batch(statements) as Promise<MediaUsageMutationResult[]>;
 }
 

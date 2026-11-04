@@ -1,7 +1,7 @@
 import { jstNow } from '../utils.js';
 import { type FormVersionContent, type PublishFormVersionResult, type PublishedFormVersion } from './types.js';
 import { getFormById } from './reads.js';
-import { formMediaUsageStatements } from './media-references.js';
+import { formMediaUsageStatements, formMediaTenantGuard, formMediaValuesGuard } from './media-references.js';
 import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 
 
@@ -113,6 +113,8 @@ export async function publishFormVersion(
           )`,
     ).bind(versionId, now, id, expectedContentRevision, versionId),
     ...formMediaUsageStatements(db, id),
+    ...formMediaTenantGuard(db, id),
+    ...formMediaValuesGuard(db, id, [existing.fields, existing.layout, existing.on_submit_message_content, existing.og_image_url]),
     ...await mediaContentDeletionGuard(db, [existing.fields, existing.layout, existing.on_submit_message_content, existing.og_image_url]),
   ]);
 

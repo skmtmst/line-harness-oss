@@ -578,7 +578,7 @@ async function applyFriendField(
   if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`)
   const input = { friendId, fieldId: c.fieldId, value: checked.value, updatedBy: 'scenario', field: target }
   if (effectKey && (c.op === 'add' || c.op === 'sub')) {
-    await commitNumericEffect(db, friendId, effectKey, friendFieldValueStatements(db, input))
+    await commitNumericEffect(db, friendId, effectKey, await friendFieldValueStatements(db, input))
   } else await setFriendFieldValue(db, input)
 }
 

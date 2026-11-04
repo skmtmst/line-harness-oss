@@ -115,7 +115,7 @@ export async function createCustomerNotificationDefinition(
       now,
       now,
     );
-    await db.batch([insert, ...await mediaContentDeletionGuard(db, [JSON.stringify(input.draftConfig)])]);
+    await db.batch([insert, ...await mediaContentDeletionGuard(db, [JSON.stringify(input.draftConfig)], [input.lineAccountId])]);
   } catch (error) {
     if (error instanceof Error && /UNIQUE/i.test(error.message)) {
       throw new LineNotificationError('duplicate_key', '同じキーのお知らせが既にあります');
@@ -158,7 +158,7 @@ export async function updateCustomerNotificationDraft(
     input.lineAccountId,
     input.expectedVersion,
   );
-  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [JSON.stringify(input.draftConfig)])]);
+  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [JSON.stringify(input.draftConfig)], [input.lineAccountId])]);
   if (!Number(result.meta.changes ?? 0)) {
     throw new LineNotificationError('version_conflict', 'ほかの担当者が先に変更しました');
   }
@@ -211,7 +211,7 @@ export async function publishCustomerNotificationDefinition(
         input.lineAccountId,
         input.expectedVersion,
       ),
-      ...await mediaContentDeletionGuard(db, [current.definition.draft_config_json]),
+      ...await mediaContentDeletionGuard(db, [current.definition.draft_config_json], [input.lineAccountId]),
     ]);
   } catch (error) {
     if (error instanceof Error && /UNIQUE/i.test(error.message)) {

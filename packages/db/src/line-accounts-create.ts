@@ -94,7 +94,7 @@ export async function createLineAccount(
                 VALUES (?, ?, ?, ?, ?, ?)`).bind(
       crypto.randomUUID(), id, SPECIALIZED_CATALOG_SETTING_KEY, '[]', now, now,
     ),
-    ...await mediaContentDeletionGuard(db, [input.ogDefaultImageUrl, input.linePictureUrl]),
+    ...await mediaContentDeletionGuard(db, [input.ogDefaultImageUrl, input.linePictureUrl], [id]),
   ]);
 
   return (await getLineAccountById(db, id, encryptionKey))!;

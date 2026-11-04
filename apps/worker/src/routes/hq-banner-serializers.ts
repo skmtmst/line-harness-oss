@@ -85,7 +85,7 @@ export function serializeMedia(m: Media, base: string) {
     sizeBytes: m.size_bytes,
     width: m.width,
     height: m.height,
-    url: m.public_url ?? `${base}/images/${m.r2_key}`,
+    url: m.r2_key.startsWith('missing-banner/') || m.r2_key.startsWith('missing-banner-delivery/') ? '' : m.public_url ?? `${base}/images/${m.r2_key}`,
   };
 }
 

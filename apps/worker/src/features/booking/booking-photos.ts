@@ -1,4 +1,4 @@
-import { isMediaDeletionConflict, mediaDeletionGuardStatements } from '../media/deletion-guard.js';
+import { isMediaDeletionConflict, isMediaTenantConflict, mediaDeletionGuardStatements } from '../media/deletion-guard.js';
 import { BOOKING_STORE_PHOTO_SLOTS, type BookingPhoto, type BookingPhotoCatalog, type BookingPhotoOwner, type BookingStorePhotoSlot, type BookingStorePhotoVisibility, type BookingStorePhotosWrite } from '@line-crm/shared';
 import { recordMenuVersion } from '@line-crm/db';
 
@@ -104,10 +104,11 @@ export async function saveBookingPhoto(db: D1Database, accountId: string, owner:
     .bind(mediaId, id, accountId, expectedVersion);
   let result: D1Result;
   try {
-    const writes = await db.batch([...mediaDeletionGuardStatements(db, [mediaId]), write]);
+    const writes = await db.batch([...mediaDeletionGuardStatements(db, [mediaId], [accountId]), write]);
     result = writes[writes.length - 1]!;
   } catch (error) {
     if (isMediaDeletionConflict(error)) throw new BookingPhotoError('media_deletion_in_progress', 409);
+    if (isMediaTenantConflict(error)) throw new BookingPhotoError('media_cross_tenant_reference', 409);
     throw error;
   }
   if (!result.meta.changes) throw new BookingPhotoError('version_conflict', 409);
@@ -127,7 +128,7 @@ export async function saveBookingStorePhotos(db: D1Database, accountId: string, 
       WHERE line_account_id=? AND version=?`)
       .bind(input.photos.exterior, input.photos.interior, input.photos.waiting, JSON.stringify(input.order), accountId, input.expectedVersion);
   // D1 batch 内で直前の CAS の changes だけを見て、競合に負けた処理が勝者の写真を公開・非公開にしないようにする。
-  const guards = mediaDeletionGuardStatements(db, Object.values(input.photos));
+  const guards = mediaDeletionGuardStatements(db, Object.values(input.photos), [accountId]);
   const statements = [...guards, photoWrite];
   if (input.visibility) statements.push(db.prepare(`INSERT INTO account_settings(id,line_account_id,key,value)
     SELECT ?,?,?,? WHERE changes()=1
@@ -137,6 +138,7 @@ export async function saveBookingStorePhotos(db: D1Database, accountId: string, 
   try { saved = (await db.batch(statements))[guards.length]; }
   catch (error) {
     if (isMediaDeletionConflict(error)) throw new BookingPhotoError('media_deletion_in_progress', 409);
+    if (isMediaTenantConflict(error)) throw new BookingPhotoError('media_cross_tenant_reference', 409);
     throw error;
   }
   if (saved?.meta.changes) return input.expectedVersion + 1;

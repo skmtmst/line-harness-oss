@@ -196,7 +196,7 @@ export async function createAutoReplyWithDraftVersion(
       now,
     ),
     ...claimStatements,
-    ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)]),
+    ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)], settings.lineAccountId ? [settings.lineAccountId] : []),
     ]);
   } catch (err) {
     // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
@@ -277,7 +277,7 @@ export async function saveAutoReplyDraftVersion(
             SET current_draft_version_id = ?
           WHERE id = ?`,
       ).bind(versionId, autoReplyId),
-      ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)]),
+      ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)], settings.lineAccountId ? [settings.lineAccountId] : []),
     ]);
     draft = await getAutoReplyVersionById(db, versionId);
     if (draft) {
@@ -299,7 +299,7 @@ export async function saveAutoReplyDraftVersion(
               last_tested_by_staff_id = NULL, updated_at = ?
         WHERE id = ? AND status = 'draft'`,
     ).bind(settings.lineAccountId, JSON.stringify(settings), now, draft.id);
-    await db.batch([update, ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)])]);
+    await db.batch([update, ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)], settings.lineAccountId ? [settings.lineAccountId] : [])]);
   } else {
     // 版番号の条件を含めた1文の更新。読取と書込のあいだの割込みは
     // 反映行数 0 になり、競合として検出する。
@@ -317,7 +317,7 @@ export async function saveAutoReplyDraftVersion(
       draft.id,
       Number(expectedVersion),
     );
-    const [applied] = await db.batch([update, ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)])]);
+    const [applied] = await db.batch([update, ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)], settings.lineAccountId ? [settings.lineAccountId] : [])]);
     if ((applied?.meta?.changes ?? 0) !== 1) {
       throw new Error('AUTO_REPLY_VERSION_CONFLICT');
     }

@@ -1,4 +1,4 @@
-import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
+import { mediaContentDeletionGuard, mediaTenantGuardByQuery } from '../media/deletion-guard.js';
 import { jstNow } from '../utils.js';
 import { getAccountSetting, getVersionedAccountSetting } from '../account-settings.js';
 import { type CommonVarSchedule } from './types.js';
@@ -43,6 +43,7 @@ export async function createCommonVarSchedule(
     db.prepare(`INSERT INTO common_var_schedules (id, var_id, effective_from, value, applied_at)
        VALUES (?, ?, ?, ?, NULL)`).bind(id, input.varId, input.effectiveFrom, input.value),
     ...await mediaContentDeletionGuard(db, [input.value]),
+    ...mediaTenantGuardByQuery(db, [input.value], 'SELECT line_account_id AS account_id FROM common_vars WHERE id=?', [input.varId]),
   ]);
   return (await db
     .prepare(`SELECT * FROM common_var_schedules WHERE id = ?`)

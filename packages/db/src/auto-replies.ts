@@ -191,7 +191,7 @@ export async function createAutoReply(
     ...memoPlanned.statements,
     ...refStatements,
     ...claimStatements,
-    ...await mediaContentDeletionGuard(db, [created.response_content, created.actions_json]),
+    ...await mediaContentDeletionGuard(db, [created.response_content, created.actions_json], created.line_account_id ? [created.line_account_id] : []),
     ]);
   } catch (err) {
     // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
@@ -393,7 +393,7 @@ export async function updateAutoReply(
     ),
     ...memoPlanned.statements,
     ...refStatements,
-    ...await mediaContentDeletionGuard(db, [merged.response_content, merged.actions_json]),
+    ...await mediaContentDeletionGuard(db, [merged.response_content, merged.actions_json], merged.line_account_id ? [merged.line_account_id] : []),
   ]);
 
   return getAutoReplyById(db, id);
@@ -482,8 +482,8 @@ export async function restoreAutoReply(
   db: D1Database,
   id: string,
 ): Promise<AutoReply | null> {
-  const before = await db.prepare('SELECT response_content, actions_json FROM auto_replies WHERE id = ? AND deleted_at IS NOT NULL')
-    .bind(id).first<{ response_content: string; actions_json: string | null }>();
+  const before = await db.prepare('SELECT response_content, actions_json, line_account_id FROM auto_replies WHERE id = ? AND deleted_at IS NOT NULL')
+    .bind(id).first<{ response_content: string; actions_json: string | null; line_account_id: string | null }>();
   const versions = await db.prepare('SELECT definition_snapshot FROM auto_reply_versions WHERE auto_reply_id = ?')
     .bind(id).all<{ definition_snapshot: string }>();
   const update = db
@@ -493,7 +493,7 @@ export async function restoreAutoReply(
         WHERE id = ? AND deleted_at IS NOT NULL`,
     )
     .bind(id);
-  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [before?.response_content, before?.actions_json, ...versions.results.map((version) => version.definition_snapshot)])]);
+  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [before?.response_content, before?.actions_json, ...versions.results.map((version) => version.definition_snapshot)], before?.line_account_id ? [before.line_account_id] : [])]);
   if ((result?.meta.changes ?? 0) !== 1) return null;
   return db
     .prepare(`SELECT * FROM auto_replies WHERE id = ?`)

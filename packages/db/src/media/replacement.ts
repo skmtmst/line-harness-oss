@@ -218,7 +218,7 @@ export async function applyMediaReplacementPlan(
     ).bind(sourceId, ...binds));
   }
 
-  statements.push(...await mediaContentDeletionGuard(db, [plan.replacement.id]));
+  statements.push(...await mediaContentDeletionGuard(db, [plan.replacement.id], [lineAccountId]));
   const results = await db.batch(statements);
   // 末尾はmedia_usagesの付け替えなので、本文を書き換えた件数だけ数える。
   const changedRows = results.slice(0, contentStatementCount)

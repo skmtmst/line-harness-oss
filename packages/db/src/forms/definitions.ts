@@ -3,7 +3,7 @@ import { jstNow } from '../utils.js';
 import { type FormDeleteImpact, type FormImpactRow, type FormImpactReferenceRow, type FormDeleteReference, type Form, type CreateFormInput, type FormLatestEdit, type UpdateFormInput, type UpdateFormResult } from './types.js';
 import { getFormById, attachFormAccounts } from './reads.js';
 import { publishFormVersion } from './versions.js';
-import { formMediaUsageStatements } from './media-references.js';
+import { formMediaUsageStatements, formMediaTenantGuard, formMediaValuesGuard } from './media-references.js';
 import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 
 import { validRestaurantCoursesSql } from './course-guard.js';
@@ -198,7 +198,7 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
         input.fields,
         input.layout ?? null,
       );
-    const [created] = await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.fields, input.layout, input.onSubmitMessageContent, input.ogImageUrl])]);
+    const [created] = await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.fields, input.layout, input.onSubmitMessageContent, input.ogImageUrl], input.lineAccountIds ?? [])]);
     if (!created?.meta.changes) throw new Error('restaurant_course_unavailable');
 
     await attachFormAccounts(db, id, input.lineAccountIds ?? []);
@@ -298,9 +298,10 @@ export async function updateForm(
       'layout' in input ? (input.layout ?? null) : existing.layout,
     );
 
+  const valuesGuard=formMediaValuesGuard(db,id,[input.fields,input.layout,input.onSubmitMessageContent,input.ogImageUrl]);
   const result=actorId?(await db.batch([update,db.prepare(`INSERT INTO audit_events(id,source_kind,source_id,tenant_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json,created_at)
     SELECT ?,'form_draft_save',?,COALESCE(s.tenant_id,'${DEFAULT_TENANT_ID}'),'business',s.id,s.role,'form.draft_saved','form',?,'success',json_object('contentRevision',?,'staffName',s.name),? FROM staff_members s WHERE s.id=? AND s.is_active=1 AND changes()=1`)
-    .bind(crypto.randomUUID(),JSON.stringify([id,expectedContentRevision+1]),id,expectedContentRevision+1,now,actorId), ...formMediaUsageStatements(db, id), ...await mediaContentDeletionGuard(db, [input.fields, input.layout, input.onSubmitMessageContent, input.ogImageUrl])]))[0]:(await db.batch([update, ...formMediaUsageStatements(db, id), ...await mediaContentDeletionGuard(db, [input.fields, input.layout, input.onSubmitMessageContent, input.ogImageUrl])]))[0];
+    .bind(crypto.randomUUID(),JSON.stringify([id,expectedContentRevision+1]),id,expectedContentRevision+1,now,actorId), ...formMediaUsageStatements(db, id), ...formMediaTenantGuard(db, id), ...valuesGuard, ...await mediaContentDeletionGuard(db, [input.fields, input.layout, input.onSubmitMessageContent, input.ogImageUrl])]))[0]:(await db.batch([update, ...formMediaUsageStatements(db, id), ...formMediaTenantGuard(db, id), ...valuesGuard, ...await mediaContentDeletionGuard(db, [input.fields, input.layout, input.onSubmitMessageContent, input.ogImageUrl])]))[0];
 
   if ((result.meta?.changes ?? 0) !== 1) {
     const valid = await db.prepare(`SELECT ${validRestaurantCoursesSql} AS valid`)

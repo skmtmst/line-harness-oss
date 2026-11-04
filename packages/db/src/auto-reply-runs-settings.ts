@@ -246,7 +246,7 @@ export async function planAutoReplyInternalMemoStatements(
               SET definition_snapshot = ?, updated_at = ?
             WHERE id = ?`,
         ).bind(JSON.stringify(snapshot), now, draft.id),
-        ...await mediaContentDeletionGuard(db, [JSON.stringify(snapshot)]),
+        ...await mediaContentDeletionGuard(db, [JSON.stringify(snapshot)], rule.line_account_id ? [rule.line_account_id] : []),
       ],
       draftUpdated: true,
       versionId: draft.id,
@@ -294,7 +294,7 @@ export async function planAutoReplyInternalMemoStatements(
       db.prepare(
         `UPDATE auto_replies SET current_published_version_id = ? WHERE id = ?`,
       ).bind(versionId, rule.id),
-      ...await mediaContentDeletionGuard(db, [snapshot]),
+      ...await mediaContentDeletionGuard(db, [snapshot], rule.line_account_id ? [rule.line_account_id] : []),
     ],
     draftUpdated: false,
   };

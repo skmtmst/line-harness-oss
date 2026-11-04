@@ -1,4 +1,4 @@
-import { isMediaDeletionConflict, mediaDeletionGuardStatements } from '../features/media/deletion-guard.js';
+import { isMediaDeletionConflict, isMediaTenantConflict, mediaDeletionGuardStatements } from '../features/media/deletion-guard.js';
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -34,8 +34,8 @@ lineSenders.post('/api/line-accounts/:id/senders',async c=>{
   try {
    const write=c.env.DB.prepare(`INSERT INTO line_senders(id,account_id,name,icon_media_id,icon_url,visibility,owner_staff_id,created_by,updated_at,idempotency_key,request_json)
     VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,idempotency_key) DO NOTHING`).bind(crypto.randomUUID(),account,String(b.name).trim(),icon?.id??null,icon?.url??null,b.visibility,owner,staff.id,new Date().toISOString(),key,canonical);
-   await c.env.DB.batch([...mediaDeletionGuardStatements(c.env.DB,[icon?.id??null]),write]);
-  } catch(e) {if(isMediaDeletionConflict(e)) throw new GapError('media_deletion_in_progress',409);if(String(e).includes('sender_limit')) throw new GapError('sender_limit',409);throw e;}
+   await c.env.DB.batch([...mediaDeletionGuardStatements(c.env.DB,[icon?.id??null],[account]),write]);
+  } catch(e) {if(isMediaDeletionConflict(e)) throw new GapError('media_deletion_in_progress',409);if(isMediaTenantConflict(e))throw new GapError('別の統括の画像は使用できません',409);if(String(e).includes('sender_limit')) throw new GapError('sender_limit',409);throw e;}
   row=await c.env.DB.prepare('SELECT * FROM line_senders WHERE account_id=? AND idempotency_key=?').bind(account,key).first<SenderRow>();
  }
  if(!row||row.request_json!==canonical) throw new GapError('idempotency_conflict',409);
@@ -52,8 +52,8 @@ lineSenders.on(['PUT','DELETE'],'/api/line-accounts/:id/senders/:senderId',async
  const write=c.env.DB.prepare(`UPDATE line_senders SET name=?,icon_media_id=?,icon_url=?,status=?,version=version+1,updated_at=? WHERE id=? AND account_id=? AND version=?`)
  .bind(remove?r.name:String(b.name).trim(),remove?r.icon_media_id:icon?.id??null,remove?r.icon_url:icon?.url??null,remove?'inactive':r.status,new Date().toISOString(),r.id,account,version);
  let result:D1Result;
- try {const writes=await c.env.DB.batch([...mediaDeletionGuardStatements(c.env.DB,[remove?null:icon?.id??null]),write]);result=writes[writes.length-1]!;}
- catch(e) {if(isMediaDeletionConflict(e)) throw new GapError('media_deletion_in_progress',409);throw e;}
+ try {const writes=await c.env.DB.batch([...mediaDeletionGuardStatements(c.env.DB,[remove?null:icon?.id??null],[account]),write]);result=writes[writes.length-1]!;}
+ catch(e) {if(isMediaDeletionConflict(e)) throw new GapError('media_deletion_in_progress',409);if(isMediaTenantConflict(e))throw new GapError('別の統括の画像は使用できません',409);throw e;}
  if(!result.meta.changes) throw new GapError('version_conflict',409);
  return c.json({success:true,data:senderResponse((await c.env.DB.prepare('SELECT * FROM line_senders WHERE id=?').bind(r.id).first<SenderRow>())!)});
 });

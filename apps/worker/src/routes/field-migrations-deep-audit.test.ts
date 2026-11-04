@@ -201,6 +201,16 @@ it('受付時に移行対象の画像が削除中なら、実行を開始せず4
   expect(runRow(p.runId!)?.status).toBe('previewed');
 });
 
+it('受付時に別統括の画像が含まれれば実行を開始せず409を返す', async () => {
+  sqlite.exec("UPDATE friend_fields SET type_v6='image' WHERE id='ff-dst'; INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES('other-image','acc-other','image','x.png','image/png',1,'other-key')");
+  const app = setupApp(); const p = await preview(app);
+  sqlite.prepare("UPDATE field_migration_items SET converted_value='other-image',status='convertible' WHERE run_id=? AND friend_id='f-1'").run(p.runId);
+  const res = await app.request(...Object.values(jpost(`/api/friend-fields/ff-src/migrations${A}`, {previewToken:p.token}, OWNER_KEY, {'Idempotency-Key':'foreign-race'})) as [string, RequestInit]);
+  expect(res.status).toBe(409);
+  expect(await res.json()).toMatchObject({code:'media_cross_tenant_reference'});
+  expect(runRow(p.runId!)?.status).toBe('previewed');
+});
+
 // D038: 事前確認の途中で項目の書き込みに失敗したら、run も残さない。
 // status=previewed の run だけが残ると、誰も使わない記録がたまる。
 describe('D038 移行の事前確認の孤児run', () => {

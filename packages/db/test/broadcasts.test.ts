@@ -21,6 +21,18 @@ describe('createBroadcast', () => {
     db = asD1(sqlite);
   });
 
+  test('複数店舗への配信に別統括の画像が混ざれば保存を戻す', async () => {
+    sqlite.exec(`INSERT INTO tenants(id,name) VALUES('t1','A'),('t2','B');
+      INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id)
+        VALUES('a','a','A','x','x','t1'),('b','b','B','x','x','t2');
+      INSERT INTO media(id,line_account_id,r2_key,filename,mime_type,size_bytes,kind)
+        VALUES('m','a','media/image.png','image.png','image/png',1,'image');`);
+    await expect(createBroadcast(db, { id:'foreign-broadcast', title:'仮', messageType:'text',
+      messageContent:'https://example.test/media/image.png', targetType:'multi-account-dedup',
+      lineAccountId:'a', accountIds:['a','b'] })).rejects.toThrow('media_cross_tenant_reference');
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM broadcasts WHERE id='foreign-broadcast'").get()).toEqual({n:0});
+  });
+
   test('persists a caller-supplied stable id and account fields atomically', async () => {
     const id = '11111111-2222-4333-8444-555555555555';
     const result = await createBroadcast(db, {

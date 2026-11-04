@@ -415,7 +415,7 @@ async function insertChange(
       nowIso(),
       nowIso(),
     );
-  await db.batch([insert, ...mediaDeletionGuardStatements(db, [input.mediaId ?? null])]);
+  await db.batch([insert, ...mediaDeletionGuardStatements(db, [input.mediaId ?? null], [store.lineAccountId])]);
   return (await changeFor(c, store.id, id))!;
 }
 

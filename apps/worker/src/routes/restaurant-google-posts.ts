@@ -1,5 +1,6 @@
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { isMediaDeletionConflict, mediaDeletionGuardStatements, mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
+import { mediaTenantGuardByQuery } from '@line-crm/db/src/media/deletion-guard.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-errors.js';
 /**
@@ -343,7 +344,7 @@ async function insertDraft(c: Context<Env>, store: StoreContext, input: DraftInp
       staff?.id ?? null,
       staff?.name ?? null,
     );
-  await db.batch([insert, ...mediaDeletionGuardStatements(db, [input.mediaId, input.mediaOriginalId, input.instagram.enabled ? input.instagram.mediaId : null, input.instagram.enabled ? input.instagram.originalMediaId : null])]);
+  await db.batch([insert, ...mediaDeletionGuardStatements(db, [input.mediaId, input.mediaOriginalId, input.instagram.enabled ? input.instagram.mediaId : null, input.instagram.enabled ? input.instagram.originalMediaId : null], [store.lineAccountId])]);
   return (await postFor(c, store.id, id))!;
 }
 
@@ -378,7 +379,7 @@ async function updateDraft(c: Context<Env>, store: StoreContext, id: string, inp
       id,
       store.id,
     );
-  await db.batch([update, ...mediaDeletionGuardStatements(db, [input.mediaId, input.mediaOriginalId, input.instagram.enabled ? input.instagram.mediaId : null, input.instagram.enabled ? input.instagram.originalMediaId : null])]);
+  await db.batch([update, ...mediaDeletionGuardStatements(db, [input.mediaId, input.mediaOriginalId, input.instagram.enabled ? input.instagram.mediaId : null, input.instagram.enabled ? input.instagram.originalMediaId : null], [store.lineAccountId])]);
 }
 
 type PostStatusPatch = Partial<{ status: PostStatus; error: string | null; requestId: string | null; sentAt: string | null; publishedAt: string | null; checkedAt: string | null; deletedAt: string | null; contentFingerprint: string | null; googlePostName: string | null; googleState: string | null; searchUrl: string | null; googleCreateTime: string | null; googleUpdateTime: string | null; origin: 'admin' | 'google'; mediaJson: string; instagramStatus: PostRow['instagram_status']; instagramPermalink: string | null; instagramError: string | null; instagramPublishedAt: string | null }>;
@@ -418,7 +419,8 @@ async function setStatusForEnv(env: Env['Bindings'], storeId: string, id: string
     .prepare(`UPDATE rt_google_posts SET ${sets.join(', ')} WHERE id = ? AND store_id = ?`)
     .bind(...values);
   if (patch.mediaJson === undefined) await update.run();
-  else await db.batch([update, ...await mediaDeletionTextGuardStatements(db, [patch.mediaJson])]);
+  else await db.batch([update, ...await mediaDeletionTextGuardStatements(db, [patch.mediaJson]),
+    ...mediaTenantGuardByQuery(db, [patch.mediaJson], 'SELECT line_account_id AS account_id FROM rt_stores WHERE id=?', [storeId])]);
 }
 
 async function setStatus(c: Context<Env>, storeId: string, id: string, patch: PostStatusPatch): Promise<void> {
@@ -625,7 +627,8 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
         now,
         stateStatus === 'published' ? now : null,
       );
-    await db.batch([insert, ...await mediaDeletionTextGuardStatements(db, [mediaJson])]);
+    await db.batch([insert, ...await mediaDeletionTextGuardStatements(db, [mediaJson]),
+      ...mediaTenantGuardByQuery(db, [mediaJson], 'SELECT line_account_id AS account_id FROM rt_stores WHERE id=?', [storeId])]);
   }
 
   // Google側から消えた公開済み投稿を検知する。

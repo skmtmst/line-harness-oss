@@ -3,7 +3,7 @@ export {getBannerUsageToday,countRecentFailedBannerGenerations,getBannerUsageThi
 import { sqlIdSet } from './id-queries.js';
 import { readHqBannerFolderAssignment } from './hq-folders.js';
 import { jstNow } from './utils.js';
-import { mediaContentDeletionGuard } from './media/deletion-guard.js';
+import { mediaContentDeletionGuard, mediaTenantGuardByQuery } from './media/deletion-guard.js';
 import type { Media } from './media/primitives/index.js';
 
 /**
@@ -452,7 +452,8 @@ export async function createBannerImage(
       input.createdBy ?? null,
       jstNow(),
     );
-  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.mediaId])]);
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.mediaId]),
+    ...mediaTenantGuardByQuery(db, [input.mediaId], 'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?', [input.tenantId])]);
   return (await getBannerImage(db, id, input.tenantId))!;
 }
 
@@ -681,7 +682,7 @@ export async function createBannerImageDelivery(
        VALUES (?, ?, ?, ?, ?, ?)`,
     )
     .bind(id, input.bannerImageId, input.lineAccountId, input.mediaId, input.deliveredBy ?? null, now);
-  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.mediaId])]);
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.mediaId], [input.lineAccountId])]);
   return {
     id,
     banner_image_id: input.bannerImageId,

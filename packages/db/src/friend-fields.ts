@@ -1,6 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { friendFieldReminderTargetStatements } from './reminders/index.js';
 import { jstNow } from './utils.js';
+import { mediaContentDeletionGuard, mediaTenantGuardByQuery } from './media/deletion-guard.js';
 import { ageFromBirthday, allergyValues, validateAllergyValues, DEFAULT_ALLERGY_OPTIONS } from '@line-crm/shared';
 
 /** 移行前の情報欄を所属させる既定テナント。既存IDと値は変えない。 */
@@ -964,10 +965,23 @@ export function validateFriendFieldValue(
  * 空文字は行を消す。「空欄にした」と「一度も入れていない」を分けても
  * 画面上は同じ見え方になり、分けた分だけ判定が増えるため。
  */
-export function friendFieldValueStatements(
+export function friendMediaCandidate(value: string | null, type?: string): string | null {
+  if (!value) return null;
+  return !type || type === 'image' || type === 'pdf' || /https?:\/\/|\/(?:media|images)\/|\bmedia\//i.test(value) ? value : null;
+}
+
+export function friendMediaIdGuards(db:D1Database, entries:Array<{value:string|null;type?:string}>):D1PreparedStatement[] {
+  const ids=[...new Set(entries.filter(entry=>entry.value && (entry.type==='image'||entry.type==='pdf') && !/^(?:https?:\/\/|\/|media\/|images\/)/i.test(entry.value))
+    .map(entry=>entry.value!))];
+  if (!ids.length) return [];
+  return [db.prepare(`INSERT INTO media_deletion_guards(blocked) SELECT 1 WHERE EXISTS(SELECT 1 FROM json_each(?) ids
+    WHERE NOT EXISTS(SELECT 1 FROM media m WHERE m.id=ids.value) OR EXISTS(SELECT 1 FROM media_deletion_jobs j WHERE j.media_id=ids.value))`).bind(JSON.stringify(ids))];
+}
+
+export async function friendFieldValueStatements(
   db: D1Database,
   input: { friendId: string; fieldId: string; value: string | null; updatedBy: string; field?: FriendFieldValueCheckTarget; sourceType?: string; sourceId?: string },
-): D1PreparedStatement[] {
+): Promise<D1PreparedStatement[]> {
   let value = input.value;
   if (input.field) {
     const checked = validateFriendFieldValue(input.field, value);
@@ -975,6 +989,8 @@ export function friendFieldValueStatements(
     value = checked.value;
   }
   const now = jstNow();
+  const fieldType = input.field?.type ?? (value ? (await db.prepare('SELECT COALESCE(type_v8,type_v6,type) AS type FROM friend_fields WHERE id=?').bind(input.fieldId).first<{type:string}>())?.type : undefined);
+  const mediaValue = friendMediaCandidate(value,fieldType);
   const statement = value === null || value === ''
     ? db.prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`).bind(input.friendId, input.fieldId)
     : db.prepare(`INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at, source_type, source_id)
@@ -982,7 +998,8 @@ export function friendFieldValueStatements(
         DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at,
           source_type = excluded.source_type, source_id = excluded.source_id`)
         .bind(input.friendId,input.fieldId,value,input.updatedBy,now,input.sourceType ?? null,input.sourceId ?? null);
-  return [statement, ...friendFieldReminderTargetStatements(db, [{ friendId: input.friendId, fieldId: input.fieldId, value }], now)];
+  return [statement, ...friendFieldReminderTargetStatements(db, [{ friendId: input.friendId, fieldId: input.fieldId, value }], now),
+    ...await mediaContentDeletionGuard(db,[mediaValue]), ...friendMediaIdGuards(db,[{value,type:fieldType}]), ...mediaTenantGuardByQuery(db,[mediaValue], 'SELECT line_account_id AS account_id FROM friends WHERE id=?',[input.friendId])];
 }
 
 
@@ -990,7 +1007,7 @@ export async function setFriendFieldValue(
   db: D1Database,
   input: Parameters<typeof friendFieldValueStatements>[1],
 ): Promise<void> {
-  await db.batch(friendFieldValueStatements(db, input));
+  await db.batch(await friendFieldValueStatements(db, input));
 }
 
 /**
@@ -1004,6 +1021,7 @@ export async function setFriendFieldValuesBulk(
   input: {
     fieldId: string;
     entries: Array<{ friendId: string; value: string | null }>;
+    fieldType?: string;
     updatedBy: string;
     now: string;
   },
@@ -1023,8 +1041,11 @@ export async function setFriendFieldValuesBulk(
           )
           .bind(entry.friendId, input.fieldId, entry.value, input.updatedBy, input.now),
   );
+  const mediaValues = input.entries.map(entry=>friendMediaCandidate(entry.value,input.fieldType));
   await db.batch([...statements, ...friendFieldReminderTargetStatements(db,
-    input.entries.map(entry => ({ ...entry, fieldId: input.fieldId })), input.now)]);
+    input.entries.map(entry => ({ ...entry, fieldId: input.fieldId })), input.now),
+    ...await mediaContentDeletionGuard(db,mediaValues), ...friendMediaIdGuards(db,input.entries.map(entry=>({value:entry.value,type:input.fieldType}))),
+    ...mediaTenantGuardByQuery(db,mediaValues, 'SELECT DISTINCT line_account_id AS account_id FROM friends WHERE id IN (SELECT value FROM json_each(?))', [JSON.stringify(input.entries.map(entry=>entry.friendId))])]);
   return statements.length;
 }
 
@@ -1038,7 +1059,7 @@ export async function setFriendFieldValuesForFriend(
   db: D1Database,
   input: {
     friendId: string;
-    entries: Array<{ fieldId: string; value: string | null }>;
+    entries: Array<{ fieldId: string; value: string | null; type?: string }>;
     updatedBy: string;
     now: string;
   },
@@ -1058,8 +1079,11 @@ export async function setFriendFieldValuesForFriend(
           )
           .bind(input.friendId, entry.fieldId, entry.value, input.updatedBy, input.now),
   );
+  const mediaValues = input.entries.map(entry=>friendMediaCandidate(entry.value,entry.type));
   await db.batch([...statements, ...friendFieldReminderTargetStatements(db,
-    input.entries.map(entry => ({ ...entry, friendId: input.friendId })), input.now)]);
+    input.entries.map(entry => ({ ...entry, friendId: input.friendId })), input.now),
+    ...await mediaContentDeletionGuard(db,mediaValues), ...friendMediaIdGuards(db,input.entries),
+    ...mediaTenantGuardByQuery(db,mediaValues, 'SELECT line_account_id AS account_id FROM friends WHERE id=?',[input.friendId])]);
   return statements.length;
 }
 

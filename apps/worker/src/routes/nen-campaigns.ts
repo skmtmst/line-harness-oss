@@ -708,7 +708,7 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireDeliveryAccess('nenCampai
       fields.articleUrl, fields.imageUrl, fields.publishedAt, input.scheduledAt, accountId, input.targetMode,
       input.targetTagId, input.completionEventName, input.completionTagId, input.sourceColumnId, now, now,
     );
-    await c.env.DB.batch([insert, ...await mediaDeletionTextGuardStatements(c.env.DB, [fields.imageUrl])]);
+    await c.env.DB.batch([insert, ...await mediaDeletionTextGuardStatements(c.env.DB, [fields.imageUrl], [accountId])]);
   } catch (error) {
     if (isNenColumnSlugConflict(error)) {
       return c.json({ success: false, error: 'column_already_exists' }, 409);
@@ -1290,7 +1290,7 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
     fields.category, fields.excerpt, fields.introText, fields.articleUrl, fields.imageUrl,
     fields.publishedAt, lineAccountId, now, now,
   );
-  await c.env.DB.batch([insert, ...await mediaDeletionTextGuardStatements(c.env.DB, [fields.imageUrl])]);
+  await c.env.DB.batch([insert, ...await mediaDeletionTextGuardStatements(c.env.DB, [fields.imageUrl], (lineAccountId ?? existing?.line_account_id) ? [lineAccountId ?? existing!.line_account_id!] : [])]);
   return c.json({ success: true, data: { id } });
 });
 

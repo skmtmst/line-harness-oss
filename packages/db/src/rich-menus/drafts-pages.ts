@@ -1,5 +1,5 @@
 import { jstNow } from '../utils.js';
-import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
+import { mediaContentDeletionGuard, mediaTenantGuardByQuery } from '../media/deletion-guard.js';
 import { type RichMenuPageInput, type PageKeepMeta, type RichMenuAreaInput } from './types.js';
 import { buildRichMenuAliasId, buildAreaInsert } from './reads.js';
 
@@ -163,5 +163,6 @@ export async function buildPageReplaceStatements(
   }
 
   stmts.push(...await mediaContentDeletionGuard(db, newPageRecords.map((page) => page.imageR2Key)));
+  stmts.push(...mediaTenantGuardByQuery(db, newPageRecords.map((page) => page.imageR2Key), 'SELECT account_id FROM rich_menu_groups WHERE id=?', [groupId]));
   return stmts;
 }

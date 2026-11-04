@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createMedia, getMediaById } from './index.js';
-import { asD1 as transactionalD1 } from '../../test/d1-test-helper.js';
+import { createMedia, getMediaById } from '../../src/media/index.js';
+import { asD1 as transactionalD1 } from '../d1-test-helper.js';
 import {
   MediaVersionConflictError,
   MediaVersionIncompatibleError,
@@ -15,7 +15,7 @@ import {
   getLatestMediaVersion,
   getMediaUploadSession,
   verifyMediaUploadSession,
-} from './uploads.js';
+} from '../../src/media/uploads.js';
 
 const packageRoot = join(import.meta.dirname, '../..');
 

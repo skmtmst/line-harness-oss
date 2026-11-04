@@ -59,7 +59,7 @@ export async function duplicateNenColumn(
     source.target_mode, source.target_tag_id, source.completion_event_name, source.completion_tag_id,
     input.id, now, now,
   );
-  await db.batch([insert, ...await mediaDeletionTextGuardStatements(db, [typeof source.image_url === 'string' ? source.image_url : null])]);
+  await db.batch([insert, ...await mediaDeletionTextGuardStatements(db, [typeof source.image_url === 'string' ? source.image_url : null], [input.lineAccountId])]);
   return { id, sourceColumnId: input.id };
 }
 

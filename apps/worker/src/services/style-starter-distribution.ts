@@ -186,7 +186,7 @@ export async function distributeStarter(
           snapshotGuard(db, a.accountId, b.kind, b.target_id, row.snapshot),
         );
       if (b && row.edited && input.editedAction !== 'new_copy') {
-        statements.push(...await mediaDeletionTextGuardStatements(db, [JSON.stringify(item)]));
+        statements.push(...await mediaDeletionTextGuardStatements(db, [JSON.stringify(item)], [a.accountId]));
         statements.push(
           db
             .prepare(

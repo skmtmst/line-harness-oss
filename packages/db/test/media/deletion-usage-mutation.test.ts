@@ -1,13 +1,16 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { asD1 } from '../../test/d1-test-helper.js';
-import { applyMediaUsageMutation } from './definitions-reads.js';
+import { asD1 } from '../d1-test-helper.js';
+import { applyMediaUsageMutation } from '../../src/media/definitions-reads.js';
 
 it.each(['checking', 'completed'])('保存と使用台帳のbatchで削除状態 %s を照合する', async (status) => {
   const sqlite = new Database(':memory:');
   try {
-    sqlite.exec(`CREATE TABLE media(id TEXT,line_account_id TEXT,r2_key TEXT);
+    sqlite.exec(`CREATE TABLE banner_images(media_id TEXT,tenant_id TEXT);
+      CREATE TABLE line_accounts(id TEXT,tenant_id TEXT);
+      INSERT INTO line_accounts VALUES('account','tenant');
+      CREATE TABLE media(id TEXT,line_account_id TEXT,r2_key TEXT);
       CREATE TABLE media_versions(media_id TEXT,r2_key TEXT);
       CREATE TABLE media_usages(media_id TEXT,ref_kind TEXT,ref_id TEXT,scanned_at TEXT);
       CREATE TABLE test_content(id TEXT PRIMARY KEY,body TEXT);
@@ -33,7 +36,9 @@ it.each(['checking', 'completed'])('保存と使用台帳のbatchで削除状態
 it('作業記録が消えたあとも、JSON本文中の古い固定画像URLを拒む', async () => {
   const sqlite=new Database(':memory:');
   try {
-    sqlite.exec(`CREATE TABLE media(id TEXT,line_account_id TEXT,r2_key TEXT);
+    sqlite.exec(`CREATE TABLE banner_images(media_id TEXT,tenant_id TEXT);
+      CREATE TABLE line_accounts(id TEXT,tenant_id TEXT);
+      CREATE TABLE media(id TEXT,line_account_id TEXT,r2_key TEXT);
       CREATE TABLE media_versions(media_id TEXT,r2_key TEXT);
       CREATE TABLE media_usages(media_id TEXT,ref_kind TEXT,ref_id TEXT,scanned_at TEXT);
       CREATE TABLE test_content(id TEXT PRIMARY KEY,body TEXT);`);
@@ -45,4 +50,30 @@ it('作業記録が消えたあとも、JSON本文中の古い固定画像URLを
     await expect(applyMediaUsageMutation(db,{lineAccountId:'new',refKind:'template',refId:'t',searchableContent:[content],mutationStatements:[db.prepare('INSERT INTO test_content VALUES (?,?)').bind('t',content)]})).rejects.toThrow('media_deletion_in_progress');
     expect(sqlite.prepare('SELECT * FROM test_content').all()).toEqual([]);
   } finally {sqlite.close();}
+});
+
+it('本文の確認後に画像の所有統括が変わったら保存と台帳を戻す', async () => {
+  const sqlite = new Database(':memory:');
+  try {
+    sqlite.exec(`CREATE TABLE banner_images(media_id TEXT,tenant_id TEXT);
+      CREATE TABLE line_accounts(id TEXT,tenant_id TEXT);
+      INSERT INTO line_accounts VALUES('a','t1'),('b','t2');
+      CREATE TABLE media(id TEXT,line_account_id TEXT,r2_key TEXT);
+      CREATE TABLE media_versions(media_id TEXT,r2_key TEXT);
+      CREATE TABLE media_usages(media_id TEXT,ref_kind TEXT,ref_id TEXT,scanned_at TEXT);
+      CREATE TABLE test_content(id TEXT PRIMARY KEY,body TEXT);
+      INSERT INTO media VALUES('m','a','object-key');`);
+    sqlite.exec(readFileSync(new URL('../../migrations/762_media_deletion_jobs.sql', import.meta.url), 'utf8'));
+    const actual = asD1(sqlite);
+    const race = { ...actual, batch: async (statements: D1PreparedStatement[]) => {
+      sqlite.prepare("UPDATE media SET line_account_id='b' WHERE id='m'").run();
+      return actual.batch(statements);
+    } } as D1Database;
+    await expect(applyMediaUsageMutation(race, {
+      lineAccountId:'a', refKind:'template', refId:'t', searchableContent:['https://example.test/object-key'],
+      mutationStatements:[race.prepare("INSERT INTO test_content VALUES('t','object-key')")],
+    })).rejects.toThrow('media_cross_tenant_reference');
+    expect(sqlite.prepare('SELECT * FROM test_content').all()).toEqual([]);
+    expect(sqlite.prepare('SELECT * FROM media_usages').all()).toEqual([]);
+  } finally { sqlite.close(); }
 });

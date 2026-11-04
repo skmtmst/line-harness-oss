@@ -150,7 +150,7 @@ export async function createTrackedLink(
           now,
           now,
         );
-      await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.ogImageUrl])]);
+      await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.ogImageUrl], input.lineAccountId ? [input.lineAccountId] : [])]);
       break;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -301,7 +301,7 @@ export async function updateTrackedLink(
        WHERE id = ?`,
     )
     .bind(name, tagId, scenarioId, introTemplateId, rewardTemplateId, lineAccountId, isActive, ogTitle, ogDescription, ogImageUrl, now, id);
-  await db.batch([update, ...await mediaContentDeletionGuard(db, [ogImageUrl])]);
+  await db.batch([update, ...await mediaContentDeletionGuard(db, [ogImageUrl], lineAccountId ? [lineAccountId] : [])]);
 
   return getTrackedLinkById(db, id);
 }

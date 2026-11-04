@@ -212,7 +212,7 @@ export async function createBroadcastMessageAsset(
     `INSERT INTO broadcast_message_assets (id, line_account_id, kind, name, payload_json, folder_id, published_version, published_at, draft_payload_json, draft_revision, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?, 1, ?, ?)`,
   ).bind(id, input.lineAccountId ?? null, input.kind, input.name, input.payloadJson, input.folderId ?? null, input.payloadJson, now, now);
-  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.payloadJson])]);
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.payloadJson], input.lineAccountId ? [input.lineAccountId] : [])]);
   return getBroadcastMessageAsset(db, id);
 }
 
@@ -255,7 +255,7 @@ export async function saveBroadcastMessageAssetDraft(
         SET ${sets.join(', ')}
       WHERE id = ? AND published_version = ? AND draft_revision = ?`,
   ).bind(...values, id, current.published_version ?? 0, current.draft_revision ?? 0);
-  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [draftPayload])]);
+  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [draftPayload], current.line_account_id ? [current.line_account_id] : [])]);
   if ((result.meta.changes ?? 0) === 0) {
     const raced = await getBroadcastMessageAsset(db, id);
     if (!raced) throw new Error('ASSET_NOT_FOUND');
@@ -331,7 +331,7 @@ export async function publishBroadcastMessageAsset(
       `INSERT OR IGNORE INTO broadcast_asset_publish_keys (asset_id, idempotency_key, published_version, draft_revision, draft_fingerprint, payload_json, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ).bind(id, options.idempotencyKey, Number(current.published_version), Number(current.draft_revision ?? 0), fingerprint, current.payload_json, now);
-    await db.batch([insert, ...await mediaContentDeletionGuard(db, [current.payload_json])]);
+    await db.batch([insert, ...await mediaContentDeletionGuard(db, [current.payload_json], current.line_account_id ? [current.line_account_id] : [])]);
     const row = await getBroadcastMessageAsset(db, id);
     return { row: row!, published: false, replayed: false };
   }
@@ -359,7 +359,7 @@ export async function publishBroadcastMessageAsset(
        SELECT ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`,
     ).bind(id, options.idempotencyKey, Number(current.published_version), Number(current.draft_revision ?? 0), fingerprint, draftPayload, now),
   ];
-  const results = await db.batch([...statements, ...await mediaContentDeletionGuard(db, [draftPayload])]);
+  const results = await db.batch([...statements, ...await mediaContentDeletionGuard(db, [draftPayload], current.line_account_id ? [current.line_account_id] : [])]);
   const changed = Number((results[0] as { meta?: { changes?: number } })?.meta?.changes ?? 0);
   if (changed === 0) {
     // 同じ要求の勝者が間に合った場合は当時の結果、それ以外は競合。

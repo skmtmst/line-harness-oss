@@ -16,6 +16,9 @@ export class UnexpectedRouteError extends HTTPException {
  * 障害の識別番号を共通の依頼番号へ接続する。入力や例外の自由文は記録しない。
  */
 export const unhandledWorkerError: ErrorHandler<Env> = (error, c) => {
+  if (String(error).includes('media_cross_tenant_reference')) {
+    return c.json({ success: false, code: 'media_cross_tenant_reference', error: '別の統括の画像は使用できません。別の画像を選んでください。' }, 409);
+  }
   if (isMediaDeletionConflict(error)) {
     return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
   }

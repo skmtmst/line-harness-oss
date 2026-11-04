@@ -1,3 +1,5 @@
+import { mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
+import { mediaTenantGuardByQuery } from '@line-crm/db/src/media/deletion-guard.js';
 import { profile } from '../services/style-profile.js';
 import type { SetupAnswer } from '@line-crm/shared';
 import { materializeInitialMenuAssets } from '../services/style-initial-assets.js';
@@ -60,10 +62,10 @@ styleStarterDistribution.post(path + '/reset', requireRole('owner', 'admin'), as
     b = await json(c);
   if (b.confirmed !== true) throw new StyleError('confirmation_required');
   const current = await c.env.DB.prepare(
-    'SELECT id,version,auto_insert FROM style_starter_sets WHERE tenant_id=? AND style=? AND archived_at IS NULL',
+    'SELECT id,version,auto_insert,definition_json FROM style_starter_sets WHERE tenant_id=? AND style=? AND archived_at IS NULL',
   )
     .bind(tenant, style)
-    .first<{ id: string; version: number; auto_insert: number }>();
+    .first<{ id: string; version: number; auto_insert: number; definition_json: string }>();
   version(b.expectedVersion, current?.version ?? 0);
   // 自分の組が無い統括は、もう標準を使っている。戻す物が無い。
   if (!current) return c.json({ success: true, data: { id: null, version: 0, reset: false, previousId: null } });
@@ -79,6 +81,8 @@ styleStarterDistribution.post(path + '/reset', requireRole('owner', 'admin'), as
     c.env.DB.prepare(
       'UPDATE style_starter_sets SET definition_json=?,version=version+1,updated_at=?,updated_by=? WHERE id=? AND tenant_id=? AND version=? AND archived_at IS NULL',
     ).bind(JSON.stringify(definition), now, c.get('staff').id, current.id, tenant, current.version),
+    ...await mediaDeletionTextGuardStatements(c.env.DB,[current.definition_json,JSON.stringify(definition)]),
+    ...mediaTenantGuardByQuery(c.env.DB,[current.definition_json,JSON.stringify(definition)],'SELECT id AS account_id FROM line_accounts WHERE tenant_id=?',[tenant]),
   ]);
   // 読んだ後にほかの人が保存していたら、写しも作られていない。上書きせずに知らせる。
   if (!updated?.meta.changes) throw new StyleError('version_conflict', 409);

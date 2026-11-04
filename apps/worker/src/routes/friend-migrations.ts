@@ -1,4 +1,6 @@
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { friendMediaCandidate, friendMediaIdGuards } from '@line-crm/db/src/friend-fields.js';
+import { mediaContentDeletionGuard, mediaTenantGuard } from '@line-crm/db/src/media/deletion-guard.js';
 import { logger } from '@line-crm/shared/server';
 import { runJson } from './friend-migration-display.js';
 import { consentRollbackConflicts, suppressionReconciliation } from '@line-crm/db/src/friend-delivery-consents.js';
@@ -1005,6 +1007,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
     const fields = result.rows.some((row) => row.values.friendFields !== undefined)
       ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: job.line_account_id }) : [];
     const statements: D1PreparedStatement[] = [];
+    const mediaEntries: Array<{value:string|null;type:string}> = [];
     let applied = 0;
     for (const row of result.rows) {
       const checked = importFields(row.values.friendFields, fields);
@@ -1030,6 +1033,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
       if (row.kind === 'add' || row.kind === 'update') {
         for (const [key, value] of Object.entries(checked.values)) {
           const field = fields.find((item) => item.field_key === key)!;
+          mediaEntries.push({value,type:field.type});
           const friendSelect = 'SELECT id FROM friends WHERE line_account_id = ? AND line_user_id = ?';
           statements.push(value === null
             ? c.env.DB.prepare(`DELETE FROM friend_field_values WHERE field_id = ? AND friend_id IN (${friendSelect})`).bind(field.id, job.line_account_id, row.lineUid)
@@ -1040,7 +1044,10 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
         }
       }
     }
-    if (statements.length > 0) await c.env.DB.batch(statements);
+    if (statements.length > 0) {
+      const values=mediaEntries.map(entry=>friendMediaCandidate(entry.value,entry.type));
+      await c.env.DB.batch([...statements,...await mediaContentDeletionGuard(c.env.DB,values),...friendMediaIdGuards(c.env.DB,mediaEntries),...mediaTenantGuard(c.env.DB,values,[job.line_account_id])]);
+    }
     await c.env.DB.prepare(`UPDATE friend_import_jobs SET status = 'completed', executed_at = ? WHERE id = ? AND status = 'previewed'`)
       .bind(now, job.id).run();
     return c.json({ success: true, data: { id: job.id, status: 'completed', applied, duplicate: false } });

@@ -235,7 +235,7 @@ export async function createCommonVar(
         crypto.randomUUID(), id, input.name, value, memo,
         status === 'draft' ? '下書きとして作成' : '作成', input.actorId ?? null, now,
       ),
-      ...await mediaContentDeletionGuard(db, [value, input.fallbackValue]),
+      ...await mediaContentDeletionGuard(db, [value, input.fallbackValue], [input.lineAccountId]),
     ]);
   } catch (error) {
     if (error instanceof Error

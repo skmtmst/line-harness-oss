@@ -1,7 +1,7 @@
 import type { ScenarioStep } from '../scenario-step-types.js';
 import { refreshScenarioReferences } from '../template-versions.js';
 import { jstNow } from '../utils.js';
-import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
+import { mediaContentDeletionGuard, mediaTenantGuardByQuery } from '../media/deletion-guard.js';
 import { type CreateScenarioStepInput, type UpdateScenarioStepInput } from './types.js';
 
 
@@ -44,7 +44,8 @@ export async function createScenarioStep(
       input.isDraft ? 1 : 0,
       now,
     );
-  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.messageContent])]);
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.messageContent]),
+    ...mediaTenantGuardByQuery(db, [input.messageContent], 'SELECT line_account_id AS account_id FROM scenarios WHERE id=?', [input.scenarioId])]);
 
   const created = (await db
     .prepare(`SELECT * FROM scenario_steps WHERE id = ?`)
@@ -138,7 +139,8 @@ export async function updateScenarioStep(
     const update = db
       .prepare(`UPDATE scenario_steps SET ${fields.join(', ')} WHERE id = ?`)
       .bind(...values);
-    await db.batch([update, ...await mediaContentDeletionGuard(db, [updates.message_content])]);
+    await db.batch([update, ...await mediaContentDeletionGuard(db, [updates.message_content]),
+      ...mediaTenantGuardByQuery(db, [updates.message_content], 'SELECT s.line_account_id AS account_id FROM scenarios s JOIN scenario_steps p ON p.scenario_id=s.id WHERE p.id=?', [id])]);
   }
 
   const updated = await db

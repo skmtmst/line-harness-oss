@@ -1,4 +1,4 @@
-import { isMediaDeletionConflict, mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
+import { isMediaDeletionConflict, isMediaTenantConflict, mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -518,7 +518,7 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), i
         run.id,
         body.accountId,
         prepared.items,
-      ), ...await mediaDeletionTextGuardStatements(c.env.DB,[JSON.stringify(prepared.items)])]);
+      ), ...await mediaDeletionTextGuardStatements(c.env.DB,[JSON.stringify(prepared.items)],[body.accountId])]);
       return c.json(
         {
           success: true,
@@ -538,6 +538,7 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), i
         failureReason: 'CLONE_TRANSACTION_FAILED',
       });
       if (isMediaDeletionConflict(err)) return c.json({success:false,error:'画像が削除中のため使用できません。'},409);
+      if (isMediaTenantConflict(err)) return c.json({success:false,code:'media_cross_tenant_reference',error:'別の統括の画像は使用できません。'},409);
       throw new UnexpectedRouteError(c, {
         success: false,
         error: '作れませんでした。何も作られていません',

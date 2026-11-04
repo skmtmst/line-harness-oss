@@ -75,6 +75,19 @@ function verify(reminderCount: number) {
 }
 
 describe('PKG66: 項目移行の参照切替を100 bind以内で確定する', () => {
+  it('受付後に別統括の画像と判明した項目だけを止め、残りは移行する', async () => {
+    await preview(0);
+    sqlite.exec(`UPDATE friend_fields SET type_v6='image' WHERE id='target';
+      INSERT INTO friends(id,line_user_id,line_account_id) VALUES('friend-2','U-test-2','account');
+      INSERT INTO media(id,kind,filename,mime_type,size_bytes,r2_key,line_account_id)
+        VALUES('image-other','image','other.png','image/png',1,'other-key','other'),('image-ok','image','ok.png','image/png',1,'ok-key','account');
+      UPDATE field_migration_items SET converted_value='image-other' WHERE run_id='run' AND friend_id='friend';
+      INSERT INTO field_migration_items(run_id,friend_id,source_value,converted_value,status) VALUES('run','friend-2','旧値','image-ok','convertible');`);
+    await executeFieldMigration(db,'run','image','staff');
+    expect(sqlite.prepare("SELECT friend_id,media_id FROM friend_field_values WHERE field_id='target'").all()).toEqual([{friend_id:'friend-2',media_id:'image-ok'}]);
+    expect(sqlite.prepare("SELECT status,reason FROM field_migration_items WHERE run_id='run' AND friend_id='friend'").get())
+      .toEqual({status:'failed',reason:'別の統括の画像のため保存しませんでした。'});
+  });
   it('受付後に削除中となった画像の項目だけを失敗にし、残りは移行する', async () => {
     sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'migrations/762_media_deletion_jobs.sql'), 'utf8'));
     await preview(0);

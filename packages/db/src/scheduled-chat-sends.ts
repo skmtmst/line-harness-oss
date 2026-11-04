@@ -112,7 +112,7 @@ export async function createScheduledChatSend(
       input.quotedMessageId,
       scheduledAt,
     );
-  const [result] = await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.content])]);
+  const [result] = await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.content], input.lineAccountId ? [input.lineAccountId] : [])]);
   if ((result.meta?.changes ?? 0) === 1) {
     const row = await getScheduledChatSend(db, input.id);
     if (!row) throw new Error('scheduled send record unavailable');
@@ -258,16 +258,17 @@ export async function updateScheduledChatSend(
   const now = input.now ?? new Date().toISOString();
   const scheduledAt =
     input.scheduledAt != null ? normalizeScheduledAt(input.scheduledAt) : null;
+  const existing = await getScheduledChatSend(db, input.id);
   const update = db
     .prepare(
       `UPDATE scheduled_chat_sends
           SET scheduled_at = COALESCE(?, scheduled_at),
               content = COALESCE(?, content),
               updated_at = ?
-        WHERE id = ? AND friend_id = ? AND status = 'scheduled'`,
+        WHERE id = ? AND friend_id = ? AND status = 'scheduled' AND line_account_id IS ?`,
     )
-    .bind(scheduledAt, input.content ?? null, now, input.id, input.friendId);
-  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [input.content])]);
+    .bind(scheduledAt, input.content ?? null, now, input.id, input.friendId, existing?.line_account_id ?? null);
+  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [input.content], existing?.line_account_id ? [existing.line_account_id] : [])]);
   if ((result.meta?.changes ?? 0) === 1) return 'updated';
   const row = await getScheduledChatSend(db, input.id);
   return !row || row.friend_id !== input.friendId ? 'not_found' : 'locked';

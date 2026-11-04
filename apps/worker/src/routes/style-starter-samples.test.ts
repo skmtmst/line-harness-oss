@@ -255,6 +255,21 @@ describe('統括の［標準を読む］［標準に戻す］', () => {
     expect((await starter(sql.db, 't', 'salon')).version).toBe(2);
   });
 
+  test('画像が削除中なら標準への切り替えと旧版の複製を行わない', async () => {
+    expect((await request(hqPath('salon'),'PUT',{expectedVersion:0,name:'本部',definition:{items:[item('hq-1')]}})).status).toBe(200);
+    sql.raw.exec(`INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key)
+      VALUES('m','a','image','x.png','image/png',1,'images/x.png');
+      INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+      VALUES('m','a','["images/x.png"]','checking','now','now');`);
+    const content=JSON.stringify({items:[{...item('hq-1'),text:'https://cdn.test/images%2Fx.png'}]});
+    sql.raw.prepare("UPDATE style_starter_sets SET definition_json=? WHERE tenant_id='t' AND archived_at IS NULL").run(content);
+    const before=sets();
+    const response=await request(hqPath('salon')+'/reset','POST',{expectedVersion:1,confirmed:true});
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('media_deletion_in_progress');
+    expect(sets()).toEqual(before);
+  });
+
   test('読んだ後にほかの人が保存していたら 409 で、上書きも写しも作らない', async () => {
     expect((await request(hqPath('salon'), 'PUT', { expectedVersion: 0, name: '本部', definition: { items: [item('hq-1')] } })).status).toBe(200);
     expect((await request(hqPath('salon'), 'PUT', { expectedVersion: 1, name: '本部', definition: { items: [item('hq-2')] } })).status).toBe(200);

@@ -1,4 +1,5 @@
 import { isMediaDeletionConflict, mediaDeletionGuardStatements } from '../features/media/deletion-guard.js';
+import { mediaTenantGuardByQuery } from '@line-crm/db/src/media/deletion-guard.js';
 import { restaurantMenuImageDeleting, validRestaurantMenuDescription, validRestaurantMenuImage } from './restaurant-menu-media.js';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { normalizedPhoneSql } from '../lib/phone-sql.js';
@@ -462,7 +463,8 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
       WHERE id = ? AND status = 'pending'`).bind(requester, approvalId));
   }
   try {
-    await db.batch([...mediaDeletionGuardStatements(db, [body.imageMediaId !== current.image_media_id ? body.imageMediaId ?? null : null]), ...writes]);
+    const mediaId = body.imageMediaId !== current.image_media_id ? body.imageMediaId ?? null : null;
+    await db.batch([...mediaDeletionGuardStatements(db, [mediaId]), ...mediaTenantGuardByQuery(db, [mediaId], 'SELECT line_account_id AS account_id FROM rt_stores WHERE id=?', [current.store_id]), ...writes]);
   } catch (error) {
     if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
     if (/unique constraint/i.test(String(error))) return c.json({ success: false, error: 'このメニューには以前の価格変更申請が残っています。メニュー一覧の申請中から確認してください' }, 409);

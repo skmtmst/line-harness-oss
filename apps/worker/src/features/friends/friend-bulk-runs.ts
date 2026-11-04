@@ -1,4 +1,6 @@
 import { canAssignChatTo, chatAssigneeId, staffIdFromChatAssignee } from '../../services/chat-assignees.js';
+import { friendMediaCandidate, friendMediaIdGuards } from '@line-crm/db/src/friend-fields.js';
+import { mediaContentDeletionGuard, mediaTenantGuardByQuery } from '@line-crm/db/src/media/deletion-guard.js';
 import {accountClause} from './friend-bulk-scope.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
@@ -965,14 +967,20 @@ async function executeUndo(
         currentRows.results.find((row) => row.field_id === id)?.value ?? null,
       ]));
       if (JSON.stringify(current) !== JSON.stringify(afterValues)) conflict();
-      for (const [fieldId, value] of Object.entries(before)) {
-        if (value === null) await db.prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`).bind(item.friend_id, fieldId).run();
-        else await db.prepare(
+      const fields=await db.prepare(`SELECT id,COALESCE(type_v8,type_v6,type) AS type FROM friend_fields WHERE id IN (SELECT value FROM json_each(?))`)
+        .bind(JSON.stringify(Object.keys(before))).all<{id:string;type:string}>();
+      const types=new Map(fields.results.map(field=>[field.id,field.type]));
+      const entries=Object.entries(before).map(([fieldId,value])=>({fieldId,value:value===null?null:String(value),type:types.get(fieldId)}));
+      const writes=entries.map(({fieldId,value}) => value === null
+        ? db.prepare(`DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?`).bind(item.friend_id,fieldId)
+        : db.prepare(
           `INSERT INTO friend_field_values (friend_id, field_id, value, updated_at, updated_by)
            VALUES (?, ?, ?, ?, ?)
            ON CONFLICT(friend_id, field_id) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by`,
-        ).bind(item.friend_id, fieldId, String(value), now, 'bulk-undo').run();
-      }
+        ).bind(item.friend_id, fieldId, value, now, 'bulk-undo'));
+      const mediaValues=entries.map(entry=>friendMediaCandidate(entry.value,entry.type));
+      await db.batch([...writes,...await mediaContentDeletionGuard(db,mediaValues),...friendMediaIdGuards(db,entries),
+        ...mediaTenantGuardByQuery(db,mediaValues,'SELECT line_account_id AS account_id FROM friends WHERE id=?',[item.friend_id])]);
       break;
     }
     case 'set_visibility': {
