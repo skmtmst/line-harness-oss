@@ -65,6 +65,9 @@ export async function listConversionDefinitionEvents(
   if (names.has('conversion_event_reversals')) {
     ledgerChecks.push(reversedSql);
   }
+  const latestReversalSql = names.has('conversion_event_reversals')
+    ? `(SELECT r.id FROM conversion_event_reversals r WHERE r.conversion_event_id = ce.id ORDER BY r.created_at DESC, r.rowid DESC LIMIT 1)`
+    : 'NULL';
   const cancelledSql = ledgerChecks.length > 0 ? `(${ledgerChecks.join(' OR ')})` : '0';
 
   const rows = await db
@@ -72,7 +75,8 @@ export async function listConversionDefinitionEvents(
       `SELECT ce.id, ce.friend_id, f.display_name AS friend_name,
               ce.approval_status, ce.value_snapshot, ce.metadata, ce.created_at,
               ${cancelledSql} AS cancelled,
-              ${reversedSql} AS reversed
+              ${reversedSql} AS reversed,
+              ${latestReversalSql} AS latest_reversal_id
          FROM conversion_events ce
          LEFT JOIN friends f ON f.id = ce.friend_id
         WHERE ce.conversion_point_id = ?
@@ -97,6 +101,7 @@ export async function listConversionDefinitionEvents(
       approvalStatus: row.approval_status,
       cancelled,
       reversed: row.reversed === 1,
+      latestReversalId: row.latest_reversal_id,
       value: row.value_snapshot,
       source,
       sourceEventId,

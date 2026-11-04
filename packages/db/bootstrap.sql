@@ -8040,7 +8040,7 @@ CREATE TABLE rt_store_group_members (
  group_id TEXT NOT NULL REFERENCES rt_store_groups(id) ON DELETE CASCADE,
  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
  referral_enabled INTEGER NOT NULL DEFAULT 0 CHECK(referral_enabled IN(0,1)),
- max_distance REAL NOT NULL DEFAULT 5 CHECK(max_distance>=0 AND max_distance<=1000),
+ max_distance REAL NOT NULL DEFAULT 5 CHECK(max_distance>=0 AND max_distance<=1000), version INTEGER NOT NULL DEFAULT 1,
  PRIMARY KEY(group_id,store_id)
 );
 
