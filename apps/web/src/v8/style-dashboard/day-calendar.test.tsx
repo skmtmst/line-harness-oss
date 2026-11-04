@@ -212,11 +212,15 @@ it.each(['salon', 'consult'] as const)('%sの閲覧のみも空日操作を灰�
 it.each(['list', 'board'])('検索結果0は%sでも予約なしとせず、検索を外せる', async view => {
   state.search = 'view=' + view
   render(<StyleDashboard style="salon" />)
-  await screen.findByRole('searchbox')
+  const searchbox = await screen.findByRole('searchbox') as HTMLInputElement
+  // 初回の値同期エフェクトを完了してから、検索の時計を進める。
+  await act(async () => {})
+  expect(searchbox.value).toBe('')
   // SearchField は入力後 300ms に絞り込む。実時間と CPU 負荷に依存させず、通知まで進める。
   vi.useFakeTimers()
   try {
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '検索に一致しない名前' } })
+    fireEvent.change(searchbox, { target: { value: '検索に一致しない名前' } })
+    expect(searchbox.value).toBe('検索に一致しない名前')
     await act(async () => { await vi.advanceTimersByTimeAsync(299) })
     expect(screen.queryByRole('button', { name: '検索を外す', exact: true })).toBeNull()
     await act(async () => { await vi.advanceTimersByTimeAsync(1) })
