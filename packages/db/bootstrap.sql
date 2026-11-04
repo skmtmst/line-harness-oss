@@ -10522,6 +10522,8 @@ CREATE INDEX idx_friend_scenarios_published_version
   ON friend_scenarios (published_version_id)
   WHERE published_version_id IS NOT NULL;
 
+CREATE INDEX idx_friend_scenarios_scenario_status ON friend_scenarios(scenario_id, status);
+
 CREATE INDEX idx_friend_scenarios_status ON friend_scenarios (status);
 
 CREATE UNIQUE INDEX idx_friend_scenarios_unique ON friend_scenarios (friend_id, scenario_id) WHERE status != 'completed';
