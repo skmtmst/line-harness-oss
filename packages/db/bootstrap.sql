@@ -4647,20 +4647,20 @@ CREATE TABLE incoming_webhooks (
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
   '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
-CREATE TABLE instagram_connections (
+CREATE TABLE "instagram_connections" (
  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), page_id TEXT NOT NULL,
- instagram_id TEXT NOT NULL UNIQUE, page_name TEXT NOT NULL, username TEXT,
+ instagram_id TEXT NOT NULL, page_name TEXT NOT NULL, username TEXT,
  page_token_encrypted TEXT NOT NULL, user_token_encrypted TEXT NOT NULL,
  expires_at TEXT NOT NULL, data_access_expires_at TEXT, profile_json TEXT, posts_json TEXT,
  refreshed_at TEXT NOT NULL, synced_at TEXT, connected_by TEXT NOT NULL,
- version INTEGER NOT NULL DEFAULT 1
-, scopes TEXT NOT NULL DEFAULT '');
+ version INTEGER NOT NULL DEFAULT 1, scopes TEXT NOT NULL DEFAULT ''
+);
 
-CREATE TABLE instagram_messages (
- id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+CREATE TABLE "instagram_messages" (
+ id TEXT NOT NULL, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
  instagram_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
  content TEXT NOT NULL, attachments_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(attachments_json)), received_at TEXT NOT NULL, created_at TEXT NOT NULL,
- UNIQUE(line_account_id,id)
+ PRIMARY KEY(line_account_id,id)
 );
 
 CREATE TABLE instagram_oauth_states (
@@ -10689,7 +10689,9 @@ CREATE INDEX idx_incoming_webhooks_folder ON incoming_webhooks(line_account_id, 
 
 CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
 
-CREATE INDEX idx_instagram_messages_account_time ON instagram_messages(line_account_id,received_at,id);
+CREATE INDEX idx_instagram_connections_instagram_id ON instagram_connections(instagram_id);
+
+CREATE INDEX idx_instagram_messages_account_time_754 ON instagram_messages(line_account_id,received_at,id);
 
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);
@@ -12527,6 +12529,10 @@ CREATE TRIGGER incoming_webhooks_folder_update BEFORE UPDATE OF folder_id, line_
 WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
 ) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER instagram_connection_tenant_insert BEFORE INSERT ON instagram_connections WHEN EXISTS(SELECT 1 FROM instagram_connections existing JOIN line_accounts old_account ON old_account.id=existing.line_account_id JOIN line_accounts new_account ON new_account.id=NEW.line_account_id WHERE existing.instagram_id=NEW.instagram_id AND existing.line_account_id<>NEW.line_account_id AND COALESCE(old_account.tenant_id,'00000000-0000-4000-8000-000000000001')<>COALESCE(new_account.tenant_id,'00000000-0000-4000-8000-000000000001')) BEGIN SELECT RAISE(ABORT,'instagram_cross_tenant'); END;
+
+CREATE TRIGGER instagram_connection_tenant_update BEFORE UPDATE OF instagram_id,line_account_id ON instagram_connections WHEN EXISTS(SELECT 1 FROM instagram_connections existing JOIN line_accounts old_account ON old_account.id=existing.line_account_id JOIN line_accounts new_account ON new_account.id=NEW.line_account_id WHERE existing.instagram_id=NEW.instagram_id AND existing.line_account_id<>NEW.line_account_id AND COALESCE(old_account.tenant_id,'00000000-0000-4000-8000-000000000001')<>COALESCE(new_account.tenant_id,'00000000-0000-4000-8000-000000000001')) BEGIN SELECT RAISE(ABORT,'instagram_cross_tenant'); END;
 
 CREATE TRIGGER line_account_tag_links_scope
 BEFORE INSERT ON line_account_tag_links
