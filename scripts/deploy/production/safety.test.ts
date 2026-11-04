@@ -8,8 +8,12 @@ import { assertResponse } from './responses.js';
 
 const sha = 'a'.repeat(40), repository = 'owner/repository';
 const context = { GITHUB_REPOSITORY: repository, GITHUB_SHA: sha, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main`, GITHUB_RUN_ID: '456', GITHUB_ACTOR: 'skmtmst', GITHUB_TRIGGERING_ACTOR: 'skmtmst' };
-const run = { repository: { full_name: repository }, head_repository: { full_name: repository }, path: '.github/workflows/deploy-cloudflare-staging.yml', head_sha: sha, status: 'completed', conclusion: 'success', event: 'workflow_dispatch' };
-const jobs = { jobs: [{ conclusion: 'success', steps: [{ name: 'Verify public source revisions', conclusion: 'success' }] }] };
+const run = { repository: { full_name: repository }, head_repository: { full_name: repository }, path: '.github/workflows/deploy-cloudflare-staging.yml', head_sha: sha, head_branch: 'codex/development', status: 'completed', conclusion: 'success', event: 'workflow_dispatch' };
+const jobs = { jobs: [{ name: 'deploy', conclusion: 'success', steps: [
+  { name: 'Deploy Worker to staging', conclusion: 'success' },
+  { name: 'Deploy Admin Panel to staging', conclusion: 'success' },
+  { name: 'Verify public source revisions', conclusion: 'success' },
+] }] };
 
 describe('approved production source and staging proof', () => {
   it('requires the full current main revision and the authorized parent', () => {
@@ -21,9 +25,12 @@ describe('approved production source and staging proof', () => {
   });
   it('does not accept a staging dry-run/replay, old SHA, foreign repo or failed public verification', () => {
     expect(() => assertStagingRun(run, jobs, sha, repository)).not.toThrow();
-    for (const mutation of [{ head_sha: 'b'.repeat(40) }, { conclusion: 'failure' }, { status: 'in_progress' }, { path: '.github/workflows/other.yml' }, { head_repository: { full_name: 'attacker/fork' } }]) expect(() => assertStagingRun({ ...run, ...mutation }, jobs, sha, repository)).toThrow();
+    expect(() => assertStagingRun({ ...run, head_branch: 'codex/masato-production-release-20261104' }, jobs, sha, repository)).not.toThrow();
+    for (const mutation of [{ head_sha: 'b'.repeat(40) }, { head_branch: 'codex/unknown-release' }, { conclusion: 'failure' }, { status: 'in_progress' }, { path: '.github/workflows/other.yml' }, { head_repository: { full_name: 'attacker/fork' } }]) expect(() => assertStagingRun({ ...run, ...mutation }, jobs, sha, repository)).toThrow();
     expect(() => assertStagingRun(run, { jobs: [{ conclusion: 'success', steps: [] }] }, sha, repository)).toThrow();
-    expect(() => assertStagingRun(run, { jobs: [{ conclusion: 'success', steps: [{ ...jobs.jobs[0].steps[0], conclusion: 'skipped' }] }] }, sha, repository)).toThrow();
+    for (const step of jobs.jobs[0].steps) {
+      expect(() => assertStagingRun(run, { jobs: [{ ...jobs.jobs[0], steps: jobs.jobs[0].steps.map(current => current === step ? { ...current, conclusion: 'skipped' } : current) }] }, sha, repository)).toThrow();
+    }
   });
   it('requires GitHub to identify the owner as both initiator and rerun initiator', () => {
     const ownerRun = { id: 456, repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: sha, head_branch: 'main', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-production.yml', actor: { login: 'skmtmst' }, triggering_actor: { login: 'skmtmst' } };

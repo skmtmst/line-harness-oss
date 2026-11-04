@@ -18,8 +18,12 @@ function fixture(failure = '') {
     if (url.hostname === 'api.github.com') {
       if (failure === 'metadata') return new Response('synthetic-provider-secret', { status: 403 });
       if (url.pathname.endsWith('/actions/runs/456')) return Response.json({ id: 456, repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: main, head_branch: 'main', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-production.yml', actor: { login: failure === 'owner' ? 'collaborator' : 'skmtmst' }, triggering_actor: { login: failure === 'rerun' ? 'collaborator' : 'skmtmst' } });
-      if (url.pathname.endsWith('/jobs')) return Response.json({ jobs: [{ conclusion: 'success', steps: [{ name: 'Verify public source revisions', conclusion: failure === 'skipped' ? 'skipped' : 'success' }] }] });
-      return Response.json({ repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: failure === 'run-sha' ? main : sha, status: 'completed', conclusion: 'success', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-staging.yml' });
+      if (url.pathname.endsWith('/jobs')) return Response.json({ jobs: [{ name: 'deploy', conclusion: 'success', steps: [
+        { name: 'Deploy Worker to staging', conclusion: 'success' },
+        { name: 'Deploy Admin Panel to staging', conclusion: 'success' },
+        { name: 'Verify public source revisions', conclusion: failure === 'skipped' ? 'skipped' : 'success' },
+      ] }] });
+      return Response.json({ repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: failure === 'run-sha' ? main : sha, head_branch: 'codex/masato-production-release-20261104', status: 'completed', conclusion: 'success', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-staging.yml' });
     }
     // No credentials, cookies or request body may reach the public probes.
     expect(init).not.toHaveProperty('headers'); expect(init).not.toHaveProperty('body');

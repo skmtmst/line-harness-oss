@@ -74,7 +74,9 @@ jobs:
   deploy:
     if: >-
       github.repository != 'Shudesu/line-harness-oss' &&
-      github.ref == 'refs/heads/codex/development' &&
+      (github.ref == 'refs/heads/codex/development' ||
+       (github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/codex/masato-production-release-20261104')) &&
       (github.event_name == 'workflow_dispatch' ||
        vars.NEN_STAGING_DELIVERY_MODE == 'dry-run' ||
        vars.NEN_STAGING_DELIVERY_MODE == 'apply')
@@ -117,7 +119,12 @@ jobs:
 
       - name: Verify staging boundary and deploy lock
         run: |
-          test "$GITHUB_REF" = "refs/heads/codex/development"
+          case "$GITHUB_REF" in
+            refs/heads/codex/development) ;;
+            refs/heads/codex/masato-production-release-20261104)
+              test "$GITHUB_EVENT_NAME" = "workflow_dispatch" ;;
+            *) echo "::error::検証配備が許可されていないブランチです。"; exit 1 ;;
+          esac
           test "$DELIVERY_MODE" = "dry-run" -o "$DELIVERY_MODE" = "apply"
           test "$DELIVERY_TARGET" = "all" -o "$DELIVERY_TARGET" = "worker" -o "$DELIVERY_TARGET" = "admin"
           test "$WORKER_CONFIG_REPLAY" != "true" -o "$PAGES_CONFIG_REPLAY" != "true"
@@ -138,6 +145,21 @@ jobs:
           grep -q 'database_name = "nen-line-stg"' apps/worker/wrangler.staging.toml
           if grep -q '^\[triggers\]' apps/worker/wrangler.staging.toml; then
             echo "::error::検証Workerでcronが有効です。通知事故を防ぐため中止します。"
+            exit 1
+          fi
+
+      - name: Verify isolated release ancestry
+        if: github.ref == 'refs/heads/codex/masato-production-release-20261104'
+        run: |
+          git fetch --no-tags --deepen=250 origin codex/development
+          release_base=941616d7a41390199ee6cfef7569cfd43b2d8497
+          excluded_merge=7e7f4f704ed237f88b2bee20c4e5b50a73c8bf45
+          git cat-file -e "$release_base^{commit}"
+          git cat-file -e "$excluded_merge^{commit}"
+          test "$(git merge-base "$GITHUB_SHA" FETCH_HEAD)" = "$release_base"
+          git merge-base --is-ancestor "$release_base" "$GITHUB_SHA"
+          if git merge-base --is-ancestor "$excluded_merge" "$GITHUB_SHA"; then
+            echo "::error::今回の対象外PR #2075が含まれています。"
             exit 1
           fi
 
@@ -266,14 +288,14 @@ jobs:
           pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin
 
       # Keep this separate from acquisition so a stale checkout still releases its lock.
-      - name: Require latest development after acquiring the staging lock
+      - name: Require latest deployment branch after acquiring the staging lock
         if: env.DELIVERY_MODE == 'apply'
         shell: bash
         run: |
           set -euo pipefail
-          latest_sha=$(git ls-remote --exit-code origin refs/heads/codex/development | awk '{print $1}')
+          latest_sha=$(git ls-remote --exit-code origin "$GITHUB_REF" | awk '{print $1}')
           if [ -z "$latest_sha" ] || [ "$latest_sha" != "$GITHUB_SHA" ]; then
-            echo "::error::検証配備の開始後に開発版が更新されました。最新版を確認し、dry-runからやり直してください。"
+            echo "::error::検証配備の開始後に対象ブランチが更新されました。最新版を確認し、dry-runからやり直してください。"
             exit 1
           fi
 

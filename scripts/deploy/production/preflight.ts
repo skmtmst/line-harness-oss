@@ -8,8 +8,8 @@ export function assertReleaseSource(sha: string, main: string, actual: string, c
   if ((main !== sha && !mainTreeAndAncestryVerified) || actual !== sha || context.GITHUB_SHA !== main || context.GITHUB_REF !== 'refs/heads/main' || context.GITHUB_EVENT_NAME !== 'workflow_dispatch') throw new Error('main_only');
   if (context.GITHUB_WORKFLOW_REF !== `${context.GITHUB_REPOSITORY}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main`) throw new Error('parent_only');
 }
-/** Staging is restricted to development. Publish its exact tested commit only
- * after main approves the identical tree (a merge commit may have another SHA). */
+/** Publish only the exact staging-tested tree after main approves it.
+ * A merge commit may have another SHA but must have the same tree. */
 export function verifyReleaseCheckout(sha: string): void {
   assertSha(sha);
   if (command('git', ['status', '--porcelain', '--untracked-files=all']).trim()) throw new Error('dirty_checkout');
@@ -21,8 +21,9 @@ export function verifyReleaseCheckout(sha: string): void {
   assertReleaseSource(sha, main, command('git', ['rev-parse', 'HEAD']).trim(), process.env, true);
 }
 export function assertStagingRun(run: any, jobs: any, sha: string, repository: string): void {
-  if (run?.repository?.full_name !== repository || run?.head_repository?.full_name !== repository || run?.path !== '.github/workflows/deploy-cloudflare-staging.yml' || run?.head_sha !== sha || run?.status !== 'completed' || run?.conclusion !== 'success' || run?.event !== 'workflow_dispatch') throw new Error('staging_run');
-  if (!jobs?.jobs?.some((job: any) => job.conclusion === 'success' && job.steps?.some((step: any) => step.name === 'Verify public source revisions' && step.conclusion === 'success'))) throw new Error('staging_public_verification');
+  if (run?.repository?.full_name !== repository || run?.head_repository?.full_name !== repository || run?.path !== '.github/workflows/deploy-cloudflare-staging.yml' || run?.head_sha !== sha || !['codex/development', 'codex/masato-production-release-20261104'].includes(run?.head_branch) || run?.status !== 'completed' || run?.conclusion !== 'success' || run?.event !== 'workflow_dispatch') throw new Error('staging_run');
+  const required = ['Deploy Worker to staging', 'Deploy Admin Panel to staging', 'Verify public source revisions'];
+  if (!jobs?.jobs?.some((job: any) => job.name === 'deploy' && job.conclusion === 'success' && required.every(name => job.steps?.some((step: any) => step.name === name && step.conclusion === 'success')))) throw new Error('staging_public_verification');
 }
 /** GitHub Free cannot protect a private environment with required reviewers.
  * The owner must start (and, for a rerun, restart) this exact release workflow. */

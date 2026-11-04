@@ -53,12 +53,37 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).toContain('default: all');
   });
 
-  it('can only run from codex/development against staging', () => {
+  it('allows only development or the manual fixed release branch against staging', () => {
     expect(workflow).toContain("github.ref == 'refs/heads/codex/development'");
+    expect(workflow).toContain("github.ref == 'refs/heads/codex/masato-production-release-20261104'");
+    expect(workflow).toContain('test "$GITHUB_EVENT_NAME" = "workflow_dispatch"');
+    expect(workflow).toContain('- name: Verify isolated release ancestry');
+    expect(workflow).toContain('git merge-base --is-ancestor "$release_base" "$GITHUB_SHA"');
+    expect(workflow).toContain('git merge-base --is-ancestor "$excluded_merge" "$GITHUB_SHA"');
+    expect(workflow.indexOf('Verify isolated release ancestry')).toBeLessThan(workflow.indexOf('Acquire the shared staging lock'));
     expect(workflow).toContain('environment: staging');
     expect(workflow).toContain('apps/worker/wrangler.staging.toml');
     expect(workflow).toContain('nen-line-stg-admin');
     expect(workflow).not.toContain('apps/worker/wrangler.toml');
+  });
+
+  it.each([
+    { branch: 'codex/development', event: 'push', allowed: true },
+    { branch: 'codex/masato-production-release-20261104', event: 'workflow_dispatch', allowed: true },
+    { branch: 'codex/masato-production-release-20261104', event: 'push', allowed: false },
+    { branch: 'codex/other-release', event: 'workflow_dispatch', allowed: false },
+  ])('checks the actual staging branch boundary: $branch / $event', ({ branch, event, allowed }) => {
+    const step = workflow.split('- name: Verify staging boundary and deploy lock')[1]
+      .split('- name: Verify isolated release ancestry')[0];
+    const script = step.split('run: |\n')[1];
+    const result = spawnSync('bash', ['-e', '-c', script], {
+      encoding: 'utf8', env: { ...process.env, GITHUB_REF: `refs/heads/${branch}`,
+        GITHUB_EVENT_NAME: event, DELIVERY_MODE: 'dry-run', DELIVERY_TARGET: 'all',
+        WORKER_CONFIG_REPLAY: 'false', PAGES_CONFIG_REPLAY: 'false',
+        CLOUDFLARE_ACCOUNT_ID: 'synthetic-account', WORKER_API_TOKEN: 'synthetic-token',
+        PAGES_API_TOKEN: 'synthetic-token' },
+    });
+    expect(result.status === 0, result.stderr).toBe(allowed);
   });
 
   it('acquires an exact deploy lock for apply and releases it however the run ends', () => {
@@ -75,9 +100,9 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).not.toMatch(/if: always\(\)\n\s+run: pnpm deploy:lock release staging/);
     expect(workflow).toContain('pnpm deploy:lock release staging --remote origin');
     expect(workflow.indexOf('pnpm deploy:lock acquire staging')).toBeLessThan(
-      workflow.indexOf('Require latest development after acquiring the staging lock'),
+      workflow.indexOf('Require latest deployment branch after acquiring the staging lock'),
     );
-    expect(workflow.indexOf('Require latest development after acquiring the staging lock')).toBeLessThan(
+    expect(workflow.indexOf('Require latest deployment branch after acquiring the staging lock')).toBeLessThan(
       workflow.indexOf('Bind the staging Cloudflare account'),
     );
     expect(workflow.indexOf('pnpm deploy:lock release staging')).toBeGreaterThan(
@@ -93,19 +118,19 @@ describe('Deploy Cloudflare Staging workflow', () => {
   ])('checks the live branch after locking: $name', ({ remoteSha, gitExit, succeeds }) => {
     const sandbox = mkdtempSync(resolve(tmpdir(), 'staging-latest-'));
     try {
-      const step = workflow.split('- name: Require latest development after acquiring the staging lock')[1]
+      const step = workflow.split('- name: Require latest deployment branch after acquiring the staging lock')[1]
         .split('- name: Bind the staging Cloudflare account')[0];
       const script = step.split('run: |\n')[1];
       writeFileSync(resolve(sandbox, 'git'), [
         '#!/bin/sh',
-        '[ "$*" = "ls-remote --exit-code origin refs/heads/codex/development" ] || exit 99',
+        '[ "$*" = "ls-remote --exit-code origin $GITHUB_REF" ] || exit 99',
         '[ -z "$STAGING_TEST_REMOTE_SHA" ] || printf "%s\\trefs/heads/codex/development\\n" "$STAGING_TEST_REMOTE_SHA"',
         'exit "$STAGING_TEST_GIT_EXIT"',
         '',
       ].join('\n'), { mode: 0o755 });
       const result = spawnSync('bash', ['-e', '-c', script], {
         encoding: 'utf8', env: { ...process.env, PATH: `${sandbox}:${process.env.PATH}`,
-          GITHUB_SHA: 'a'.repeat(40), STAGING_TEST_REMOTE_SHA: remoteSha, STAGING_TEST_GIT_EXIT: String(gitExit) },
+          GITHUB_SHA: 'a'.repeat(40), GITHUB_REF: 'refs/heads/codex/development', STAGING_TEST_REMOTE_SHA: remoteSha, STAGING_TEST_GIT_EXIT: String(gitExit) },
       });
       expect(result.status === 0, result.stderr).toBe(succeeds);
     } finally {

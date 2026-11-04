@@ -47,6 +47,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -55,17 +56,38 @@ jobs:
             exit 0
           fi
 
-          # 本番昇格は検証済みの開発版そのものだけに限る。
-          # main 宛てというだけで所有パスの検査を免除しない。
+          # 本番昇格は、検証済みの開発版か、共同開発者の新しい統合を
+          # 含めないために固定した一度限りのリリース枝に限る。
           if [ "$BASE_REF" = "main" ]; then
             if [[ ! "$HEAD_REF" == codex/masato-production-release-* ]]; then
               echo "::error::本番昇格専用ブランチではありません。"
               exit 1
             fi
-            git fetch --no-tags origin codex/development
-            if ! git merge-base --is-ancestor "$HEAD_SHA" FETCH_HEAD; then
-              echo "::error::PRのHEADが開発版に含まれていません。"
+            if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+              echo "::error::本番昇格の枝は同じリポジトリに必要です。"
               exit 1
+            fi
+            git fetch --no-tags origin codex/development
+            excluded_merge=7e7f4f704ed237f88b2bee20c4e5b50a73c8bf45
+            if ! git cat-file -e "$excluded_merge^{commit}"; then
+              echo "::error::対象外マージの履歴を確認できません。"
+              exit 1
+            fi
+            if [ "$HEAD_REF" = codex/masato-production-release-20261104 ] && \
+               git merge-base --is-ancestor "$excluded_merge" "$HEAD_SHA"; then
+              echo "::error::今回の対象外PR #2075が含まれています。"
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$HEAD_SHA" FETCH_HEAD; then
+              release_base=941616d7a41390199ee6cfef7569cfd43b2d8497
+              git cat-file -e "$release_base^{commit}"
+              if [ "$HEAD_REF" != codex/masato-production-release-20261104 ] || \
+                 [ "$(git merge-base "$HEAD_SHA" FETCH_HEAD)" != "$release_base" ] || \
+                 ! git merge-base --is-ancestor "$release_base" "$HEAD_SHA" || \
+                 git merge-base --is-ancestor "$excluded_merge" "$HEAD_SHA"; then
+                echo "::error::PRのHEADは検証済み開発版にも、今回固定したリリース枝にも該当しません。"
+                exit 1
+              fi
             fi
             stage_runs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-cloudflare-staging.yml/runs?head_sha=$HEAD_SHA&status=success&per_page=100")
             deployed=false
@@ -77,7 +99,7 @@ jobs:
                 deployed=true
                 break
               fi
-            done < <(jq -r --arg sha "$HEAD_SHA" '.workflow_runs[] | select(.head_sha == $sha and .event == "workflow_dispatch" and .conclusion == "success") | .id' <<< "$stage_runs")
+            done < <(jq -r --arg sha "$HEAD_SHA" --arg branch "$HEAD_REF" '.workflow_runs[] | select(.head_sha == $sha and .head_branch == $branch and .event == "workflow_dispatch" and .conclusion == "success") | .id' <<< "$stage_runs")
             if [ "$deployed" != true ]; then
               echo "::error::PRのHEADと同じSHAでWorker・管理画面を検証配備した成功記録がありません。"
               exit 1
