@@ -1,4 +1,5 @@
 import { d1BindingIdentity } from '../lib/d1-timing.js';
+import { storedTimestamp } from '@line-crm/shared';
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -44,13 +45,14 @@ const IDENT_SQL = `
 // 最新の x_username が優先される（順序指定なしだと SQLite の行順は未定義）。
 // active な following friend に紐付くものだけに絞る — 退会済み・非アクティブ
 // アカウント分の歴史的フォーム提出を毎回 JSON.parse する CPU コストを避ける。
+const FORMS_ORDER = `ORDER BY julianday(${storedTimestamp('fs.created_at', 'sql')}) DESC`;
 const FORMS_SQL = `
   SELECT fs.friend_id, fs.data, fs.created_at
   FROM form_submissions fs
   JOIN friends f ON f.id = fs.friend_id
   JOIN line_accounts la ON la.id = f.line_account_id
   WHERE f.is_following = 1 AND la.is_active = 1
-  ORDER BY fs.created_at DESC
+  ${FORMS_ORDER}
 `;
 
 export interface AccountMembership {
@@ -134,8 +136,8 @@ async function computeAllRows(db: D1Database, allowedAccountIds?: readonly strin
   const scoped = allowedAccountIds !== undefined;
   const identQuery = db.prepare(IDENT_SQL + (scoped
     ? ' AND friends.line_account_id IN (SELECT value FROM json_each(?))' : ''));
-  const formsQuery = db.prepare(FORMS_SQL.replace('ORDER BY fs.created_at DESC', (scoped
-    ? 'AND f.line_account_id IN (SELECT value FROM json_each(?)) ' : '') + 'ORDER BY fs.created_at DESC'));
+  const formsQuery = db.prepare(FORMS_SQL.replace(FORMS_ORDER, (scoped
+    ? 'AND f.line_account_id IN (SELECT value FROM json_each(?)) ' : '') + FORMS_ORDER));
   const bindings = JSON.stringify(allowedAccountIds);
   const identResult = await (scoped ? identQuery.bind(bindings) : identQuery).all<IdentRow>();
   const formsResult = await (scoped ? formsQuery.bind(bindings) : formsQuery).all<FormRow>();
