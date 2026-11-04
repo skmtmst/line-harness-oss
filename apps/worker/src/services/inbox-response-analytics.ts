@@ -20,6 +20,12 @@ export async function inboxResponseAnalytics(db:D1Database,account:string,from:s
  const filter=`account_id=? AND reply_kind='manual' AND is_first_response=1 AND pending_since IS NOT NULL
   AND julianday(responded_at)>=julianday(?) AND julianday(responded_at)<julianday(?) AND (? IS NULL OR staff_id=?)`;
  const binds=[account,start,end,ownStaffId,ownStaffId];
+ const totalMedian=await db.prepare(`WITH ranked AS (
+  SELECT (julianday(responded_at)-julianday(pending_since))*1440 AS minutes,
+   ROW_NUMBER() OVER(ORDER BY julianday(responded_at)-julianday(pending_since)) AS rn,COUNT(*) OVER() AS total
+  FROM inbox_response_samples WHERE ${filter}
+ ) SELECT ROUND(AVG(minutes),2) AS median FROM ranked WHERE rn IN ((total+1)/2,(total+2)/2)`)
+  .bind(...binds).first<{median:number|null}>();
  const rows=await db.prepare(`WITH ranked AS (
   SELECT staff_id,staff_deleted,pending_since,due_at,responded_at,
    (julianday(responded_at)-julianday(pending_since))*1440 AS minutes,
@@ -55,7 +61,9 @@ export async function inboxResponseAnalytics(db:D1Database,account:string,from:s
  const deletedAutomatic=ownStaffId===null ? await db.prepare(`SELECT COALESCE(SUM(automatic),0) AS count FROM inbox_response_deleted_weekly WHERE account_id=? AND week>=? AND week<=?`).bind(account,from,to).first<{count:number}>() : null;
  const automatic=ownStaffId===null ? await db.prepare(`SELECT COUNT(*) AS count,SUM(CASE WHEN chat_id IS NULL THEN 1 ELSE 0 END) AS unavailable FROM inbox_response_samples WHERE account_id=? AND reply_kind='automatic'
   AND julianday(responded_at)>=julianday(?) AND julianday(responded_at)<julianday(?)`).bind(account,start,end).first<{count:number;unavailable:number|null}>() : null;
- return {byStaff:merged.map(r=>({staffId:r.staff_id,staffDeleted:Boolean(r.staff_deleted),staffName:r.staff_name,medianFirstResponseMinutes:r.median,deletedCount:r.deleted_count,
+ const due=merged.reduce((sum,row)=>sum+row.due_count,0),onTime=merged.reduce((sum,row)=>sum+row.on_time,0);
+ const manualCount=merged.reduce((sum,row)=>sum+row.count,0),automaticCount=automatic ? automatic.count+(deletedAutomatic?.count??0):0;
+ return {summary:{medianFirstResponseMinutes:totalMedian?.median??null,withinSlaRate:due?Math.round(onTime*10000/due)/100:null,overdueCount:due-onTime,totalCount:manualCount+automaticCount},byStaff:merged.map(r=>({staffId:r.staff_id,staffDeleted:Boolean(r.staff_deleted),staffName:r.staff_name,medianFirstResponseMinutes:r.median,deletedCount:r.deleted_count,
   withinSlaRate:r.due_count?Math.round(r.on_time*10000/r.due_count)/100:null,count:r.count})),
   automatic:automatic?{count:automatic.count+(deletedAutomatic?.count??0),deletedCount:deletedAutomatic?.count??0,unavailableCount:automatic.unavailable??0}:null,weekly:[...weekly.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([week,count])=>({week,count}))};
 }

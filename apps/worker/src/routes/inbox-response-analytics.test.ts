@@ -12,8 +12,9 @@ afterEach(()=>d.raw.close());
 const path='/api/analytics/inbox-response?account_id=a&from=2026-11-02&to=2026-11-08';
 test('担当別中央値・期限内割合と自動応答を分け、他店を混ぜない',async()=>{
  const res=await gapCall(gapApp(d,[inboxSla]),path);expect(res.status).toBe(200);
- const body=await res.json() as {data:{byStaff:Array<{staffId:string;medianFirstResponseMinutes:number;withinSlaRate:number|null;count:number}>;automatic:{count:number;deletedCount:number;unavailableCount:number};weekly:unknown[]}};
+ const body=await res.json() as {data:{summary:{medianFirstResponseMinutes:number;withinSlaRate:number;overdueCount:number;totalCount:number};byStaff:Array<{staffId:string;medianFirstResponseMinutes:number;withinSlaRate:number|null;count:number}>;automatic:{count:number;deletedCount:number;unavailableCount:number};weekly:unknown[]}};
  expect(body.data.byStaff).toEqual(expect.arrayContaining([expect.objectContaining({staffId:'s',medianFirstResponseMinutes:15,withinSlaRate:50,count:2}),expect.objectContaining({staffId:'o',withinSlaRate:null,count:1})]));
+ expect(body.data.summary).toEqual({medianFirstResponseMinutes:10,withinSlaRate:50,overdueCount:1,totalCount:4});
  expect(body.data.automatic).toEqual({count:1,deletedCount:0,unavailableCount:1});expect(body.data.weekly.length).toBe(1);
 });
 test('スタッフと閲覧のみは自分だけ、他店と不正な期間は拒否',async()=>{
@@ -57,4 +58,11 @@ test('自動の返事も削除前後で別の件数を保ち、会話の一覧�
  const result=await gapCall(app,url);expect(result.status).toBe(200);
  expect((await result.json() as {data:{items:unknown[]}}).data.items).toEqual([]);
  expect((await gapCall(gapApp(d,[inboxSla],{...gapOwner,id:'s',role:'staff',permissionKeys:['/chats']}),url)).status).toBe(403);
+});
+test('退職した担当者の記録は未割当とは分けて削除された担当者にまとめる',async()=>{
+ d.raw.pragma('foreign_keys = ON');
+ d.raw.exec("UPDATE staff SET staff_member_id=NULL WHERE staff_member_id='s'; DELETE FROM staff_members WHERE id='s'");
+ const res=await gapCall(gapApp(d,[inboxSla]),path);expect(res.status).toBe(200);
+ const body=await res.json() as {data:{byStaff:Array<{staffId:string|null;staffDeleted:boolean;staffName:string;count:number}>}};
+ expect(body.data.byStaff).toContainEqual(expect.objectContaining({staffId:null,staffDeleted:true,staffName:'削除された担当者',count:2}));
 });
