@@ -16,11 +16,13 @@ it('過去分は作らず、手動の返事ごとに担当と当時の期限を�
   raw.exec("UPDATE chats SET last_operator_message_at='2026-11-05T00:20:00Z' WHERE id='c'");
   raw.exec("UPDATE chats SET last_operator_message_at='2026-11-05T00:21:00Z' WHERE id='c'");
   expect(raw.prepare('SELECT account_id,staff_id,pending_since,due_at,responded_at,is_first_response FROM inbox_response_samples ORDER BY responded_at').all()).toEqual([
-   {account_id:'a',staff_id:'s',pending_since:'2026-11-05T00:00:00Z',due_at:'2026-11-05T00:30:00Z',responded_at:'2026-11-05T00:20:00Z',is_first_response:1},
-   {account_id:'a',staff_id:'s',pending_since:null,due_at:null,responded_at:'2026-11-05T00:21:00Z',is_first_response:0},
+   {account_id:'a',staff_id:'s',pending_since:'2026-11-05T00:00:00Z',due_at:'2026-11-05T00:30:00Z',responded_at:'2026-11-05T00:20:00.000Z',is_first_response:1},
+   {account_id:'a',staff_id:'s',pending_since:null,due_at:null,responded_at:'2026-11-05T00:21:00.000Z',is_first_response:0},
   ]);
   raw.exec("INSERT INTO messages_log(id,friend_id,direction,message_type,content,source,created_at) VALUES('m','f','outgoing','text','private text','auto_reply','2026-11-05T00:22:00Z')");
   expect(raw.prepare("SELECT reply_kind,staff_id,due_at,is_first_response FROM inbox_response_samples WHERE reply_kind='automatic'").get()).toEqual({reply_kind:'automatic',staff_id:null,due_at:null,is_first_response:0});
+  raw.exec("INSERT INTO messages_log(id,friend_id,direction,message_type,content,source,created_at) VALUES('delayed','f','outgoing','text','private text','external','2026-11-05 09:23:00+09:00'); UPDATE messages_log SET source='auto_reply' WHERE id='delayed'; UPDATE messages_log SET source='external' WHERE id='delayed'; UPDATE messages_log SET source='auto_reply' WHERE id='delayed'");
+  expect(raw.prepare("SELECT responded_at FROM inbox_response_samples WHERE id='auto:delayed'").all()).toEqual([{responded_at:'2026-11-05T00:23:00.000Z'}]);
   expect((raw.prepare('PRAGMA table_info(inbox_response_samples)').all() as Array<{name:string}>).map(x=>x.name)).not.toContain('friend_id');
   expect((raw.prepare('PRAGMA table_info(inbox_response_samples)').all() as Array<{name:string}>).map(x=>x.name)).toContain('chat_id');
  } finally {raw.close()}
@@ -62,5 +64,16 @@ it('会話削除時は週単位の匿名の件数だけ残し、担当者と店�
   raw.exec(`INSERT INTO chats(id) VALUES('c3'); INSERT INTO inbox_response_samples(id,account_id,chat_id,responded_at,is_first_response) VALUES('4','a','c3','2026-11-05T00:20:00Z',1); DELETE FROM line_accounts WHERE id='a'`);
   expect(raw.prepare('SELECT count(*) n FROM inbox_response_deleted_weekly').get()).toEqual({n:0});
   expect(raw.prepare('SELECT count(*) n FROM inbox_response_samples').get()).toEqual({n:0});
+ } finally {raw.close()}
+});
+
+it('担当者削除と担当者別集計で対象だけを索引から探せる',()=>{
+ const raw=new Database(':memory:');
+ try {
+  raw.exec(readFileSync(new URL('../bootstrap.sql',import.meta.url),'utf8'));
+  for(const table of ['inbox_response_samples','inbox_response_deleted_weekly']) {
+   const plan=raw.prepare(`EXPLAIN QUERY PLAN SELECT * FROM ${table} WHERE staff_id=?`).all('s') as Array<{detail:string}>;
+   expect(plan.map(row=>row.detail).join(' ')).toContain('USING INDEX');
+  }
  } finally {raw.close()}
 });

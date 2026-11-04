@@ -12,6 +12,8 @@ CREATE TABLE inbox_response_samples (
  is_first_response INTEGER NOT NULL CHECK(is_first_response IN (0,1))
 );
 CREATE INDEX inbox_response_samples_period ON inbox_response_samples(account_id,responded_at,staff_id);
+CREATE INDEX inbox_response_samples_staff_period ON inbox_response_samples(account_id,staff_id,responded_at,id);
+CREATE INDEX inbox_response_samples_staff ON inbox_response_samples(staff_id);
 CREATE INDEX inbox_response_samples_chat ON inbox_response_samples(chat_id);
 CREATE TRIGGER inbox_response_samples_manual AFTER UPDATE OF last_operator_message_at ON chats
 WHEN NEW.last_operator_message_at IS NOT NULL
@@ -20,15 +22,22 @@ BEGIN
  SELECT lower(hex(randomblob(16))), f.line_account_id, NEW.id, NEW.assignee_staff_id,
    CASE WHEN OLD.pending_since IS NOT NULL AND OLD.first_response_at IS NULL THEN OLD.pending_since ELSE NULL END,
    CASE WHEN OLD.pending_since IS NOT NULL AND OLD.first_response_at IS NULL THEN OLD.sla_due_at ELSE NULL END,
-   NEW.last_operator_message_at,
+   strftime('%Y-%m-%dT%H:%M:%fZ',NEW.last_operator_message_at),
    CASE WHEN OLD.pending_since IS NOT NULL AND OLD.first_response_at IS NULL AND julianday(NEW.last_operator_message_at)>=julianday(OLD.pending_since) THEN 1 ELSE 0 END
  FROM friends f WHERE f.id=NEW.friend_id AND f.line_account_id IS NOT NULL; END;
 -- Automatic replies are counted separately and never stop the human SLA clock.
 CREATE TRIGGER inbox_response_samples_automatic AFTER INSERT ON messages_log
 WHEN NEW.direction='outgoing' AND NEW.source IN ('auto_reply','qa')
 BEGIN
- INSERT INTO inbox_response_samples(id,account_id,chat_id,staff_id,reply_kind,pending_since,due_at,responded_at,is_first_response)
- SELECT lower(hex(randomblob(16))),f.line_account_id,(SELECT c.id FROM chats c WHERE c.friend_id=NEW.friend_id LIMIT 1),NULL,'automatic',NULL,NULL,NEW.created_at,0
+ INSERT OR IGNORE INTO inbox_response_samples(id,account_id,chat_id,staff_id,reply_kind,pending_since,due_at,responded_at,is_first_response)
+ SELECT 'auto:'||NEW.id,f.line_account_id,(SELECT c.id FROM chats c WHERE c.friend_id=NEW.friend_id LIMIT 1),NULL,'automatic',NULL,NULL,strftime('%Y-%m-%dT%H:%M:%fZ',NEW.created_at),0
+ FROM friends f WHERE f.id=NEW.friend_id AND f.line_account_id IS NOT NULL; END;
+-- The proxy records delayed replies as external before their origin is known.
+CREATE TRIGGER inbox_response_samples_automatic_source AFTER UPDATE OF source ON messages_log
+WHEN NEW.direction='outgoing' AND NEW.source IN ('auto_reply','qa') AND COALESCE(OLD.source,'') NOT IN ('auto_reply','qa')
+BEGIN
+ INSERT OR IGNORE INTO inbox_response_samples(id,account_id,chat_id,staff_id,reply_kind,pending_since,due_at,responded_at,is_first_response)
+ SELECT 'auto:'||NEW.id,f.line_account_id,(SELECT c.id FROM chats c WHERE c.friend_id=NEW.friend_id LIMIT 1),NULL,'automatic',NULL,NULL,strftime('%Y-%m-%dT%H:%M:%fZ',NEW.created_at),0
  FROM friends f WHERE f.id=NEW.friend_id AND f.line_account_id IS NOT NULL; END;
 
 -- Only weekly, anonymous counts survive deletion of a conversation.
@@ -43,6 +52,7 @@ CREATE TABLE inbox_response_deleted_weekly (
  automatic INTEGER NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX inbox_response_deleted_weekly_key ON inbox_response_deleted_weekly(account_id,ifnull(staff_id,''),staff_deleted,week);
+CREATE INDEX inbox_response_deleted_weekly_staff ON inbox_response_deleted_weekly(staff_id);
 CREATE TRIGGER inbox_response_samples_deleted BEFORE DELETE ON inbox_response_samples
 WHEN OLD.chat_id IS NOT NULL AND (OLD.reply_kind='automatic' OR (OLD.reply_kind='manual' AND OLD.is_first_response=1))
  AND EXISTS(SELECT 1 FROM line_accounts WHERE id=OLD.account_id)
