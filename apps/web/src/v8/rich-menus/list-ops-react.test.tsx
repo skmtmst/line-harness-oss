@@ -269,7 +269,7 @@ describe('失敗の文', () => {
   })
 
   test('公開内容が変わった409では確認を閉じ、途中まで進んだ可能性を知らせる',async()=>{
-    mocks.unpublish.mockRejectedValue(new ApiError(409,'changed','RICH_MENU_CONFIRMATION_CHANGED'))
+    mocks.unpublish.mockRejectedValue(new ApiError(409,'changed','RICH_MENU_CONFIRMATION_CHANGED',{partial:true}))
     const view=renderList()
     await pick(view,'通常メニュー','取り下げ・削除する')
     const dialog=await openDialog()
@@ -277,6 +277,16 @@ describe('失敗の文', () => {
     await waitFor(()=>expect(document.body.textContent).toContain('一部の取り下げが進んだ可能性があります'))
     expect(document.body.contains(dialog)).toBe(false)
     expect(mocks.unpublish).toHaveBeenCalledTimes(1)
+  })
+
+  test('LINEに触れる前の409は途中まで進んだと案内しない',async()=>{
+    mocks.unpublish.mockRejectedValue(new ApiError(409,'changed','RICH_MENU_CONFIRMATION_CHANGED',{partial:false}))
+    const view=renderList()
+    await pick(view,'通常メニュー','取り下げ・削除する')
+    const dialog=await openDialog()
+    fireEvent.click(await within(dialog).findByRole('button',{name:/LINEから取り下げる/}))
+    await waitFor(()=>expect(document.body.textContent).toContain('公開内容が変わりました。最新の状態を確認してください。'))
+    expect(document.body.textContent).not.toContain('一部の取り下げが進んだ可能性があります')
   })
 
   test('LINEからの削除と取り込みの失敗は、それぞれの文にする', async () => {

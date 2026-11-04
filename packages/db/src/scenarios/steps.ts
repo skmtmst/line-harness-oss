@@ -43,10 +43,7 @@ export async function createScenarioStep(
       input.isDraft ? 1 : 0,
       now,
     );
-  await db.batch([
-    insert,
-    db.prepare(`UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = ?`).bind(input.scenarioId),
-  ]);
+  await db.batch([insert, db.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = ? AND changes() > 0').bind(input.scenarioId)]);
 
   const created = (await db
     .prepare(`SELECT * FROM scenario_steps WHERE id = ?`)
@@ -139,8 +136,7 @@ export async function updateScenarioStep(
     values.push(id);
     await db.batch([
       db.prepare(`UPDATE scenario_steps SET ${fields.join(', ')} WHERE id = ?`).bind(...values),
-      db.prepare(`UPDATE scenarios SET content_revision = content_revision + 1
-        WHERE id = (SELECT scenario_id FROM scenario_steps WHERE id = ?) AND changes() = 1`).bind(id),
+      db.prepare('UPDATE scenarios SET content_revision = content_revision + 1 WHERE id = (SELECT scenario_id FROM scenario_steps WHERE id = ?) AND changes() > 0').bind(id),
     ]);
   }
 

@@ -149,14 +149,17 @@ export async function setPageRichMenuId(
   // 札があるときは「まだ自分が lease を持っている」ことを同じ1文の条件にする。
   // 先に確認してから書くと、確認と書込みの間に回収された旧holderが
   // 新しい所有者の反映を古いIDで上書きできてしまう。
-  const result = await db
-    .prepare(
+  const results = await db.batch([
+    db.prepare(
       `UPDATE rich_menu_pages SET line_richmenu_id = ?, updated_at = ?
         WHERE id = ?${fenceClause(fence, 'rich_menu_pages.group_id')}`,
     )
-    .bind(lineRichMenuId, jstNow(), pageId, ...fenceBinds(fence))
-    .run();
-  return (result.meta?.changes ?? 0) > 0;
+    .bind(lineRichMenuId, jstNow(), pageId, ...fenceBinds(fence)),
+    db.prepare(`UPDATE rich_menu_groups SET confirmation_revision = confirmation_revision + 1
+      WHERE id = (SELECT group_id FROM rich_menu_pages WHERE id = ? AND line_richmenu_id = ?)${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`)
+      .bind(pageId, lineRichMenuId, ...fenceBinds(fence)),
+  ]);
+  return (results[0].meta?.changes ?? 0) > 0;
 }
 
 /**
@@ -175,7 +178,7 @@ export async function markRichMenuGroupPublished(
   const result = await db
     .prepare(
       `UPDATE rich_menu_groups
-         SET status = 'published', updated_at = ?
+         SET status = 'published', confirmation_revision = confirmation_revision + 1, updated_at = ?
        WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
     )
     .bind(jstNow(), groupId, ...fenceBinds(fence))
@@ -207,7 +210,7 @@ export async function markRichMenuGroupUnpublished(
   const decided = await db
     .prepare(
       `UPDATE rich_menu_groups
-          SET status = 'draft', is_default_for_all = 0, updated_at = ?
+          SET status = 'draft', is_default_for_all = 0, confirmation_revision = confirmation_revision + 1, updated_at = ?
         WHERE id = ?${fence ? ' AND publishing_owner = ? AND publishing_generation = ?' : ''}`,
     )
     .bind(now, groupId, ...fenceBinds(fence))

@@ -6,13 +6,13 @@ export type DeliveryMode = 'relative' | 'elapsed' | 'absolute_time';
 
 export interface Scenario {
   id: string;
+  content_revision: number;
   name: string;
   description: string | null;
   trigger_type: ScenarioTriggerType;
   trigger_tag_id: string | null;
   line_account_id: string | null;
   is_active: number;
-  content_revision: number;
   delivery_mode: DeliveryMode;
   /** 他のシナリオと同時に動いてよいか。1 が既定（並行を許す） */
   allow_concurrent: number;

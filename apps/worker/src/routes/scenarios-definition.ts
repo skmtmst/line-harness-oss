@@ -12,7 +12,7 @@ import { fail } from '../lib/fail.js';
 import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess } from '../middleware/role-guard.js';
 import { sha256Hex } from '../middleware/auth.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
 import { ScenarioContractError } from '../features/scenarios/scenario-contract/index.js';
 import { LineClient } from '@line-crm/line-sdk';
@@ -71,6 +71,15 @@ const requireScenarioEditBoundary: MiddlewareHandler<Env> = async (c, next) => {
     if (!step) return fail(c, 404, 'STEP_NOT_FOUND');
   }
   await next();
+}
+
+export async function scenarioSubscriptionScope(c: Context<Env>, id: string) {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const inaccessible = await c.env.DB.prepare(`SELECT 1 FROM friend_scenarios fs LEFT JOIN friends f ON f.id=fs.friend_id
+    WHERE fs.scenario_id=? AND (f.id IS NULL OR (f.line_account_id IS NULL AND ?=0)
+      OR (f.line_account_id IS NOT NULL AND f.line_account_id NOT IN (SELECT value FROM json_each(?)))) LIMIT 1`)
+    .bind(id, scope.canSeeUnassigned ? 1 : 0, JSON.stringify(scope.allowedAccountIds)).first();
+  return inaccessible ? null : scope;
 }
 
 export async function requireVisibleScenario(c: Context<Env>, next: () => Promise<void>) {
@@ -289,6 +298,7 @@ export /** 購読行を共有の応答形式へ変換する。 */
 function serializeFriendScenario(row: DbFriendScenario) {
   return {
     id: row.id,
+    confirmationRevision: row.confirmation_revision,
     friendId: row.friend_id,
     scenarioId: row.scenario_id,
     currentStepOrder: row.current_step_order,
@@ -509,7 +519,7 @@ type FriendScenarioOp = 'pause' | 'resume' | 'move' | 'retry';
 
 export interface FriendOpOutcome {
   status: 200 | 201 | 400 | 404 | 409 | 422;
-  body: { success: boolean; data?: unknown; error?: string };
+  body: { success: boolean; data?: unknown; error?: string; current?: unknown };
 }
 
 export /**

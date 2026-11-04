@@ -467,7 +467,7 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   const expected=hasConfirmation?{version:Number(body.expectedVersion),generation:Number(body.expectedPublishGeneration),isDefaultForAll:body.expectedIsDefaultForAll as boolean,pages:body.expectedPages as Array<{id:string;orderIndex:number;lineRichMenuId:string|null}>}:undefined;
   const conflict=async(partial=false)=>{
     const latest=await getRichMenuGroupWithPages(c.env.DB,groupId);
-    return c.json({success:false,code:'RICH_MENU_CONFIRMATION_CHANGED',error:partial?'公開内容が変わりました。一部の取り下げが進んだ可能性があります。最新の状態を確認してください':'公開内容が変わりました。最新の状態を確認してください',data:latest?{version:latest.version,publishingGeneration:latest.publishing_generation??0,status:latest.status,isDefaultForAll:latest.is_default_for_all===1,pages:latest.pages.map(page=>({id:page.id,orderIndex:page.order_index,lineRichMenuId:page.line_richmenu_id}))}:null},409);
+    return c.json({success:false,code:'RICH_MENU_CONFIRMATION_CHANGED',error:partial?'公開内容が変わりました。一部の取り下げが進んだ可能性があります。最新の状態を確認してください':'公開内容が変わりました。最新の状態を確認してください',data:latest?{partial,version:latest.version,publishingGeneration:latest.publishing_generation??0,status:latest.status,isDefaultForAll:latest.is_default_for_all===1,pages:latest.pages.map(page=>({id:page.id,orderIndex:page.order_index,lineRichMenuId:page.line_richmenu_id}))}:{partial}},409);
   };
 
   const account = await getLineAccountById(c.env.DB, group.account_id);

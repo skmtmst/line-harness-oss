@@ -52,6 +52,8 @@ export const richMenusMethods = {
         isDefaultForAll: boolean;
         status: 'draft' | 'published';
         publishingAt: string | null;
+        publicationGeneration?: number;
+        confirmationRevision?: number;
         targetingCondition: string | null;
         targetingPriority: number;
         targetingEnabled: boolean;
@@ -306,6 +308,8 @@ export const richMenusMethods = {
     testApplyState: (groupId: string) =>
       fetchApi<ApiResponse<{
         linked: boolean;
+        confirmationRevision?: number;
+        destinationToken?: string | null;
         linkGuidance: string | null;
         /** 宛先の明示。連携済みの本人LINEだけ。未連携なら null。 */
         destination: { staffName: string | null; lineUserIdMasked: string } | null;
@@ -314,13 +318,13 @@ export const richMenusMethods = {
       }>>(`/api/rich-menu-groups/${groupId}/test-apply`),
 
     /** N-152: 本人確認済みLINEへテスト適用する。confirm: true が必須。 */
-    testApply: (groupId: string, idempotencyKey: string) =>
+    testApply: (groupId: string, idempotencyKey: string, expected?: { expectedConfirmationRevision: number; expectedDestinationToken: string }) =>
       fetchApi<ApiResponse<{ id: string; status: string }>>(
         `/api/rich-menu-groups/${groupId}/test-apply`,
         {
           method: 'POST',
           headers: { 'Idempotency-Key': idempotencyKey },
-          body: JSON.stringify({ confirm: true }),
+          body: JSON.stringify({ confirm: true, ...expected }),
         },
       ),
 

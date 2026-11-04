@@ -14,6 +14,7 @@ import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
+import { scenarioSubscriptionScope } from './scenarios-definition.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { resumeQuestionAnswer, registerLegacyQuestionAnswers } from '../features/scenarios/scenario-question-answer/index.js';
@@ -323,6 +324,8 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       onCompleteScenarioId?: string | null;
     }>();
 
+    const stopScope = body.isActive === false ? await scenarioSubscriptionScope(c, id) : null;
+    if (body.isActive === false && !stopScope) return c.json({ success: false, error: '関連する対象を確認できないため操作できません' }, 403);
     if (body.expectedContentRevision !== undefined && (!Number.isSafeInteger(body.expectedContentRevision) || body.expectedContentRevision < 1)) {
       return inputError(c, { success: false, error: 'invalid_confirmation_revision' }, 400, ['expectedContentRevision']);
     }
@@ -406,6 +409,7 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       ...(body.isActive === false ? { stop: { reason: body.reason?.trim() || null, staffId: c.get('staff')!.id } } : {}),
       expectedRevision: body.expectedContentRevision,
       expectedSubscriptions: body.expectedSubscriptions,
+      accountScope: stopScope ? { accountIds: stopScope.allowedAccountIds, canSeeUnassigned: stopScope.canSeeUnassigned } : undefined,
     });
 
     if (!updated) {
@@ -447,18 +451,20 @@ export const get__api_scenarios_id_move_referrers_8 = async (c: Context<Env, "/a
 export const delete__api_scenarios_id_9 = async (c: Context<Env, "/api/scenarios/:id">) => {
   try {
     const id = c.req.param('id');
+    const scope = await scenarioSubscriptionScope(c, id);
+    if (!scope) return c.json({ success: false, error: '関連する対象を確認できないため操作できません' }, 403);
     const body = await c.req.json<{ expectedContentRevision?: unknown; expectedSubscriptions?: unknown; expectedActiveSubscriptions?: unknown; expectedReferrers?: unknown }>().catch(() => null);
     const revision = body?.expectedContentRevision;
     const subscriptions = body?.expectedSubscriptions;
     const activeSubscriptions = body?.expectedActiveSubscriptions;
     const referrers = body?.expectedReferrers;
     if (revision !== undefined || subscriptions !== undefined || activeSubscriptions !== undefined || referrers !== undefined) {
-      if (!Number.isSafeInteger(revision) || Number(revision) < 1 || !validSubscriptionSummary(subscriptions) || (activeSubscriptions !== undefined && !validSubscriptionSummary(activeSubscriptions))
+      if (!Number.isSafeInteger(revision) || Number(revision) < 1 || !validSubscriptionSummary(subscriptions) || !validSubscriptionSummary(activeSubscriptions)
         || !Array.isArray(referrers) || referrers.some(item => !item || typeof item.id !== 'string' || !item.id || !Number.isSafeInteger(item.revision) || item.revision < 1)
         || new Set(referrers.map(item => item.id)).size !== referrers.length)
         return inputError(c, { success: false, error: 'invalid_confirmation' }, 400, ['expectedContentRevision', 'expectedSubscriptions', 'expectedActiveSubscriptions', 'expectedReferrers']);
     }
-    await deleteScenario(c.env.DB, id, revision === undefined ? undefined : { expectedRevision: revision as number, expectedSubscriptions: subscriptions as { activeCount: number; rowIdSum: number; rowIdSquareSum: number }, expectedActiveSubscriptions: activeSubscriptions as { activeCount: number; rowIdSum: number; rowIdSquareSum: number } | undefined, expectedReferrers: referrers as Array<{id: string; revision: number}> });
+    await deleteScenario(c.env.DB, id, revision === undefined ? undefined : { expectedRevision: revision as number, expectedSubscriptions: subscriptions as { activeCount: number; rowIdSum: number; rowIdSquareSum: number }, expectedActiveSubscriptions: activeSubscriptions as { activeCount: number; rowIdSum: number; rowIdSquareSum: number } | undefined, expectedReferrers: referrers as Array<{id: string; revision: number}>, accountIds: scope.allowedAccountIds, canSeeUnassigned: scope.canSeeUnassigned });
     return c.json({ success: true, data: null });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
@@ -468,7 +474,8 @@ export const delete__api_scenarios_id_9 = async (c: Context<Env, "/api/scenarios
       return c.json({ success: false, error: 'scenario_confirmation_conflict', data: serializeScenario(current) }, 409);
     }
     if (code === 'SCENARIO_HAS_DEPENDENTS' || /FOREIGN KEY/i.test(code)) {
-      return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
+      const scenario = await getScenarioById(c.env.DB, c.req.param('id'));
+      return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。', current: scenario ? serializeScenario(scenario) : null }, 409);
     }
     throw err;
   }

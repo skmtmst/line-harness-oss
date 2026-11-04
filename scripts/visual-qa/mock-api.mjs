@@ -1433,7 +1433,7 @@ const RESTAURANT_SNAPSHOT = {
     total_capacity: 26, ota_capacity: 10, line_capacity: 10, walk_in_capacity: 6,
     reserved_count: h === 19 ? 20 : 8,
   }))),
-  menuItems: RESTAURANT_MENU,
+  menuItems: RESTAURANT_MENU.map((item) => ({...item, confirmation_revision: 1})),
   connectors: [
     { id: 'con-1', store_id: 'store-sby', provider: 'restaurant_board', mode: 'inbound_only', status: 'connected', last_synced_at: restaurantAt(8, 0), last_error: null },
     { id: 'con-2', store_id: 'store-omt', provider: 'restaurant_board', mode: 'inbound_only', status: 'connected', last_synced_at: restaurantAt(8, 0), last_error: null },
@@ -4645,7 +4645,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/auto-replies/ar-new/draft') return { success: true, data: AUTO_REPLY_NEW_DRAFT }
   if (pathname === '/api/auto-replies/ar-new/conflicts') return { success: true, data: { conflicts: AUTO_REPLY_NEW_CONFLICTS, source: 'draft' } }
-  if (pathname === '/api/auto-replies/ar-new') return { success: true, data: AUTO_REPLY_NEW_LIVE }
+  if (pathname === '/api/auto-replies/ar-new') return { success: true, data: { ...AUTO_REPLY_NEW_LIVE, confirmationRevision: 1 } }
   if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
     return { success: true, data: AUTO_REPLY_PUBLISH_DRAFT }
   }
@@ -4657,7 +4657,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const autoReplyOne = /^\/api\/auto-replies\/([^/]+)$/.exec(pathname)
   if (autoReplyOne) {
     const found = AUTO_REPLIES.find((item) => item.id === autoReplyOne[1])
-    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
+    return found ? { success: true, data: { ...found, confirmationRevision: 1 } } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/reminders') {
     const usesListContract = ['page', 'limit', 'q', 'folderId', 'status', 'sort'].some((key) => query.has(key))
@@ -5986,13 +5986,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         success: true,
         data: {
           ...impact,
-          group: { ...impact.group, id: asked.id, name: asked.name, status: asked.status },
-          lineResources: { ...impact.lineResources, isDefaultForAll: Boolean(asked.isDefaultForAll) },
+          group: { ...impact.group, id: asked.id, name: asked.name, status: asked.status, accountId: process.env.VISUAL_QA_ACCOUNT_ID || impact.group.accountId, version: asked.version ?? 1, publishingGeneration: 0 },
+          lineResources: { ...impact.lineResources, isDefaultForAll: Boolean(asked.isDefaultForAll), pages: [{id:`${asked.id}-page`,orderIndex:0,lineRichMenuId:`line-${asked.id}`}] },
           blockers,
         },
       }
     }
-    return { success: true, data: impact }
+    return { success: true, data: { ...impact, group: { ...impact.group, accountId: process.env.VISUAL_QA_ACCOUNT_ID || impact.group.accountId, version: asked?.version ?? 1, publishingGeneration: 0 }, lineResources: { ...impact.lineResources, pages: [{id:`${impact.group.id}-page`,orderIndex:0,lineRichMenuId:impact.group.status === 'published' ? `line-${impact.group.id}` : null}] } } }
   }
   if (pathname === '/api/rich-menu-groups') {
     if (query.has('page') || query.has('limit')) {

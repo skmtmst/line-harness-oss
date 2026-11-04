@@ -1,4 +1,5 @@
 import { getRestaurantReservationForm,putRestaurantReservationForm } from './restaurant-reservation-form.js';
+import { stopRestaurantTable } from './restaurant-table-stop.js';
 import { registerRestaurantSetupProgressRoutes } from './restaurant-setup-progress.js';
 import { getRestaurantFollowupEngines,initializeRestaurantFollowupEngines,saveRestaurantFollowupEngine,testRestaurantFollowupEngineHandler,startRestaurantFollowupEngineHandler } from './restaurant-followup-engine.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -135,6 +136,7 @@ restaurantTest.post('/api/restaurant-test/memberships', requireRole('owner', 'ad
 restaurantTest.delete('/api/restaurant-test/tables/:id', requireRole('owner', 'admin'), delete__api_restaurant_test_tables_id);
 
 restaurantTest.patch('/api/restaurant-test/tables/:id', requireRole('owner', 'admin'), inputJsonBoundary({"code":["string"],"label":["string"],"seatType":["string"],"minCapacity":["number"],"maxCapacity":["number"],"isActive":["boolean"],"floorX":["number"],"floorY":["number"],"joinGroup":["null","string"]}), patch__api_restaurant_test_tables_id_4);
+restaurantTest.post('/api/restaurant-test/tables/:id/stop', requireRole('owner', 'admin'), inputJsonBoundary(), stopRestaurantTable);
 
 restaurantTest.patch('/api/restaurant-test/memberships/:id', requireRole('owner', 'admin'), inputJsonBoundary({"storeId":["null","string"],"staffName":["string"],"email":["null","string"],"role":["string"],"lineUid":["null","string"],"googleEmail":["null","string"],"status":["string"],"expectedPolicyVersion":["number"],"idempotencyKey":["string"]}), patch__api_restaurant_test_memberships_id_5);
 

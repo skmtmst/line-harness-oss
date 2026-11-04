@@ -46,6 +46,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   restaurantGoogleApi,
+  type GoogleConnectionData,
   type GooglePost,
   type GooglePostCtaType,
   type GooglePostDraftInput,
@@ -122,7 +123,7 @@ function instagramFact(ig: NonNullable<GooglePost['instagram']>): string {
   return ig.caption ? 'Google と同時に出します（Instagram 用の文章あり）' : 'Google と同時に出します（本文をそのまま使います）'
 }
 
-export function PostsBoard({ accountId, go, store, googleLocation }: { accountId: string; go: GoogleNav; store?: { id: string; name?: string | null }; googleLocation?: string | null }) {
+export function PostsBoard({ accountId, go, store, googleLocation, connection, onConnectionReloaded }: { accountId: string; go: GoogleNav; store?: { id: string; name?: string | null }; googleLocation?: string | null; connection?: { id?: string; confirmationRevision?: number }; onConnectionReloaded?: (data: GoogleConnectionData) => void }) {
   const scope = useRef({ id: accountId, generation: 0 })
   if (scope.current.id !== accountId) scope.current = { id: accountId, generation: scope.current.generation + 1 }
   const loadedScope = useRef(-1)
@@ -139,7 +140,8 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
   const [confirmRemove, setConfirmRemove] = useState<GooglePost | null>(null)
   const removeTicket = useRef<object | null>(null)
   const renderedRemoveTicket = removeTicket.current
-  const [removeScope, setRemoveScope] = useState<{ id: string; generation: number; store?: { id: string; name?: string | null }; googleLocation?: string | null } | null>(null)
+  const [removeScope, setRemoveScope] = useState<{ id: string; generation: number; store?: { id: string; name?: string | null }; googleLocation?: string | null; connectionId?: string; connectionRevision?: number } | null>(null)
+
   const [actionError, setActionError] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const { allowed: canPublish, lockedReason: publishReason, canView } = useGooglePermission('manager', data?.permissions?.canPublish ?? false)
@@ -191,15 +193,34 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
     setBusyId(confirmRemove.id)
     setActionError('')
     try {
-      await restaurantGoogleApi.removePost(accountId, confirmRemove.id)
+      if (!Number.isSafeInteger(confirmRemove.confirmationRevision) || !Number.isSafeInteger(removeScope?.connectionRevision) || !removeScope?.connectionId) throw new Error('確認した版がありません')
+      await restaurantGoogleApi.removePost(accountId, confirmRemove.id, { expectedPostRevision: confirmRemove.confirmationRevision!, expectedConnectionRevision: removeScope.connectionRevision!, expectedConnectionId: removeScope.connectionId })
       if (!alive.current || requestScope !== scope.current || requestTicket !== removeTicket.current) return false
       removeTicket.current = null
+
       setConfirmRemove(null)
       await load()
       return true
     } catch (err) {
       if (!alive.current || requestScope !== scope.current || requestTicket !== removeTicket.current) return false
       setActionError(errorMessage(err, '削除できませんでした。'))
+      if (err instanceof ApiError && err.status === 409) {
+        const generation = scope.current.generation
+        try {
+          const [latestPosts, latestConnection] = await Promise.all([
+            restaurantGoogleApi.posts(accountId, { filter, kind, page, perPage }),
+            restaurantGoogleApi.connection(accountId),
+          ])
+          if (!alive.current || generation !== scope.current.generation) return false
+          const latest = latestConnection.connection?.id && Number.isSafeInteger(latestConnection.connection.confirmationRevision)
+            ? latestPosts.posts.find(item => item.id === confirmRemove.id && item.status === 'published') : undefined
+          onConnectionReloaded?.(latestConnection)
+          setData(latestPosts)
+          setConfirmRemove(latest ?? null)
+          setRemoveScope(previous => previous && latest ? { ...previous, googleLocation: latestConnection.connection?.locationTitle,
+            connectionId: latestConnection.connection?.id, connectionRevision: latestConnection.connection?.confirmationRevision } : null)
+        } catch { if (alive.current && generation === scope.current.generation) setConfirmRemove(null) }
+      }
       return false
     } finally {
       setBusyId(null)
@@ -230,7 +251,8 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
     if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', group: 'view', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
-    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { removeTicket.current = {}; setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation }); setConfirmRemove(post) } } })
+    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { removeTicket.current = {}; setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation, connectionId: connection?.id, connectionRevision: connection?.confirmationRevision }); setConfirmRemove(post) } } })
+
     if (!canView) return items.map(item => ({ ...item, disabled: true, lockedReason: undefined }))
     return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
   }

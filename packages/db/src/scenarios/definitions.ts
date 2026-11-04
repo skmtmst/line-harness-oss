@@ -93,7 +93,7 @@ export async function updateScenario(
   db: D1Database,
   id: string,
   updates: UpdateScenarioInput,
-  options?: { stop?: { reason: string | null; staffId: string }; expectedRevision?: number; expectedSubscriptions?: { activeCount: number; rowIdSum: number; rowIdSquareSum: number } },
+  options?: { stop?: { reason: string | null; staffId: string }; expectedRevision?: number; expectedSubscriptions?: { activeCount: number; rowIdSum: number; rowIdSquareSum: number }; accountScope?: { accountIds: string[]; canSeeUnassigned: boolean } },
 ): Promise<Scenario | null> {
   const now = jstNow();
   const fields: string[] = [];
@@ -163,7 +163,7 @@ export async function updateScenario(
       .first<Scenario>();
   }
 
-  fields.push('updated_at = ?');
+  fields.push('content_revision = content_revision + 1', 'updated_at = ?');
   values.push(now);
   values.push(id);
 
@@ -171,12 +171,13 @@ export async function updateScenario(
   // 最後の行が削除されると rowid が再利用され、入れ替わりを検知できない場合がある。
   const expected = options?.expectedSubscriptions;
   const updated = await db
-    .prepare(`UPDATE scenarios SET content_revision = content_revision + 1, ${fields.join(', ')}
+    .prepare(`UPDATE scenarios SET ${fields.join(', ')}
       WHERE id = ? AND (? IS NULL OR content_revision = ?)
       AND (? IS NULL OR ((SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status IN ('active','delivering'))=?
         AND (SELECT COALESCE(SUM(rowid),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status IN ('active','delivering'))=?
-        AND (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status IN ('active','delivering'))=?))`)
-    .bind(...values, options?.expectedRevision ?? null, options?.expectedRevision ?? null, expected?.activeCount ?? null, expected?.activeCount ?? null, expected?.rowIdSum ?? null, expected?.rowIdSquareSum ?? null)
+        AND (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status IN ('active','delivering'))=?))
+      AND (? IS NULL OR NOT EXISTS (SELECT 1 FROM friend_scenarios fs LEFT JOIN friends f ON f.id=fs.friend_id WHERE fs.scenario_id=scenarios.id AND (f.id IS NULL OR (f.line_account_id IS NULL AND ?=0) OR (f.line_account_id IS NOT NULL AND f.line_account_id NOT IN (SELECT value FROM json_each(?))))))` )
+    .bind(...values, options?.expectedRevision ?? null, options?.expectedRevision ?? null, expected?.activeCount ?? null, expected?.activeCount ?? null, expected?.rowIdSum ?? null, expected?.rowIdSquareSum ?? null, options?.accountScope ? 1 : null, options?.accountScope?.canSeeUnassigned ? 1 : 0, JSON.stringify(options?.accountScope?.accountIds ?? []))
     .run();
   if (!updated.meta.changes && (options?.expectedRevision !== undefined || expected !== undefined)) throw new Error('SCENARIO_CONFIRMATION_CONFLICT');
 
@@ -205,7 +206,7 @@ export async function updateScenario(
  *   mode='pause'（何もしない）へ戻し、整合した設定にする。削除の確認窓で
  *   参照元の名前を見せてから消す（窓側の役目）。
  */
-export async function deleteScenario(db: D1Database, id: string, confirmation?: { expectedRevision: number; expectedSubscriptions: { activeCount: number; rowIdSum: number; rowIdSquareSum: number }; expectedActiveSubscriptions?: { activeCount: number; rowIdSum: number; rowIdSquareSum: number }; expectedReferrers: Array<{ id: string; revision: number }> }): Promise<void> {
+export async function deleteScenario(db: D1Database, id: string, confirmation?: { expectedRevision: number; expectedSubscriptions: { activeCount: number; rowIdSum: number; rowIdSquareSum: number }; expectedActiveSubscriptions?: { activeCount: number; rowIdSum: number; rowIdSquareSum: number }; expectedReferrers: Array<{ id: string; revision: number }>; accountIds?: string[]; canSeeUnassigned?: boolean }): Promise<void> {
   const dependent = await db.prepare(
     `SELECT id FROM affiliate_offers WHERE scenario_id = ? LIMIT 1`,
   ).bind(id).first<{ id: string }>();
@@ -232,11 +233,12 @@ export async function deleteScenario(db: D1Database, id: string, confirmation?: 
       AND (? IS NULL OR ((SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status IN ('active','delivering'))=?
         AND (SELECT COALESCE(SUM(rowid),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status IN ('active','delivering'))=?
         AND (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status IN ('active','delivering'))=?))
+      AND (? IS NULL OR NOT EXISTS (SELECT 1 FROM friend_scenarios fs LEFT JOIN friends f ON f.id=fs.friend_id WHERE fs.scenario_id=scenarios.id AND (f.id IS NULL OR (f.line_account_id IS NULL AND ?=0) OR (f.line_account_id IS NOT NULL AND f.line_account_id NOT IN (SELECT value FROM json_each(?))))))
       AND (SELECT COUNT(*) FROM scenarios ref WHERE ref.on_complete_scenario_id=scenarios.id)=json_array_length(?)
       AND NOT EXISTS (SELECT 1 FROM scenarios ref WHERE ref.on_complete_scenario_id=scenarios.id
         AND NOT EXISTS (SELECT 1 FROM json_each(?) expected WHERE json_extract(expected.value,'$.id')=ref.id
           AND json_extract(expected.value,'$.revision')=ref.content_revision))`)
-      .bind(id, confirmation.expectedRevision, expected!.activeCount, expected!.rowIdSum, expected!.rowIdSquareSum, expectedActive?.activeCount ?? null, expectedActive?.activeCount ?? null, expectedActive?.rowIdSum ?? null, expectedActive?.rowIdSquareSum ?? null, expectedReferrers, expectedReferrers)
+      .bind(id, confirmation.expectedRevision, expected!.activeCount, expected!.rowIdSum, expected!.rowIdSquareSum, expectedActive?.activeCount ?? null, expectedActive?.activeCount ?? null, expectedActive?.rowIdSum ?? null, expectedActive?.rowIdSquareSum ?? null, confirmation.accountIds ? 1 : null, confirmation.canSeeUnassigned ? 1 : 0, JSON.stringify(confirmation.accountIds ?? []), expectedReferrers, expectedReferrers)
       : db.prepare(`DELETE FROM scenarios WHERE id = ?`).bind(id),
     ...(confirmation ? [db.prepare(`SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'scenario_delete_conflict' END)`)] : []),
     db.prepare(`DELETE FROM scenario_publish_keys WHERE scenario_id = ?`).bind(id),

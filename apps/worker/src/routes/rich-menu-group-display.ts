@@ -13,6 +13,8 @@ export function serializeGroup(row: RichMenuGroup) {
     isDefaultForAll: row.is_default_for_all === 1,
     status: row.status,
     publishingAt: row.publishing_at,
+    publicationGeneration: row.publishing_generation,
+    confirmationRevision: row.confirmation_revision,
     targetingCondition: row.targeting_condition,
     targetingPriority: row.targeting_priority,
     targetingEnabled: row.targeting_enabled === 1,

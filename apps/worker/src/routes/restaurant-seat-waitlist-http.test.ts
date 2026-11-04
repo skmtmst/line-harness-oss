@@ -1,3 +1,4 @@
+import { processBookingWaitlists } from '../services/waitlist-tick.js';
 import { seedExistingRestaurantFollowup } from '../test-utils/restaurant-followup-fixture.js';
 import { publishScenarioVersion } from '@line-crm/db';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
@@ -127,6 +128,63 @@ function del(path: string) {
   }, env);
 }
 
+describe('卓の停止と予約移動の一括確認', () => {
+  function fixture() {
+    if (!testDb.raw.prepare("PRAGMA table_info(rt_reservations)").all().some((row: any) => row.name === 'confirmation_revision')) {
+      testDb.raw.exec('ALTER TABLE rt_reservations ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1');
+    }
+    seedReservation('stop-r1');
+    testDb.raw.prepare("UPDATE rt_reservations SET starts_at='2099-01-01T10:00:00Z', ends_at='2099-01-01T11:00:00Z' WHERE id='stop-r1'").run();
+    seedReservation('stop-r2');
+    testDb.raw.prepare("UPDATE rt_reservations SET starts_at='2099-01-01T12:00:00Z', ends_at='2099-01-01T13:00:00Z' WHERE id='stop-r2'").run();
+    return { storeId: 'store-s', expectedTableRevision: 1, reservations: [
+      { id: 'stop-r1', expectedRevision: 1, targetTableId: null as string | null },
+      { id: 'stop-r2', expectedRevision: 1, targetTableId: null as string | null },
+    ] };
+  }
+  function state() {
+    return { table: testDb.raw.prepare("SELECT is_active, confirmation_revision FROM rt_tables WHERE id='table-1'").get(),
+      reservations: testDb.raw.prepare("SELECT id,table_id,confirmation_revision FROM rt_reservations WHERE id LIKE 'stop-r%' ORDER BY id").all() };
+  }
+  it('古い予約の版では何も変更せず409を返す', async () => {
+    const body = fixture(); const before = state(); body.reservations[1].expectedRevision = 2;
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
+  it('途中の更新が失敗するとすべて巻き戻る', async () => {
+    const body = fixture(); const before = state();
+    testDb.raw.exec("CREATE TRIGGER reject_second_stop BEFORE UPDATE ON rt_reservations WHEN OLD.id='stop-r2' BEGIN SELECT RAISE(ABORT, 'CHECK constraint failed: fixture'); END");
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
+  it.each(['closure_conflict', 'customer_table_conflict'])('%s は理由付き409で全更新を戻す', async (code) => {
+    const body = fixture(); const before = state();
+    testDb.raw.exec(`CREATE TRIGGER reject_conflict BEFORE UPDATE ON rt_reservations WHEN OLD.id='stop-r2' BEGIN SELECT RAISE(ABORT, '${code}'); END`);
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code, reason: expect.any(String) });
+    expect(state()).toEqual(before);
+  });
+  it('同じ確認の二重実行は一度だけ成功する', async () => {
+    const body = fixture();
+    const responses = await Promise.all([post('/api/restaurant-test/tables/table-1/stop', body), post('/api/restaurant-test/tables/table-1/stop', body)]);
+    expect(responses.map(r => r.status).sort()).toEqual([200,409]);
+    expect(state().table).toEqual({ is_active: 0, confirmation_revision: 2 });
+  });
+  it('確認した予約を入る卓へ移して停止する', async () => {
+    const body = fixture(); body.reservations[0].targetTableId = 'table-2';
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(200);
+    expect(state().reservations).toEqual([{ id: 'stop-r1', table_id: 'table-2', confirmation_revision: 2 }, { id: 'stop-r2', table_id: null, confirmation_revision: 2 }]);
+  });
+  it('確認後に予約が追加されるとすべて保ったまま409になる', async () => {
+    const body = fixture(); seedReservation('stop-r3');
+    testDb.raw.prepare("UPDATE rt_reservations SET starts_at='2099-01-01T14:00:00Z', ends_at='2099-01-01T15:00:00Z' WHERE id='stop-r3'").run();
+    const before = state(); const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
+});
+
 beforeEach(() => {
   authMocks.getStaffByApiKey.mockReset();
   authMocks.getStaffByApiKey.mockResolvedValue(null);
@@ -167,6 +225,48 @@ async function approveFollowup(){
 }
 
 describe('席の空き待ち', () => {
+  test('古い確認では取消も次の組への通知もしない', async () => {
+    const created = await post('/api/restaurant-test/seat-waitlist', { storeId: 'store-s', startsAt: SLOT, guestCount: 2, customerName: '試験', lineUid: 'U-seat-a' });
+    const id = (await created.json() as { data: { id: string } }).data.id;
+    await post('/api/restaurant-test/seat-waitlist', { storeId: 'store-s', startsAt: SLOT, guestCount: 2, customerName: '次の組', lineUid: 'U-next' });
+    testDb.raw.prepare("UPDATE rt_seat_waitlist SET status='invited',table_id='table-1',hold_expires_at=?,confirmation_revision=confirmation_revision+1 WHERE id=?").run(SLOT, id);
+    const response = await del(`/api/restaurant-test/seat-waitlist/${id}?expectedConfirmationRevision=1`);
+    expect(response.status).toBe(409);
+    expect(testDb.raw.prepare('SELECT status FROM rt_seat_waitlist WHERE id=?').get(id)).toEqual({ status: 'invited' });
+    expect(testDb.raw.prepare("SELECT status FROM rt_seat_waitlist WHERE line_uid='U-next'").get()).toEqual({ status: 'waiting' });
+    expect(cardSender).not.toHaveBeenCalled();
+    expect(commonSender).not.toHaveBeenCalled();
+  });
+  test('見回りだけでは確認した版が変わらず取消できる', async () => {
+    const created = await post('/api/restaurant-test/seat-waitlist', { storeId: 'store-s', startsAt: SLOT, guestCount: 2, customerName: '試験', lineUid: 'U-seat-a' });
+    const id = (await created.json() as { data: { id: string } }).data.id;
+    testDb.raw.exec("UPDATE rt_tables SET is_active=0 WHERE store_id='store-s'");
+    await processBookingWaitlists(env, undefined, 'store-s');
+    expect((await del(`/api/restaurant-test/seat-waitlist/${id}?expectedConfirmationRevision=1`)).status).toBe(200);
+  });
+  test('読み取り後に版が変われば取消と送信をしない', async () => {
+    const created = await post('/api/restaurant-test/seat-waitlist', { storeId: 'store-s', startsAt: SLOT, guestCount: 2, customerName: '試験', lineUid: 'U-seat-a' });
+    const id = (await created.json() as { data: { id: string } }).data.id;
+    const original = testDb.db.prepare.bind(testDb.db);
+    const spy = vi.spyOn(testDb.db, 'prepare').mockImplementation((sql) => {
+      if (sql.includes("status = 'cancelled'") && sql.includes('UPDATE rt_seat_waitlist')) {
+        testDb.raw.prepare('UPDATE rt_seat_waitlist SET confirmation_revision=confirmation_revision+1 WHERE id=?').run(id);
+      }
+      return original(sql);
+    });
+    try {
+      expect((await del(`/api/restaurant-test/seat-waitlist/${id}?expectedConfirmationRevision=1`)).status).toBe(409);
+      expect(testDb.raw.prepare('SELECT status FROM rt_seat_waitlist WHERE id=?').get(id)).toEqual({ status: 'waiting' });
+      expect(cardSender).not.toHaveBeenCalled();
+    } finally { spy.mockRestore(); }
+  });
+  test('一致する確認は一度だけ取り消せる', async () => {
+    const created = await post('/api/restaurant-test/seat-waitlist', { storeId: 'store-s', startsAt: SLOT, guestCount: 2, customerName: '試験', lineUid: 'U-seat-a' });
+    const id = (await created.json() as { data: { id: string } }).data.id;
+    expect((await del(`/api/restaurant-test/seat-waitlist/${id}?expectedConfirmationRevision=1`)).status).toBe(200);
+    expect((await del(`/api/restaurant-test/seat-waitlist/${id}?expectedConfirmationRevision=1`)).status).toBe(409);
+    expect(testDb.raw.prepare('SELECT status,confirmation_revision FROM rt_seat_waitlist WHERE id=?').get(id)).toEqual({ status: 'cancelled', confirmation_revision: 2 });
+  });
   test('登録・二重登録は409・一覧・取り消し', async () => {
     const body = {
       storeId: 'store-s', startsAt: SLOT, guestCount: 2,

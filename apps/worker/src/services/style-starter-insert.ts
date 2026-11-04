@@ -284,7 +284,7 @@ export async function insertStyleStarterItems(
       statements.push(
         db
           .prepare(
-            'UPDATE automation_definitions SET current_draft_version_id=? WHERE id=?',
+            'UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, current_draft_version_id=? WHERE id=?',
           )
           .bind(draftId, id),
       );

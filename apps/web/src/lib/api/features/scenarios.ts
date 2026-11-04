@@ -153,6 +153,8 @@ export const scenariosMethods = {
         method: 'PUT',
         body: JSON.stringify({ ...data, isActive: false }),
       }),
+    bulkStop: (items: Array<{ id: string; revision: number; activeCount: number; rowIdSum: number; rowIdSquareSum: number }>) =>
+      fetchApi<ApiResponse<{ stopped: number }>>('/api/scenarios/bulk-stop', { method: 'POST', body: JSON.stringify({ items }) }),
     delete: (id: string, confirmation?: Pick<ScenarioConfirmation, 'contentRevision' | 'activeCount' | 'rowIdSum' | 'rowIdSquareSum' | 'totalCount' | 'totalRowIdSum' | 'totalRowIdSquareSum' | 'referrers'>) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE', ...(confirmation ? { body: JSON.stringify({ expectedContentRevision: confirmation.contentRevision, expectedSubscriptions: { activeCount: confirmation.totalCount, rowIdSum: confirmation.totalRowIdSum, rowIdSquareSum: confirmation.totalRowIdSquareSum }, expectedActiveSubscriptions: { activeCount: confirmation.activeCount, rowIdSum: confirmation.rowIdSum, rowIdSquareSum: confirmation.rowIdSquareSum }, expectedReferrers: confirmation.referrers }) } : {}) }),
     /**
@@ -271,13 +273,13 @@ export const scenariosMethods = {
           { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
         ),
       /** 購読を別のシナリオへ移す。返るのは移し先でできた新しい購読。 */
-      move: (subscriptionId: string, targetScenarioId: string, idempotencyKey: string) =>
+      move: (subscriptionId: string, targetScenarioId: string, idempotencyKey: string, confirmation?: { revision: number; status: string }) =>
         fetchApi<ApiResponse<FriendScenarioSubscription>>(
           `/api/scenario-subscriptions/${subscriptionId}/move`,
           {
             method: 'POST',
             headers: { 'Idempotency-Key': idempotencyKey },
-            body: JSON.stringify({ targetScenarioId }),
+            body: JSON.stringify({ targetScenarioId, expectedConfirmationRevision: confirmation?.revision, expectedStatus: confirmation?.status }),
           },
         ),
     },

@@ -16,6 +16,8 @@ const handoversGet = vi.hoisted(() => vi.fn())
 const handoversSaveDecisions = vi.hoisted(() => vi.fn())
 const handoversExecute = vi.hoisted(() => vi.fn())
 const handoversCancel = vi.hoisted(() => vi.fn())
+const handoversRollback = vi.hoisted(() => vi.fn())
+
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -32,6 +34,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         saveDecisions: handoversSaveDecisions,
         execute: handoversExecute,
         cancel: handoversCancel,
+        rollback: handoversRollback,
+
       },
     },
   }
@@ -67,6 +71,7 @@ import HandoverV8 from './handover'
 function handoverDetail(over: Record<string, unknown> = {}) {
   return {
     id: 'h1',
+    confirmationRevision: 4,
     status: 'previewed',
     code: 'ABC123',
     fromAccountId: 'acc-1',
@@ -122,7 +127,9 @@ beforeEach(() => {
   handoversGet.mockReset()
   handoversSaveDecisions.mockReset()
   handoversExecute.mockReset()
-  handoversCancel.mockReset()
+  handoversCancel.mockReset().mockResolvedValue({ success: true, data: {} })
+  handoversRollback.mockReset().mockResolvedValue({ success: true, data: { restoredCount: 1 } })
+
   lineAccountsGet.mockResolvedValue({ success: true, data: { id: 'acc-1', name: '然-NEN-TEST' } })
   lineAccountsList.mockResolvedValue({ success: true, data: [{ id: 'acc-2', name: '然-NEN-本店' }] })
   staffMe.mockResolvedValue({ success: true, data: { role: 'owner' } })
@@ -176,6 +183,24 @@ it.each([
   expect(dialog?.textContent).toContain('移し先のLINEアカウント')
   expect(dialog?.textContent).toContain('検証環境')
   expect(handoversExecute).not.toHaveBeenCalled()
+})
+
+it.each([
+  ['本実行する','本実行する','previewed',null],
+  ['引き継ぎをやめる','引き継ぎを取り消す','previewed',null],
+  ['切り戻す','切り戻す','completed','2099-01-01T00:00:00.000Z'],
+])('%s は確認時の版を渡す', async (openLabel, confirmLabel, status, rollbackDeadline) => {
+  handoversGet.mockResolvedValue({ success:true,data:handoverDetail({unresolvedReviews:0,status,rollbackDeadline}) })
+  handoversExecute.mockResolvedValue({ success:true,data:{movedCount:1} })
+  await renderV8()
+  const open = [...document.querySelectorAll('button')].find(el => el.textContent?.includes(openLabel))!
+  await act(async()=>{open.click()})
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+  const confirm = [...dialog.querySelectorAll('button')].find(el=>el.textContent?.trim()===confirmLabel)!
+  await act(async()=>{confirm.click(); await Promise.resolve()})
+  if (status==='completed') expect(handoversRollback).toHaveBeenCalledWith('h1',undefined,'token',4)
+  else if (openLabel==='本実行する') expect(handoversExecute).toHaveBeenCalledWith('h1','token',4)
+  else expect(handoversCancel).toHaveBeenCalledWith('h1',4)
 })
 
 

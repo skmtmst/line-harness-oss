@@ -12,6 +12,8 @@ import styles from '@/app/rich-menus/new/create-v8.module.css'
 
 type TestApplyState = {
   linked: boolean
+  confirmationRevision?: number
+  destinationToken?: string | null
   linkGuidance: string | null
   destination: { staffName: string | null; lineUserIdMasked: string } | null
   active: RichMenuTestApplyItem | null
@@ -44,6 +46,7 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
   const [actionError, setActionError] = useState('')
   const keyRef = useRef('')
   const busyRef = useRef(false)
+  const confirmation = useRef<{ expectedConfirmationRevision: number; expectedDestinationToken: string } | null>(null)
   const generation = useRef(0)
   const mounted = useRef(false)
   const context = useRef({ groupId, accountId })
@@ -64,6 +67,7 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
       if (!res.success) throw new Error(res.error)
       setState(res.data)
       setLoadError('')
+      return res.data
     } catch (e) {
       if (request !== generation.current) return
       setLoadError(e instanceof ApiError && e.status === 403
@@ -77,7 +81,10 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
   }, [open, load])
 
   function openConfirm(kind: 'apply' | 'revert') {
+    confirmation.current = typeof state?.confirmationRevision === 'number' && state.destinationToken
+      ? { expectedConfirmationRevision: state.confirmationRevision, expectedDestinationToken: state.destinationToken } : null
     confirmTicket.current = { context: context.current, applyId: kind === 'revert' ? state?.active?.id ?? null : null }
+
     keyRef.current = crypto.randomUUID()
     setActionError('')
     setConfirmKind(kind)
@@ -92,7 +99,8 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
     const request = generation.current
     try {
       if (confirmKind === 'apply') {
-        const res = await api.richMenuGroups.testApply(groupId, keyRef.current)
+        if (!confirmation.current) throw new Error('確認した版がありません')
+        const res = await api.richMenuGroups.testApply(groupId, keyRef.current, confirmation.current)
         if (request !== generation.current) return
         if (!res.success) throw new Error(res.error)
         setNotice('あなたのLINEにこのメニューを出しました。LINEアプリで見え方を確認してください。')
@@ -107,6 +115,15 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
       await load()
     } catch (e) {
       if (request !== generation.current) return
+      if (e instanceof ApiError && e.status === 409) {
+        confirmation.current = null
+        const latest = await load()
+        if (!mounted.current) return
+        if (latest?.linked && typeof latest.confirmationRevision === 'number' && latest.destinationToken) {
+          confirmation.current = { expectedConfirmationRevision: latest.confirmationRevision, expectedDestinationToken: latest.destinationToken }
+          keyRef.current = crypto.randomUUID()
+        } else setConfirmKind(null)
+      }
       setActionError(e instanceof ApiError && e.status === 409
         ? 'ほかの操作と重なりました。状態を確認してから、もう一度お試しください。'
         : confirmKind === 'apply'
