@@ -114,6 +114,7 @@ beforeEach(() => {
 
 describe('ファイルの安全確認の設定画面', () => {
   const externalConfig = {
+    confirmationRevision: 7,
     externalProvider: 'scanner', externalEndpointUrl: 'https://scan.example.com/check',
     externalSecretRef: 'FILE_SCAN_SECRET_PRIMARY', externalEnabled: true,
     externalTimeoutMs: 10000, maxBytesOverride: null, maxPixelsOverride: null, updatedAt: '2026-10-12T00:00:00Z',
@@ -346,6 +347,7 @@ describe('ファイルの安全確認の設定画面', () => {
       success: true,
       data: {
         config: {
+          confirmationRevision: 7,
           externalProvider: 'acme-scan',
           externalEndpointUrl: 'https://scan.example.com/check',
           externalSecretRef: 'FILE_SCAN_API_KEY',
@@ -377,8 +379,25 @@ describe('ファイルの安全確認の設定画面', () => {
         externalProvider: null,
         externalEndpointUrl: null,
         externalSecretRef: null,
+        expectedConfirmationRevision: 7,
       })
     })
+  })
+
+  test('外部検査を止める確認窓は開いた時の版を固定する', async () => {
+    ready()
+    const config = { ...externalConfig }
+    mocks.getConfig.mockResolvedValue({ success: true, data: { config } })
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    mocks.saveConfig.mockResolvedValue({ success: true, data: { lineAccountId: 'acc-1' } })
+    render(<FileScanSettingsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '外の検査を止める' }))
+    await screen.findByRole('heading', { name: '外の検査を止める' })
+    config.confirmationRevision = 8
+    confirmInDialog('外の検査を止める')
+    await waitFor(() => expect(mocks.saveConfig).toHaveBeenCalledWith('acc-1', {
+      externalProvider: null, externalEndpointUrl: null, externalSecretRef: null, expectedConfirmationRevision: 7,
+    }))
   })
 
   test('外部検査の停止中に切り替えても切替先の設定を操作できる', async () => {
@@ -473,6 +492,7 @@ describe('ファイルの安全確認の設定画面', () => {
       success: true,
       data: {
         config: {
+          confirmationRevision: 7,
           externalProvider: 'acme-scan',
           externalEndpointUrl: 'https://scan.example.com/check',
           externalSecretRef: 'FILE_SCAN_API_KEY',

@@ -67,7 +67,7 @@ export function useFileScan() {
   const [secretRef, setSecretRef] = useState('')
   const [configBusy, setConfigBusy] = useState(false)
   const [stopExternal, setStopExternal] = useState(false)
-  const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object; revision: number | undefined } | null>(null)
   const stopTicket = useRef<object | null>(null)
   const stopLock = useRef<object | null>(null)
   const configLock = useRef<object | null>(null)
@@ -264,6 +264,7 @@ export function useFileScan() {
    */
   async function stopExternalConfig() {
     if (!canEditRef.current || !selectedAccountId || !stopScope || stopScope.scope !== scope.current || stopScope.ticket !== stopTicket.current || loadedScope.current !== stopScope.scope || !mounted.current || stopLock.current || configLock.current) return
+    if (!stopScope.revision) { setStopError('設定を消せませんでした。'); return }
     const current = () => mounted.current && canEditRef.current && stopScope.scope === scope.current && stopScope.ticket === stopTicket.current
     const lock = {}; stopLock.current = lock; configLock.current = lock; setConfigBusy(true)
     setStopError('')
@@ -272,6 +273,7 @@ export function useFileScan() {
         externalProvider: null,
         externalEndpointUrl: null,
         externalSecretRef: null,
+        expectedConfirmationRevision: stopScope.revision,
       })
       if (!current()) return
       if (!res.success) {
@@ -331,7 +333,7 @@ export function useFileScan() {
   const changeStopExternal = (open: boolean) => {
     if (open) {
       if (!canOpen()) return
-      const ticket = {}; stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket }); setStopExternal(true)
+      const ticket = {}; stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket, revision: config?.confirmationRevision }); setStopExternal(true)
     } else if (stopScope?.ticket === stopTicket.current) { stopTicket.current = null; setStopExternal(false) }
   }
 

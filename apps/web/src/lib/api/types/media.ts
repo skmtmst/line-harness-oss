@@ -54,6 +54,7 @@ export type FileScanItem = {
 }
 
 export type FileScanConfig = {
+  confirmationRevision?: number
   externalProvider: string | null
   externalEndpointUrl: string | null
   externalSecretRef: string | null

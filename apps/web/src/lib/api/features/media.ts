@@ -228,6 +228,7 @@ export const mediaMethods = {
       externalTimeoutMs?: number
       maxBytesOverride?: number | null
       maxPixelsOverride?: number | null
+      expectedConfirmationRevision?: number
     }) =>
       fetchApi<ApiResponse<{ lineAccountId: string }>>(
         '/api/file-scans/config',
