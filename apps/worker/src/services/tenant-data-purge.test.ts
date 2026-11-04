@@ -104,12 +104,15 @@ describe('tenant data retention purge', () => {
   test('期限切れの試用は保護表を消せるが、契約中は削除要請があっても保護表を消せない', async () => {
     seedTenant('trial', { planStatus: 'trialing', trialEndsAt: jst(-100), anchor: jst(-99) });
     seedTenant('active', { planStatus: 'active', requested: jst(-1) });
-    sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES ('trial-h', 'trial', 'tag', 'test'), ('active-h', 'active', 'tag', 'test')").run();
+    seedTenant('future-trial', { planStatus: 'trialing', trialEndsAt: jst(1), requested: jst(-1) });
+    sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES ('trial-h', 'trial', 'tag', 'test'), ('active-h', 'active', 'tag', 'test'), ('future-h', 'future-trial', 'tag', 'test')").run();
     const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
     expect(result.completed).toBe(1);
-    expect(result.failedTenants).toBe(1);
+    expect(result.failedTenants).toBe(0);
+    expect(result.tenants).toBe(1);
     expect(count('hq_templates', 'id = ?', 'trial-h')).toBe(0);
     expect(count('hq_templates', 'id = ?', 'active-h')).toBe(1);
+    expect(count('hq_templates', 'id = ?', 'future-h')).toBe(1);
     expect(count('tenant_purge_guard', '1 = 1')).toBe(0);
   });
 
@@ -121,6 +124,63 @@ describe('tenant data retention purge', () => {
     expect(result.failedTenants).toBe(1);
     expect(count('tenant_purge_guard', '1 = 1')).toBe(0);
     expect(count('hq_templates', 'id = ?', 'h1')).toBe(1);
+  });
+
+  test('失敗が続く3統括より未処理の統括を優先し、次の回に削除する', async () => {
+    for (const id of ['a', 'b', 'c', 'd']) {
+      seedTenant(id, { anchor: jst(-100) });
+      sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES (?, ?, 'tag', 'test')").run(`h-${id}`, id);
+    }
+    sqlite.raw.exec("CREATE TRIGGER test_failure BEFORE DELETE ON hq_templates WHEN OLD.tenant_id <> 'd' BEGIN SELECT RAISE(ABORT, 'fixture'); END");
+    const first = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+    expect(first.failedTenants).toBe(3);
+    const next = new Date(Date.parse(NOW) + 6 * 60 * 60 * 1000).toISOString();
+    const second = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: next });
+    expect(second.completed).toBe(1);
+    expect(count('hq_templates', 'tenant_id = ?', 'd')).toBe(0);
+    expect(count('hq_templates', "tenant_id IN ('a','b','c')")).toBe(3);
+  });
+
+  test('予期しない失敗でも統括と削除済み件数を安全なコードで記録する', async () => {
+    seedTenant('t1', { anchor: jst(-91) });
+    seedFriends('t1', 1);
+    seedMedia('t1', 'private-object-key');
+    const DB = new Proxy(sqlite.db, { get(target, prop) {
+      if (prop === 'prepare') return (sql: string) => {
+        if (/^SELECT media\./.test(sql)) throw new Error('private-object-key secret-error');
+        return target.prepare(sql);
+      };
+      return Reflect.get(target, prop);
+    }});
+    const result = await processTenantDataPurge({ DB, IMAGES: createR2() }, { now: NOW });
+    expect(result.failedTenants).toBe(1);
+    const audit = sqlite.raw.prepare("SELECT tenant_id, after_json FROM audit_events WHERE action='tenant_data.purge_failed'").get() as { tenant_id: string; after_json: string };
+    expect(audit.tenant_id).toBe('t1');
+    expect(JSON.parse(audit.after_json)).toMatchObject({ failureCode: 'unexpected_failure', deletedRows: 1 });
+    expect(audit.after_json).not.toContain('private-object-key');
+    expect(audit.after_json).not.toContain('secret-error');
+    expect(result.deletedRows).toBe(1);
+  });
+
+  test.each(['status', 'deadline'] as const)('削除中に対象の%sが変われば保護表の許可を発行しない', async (changed) => {
+    seedTenant('t1', { anchor: jst(-91) });
+    let changedState = false;
+    const DB = new Proxy(sqlite.db, { get(target, prop) {
+      if (prop === 'batch') return async (statements: D1PreparedStatement[]) => {
+        if (!changedState) {
+          changedState = true;
+          if (changed === 'status') sqlite.raw.prepare("UPDATE tenants SET plan_status='active' WHERE id='t1'").run();
+          else sqlite.raw.prepare("UPDATE tenants SET retention_anchor_at=? WHERE id='t1'").run(jst(-1));
+        }
+        return target.batch(statements);
+      };
+      return Reflect.get(target, prop);
+    }});
+    const result = await processTenantDataPurge({ DB, IMAGES: createR2() }, { now: NOW });
+    expect(changedState).toBe(true);
+    expect(result.failedTenants).toBe(1);
+    expect(result.completed).toBe(0);
+    expect(count('tenant_purge_guard', '1 = 1')).toBe(0);
   });
 
   test('保存期限(90日)が過ぎた統括の顧客データとR2画像を消し、支払の記録は残す', async () => {

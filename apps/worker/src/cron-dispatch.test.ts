@@ -286,6 +286,18 @@ test('設定済みのCron式は実際のレーンを呼び、通知は重いレ�
   }
 });
 
+test('統括の削除失敗を6時間ごとのジョブ失敗として知らせる', async () => {
+  const { runSixHourlyHeavyJobs } = await import('./cron/six-hourly.js');
+  const fixture = createTestD1();
+  try {
+    processors.processTenantDataPurge.mockResolvedValueOnce({ failedTenants: 1 });
+    await runSixHourlyHeavyJobs({ scheduledTime: Date.now() } as ScheduledEvent, { DB: fixture.db } as import('./index.js').Env['Bindings']);
+    const job = observed.jobs.find(item => item.name === 'tenant data retention purge');
+    expect(job).toBeDefined();
+    await expect(job!.run()).rejects.toThrow('tenant_data_purge_retry_required');
+  } finally { fixture.raw.close(); }
+});
+
 test('壊れた店の付与キューが失敗しても別の店の予約済み通知を届ける', async () => {
   const fixture = createTestD1();
   const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');

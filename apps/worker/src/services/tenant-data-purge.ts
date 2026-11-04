@@ -140,12 +140,22 @@ export async function processTenantDataPurge(
   let budget = ROWS_PER_RUN;
   for (const tenant of tenants) {
     if (budget <= 0) break;
+    const progress: OneTenantResult = { deletedRows: 0, deletedObjects: 0, failedObjects: 0, finished: true };
     let purged: OneTenantResult;
-    try { purged = await purgeOneTenant(env, tenant, now, budget); }
+    try { purged = await purgeOneTenant(env, tenant, now, budget, progress); }
     catch {
-      result.failedTenants += 1;
+      progress.finished = false;
+      progress.failure = { table: 'unknown', failureCode: 'unexpected_failure', r2DeletedBeforeFailure: 0 };
+      try {
+        await recordAuditEvent(env.DB, {
+          category: 'business', action: 'tenant_data.purge_failed', tenantId: tenant.id,
+          actorPrincipalId: 'system:retention', targetKind: 'tenant', targetId: tenant.id,
+          result: 'failed', after: { ...progress.failure, deletedRows: progress.deletedRows, deletedObjects: progress.deletedObjects },
+          retentionClass: 'security', createdAt: now,
+        });
+      } catch { logger.error('tenant_data_purge.audit_failed'); }
       logger.error('tenant_data_purge.tenant_failed');
-      continue;
+      purged = progress;
     }
     budget -= purged.deletedRows;
     result.deletedRows += purged.deletedRows;
@@ -187,15 +197,10 @@ async function purgeOneTenant(
   tenant: TenantRetention,
   now: string,
   budget: number,
+  out: OneTenantResult,
 ): Promise<OneTenantResult> {
   const startedAt = now;
   const byTable: Record<string, number> = {};
-  const out: OneTenantResult = {
-    deletedRows: 0,
-    deletedObjects: 0,
-    failedObjects: 0,
-    finished: true,
-  };
   let remaining = budget;
 
   // 子が先、親が後。親を先に消すと子が親をたどれなくなって消し残る。
