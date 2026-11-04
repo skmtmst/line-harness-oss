@@ -108,7 +108,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
     const claimId = crypto.randomUUID();
     const claim = await c.env.DB
       .prepare(
-        `UPDATE bookings SET decided_at = COALESCE(decided_at, ?), cancel_claim_id = ?,
+        `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, decided_at = COALESCE(decided_at, ?), cancel_claim_id = ?,
                               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
           WHERE id = ? AND line_account_id = ?
             AND status IN ('cancelled','expired')
@@ -173,7 +173,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   const claimId = crypto.randomUUID();
   const updateResult = await c.env.DB
     .prepare(
-      `UPDATE bookings SET status = 'cancelled', decided_at = ?, cancel_claim_id = ?,
+      `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = 'cancelled', decided_at = ?, cancel_claim_id = ?,
                             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND line_account_id = ?
           AND lock_version = ? AND status IN ('requested','confirmed')`,
@@ -206,7 +206,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       // ずみなら 0 件になり、後発の成功予約は cancelled のまま残る。
       await c.env.DB.batch([
         c.env.DB.prepare(
-          `UPDATE bookings SET status = ?, decided_at = ?, cancel_claim_id = NULL,
+          `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?, cancel_claim_id = NULL,
                                 updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
             WHERE id = ? AND line_account_id = ? AND status = ?
               AND decided_at = ? AND lock_version = ? AND friend_id = ?

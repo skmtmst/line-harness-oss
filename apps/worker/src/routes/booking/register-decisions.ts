@@ -90,7 +90,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   // 状態を変えたので 409 を返し、副作用（reminders 作成・通知）は走らせない。
   const updateStatement = c.env.DB
     .prepare(
-      `UPDATE bookings SET status = ?, decided_at = ?, cancellation_reason=COALESCE(?,cancellation_reason),
+      `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?, cancellation_reason=COALESCE(?,cancellation_reason),
                             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND status = ?`,
     )
@@ -145,7 +145,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         // 巻き戻しが 0 件 (同時更新あり) なら相手の処理に任せる。
         await c.env.DB.batch([
           c.env.DB.prepare(
-            `UPDATE bookings SET status = ?, decided_at = ?,
+            `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?,
                                   updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
               WHERE id = ? AND status = ?`,
           ).bind(row.status, row.decided_at, id, next),
@@ -185,7 +185,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         // 状態更新を巻き戻して 409 にする (却下分岐と同趣旨)。
         await c.env.DB.batch([
           c.env.DB.prepare(
-            `UPDATE bookings SET status = ?, decided_at = ?,
+            `UPDATE bookings SET confirmation_revision = confirmation_revision + 1, status = ?, decided_at = ?,
                                   updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
               WHERE id = ? AND status = ?`,
           ).bind(row.status, row.decided_at, id, next),

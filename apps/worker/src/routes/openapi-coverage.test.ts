@@ -361,6 +361,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PATCH /api/dashboard/style/restaurant-reservations/{id}',
   'POST /api/dashboard/style/activate',
   'POST /api/dashboard/style/closures',
+  'POST /api/dashboard/style/closures/confirmation',
+  'POST /api/dashboard/style/closures/confirmed',
   'POST /api/dashboard/style/results/{id}/audiences',
   'POST /api/liff/booking/page-views',
   'PUT /api/dashboard/style',
