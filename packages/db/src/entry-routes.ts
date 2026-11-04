@@ -2,7 +2,7 @@ import type { RefTracking } from './entry-route-tracking-types.js';
 export type { RefTracking } from './entry-route-tracking-types.js';
 import { jstNow, nextVersionToken } from './utils.js';
 import { ensureEntryRouteGenre } from './entry-route-genres.js';
-import { DEFAULT_TENANT_ID, type EntryRouteMonth } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, storedTimestamp, type EntryRouteMonth } from '@line-crm/shared';
 
 export interface EntryRoute {
   id: string;
@@ -542,7 +542,7 @@ export async function selectAdClickForPlatform(
   const rows = await db
     .prepare(
       `SELECT id, ${clickIdType} AS click_id, created_at,
-              strftime('%Y-%m-%dT%H:%M:%fZ', created_at, '+' || ? || ' days') AS expires_at,
+              strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('created_at', 'sql')}, '+' || ? || ' days') AS expires_at,
               ad_conversion_consent_at, ip_address, user_agent
        FROM ref_tracking
        WHERE friend_id = ? AND line_account_id = ?
@@ -550,12 +550,12 @@ export async function selectAdClickForPlatform(
        ORDER BY
          CASE
            WHEN ad_conversion_consent_at IS NOT NULL
-             AND julianday(created_at, '+' || ? || ' days') > julianday(?) THEN 0
+             AND julianday(${storedTimestamp('created_at', 'sql')}, '+' || ? || ' days') > julianday(?) THEN 0
            WHEN ad_conversion_consent_at IS NULL
-             AND julianday(created_at, '+' || ? || ' days') > julianday(?) THEN 1
+             AND julianday(${storedTimestamp('created_at', 'sql')}, '+' || ? || ' days') > julianday(?) THEN 1
            ELSE 2
          END,
-         julianday(created_at) DESC, id DESC
+         julianday(${storedTimestamp('created_at', 'sql')}) DESC, id DESC
        LIMIT 1`,
     )
     .bind(
@@ -579,20 +579,20 @@ export async function selectAdClickForPlatform(
   const row = rows.results[0];
   if (!row) return { status: 'missing_click_id', clickIdType };
 
-  const recordedAtMs = new Date(row.created_at).getTime();
+  const recordedAtMs = new Date(storedTimestamp(row.created_at)).getTime();
   const expiresAt = row.expires_at ?? row.created_at;
   const expiresAtMs = new Date(expiresAt).getTime();
   const common = {
     refTrackingId: row.id,
     clickId: row.click_id,
     clickIdType,
-    recordedAt: row.created_at,
+    recordedAt: storedTimestamp(row.created_at),
     expiresAt,
   };
   if (!row.ad_conversion_consent_at && expiresAtMs > now.getTime()) {
     return { status: 'missing_consent', ...common };
   }
-  if (!Number.isFinite(recordedAtMs) || expiresAtMs <= now.getTime()) {
+  if (!Number.isFinite(recordedAtMs) || !Number.isFinite(expiresAtMs) || expiresAtMs <= now.getTime()) {
     return { status: 'expired', ...common };
   }
   return {
@@ -608,16 +608,17 @@ export async function getRefTrackingWithClickIds(
   db: D1Database,
   friendId: string,
 ): Promise<RefTracking | null> {
-  return db
+  const row = await db
     .prepare(
       `SELECT * FROM ref_tracking
        WHERE friend_id = ?
        AND (fbclid IS NOT NULL OR gclid IS NOT NULL OR twclid IS NOT NULL OR ttclid IS NOT NULL)
-       ORDER BY created_at DESC
+       ORDER BY julianday(${storedTimestamp('created_at', 'sql')}) DESC, id DESC
        LIMIT 1`,
     )
     .bind(friendId)
     .first<RefTracking>();
+  return row ? { ...row, created_at: storedTimestamp(row.created_at) } : null;
 }
 
 export async function getRefTrackingByFriend(
@@ -625,10 +626,10 @@ export async function getRefTrackingByFriend(
   friendId: string,
 ): Promise<RefTracking[]> {
   const result = await db
-    .prepare(`SELECT * FROM ref_tracking WHERE friend_id = ? ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM ref_tracking WHERE friend_id = ? ORDER BY julianday(${storedTimestamp('created_at', 'sql')}) DESC, id DESC`)
     .bind(friendId)
     .all<RefTracking>();
-  return result.results;
+  return result.results.map(row => ({ ...row, created_at: storedTimestamp(row.created_at) }));
 }
 
 export async function getRefTrackingStats(

@@ -161,6 +161,16 @@ describe('resolveAffiliateAttribution', () => {
     expect(ATTRIBUTION_WINDOW_DAYS).toBe(90);
   });
 
+  test('UTC と JST の記録を実時刻で並べ、最後の紹介を選ぶ', async () => {
+    insertFriend(sqlite, 'friend-mixed');
+    insertAffiliate(sqlite, 'aff-first'); insertAffiliate(sqlite, 'aff-last');
+    insertLink(sqlite, { id: 'first', affiliateId: 'aff-first', refCode: 'first' });
+    insertLink(sqlite, { id: 'last', affiliateId: 'aff-last', refCode: 'last' });
+    insertTouch(sqlite, { id: 'first-touch', refCode: 'first', friendId: 'friend-mixed', createdAt: '2026-07-07 02:00:00' });
+    insertTouch(sqlite, { id: 'last-touch', refCode: 'last', friendId: 'friend-mixed', createdAt: '2026-07-07T11:30:00' });
+    expect(await resolveAffiliateAttribution(db, 'friend-mixed', NOW)).toEqual({ affiliateId: 'aff-last', refCode: 'last' });
+  });
+
   test('(a) multiple touches within 90 days -> latest affiliate link wins', async () => {
     insertFriend(sqlite, 'friend-a');
     insertAffiliate(sqlite, 'aff-1');

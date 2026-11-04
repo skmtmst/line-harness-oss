@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 export type { Affiliate } from './affiliate-record-types.js';
 import type { Affiliate } from './affiliate-record-types.js';
 import { sqlIdSet } from './id-queries.js';
@@ -464,13 +465,13 @@ export async function getAffiliateReport(
   const clickDateBinds: unknown[] = [];
   const cvDateBinds: unknown[] = [];
   if (opts.startDate) {
-    clickDateCond += ` AND julianday(rt.created_at) >= julianday(?)`;
+    clickDateCond += ` AND julianday(${storedTimestamp('rt.created_at', 'sql')}) >= julianday(?)`;
     cvDateCond += ` AND ce.created_at >= ?`;
     clickDateBinds.push(opts.startDate);
     cvDateBinds.push(opts.startDate);
   }
   if (opts.endDate) {
-    clickDateCond += ` AND julianday(rt.created_at) <= julianday(?)`;
+    clickDateCond += ` AND julianday(${storedTimestamp('rt.created_at', 'sql')}) <= julianday(?)`;
     cvDateCond += ` AND ce.created_at <= ?`;
     clickDateBinds.push(opts.endDate);
     cvDateBinds.push(opts.endDate);

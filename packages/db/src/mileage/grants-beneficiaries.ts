@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { dbTableExists, jstNow } from '../utils.js';
 import { type ReferralMileageBeneficiary, type MileageLedgerEntry } from './types.js';
 import { resolvePinnedRuleRow } from './rules.js';
@@ -35,12 +36,12 @@ export async function resolveReferralMileageBeneficiary(
          JOIN affiliate_links al ON al.ref_code = rt.ref_code
          JOIN affiliates a ON a.id = al.affiliate_id
          JOIN friends referrer ON referrer.id = a.friend_id
-        WHERE julianday(rt.created_at) >= julianday(referred.created_at) - 1
-          AND julianday(rt.created_at) <= julianday(referred.created_at) + 1
+        WHERE julianday(${storedTimestamp('rt.created_at', 'sql')}) >= julianday(referred.created_at) - 1
+          AND julianday(${storedTimestamp('rt.created_at', 'sql')}) <= julianday(referred.created_at) + 1
           AND a.friend_id != referred.id
           AND (referred.user_id IS NULL OR referrer.user_id IS NULL
                OR referrer.user_id != referred.user_id)
-        ORDER BY julianday(rt.created_at) DESC, rt.id DESC
+        ORDER BY julianday(${storedTimestamp('rt.created_at', 'sql')}) DESC, rt.id DESC
         LIMIT 1`,
     )
     .bind(referredFriendId, referredFriendId)

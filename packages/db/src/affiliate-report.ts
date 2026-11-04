@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { sqlIdSet } from './id-queries.js';
 import { ATTRIBUTION_WINDOW_DAYS } from './affiliate-attribution.js';
 import { boundedListLimit, nonNegativeListOffset } from './utils.js';
@@ -43,10 +44,10 @@ export const FRIEND_ADD_WINNER_SUBQUERY = `
    WHERE rt2.friend_id = f.id
      AND al2.line_account_id IS f.line_account_id
      AND a2.line_account_id IS f.line_account_id
-     AND julianday(rt2.created_at) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
-     AND julianday(rt2.created_at) <= julianday(f.created_at)
+     AND julianday(${storedTimestamp('rt2.created_at', 'sql')}) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
+     AND julianday(${storedTimestamp('rt2.created_at', 'sql')}) <= julianday(f.created_at)
      AND (a2.friend_id IS NULL OR a2.friend_id != rt2.friend_id)
-   ORDER BY julianday(rt2.created_at) DESC
+   ORDER BY julianday(${storedTimestamp('rt2.created_at', 'sql')}) DESC
    LIMIT 1
 `;
 
@@ -147,11 +148,11 @@ export async function getAffiliateReportV2(
   const clickConds: string[] = ['al.affiliate_id = ?', 'al.line_account_id IS ?'];
   const clickBinds: unknown[] = [affiliateId, lineAccountId];
   if (startDate) {
-    clickConds.push('julianday(rt.created_at) >= julianday(?)');
+    clickConds.push(`julianday(${storedTimestamp('rt.created_at', 'sql')}) >= julianday(?)`);
     clickBinds.push(startDate);
   }
   if (endDate) {
-    clickConds.push('julianday(rt.created_at) <= julianday(?)');
+    clickConds.push(`julianday(${storedTimestamp('rt.created_at', 'sql')}) <= julianday(?)`);
     clickBinds.push(endDate);
   }
   const clicksRow = await db
@@ -379,10 +380,10 @@ export async function getAffiliateReportV2(
              WHERE rt2.friend_id = friends.id
                AND al2.line_account_id IS friends.line_account_id
                AND a2.line_account_id IS friends.line_account_id
-               AND julianday(rt2.created_at) >= julianday(friends.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
-               AND julianday(rt2.created_at) <= julianday(friends.created_at)
+               AND julianday(${storedTimestamp('rt2.created_at', 'sql')}) >= julianday(friends.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
+               AND julianday(${storedTimestamp('rt2.created_at', 'sql')}) <= julianday(friends.created_at)
                AND (a2.friend_id IS NULL OR a2.friend_id != rt2.friend_id)
-             ORDER BY julianday(rt2.created_at) DESC
+             ORDER BY julianday(${storedTimestamp('rt2.created_at', 'sql')}) DESC
              LIMIT 1
           ) = ?
        ),
@@ -523,10 +524,10 @@ export async function getAffiliateLinkStats(
               WHERE rt2.friend_id = f.id
                 AND al2.line_account_id IS f.line_account_id
                 AND a2.line_account_id IS f.line_account_id
-                AND julianday(rt2.created_at) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
-                AND julianday(rt2.created_at) <= julianday(f.created_at)
+                AND julianday(${storedTimestamp('rt2.created_at', 'sql')}) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
+                AND julianday(${storedTimestamp('rt2.created_at', 'sql')}) <= julianday(f.created_at)
                 AND (a2.friend_id IS NULL OR a2.friend_id != rt2.friend_id)
-              ORDER BY julianday(rt2.created_at) DESC
+              ORDER BY julianday(${storedTimestamp('rt2.created_at', 'sql')}) DESC
               LIMIT 1
            ) AS winner_ref_code
              FROM friends f
@@ -578,7 +579,7 @@ export async function getFriendJourney(
     .prepare(
       `SELECT at, type, ref_code, affiliate_id, label, detail FROM (
          -- touches
-         SELECT rt.created_at AS at, 'touch' AS type, rt.ref_code AS ref_code,
+         SELECT ${storedTimestamp('rt.created_at', 'sql')} AS at, 'touch' AS type, rt.ref_code AS ref_code,
                 al.affiliate_id AS affiliate_id, NULL AS label, rt.source_url AS detail
            FROM ref_tracking rt
            LEFT JOIN affiliate_links al ON al.ref_code = rt.ref_code
@@ -683,10 +684,10 @@ export async function getAffiliateJourneys(
                     JOIN affiliate_links al2 ON al2.ref_code = rt2.ref_code
                     JOIN affiliates a2 ON a2.id = al2.affiliate_id
                    WHERE rt2.friend_id = f.id
-                     AND julianday(rt2.created_at) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
-                     AND julianday(rt2.created_at) <= julianday(f.created_at)
+                     AND julianday(${storedTimestamp('rt2.created_at', 'sql')}) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
+                     AND julianday(${storedTimestamp('rt2.created_at', 'sql')}) <= julianday(f.created_at)
                      AND (a2.friend_id IS NULL OR a2.friend_id != rt2.friend_id)
-                   ORDER BY julianday(rt2.created_at) DESC
+                   ORDER BY julianday(${storedTimestamp('rt2.created_at', 'sql')}) DESC
                    LIMIT 1
                 ) AS ref_code
            FROM friends f
@@ -696,10 +697,10 @@ export async function getAffiliateJourneys(
               JOIN affiliate_links al3 ON al3.ref_code = rt3.ref_code
               JOIN affiliates a3 ON a3.id = al3.affiliate_id
              WHERE rt3.friend_id = f.id
-               AND julianday(rt3.created_at) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
-               AND julianday(rt3.created_at) <= julianday(f.created_at)
+               AND julianday(${storedTimestamp('rt3.created_at', 'sql')}) >= julianday(f.created_at) - ${ATTRIBUTION_WINDOW_DAYS}
+               AND julianday(${storedTimestamp('rt3.created_at', 'sql')}) <= julianday(f.created_at)
                AND (a3.friend_id IS NULL OR a3.friend_id != rt3.friend_id)
-             ORDER BY julianday(rt3.created_at) DESC
+             ORDER BY julianday(${storedTimestamp('rt3.created_at', 'sql')}) DESC
              LIMIT 1
           ) = ?
             ${cursorClause}

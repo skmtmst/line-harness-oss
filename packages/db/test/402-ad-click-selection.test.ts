@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { recordRefTracking, selectAdClickForPlatform } from '../src/entry-routes.js';
+import { recordRefTracking, selectAdClickForPlatform, getRefTrackingWithClickIds, getRefTrackingByFriend } from '../src/entry-routes.js';
 import { asD1 } from './d1-test-helper.js';
 
 const bootstrap = readFileSync(join(import.meta.dirname, '../bootstrap.sql'), 'utf8');
@@ -105,6 +105,16 @@ describe('402 媒体別広告クリック選択', () => {
     });
 
     expect(selected.status).toBe(expected);
+  });
+
+  it('旧UTCと時差なしJSTを実時刻で期限判定し、外部へ時差付きで渡す', async () => {
+    const { raw, db } = setup();
+    insertRef(raw, { id: 'legacy', twclid: 'tw-old', createdAt: '2026-08-17T08:59:59.000' });
+    expect(await selectAdClickForPlatform(db, { friendId: 'f1', lineAccountId: 'a1', platformName: 'x', validityDays: 30, now: NOW })).toMatchObject({ status: 'expired', recordedAt: '2026-08-17T08:59:59.000+09:00' });
+    insertRef(raw, { id: 'utc', twclid: 'tw-new', createdAt: '2026-09-15 12:00:00' });
+    expect(await selectAdClickForPlatform(db, { friendId: 'f1', lineAccountId: 'a1', platformName: 'x', validityDays: 30, now: NOW })).toMatchObject({ status: 'eligible', refTrackingId: 'utc', recordedAt: '2026-09-15T12:00:00Z' });
+    expect(await getRefTrackingWithClickIds(db, 'f1')).toMatchObject({ id: 'utc', created_at: '2026-09-15T12:00:00Z' });
+    expect((await getRefTrackingByFriend(db, 'f1')).map(row => row.id)).toEqual(['utc', 'legacy']);
   });
 
   it('同意なしと媒体IDなしを区別する', async () => {

@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { jstNow } from '../utils.js';
 import { enqueueMileageEvent } from '../mileage/index.js';
@@ -302,8 +303,8 @@ export async function getTagRetroactiveMileagePreview(
          JOIN affiliate_links al ON al.ref_code = rt.ref_code
          JOIN affiliates a ON a.id = al.affiliate_id
          JOIN friends referrer ON referrer.id = a.friend_id
-         WHERE julianday(rt.created_at) >= julianday(rf.created_at) - 1
-           AND julianday(rt.created_at) <= julianday(rf.created_at) + 1
+         WHERE julianday(${storedTimestamp('rt.created_at', 'sql')}) >= julianday(rf.created_at) - 1
+           AND julianday(${storedTimestamp('rt.created_at', 'sql')}) <= julianday(rf.created_at) + 1
            AND a.friend_id != rf.id
            AND (rf.user_id IS NULL OR referrer.user_id IS NULL
                 OR referrer.user_id != rf.user_id)

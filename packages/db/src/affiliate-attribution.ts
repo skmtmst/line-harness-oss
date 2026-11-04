@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { dbTableExists, jstNow } from './utils.js';
 // =============================================================================
 // Affiliate Attribution — last-touch resolution (ASP)
@@ -56,12 +57,12 @@ export async function resolveAffiliateAttribution(
          JOIN affiliate_links al ON al.ref_code = rt.ref_code
          JOIN affiliates a ON a.id = al.affiliate_id
         WHERE rt.friend_id = ?
-          AND julianday(rt.created_at) >= julianday(?) - ${windowDays}
-          AND julianday(rt.created_at) <= julianday(?)
+          AND julianday(${storedTimestamp('rt.created_at', 'sql')}) >= julianday(?) - ${windowDays}
+          AND julianday(${storedTimestamp('rt.created_at', 'sql')}) <= julianday(?)
           AND al.is_active = 1
           AND a.is_active = 1
           AND (a.friend_id IS NULL OR a.friend_id != rt.friend_id)  -- 自己クリック除外
-        ORDER BY julianday(rt.created_at) DESC
+        ORDER BY julianday(${storedTimestamp('rt.created_at', 'sql')}) DESC
         LIMIT 1`,
     )
     .bind(friendId, now, now)
@@ -170,8 +171,8 @@ async function loadTouches(
   const affAccountSelect = full ? 'a.line_account_id AS aff_account' : 'NULL AS aff_account';
   const touches = await db
     .prepare(
-      `SELECT rt.id AS touch_id, julianday(rt.created_at) AS touched_julian,
-              rt.ref_code AS ref_code, rt.created_at AS touched_at,
+      `SELECT rt.id AS touch_id, julianday(${storedTimestamp('rt.created_at', 'sql')}) AS touched_julian,
+              rt.ref_code AS ref_code, ${storedTimestamp('rt.created_at', 'sql')} AS touched_at,
               al.affiliate_id AS affiliate_id, ${offerSelect},
               al.is_active AS link_active, ${linkAccountSelect},
               a.is_active AS aff_active, a.friend_id AS aff_friend_id,
@@ -180,10 +181,10 @@ async function loadTouches(
          JOIN affiliate_links al ON al.ref_code = rt.ref_code
          JOIN affiliates a ON a.id = al.affiliate_id
         WHERE rt.friend_id = ?
-          AND julianday(rt.created_at) <= julianday(?)
-          AND (? IS NULL OR julianday(rt.created_at) < ?
-            OR (julianday(rt.created_at) = ? AND rt.id < ?))
-        ORDER BY julianday(rt.created_at) DESC, rt.id DESC
+          AND julianday(${storedTimestamp('rt.created_at', 'sql')}) <= julianday(?)
+          AND (? IS NULL OR julianday(${storedTimestamp('rt.created_at', 'sql')}) < ?
+            OR (julianday(${storedTimestamp('rt.created_at', 'sql')}) = ? AND rt.id < ?))
+        ORDER BY julianday(${storedTimestamp('rt.created_at', 'sql')}) DESC, rt.id DESC
         LIMIT ${TOUCH_PAGE_SIZE}`,
     )
     .bind(friendId, now, cursor?.touchedJulian ?? null, cursor?.touchedJulian ?? null,
