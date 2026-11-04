@@ -858,6 +858,17 @@ restaurantGooglePosts.post(
       return fail(c, 409, 'まだ Google ビジネスへ公開されていません', { code: 'not_published' });
     if (row.instagram_status !== 'failed' && row.instagram_status !== 'skipped')
       return fail(c, 409, 'Instagram へ再送できる状態ではありません', { code: 'not_retryable' });
+    if (row.instagram_error === 'instagram_publish_result_unknown')
+      return fail(c, 409, '公開結果を確認できないため、Instagram上の投稿を確認してください', { code: 'publish_result_unknown' });
+    const claim = await dbFor(c.env, store.id)
+      .prepare(`UPDATE rt_google_posts SET instagram_status = 'pending', instagram_error = NULL, updated_at = ?
+        WHERE id = ? AND store_id = ? AND instagram_enabled = 1 AND google_post_name IS NOT NULL
+          AND instagram_status IN ('failed', 'skipped')
+          AND (instagram_error IS NULL OR instagram_error != 'instagram_publish_result_unknown')`)
+      .bind(nowIso(), row.id, store.id)
+      .run();
+    if (claim.meta.changes !== 1)
+      return fail(c, 409, 'Instagram への再送はすでに始まっています', { code: 'not_retryable' });
     await crossPostToInstagram(c, store, row);
     const updated = (await postFor(c, store.id, row.id))!;
     auditLog(
@@ -901,34 +912,3 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/remove', requi
     return googleErrorResponse(c, error);
   }
 });
-
-/**
- * Instagram へ再送する（★V8-B `sKbNq` の「Instagram 失敗・再試行」から呼ばれる口）。
- * Google はもう公開済みなので触らない。出すのは Instagram だけ。
- */
-restaurantGooglePosts.post(
-  '/api/restaurant-test/google/posts/:id/instagram/retry',
-  requireRole('owner', 'admin'),
-  async (c) => {
-    const store = await storeFor(c);
-    if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
-    const row = await postFor(c, store.id, c.req.param('id'));
-    if (!row) return fail(c, 404, '投稿が見つかりません');
-    if (!writeEnabled(c.env)) return fail(c, 403, 'この環境では投稿できません', { code: 'write_disabled' });
-    if (row.instagram_enabled !== 1)
-      return fail(c, 409, 'この投稿は Instagram へ出さない設定です', { code: 'instagram_disabled' });
-    if (!row.google_post_name)
-      return fail(c, 409, 'まだ Google ビジネスへ公開されていません', { code: 'not_published' });
-    if (row.instagram_status !== 'failed' && row.instagram_status !== 'skipped')
-      return fail(c, 409, 'Instagram へ再送できる状態ではありません', { code: 'not_retryable' });
-    await crossPostToInstagram(c, store, row);
-    const updated = (await postFor(c, store.id, row.id))!;
-    auditLog(
-      c,
-      'restaurant.google.post.instagram_retry',
-      { id: row.id, kind: 'rt_google_post' },
-      { result: updated.instagram_status === 'published' ? 'success' : 'failed', lineAccountId: store.lineAccountId },
-    );
-    return c.json({ success: true, post: publicPost(updated) });
-  },
-);

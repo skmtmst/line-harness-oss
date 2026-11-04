@@ -520,14 +520,22 @@ export async function instagramPublish(
     'POST',
   );
   if (!container.id) throw new InstagramError('meta_request_failed');
-  const published = await instagramGraph<{ id?: string }>(
-    config,
-    `${instagramId}/media_publish`,
-    pageToken,
-    { creation_id: container.id },
-    'POST',
-  );
-  if (!published.id) throw new InstagramError('meta_request_failed');
+  // Meta may have published the post even when its response is lost. A second
+  // /media_publish request could make a duplicate, so leave this result for
+  // manual inspection instead of offering an automatic retry.
+  let published: { id?: string };
+  try {
+    published = await instagramGraph<{ id?: string }>(
+      config,
+      `${instagramId}/media_publish`,
+      pageToken,
+      { creation_id: container.id },
+      'POST',
+    );
+  } catch {
+    throw new InstagramError('instagram_publish_result_unknown', 502);
+  }
+  if (!published.id) throw new InstagramError('instagram_publish_result_unknown', 502);
   // 投稿自体は済んでいるので、見に行く先の取得だけ失敗しても成功として扱う。
   let permalink: string | null = null;
   try {

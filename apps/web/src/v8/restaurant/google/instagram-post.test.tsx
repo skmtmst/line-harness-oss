@@ -156,6 +156,16 @@ describe('投稿一覧の Instagram の札（★V8-B `HEEN9`）', () => {
     fireEvent.click(screen.getByText('Instagram へ再送'))
     await waitFor(() => expect(fixture.retryInstagram).toHaveBeenCalledWith('acc-1', 'p-failed'))
   })
+
+  it('公開結果が不明な投稿は要確認と示し、再送を出さない', async () => {
+    fixture.posts.mockResolvedValue(listOf([
+      post('p-unknown', { summary: '確認が必要な投稿', status: 'published', instagram: ig({ status: 'failed', error: 'instagram_publish_result_unknown' }) }),
+    ]))
+    render(<PostsBoard accountId="acc-1" go={go} />)
+    expect(await screen.findByText('Instagram 要確認')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '投稿「確認が必要な投稿」の操作' }))
+    expect(screen.queryByText('Instagram へ再送')).toBeNull()
+  })
 })
 
 describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', () => {

@@ -109,7 +109,11 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
     setSyncing(true)
     setSyncError('')
     try {
-      await restaurantGoogleApi.syncPerformance(accountId)
+      const result = await restaurantGoogleApi.syncPerformance(accountId)
+      if (result.failed > 0) {
+        setSyncError('Googleから数値を取り込めませんでした。時間をおいて再試行してください。')
+        return
+      }
       await load()
     } catch (err) {
       setSyncError(errorMessage(err, 'Googleから数値を取り込めませんでした。'))

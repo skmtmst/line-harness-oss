@@ -78,6 +78,9 @@ let createSeq = 0;
 let instagramCalls: Array<{ url: string; init?: RequestInit }>;
 /** null 以外にすると、コンテナ作成（`/media`）がそのHTTP状態で落ちる。 */
 let instagramFailStatus: number | null;
+let instagramPublishFailStatus: number | null;
+let instagramRetryGate: Promise<void> | null;
+let instagramRetryStarted: (() => void) | null;
 /** R2 の `IMAGES` の代わり。キーごとのバイト列を持つだけ。 */
 let imageStore: Map<string, Uint8Array>;
 let cfImagesEnabled: boolean;
@@ -233,6 +236,9 @@ beforeEach(async () => {
   createSeq = 0;
   instagramCalls = [];
   instagramFailStatus = null;
+  instagramPublishFailStatus = null;
+  instagramRetryGate = null;
+  instagramRetryStarted = null;
   imageStore = new Map();
   imageTransforms = [];
   vi.stubGlobal(
@@ -246,9 +252,16 @@ beforeEach(async () => {
         const path = new URL(url).pathname;
         if (path.endsWith('/media')) {
           if (instagramFailStatus) return jsonResponse({ error: { message: 'メタ側の生の本文', code: 190 } }, instagramFailStatus);
+          if (instagramRetryGate) {
+            instagramRetryStarted?.();
+            await instagramRetryGate;
+          }
           return jsonResponse({ id: 'ig-container-1' });
         }
-        if (path.endsWith('/media_publish')) return jsonResponse({ id: 'ig-media-1' });
+        if (path.endsWith('/media_publish')) {
+          if (instagramPublishFailStatus) return jsonResponse({ error: { message: '公開結果を受け取れない' } }, instagramPublishFailStatus);
+          return jsonResponse({ id: 'ig-media-1' });
+        }
         if (url.includes('fields=permalink')) return jsonResponse({ permalink: 'https://www.instagram.com/p/abc123/' });
         return jsonResponse({}, 404);
       }
@@ -773,6 +786,39 @@ describe('Instagram 同時投稿', () => {
     expect(body.post.status).toBe('published');
     expect(body.post.instagram).toMatchObject({ status: 'published', permalink: 'https://www.instagram.com/p/abc123/', error: null });
     expect(testDb.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='restaurant.google.post.instagram_retry'").get()).toEqual({ n: 1 });
+  });
+
+  it('同じ投稿への同時再送は実行権を取った1件だけがMetaへ送る', async () => {
+    await seedInstagramConnection();
+    instagramFailStatus = 400;
+    const r = await publishWithInstagram();
+    instagramFailStatus = null;
+    instagramCalls = [];
+    let release = () => {};
+    let started = () => {};
+    const entered = new Promise<void>((resolve) => { started = resolve });
+    instagramRetryGate = new Promise<void>((resolve) => { release = resolve });
+    instagramRetryStarted = started;
+
+    const first = call(`/api/restaurant-test/google/posts/${r.id}/instagram/retry`, { body: {} });
+    await entered;
+    const second = await call(`/api/restaurant-test/google/posts/${r.id}/instagram/retry`, { body: {} });
+    expect(second.status).toBe(409);
+    release();
+    expect((await first).status).toBe(200);
+    expect(graphPaths()).toEqual(['ig-1/media', 'ig-1/media_publish', 'ig-media-1']);
+  });
+
+  it('公開要求の結果が不明なときは重複防止のため自動再送を拒否する', async () => {
+    await seedInstagramConnection();
+    instagramPublishFailStatus = 503;
+    const r = await publishWithInstagram();
+    expect((await instagramOf(r.id)).instagram).toMatchObject({ status: 'failed', error: 'instagram_publish_result_unknown' });
+    const before = instagramCalls.length;
+    const retry = await call(`/api/restaurant-test/google/posts/${r.id}/instagram/retry`, { body: {} });
+    expect(retry.status).toBe(409);
+    expect(((await retry.json()) as { code: string }).code).toBe('publish_result_unknown');
+    expect(instagramCalls).toHaveLength(before);
   });
 
   it('再送できない状態（公開済み・Instagramへ出さない設定・未公開）は409で断る', async () => {

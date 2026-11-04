@@ -141,6 +141,21 @@ describe('GB-9 パフォーマンスの手動取り込み', () => {
     expect(text).not.toContain('API error')
   })
 
+  it('HTTP 200でもfailedがあれば古い数値を保持して失敗を表示する', async () => {
+    const api = await import('@/lib/restaurant-google-api')
+    vi.mocked(api.restaurantGoogleApi.syncPerformance).mockResolvedValueOnce({
+      success: true, synced: 0, skipped: 0, failed: 1, syncedAt: '2026-09-29T14:30:00.000Z',
+    })
+    await render()
+    expect(perf.loadCalls).toHaveLength(1)
+
+    await act(async () => { syncButton().click() })
+
+    expect(perf.loadCalls).toHaveLength(1)
+    expect(container.textContent).toContain('Googleから数値を取り込めませんでした。')
+    expect(container.textContent).toContain('飲食店向け指標')
+  })
+
   it('取り込みに失敗しても、画面は開いたままにする', async () => {
     perf.syncError = new ApiError(502, undefined, 'unavailable')
     await render()
