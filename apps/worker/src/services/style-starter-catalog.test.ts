@@ -54,7 +54,10 @@ test('店限定の担当者のスタイル選択でも、統括の承認済み�
   await set([await catalog('tag',tag())]);
   const saved=await initializeAccountStyle(sql.db,'a','t','admin','standard');
   expect(saved.catalogApplication?.items[0].state).toBe('succeeded');
+  const initialTime = (sql.raw.prepare("SELECT first_starter_at FROM account_styles WHERE line_account_id='a'").get() as {first_starter_at:string | null}).first_starter_at;
+  expect(initialTime).toBeTruthy();
   await applyCatalogStarter(sql.db,'t','a','admin','standard');
+  expect(sql.raw.prepare("SELECT first_starter_at FROM account_styles WHERE line_account_id='a'").get()).toEqual({first_starter_at:initialTime});
   expect(sql.raw.prepare("SELECT COUNT(*) n FROM tags WHERE line_account_id='a'").get()).toEqual({n:1});
   expect(sql.raw.prepare("SELECT initiated_by,approved_by,state FROM style_starter_catalog_items").get()).toEqual({initiated_by:'admin',approved_by:'owner',state:'succeeded'});
 });
