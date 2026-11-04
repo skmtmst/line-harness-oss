@@ -21,3 +21,6 @@ ALTER TABLE meet_consultations ADD COLUMN confirmation_revision INTEGER NOT NULL
 ALTER TABLE rich_menu_groups ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE outgoing_webhooks ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE incoming_webhooks ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE bookings ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE event_bookings ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_reservations ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
