@@ -420,7 +420,7 @@ jobs:
         run: |
           pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build
           pnpm --filter web release-log
-      - run: pnpm --config.enable-pre-post-scripts=false --filter web test --shard=${{ matrix.shard }}/4
+      - run: pnpm --filter web exec vitest run --config vitest.config.ts --shard=${{ matrix.shard }}/4
 
   web-checks:
     name: Admin lint, typecheck and tests
