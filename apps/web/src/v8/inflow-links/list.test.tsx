@@ -112,6 +112,19 @@ const buttonByLabel = (label: string) =>
 const rowOf = (refCode: string) => host.querySelector(`[data-row-id="${ROUTES.find(row => row.refCode === refCode)?.id ?? refCode}"]`)
 
 describe('V8 流入と計測の一覧', () => {
+  it('集計に記録がない経路は追加なしの件数と一覧に含まれる', async () => {
+    await render()
+    const presets = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('よく使う絞り込み'))!
+    await act(async () => { presets.click() })
+    const dialog = host.querySelector('[role="dialog"][aria-label="よく使う絞り込みと並び順"]')!
+    const zero = [...dialog.querySelectorAll('button')].find(button => button.textContent?.includes('友だち追加なし'))!
+    expect(zero.textContent).toMatch(/友だち追加なし\s*2/)
+    await act(async () => { zero.click() })
+    expect(rowOf('flyer-26s')).toBeTruthy()
+    expect(rowOf('ad-summer')).toBeTruthy()
+    expect(rowOf('summer-ig')).toBeNull()
+  })
+
   it('アカウントを切り替えて戻しても古い停止確認は実行しない', async () => {
     const originalFetch = globalThis.fetch
     const updates: string[] = []

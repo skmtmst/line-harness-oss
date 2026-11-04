@@ -430,7 +430,7 @@ export default function InflowListV8({
         row.name.toLocaleLowerCase('ja').includes(normalizedSearch)
         || row.refCode.toLocaleLowerCase('ja').includes(normalizedSearch))
     : genreRows
-  const sortedRows = sortRows(searchedRows.filter((row) => matchesFilter(row, filter)), sort)
+  const sortedRows = sortRows(searchedRows.filter((row) => matchesFilter(row, filter, summaryAvailable)), sort)
   const pageCount = Math.max(1, Math.ceil(sortedRows.length / pageSize))
   const currentPage = Math.min(page, pageCount)
   const currentRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -446,7 +446,7 @@ export default function InflowListV8({
   const routeCountAvailable = !loading && !loadFailed
   const accountRouteCount = summary?.routeTotal ?? accountRows.length
   const unconfiguredCount = accountRows.filter(isUnconfigured).length
-  const hasFriendsCount = accountRows.filter((row) => (row.stats?.friendCount ?? 0) > 0).length
+  const hasFriendsCount = accountRows.filter((row) => matchesFilter(row, 'has-friends', summaryAvailable)).length
   const genreNames = availableGenres.map((genre) => genre.name)
   const adNamesSub = adConnected === null
     ? '読み込めませんでした'
@@ -545,14 +545,14 @@ export default function InflowListV8({
   const filterChips = (
     <SegmentedControl<RouteFilter> aria-label="流入経路の絞り込み" fit="content" value={filter} onClear={() => { setFilter('all'); setPage(1) }} onChange={(value) => { setFilter(value); setPage(1) }} options={[
       { value: 'all', label: 'すべて' },
-      { value: 'has-friends', label: '友だち追加あり', title: routeCountAvailable ? `友だち追加あり ${formatNumber(hasFriendsCount)} 件` : undefined },
+      { value: 'has-friends', label: '友だち追加あり', title: summaryAvailable ? `友だち追加あり ${formatNumber(hasFriendsCount)} 件` : undefined },
       { value: 'unconfigured', label: '動きが未設定', count: routeCountAvailable ? unconfiguredCount : undefined },
     ]} />
   )
   const presetCounts: Array<[RouteFilter, string, number]> = [
     ['all', 'すべて', genreRows.length],
-    ['has-friends', '友だち追加あり', genreRows.filter((row) => matchesFilter(row, 'has-friends')).length],
-    ['no-friends', '友だち追加なし', genreRows.filter((row) => matchesFilter(row, 'no-friends')).length],
+    ['has-friends', '友だち追加あり', genreRows.filter((row) => matchesFilter(row, 'has-friends', summaryAvailable)).length],
+    ['no-friends', '友だち追加なし', genreRows.filter((row) => matchesFilter(row, 'no-friends', summaryAvailable)).length],
     ['unconfigured', '動きが未設定', genreRows.filter(isUnconfigured).length],
   ]
   const presetBox = (
