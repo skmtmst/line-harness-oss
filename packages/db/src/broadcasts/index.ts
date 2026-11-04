@@ -4,6 +4,7 @@ export {markInsightFailed} from '../broadcast-insight-retry.js';
 import { sqlIdSet } from '../id-queries.js';
 import { refreshBroadcastReferences, removeConsumerReferences } from '../template-versions.js';
 import { jstNow } from '../utils.js';
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 // 'segment' は 029 の CHECK では前から許されていたが、型だけ落ちていた。
 // 絞り込み条件（segment_conditions）で宛先を決める配信で使う。
 export type BroadcastTargetType = 'all' | 'tag' | 'segment' | 'multi-account-dedup';
@@ -296,7 +297,7 @@ export async function createBroadcast(
     ? 'draft'
     : input.scheduledAt ? 'scheduled' : 'draft';
 
-  await db
+  const insert = db
     .prepare(
       `INSERT INTO broadcasts
          (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, stealth_spread_minutes, segment_conditions, folder_id, measure_opens, internal_memo, draft_step, draft_payload_json, message_options_json, after_action_version_id, created_at)
@@ -328,8 +329,8 @@ export async function createBroadcast(
       input.messageOptionsJson ?? null,
       input.afterActionVersionId ?? null,
       now,
-    )
-    .run();
+    );
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.messageContent, input.messageBubblesJson, input.draftPayloadJson])]);
 
   // 467: 保存で参照表を書き換える。吹き出しの templateId を読む。
   await refreshBroadcastReferences(db, id, input.messageBubblesJson ?? null);
@@ -474,9 +475,10 @@ export async function updateBroadcast(
     fields.push('lock_version = lock_version + 1');
     const statement = db.prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ? AND lock_version = ? AND status IN ('draft','scheduled')`)
       .bind(...values, id, expectedVersion);
-    const result = updates.resetDeliveryAttempt
-      ? (await db.batch([statement, db.prepare('DELETE FROM broadcast_insights WHERE broadcast_id = ? AND changes() > 0').bind(id)]))[0]
-      : await statement.run();
+    const batch = [statement];
+    if (updates.resetDeliveryAttempt) batch.push(db.prepare('DELETE FROM broadcast_insights WHERE broadcast_id = ? AND changes() > 0').bind(id));
+    batch.push(...await mediaContentDeletionGuard(db, [updates.message_content, updates.message_bubbles_json, updates.draft_payload_json]));
+    const result = (await db.batch(batch))[0]!;
     if (!result.meta.changes) return null;
   } else {
     const current = await getBroadcastById(db, id);

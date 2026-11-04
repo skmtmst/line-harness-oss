@@ -55,7 +55,15 @@ export type MediaDeleteImpactReferenceKind =
   | "booking_settings"
   | "form"
   | "auto_reply"
-  | "visit_stamp_card";
+  | "visit_stamp_card"
+  | "visit_stamp_photo"
+  | "banner_image"
+  | "other_image_setting"
+  | "company_logo"
+  | "line_sender_icon"
+  | "google_post"
+  | "google_profile_photo"
+  | "friend_field";
 
 /** 登録メディアを消す前に、運用者が確認する現在の使用先。 */
 export interface MediaDeleteImpactReference {
@@ -77,6 +85,8 @@ export interface MediaDeleteImpact {
     kind: MediaItem["kind"];
   };
   usageCount: number;
+  /** 削除を妨げない送信済みトークの件数。 */
+  sentMessageCount?: number;
   references: MediaDeleteImpactReference[];
   /** すべての使用先を削除直前に読み切った時刻。0件でも必ず入る。 */
   checkedAt: string;

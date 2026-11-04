@@ -128,6 +128,31 @@ async function confirmReady() {
   await waitFor(() => expect(executeButton()).not.toBeNull())
 }
 
+it('削除中の画像で移行できなかった友だちと移行先、理由を結果に示す', async () => {
+  await confirmReady()
+  fixture.migrationRun.mockResolvedValue({ success: true, data: {
+    ...runData('partial'),
+    summary: { total: 2, convertible: 2, review: 0, invalid: 0, processed: 2, succeeded: 1, failed: 1 },
+    rows: [{ friendId: 'friend-1', friendName: '友だちA', sourceValue: 'image-private-key', convertedValue: null,
+      status: 'failed', reason: 'この画像は削除中のため登録できません。' }],
+  } })
+  fireEvent.click(executeButton()!)
+  await screen.findByText('友だちA（友だちID：friend-1）／旧項目（新）：画像が削除中のため保存しませんでした。')
+  expect(screen.queryByText(/image-private-key/)).toBeNull()
+})
+
+it('失敗した友だちが100人を超えたら続きを確認できる', async () => {
+  await confirmReady()
+  const failed = { ...runData('partial'), summary: { total: 101, convertible: 101, review: 0, invalid: 0, processed: 101, succeeded: 0, failed: 101 } }
+  fixture.migrationRun.mockResolvedValueOnce({ success: true, data: { ...failed, rows: [] } })
+    .mockResolvedValueOnce({ success: true, data: { ...failed, rows: [{ friendId: 'friend-last', friendName: '友だちB', sourceValue: '', convertedValue: null,
+      status: 'failed', reason: 'この画像は削除中のため登録できません。' }] } })
+  fireEvent.click(executeButton()!)
+  fireEvent.click(await screen.findByRole('button', { name: '次の100人' }))
+  await screen.findByText('友だちB（友だちID：friend-last）／旧項目（新）：画像が削除中のため保存しませんでした。')
+  expect(fixture.migrationRun).toHaveBeenLastCalledWith('run-9', 'account-1', 100)
+})
+
 describe('R548 結果の取得失敗は黙殺せず同じrunへ戻す', () => {
   it('POST成功後のGET失敗で未確認を出し、実行ボタンは戻さない', async () => {
     await confirmReady()

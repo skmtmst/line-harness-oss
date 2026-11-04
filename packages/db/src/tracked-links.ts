@@ -1,5 +1,6 @@
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 // =============================================================================
 // Tracked Links — URL click tracking with automatic actions
 // =============================================================================
@@ -126,7 +127,7 @@ export async function createTrackedLink(
   for (let attempt = 1; ; attempt++) {
     const shortCode = generateShortCode();
     try {
-      await db
+      const insert = db
         .prepare(
           `INSERT INTO tracked_links (id, name, original_url, tag_id, scenario_id, intro_template_id, reward_template_id, line_account_id, short_code, dedup_key, template_id, is_active, click_count, og_title, og_description, og_image_url, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, ?)`,
@@ -148,8 +149,8 @@ export async function createTrackedLink(
           input.ogImageUrl ?? null,
           now,
           now,
-        )
-        .run();
+        );
+      await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.ogImageUrl])]);
       break;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -293,14 +294,14 @@ export async function updateTrackedLink(
   const ogImageUrl =
     input.ogImageUrl === undefined ? existing.og_image_url : input.ogImageUrl;
 
-  await db
+  const update = db
     .prepare(
       `UPDATE tracked_links
          SET name = ?, tag_id = ?, scenario_id = ?, intro_template_id = ?, reward_template_id = ?, line_account_id = ?, is_active = ?, og_title = ?, og_description = ?, og_image_url = ?, updated_at = ?
        WHERE id = ?`,
     )
-    .bind(name, tagId, scenarioId, introTemplateId, rewardTemplateId, lineAccountId, isActive, ogTitle, ogDescription, ogImageUrl, now, id)
-    .run();
+    .bind(name, tagId, scenarioId, introTemplateId, rewardTemplateId, lineAccountId, isActive, ogTitle, ogDescription, ogImageUrl, now, id);
+  await db.batch([update, ...await mediaContentDeletionGuard(db, [ogImageUrl])]);
 
   return getTrackedLinkById(db, id);
 }

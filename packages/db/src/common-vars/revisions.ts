@@ -1,3 +1,4 @@
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { jstNow } from '../utils.js';
 import { type CommonVarExpiryBehavior, type CommonVar } from './record-types.js';
@@ -159,6 +160,7 @@ export async function updateCommonVar(
         input.actorId ?? null,
         now,
       ),
+      ...await mediaContentDeletionGuard(db, [input.value ?? existing.value, input.fallbackValue]),
     ]);
     if (Number(results[0]?.meta.changes ?? 0) === 0) {
       throw new CommonVarVersionConflictError(

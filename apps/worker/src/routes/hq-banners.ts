@@ -1,3 +1,4 @@
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { checkMediaGate } from '../services/file-scan.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
@@ -722,7 +723,8 @@ hqBanners.post('/api/hq/banners/images/:id/deliver', inputJsonBoundary(), async 
       }
       const source = await getPinnedMediaObject(c.env.IMAGES, image.media.r2_key, sourceGate.etag);
       if (!source) {
-        return c.json({ success: false, error: '画像の実体が見つかりません。もう一度生成してください' }, 409);
+        const deleting = await c.env.DB.prepare('SELECT 1 FROM media_deletion_jobs WHERE media_id=?').bind(image.media.id).first();
+        return c.json({ success: false, error: deleting ? '画像が削除中のため使用できません。' : '画像の実体が見つかりません。もう一度生成してください' }, 409);
       }
       const bytes = new Uint8Array(await source.arrayBuffer());
       const ext = image.media.r2_key.split('.').pop() || 'jpg';
@@ -740,12 +742,14 @@ hqBanners.post('/api/hq/banners/images/:id/deliver', inputJsonBoundary(), async 
           mimeType: image.media.mime_type,
           sizeBytes: bytes.byteLength,
           r2Key,
+          sourceMedia: { id: image.media.id, r2Key: image.media.r2_key },
           width: image.media.width,
           height: image.media.height,
           uploadedBy: staff?.id ?? null,
         });
       } catch (error) {
         await c.env.IMAGES.delete(r2Key).catch(() => undefined);
+        if (isMediaDeletionConflict(error)) return c.json({success:false,error:'画像が削除中のため使用できません。'},409);
         throw error;
       }
       await createBannerImageDelivery(c.env.DB, {

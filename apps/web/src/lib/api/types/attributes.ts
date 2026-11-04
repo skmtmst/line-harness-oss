@@ -162,6 +162,7 @@ export type FriendFieldMigrationRun = {
   usageTargets: unknown
   rows: Array<{
     friendId: string
+    friendName?: string | null
     sourceValue: string
     convertedValue: string | null
     status: string

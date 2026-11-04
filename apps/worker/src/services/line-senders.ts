@@ -9,9 +9,13 @@ export function validSenderName(input:unknown):input is string {
 export async function senderIcon(db:D1Database,account:string,id:unknown):Promise<{id:string;url:string}|null> {
  if(id==null) return null;
  if(typeof id!=='string') throw new GapError('invalid_icon');
+ if(await db.prepare('SELECT 1 FROM media_deletion_jobs WHERE media_id=? AND line_account_id=?').bind(id,account).first()) throw new GapError('media_deletion_in_progress',409);
  const m=await db.prepare('SELECT id,public_url,mime_type,size_bytes,width,height FROM media WHERE id=? AND line_account_id=? AND archived_at IS NULL').bind(id,account)
   .first<{id:string;public_url:string;mime_type:string;size_bytes:number;width:number;height:number}>();
- if(!m||!['image/png','image/jpeg'].includes(m.mime_type)||m.size_bytes>1024*1024||!m.width||m.width!==m.height) throw new GapError('invalid_icon');
+ if(!m||!['image/png','image/jpeg'].includes(m.mime_type)||m.size_bytes>1024*1024||!m.width||m.width!==m.height) {
+  if(await db.prepare('SELECT 1 FROM media_deletion_jobs WHERE media_id=? AND line_account_id=?').bind(id,account).first()) throw new GapError('media_deletion_in_progress',409);
+  throw new GapError('invalid_icon');
+ }
  try {const u=new URL(m.public_url);if(u.protocol!=='https:'||u.username||u.password) throw 0;} catch {throw new GapError('invalid_icon');}
  return {id:m.id,url:m.public_url};
 }

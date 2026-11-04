@@ -1,4 +1,5 @@
 import { logger } from '@line-crm/shared/server';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { FormReferenceAccessError, formReferenceAccount, resolveFormReferences, publicReferenceLayout, validateFormReferences, createFormDraftOnce, FormDraftCreateError } from '../features/forms/index.js';
 import { formWebhookTarget } from '../services/public-https-request.js';
@@ -24,6 +25,14 @@ import { legacyFormFieldTypeError, parseLayout, validateFormForPublish, DEFAULT_
 import { formMatchesListFilter, formMatchesListQuery, sortFormListItems } from '@line-crm/shared';
 import { serializeForm, validFormListFilter, validFormListSort, FORM_LIST_PAGE_FALLBACK_LIMIT, stoppedPublicFormResponse, readFormTestToken, verifyFormTestToken, serializePublicForm, canUseFormFromAccount, requireFormManage, FORM_TEST_TOKEN_MAX_ACTIVE, FORM_TEST_TOKEN_TTL_MS, sha256Hex, authorizedDeleteImpact } from './forms-definition.js';
 import type { Context } from 'hono';
+
+async function guardMediaWrite<T>(c: Context<Env>, operation: Promise<T>): Promise<T | Response> {
+  try { return await operation; }
+  catch (error) {
+    if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
+    throw error;
+  }
+}
 
 async function createFormIfCoursesExist(...args: Parameters<typeof createForm>) {
   try { return await createForm(...args); }
@@ -256,7 +265,8 @@ export const post__api_forms_id_publish_4 = async (c: Context<Env, "/api/forms/:
       return inputError(c, { success: false, error: '公開できる同じ店の参照を選び直してください' }, 422, ['layout.references']);
     }
   }
-  const result = await publishFormVersion(c.env.DB, id, expected);
+  const result = await guardMediaWrite(c, publishFormVersion(c.env.DB, id, expected));
+  if (result instanceof Response) return result;
   if (result.kind === 'not_found') {
     return fail(c, 404, 'FORM_NOT_FOUND');
   }
@@ -370,7 +380,7 @@ export const post__api_forms_6 = async (c: Context<Env, "/api/forms">) => {
     return inputError(c, { success: false, error: '公開できる同じ店の参照を選び直してください' }, 422, ['layout.references']);
   }
 
-  const form = await createFormIfCoursesExist(c.env.DB, {
+  const form = await guardMediaWrite(c, createFormIfCoursesExist(c.env.DB, {
     name: body.name,
     isActive: hasDeliveryAccess(c.get('staff'), 'forms', 'publish'),
     description: body.description ?? null,
@@ -388,7 +398,8 @@ export const post__api_forms_6 = async (c: Context<Env, "/api/forms">) => {
     ogDescription: body.ogDescription ?? null,
     ogImageUrl: body.ogImageUrl ?? null,
     lineAccountIds: [body.accountId],
-  });
+  }));
+  if (form instanceof Response) return form;
 
   if (!form) return c.json({success:false,code:'restaurant_course_unavailable',error:'コースが見つかりません。メニューを選び直してください'},409);
   return c.json({ success: true, data: serializeForm(form) }, 201);
@@ -421,13 +432,14 @@ export const post__api_forms_drafts_7 = async (c: Context<Env, "/api/forms/draft
       throw cause;
     }
   }
-  const form = await createFormIfCoursesExist(c.env.DB, {
+  const form = await guardMediaWrite(c, createFormIfCoursesExist(c.env.DB, {
     name,
     fields: '[]',
     layout: null,
     isActive: false,
     lineAccountIds: [body.accountId],
-  });
+  }));
+  if (form instanceof Response) return form;
   if (!form) return c.json({success:false,code:'restaurant_course_unavailable',error:'コースが見つかりません。メニューを選び直してください'},409);
   return c.json({ success: true, data: serializeForm(form) }, 201);
 };
@@ -449,7 +461,7 @@ export const post__api_forms_id_duplicate_8 = async (c: Context<Env, "/api/forms
     .catch(() => ({} as { name?: unknown }));
   const requestedName = typeof body.name === 'string' ? body.name.trim() : '';
   const name = (requestedName || `${source.name}の複製`).slice(0, 200);
-  const copy = await createFormIfCoursesExist(c.env.DB, {
+  const copy = await guardMediaWrite(c, createFormIfCoursesExist(c.env.DB, {
     name,
     description: source.description,
     fields: source.fields,
@@ -468,7 +480,8 @@ export const post__api_forms_id_duplicate_8 = async (c: Context<Env, "/api/forms
     // 公開中の写しを作らない。編集画面で中身を整えてから公開する。
     isActive: false,
     lineAccountIds: accountIds,
-  });
+  }));
+  if (copy instanceof Response) return copy;
   if (!copy) return c.json({success:false,code:'restaurant_course_unavailable',error:'コースが見つかりません。メニューを選び直してください'},409);
   /*
    * 所属フォルダも引き継ぐ。消えた箱・別用途の箱は付けない（PUT の
@@ -610,7 +623,8 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
   if (body.ogDescription !== undefined) updates.ogDescription = body.ogDescription;
   if (body.ogImageUrl !== undefined) updates.ogImageUrl = body.ogImageUrl;
 
-  const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision,c.get('staff')?.id);
+  const updated = await guardMediaWrite(c, updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision,c.get('staff')?.id));
+  if (updated instanceof Response) return updated;
 
   if (updated.kind === 'restaurant_course_unavailable') {
     return c.json({success:false,code:'restaurant_course_unavailable',error:'コースが見つかりません。メニューを選び直してください'},409);

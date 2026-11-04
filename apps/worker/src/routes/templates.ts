@@ -8,6 +8,7 @@ import { tapExtrasError } from '@line-crm/shared';
 import { Hono } from 'hono';
 import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
 import { getTemplatesWithUsageCount, getTemplateSendCounts, getTemplateFolderCounts, getTemplateById, getTemplateUsage, createTemplate, updateTemplate, saveTemplateDraft, publishTemplate, hasTemplateDraft, deleteTemplate, deleteCreatedTemplateDraft, getCarouselTapTotals, getFolderById, listTemplateVersions, revertTemplateToVersion, listBroadcastReferences, listTemplateReferences, getBroadcastDeleteBlockers, getPinnedReminderDeleteBlockers, MediaReferenceAccountError } from '@line-crm/db';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 import type { TemplateRow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess } from '../middleware/role-guard.js';
@@ -549,6 +550,7 @@ templates.post('/api/templates', requireDeliveryAccess('templates'), inputJsonBo
     // 作った直後は未公開(版0・公開日時なし・下書きあり)。
     return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, messageContent: item.message_content, question: questionValue(item.question_json), questionStatus: item.question_status, folderId: item.folder_id ?? null, hasDraft: true, publishedVersion: 0, publishedAt: null, draftRevision: 1, createdAt: item.created_at, updatedAt: item.updated_at } }, 201);
   } catch (err) {
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     if (err instanceof MediaReferenceAccountError) {
       return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
@@ -712,6 +714,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
       },
     });
   } catch (err) {
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     if (err instanceof MediaReferenceAccountError) {
       return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
@@ -815,6 +818,7 @@ templates.post('/api/templates/:id/publish', requireDeliveryAccess('templates'),
     });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     if (code === 'TEMPLATE_VERSION_CONFLICT') {
       return c.json({ success: false, error: 'ほかの人が先に公開しました。開き直して確認してください' }, 409);
     }
@@ -912,6 +916,7 @@ templates.post('/api/templates/:id/revert', requireDeliveryAccess('templates'), 
     });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     if (code === 'TEMPLATE_NOT_FOUND') {
       return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }

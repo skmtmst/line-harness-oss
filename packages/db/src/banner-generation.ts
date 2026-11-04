@@ -3,6 +3,7 @@ export {getBannerUsageToday,countRecentFailedBannerGenerations,getBannerUsageThi
 import { sqlIdSet } from './id-queries.js';
 import { readHqBannerFolderAssignment } from './hq-folders.js';
 import { jstNow } from './utils.js';
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 import type { Media } from './media/primitives/index.js';
 
 /**
@@ -432,7 +433,7 @@ export async function createBannerImage(
   },
 ): Promise<BannerImage> {
   const id = crypto.randomUUID();
-  await db
+  const insert = db
     .prepare(
       `INSERT INTO banner_images
          (id, tenant_id, project_id, generation_id, media_id, sequence, source, parent_image_id,
@@ -450,8 +451,8 @@ export async function createBannerImage(
       input.parentImageId ?? null,
       input.createdBy ?? null,
       jstNow(),
-    )
-    .run();
+    );
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.mediaId])]);
   return (await getBannerImage(db, id, input.tenantId))!;
 }
 
@@ -673,14 +674,14 @@ export async function createBannerImageDelivery(
 ): Promise<BannerImageDelivery> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db
+  const insert = db
     .prepare(
       `INSERT INTO banner_image_deliveries
          (id, banner_image_id, line_account_id, media_id, delivered_by, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.bannerImageId, input.lineAccountId, input.mediaId, input.deliveredBy ?? null, now)
-    .run();
+    .bind(id, input.bannerImageId, input.lineAccountId, input.mediaId, input.deliveredBy ?? null, now);
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.mediaId])]);
   return {
     id,
     banner_image_id: input.bannerImageId,

@@ -1,4 +1,5 @@
 import { logger } from '@line-crm/shared/server';
+import { isMediaDeletionConflict, mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import type { VisitStampSettings, VisitStampCardInput, VisitStampCard, VisitStampWallet, VisitStampEntry, VisitStampRedemption } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { getStaffById } from '@line-crm/db';
@@ -145,7 +146,13 @@ export async function saveStampCard(db:D1Database,tenantId:string,input:VisitSta
   if(input.settings.expiryBasis!==undefined){const expiry=storedStampExpiry(input.settings);
     statements.push(db.prepare(`UPDATE visit_stamp_wallets AS w SET expires_at=${expiry.sql} WHERE w.card_id=?
       AND EXISTS(SELECT 1 FROM visit_stamp_cards WHERE id=? AND write_token=?)`).bind(...expiry.args,cardId,cardId,token));}
-  const result=await db.batch(statements);if(!result[0].meta.changes)throw new StampError('カードが更新されました。読み直してください',409);
+  statements.push(...await mediaDeletionTextGuardStatements(db,[JSON.stringify(input.settings)]));
+  let result:D1Result[];
+  try { result=await db.batch(statements); } catch (error) {
+    if (isMediaDeletionConflict(error)) throw new StampError('削除中の画像は使用できません。別の画像を選んでください。',409);
+    throw error;
+  }
+  if(!result[0].meta.changes)throw new StampError('カードが更新されました。読み直してください',409);
   return readStampCard(db,await stampCard(db,cardId,tenantId));
 }
 export async function stampFriend(db:D1Database,cardId:string,friendId:string,accountId:string) {
@@ -311,7 +318,10 @@ export async function applyPaperStamps(db:D1Database,id:string,tenantId:string,a
 export async function requestPaperStamps(db:D1Database,cardId:string,friendId:string,accountId:string,photo:unknown,count:number) {
   const url=safeRestaurantHttpsUrl(photo);if(!url||!Number.isSafeInteger(count)||count<1||count>10000)throw new StampError('写真のHTTPS URLと押印数を確認してください');
   const submittedFriendId=friendId;friendId=(await stampWallet(db,cardId,friendId,accountId)).friendId;const id=crypto.randomUUID();
-  const res=await db.prepare(`INSERT OR IGNORE INTO visit_stamp_paper_requests(id,card_id,friend_id,line_account_id,photo_url,stamps,submitted_friend_id) VALUES(?,?,?,?,?,?,?)`).bind(id,cardId,friendId,accountId,url,count,submittedFriendId).run();
+  const insert=db.prepare(`INSERT OR IGNORE INTO visit_stamp_paper_requests(id,card_id,friend_id,line_account_id,photo_url,stamps,submitted_friend_id) VALUES(?,?,?,?,?,?,?)`).bind(id,cardId,friendId,accountId,url,count,submittedFriendId);
+  let res:D1Result;
+  try { [res]=await db.batch([insert,...await mediaDeletionTextGuardStatements(db,[url])]); }
+  catch(error) { if(isMediaDeletionConflict(error))throw new StampError('削除中の画像は使用できません。別の画像を選んでください。',409);throw error; }
   if(!res.meta.changes)throw new StampError('申請済みまたは移行済みです',409);return {id,status:'pending' as const};
 }
 

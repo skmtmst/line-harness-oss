@@ -57,6 +57,18 @@ describe('B 元に戻す: 削除した自動応答の復活', () => {
   const restore = (target: ReturnType<typeof app>, id: string) =>
     target.instance.request(`/api/auto-replies/${id}/restore`, { method: 'POST' }, target.bindings);
 
+  it('削除済み画像を含む自動応答を復元しない', async () => {
+    const target = app(testDb.db);
+    expect((await remove(target, 'rule-1')).status).toBe(200);
+    testDb.raw.prepare("UPDATE auto_replies SET response_content = ? WHERE id = 'rule-1'").run('https://worker.test/images/deleted-key');
+    testDb.raw.exec(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+      VALUES('media-deleted','account-1','["deleted-key"]','completed','now','now')`);
+    const response = await restore(target, 'rule-1');
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'media_deletion_in_progress' });
+    expect(testDb.raw.prepare("SELECT deleted_at IS NOT NULL AS deleted FROM auto_replies WHERE id='rule-1'").get()).toEqual({ deleted: 1 });
+  });
+
   it('削除→復活で一覧に戻り、戻した直後は停止のまま', async () => {
     const target = app(testDb.db);
     expect((await remove(target, 'rule-1')).status).toBe(200);

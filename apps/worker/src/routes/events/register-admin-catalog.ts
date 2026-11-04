@@ -1,4 +1,5 @@
 import type { Env } from '../../worker-env.js';
+import { mediaDeletionTextGuardStatements } from '../../features/media/deletion-guard.js';
 import type { Hono } from 'hono';
 import { normalizeEventQuestions, validateEventInput } from '../event-input.js';
 import type { EventQuestion } from '../event-input.js';
@@ -151,9 +152,10 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), inputJson
         approvalDeadlineHours,
         new Date().toISOString(),
       ),
+      ...await mediaDeletionTextGuardStatements(c.env.DB, [body.image_url as string | null, body.og_image_url as string | null]),
     ]);
   } else {
-    await insertEvent.run();
+    await c.env.DB.batch([insertEvent, ...await mediaDeletionTextGuardStatements(c.env.DB, [body.image_url as string | null, body.og_image_url as string | null]),]);
   }
   const row = await c.env.DB
     .prepare(`SELECT * FROM events WHERE id = ?`)
@@ -370,6 +372,7 @@ events.post('/api/events/admin/events/:id/duplicate', requireRole('owner', 'admi
       SELECT lower(hex(randomblob(16))),?,starts_at,ends_at,capacity,is_active,sort_order FROM event_slots
       WHERE event_id = ? AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM events WHERE id = ?)`)
       .bind(id, sourceId, id),
+    ...await mediaDeletionTextGuardStatements(c.env.DB, [source.image_url as string | null, source.og_image_url as string | null]),
   ]);
   if (!result[0].meta.changes) return bad(c, 'version_conflict', 409);
   return c.json({ id, lifecycle_status: 'draft' }, 201);
@@ -566,6 +569,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), inputJ
               SET current_published_version_id = ?, version_write_token = NULL
             WHERE id = ? AND version = ? AND version_write_token = ?`,
         ).bind(publishedVersionId, id, nextVersion, writeToken),
+        ...await mediaDeletionTextGuardStatements(c.env.DB, [nextEvent.image_url as string | null, nextEvent.og_image_url as string | null]),
       ])
     : await c.env.DB.batch([
         update,
@@ -573,6 +577,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), inputJ
           `UPDATE events SET version_write_token = NULL
             WHERE id = ? AND version = ? AND version_write_token = ?`,
         ).bind(id, nextVersion, writeToken),
+        ...await mediaDeletionTextGuardStatements(c.env.DB, [nextEvent.image_url as string | null, nextEvent.og_image_url as string | null]),
       ]);
   if ((results[0]?.meta?.changes ?? 0) === 0) return bad(c, 'version_conflict', 409);
   // 通知設定が変わった場合、確定予約の未送信通知を作り直し、新しい予定へ合わせる。

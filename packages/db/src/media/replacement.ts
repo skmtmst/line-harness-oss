@@ -1,4 +1,5 @@
 import { getMediaVersionKeys } from './storage-keys.js';
+import { mediaContentDeletionGuard } from './deletion-guard.js';
 import { type Media, mediaLiveContentPath, USAGE_REPLACE_PAIR_CHUNK, type MediaRefKind } from './primitives.js';
 import { type MediaReplacementPlan, type MediaReplacementApplyScope, type MediaReplacementApplyResult } from './types.js';
 
@@ -217,6 +218,7 @@ export async function applyMediaReplacementPlan(
     ).bind(sourceId, ...binds));
   }
 
+  statements.push(...await mediaContentDeletionGuard(db, [plan.replacement.id]));
   const results = await db.batch(statements);
   // 末尾はmedia_usagesの付け替えなので、本文を書き換えた件数だけ数える。
   const changedRows = results.slice(0, contentStatementCount)

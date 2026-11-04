@@ -241,9 +241,9 @@ export const attributesMethods = {
         },
       ),
     /** 実行の状態と失敗した行を確認する。 */
-    migrationRun: (runId: string, accountId: string) =>
+    migrationRun: (runId: string, accountId: string, offset = 0) =>
       fetchApi<ApiResponse<FriendFieldMigrationRun>>(
-        `/api/field-migrations/${runId}?lineAccountId=${encodeURIComponent(accountId)}`,
+        `/api/field-migrations/${runId}?lineAccountId=${encodeURIComponent(accountId)}&offset=${offset}`,
       ),
     /**
      * R515: 応答だけ失った再試行で二重に作らないため、要求キーを付ける。

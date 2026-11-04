@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 import { encryptCredential } from './credential-crypto.js';
 import { type LineAccount, type UpdateLineAccountInput, type UpdateLineAccountFieldsInput } from './line-accounts-types.js';
 import { resolveCredentialEncryptionKey, decryptLineAccountCredentials } from './line-accounts-credentials.js';
@@ -122,10 +123,10 @@ export async function updateLineAccount(
   values.push(jstNow());
   values.push(id);
 
-  await db
+  const update = db
     .prepare(`UPDATE line_accounts SET ${fields.join(', ')} WHERE id = ?`)
-    .bind(...values)
-    .run();
+    .bind(...values);
+  await db.batch([update, ...await mediaContentDeletionGuard(db, [updates.og_default_image_url, updates.icon_url])]);
 
   return getLineAccountById(db, id, encryptionKey);
 }
@@ -236,10 +237,10 @@ export async function updateLineAccountFields(
   binds.push(jstNow());
   binds.push(id);
 
-  await db
+  const update = db
     .prepare(`UPDATE line_accounts SET ${sets.join(', ')} WHERE id = ?`)
-    .bind(...binds)
-    .run();
+    .bind(...binds);
+  await db.batch([update, ...await mediaContentDeletionGuard(db, [input.ogDefaultImageUrl, input.iconUrl, input.linePictureUrl])]);
 
   return getLineAccountById(db, id, encryptionKey);
 }

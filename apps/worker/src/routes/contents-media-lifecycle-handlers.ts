@@ -1,9 +1,10 @@
-import { findDirectMediaUsages } from '../features/media/direct-media-usages.js';
+import { claimMediaDeletion, beginMediaObjectDeletion, finishMediaDeletion, releaseUnstartedMediaDeletion, releaseMediaDeletionLease } from '@line-crm/db/src/media/deletion-jobs.js';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
+import { countSentMediaMessages, findDirectMediaUsages } from '../features/media/direct-media-usages.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
-import { getMediaVersionKeys } from '@line-crm/db';
-import { getMediaById, getFolderById, updateMedia, deleteMedia, getMediaUsages, getMediaDeleteImpactSnapshot, isMissingTableError, applyMediaReplacementPlan, getMediaVersionList, getMediaLiveTarget, getMediaUsageReferenceStates, retargetMediaUsageReference, MediaUsageReferenceError, MEDIA_REF_KINDS, jstNow, getCommonVars, countCommonVars, COMMON_VARS_LIST_LIMIT, getCommonVarUsageSummaries, getCommonVarByIdIncludingArchived, getCommonVarUsageImpact, getCommonVarVersions, type CommonVar } from '@line-crm/db';
+import { getMediaById, getFolderById, updateMedia, getMediaUsages, getMediaDeleteImpactSnapshot, isMissingTableError, applyMediaReplacementPlan, getMediaVersionList, getMediaLiveTarget, getMediaUsageReferenceStates, retargetMediaUsageReference, MediaUsageReferenceError, MEDIA_REF_KINDS, jstNow, getCommonVars, countCommonVars, COMMON_VARS_LIST_LIMIT, getCommonVarUsageSummaries, getCommonVarByIdIncludingArchived, getCommonVarUsageImpact, getCommonVarVersions, type CommonVar } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 import { isWebinarSource, privateImageKey, publicDeliveryContentType, publicImageKey } from '../services/image-access.js';
 import { fail } from '../lib/fail.js';
@@ -272,6 +273,7 @@ export const get__api_media_id_delete_impact_5 = async (c: Context<Env, "/api/me
     if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
     const { impact, usages } = snapshot;
     const direct = await findDirectMediaUsages(c.env.DB, existing, accountId);
+    const sentMessageCount = existing.kind === 'image' ? await countSentMediaMessages(c.env.DB, existing) : 0;
     const directReferences = direct.map(row => ({ kind: row.refKind, name: row.name, href: row.href, state: 'available' as const, scannedAt: checkedAt, refKind: row.refKind, refId: row.refId, reference: null }));
     /*
       R34: 版の表が無い環境では版の一覧が読めない。全体を503にせず、
@@ -313,6 +315,7 @@ export const get__api_media_id_delete_impact_5 = async (c: Context<Env, "/api/me
       success: true,
       data: {
         ...verifiedImpact,
+        sentMessageCount,
         usageCount: verifiedImpact.usageCount + direct.length,
         canDelete: verifiedImpact.canDelete && direct.length === 0,
         recommendedAction: direct.length ? 'review_references' : verifiedImpact.recommendedAction,
@@ -471,12 +474,14 @@ export const post__api_media_id_replace_usages_7 = async (c: Context<Env, "/api/
     if (err instanceof RequestBodyError) {
       return inputError(c, { success: false, error: err.message }, err.status, []);
     }
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '画像が削除中のため使用できません。' }, 409);
     logger.error("contents.media_id_replace_usages_post_failed");
     return c.json({ success: false, error: '使用先を差し替えられませんでした' }, 503);
   }
 };
 
 export const delete__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) => {
+  let acquired: { id: string; accountId: string; owner: string; status: 'checking' | 'deleting' } | null = null;
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
@@ -486,56 +491,69 @@ export const delete__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) 
     }
     const existing = await getMediaById(c.env.DB, id, accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-
-    const checkedAt = jstNow();
-    const scan = await scanSingleMediaUsage(c.env.DB, checkedAt, {
-      id: existing.id,
-      r2_key: existing.r2_key,
-    });
-    const snapshot = await getMediaDeleteImpactSnapshot(c.env.DB, id, accountId, checkedAt);
-    if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
-    const direct = await findDirectMediaUsages(c.env.DB, existing, accountId);
-    // R34: 読み残しがあるときは使われていないと断定できない。確かめられ
-    // ないものは消させない（ fail-closed）。読み直しを促す409で返す。
-    const verified = (scan.skippedTables ?? []).length === 0;
-    const baseImpact = { ...snapshot.impact, usageCount: snapshot.impact.usageCount + direct.length, references: [...snapshot.impact.references, ...direct.map(row => ({ kind:row.refKind, name:row.name, href:row.href, state:'available' as const, scannedAt:checkedAt }))], canDelete: snapshot.impact.canDelete && direct.length === 0, recommendedAction: direct.length ? 'review_references' as const : snapshot.impact.recommendedAction };
-    const impact = verified ? baseImpact : {
-      ...baseImpact,
-      canDelete: false,
-      recommendedAction: 'review_references' as const,
-    };
-    if (!impact.canDelete) {
-      return c.json(
-        verified
-          ? {
-            success: false,
-            error: `このファイルは ${impact.usageCount} か所で使われています。先に使用先から外してください。`,
-            code: 'media_delete_blocked',
-            data: { ...impact, verified },
-          }
-          : {
-            success: false,
-            error: '使用先を確かめられなかったため削除できません。使用先を読み直してから、もう一度お試しください。',
-            code: 'media_delete_unverified',
-            data: { ...impact, verified },
-          },
-        409,
-      );
-    }
-
-    // 実体の削除失敗は記録を保持して再試行できるようにする。
-    const keys = await getMediaVersionKeys(c.env.DB, id);
     if (!c.env.IMAGES) return c.json({ success: false, code: 'MEDIA_STORAGE_UNAVAILABLE', error: '保管庫へ接続できないため削除していません' }, 503);
+
+    const owner = crypto.randomUUID();
+    const now = new Date();
+    const job = await claimMediaDeletion(c.env.DB, { mediaId: id, accountId, owner, now: now.toISOString(), leaseUntil: new Date(now.getTime() + 300_000).toISOString() });
+    if (!job) return c.json({ success: false, code: 'media_delete_busy', error: '送信中か、ほかの削除処理が進行中です。しばらくしてから読み直してください。' }, 409);
+    acquired = { id, accountId, owner, status: job.status === 'deleting' ? 'deleting' : 'checking' };
+    if (acquired.status === 'checking') {
+      const checkedAt = jstNow();
+      const scan = await scanSingleMediaUsage(c.env.DB, checkedAt, {
+        id: existing.id,
+        r2_key: existing.r2_key,
+      });
+      const snapshot = await getMediaDeleteImpactSnapshot(c.env.DB, id, accountId, checkedAt);
+      if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
+      const direct = await findDirectMediaUsages(c.env.DB, existing, accountId);
+      // R34: 読み残しがあるときは使われていないと断定できない。確かめられ
+      // ないものは消させない（ fail-closed）。読み直しを促す409で返す。
+      const verified = (scan.skippedTables ?? []).length === 0;
+      const baseImpact = { ...snapshot.impact, usageCount: snapshot.impact.usageCount + direct.length, references: [...snapshot.impact.references, ...direct.map(row => ({ kind:row.refKind, name:row.name, href:row.href, state:'available' as const, scannedAt:checkedAt }))], canDelete: snapshot.impact.canDelete && direct.length === 0, recommendedAction: direct.length ? 'review_references' as const : snapshot.impact.recommendedAction };
+      const impact = verified ? baseImpact : {
+        ...baseImpact,
+        canDelete: false,
+        recommendedAction: 'review_references' as const,
+      };
+      if (!impact.canDelete) {
+        return c.json(
+          verified
+            ? {
+              success: false,
+              error: `このファイルは ${impact.usageCount} か所で使われています。先に使用先から外してください。`,
+              code: 'media_delete_blocked',
+              data: { ...impact, verified },
+            }
+            : {
+              success: false,
+              error: '使用先を確かめられなかったため削除できません。使用先を読み直してから、もう一度お試しください。',
+              code: 'media_delete_unverified',
+              data: { ...impact, verified },
+            },
+          409,
+        );
+      }
+      if (!await beginMediaObjectDeletion(c.env.DB, id, accountId, owner, new Date().toISOString())) {
+        return c.json({ success: false, code: 'media_delete_busy', error: '削除の確認期限が切れました。読み直してください。' }, 409);
+      }
+      acquired.status = 'deleting';
+    }
     try {
-      await c.env.IMAGES.delete([...new Set([existing.r2_key, ...keys])]);
+      await c.env.IMAGES.delete(JSON.parse(job.r2_keys_json) as string[]);
     } catch {
       return c.json({ success: false, code: 'MEDIA_STORAGE_DELETE_FAILED', error: 'ファイルを削除できませんでした。記録を保持しているので、もう一度お試しください' }, 503);
     }
-    await deleteMedia(c.env.DB, id, accountId);
+    if (!await finishMediaDeletion(c.env.DB, id, accountId, owner, new Date().toISOString())) {
+      return c.json({ success: false, code: 'MEDIA_DELETE_RETRY_REQUIRED', error: '削除を確定できませんでした。もう一度お試しください。' }, 503);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     logger.error("contents.media_id_delete_failed");
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
+  } finally {
+    if (acquired?.status === 'checking') await releaseUnstartedMediaDeletion(c.env.DB, acquired.id, acquired.accountId, acquired.owner).catch(() => undefined);
+    if (acquired?.status === 'deleting') await releaseMediaDeletionLease(c.env.DB, acquired.id, acquired.accountId, acquired.owner, new Date().toISOString()).catch(() => undefined);
   }
 };
 

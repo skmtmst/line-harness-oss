@@ -1,4 +1,5 @@
 import { jstNow } from '../utils.js';
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 import { type RichMenuPageInput, type PageKeepMeta, type RichMenuAreaInput } from './types.js';
 import { buildRichMenuAliasId, buildAreaInsert } from './reads.js';
 
@@ -19,7 +20,7 @@ export async function replaceRichMenuPages(
 ): Promise<void> {
   const now = jstNow();
   const keep = await loadPageKeepMeta(db, groupId);
-  const stmts = buildPageReplaceStatements(db, groupId, pages, keep, now);
+  const stmts = await buildPageReplaceStatements(db, groupId, pages, keep, now);
   await db.batch(stmts);
 }
 
@@ -73,13 +74,13 @@ export async function loadPageKeepMeta(db: D1Database, groupId: string): Promise
  * ページ置換の書き込み文を作る (DELETE → 復元 INSERT)。
  * 呼び出し側が 1 batch で流す。meta 更新と束ねるときは同じ batch へ足す。
  */
-export function buildPageReplaceStatements(
+export async function buildPageReplaceStatements(
   db: D1Database,
   groupId: string,
   pages: RichMenuPageInput[],
   keep: PageKeepMeta,
   now: string,
-): D1PreparedStatement[] {
+): Promise<D1PreparedStatement[]> {
   const { existingMap, existingAreaIds } = keep;
   const claimedAreaIds = new Set<string>();
   const resolveAreaId = (a: RichMenuAreaInput): string => {
@@ -161,5 +162,6 @@ export function buildPageReplaceStatements(
     );
   }
 
+  stmts.push(...await mediaContentDeletionGuard(db, newPageRecords.map((page) => page.imageR2Key)));
   return stmts;
 }

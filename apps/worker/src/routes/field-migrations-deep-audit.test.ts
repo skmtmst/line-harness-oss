@@ -185,6 +185,22 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
 });
 
+it('受付時に移行対象の画像が削除中なら、実行を開始せず409を返す', async () => {
+  sqlite.exec(readFileSync(join(import.meta.dirname, '../../../../packages/db/migrations/762_media_deletion_jobs.sql'), 'utf8'));
+  sqlite.exec("UPDATE friend_fields SET type_v6='image' WHERE id='ff-dst'");
+  const app = setupApp();
+  const p = await preview(app);
+  expect(p.token).toBeTruthy();
+  sqlite.prepare("UPDATE field_migration_items SET converted_value='image-blocked', status='convertible' WHERE run_id=? AND friend_id='f-1'").run(p.runId);
+  sqlite.exec("INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at) VALUES('image-blocked','acc-1','[]','checking','now','now')");
+  const res = await app.request(...Object.values(
+    jpost(`/api/friend-fields/ff-src/migrations${A}`, { previewToken: p.token }, OWNER_KEY, { 'Idempotency-Key': 'media-race' }),
+  ) as [string, RequestInit]);
+  expect(res.status).toBe(409);
+  expect(await res.json()).toMatchObject({ code: 'media_deletion_in_progress' });
+  expect(runRow(p.runId!)?.status).toBe('previewed');
+});
+
 // D038: 事前確認の途中で項目の書き込みに失敗したら、run も残さない。
 // status=previewed の run だけが残ると、誰も使わない記録がたまる。
 describe('D038 移行の事前確認の孤児run', () => {

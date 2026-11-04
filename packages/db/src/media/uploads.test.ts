@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createMedia, getMediaById } from './index.js';
+import { asD1 as transactionalD1 } from '../../test/d1-test-helper.js';
 import {
   MediaVersionConflictError,
   MediaVersionIncompatibleError,
@@ -155,6 +156,26 @@ describe('メディアのアップロード予約と版の内容情報', () => {
     });
     const updated = await getMediaById(db, media.id, 'account-a');
     expect(updated).toMatchObject({ width: 100, height: 50, filename: 'b.png' });
+  });
+
+  it('版の確認後に削除を確保されると、版とメディアを一緒に巻き戻す', async () => {
+    sqlite.exec(readFileSync(join(packageRoot, 'migrations/762_media_deletion_jobs.sql'), 'utf8'));
+    const txDb = transactionalD1(sqlite);
+    const first = await verifiedSession(txDb, {}, { width: 100, height: 50 });
+    const media = await completeNewMediaUpload(txDb, first);
+    const next = await verifiedSession(txDb, { targetMediaId: media.id, filename: 'b.png' }, { width: 100, height: 50 });
+    const raceDb = { ...txDb, batch: async (statements: D1PreparedStatement[]) => {
+      sqlite.prepare(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+        VALUES (?, 'account-a', '[]', 'checking', 'now', 'now')`).run(media.id);
+      return txDb.batch(statements);
+    } } as D1Database;
+    await expect(createMediaVersionFromUpload(raceDb, {
+      mediaId: media.id, lineAccountId: 'account-a', uploadSessionId: next.id,
+      expectedVersionNo: 1, changeReason: '差し替え',
+    })).rejects.toThrow('media_deletion_in_progress');
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM media_versions WHERE media_id = ?').get(media.id)).toEqual({ n: 1 });
+    expect((await getMediaById(txDb, media.id, 'account-a'))?.r2_key).toBe(media.r2_key);
+    expect((await getMediaUploadSession(txDb, next.id, 'account-a'))?.status).toBe('verified');
   });
 
   it('寸法が違う版追加は互換性エラーで拒否し、版もメディアも変わらない', async () => {

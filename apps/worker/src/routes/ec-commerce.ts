@@ -1,4 +1,5 @@
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { isMediaDeletionConflict, mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import { jstDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -1029,7 +1030,7 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
     return inputError(c, { success: false, error: 'Invalid button or image' }, 400, ["buttonLabel","buttonUrl","imageUrl"]);
   }
   const now = jstNow();
-  await c.env.DB.prepare(
+  const write = c.env.DB.prepare(
     `INSERT INTO ec_notification_account_settings
        (line_account_id, event_type, is_enabled, title_override, intro_text, outro_text,
         button_label, button_url, image_url, created_at, updated_at)
@@ -1040,7 +1041,9 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
        button_url = excluded.button_url, image_url = excluded.image_url,
        updated_at = excluded.updated_at`,
   ).bind(lineAccountId, eventType, body.isEnabled ? 1 : 0, title, introText, outroText,
-    buttonLabel || null, buttonUrl || null, imageUrl || null, now, now).run();
+    buttonLabel || null, buttonUrl || null, imageUrl || null, now, now);
+  try { await c.env.DB.batch([write, ...await mediaDeletionTextGuardStatements(c.env.DB, [imageUrl])]); }
+  catch (error) { if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409); throw error; }
   return c.json({ success: true });
 });
 

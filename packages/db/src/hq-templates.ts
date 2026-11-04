@@ -1,4 +1,5 @@
 import { validRestaurantCoursesSql } from './forms/course-guard.js';
+import { MEDIA_CONTENT_DELETION_GUARD_SQL, mediaDeletedKeyFingerprintGuard } from './media/deletion-guard.js';
 import type { HqTemplateVersion } from './hq-template-version-types.js';
 export type { HqTemplateVersion } from './hq-template-version-types.js';
 import type { HqTemplateArchiveStatus } from '@line-crm/shared';
@@ -138,7 +139,11 @@ export async function executeHqTemplatePlan(
   db: D1Database,
   plan: HqTemplateStatementPlan,
 ) {
-  return db.batch(prepareHqTemplatePlan(db, plan));
+  const fingerprintGuards: D1PreparedStatement[] = [];
+  for (const statement of plan.statements) if (statement.sql === MEDIA_CONTENT_DELETION_GUARD_SQL) {
+    fingerprintGuards.push(...await mediaDeletedKeyFingerprintGuard(db, JSON.parse(String(statement.bindings[0])) as string[]));
+  }
+  return db.batch([...prepareHqTemplatePlan(db, plan), ...fingerprintGuards]);
 }
 
 export async function createHqTemplate(
@@ -404,6 +409,7 @@ export function buildCreateHqTemplateVersionPlan(input: {
           input.expectedTemplateRevision,
         ],
       },
+      { sql: MEDIA_CONTENT_DELETION_GUARD_SQL, bindings: [JSON.stringify([input.definitionJson])] },
     ],
   };
 }

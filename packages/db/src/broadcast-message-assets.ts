@@ -1,3 +1,4 @@
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 import { jstNow } from './utils.js';
 
 export type BroadcastMessageAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
@@ -207,10 +208,11 @@ export async function createBroadcastMessageAsset(
   const id = crypto.randomUUID();
   const now = jstNow();
   // 新規は未公開の下書きで始める。live列には初期内容を入れるが版は0。
-  await db.prepare(
+  const insert = db.prepare(
     `INSERT INTO broadcast_message_assets (id, line_account_id, kind, name, payload_json, folder_id, published_version, published_at, draft_payload_json, draft_revision, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?, 1, ?, ?)`,
-  ).bind(id, input.lineAccountId ?? null, input.kind, input.name, input.payloadJson, input.folderId ?? null, input.payloadJson, now, now).run();
+  ).bind(id, input.lineAccountId ?? null, input.kind, input.name, input.payloadJson, input.folderId ?? null, input.payloadJson, now, now);
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.payloadJson])]);
   return getBroadcastMessageAsset(db, id);
 }
 
@@ -248,11 +250,12 @@ export async function saveBroadcastMessageAssetDraft(
     sets.unshift('folder_id = ?');
     values.unshift(updates.folderId);
   }
-  const result = await db.prepare(
+  const update = db.prepare(
     `UPDATE broadcast_message_assets
         SET ${sets.join(', ')}
       WHERE id = ? AND published_version = ? AND draft_revision = ?`,
-  ).bind(...values, id, current.published_version ?? 0, current.draft_revision ?? 0).run();
+  ).bind(...values, id, current.published_version ?? 0, current.draft_revision ?? 0);
+  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [draftPayload])]);
   if ((result.meta.changes ?? 0) === 0) {
     const raced = await getBroadcastMessageAsset(db, id);
     if (!raced) throw new Error('ASSET_NOT_FOUND');
@@ -324,10 +327,11 @@ export async function publishBroadcastMessageAsset(
   const now = jstNow();
   if (!hasDraft) {
     // 下書きなし公開も当時の公開文を記録する。後の版が進んだ再送に旧本文を返すため。
-    await db.prepare(
+    const insert = db.prepare(
       `INSERT OR IGNORE INTO broadcast_asset_publish_keys (asset_id, idempotency_key, published_version, draft_revision, draft_fingerprint, payload_json, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(id, options.idempotencyKey, Number(current.published_version), Number(current.draft_revision ?? 0), fingerprint, current.payload_json, now).run();
+    ).bind(id, options.idempotencyKey, Number(current.published_version), Number(current.draft_revision ?? 0), fingerprint, current.payload_json, now);
+    await db.batch([insert, ...await mediaContentDeletionGuard(db, [current.payload_json])]);
     const row = await getBroadcastMessageAsset(db, id);
     return { row: row!, published: false, replayed: false };
   }
@@ -355,7 +359,7 @@ export async function publishBroadcastMessageAsset(
        SELECT ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`,
     ).bind(id, options.idempotencyKey, Number(current.published_version), Number(current.draft_revision ?? 0), fingerprint, draftPayload, now),
   ];
-  const results = await db.batch(statements);
+  const results = await db.batch([...statements, ...await mediaContentDeletionGuard(db, [draftPayload])]);
   const changed = Number((results[0] as { meta?: { changes?: number } })?.meta?.changes ?? 0);
   if (changed === 0) {
     // 同じ要求の勝者が間に合った場合は当時の結果、それ以外は競合。

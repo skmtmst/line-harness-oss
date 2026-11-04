@@ -1,5 +1,6 @@
 import type { AutoReply } from './auto-reply-record-types.js';
 import { jstNow } from './utils.js';
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 import { type AutoReplyVersionRow, type AutoReplyDraftSettings } from './auto-reply-runs-types.js';
 import { getAutoReplyDraftVersion, parseAutoReplyVersionSettings, getAutoReplyVersionById, autoReplyDefinitionSnapshot, getAutoReplyPublishedVersion, autoReplyRuntimeSnapshot } from './auto-reply-runs-settings.js';
 
@@ -164,6 +165,7 @@ export async function publishAutoReplyDraftVersion(
       ...snapshotGuardBinds,
       ...stopGuardBinds,
     ),
+    ...await mediaContentDeletionGuard(db, [draft.definition_snapshot]),
   ]);
   const published = await getAutoReplyVersionById(db, draft.id);
   const ruleAfter = await db.prepare(`SELECT * FROM auto_replies WHERE id = ?`)
@@ -260,6 +262,7 @@ export async function ensureAutoReplyPublishedVersion(
       `UPDATE auto_replies SET current_published_version_id = ?, lifecycle_status = 'published'
         WHERE id = ?`,
     ).bind(id, rule.id),
+    ...await mediaContentDeletionGuard(db, [snapshotToSave]),
   ]);
 
   const saved = await db

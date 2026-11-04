@@ -2045,6 +2045,27 @@
       "column": "line_account_id"
     }
   },
+  "media_deleted_key_fingerprints": {
+    "category": "global",
+    "reason": "削除済みR2キーのSHA-256のみを保持し、削除済み画像の再登録を防ぐため"
+  },
+  "media_deletion_guards": {
+    "category": "global"
+  },
+  "media_deletion_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "media_send_claims": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "media_file_scans": {
     "category": "purge",
     "scope": {

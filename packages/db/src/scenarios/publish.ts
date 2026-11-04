@@ -1,3 +1,4 @@
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 import { jstNow } from '../utils.js';
 import { type ScenarioVersion, type Scenario, type ScenarioPublishKey } from './types.js';
 import { getScenarioSteps } from './steps.js';
@@ -178,6 +179,7 @@ export async function publishScenarioVersion(
              (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
            VALUES (?, ?, ?, ?, ?)`,
         ).bind(input.idempotencyKey, scenarioId, current.id, draftPayload, jstNow()),
+        ...await mediaContentDeletionGuard(db, [draftPayload]),
       ]);
       const row = await db.prepare(
         `SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`,
@@ -238,6 +240,7 @@ export async function publishScenarioVersion(
              (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
            VALUES (?, ?, ?, ?, ?)`,
         ).bind(input.idempotencyKey, scenarioId, id, draftPayload, now),
+        ...await mediaContentDeletionGuard(db, [JSON.stringify(snapshotSteps), JSON.stringify(snapshotActions)]),
       ]);
     } catch (error) {
       const kind = classifyPublishBatchError(error);

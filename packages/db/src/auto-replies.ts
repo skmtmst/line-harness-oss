@@ -1,6 +1,7 @@
 export type { AutoReply, CreateAutoReplyInput } from './auto-reply-record-types.js';
 import type { AutoReply, CreateAutoReplyInput } from './auto-reply-record-types.js';
 import { jstNow } from './utils.js';
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 import { removeConsumerReferences, planSyncTemplateReferenceStatements } from './template-versions.js';
 import {
   planAutoReplyInternalMemoStatements,
@@ -190,6 +191,7 @@ export async function createAutoReply(
     ...memoPlanned.statements,
     ...refStatements,
     ...claimStatements,
+    ...await mediaContentDeletionGuard(db, [created.response_content, created.actions_json]),
     ]);
   } catch (err) {
     // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
@@ -391,6 +393,7 @@ export async function updateAutoReply(
     ),
     ...memoPlanned.statements,
     ...refStatements,
+    ...await mediaContentDeletionGuard(db, [merged.response_content, merged.actions_json]),
   ]);
 
   return getAutoReplyById(db, id);
@@ -479,15 +482,19 @@ export async function restoreAutoReply(
   db: D1Database,
   id: string,
 ): Promise<AutoReply | null> {
-  const result = await db
+  const before = await db.prepare('SELECT response_content, actions_json FROM auto_replies WHERE id = ? AND deleted_at IS NOT NULL')
+    .bind(id).first<{ response_content: string; actions_json: string | null }>();
+  const versions = await db.prepare('SELECT definition_snapshot FROM auto_reply_versions WHERE auto_reply_id = ?')
+    .bind(id).all<{ definition_snapshot: string }>();
+  const update = db
     .prepare(
       `UPDATE auto_replies
           SET deleted_at = NULL, deleted_by_staff_id = NULL, is_active = 0
         WHERE id = ? AND deleted_at IS NOT NULL`,
     )
-    .bind(id)
-    .run();
-  if ((result.meta.changes ?? 0) !== 1) return null;
+    .bind(id);
+  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [before?.response_content, before?.actions_json, ...versions.results.map((version) => version.definition_snapshot)])]);
+  if ((result?.meta.changes ?? 0) !== 1) return null;
   return db
     .prepare(`SELECT * FROM auto_replies WHERE id = ?`)
     .bind(id)

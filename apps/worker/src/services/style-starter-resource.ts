@@ -1,3 +1,4 @@
+import { mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import { formMediaUsageStatements } from '@line-crm/db';
 import { styleMenuActionData } from './style-menu-action-data.js';
 import { initialMenuImageKey } from '@line-crm/shared';
@@ -150,6 +151,7 @@ export async function overwriteResource(
         ),
       publishedVersionStatement(db, id, current.published_version + 1, {}, now),
     );
+    statements.push(...await mediaDeletionTextGuardStatements(db,[item.text ?? item.name]));
     return statements;
   }
   if (item.kind === 'form') {
@@ -160,7 +162,7 @@ export async function overwriteResource(
     if(!current)return [];
     const definition=await initialFormLayout(db,account,style,item.formTarget),layout=JSON.stringify(definition);
     if(layout===current.layout)return [];
-    return [...initialFormScopeGuards(db,account,definition),db.prepare('UPDATE forms SET layout=?,content_revision=content_revision+1,updated_at=? WHERE id=? AND is_active=0').bind(layout,now,id), ...formMediaUsageStatements(db, id)];
+    return [...initialFormScopeGuards(db,account,definition),db.prepare('UPDATE forms SET layout=?,content_revision=content_revision+1,updated_at=? WHERE id=? AND is_active=0').bind(layout,now,id), ...formMediaUsageStatements(db, id), ...await mediaDeletionTextGuardStatements(db,[layout])];
   }
   if (item.kind === 'booking_menu')
     return [
@@ -231,6 +233,7 @@ export async function overwriteResource(
     }
     if(item.initialMenu) statements.push(db.prepare(`UPDATE rich_menu_pages SET image_r2_key=?,image_content_type='image/png' WHERE id=(SELECT default_page_id FROM rich_menu_groups WHERE id=? AND account_id=?)`)
       .bind(initialMenuImageKey(account,item.initialMenu),id,account));
+    statements.push(...await mediaDeletionTextGuardStatements(db,[JSON.stringify(item)]));
     return statements;
   }
   if (item.kind === 'tag_set')
@@ -250,6 +253,7 @@ export async function overwriteResource(
         )
         .bind(id, id, account),
       ...scenarioStepStatements(db, id, item, now),
+      ...await mediaDeletionTextGuardStatements(db,[JSON.stringify(item)]),
     ];
   if (item.kind === 'friend_add_rule')
     // 下書きの文だけを差し替える。公開済みの版・受け皿の状態は触らない。

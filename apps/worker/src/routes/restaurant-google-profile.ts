@@ -23,6 +23,7 @@ import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
+import { isMediaDeletionConflict, mediaDeletionGuardStatements } from '../features/media/deletion-guard.js';
 import { GoogleBusinessError, type RequestOptions } from '../services/google-business.js';
 import {
   DESCRIPTION_MAX_LENGTH,
@@ -386,11 +387,12 @@ function summaryForRegular(weekdays: Weekday[], weekly: WeeklyHours): string {
 async function insertChange(
   c: Context<Env>,
   store: StoreContext,
-  input: { kind: ChangeKind; source: ChangeSource; summary: string; target: ChangeTarget; before: unknown; after: unknown; inputText?: string | null; impact: number; baseFingerprint: string },
+  input: { kind: ChangeKind; source: ChangeSource; summary: string; target: ChangeTarget; before: unknown; after: unknown; inputText?: string | null; impact: number; baseFingerprint: string; mediaId?: string },
 ): Promise<ChangeRow> {
   const id = crypto.randomUUID();
   const staff = c.get('staff');
-  await dbFor(c.env, store.id)
+  const db = dbFor(c.env, store.id);
+  const insert = db
     .prepare(
       `INSERT INTO rt_google_changes
          (id, store_id, kind, source, summary, target_json, before_json, after_json, input_text, reservation_impact_count, base_fingerprint, status, staff_id, staff_name, created_at, updated_at)
@@ -412,8 +414,8 @@ async function insertChange(
       staff?.name ?? null,
       nowIso(),
       nowIso(),
-    )
-    .run();
+    );
+  await db.batch([insert, ...mediaDeletionGuardStatements(db, [input.mediaId ?? null])]);
   return (await changeFor(c, store.id, id))!;
 }
 
@@ -732,7 +734,9 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/profile/propose', inpu
         after: { action: 'add', mediaId: media.id, filename: media.filename, sourceUrl },
         impact: 0,
         baseFingerprint: profile.fingerprint,
-      });
+        mediaId: media.id,
+      }).catch((error: unknown) => { if (isMediaDeletionConflict(error)) return null; throw error; });
+      if (!change) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
       return c.json({ success: true, change: publicChange(change) });
     }
     if (body.action === 'delete') {

@@ -1,4 +1,5 @@
-import { validRestaurantMenuDescription, validRestaurantMenuImage } from './restaurant-menu-media.js';
+import { isMediaDeletionConflict, mediaDeletionGuardStatements } from '../features/media/deletion-guard.js';
+import { restaurantMenuImageDeleting, validRestaurantMenuDescription, validRestaurantMenuImage } from './restaurant-menu-media.js';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { normalizedPhoneSql } from '../lib/phone-sql.js';
 import type { OrganizationRow, OrganizationContext, SelectedRestaurantStore } from './restaurant-context-types.js';
@@ -429,7 +430,11 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
   }
   if (body.effectiveAt !== undefined && body.effectiveAt !== null && (typeof body.effectiveAt !== 'string' || !Number.isFinite(Date.parse(body.effectiveAt)))) return inputError(c, { success:false,error:'価格の開始日時を確認してください' }, 400, ["effectiveAt"]);
   if (!validRestaurantMenuDescription(body.description)) return inputError(c, { success:false, error:'説明は2000文字以内で入力してください' }, 400, ['description']);
-  if ((body.imageMediaId != null && (typeof body.imageMediaId !== 'string' || !body.imageMediaId)) || (body.imageMediaId !== undefined && body.imageMediaId !== current.image_media_id && !await validRestaurantMenuImage(dbFor(c.env, current.store_id), current.store_id, body.imageMediaId))) return inputError(c, { success:false, code:'MENU_IMAGE_UNAVAILABLE', error:'選択した画像を利用できません。登録メディアから選び直してください。' }, 400, ['imageMediaId']);
+  if (typeof body.imageMediaId === 'string' && body.imageMediaId !== current.image_media_id && await restaurantMenuImageDeleting(dbFor(c.env, current.store_id), current.store_id, body.imageMediaId)) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
+  if ((body.imageMediaId != null && (typeof body.imageMediaId !== 'string' || !body.imageMediaId)) || (body.imageMediaId !== undefined && body.imageMediaId !== current.image_media_id && !await validRestaurantMenuImage(dbFor(c.env, current.store_id), current.store_id, body.imageMediaId))) {
+    if (typeof body.imageMediaId === 'string' && await restaurantMenuImageDeleting(dbFor(c.env, current.store_id), current.store_id, body.imageMediaId)) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
+    return inputError(c, { success:false, code:'MENU_IMAGE_UNAVAILABLE', error:'選択した画像を利用できません。登録メディアから選び直してください。' }, 400, ['imageMediaId']);
+  }
   const effectiveAt = body.effectiveAt ? new Date(body.effectiveAt).toISOString() : null;
   const db = dbFor(c.env, current.store_id);
   const approvalId = price !== current.price ? crypto.randomUUID() : null;
@@ -457,8 +462,9 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
       WHERE id = ? AND status = 'pending'`).bind(requester, approvalId));
   }
   try {
-    await db.batch(writes);
+    await db.batch([...mediaDeletionGuardStatements(db, [body.imageMediaId !== current.image_media_id ? body.imageMediaId ?? null : null]), ...writes]);
   } catch (error) {
+    if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
     if (/unique constraint/i.test(String(error))) return c.json({ success: false, error: 'このメニューには以前の価格変更申請が残っています。メニュー一覧の申請中から確認してください' }, 409);
     throw error;
   }

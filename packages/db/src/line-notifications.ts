@@ -1,3 +1,4 @@
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 import { jstNow } from './utils.js';
 
 export type CustomerNotificationStatus = 'draft' | 'published' | 'stopped';
@@ -96,7 +97,7 @@ export async function createCustomerNotificationDefinition(
   const id = crypto.randomUUID();
   const now = jstNow();
   try {
-    await db.prepare(`
+    const insert = db.prepare(`
       INSERT INTO customer_notification_definitions
         (id, line_account_id, key, name, category, source_event_type, status,
          draft_config_json, created_by, updated_by, created_at, updated_at)
@@ -113,7 +114,8 @@ export async function createCustomerNotificationDefinition(
       input.staffId,
       now,
       now,
-    ).run();
+    );
+    await db.batch([insert, ...await mediaContentDeletionGuard(db, [JSON.stringify(input.draftConfig)])]);
   } catch (error) {
     if (error instanceof Error && /UNIQUE/i.test(error.message)) {
       throw new LineNotificationError('duplicate_key', '同じキーのお知らせが既にあります');
@@ -140,7 +142,7 @@ export async function updateCustomerNotificationDraft(
 ): Promise<{ definition: CustomerNotificationDefinitionRow; versions: CustomerNotificationVersionRow[] }> {
   const current = await getCustomerNotificationDefinition(db, input.id, input.lineAccountId);
   if (!current) throw new LineNotificationError('not_found', 'お知らせが見つかりません');
-  const result = await db.prepare(`
+  const update = db.prepare(`
     UPDATE customer_notification_definitions
        SET name = ?, category = ?, source_event_type = ?, draft_config_json = ?,
            updated_by = ?, updated_at = ?, version = version + 1
@@ -155,7 +157,8 @@ export async function updateCustomerNotificationDraft(
     input.id,
     input.lineAccountId,
     input.expectedVersion,
-  ).run();
+  );
+  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [JSON.stringify(input.draftConfig)])]);
   if (!Number(result.meta.changes ?? 0)) {
     throw new LineNotificationError('version_conflict', 'ほかの担当者が先に変更しました');
   }
@@ -208,6 +211,7 @@ export async function publishCustomerNotificationDefinition(
         input.lineAccountId,
         input.expectedVersion,
       ),
+      ...await mediaContentDeletionGuard(db, [current.definition.draft_config_json]),
     ]);
   } catch (error) {
     if (error instanceof Error && /UNIQUE/i.test(error.message)) {

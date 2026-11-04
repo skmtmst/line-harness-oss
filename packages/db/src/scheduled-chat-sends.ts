@@ -1,3 +1,4 @@
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 import {normalizeScheduledAt} from './scheduled-chat-time.js';
 export {normalizeScheduledAt} from './scheduled-chat-time.js';
 // 1対1トークの送信予約の状態機械を DB で持つ。
@@ -74,7 +75,7 @@ export async function createScheduledChatSend(
 ): Promise<{ row: ScheduledChatSendRow; created: boolean }> {
   const now = input.now ?? new Date().toISOString();
   const scheduledAt = normalizeScheduledAt(input.scheduledAt);
-  const result = await db
+  const insert = db
     .prepare(
       `INSERT OR IGNORE INTO scheduled_chat_sends
          (id, friend_id, line_account_id, staff_id, message_type, content,
@@ -110,8 +111,8 @@ export async function createScheduledChatSend(
       input.content,
       input.quotedMessageId,
       scheduledAt,
-    )
-    .run();
+    );
+  const [result] = await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.content])]);
   if ((result.meta?.changes ?? 0) === 1) {
     const row = await getScheduledChatSend(db, input.id);
     if (!row) throw new Error('scheduled send record unavailable');
@@ -257,7 +258,7 @@ export async function updateScheduledChatSend(
   const now = input.now ?? new Date().toISOString();
   const scheduledAt =
     input.scheduledAt != null ? normalizeScheduledAt(input.scheduledAt) : null;
-  const result = await db
+  const update = db
     .prepare(
       `UPDATE scheduled_chat_sends
           SET scheduled_at = COALESCE(?, scheduled_at),
@@ -265,8 +266,8 @@ export async function updateScheduledChatSend(
               updated_at = ?
         WHERE id = ? AND friend_id = ? AND status = 'scheduled'`,
     )
-    .bind(scheduledAt, input.content ?? null, now, input.id, input.friendId)
-    .run();
+    .bind(scheduledAt, input.content ?? null, now, input.id, input.friendId);
+  const [result] = await db.batch([update, ...await mediaContentDeletionGuard(db, [input.content])]);
   if ((result.meta?.changes ?? 0) === 1) return 'updated';
   const row = await getScheduledChatSend(db, input.id);
   return !row || row.friend_id !== input.friendId ? 'not_found' : 'locked';

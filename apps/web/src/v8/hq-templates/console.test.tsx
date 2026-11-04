@@ -592,6 +592,24 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     expect(calls.distribute).not.toHaveBeenCalled()
   })
 
+  it('画像削除による409後に配布結果を読み直し、成功と停止した配布を表示する', async () => {
+    const reason = '画像が削除中のため止めました。画像を差し替えて、もう一度配布してください。'
+    calls.distribute.mockImplementationOnce(async () => delivered('t-1')).mockRejectedValueOnce(Object.assign(new Error(reason), { status: 409 }))
+    calls.result.mockResolvedValueOnce({ ...delivered('t-2'), status: 'failed', stores: [{ ...delivered('t-2').stores[0], status: 'failed', reason }] })
+    render(<HqTemplatesV8 type="template" />)
+    const dialog = await selectFolder()
+    await pickStores(dialog, ['然 -NEN- 本店'])
+    fireEvent.click(within(dialog).getByRole('button', { name: '2 件を 1 アカウントへ配る' }))
+    fireEvent.click(await screen.findByRole('button', { name: '次のひな形を確かめる（1/2）' }))
+    fireEvent.click(await screen.findByRole('button', { name: '2 件を 1 アカウントへ配る' }))
+    const result = await findPickerDialog('配った結果：フォルダ「予約」')
+    expect(within(result).getByText(reason)).toBeTruthy()
+    expect(within(result).getByText('成功')).toBeTruthy()
+    expect(within(result).getByText('失敗')).toBeTruthy()
+    expect(within(result).getByRole('button', { name: '失敗した 1 件をやり直す' })).toBeTruthy()
+    expect(calls.result).toHaveBeenCalledWith('t-2','run-t-2')
+  })
+
   it('失敗したひな形とアカウントだけ再確認し、先に成功した配布は送らない', async () => {
     calls.distribute.mockImplementationOnce(async () => delivered('t-1')).mockImplementationOnce(async () => ({ ...delivered('t-2'), status: 'failed', stores: [{ ...delivered('t-2').stores[0], status: 'failed', reason: '更新を確認してください' }] }))
     render(<HqTemplatesV8 type="template" />)

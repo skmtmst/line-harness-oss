@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import { createInvocationContext, currentInvocation, logger, runWithInvocation } from '@line-crm/shared/server';
 import type { Env } from '../worker-env.js';
 import { reportHarnessErrorToSlack } from '../services/codex-slack-relay.js';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 
 /** 既存の案内と復旧用データを保ったまま、予期しない失敗を共通処理へ渡す。 */
 export class UnexpectedRouteError extends HTTPException {
@@ -15,6 +16,9 @@ export class UnexpectedRouteError extends HTTPException {
  * 障害の識別番号を共通の依頼番号へ接続する。入力や例外の自由文は記録しない。
  */
 export const unhandledWorkerError: ErrorHandler<Env> = (error, c) => {
+  if (isMediaDeletionConflict(error)) {
+    return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
+  }
   const context = currentInvocation() ?? createInvocationContext('http');
   return runWithInvocation(context, async () => {
     const incidentId = context.requestId;

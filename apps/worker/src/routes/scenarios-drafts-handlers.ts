@@ -1,4 +1,5 @@
 import { validateConditionForStorage } from './scenario-condition-validation.js';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 import { hasDeliveryAccess } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
@@ -564,6 +565,7 @@ export const post__api_scenarios_id_steps_10 = async (c: Context<Env, "/api/scen
 
     return c.json({ success: true, data: serializeStep(step) }, 201);
   } catch (err) {
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     throw err;
   }
 };

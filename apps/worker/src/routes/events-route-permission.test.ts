@@ -3,6 +3,8 @@
  * owner/admin または /events 権限のある staff だけを許可し、権限なし・閲覧専用・他店舗は拒む。外部へは送信しない。
  */
 import { Hono } from 'hono';
+import { createHash } from 'node:crypto';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Env } from '../worker-env.js';
@@ -77,6 +79,7 @@ function seed(raw: import('better-sqlite3').Database): void {
 
 function makeApp(db: D1Database) {
   const app = new Hono<Env>();
+  app.onError(unhandledWorkerError);
   app.use('*', authMiddleware);
   app.route('/', events);
   return { app, env: { DB: db } as unknown as Env };
@@ -156,4 +159,47 @@ describe('本番 events ルートの権限 (実認証)', () => {
       status: 'rejected',
     });
   });
+});
+
+it('削除中の画像をイベントへ保存せず409を返す', async () => {
+  const {db,raw}=createTestD1({loginPolicy:'off'});
+  try {
+    seed(raw);
+    raw.prepare("INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at) VALUES('m','account-1',?,'checking','now','now')").run(JSON.stringify(['object-key']));
+    const {app,env}=makeApp(db);
+    const response=await app.request('/api/events/admin/events?account_id=account-1',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer key-owner'},body:JSON.stringify({name:'画像付き',image_url:'https://example.test/object-key'})},env);
+    expect(response.status).toBe(409);
+    expect(raw.prepare("SELECT COUNT(*) AS n FROM events WHERE name='画像付き'").get()).toEqual({n:0});
+  } finally {raw.close();}
+});
+
+it('削除記録の消去後も固定URLとライブURLを登録しない', async () => {
+  const {db,raw}=createTestD1({loginPolicy:'off'});
+  try {
+    seed(raw);
+    const fingerprint=createHash('sha256').update('media/other/final/old.png').digest('hex');
+    raw.prepare('INSERT INTO media_deleted_key_fingerprints(sha256) VALUES(?)').run(fingerprint);
+    const {app,env}=makeApp(db);
+    for (const image_url of ['https://example.test/images/media/other/final/old.png','https://example.test/media/deleted-id/content']) {
+      const response=await app.request('/api/events/admin/events?account_id=account-1',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer key-owner'},body:JSON.stringify({name:'保存しない',image_url})},env);
+      expect(response.status).toBe(409);
+    }
+    expect(raw.prepare("SELECT COUNT(*) AS n FROM events WHERE name='保存しない'").get()).toEqual({n:0});
+  } finally {raw.close();}
+});
+
+it('別統括が持つ画像のURLも、現状はイベントに登録できる', async () => {
+  const {db,raw}=createTestD1({loginPolicy:'off'});
+  try {
+    seed(raw);
+    raw.exec(`INSERT INTO tenants(id,name) VALUES('tenant-a','架空A'),('tenant-b','架空B');
+      UPDATE line_accounts SET tenant_id='tenant-a' WHERE id='account-1';
+      UPDATE line_accounts SET tenant_id='tenant-b' WHERE id='account-2';
+      INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key)
+        VALUES('foreign-media','account-2','image','image.png','image/png',1,'foreign/known-image.png');`);
+    const {app,env}=makeApp(db);
+    const response=await app.request('/api/events/admin/events?account_id=account-1',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer key-owner'},body:JSON.stringify({name:'架空イベント',image_url:'https://example.test/images/foreign/known-image.png'})},env);
+    expect(response.status).toBe(201);
+    expect(raw.prepare("SELECT image_url FROM events WHERE name='架空イベント'").get()).toEqual({image_url:'https://example.test/images/foreign/known-image.png'});
+  } finally {raw.close();}
 });

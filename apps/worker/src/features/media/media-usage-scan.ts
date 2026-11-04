@@ -36,7 +36,7 @@ const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; c
     refKind: 'broadcast',
     table: 'broadcasts',
     idColumn: 'id',
-    columns: ['message_content', 'message_bubbles_json'],
+    columns: ['message_content', 'message_bubbles_json', 'draft_payload_json'],
   },
   // 旧 rich_menus 表は存在しない。LINEへ送る実画像はページのR2キーで持つ。
   { refKind: 'rich_menu', table: 'rich_menu_pages', idColumn: 'id', columns: ['image_r2_key'] },
@@ -52,16 +52,21 @@ const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; c
   { refKind: 'booking_menu', table: 'menus', idColumn: 'id', columns: ['photo_media_id'], mediaIdMatch: true, activeOnly: true },
   { refKind: 'booking_staff', table: 'staff', idColumn: 'id', columns: ['photo_media_id'], mediaIdMatch: true, activeOnly: true },
   { refKind: 'booking_settings', table: 'booking_settings', idColumn: 'id', columns: ['store_photo_media_id', 'store_photo_interior_media_id', 'store_photo_waiting_media_id'], mediaIdMatch: true },
-  { refKind: 'form', table: 'forms', idColumn: 'id', columns: ['layout', 'published_layout'] },
+  { refKind: 'form', table: 'forms', idColumn: 'id', columns: ['layout', 'published_layout', 'fields', 'published_fields', 'on_submit_message_content', 'published_message', 'og_image_url', 'published_og_image_url'] },
 ];
 
 /** 店の6種類は同じテンプレート参照として点検する。 */
 function sourceTable(source: typeof SOURCES[number]): string {
-  if (source.refKind === 'form') return `(SELECT f.id,f.layout,v.layout AS published_layout FROM forms f
-    LEFT JOIN form_versions v ON v.id=f.current_published_version_id AND v.form_id=f.id)`;
+  if (source.refKind === 'form') return `(SELECT f.id,f.layout,
+    (SELECT json_group_array(v.layout) FROM form_versions v WHERE v.form_id=f.id) AS published_layout,
+    f.fields,(SELECT json_group_array(v.fields) FROM form_versions v WHERE v.form_id=f.id) AS published_fields,
+    f.on_submit_message_content,(SELECT json_group_array(v.on_submit_message_content) FROM form_versions v WHERE v.form_id=f.id) AS published_message,
+    f.og_image_url,(SELECT json_group_array(v.og_image_url) FROM form_versions v WHERE v.form_id=f.id) AS published_og_image_url FROM forms f)`;
   if (source.activeOnly) return `(SELECT id,${source.columns.join(',')} FROM ${source.table} WHERE deleted_at IS NULL)`;
   if (source.refKind !== 'template') return source.table;
-  return `(SELECT id, message_content, draft_message_content FROM templates
+  return `(SELECT t.id, json_array(t.message_content,t.message_bubbles_json,
+      (SELECT json_group_array(json_array(v.message_content,v.message_bubbles_json)) FROM template_versions v WHERE v.template_id=t.id)) AS message_content,
+      json_array(t.draft_message_content,t.draft_message_bubbles_json) AS draft_message_content FROM templates t
     UNION ALL SELECT id, payload_json AS message_content,
       draft_payload_json AS draft_message_content FROM broadcast_message_assets)`;
 }
@@ -116,8 +121,9 @@ async function findMatches(
   for (const source of SOURCES) {
     try {
       const sourceTokens = source.mediaIdMatch ? [mediaId] : source.refKind === 'form' ? [...tokens, mediaId] : tokens;
-      for (let index = 0; index < sourceTokens.length; index += MATCH_TOKEN_CHUNK) {
-        const chunk = sourceTokens.slice(index, index + MATCH_TOKEN_CHUNK);
+      const tokenChunk = Math.min(MATCH_TOKEN_CHUNK, Math.floor(90 / source.columns.length));
+      for (let index = 0; index < sourceTokens.length; index += tokenChunk) {
+        const chunk = sourceTokens.slice(index, index + tokenChunk);
         // LIKE '%...%' だと、R2キーやライブURLのような長いトークンでD1が
         // 「LIKE or GLOB pattern too complex」を返して全読み口が503になる
         // （staging実測：85文字のR2キーで発生、D1側のLIKEパターン長の壁は50文字）。

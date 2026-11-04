@@ -1,3 +1,4 @@
+import { mediaDeletedKeyFingerprintGuard } from './deletion-guard.js';
 import { jstNow } from '../utils.js';
 import { type MediaKind, type Media } from './primitives.js';
 import { getMediaById } from './definitions-reads.js';
@@ -19,6 +20,7 @@ export async function createMedia(
     durationMs?: number | null;
     publicUrl?: string | null;
     uploadedBy?: string | null;
+    sourceMedia?: { id: string; r2Key: string };
   },
 ): Promise<Media> {
   const id = crypto.randomUUID();
@@ -56,6 +58,11 @@ export async function createMedia(
       input.width ?? null, input.height ?? null, input.durationMs ?? null,
       now, input.uploadedBy ?? null, now, now,
     ),
+    ...(input.sourceMedia ? [db.prepare(`INSERT INTO media_deletion_guards(blocked)
+      SELECT 1 WHERE EXISTS(SELECT 1 FROM media_deletion_jobs WHERE media_id=?)
+        OR NOT EXISTS(SELECT 1 FROM media WHERE id=? AND r2_key=?)`)
+      .bind(input.sourceMedia.id,input.sourceMedia.id,input.sourceMedia.r2Key)] : []),
+    ...await mediaDeletedKeyFingerprintGuard(db, [input.r2Key, input.sourceMedia?.r2Key], {checkLiveIds:false}),
   ]);
   return (await getMediaById(db, id, input.lineAccountId))!;
 }

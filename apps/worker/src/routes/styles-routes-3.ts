@@ -1,3 +1,4 @@
+import { mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import { catalogDetails } from '../services/style-starter-catalog-details.js';
 import type { StarterCatalogKind } from '@line-crm/shared';
 import { listStarterCatalog, saveCatalogStarter } from '../services/style-starter-catalog-save.js';
@@ -232,7 +233,7 @@ styles.put(
     const id = current?.id ?? crypto.randomUUID(),
       now = new Date().toISOString();
     if (current) {
-      const r = await c.env.DB.prepare(
+      const statement = c.env.DB.prepare(
         'UPDATE style_starter_sets SET name=?,definition_json=?,version=version+1,updated_at=?,updated_by=?,auto_insert=? WHERE id=? AND tenant_id=? AND version=?',
       )
         .bind(
@@ -244,11 +245,11 @@ styles.put(
           id,
           tenant,
           current.version,
-        )
-        .run();
+        );
+      const [r] = await c.env.DB.batch([statement, ...await mediaDeletionTextGuardStatements(c.env.DB, [JSON.stringify(definition)])]);
       if (!r.meta.changes) throw new StyleError('version_conflict', 409);
     } else
-      await c.env.DB.prepare(
+      await c.env.DB.batch([c.env.DB.prepare(
         'INSERT INTO style_starter_sets(id,tenant_id,style,name,definition_json,updated_at,updated_by,auto_insert) VALUES(?,?,?,?,?,?,?,?)',
       )
         .bind(
@@ -260,8 +261,7 @@ styles.put(
           now,
           c.get('staff').id,
           Number(autoInsert),
-        )
-        .run();
+        ), ...await mediaDeletionTextGuardStatements(c.env.DB, [JSON.stringify(definition)])]);
     return c.json({
       success: true,
       data: { id, version: (current?.version ?? 0) + 1, autoInsert },

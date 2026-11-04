@@ -75,6 +75,29 @@ function verify(reminderCount: number) {
 }
 
 describe('PKG66: 項目移行の参照切替を100 bind以内で確定する', () => {
+  it('受付後に削除中となった画像の項目だけを失敗にし、残りは移行する', async () => {
+    sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'migrations/762_media_deletion_jobs.sql'), 'utf8'));
+    await preview(0);
+    sqlite.exec(`
+      UPDATE friend_fields SET type_v6 = 'image' WHERE id = 'target';
+      INSERT INTO friends (id,line_user_id,line_account_id) VALUES ('friend-2','U-test-2','account');
+      INSERT INTO media (id,kind,filename,mime_type,size_bytes,r2_key,line_account_id)
+        VALUES ('image-blocked','image','blocked.png','image/png',1,'blocked','account'),
+               ('image-ok','image','ok.png','image/png',1,'ok','account');
+      UPDATE field_migration_items SET converted_value = 'image-blocked' WHERE run_id = 'run' AND friend_id = 'friend';
+      INSERT INTO field_migration_items(run_id,friend_id,source_value,converted_value,status)
+        VALUES('run','friend-2','旧値','image-ok','convertible');
+      INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+        VALUES('image-blocked','account','["blocked"]','checking','now','now');
+    `);
+    await executeFieldMigration(db, 'run', 'image', 'staff');
+    expect(sqlite.prepare("SELECT friend_id,media_id FROM friend_field_values WHERE field_id='target'").all())
+      .toEqual([{ friend_id: 'friend-2', media_id: 'image-ok' }]);
+    expect(sqlite.prepare("SELECT friend_id,status,reason FROM field_migration_items WHERE run_id='run' ORDER BY friend_id").all())
+      .toEqual([{ friend_id: 'friend', status: 'failed', reason: 'この画像は削除中のため登録できません。' },
+        { friend_id: 'friend-2', status: 'succeeded', reason: null }]);
+  });
+
   it.each([96, 97, 197])('%i件のリマインダを全件切り替える', async (count) => {
     await preview(count);
     await executeFieldMigration(db, 'run', 'text', 'staff');

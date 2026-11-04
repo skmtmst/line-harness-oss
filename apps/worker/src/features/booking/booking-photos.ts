@@ -1,3 +1,4 @@
+import { isMediaDeletionConflict, mediaDeletionGuardStatements } from '../media/deletion-guard.js';
 import { BOOKING_STORE_PHOTO_SLOTS, type BookingPhoto, type BookingPhotoCatalog, type BookingPhotoOwner, type BookingStorePhotoSlot, type BookingStorePhotoVisibility, type BookingStorePhotosWrite } from '@line-crm/shared';
 import { recordMenuVersion } from '@line-crm/db';
 
@@ -78,8 +79,14 @@ export async function getBookingPhotos(db: D1Database, accountId: string, origin
 
 async function checkMedia(db: D1Database, accountId: string, mediaId: string | null): Promise<void> {
   if (mediaId === null) return;
+  if (await db.prepare(`SELECT 1 FROM media_deletion_jobs WHERE media_id=? AND line_account_id=?`).bind(mediaId, accountId).first()) {
+    throw new BookingPhotoError('media_deletion_in_progress', 409);
+  }
   if (!await db.prepare(`SELECT id FROM media WHERE id=? AND line_account_id=? AND kind='image' AND archived_at IS NULL`)
-    .bind(mediaId, accountId).first()) throw new BookingPhotoError('booking_photo_media_unavailable');
+    .bind(mediaId, accountId).first()) {
+    if (await db.prepare(`SELECT 1 FROM media_deletion_jobs WHERE media_id=? AND line_account_id=?`).bind(mediaId, accountId).first()) throw new BookingPhotoError('media_deletion_in_progress', 409);
+    throw new BookingPhotoError('booking_photo_media_unavailable');
+  }
 }
 
 /** 写真の CAS と利用台帳の更新は、同じ文のトリガーで確定する。 */
@@ -91,10 +98,18 @@ export async function saveBookingPhoto(db: D1Database, accountId: string, owner:
   if (!current) throw new BookingPhotoError('not_found', 404);
   if (current.version !== expectedVersion) throw new BookingPhotoError('version_conflict', 409, current.version);
   await checkMedia(db, accountId, mediaId);
-  const result = await db.prepare(`UPDATE ${table} SET photo_media_id=?,${versionColumn}=${versionColumn}+1,
+  const write = db.prepare(`UPDATE ${table} SET photo_media_id=?,${versionColumn}=${versionColumn}+1,
     updated_at=strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')
     WHERE id=? AND line_account_id=? AND deleted_at IS NULL AND ${versionColumn}=?`)
-    .bind(mediaId, id, accountId, expectedVersion).run();
+    .bind(mediaId, id, accountId, expectedVersion);
+  let result: D1Result;
+  try {
+    const writes = await db.batch([...mediaDeletionGuardStatements(db, [mediaId]), write]);
+    result = writes[writes.length - 1]!;
+  } catch (error) {
+    if (isMediaDeletionConflict(error)) throw new BookingPhotoError('media_deletion_in_progress', 409);
+    throw error;
+  }
   if (!result.meta.changes) throw new BookingPhotoError('version_conflict', 409);
   if (owner === 'menu') await recordMenuVersion(db, { menuId: id, staffId });
   return expectedVersion + 1;
@@ -112,12 +127,18 @@ export async function saveBookingStorePhotos(db: D1Database, accountId: string, 
       WHERE line_account_id=? AND version=?`)
       .bind(input.photos.exterior, input.photos.interior, input.photos.waiting, JSON.stringify(input.order), accountId, input.expectedVersion);
   // D1 batch 内で直前の CAS の changes だけを見て、競合に負けた処理が勝者の写真を公開・非公開にしないようにする。
-  const statements = [photoWrite];
+  const guards = mediaDeletionGuardStatements(db, Object.values(input.photos));
+  const statements = [...guards, photoWrite];
   if (input.visibility) statements.push(db.prepare(`INSERT INTO account_settings(id,line_account_id,key,value)
     SELECT ?,?,?,? WHERE changes()=1
     ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value,updated_at=strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')`)
     .bind(crypto.randomUUID(), accountId, STORE_PHOTO_VISIBILITY_KEY, JSON.stringify(input.visibility)));
-  const [saved] = await db.batch(statements);
+  let saved: D1Result | undefined;
+  try { saved = (await db.batch(statements))[guards.length]; }
+  catch (error) {
+    if (isMediaDeletionConflict(error)) throw new BookingPhotoError('media_deletion_in_progress', 409);
+    throw error;
+  }
   if (saved?.meta.changes) return input.expectedVersion + 1;
   const current = await db.prepare('SELECT version FROM booking_settings WHERE line_account_id=?').bind(accountId).first<{ version: number }>();
   throw new BookingPhotoError('version_conflict', 409, current?.version);

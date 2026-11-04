@@ -1,4 +1,5 @@
 import { readPriority } from '../features/auto-replies/auto-reply-priority/index.js';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
 import { getAutoReplyById, createAutoReply, updateAutoReply, deleteAutoReply, restoreAutoReply, stopAutoReply, getTemplateById, autoReplyDraftSettingsFromRow, autoReplyRuleCreateFingerprint, createAutoReplyWithDraftVersion, getAutoReplyDraftVersion, getAutoReplyPublishedVersion, parseAutoReplyVersionSettings, saveAutoReplyDraftVersion } from '@line-crm/db';
@@ -201,6 +202,7 @@ export const post__api_auto_replies_1 = async (c: Context<Env, "/api/auto-replie
         : await createAutoReply(c.env.DB, createInput, idempotency);
       item = created.rule;
     } catch (err) {
+      if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
       const mapped = idempotencyErrorResponse(err);
       if (mapped) return inputError(c, { success: false, error: mapped.error }, mapped.status, ["triggerConfig"]);
       throw err;
@@ -423,6 +425,7 @@ export const put__api_auto_replies_id_2 = async (c: Context<Env, "/api/auto-repl
     const memos = await internalMemosOf(c.env.DB, [updated.id]);
     return c.json({ success: true, data: serializeAutoReply(updated, memos.get(updated.id) ?? null) });
   } catch (err) {
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     throw err;
   }
 };
@@ -493,6 +496,7 @@ export const post__api_auto_replies_id_restore_5 = async (c: Context<Env, "/api/
     await resolveStoppedByNames(c.env.DB, [data]);
     return c.json({ success: true, data });
   } catch (err) {
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     throw err;
   }
 };

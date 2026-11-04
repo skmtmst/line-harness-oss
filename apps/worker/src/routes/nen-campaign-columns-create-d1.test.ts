@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { Hono } from 'hono';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';
 
@@ -57,6 +58,7 @@ let nenCampaigns: Awaited<typeof import('./nen-campaigns.js')>['nenCampaigns'];
 
 function app() {
   const instance = new Hono<Env>();
+  instance.onError(unhandledWorkerError);
   instance.use('*', async (c, next) => {
     c.set('staff', {
       id: 'env-owner', name: 'env-owner', role: 'owner', readOnly: false, tenantId: TENANT_ID,
@@ -197,4 +199,11 @@ describe('POST /api/nen-campaigns/columns — 実スキーマで下書きが作�
     expect(columnRows()).toHaveLength(0);
     expect(pendingJobCount()).toBe(0);
   });
+});
+
+test('削除中の画像をコラムに保存せず409を返す', async () => {
+  sqlite.prepare("INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at) VALUES('m',?,?,'checking','now','now')").run(ACCOUNT,JSON.stringify(['object-key']));
+  const result=await post({title:'保存しない',articleUrl:'https://example.com/article',imageUrl:'https://example.com/object-key'});
+  expect(result.status).toBe(409);
+  expect(columnRows()).toHaveLength(0);
 });

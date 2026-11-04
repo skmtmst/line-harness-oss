@@ -214,6 +214,8 @@ export default function MediaLibraryListV8() {
   const singleLock = useRef(false)
   const bulkLock = useRef(false)
   const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkImpacts, setBulkImpacts] = useState<Array<{ id: string; filename: string; count: number }> | null>(null)
+  const [bulkImpactError, setBulkImpactError] = useState(false)
   /** まとめて削除の進み具合。件数が多いときに止まっているように見せない。 */
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   /** 大きく出している札。押した札の中身を原寸で見せる。 */
@@ -511,13 +513,33 @@ export default function MediaLibraryListV8() {
     const ticket = {}; bulkTicket.current = ticket
     const accounts = [...new Set(removableSelected.map(id => [...items, ...selectionItems].find(item => item.id === id)?.lineAccountId ?? ''))]
     setBulkContext({ scope: renderedScope, ticket, accounts })
+    setBulkImpacts(null)
+    setBulkImpactError(false)
     setBulkConfirm(removableSelected)
+    try {
+      const byId = new Map([...items, ...selectionItems].map(item => [item.id, item]))
+      const results: Array<{ id: string; filename: string; count: number }> = []
+      for (let offset = 0; offset < removableSelected.length; offset += 10) {
+        if (!mounted.current || bulkTicket.current !== ticket || renderedScope !== accountScope.current) return
+        const chunk = await Promise.all(removableSelected.slice(offset, offset + 10).map(async id => {
+          const item = byId.get(id)
+          if (!item?.lineAccountId) throw new Error('account missing')
+          const response = await api.media.deleteImpact(id, item.lineAccountId)
+          if (!response.success || response.data.verified === false || !response.data.canDelete) throw new Error('impact unavailable')
+          return { id, filename: item.filename, count: response.data.sentMessageCount ?? 0 }
+        }))
+        results.push(...chunk)
+      }
+      if (mounted.current && bulkTicket.current === ticket && renderedScope === accountScope.current) setBulkImpacts(results)
+    } catch {
+      if (mounted.current && bulkTicket.current === ticket && renderedScope === accountScope.current) setBulkImpactError(true)
+    }
   }
 
   function runBulkDelete(ids: string[]) {
     const context = bulkContext
     const current = () => mounted.current && canManageRef.current && context?.scope === accountScope.current && context.ticket === bulkTicket.current
-    if (!current() || bulkLock.current) return
+    if (!current() || bulkLock.current || bulkImpacts === null || bulkImpactError) return
     bulkLock.current = true
     void deleteMediaSelection({ items, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, selectionItems, setBulkBusy, setBulkConfirm, setBulkProgress, setError, setSelected, isCurrent: current }, ids).finally(() => {
       bulkLock.current = false
@@ -1164,9 +1186,13 @@ export default function MediaLibraryListV8() {
         ) : impact ? (
           <div>
             <p>
-              {usageText(impact)}
+              {impact.verified !== false && impact.usageCount === 0 && (impact.sentMessageCount ?? 0) > 0
+                ? '削除を止める使用先はありません。' : usageText(impact)}
               {blockedReason(impact) ? ` ${blockedReason(impact)}` : ''}
             </p>
+            {(impact.sentMessageCount ?? 0) > 0 ? (
+              <p>送信済みのトーク {impact.sentMessageCount} 件で画像が表示されなくなることがあります。</p>
+            ) : null}
             {impact.verified === false ? (
               <div>
                 <Button type="button" onClick={() => { if (deleting) return openDelete(deleting) }} busyLabel="処理中…">もう一度読み込む</Button>
@@ -1208,7 +1234,7 @@ export default function MediaLibraryListV8() {
         open={bulkConfirm !== null && bulkContext?.scope === accountScope.current}
         tone="destructive"
         title={bulkConfirm ? `${formatNumber(bulkConfirm.length)} 件のメディアを削除しますか？` : ''}
-        description="どこにも使われていないと確かめたものだけを消します。元に戻せません。"
+        description="削除を止める使用先がないと確かめたものだけを消します。元に戻せません。"
         busy={bulkBusy}
         onCancel={() => {
           if (bulkBusy) return
@@ -1222,7 +1248,7 @@ export default function MediaLibraryListV8() {
             <Button
               type="button"
               variant="primary"
-              disabled={bulkBusy}
+              disabled={bulkBusy || bulkImpacts === null || bulkImpactError}
               onClick={() => void runBulkDelete(bulkConfirm ?? [])} busy={bulkBusy} busyLabel="処理中…">削除する
             </Button>
           </DialogActions>
@@ -1230,8 +1256,11 @@ export default function MediaLibraryListV8() {
       >
         {bulkContext ? <OperationTargetSummary accounts={bulkContext.accounts.map(id => ({ id }))} /> : null}
         <p>
-          使われている場所があるものは、はじめから選べません。消したあとは元に戻せません。
+          削除を止める使用先があるものは、はじめから選べません。消したあとは元に戻せません。
         </p>
+        {bulkImpactError ? <p role="alert">削除したときの影響を確かめられませんでした。窓を閉じて読み直してください。</p> : bulkImpacts === null ? <p>送信済みトークへの影響を確認しています…</p> : bulkImpacts.filter(item => item.count > 0).map(item => (
+          <p key={item.id}>「{item.filename}」は送信済みのトーク {item.count} 件で画像が表示されなくなることがあります。</p>
+        ))}
         {bulkBusy && bulkProgress ? (
           <p aria-live="polite">
             処理中…（{bulkProgress.done}/{formatNumber(bulkProgress.total)} 件）

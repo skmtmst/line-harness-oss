@@ -1,6 +1,7 @@
 import { sqlIdSet } from './id-queries.js';
 import type { AutoReply } from './auto-reply-record-types.js';
 import { jstNow } from './utils.js';
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 import { type AutoReplyDraftSettings, type AutoReplyVersionRow } from './auto-reply-runs-types.js';
 
 
@@ -245,6 +246,7 @@ export async function planAutoReplyInternalMemoStatements(
               SET definition_snapshot = ?, updated_at = ?
             WHERE id = ?`,
         ).bind(JSON.stringify(snapshot), now, draft.id),
+        ...await mediaContentDeletionGuard(db, [JSON.stringify(snapshot)]),
       ],
       draftUpdated: true,
       versionId: draft.id,
@@ -292,6 +294,7 @@ export async function planAutoReplyInternalMemoStatements(
       db.prepare(
         `UPDATE auto_replies SET current_published_version_id = ? WHERE id = ?`,
       ).bind(versionId, rule.id),
+      ...await mediaContentDeletionGuard(db, [snapshot]),
     ],
     draftUpdated: false,
   };

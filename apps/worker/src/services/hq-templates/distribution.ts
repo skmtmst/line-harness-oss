@@ -1,4 +1,6 @@
+import { mediaDeletedKeyFingerprintGuard } from '@line-crm/db/src/media/deletion-guard.js';
 import {catalogWarnings} from './catalog.js';
+import { isMediaDeletionConflict, MEDIA_DELETION_TEXT_GUARD_SQL } from '../../features/media/deletion-guard.js';
 import { canonicalDefinition } from './canonical-definition.js';
 import { isCatalogType, parseCatalogDefinition, catalogSnapshot, inspectCatalog, planCatalog } from './catalog.js';
 import { listTemplateAccounts, requireTargetAccounts } from './accounts.js';
@@ -39,7 +41,11 @@ function guard(sql: string, bindings: HqTemplateStatement['bindings']): HqTempla
   return { sql: `SELECT json(CASE WHEN (${sql}) THEN '{}' ELSE 'HQ_GUARD_FAILED' END)`, bindings };
 }
 async function batch(db: D1Database, statements: HqTemplateStatement[]) {
-  return db.batch(statements.map(s => db.prepare(s.sql).bind(...s.bindings)));
+  const fingerprintGuards: D1PreparedStatement[] = [];
+  for (const statement of statements) if (statement.sql === MEDIA_DELETION_TEXT_GUARD_SQL) {
+    fingerprintGuards.push(...await mediaDeletedKeyFingerprintGuard(db, JSON.parse(String(statement.bindings[0])) as string[]));
+  }
+  return db.batch([...statements.map(s => db.prepare(s.sql).bind(...s.bindings)), ...fingerprintGuards]);
 }
 function audit(authority: HqTemplateAuthority, action: string, targetId: string, accountId: string | null = null, result = 'success', runId: string | null = null): HqTemplateStatement {
   return { sql: `INSERT INTO audit_events(id,tenant_id,line_account_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,?,?,'business',?, ?,?,'hq_template',?,?,?)`,
@@ -107,8 +113,10 @@ export async function saveTemplate(db: D1Database, authority: HqTemplateAuthorit
   statements.push({ sql: `INSERT INTO hq_template_versions(id,tenant_id,template_id,version,definition_json,content_hash,created_by,created_at) VALUES (?,?,?,(SELECT COALESCE(MAX(version),0)+1 FROM hq_template_versions WHERE tenant_id=? AND template_id=?),?,?,?,?)`, bindings: [versionId, authority.tenantId, templateId, authority.tenantId, templateId, json, await digest(json), authority.actorId, createdAt] });
   statements.push({ sql: `UPDATE hq_templates SET name=?,description=?,current_version_id=?,revision=revision+1,updated_at=? WHERE id=? AND tenant_id=?`, bindings: [name, description, versionId, createdAt, templateId, authority.tenantId] }, audit(authority, current ? 'edited' : 'created', templateId));
   statements.push({ sql: 'UPDATE hq_templates SET folder_id=? WHERE id=? AND tenant_id=?', bindings: [folderId as string | null, templateId, authority.tenantId] });
+  statements.push({ sql: MEDIA_DELETION_TEXT_GUARD_SQL, bindings: [JSON.stringify([json])] });
   try { await batch(db, statements); }
-  catch {
+  catch (error) {
+    if (isMediaDeletionConflict(error)) throw new HqTemplateError('media_deletion_in_progress', 409);
     if (type === 'form') {
       const valid = await db.prepare(`SELECT ${validRestaurantCoursesSql} AS valid`).bind(json, null).first<{valid:number}>();
       if (!valid?.valid) throw new HqTemplateError('restaurant_course_unavailable', 409);
@@ -230,7 +238,9 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
   await batch(db, statements);
   return { preflightId, expiresAt, stores };
 }
-function resultReason(status: string): string | null {
+export const MEDIA_DELETION_DISTRIBUTION_REASON = '画像が削除中のため止めました。画像を差し替えて、もう一度配布してください。';
+function resultReason(status: string, errorCode: string | null): string | null {
+  if (status === 'failed' && errorCode === 'MEDIA_DELETION_IN_PROGRESS') return MEDIA_DELETION_DISTRIBUTION_REASON;
   if (status === 'version_conflict') return VERSION_CONFLICT_MESSAGE;
   if (status === 'failed') return 'この店舗には配布できませんでした。もう一度確認してください';
   if (status === 'unsupported') return 'この種類の配布はまだ利用できません';
@@ -257,7 +267,7 @@ export async function distributionResult(db: D1Database, authority: HqTemplateAu
       }
       if (r.resolution_mode === 'create') counts.created++; else if (r.resolution_mode === 'overwrite') counts.overwritten++; else counts.aliased++;
     }
-    stores.push({ accountId: row.target_account_id, status: row.status, reason: resultReason(row.status), cleanupPending: Number(cleanup?.count ?? 0) > 0, counts,
+    stores.push({ accountId: row.target_account_id, status: row.status, reason: resultReason(row.status, row.error_code), cleanupPending: Number(cleanup?.count ?? 0) > 0, counts,
       createdName: row.status === 'succeeded' ? row.created_name ?? null : null });
   }
   const targets = (await db.prepare(`SELECT target_account_id FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id`).bind(authority.tenantId, templateId, runId).all<{ target_account_id: string }>()).results;
@@ -337,11 +347,13 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     const existing = await db.prepare(`SELECT status FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?`).bind(runId, authority.tenantId, p.target_account_id).first();
     if (existing) continue;
     const selected: HqTemplateResolution[] = selections.filter(s => s.accountId === p.target_account_id).map(s => ({ sourceId: s.sourceId, itemKind: stored.find(r => r.preflight_id === p.id && r.source_id === s.sourceId)!.item_kind, mode: s.mode }));
+    const stopped = !!await db.prepare("SELECT 1 FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND error_code='MEDIA_DELETION_IN_PROGRESS' LIMIT 1").bind(runId, authority.tenantId).first();
     const snapshot = await storeSnapshot(db, p.target_account_id);
     const conflict = p.expires_at === null || p.expires_at <= new Date().toISOString() || `hqts1.${await digest(snapshot)}` !== p.snapshot_token;
-    let status = conflict ? 'version_conflict' : 'succeeded';
+    let status = stopped ? 'failed' : conflict ? 'version_conflict' : 'succeeded';
+    let errorCode: string | null = stopped ? 'MEDIA_DELETION_IN_PROGRESS' : null;
     let plan: ReturnType<typeof planTags> | null = null;
-    if (!conflict) {
+    if (!conflict && !stopped) {
       try {
         if(template.template_type==='booking_menu'){
           const adapter=getHqTemplateAdapter('booking_menu',{db,authority}),input={templateVersionId:p.template_version_id,definitionJson:version.definition_json};
@@ -370,20 +382,25 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     }
     const persist = async (finalStatus: string, commit: HqTemplateStatement[], resolutions: readonly HqTemplateResolution[]) => {
       const statements = [guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND tenant_id=? AND status='ready') AND NOT EXISTS(SELECT 1 FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?)`, [p.id, authority.tenantId, runId, authority.tenantId, p.target_account_id])];
-      if (finalStatus === 'succeeded') statements.push(guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, [p.id]));
+      if (finalStatus === 'succeeded') {
+        statements.push(guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, [p.id]));
+        statements.push({sql: MEDIA_DELETION_TEXT_GUARD_SQL, bindings: [JSON.stringify([version.definition_json])]});
+        statements.push({sql: `INSERT INTO media_deletion_guards(blocked) SELECT 1 WHERE EXISTS(SELECT 1 FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND error_code='MEDIA_DELETION_IN_PROGRESS')`, bindings: [runId, authority.tenantId]});
+      }
       // 各店舗の原子的トランザクション内でも統括の所有権を確認する。
       statements.push(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [p.target_account_id, authority.tenantId]));
       for (const r of resolutions) statements.push({ sql: `UPDATE hq_template_preflight_resolutions SET resolution_mode=?,target_id=COALESCE(?,target_id),alias_name=?,expected_revision=COALESCE(?,expected_revision) WHERE preflight_id=? AND tenant_id=? AND source_id=?`, bindings: [r.mode, r.targetId ?? null, r.mode === 'alias' ? r.aliasName ?? 'pending' : null, r.expectedRevision ?? null, p.id, authority.tenantId, r.sourceId] });
-      statements.push({ sql: `INSERT INTO hq_template_distribution_results(run_id,tenant_id,template_id,template_version_id,target_account_id,preflight_id,idempotency_fingerprint,snapshot_token,status,finished_at) VALUES (?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, bindings: [runId, authority.tenantId, templateId, p.template_version_id, p.target_account_id, p.id, runId, p.snapshot_token, finalStatus] }, ...commit, audit(authority, 'distributed', templateId, p.target_account_id, finalStatus === 'succeeded' ? 'success' : 'failed', runId));
+      statements.push({ sql: `INSERT INTO hq_template_distribution_results(run_id,tenant_id,template_id,template_version_id,target_account_id,preflight_id,idempotency_fingerprint,snapshot_token,status,error_code,finished_at) VALUES (?,?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, bindings: [runId, authority.tenantId, templateId, p.template_version_id, p.target_account_id, p.id, runId, p.snapshot_token, finalStatus, errorCode] }, ...commit, audit(authority, 'distributed', templateId, p.target_account_id, finalStatus === 'succeeded' ? 'success' : 'failed', runId));
       if (finalStatus === 'succeeded' && initialResourceCommit) statements.push(...await initialResourceCommit(p.target_account_id,resolutions));
       if (finalStatus === 'succeeded') statements.push(captureDistributionName(runId, authority.tenantId, p.target_account_id));
       return batch(db, statements);
     };
     try { await persist(status, plan?.statements ?? [], plan?.resolutions ?? selected); }
-    catch {
+    catch (error) {
       const committed = await db.prepare(`SELECT status FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?`).bind(runId, authority.tenantId, p.target_account_id).first();
       if (committed) continue;
-      status = !p.expires_at || p.expires_at <= new Date().toISOString() || `hqts1.${await digest(await storeSnapshot(db, p.target_account_id))}` !== p.snapshot_token ? 'version_conflict' : 'failed';
+      if (isMediaDeletionConflict(error)) { status = 'failed'; errorCode = 'MEDIA_DELETION_IN_PROGRESS'; }
+      else status = !p.expires_at || p.expires_at <= new Date().toISOString() || `hqts1.${await digest(await storeSnapshot(db, p.target_account_id))}` !== p.snapshot_token ? 'version_conflict' : 'failed';
       try { await persist(status, [], plan?.resolutions ?? selected); } catch { throw new HqTemplateError('RESULT_UNAVAILABLE', 500); }
     }
   }

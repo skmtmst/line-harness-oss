@@ -1,3 +1,4 @@
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 import { jstNow } from '../utils.js';
 import { type CommonVar, type CommonVarUsageKind, type CommonVarExpiryBehavior } from './record-types.js';
 import { type CommonVarUsageImpact, type CommonVarUsageItem } from './types.js';
@@ -234,6 +235,7 @@ export async function createCommonVar(
         crypto.randomUUID(), id, input.name, value, memo,
         status === 'draft' ? '下書きとして作成' : '作成', input.actorId ?? null, now,
       ),
+      ...await mediaContentDeletionGuard(db, [value, input.fallbackValue]),
     ]);
   } catch (error) {
     if (error instanceof Error

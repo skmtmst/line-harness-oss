@@ -1,4 +1,5 @@
 import { jstNow } from '../utils.js';
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 import { type RichMenuDuplicateRequest, type DuplicateRichMenuGroupOutcome } from './types.js';
 import { getRichMenuGroupWithPages, buildRichMenuAliasId, buildAreaInsert } from './reads.js';
 
@@ -163,7 +164,7 @@ export async function duplicateRichMenuGroupAtomic(
   );
 
   try {
-    await db.batch(stmts);
+    await db.batch([...stmts, ...await mediaContentDeletionGuard(db, newPages.map(({ source }) => source.image_r2_key))]);
   } catch (error) {
     // 同時に来た同じ鍵の片方だけが通る。負けた側は台帳を読み直して
     // 既存の作成物を返す（別groupへの鍵違いなら conflict）。

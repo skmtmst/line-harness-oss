@@ -4918,6 +4918,25 @@ CREATE TABLE media (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 , line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, archived_at TEXT, archived_by TEXT, archive_reason TEXT, usage_expires_at TEXT, usage_consent_note TEXT, revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1));
 
+CREATE TABLE media_deleted_key_fingerprints (
+  sha256 TEXT PRIMARY KEY CHECK (length(sha256) = 64 AND sha256 NOT GLOB '*[^0-9a-f]*')
+);
+
+CREATE TABLE media_deletion_guards (
+  blocked INTEGER NOT NULL CONSTRAINT media_deletion_in_progress CHECK (blocked = 0)
+);
+
+CREATE TABLE media_deletion_jobs (
+  media_id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL,
+  r2_keys_json TEXT NOT NULL CHECK (json_valid(r2_keys_json) AND json_type(r2_keys_json) = 'array'),
+  status TEXT NOT NULL CHECK (status IN ('checking', 'deleting', 'completed')),
+  lease_owner TEXT,
+  lease_expires_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE media_file_scans (
   id               TEXT PRIMARY KEY,
   -- 全体で使う素材（配信用画像など）はアカウントを持たないため NULL を許す。
@@ -4944,6 +4963,14 @@ CREATE TABLE media_file_scans (
   released_by      TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE media_send_claims (
+  claim_id TEXT NOT NULL,
+  media_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  PRIMARY KEY (claim_id, media_id)
 );
 
 CREATE TABLE media_storage_quotas (
@@ -10775,6 +10802,10 @@ CREATE INDEX idx_media_file_scans_subject
   ON media_file_scans(subject_kind, subject_id);
 
 CREATE INDEX idx_media_kind ON media(kind, created_at DESC);
+
+CREATE INDEX idx_media_send_claims_expiry ON media_send_claims(expires_at);
+
+CREATE INDEX idx_media_send_claims_media ON media_send_claims(media_id, expires_at);
 
 CREATE INDEX idx_media_upload_sessions_account_status
   ON media_upload_sessions(line_account_id, status, expires_at);

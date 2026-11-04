@@ -23,6 +23,7 @@ async function photoAction(c: Context<Env>, save: (body: Record<string, unknown>
   try {
     return c.json({ success: true, data: { version: await save(body, accountId) } });
   } catch (error) {
+    if (error instanceof BookingPhotoError && error.code === 'media_deletion_in_progress') return c.json({ success: false, code: error.code, error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
     if (error instanceof BookingPhotoError) return c.json({ success: false, error: error.code, data: { currentVersion: error.currentVersion } }, error.status);
     if (String(error).includes('booking_photo_media_unavailable')) return c.json({ error: 'booking_photo_media_unavailable' }, 400);
     logger.error('booking_photos_save_failed');

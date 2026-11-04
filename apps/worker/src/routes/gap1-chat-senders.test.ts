@@ -1,4 +1,5 @@
 import {beforeEach,afterEach,expect,test,vi} from 'vitest';
+import {readFileSync} from 'node:fs';
 import {Hono} from 'hono';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
@@ -91,6 +92,21 @@ test('SND-18: 大きな画像・非正方形・別店の画像は保存しない
  d.raw.exec("INSERT INTO media(id,kind,filename,mime_type,size_bytes,width,height,r2_key,public_url,line_account_id) VALUES('big','image','big','image/png',3000000,100,100,'big','https://example.test/icon.png','a')");
  expect((await call('/api/line-accounts/a/senders','POST',{name:'係',visibility:'all',iconMediaId:'big'})).status).toBe(400);
 });
+test('削除の確保が担当者アイコンの確認後に割り込んだら、保存を取り消す',async()=>{
+ d.raw.exec(readFileSync(new URL('../../../../packages/db/migrations/762_media_deletion_jobs.sql',import.meta.url),'utf8'));
+ d.raw.exec("INSERT INTO media(id,kind,filename,mime_type,size_bytes,width,height,r2_key,public_url,line_account_id) VALUES('icon','image','icon','image/png',100,100,100,'icon','https://example.test/icon.png','a')");
+ const originalBatch=d.db.batch.bind(d.db);
+ const batch=vi.spyOn(d.db,'batch').mockImplementationOnce(async statements=>{
+  d.raw.prepare("INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at) VALUES('icon','a','[\"icon\"]','checking','now','now')").run();
+  return originalBatch(statements);
+ });
+ try {
+  const response=await call('/api/line-accounts/a/senders','POST',{name:'係',visibility:'all',iconMediaId:'icon'});
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({code:'media_deletion_in_progress'});
+  expect(d.raw.prepare('SELECT COUNT(*) n FROM line_senders').get()).toEqual({n:0});
+ } finally {batch.mockRestore();}
+});
 test('UNS-06 UNS-09 UNS-13 UNS-21: 1万人はSQLで集計し、古い人数の確定を送信前に拒否',async()=>{
  d.raw.exec(`WITH RECURSIVE n(x) AS(SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<9999)
  INSERT INTO friends(id,line_user_id,line_account_id) SELECT 'many-'||x,'Umany-'||x,'a' FROM n;
@@ -132,4 +148,39 @@ test('SND-20: アイコンの保管後はアカウントの送り手で送る',a
  d.raw.exec("UPDATE media SET archived_at=datetime('now') WHERE id='icon'");
  expect((await (await call('/api/line-accounts/a/senders')).json() as any).data[0].iconMissing).toBe(true);
  expect((await call('/api/chats/c/send','POST',{content:'顔なし',senderId:b.data.id})).status).toBe(200);expect(push.mock.calls[0][1][0]).not.toHaveProperty('sender');
+});
+
+test('画像を送信している間は削除を確保できず、送信後には確保できる', async () => {
+ d.raw.exec("INSERT INTO media(id,kind,filename,mime_type,size_bytes,r2_key,public_url,line_account_id) VALUES('send-media','image','image.png','image/png',1,'objects/send-key','https://cdn.test/objects/send-key','a')");
+ let finish!: () => void;
+ push.mockImplementationOnce(() => new Promise(resolve => { finish = () => resolve({}); }));
+ const sending = call('/api/chats/c/send-combined','POST',{image:{originalContentUrl:'https://cdn.test/objects/send-key',previewImageUrl:'https://cdn.test/objects/send-key'}});
+ await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+ const {claimMediaDeletion}=await import('@line-crm/db/src/media/deletion-jobs.js');
+ const attempt=()=>claimMediaDeletion(d.db,{mediaId:'send-media',accountId:'a',owner:'delete',now:new Date().toISOString(),leaseUntil:new Date(Date.now()+60_000).toISOString()});
+ expect(await attempt()).toBeNull();
+ finish();
+ expect((await sending).status).toBe(200);
+ expect(d.raw.prepare('SELECT count(*) n FROM media_send_claims').get()).toEqual({n:0});
+ expect(await attempt()).not.toBeNull();
+});
+
+test('削除中の画像は送信せず理由を返す', async () => {
+ d.raw.exec(`INSERT INTO media(id,kind,filename,mime_type,size_bytes,r2_key,public_url,line_account_id) VALUES('send-media','image','image.png','image/png',1,'objects/send-key','https://cdn.test/objects/send-key','a');
+   INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at) VALUES('send-media','a','["objects/send-key"]','checking','now','now');`);
+ const response=await call('/api/chats/c/send-combined','POST',{image:{originalContentUrl:'https://cdn.test/objects/send-key',previewImageUrl:'https://cdn.test/objects/send-key'}});
+ expect(response.status).toBe(409);
+ expect(await response.json()).toMatchObject({code:'media_deletion_in_progress'});
+ expect(push).not.toHaveBeenCalled();
+ expect(d.raw.prepare('SELECT count(*) n FROM media_send_claims').get()).toEqual({n:0});
+});
+
+test('単体の画像送信も削除中なら送らずに409を返す', async () => {
+ d.raw.exec(`INSERT INTO media(id,kind,filename,mime_type,size_bytes,r2_key,public_url,line_account_id) VALUES('send-media','image','image.png','image/png',1,'objects/send-key','https://cdn.test/objects/send-key','a');
+   INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at) VALUES('send-media','a','["objects/send-key"]','checking','now','now');`);
+ const content=JSON.stringify({originalContentUrl:'https://cdn.test/objects/send-key',previewImageUrl:'https://cdn.test/objects/send-key'});
+ const response=await call('/api/chats/c/send','POST',{messageType:'image',content});
+ expect(response.status).toBe(409);
+ expect(await response.json()).toMatchObject({code:'media_deletion_in_progress'});
+ expect(push).not.toHaveBeenCalled();
 });

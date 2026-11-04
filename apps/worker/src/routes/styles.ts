@@ -1,3 +1,4 @@
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 import { styleStarterDistribution } from './style-starter-distribution.js';
 import { Hono } from 'hono';
 
@@ -21,6 +22,7 @@ export { bookingAudience } from './styles-common.js';
 export const styles = new Hono<Env>();
 
 styles.onError((e, c) => {
+  if (isMediaDeletionConflict(e)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '画像が削除中のため保存できません。' }, 409);
   if (String(e).includes('style_mode_capacity_full'))
     return c.json({ success: false, code: 'mode_capacity_full' }, 409);
   if (

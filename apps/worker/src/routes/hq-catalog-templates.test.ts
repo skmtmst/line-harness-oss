@@ -105,3 +105,33 @@ test('HQT-03 HQT-14: 予約を使わない店は配らない、代理も配れ�
  const id=await create('booking_menu');f.raw.exec("INSERT INTO account_styles(line_account_id,style,updated_at) VALUES('a','ec',datetime('now'))");const p=await check(id);expect((p.stores[0] as any).warnings).toContain('booking_not_used');expect((await run(id,p)).body.data.status).toBe('failed');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
  const im=new Hono<Env>();im.use('*',async(c,next)=>{c.set('staff',staff);c.set('impersonation',{id:'im',tenantId:'t',mode:'write',piiRevealed:true,startedAt:'2026-10-16'});await next();});im.route('/',hqTemplates);const r=await im.request(`/api/hq/templates/${id}/preflight`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountIds:['a']})},{DB:f.db} as Env['Bindings']);expect(r.status).toBe(403);
 });
+
+test('配布中に画像が削除中になれば残りを止め、結果を残して差し替え後に再配布できる', async () => {
+ const imageUrl='https://example.invalid/media/p/content';
+ f.raw.prepare("INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES('p','a','image','p.png','image/png',1,'media/a/p.png')").run();
+ f.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id) VALUES('c','Store3','c','x','x','t')");
+ const id=await create('mileage_reward',{schemaVersion:1,settings:{...defs.mileage_reward.settings,imageUrl}});
+ const p=await check(id,['a','b','c']);
+ const original=f.db.batch.bind(f.db); let interrupted=false;
+ f.db.batch=(async statements=>{
+  const result=await original(statements);
+  if(!interrupted && (f.raw.prepare("SELECT COUNT(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get() as {n:number}).n===1){
+   interrupted=true;
+   f.raw.prepare("INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at) VALUES('p','a','[]','checking','2026-01-01','2026-01-01')").run();
+  }
+  return result;
+ }) as D1Database['batch'];
+ const result=await run(id,p);
+ expect(result.status).toBe(409);
+ expect(result.body.data.status).toBe('partial');
+ expect(result.body.data.stores.map(s=>s.status)).toEqual(['succeeded','failed','failed']);
+ expect((result.body.data.stores[2] as {reason?:string}).reason).toContain('画像が削除中');
+ expect((result.body.data.stores[1] as {reason?:string}).reason).toContain('画像が削除中');
+ expect(f.raw.prepare("SELECT line_account_id FROM mileage_rewards ORDER BY line_account_id").all()).toEqual([{line_account_id:'a'}]);
+ const saved=await call<Detail>(`/${id}`);
+ expect((await call(`/${id}`,'PATCH',{name:'配るひな形',definition:{schemaVersion:1,settings:{...defs.mileage_reward.settings,imageUrl:'https://example.invalid/replacement.png'}},expectedRevision:saved.body.data.template.revision})).status).toBe(200);
+ const retry=await run(id,await check(id,['b','c']));
+ expect(retry.status).toBe(200);
+ expect(retry.body.data.stores.map(store=>store.status)).toEqual(['succeeded','succeeded']);
+ expect(f.raw.prepare("SELECT line_account_id FROM mileage_rewards ORDER BY line_account_id").all()).toEqual([{line_account_id:'a'},{line_account_id:'b'},{line_account_id:'c'}]);
+});

@@ -33,6 +33,7 @@ type Media = { id: string; filename: string; usageCount: number; lineAccountId?:
 type Impact = {
   usageCount: number
   canDelete: boolean
+  sentMessageCount?: number
   verified?: boolean
   checkedAt?: string
   references?: Array<{ kind: string; name: string | null; href: string | null; state: 'available' | 'unavailable' }>
@@ -47,6 +48,7 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 const impactOf = (id: string, impact: Impact) => ({
   media: { id, filename: id, kind: 'image' },
   usageCount: impact.usageCount,
+  sentMessageCount: impact.sentMessageCount,
   references: (impact.references ?? []).map((ref) => ({ ...ref, scannedAt: '2026-09-01T00:00:00.000Z' })),
   checkedAt: impact.checkedAt ?? '2026-09-16T01:30:00.000Z',
   lastScannedAt: null,
@@ -151,6 +153,15 @@ const deferred = <T,>() => {
 }
 
 describe('1件ずつの削除確認（YfTfJ）', () => {
+  it('送信済みトークは匿名の件数を伝え、削除を止めない', async () => {
+    impacts.set('m-1', { usageCount: 0, canDelete: true, sentMessageCount: 2 })
+    await render(); await openDeleteFor('秋の新商品.png')
+    expect(dialog()?.textContent).toContain('送信済みのトーク 2 件で画像が表示されなくなることがあります')
+    expect(dialog()?.textContent).toContain('削除を止める使用先はありません。')
+    expect(dialog()?.textContent).not.toContain('どこでも使っていません。')
+    expect(buttonIn(dialog(), '削除する')).toBeDefined()
+  })
+
   it('メディアのアカウントが不明なら選択中のアカウントで補わない', async () => {
     media = [{ id: 'm-1', filename: '秋の新商品.png', usageCount: 0, lineAccountId: null }]
     impacts.set('m-1', { usageCount: 0, canDelete: true })
@@ -417,6 +428,10 @@ describe('遅れて返った結果の照合', () => {
 })
 
 describe('まとめて削除', () => {
+  beforeEach(() => {
+    impacts.set('m-a', { usageCount: 0, canDelete: true, sentMessageCount: 2 })
+    impacts.set('m-b', { usageCount: 0, canDelete: true, sentMessageCount: 0 })
+  })
   const selectAll = async () => {
     await click(host.querySelector('input[aria-label="A.pngを選ぶ"]'))
     await click(host.querySelector('input[aria-label="B.pngを選ぶ"]'))
@@ -457,6 +472,7 @@ describe('まとめて削除', () => {
     await selectAll()
     await click(buttonIn(document, '選択したメディアを削除（2）'))
     expect(dialog()?.textContent).toContain('2 件のメディアを削除しますか？')
+    expect(dialog()?.textContent).toContain('「A.png」は送信済みのトーク 2 件で画像が表示されなくなることがあります')
     expect(dialog()?.textContent).toContain('LINEアカウント')
     expect(dialog()?.textContent).toContain('環境')
     await click(buttonIn(dialog(), '削除する'))

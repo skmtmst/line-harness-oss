@@ -1,4 +1,5 @@
 import { jstNow } from '../utils.js';
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 import { type SaveRichMenuGroupDraftInput, type SaveRichMenuGroupDraftResult } from './types.js';
 import { buildMetaSets } from './drafts-groups.js';
 import { loadPageKeepMeta, buildPageReplaceStatements } from './drafts-pages.js';
@@ -72,7 +73,7 @@ export async function saveRichMenuGroupDraft(
     );
   }
   if (input.pages && keep) {
-    stmts.push(...buildPageReplaceStatements(db, groupId, input.pages, keep, now));
+    stmts.push(...await buildPageReplaceStatements(db, groupId, input.pages, keep, now));
   }
   try {
     await db.batch(stmts);
@@ -109,12 +110,12 @@ export async function setRichMenuPageImage(
   imageR2Key: string,
   imageContentType: string,
 ): Promise<void> {
-  await db
+  const update = db
     .prepare(
       `UPDATE rich_menu_pages SET image_r2_key = ?, image_content_type = ?, updated_at = ? WHERE id = ?`,
     )
-    .bind(imageR2Key, imageContentType, jstNow(), pageId)
-    .run();
+    .bind(imageR2Key, imageContentType, jstNow(), pageId);
+  await db.batch([update, ...await mediaContentDeletionGuard(db, [imageR2Key])]);
 }
 
 export async function pageBelongsToGroup(

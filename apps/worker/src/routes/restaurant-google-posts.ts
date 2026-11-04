@@ -1,4 +1,5 @@
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
+import { isMediaDeletionConflict, mediaDeletionGuardStatements, mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-errors.js';
 /**
@@ -311,7 +312,8 @@ function serializeMedia(media: MediaRef[], input: DraftInput): string {
 async function insertDraft(c: Context<Env>, store: StoreContext, input: DraftInput, media: MediaRef[]): Promise<PostRow> {
   const id = crypto.randomUUID();
   const staff = c.get('staff');
-  await dbFor(c.env, store.id)
+  const db = dbFor(c.env, store.id);
+  const insert = db
     .prepare(
       `INSERT INTO rt_google_posts
          (id, store_id, kind, summary, title, event_start_date, event_start_time, event_end_date, event_end_time,
@@ -340,13 +342,14 @@ async function insertDraft(c: Context<Env>, store: StoreContext, input: DraftInp
       input.instagram.enabled ? (input.instagram.mediaId ?? input.mediaId) : null,
       staff?.id ?? null,
       staff?.name ?? null,
-    )
-    .run();
+    );
+  await db.batch([insert, ...mediaDeletionGuardStatements(db, [input.mediaId, input.mediaOriginalId, input.instagram.enabled ? input.instagram.mediaId : null, input.instagram.enabled ? input.instagram.originalMediaId : null])]);
   return (await postFor(c, store.id, id))!;
 }
 
 async function updateDraft(c: Context<Env>, store: StoreContext, id: string, input: DraftInput, media: MediaRef[]): Promise<void> {
-  await dbFor(c.env, store.id)
+  const db = dbFor(c.env, store.id);
+  const update = db
     .prepare(
       `UPDATE rt_google_posts SET
          kind = ?, summary = ?, title = ?, event_start_date = ?, event_start_time = ?, event_end_date = ?, event_end_time = ?,
@@ -374,8 +377,8 @@ async function updateDraft(c: Context<Env>, store: StoreContext, id: string, inp
       nowIso(),
       id,
       store.id,
-    )
-    .run();
+    );
+  await db.batch([update, ...mediaDeletionGuardStatements(db, [input.mediaId, input.mediaOriginalId, input.instagram.enabled ? input.instagram.mediaId : null, input.instagram.enabled ? input.instagram.originalMediaId : null])]);
 }
 
 type PostStatusPatch = Partial<{ status: PostStatus; error: string | null; requestId: string | null; sentAt: string | null; publishedAt: string | null; checkedAt: string | null; deletedAt: string | null; contentFingerprint: string | null; googlePostName: string | null; googleState: string | null; searchUrl: string | null; googleCreateTime: string | null; googleUpdateTime: string | null; origin: 'admin' | 'google'; mediaJson: string; instagramStatus: PostRow['instagram_status']; instagramPermalink: string | null; instagramError: string | null; instagramPublishedAt: string | null }>;
@@ -410,10 +413,12 @@ async function setStatusForEnv(env: Env['Bindings'], storeId: string, id: string
     values.push(value);
   }
   values.push(id, storeId);
-  await dbFor(env, storeId)
+  const db = dbFor(env, storeId);
+  const update = db
     .prepare(`UPDATE rt_google_posts SET ${sets.join(', ')} WHERE id = ? AND store_id = ?`)
-    .bind(...values)
-    .run();
+    .bind(...values);
+  if (patch.mediaJson === undefined) await update.run();
+  else await db.batch([update, ...await mediaDeletionTextGuardStatements(db, [patch.mediaJson])]);
 }
 
 async function setStatus(c: Context<Env>, storeId: string, id: string, patch: PostStatusPatch): Promise<void> {
@@ -595,7 +600,9 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
     }
     // Google側で直接作られた投稿。編集はさせず、一覧に「Googleで作成」として出す。
     const id = crypto.randomUUID();
-    await dbFor(env, storeId)
+    const db = dbFor(env, storeId);
+    const mediaJson = JSON.stringify(mediaRefsFromUrls(post.mediaUrls));
+    const insert = db
       .prepare(
         `INSERT INTO rt_google_posts
            (id, store_id, kind, origin, summary, title, media_json, status, google_post_name, google_state, search_url,
@@ -608,7 +615,7 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
         post.kind === 'unknown' || post.kind === 'alert' ? 'standard' : post.kind,
         post.summary,
         post.title,
-        JSON.stringify(mediaRefsFromUrls(post.mediaUrls)),
+        mediaJson,
         stateStatus,
         post.name,
         post.state,
@@ -617,8 +624,8 @@ export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string
         post.updateTime,
         now,
         stateStatus === 'published' ? now : null,
-      )
-      .run();
+      );
+    await db.batch([insert, ...await mediaDeletionTextGuardStatements(db, [mediaJson])]);
   }
 
   // Google側から消えた公開済み投稿を検知する。
@@ -681,7 +688,9 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts', inputJsonBoundar
     const originalMedia = await resolveMedia(c, store, input.instagram.originalMediaId);
     if (!originalMedia.ok) return fail(c, 404, originalMedia.error, { code: 'media_not_found' });
   }
-  const row = await insertDraft(c, store, input, mediaResult.media);
+  const row = await insertDraft(c, store, input, mediaResult.media)
+    .catch((error: unknown) => { if (isMediaDeletionConflict(error)) return null; throw error; });
+  if (!row) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
   return c.json({ success: true, post: publicPost(row) });
 });
 
@@ -730,7 +739,8 @@ restaurantGooglePosts.put('/api/restaurant-test/google/posts/:id', inputJsonBoun
     const originalMedia = await resolveMedia(c, store, input.instagram.originalMediaId);
     if (!originalMedia.ok) return fail(c, 404, originalMedia.error, { code: 'media_not_found' });
   }
-  await updateDraft(c, store, row.id, input, mediaResult.media);
+  try { await updateDraft(c, store, row.id, input, mediaResult.media); }
+  catch (error) { if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409); throw error; }
   return c.json({ success: true, post: publicPost((await postFor(c, store.id, row.id))!) });
 });
 

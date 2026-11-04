@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 import { DEFAULT_TENANT_ID, SPECIALIZED_CATALOG_SETTING_KEY } from '@line-crm/shared';
 import { encryptCredential } from './credential-crypto.js';
 import { type CreateLineAccountInput, type LineAccount, type LineAccountConnectionCheck, type SaveLineAccountConnectionChecksInput } from './line-accounts-types.js';
@@ -93,6 +94,7 @@ export async function createLineAccount(
                 VALUES (?, ?, ?, ?, ?, ?)`).bind(
       crypto.randomUUID(), id, SPECIALIZED_CATALOG_SETTING_KEY, '[]', now, now,
     ),
+    ...await mediaContentDeletionGuard(db, [input.ogDefaultImageUrl, input.linePictureUrl]),
   ]);
 
   return (await getLineAccountById(db, id, encryptionKey))!;

@@ -1,5 +1,6 @@
 /** 動画指定は自由な R2 prefix を受け付けず、同じアカウントの kind=video の登録メディアからキーを解決する。実 route・認証・SQLite で検証し、R2 自体へは触れない。 */
 import { Hono } from 'hono';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -66,6 +67,7 @@ let webinarRoutes: Awaited<typeof import('./webinars.js')>['webinarRoutes'];
 
 function app() {
   const instance = new Hono<Env>();
+  instance.onError(unhandledWorkerError);
   instance.use('*', authMiddleware);
   instance.route('/', webinarRoutes);
   return instance;
@@ -112,6 +114,13 @@ beforeEach(async () => {
 });
 
 describe('ウェビナー動画のメディア選択 (N-115)', () => {
+  test('削除中の動画は保存できず、既存値も変わらない', async () => {
+    sqlite.raw.prepare(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+      VALUES(?,?,?,'checking','now','now')`).run(MEDIA_VIDEO_A, ACC_A, JSON.stringify(['media/acc-a/video-1.mp4']));
+    const res = await put(WEBINAR_A, KEY_OWNER, { videoMediaId: MEDIA_VIDEO_A });
+    expect(res.status).toBe(409);
+    expect(savedPrefix(WEBINAR_A)).toBeNull();
+  });
   test('同じアカウントの動画メディアを選ぶと、保存値はそのr2_keyになる', async () => {
     const res = await put(WEBINAR_A, KEY_OWNER, { videoMediaId: MEDIA_VIDEO_A });
     expect(res.status).toBe(200);

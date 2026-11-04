@@ -1,4 +1,5 @@
 import { sqlIdSet } from '../id-queries.js';
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 import { jstNow } from '../utils.js';
 import { type WebinarParticipantClassification, type Webinar, type WebinarListScope, type WebinarListFilters, type WebinarListPaging, type WebinarListRow, type WebinarOverview, type WebinarOverviewMetric, type WebinarCreateInput } from './types.js';
 
@@ -236,7 +237,7 @@ export async function getWebinarById(db: D1Database, id: string): Promise<Webina
 export async function createWebinar(db: D1Database, input: WebinarCreateInput): Promise<Webinar> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db
+  const insert = db
     .prepare(
       `INSERT INTO webinars (id, account_id, title, slug, status, video_prefix,
          duration_seconds, schedule_json, cta_json, tag_on_attend, tag_on_cta_click,
@@ -249,8 +250,8 @@ export async function createWebinar(db: D1Database, input: WebinarCreateInput): 
       input.ctaJson ?? null, input.tagOnAttend ?? null, input.tagOnCtaClick ?? null,
       input.folderId ?? null, input.publicationStartsAt ?? null, input.publicationEndsAt ?? null,
       now, now,
-    )
-    .run();
+    );
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.videoPrefix])]);
   return (await getWebinarById(db, id))!;
 }
 
@@ -287,7 +288,7 @@ export async function updateWebinar(
       patch.publicationEndsAt !== undefined ? patch.publicationEndsAt : existing.publication_ends_at,
       jstNow(), id, ...(expectedVersion === undefined ? [] : [expectedVersion]),
     );
-  if (expectedVersion === undefined) await update.run();
+  if (expectedVersion === undefined) await db.batch([update, ...await mediaContentDeletionGuard(db, [patch.videoPrefix])]);
   else {
     const result = await db.batch([
       db.prepare(`INSERT OR IGNORE INTO webinar_editor_settings (webinar_id,version,created_at,updated_at) VALUES (?,0,?,?)`).bind(id,jstNow(),jstNow()),
@@ -303,7 +304,7 @@ export async function updateWebinar(
           'publicPageTest',CASE WHEN public_page_test_json IS NULL THEN NULL ELSE json(public_page_test_json) END),?
         FROM webinar_editor_settings WHERE webinar_id=? AND version=? AND changes()=1`)
         .bind(crypto.randomUUID(),jstNow(),id,expectedVersion+1),
-
+      ...await mediaContentDeletionGuard(db, [patch.videoPrefix]),
     ]);
     if (Number(result[1].meta?.changes ?? 0) !== 1) return null;
   }

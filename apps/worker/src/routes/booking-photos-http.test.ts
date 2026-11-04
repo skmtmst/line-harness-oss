@@ -164,6 +164,74 @@ describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
       expect(scanned.matched).toBe(expected);
     }
   });
+  it('削除中の画像は予約メニュー・担当者・店舗に登録できない', async () => {
+    raw.prepare(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+      VALUES('p','a','["photos/p"]','deleting','now','now')`).run();
+    expect((await menuSave('p')).status).toBe(409);
+    expect((await request('/api/booking/admin/staff/s/photo', { expectedVersion: 1, mediaId: 'p' })).status).toBe(409);
+    expect((await storeSave(photos())).status).toBe(409);
+    expect(raw.prepare("SELECT photo_media_id FROM menus WHERE id='m'").get()).toEqual({ photo_media_id: null });
+    expect(raw.prepare("SELECT photo_media_id FROM staff WHERE id='s'").get()).toEqual({ photo_media_id: null });
+    expect(raw.prepare("SELECT COUNT(*) AS count FROM media_usages WHERE media_id='p'").get()).toEqual({ count: 0 });
+  });
+  it('画像の事前確認と予約写真の保存の間に削除が始まると保存しない', async () => {
+    const base = db;
+    let intercepted = false;
+    db = { ...base, batch: async (statements: D1PreparedStatement[]) => {
+      if (!intercepted) {
+        intercepted = true;
+        raw.prepare(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+          VALUES('p','a','["photos/p"]','checking','now','now')`).run();
+      }
+      return base.batch(statements);
+    } } as D1Database;
+    expect((await menuSave('p')).status).toBe(409);
+    expect(intercepted).toBe(true);
+    expect(raw.prepare("SELECT photo_media_id FROM menus WHERE id='m'").get()).toEqual({ photo_media_id: null });
+    expect(raw.prepare("SELECT COUNT(*) AS count FROM media_usages WHERE media_id='p'").get()).toEqual({ count: 0 });
+  });
+  it('確認の直後に予約写真が登録されたら実体を削除しない', async () => {
+    const before = await app.request('/api/media/p/delete-impact?accountId=a', {}, { DB: db } as Env['Bindings']);
+    expect(before.status).toBe(200);
+    expect((await before.json() as {data:{canDelete:boolean}}).data.canDelete).toBe(true);
+    let inserted = false;
+    // 使用先の事前確認の直後、削除の確保が始まる前に予約写真が保存される。
+    const racing = { ...db, async batch(statements: D1PreparedStatement[]) {
+      if (!inserted) {
+        inserted = true;
+        expect((await menuSave('p')).status).toBe(200);
+      }
+      return db.batch(statements);
+    } } as D1Database;
+    const remove = vi.fn();
+    const response = await app.request('/api/media/p?accountId=a', { method: 'DELETE' }, { DB: racing, IMAGES: { delete: remove } } as unknown as Env['Bindings']);
+    expect(inserted).toBe(true);
+    expect(response.status).toBe(409);
+    expect(remove).not.toHaveBeenCalled();
+    expect(raw.prepare("SELECT photo_media_id FROM menus WHERE id='m'").get()).toEqual({ photo_media_id: 'p' });
+    expect(raw.prepare("SELECT id FROM media WHERE id='p'").get()).toEqual({ id: 'p' });
+  });
+  it('削除のR2処理中には予約写真へ登録できない', async () => {
+    let registrationStatus = 0;
+    const remove = vi.fn(async () => { registrationStatus = (await menuSave('p')).status; });
+    const response = await app.request('/api/media/p?accountId=a', { method: 'DELETE' }, { DB: db, IMAGES: { delete: remove } } as unknown as Env['Bindings']);
+    expect(registrationStatus).toBe(409);
+    expect(response.status).toBe(200);
+    expect(raw.prepare("SELECT photo_media_id FROM menus WHERE id='m'").get()).toEqual({ photo_media_id: null });
+  });
+  it('R2削除が失敗したときキーを保持して再試行できる', async () => {
+    const remove = vi.fn().mockRejectedValueOnce(new Error('R2 unavailable')).mockResolvedValue(undefined);
+    const env = { DB: db, IMAGES: { delete: remove } } as unknown as Env['Bindings'];
+    expect((await app.request('/api/media/p?accountId=a', { method: 'DELETE' }, env)).status).toBe(503);
+    const job = raw.prepare("SELECT r2_keys_json,status FROM media_deletion_jobs WHERE media_id='p'").get() as { r2_keys_json: string; status: string };
+    expect(job.status).toBe('deleting');
+    expect(JSON.parse(job.r2_keys_json)).toContain('photos/p');
+    expect((await menuSave('p')).status).toBe(409);
+    expect((await app.request('/api/media/p?accountId=a', { method: 'DELETE' }, env)).status).toBe(200);
+    expect(remove).toHaveBeenCalledTimes(2);
+    expect(raw.prepare("SELECT id FROM media WHERE id='p'").get()).toBeUndefined();
+    expect(raw.prepare("SELECT status FROM media_deletion_jobs WHERE media_id='p'").get()).toEqual({ status: 'completed' });
+  });
   it('メディア一覧の実際の削除口で予約写真3種類を止め、保管庫を削除しない', async () => {
     await menuSave('p');
     await request('/api/booking/admin/staff/s/photo', { expectedVersion: 1, mediaId: 'p' });
@@ -200,7 +268,7 @@ describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
     expect(env.IMAGES.delete).not.toHaveBeenCalled();
     const replacement = await app.request('/api/media/p/replacement-impact?accountId=a&replacementId=p-more', {}, env);
     const plan = await replacement.json() as { data:{ canReplace:boolean; canPartiallyReplace:boolean; usageCount:number } };
-    expect(plan.data).toMatchObject({ canReplace:false, canPartiallyReplace:false, usageCount:3 });
+    expect(plan.data).toMatchObject({ canReplace:false, canPartiallyReplace:false, usageCount:5 });
   });
   it.each(['本文', '過去の版'])('全店共通の自動応答の%sが画像を使えば、店の画像を消せない', async source => {
     raw.exec(`INSERT INTO auto_replies(id,keyword,response_type,response_content,line_account_id,name) VALUES
@@ -213,18 +281,18 @@ describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
     const impact = await app.request('/api/media/p/delete-impact?accountId=a', {}, env);
     expect(impact.status).toBe(200);
     const body = await impact.json() as {data:{usageCount:number;canDelete:boolean;references:Array<{name:string}>}};
-    expect(body.data).toMatchObject({ usageCount:1, canDelete:false });
+    expect(body.data).toMatchObject({ usageCount:2, canDelete:false });
     expect(body.data.references.map(reference => reference.name)).toContain('全店共通の応答');
     expect(JSON.stringify(body)).not.toContain('別店だけの応答');
     expect((await app.request('/api/media/p?accountId=a', {method:'DELETE'}, env)).status).toBe(409);
     expect(remove).not.toHaveBeenCalled();
   });
-  it('別店だけの参照を対象店の使用先に混ぜない', async () => {
+  it('別店だけの参照も匿名で削除を止める', async () => {
     raw.exec(`INSERT INTO auto_replies(id,keyword,response_type,response_content,line_account_id,name)
       VALUES ('reply-b','b','image','https://worker.test/images/photos/p','b','別店だけ');`);
     const response = await app.request('/api/media/p/delete-impact?accountId=a', {}, { DB: db } as Env['Bindings']);
     const body = await response.json() as {data:{usageCount:number;canDelete:boolean}};
-    expect(body.data).toMatchObject({ usageCount:0, canDelete:true });
+    expect(body.data).toMatchObject({ usageCount:1, canDelete:false });
     expect(JSON.stringify(body)).not.toContain('別店だけ');
   });
   it('追加の使用先を読み取れない時は表示も削除も安全側で止める', async () => {
@@ -368,4 +436,20 @@ it('飲食メニューの使用先を読み取れない場合、差替え影響�
   const response = await app.request('/api/media/p/replacement-impact?accountId=a&replacementId=p-more', {}, env);
   expect(response.status).toBe(503);
   expect(await response.json()).toMatchObject({ success:false, error:'差し替えたときの影響を確認できませんでした' });
+});
+
+it('送信済みトークは件数だけを示して削除を許し、履歴を残す', async () => {
+  raw.exec(`INSERT INTO friends(id,line_user_id,line_account_id) VALUES('private-friend','U-private','a');
+    INSERT INTO messages_log(id,friend_id,line_account_id,direction,message_type,content,source)
+    VALUES('sent-image','private-friend','a','outgoing','image','https://worker.test/images/photos/p','manual');`);
+  const remove=vi.fn();
+  const env={DB:db,WORKER_URL:'https://worker.test',IMAGES:{delete:remove}} as unknown as Env['Bindings'];
+  const impact=await app.request('/api/media/p/delete-impact?accountId=a',{},env);
+  expect(impact.status).toBe(200);
+  const result=await impact.json() as {data:{canDelete:boolean;sentMessageCount:number}};
+  expect(result.data).toMatchObject({canDelete:true,sentMessageCount:1});
+  expect(JSON.stringify(result.data)).not.toContain('private-friend');
+  expect((await app.request('/api/media/p?accountId=a',{method:'DELETE'},env)).status).toBe(200);
+  expect(remove).toHaveBeenCalled();
+  expect(raw.prepare("SELECT count(*) n FROM messages_log WHERE id='sent-image'").get()).toEqual({n:1});
 });

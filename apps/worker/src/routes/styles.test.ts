@@ -534,6 +534,17 @@ describe('style setup', () => {
       ],
     });
   });
+  test('削除中の画像URLを初期セットに保存しない', async () => {
+    raw.exec(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+      VALUES('m','a','["object-key"]','checking','now','now')`);
+    const response = await request('PUT','/api/hq/style-starter-sets/restaurant', {
+      expectedVersion:0, name:'初期セット',
+      definition:{items:[{key:'hello',kind:'template',name:'案内',text:'https://cdn.test/object-key'}]},
+    });
+    expect(response.status).toBe(409);
+    expect(await value(response)).toMatchObject({code:'media_deletion_in_progress'});
+    expect(raw.prepare('SELECT count(*) n FROM style_starter_sets').get()).toEqual({n:0});
+  });
   test('HQ list returns style account count, last edit and auto insertion preference', async () => {
     const payload = {
       expectedVersion: 0,

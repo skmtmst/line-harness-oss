@@ -1,4 +1,5 @@
 import { deliveryLimitFromOptions, limitedDeliveryPlan, optionsWithDeliveryConfirmation } from '../features/broadcasts/broadcast-delivery-limit/index.js';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
@@ -343,6 +344,7 @@ export const post__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">)
       saveAsDraft,
     });
   } catch (createError) {
+    if (isMediaDeletionConflict(createError)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     // 同時再送は主キーで1件だけ確定し、負けた要求も保存済みの同じ結果を返す。
     const existing = idempotencyKey
       ? await getBroadcastById(c.env.DB, idempotencyKey)

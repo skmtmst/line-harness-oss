@@ -1,3 +1,4 @@
+import { mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { verifyNenWebhook } from '../lib/hmac.js';
@@ -696,7 +697,7 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireDeliveryAccess('nenCampai
    * 明示操作だけが行う）。ISO8601(Z付き)で保存し、表示側が日本時間で読める形にする。
    */
   try {
-    await c.env.DB.prepare(
+    const insert = c.env.DB.prepare(
       `INSERT INTO nen_columns
         (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url,
          published_at, delivery_status, delivery_at, line_account_id, target_mode, target_tag_id,
@@ -706,7 +707,8 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireDeliveryAccess('nenCampai
       id, input.slug, fields.title, fields.category, fields.excerpt, fields.introText,
       fields.articleUrl, fields.imageUrl, fields.publishedAt, input.scheduledAt, accountId, input.targetMode,
       input.targetTagId, input.completionEventName, input.completionTagId, input.sourceColumnId, now, now,
-    ).run();
+    );
+    await c.env.DB.batch([insert, ...await mediaDeletionTextGuardStatements(c.env.DB, [fields.imageUrl])]);
   } catch (error) {
     if (isNenColumnSlugConflict(error)) {
       return c.json({ success: false, error: 'column_already_exists' }, 409);
@@ -1275,7 +1277,7 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
   // 紹介文が消える。既定文のまま古くなるより、人が直した内容が消えるほうが
   // 害が大きいため、編集済みの内容を優先する。
   // https://github.com/kentavndng/line-harness-board/issues/711
-  await c.env.DB.prepare(
+  const insert = c.env.DB.prepare(
     `INSERT INTO nen_columns
       (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url, published_at, delivery_status, line_account_id, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)
@@ -1287,7 +1289,8 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
     id, typeof body.external_id === 'string' ? body.external_id : body.slug, body.slug, fields.title,
     fields.category, fields.excerpt, fields.introText, fields.articleUrl, fields.imageUrl,
     fields.publishedAt, lineAccountId, now, now,
-  ).run();
+  );
+  await c.env.DB.batch([insert, ...await mediaDeletionTextGuardStatements(c.env.DB, [fields.imageUrl])]);
   return c.json({ success: true, data: { id } });
 });
 

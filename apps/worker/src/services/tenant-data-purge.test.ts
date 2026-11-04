@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { processTenantDataPurge } from './tenant-data-purge.js';
@@ -109,6 +110,10 @@ describe('tenant data retention purge', () => {
     // R2の実体も消す。
     expect(IMAGES.delete).toHaveBeenCalledWith(['images/t1.png']);
     expect(result.deletedObjects).toBe(1);
+    const fingerprint = createHash('sha256').update('images/t1.png').digest('hex');
+    const marks = sqlite.raw.prepare('SELECT * FROM media_deleted_key_fingerprints').all();
+    expect(marks).toEqual([{sha256:fingerprint}]);
+    expect(JSON.stringify(marks)).not.toContain('images/t1.png');
   });
 
   test('削除の実績が監査表に残り、統括に削除済みの印が付く', async () => {

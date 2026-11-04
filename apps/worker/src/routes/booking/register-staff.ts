@@ -1,4 +1,5 @@
 import type { Env } from '../../worker-env.js';
+import { isMediaDeletionConflict, mediaDeletionTextGuardStatements } from '../../features/media/deletion-guard.js';
 import type { Hono } from 'hono';
 import { gapWrite, GapError } from '../../services/gap-common.js';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
@@ -83,7 +84,7 @@ booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY)
     }
   }
   const id = crypto.randomUUID();
-  await c.env.DB
+  const insert = c.env.DB
     .prepare(
       `INSERT INTO staff
         (id, line_account_id, name, display_name, role, profile_image_url, bio,
@@ -103,8 +104,9 @@ booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY)
       b.is_active!,
       b.staff_member_id ?? null,
       b.nominationFee??0,
-    )
-    .run();
+    );
+  try { await c.env.DB.batch([insert, ...await mediaDeletionTextGuardStatements(c.env.DB, [b.profile_image_url])]); }
+  catch (error) { if (isMediaDeletionConflict(error)) return c.json({ code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409); throw error; }
   return c.json({ id }, 201);
 });
 
@@ -155,12 +157,15 @@ booking.put('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTINGS_K
       }, 422, []);
     }
   }
-  const result = await c.env.DB.prepare(
+  const update = c.env.DB.prepare(
     `UPDATE staff
         SET ${updates.join(', ')},
             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
       WHERE id = ? AND line_account_id = ?`,
-  ).bind(...values, id, accountId).run();
+  ).bind(...values, id, accountId);
+  let result:D1Result;
+  try { [result] = await c.env.DB.batch([update, ...await mediaDeletionTextGuardStatements(c.env.DB, [parsed.value.profile_image_url])]); }
+  catch (error) { if (isMediaDeletionConflict(error)) return c.json({ code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409); throw error; }
   if (result.meta.changes === 0) return c.json({ error: 'staff_not_found' }, 404);
   return c.json({ ok: true });
 });

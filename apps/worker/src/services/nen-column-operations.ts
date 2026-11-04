@@ -1,3 +1,4 @@
+import { mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import { jstNow } from '@line-crm/db';
 import { isNenQuietHours, nenQuietHoursResumeAt } from './nen-engagement.js';
 
@@ -46,7 +47,7 @@ export async function duplicateNenColumn(
   const id = input.newId ?? crypto.randomUUID();
   const now = jstNow();
   const slug = `copy-${input.id}-${id.slice(0, 8)}`;
-  await db.prepare(
+  const insert = db.prepare(
     `INSERT INTO nen_columns
       (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url,
        published_at, delivery_status, delivery_at, line_account_id, target_mode, target_tag_id,
@@ -57,7 +58,8 @@ export async function duplicateNenColumn(
     source.article_url, source.image_url, source.published_at, input.lineAccountId,
     source.target_mode, source.target_tag_id, source.completion_event_name, source.completion_tag_id,
     input.id, now, now,
-  ).run();
+  );
+  await db.batch([insert, ...await mediaDeletionTextGuardStatements(db, [typeof source.image_url === 'string' ? source.image_url : null])]);
   return { id, sourceColumnId: input.id };
 }
 

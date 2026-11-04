@@ -1,6 +1,7 @@
 import { type MileageRewardSummary, type MileageRewardDraftInput } from './rewards-types.js';
 import { MileageRewardError, validateMileageRewardDraft } from './rewards-validation.js';
 import { requirePublishedActionVersion, getMileageReward } from './rewards-definitions-reads.js';
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 
 
 export async function createMileageRewardDraft(
@@ -35,6 +36,7 @@ export async function createMileageRewardDraft(
       draft.targetConditions ? JSON.stringify(draft.targetConditions) : null,
       draft.failurePolicy, draft.customerMessage, input.createdBy ?? null, now,
     ),
+    ...await mediaContentDeletionGuard(db, [draft.imageUrl]),
   ]);
   const created = await getMileageReward(db, { id: rewardId, lineAccountId: input.lineAccountId });
   if (!created) throw new MileageRewardError('create_failed', '使い道を作成できませんでした', 500);
@@ -108,6 +110,7 @@ export async function updateMileageRewardDraft(
       draft.failurePolicy, draft.customerMessage, input.updatedBy ?? null,
       input.expectedVersionId, input.id, ...revisionBinds, input.lineAccountId,
     ),
+    ...await mediaContentDeletionGuard(db, [draft.imageUrl]),
   ]);
   if ((results[0]?.meta?.changes ?? 0) !== 1 || (results[1]?.meta?.changes ?? 0) !== 1) {
     throw new MileageRewardError('version_conflict', 'ほかの人が先に変更しました。読み直してください', 409);

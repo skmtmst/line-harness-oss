@@ -224,6 +224,12 @@ async function deleteR2Objects(
     .flatMap((row) => columns.map((column) => row[column]))
     .filter((key): key is string => typeof key === 'string' && key.length > 0);
   if (keys.length === 0) return { deleted: 0, failed: 0 };
+  if (table === 'media' || table === 'media_versions') {
+    // The purge removes the original account and keys, so retain only their
+    // non-reversible fingerprints before the first object can be removed.
+    const hashes = await Promise.all(keys.map(async key => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key))), byte => byte.toString(16).padStart(2, '0')).join('')));
+    await env.DB.prepare(`INSERT OR IGNORE INTO media_deleted_key_fingerprints(sha256) SELECT value FROM json_each(?)`).bind(JSON.stringify(hashes)).run();
+  }
   if (!env.IMAGES) return { deleted: 0, failed: keys.length };
 
   try {

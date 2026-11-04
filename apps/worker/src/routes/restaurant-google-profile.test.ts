@@ -509,6 +509,23 @@ describe('Googleビジネス：プロフィール項目・写真（GB-18 / GB-19
     expect(JSON.parse(String(patchCalls()[0].init?.body))).toMatchObject({ storefrontAddress: { regionCode: 'JP', postalCode: '150-0002', addressLines: ['渋谷1-1-1', 'ビル2F'] } });
   });
 
+  it('店舗写真の選択後に削除が始まると変更案を保存しない', async () => {
+    testDb.raw.prepare(`INSERT INTO media (id,kind,filename,mime_type,size_bytes,r2_key,line_account_id)
+      VALUES ('media-race','image','photo.jpg','image/jpeg',1000,'images/photo.jpg','account-2')`).run();
+    const originalBatch = testDb.db.batch.bind(testDb.db);
+    const batch = vi.spyOn(testDb.db, 'batch').mockImplementationOnce(async statements => {
+      testDb.raw.prepare(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+        VALUES('media-race','account-2','["images/photo.jpg"]','checking','now','now')`).run();
+      return originalBatch(statements);
+    });
+    try {
+      const response = await call('/api/restaurant-test/google/profile/propose', { body: { field: 'photo', action: 'add', mediaId: 'media-race' } });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ code: 'media_deletion_in_progress' });
+      expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM rt_google_changes WHERE kind='photo'").get()).toEqual({ n: 0 });
+    } finally { batch.mockRestore(); }
+  });
+
   it('写真：登録メディアの画像だけを追加でき、送信で media.create に公開URLを渡す。削除は自店舗の写真だけ', async () => {
     testDb.raw
       .prepare(`INSERT INTO media (id, kind, filename, mime_type, size_bytes, r2_key, line_account_id) VALUES (?, 'image', ?, 'image/jpeg', 1000, ?, ?)`)

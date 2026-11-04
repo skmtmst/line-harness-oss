@@ -59,6 +59,20 @@ describe('登録メディアの厳密走査と実DBスキーマ', () => {
     db = asD1(sqlite);
   });
 
+  it('今の内容から外れたテンプレートとフォームの旧版も使用先として検出する', async () => {
+    sqlite.exec(`INSERT INTO templates(id,name,message_type,message_content,line_account_id)
+      VALUES('template-history','旧版','text','今の内容','account-1');
+      INSERT INTO template_versions(id,template_id,version_number,message_type,message_content)
+      VALUES('template-version-history','template-history',99,'image','https://example.test/images/media/guide.png');
+      INSERT INTO forms(id,name,layout,is_active) VALUES('form-history','旧フォーム','{}',0);
+      INSERT INTO form_versions(id,form_id,version_number,source_content_revision,name,fields,layout,save_to_metadata,published_at,created_at)
+      VALUES('form-version-history','form-history',99,99,'旧フォーム','[]','{"image":"https://example.test/images/media/guide.png"}',1,'now','now');`);
+    const result = await scanSingleMediaUsage(db, '2026-11-04T00:00:00.000', { id: 'media-1', r2_key: 'media/guide.png' });
+    expect(result.matched).toBe(2);
+    expect(sqlite.prepare("SELECT ref_kind,ref_id FROM media_usages ORDER BY ref_kind,ref_id").all())
+      .toEqual([{ ref_kind: 'form', ref_id: 'form-history' }, { ref_kind: 'template', ref_id: 'template-history' }]);
+  });
+
   it('現行列だけを読み、複数吹き出しと画像列の参照を落とさない', async () => {
     const mediaUrl = 'https://example.com/images/media/guide.png';
     sqlite.prepare(

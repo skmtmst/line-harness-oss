@@ -470,6 +470,25 @@ describe('画像ライブラリと店舗への受け渡し', () => {
     expect(res.status).toBe(400);
   });
 
+  it('コピー中に元画像の削除が始まれば登録せず、コピー先を片付ける', async () => {
+    const { image } = await generatedImage();
+    const source = testDb.raw.prepare('SELECT media_id FROM banner_images WHERE id=?').get(image.id) as {media_id:string};
+    const before = r2.store.size;
+    const put = vi.mocked(r2.bucket.put);
+    const original = put.getMockImplementation()!;
+    put.mockImplementationOnce(async (...args) => {
+      const result = await original(...args);
+      testDb.raw.prepare(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at) VALUES(?,'hq','[]','checking','now','now')`).run(source.media_id);
+      return result;
+    });
+    const response=await call('POST', `/api/hq/banners/images/${image.id}/deliver`, { lineAccountIds:['account-1'] });
+    expect(response.status).toBe(409);
+    expect((await response.text())).toContain('画像が削除中');
+    expect(r2.store.size).toBe(before);
+    expect(testDb.raw.prepare('SELECT count(*) n FROM banner_image_deliveries').get()).toEqual({n:0});
+    expect(testDb.raw.prepare('SELECT count(*) n FROM media WHERE line_account_id IS NOT NULL').get()).toEqual({n:0});
+  });
+
   it('店舗へ渡すと店舗の登録メディアが作られ、同じ店舗へは二度作らない', async () => {
     const { image } = await generatedImage();
     let res = await call('POST', `/api/hq/banners/images/${image.id}/deliver`, { lineAccountIds: ['account-1', 'account-2'] });

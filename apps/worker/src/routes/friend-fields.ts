@@ -231,6 +231,7 @@ function serializeMigrationRun(run: Awaited<ReturnType<typeof getFieldMigrationR
     usageTargets: JSON.parse(run.usage_targets_json) as unknown,
     rows: rows.map((row) => ({
       friendId: row.friend_id,
+      friendName: row.friend_name ?? null,
       sourceValue: row.source_value,
       convertedValue: row.converted_value,
       status: row.status,
@@ -487,6 +488,12 @@ friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'adm
       await markFieldMigrationStale(c.env.DB, run.id);
       return c.json({ success: false, code: 'PREVIEW_STALE', error: '事前確認後に値または使用先が変わりました。やり直してください' }, 409);
     }
+    if ((target.type === 'image' || target.type === 'pdf') && await c.env.DB.prepare(
+      `SELECT 1 FROM field_migration_items i
+        WHERE i.run_id = ? AND i.status = 'convertible' AND (EXISTS(SELECT 1 FROM media_deletion_jobs j WHERE j.media_id=i.converted_value) OR NOT EXISTS(SELECT 1 FROM media m WHERE m.id=i.converted_value)) LIMIT 1`,
+    ).bind(run.id).first()) {
+      return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像が含まれているため移行できません。事前確認をやり直してください。' }, 409);
+    }
     if (!await queueFieldMigration(c.env.DB, run.id, idempotencyKey)) {
       /*
        * D036: 前の試しが途中で止まった分は続けられる。実行は「まだの行だけ」を
@@ -519,7 +526,11 @@ friendFields.get('/api/field-migrations/:runId', async (c) => {
     if (scope instanceof Response) return scope;
     const run = await getFieldMigrationRun(c.env.DB, c.req.param('runId'), scope);
     if (!run) return c.json({ success: false, error: '移行履歴が見つかりません' }, 404);
-    const rows = await getFieldMigrationItems(c.env.DB, run.id);
+    const rawOffset = c.req.query('offset') ?? '0';
+    if (!/^\d+$/.test(rawOffset) || !Number.isSafeInteger(Number(rawOffset))) {
+      return c.json({ success: false, error: '表示する位置を確認してください' }, 400);
+    }
+    const rows = await getFieldMigrationItems(c.env.DB, run.id, 100, Number(rawOffset));
     return c.json({ success: true, data: serializeMigrationRun(run, rows) });
   } catch (err) {
     throw err;

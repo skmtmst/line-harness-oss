@@ -405,7 +405,8 @@ export async function saveTemplateDraft(
     refKind: 'template',
     refId: id,
     // 公開中の本文は下書き保存では消えない。両方を数える。
-    searchableContent: [current.message_content, draftMessageContent],
+    searchableContent: [current.message_content, draftMessageContent, current.message_bubbles_json,
+      updates.messageBubblesJson === undefined ? (snapshot ? current.draft_message_bubbles_json : current.message_bubbles_json) : updates.messageBubblesJson],
     mutationStatements: [mutation],
     usageGuard: {
       sql: `EXISTS (
@@ -596,7 +597,7 @@ export async function publishTemplate(
     lineAccountId: current.line_account_id,
     refKind: 'template',
     refId: id,
-    searchableContent: [current.draft_message_content],
+    searchableContent: [current.draft_message_content, current.draft_message_bubbles_json],
     mutationStatements: publishBatch,
     usageGuard: {
       sql: `EXISTS (

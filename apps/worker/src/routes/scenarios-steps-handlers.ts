@@ -1,4 +1,5 @@
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 import { validateConditionForStorage } from './scenario-condition-validation.js';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
@@ -237,6 +238,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
 
     return c.json({ success: true, data: serializeStep(updated) });
   } catch (err) {
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     throw err;
   }
 };

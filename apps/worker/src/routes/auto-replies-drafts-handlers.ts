@@ -1,4 +1,5 @@
 import { logger } from '@line-crm/shared/server';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
@@ -170,6 +171,7 @@ export const post__api_auto_replies_drafts_3 = async (c: Context<Env, "/api/auto
       );
       return c.json({ success: true, data: draftVersionResponse(created.version) }, 201);
     } catch (err) {
+      if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
       const mapped = idempotencyErrorResponse(err);
       if (mapped) return inputError(c, { success: false, error: mapped.error }, mapped.status, ["triggerConfig"]);
       throw err;
@@ -256,6 +258,7 @@ export const put__api_auto_replies_id_draft_6 = async (c: Context<Env, "/api/aut
     return c.json({ success: true, data: draftVersionResponse(version) });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     if (code === 'AUTO_REPLY_NOT_FOUND') {
       return c.json({ success: false, error: '自動応答が見つかりません' }, 404);
     }
@@ -490,6 +493,7 @@ export const post__api_auto_replies_id_publish_10 = async (c: Context<Env, "/api
     });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
+    if (isMediaDeletionConflict(err)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     if (code === 'AUTO_REPLY_PUBLISH_KEY_CONFLICT') {
       return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
     }

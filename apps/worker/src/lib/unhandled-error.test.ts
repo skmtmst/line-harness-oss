@@ -8,6 +8,17 @@ vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: 
 import { UnexpectedRouteError, unhandledWorkerError } from './unhandled-error.js';
 afterEach(() => vi.restoreAllMocks());
 
+it('削除中画像のDB競合を理由付き409にし、障害通知を送らない', async () => {
+  report.mockClear();
+  const app = new Hono<Env>();
+  app.get('/api/test', () => { throw new Error('CHECK constraint failed: media_deletion_in_progress'); });
+  app.onError(unhandledWorkerError);
+  const response = await app.request('/api/test', {}, {} as Env['Bindings']);
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({ code: 'media_deletion_in_progress' });
+  expect(report).not.toHaveBeenCalled();
+});
+
 it('S01の応答・ログ・通知の事故番号を、共通の依頼番号と同じにする', async () => {
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
   const app = new Hono<Env>();

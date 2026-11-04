@@ -1,6 +1,7 @@
 import { jstNow } from '../utils.js';
 import { getMediaStorageQuota } from './uploads.js';
 import { type MediaRefKind, type MediaUsageMutationResult, type MediaKind, type Media } from './primitives.js';
+import { mediaContentDeletionGuard } from './deletion-guard.js';
 
 
 
@@ -113,6 +114,7 @@ export async function applyMediaUsageMutation(
        VALUES ${chunk.map(() => '(?, ?, ?, ?)').join(',')}`,
     ).bind(...chunk.flatMap((row) => [row.id, input.refKind, input.refId, scannedAt])));
   }
+  statements.push(...await mediaContentDeletionGuard(db, content));
   return db.batch(statements) as Promise<MediaUsageMutationResult[]>;
 }
 

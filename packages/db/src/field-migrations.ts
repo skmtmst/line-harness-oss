@@ -50,6 +50,7 @@ export interface FieldMigrationItem {
   status: FieldMigrationItemStatus;
   reason: string | null;
   migrated_at: string | null;
+  friend_name?: string | null;
 }
 
 const countStatus = (items: FieldMigrationPreviewItem[], status: FieldMigrationPreviewItem['status']) =>
@@ -159,12 +160,15 @@ export async function getFieldMigrationItems(
   db: D1Database,
   runId: string,
   limit = 100,
+  offset = 0,
 ): Promise<FieldMigrationItem[]> {
   const result = await db.prepare(
-    `SELECT * FROM field_migration_items
-      WHERE run_id = ? AND status != 'convertible'
-      ORDER BY friend_id ASC LIMIT ?`,
-  ).bind(runId, limit).all<FieldMigrationItem>();
+    `SELECT i.*, f.display_name AS friend_name FROM field_migration_items i
+      JOIN field_migration_runs r ON r.id = i.run_id
+      LEFT JOIN friends f ON f.id = i.friend_id AND f.line_account_id = r.line_account_id
+      WHERE i.run_id = ? AND i.status != 'convertible'
+      ORDER BY CASE WHEN i.status = 'failed' THEN 0 ELSE 1 END, i.friend_id ASC LIMIT ? OFFSET ?`,
+  ).bind(runId, limit, offset).all<FieldMigrationItem>();
   return result.results;
 }
 
@@ -264,12 +268,17 @@ export async function executeFieldMigration(
               SET status = 'succeeded', migrated_at = ?, reason = NULL
             WHERE run_id = ? AND friend_id = ?`,
         ).bind(now, runId, item.friend_id),
+        ...(typed.mediaId ? [db.prepare(`INSERT INTO media_deletion_guards(blocked)
+          SELECT 1 WHERE EXISTS (SELECT 1 FROM media_deletion_jobs WHERE media_id = ?) OR NOT EXISTS (SELECT 1 FROM media WHERE id = ?)`)
+          .bind(typed.mediaId, typed.mediaId)] : []),
       ]);
     } catch (error) {
       await db.prepare(
         `UPDATE field_migration_items SET status = 'failed', reason = ?
           WHERE run_id = ? AND friend_id = ?`,
-      ).bind(error instanceof Error ? error.message.slice(0, 300) : '保存に失敗しました', runId, item.friend_id).run();
+      ).bind(String(error).includes('media_deletion_in_progress')
+        ? 'この画像は削除中のため登録できません。'
+        : error instanceof Error ? error.message.slice(0, 300) : '保存に失敗しました', runId, item.friend_id).run();
     }
   }
   /*

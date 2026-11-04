@@ -109,6 +109,7 @@ function FieldMigrate() {
   /** 実行は確認と同じ証票で1回だけ。確認が成立した時点で発行する。 */
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null)
   const [run, setRun] = useState<FriendFieldMigrationRun | null>(null)
+  const [failureOffset, setFailureOffset] = useState(0)
   /*
    * R548: 実行POSTを受け付けたrun。結果がまだ無くても「移行を実行する」
    * には戻さない（同じ実行の再取得・再開で続ける）。
@@ -349,6 +350,7 @@ function FieldMigrate() {
   const execute = async () => {
     if (!source || !selectedAccountId || !preview?.previewToken || !idempotencyKey || executing) return
     setExecuting(true); setError(''); setPollProblem('')
+    setFailureOffset(0)
     const token = gateRef.current.begin()
     const account = selectedAccountId
     try {
@@ -372,7 +374,25 @@ function FieldMigrate() {
   const refetchRun = () => {
     if (!selectedAccountId || !executedRunId || executing) return
     setPollProblem('')
+    setFailureOffset(0)
     pollRun(executedRunId, selectedAccountId, gateRef.current.begin(), 0)
+  }
+
+  const showFailurePage = async (offset: number) => {
+    if (!selectedAccountId || !executedRunId || executing) return
+    const account = selectedAccountId
+    const token = gateRef.current.begin()
+    setExecuting(true); setPollProblem('')
+    try {
+      const result = await api.friendFields.migrationRun(executedRunId, account, offset)
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
+      if (!result.success) throw new Error(result.error)
+      setRun(result.data); setFailureOffset(offset)
+    } catch {
+      if (gateRef.current.current(token) && accountRef.current === account) setPollProblem('移行の結果を確認できませんでした。通信を確かめて、結果を確認し直してください。')
+    } finally {
+      if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
+    }
   }
 
   /*
@@ -383,6 +403,7 @@ function FieldMigrate() {
   const resume = async () => {
     if (!source || !selectedAccountId || !preview?.previewToken || !executedRunId || executing) return
     setExecuting(true); setError(''); setPollProblem('')
+    setFailureOffset(0)
     const token = gateRef.current.begin()
     const account = selectedAccountId
     try {
@@ -655,8 +676,15 @@ function FieldMigrate() {
             { label: '確認が必要なまま', value: `${run.summary.review + run.summary.invalid} 人` },
           ]} />
           {run.rows.filter((row) => row.status === 'failed').map((row) => (
-            <p key={row.friendId} className={styles.fieldError}>{`${row.sourceValue || '（空欄）'}：${row.reason ?? '失敗しました。通信を確かめて、もう一度お試しください。'}`}</p>
+            <p key={row.friendId} className={styles.fieldError}>{row.reason === 'この画像は削除中のため登録できません。'
+              ? `${row.friendName || '名前未登録'}（友だちID：${row.friendId}）／${fields.find((field) => field.id === run.targetFieldId)?.name ?? target?.name ?? '移行先の項目'}：画像が削除中のため保存しませんでした。`
+              : `${row.sourceValue || '（空欄）'}：${row.reason ?? '失敗しました。通信を確かめて、もう一度お試しください。'}`}</p>
           ))}
+          {!RUN_RUNNING.has(run.status) && run.summary.failed > 100 ? <>
+            {failureOffset > 0 ? <Button onClick={() => void showFailurePage(Math.max(0, failureOffset - 100))} disabled={executing}>前の100人</Button> : null}
+            {failureOffset + 100 < run.summary.failed ? <Button onClick={() => void showFailurePage(failureOffset + 100)} disabled={executing}>次の100人</Button> : null}
+          </> : null}
+          {pollProblem ? <Notice tone="danger" message={pollProblem} /> : null}
           {run.error ? <Notice tone="danger" message={run.error} /> : null}
           {/* 元に戻す操作はまだ無い。戻す必要が出たときの行き先をはっきり書く。 */}
           {run.rollbackDeadline ? <p className={styles.fieldNote}>{`元の項目の値は ${formatDateTime(run.rollbackDeadline)} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。`}</p> : null}

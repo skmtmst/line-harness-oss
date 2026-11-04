@@ -43,14 +43,24 @@ companySettings.put('/api/settings/company', requireRole('owner', 'admin'), inpu
     return inputError(c, { success: false, code: 'INVALID_INPUT', error: '会社名・表示名・画像・色・版の指定を確認してください' }, 400, ["companyName","loginDisplayName","logoMediaId","logoBackgroundColor","expectedVersion"]);
   }
   const db = dbFor(c.env), staff = c.get('staff')!, tenantId = staff.tenantId!;
+  const logoMediaId = input.logoMediaId;
+  const logoDeleting = async () => logoMediaId && Boolean(await db.prepare(`SELECT 1 FROM media_deletion_jobs j
+    JOIN line_accounts a ON a.id=j.line_account_id WHERE j.media_id=? AND a.tenant_id=?`)
+    .bind(logoMediaId, tenantId).first());
+  const deletingResponse = () => c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
+  if (await logoDeleting()) return deletingResponse();
   if (input.logoMediaId && !await isCompanyLogo(db, tenantId, input.logoMediaId)) {
+    if (await logoDeleting()) return deletingResponse();
     return inputError(c, { success: false, code: 'INVALID_LOGO', error: 'この会社に登録された公開済みの画像を選んでください' }, 422, ["logoMediaId"]);
   }
   const data = await saveCompanySettings(db, tenantId, staff.id, staff.role as 'owner' | 'admin', {
     ...input, companyName: input.companyName.trim(), loginDisplayName: input.loginDisplayName.trim(),
     logoBackgroundColor: input.logoBackgroundColor.toLowerCase(),
   });
-  if (!data) return c.json({ success: false, code: 'VERSION_CONFLICT', error: '編集がありました。最新版を読み直してください' }, 409);
+  if (!data) {
+    if (await logoDeleting()) return deletingResponse();
+    return c.json({ success: false, code: 'VERSION_CONFLICT', error: '編集がありました。最新版を読み直してください' }, 409);
+  }
   c.set('auditRecorded', true);
   return c.json({ success: true, data });
 });

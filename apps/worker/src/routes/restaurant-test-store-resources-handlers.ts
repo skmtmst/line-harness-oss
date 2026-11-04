@@ -1,4 +1,5 @@
-import { validRestaurantMenuDescription, validRestaurantMenuImage } from './restaurant-menu-media.js';
+import { isMediaDeletionConflict, mediaDeletionGuardStatements, mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
+import { restaurantMenuImageDeleting, validRestaurantMenuDescription, validRestaurantMenuImage } from './restaurant-menu-media.js';
 import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
 import { normalizePhone } from '@line-crm/shared';
 import { normalizedPhoneSql as customerPhoneSql } from '../lib/phone-sql.js';
@@ -328,11 +329,21 @@ export const post__api_restaurant_test_menu_10 = async (c: Context<Env, "/api/re
   if (price > 1_000_000) return inputError(c, { success: false, error: '値段は1,000,000円以下で入れてください。' }, 400, ['price']);
   if (!['course', 'a_la_carte'].includes(body.kind || '') || !body.name?.trim() || !Number.isInteger(price) || price < 0) return inputError(c, { success: false, error: 'メニューの入力内容が正しくありません' }, 400, ["kind","name","price"]);
   if (!validRestaurantMenuDescription(body.description)) return inputError(c, { success:false, error:'説明は2000文字以内で入力してください' }, 400, ['description']);
-  if ((body.imageMediaId != null && (typeof body.imageMediaId !== 'string' || !body.imageMediaId)) || (!await validRestaurantMenuImage(dbFor(c.env, body.storeId), body.storeId, body.imageMediaId ?? null))) return inputError(c, { success:false, code:'MENU_IMAGE_UNAVAILABLE', error:'選択した画像を利用できません。登録メディアから選び直してください。' }, 400, ['imageMediaId']);
+  if (typeof body.imageMediaId === 'string' && await restaurantMenuImageDeleting(dbFor(c.env, body.storeId), body.storeId, body.imageMediaId)) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
+  if ((body.imageMediaId != null && (typeof body.imageMediaId !== 'string' || !body.imageMediaId)) || (!await validRestaurantMenuImage(dbFor(c.env, body.storeId), body.storeId, body.imageMediaId ?? null))) {
+    if (typeof body.imageMediaId === 'string' && await restaurantMenuImageDeleting(dbFor(c.env, body.storeId), body.storeId, body.imageMediaId)) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
+    return inputError(c, { success:false, code:'MENU_IMAGE_UNAVAILABLE', error:'選択した画像を利用できません。登録メディアから選び直してください。' }, 400, ['imageMediaId']);
+  }
   const status = body.status ?? 'active';
   if (!['draft', 'active'].includes(status)) return inputError(c, { success: false, error: '作成時の状態は下書きまたは公開です' }, 400, ["status"]);
   const id = crypto.randomUUID();
-  await dbFor(c.env, body.storeId).prepare('INSERT INTO rt_menu_items (id, store_id, kind, name, price, allergens_json, service_periods_json, status, description, image_media_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, body.storeId, body.kind, body.name.trim(), price, JSON.stringify(body.allergens || []), JSON.stringify(body.servicePeriods || ['dinner']), status, body.description?.trim() || null, body.imageMediaId ?? null).run();
+  const db = dbFor(c.env, body.storeId);
+  const write = db.prepare('INSERT INTO rt_menu_items (id, store_id, kind, name, price, allergens_json, service_periods_json, status, description, image_media_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, body.storeId, body.kind, body.name.trim(), price, JSON.stringify(body.allergens || []), JSON.stringify(body.servicePeriods || ['dinner']), status, body.description?.trim() || null, body.imageMediaId ?? null);
+  try { await db.batch([...mediaDeletionGuardStatements(db, [body.imageMediaId ?? null]), write]); }
+  catch (error) {
+    if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため登録できません。別の画像を選んでください。' }, 409);
+    throw error;
+  }
   return c.json({ success: true, data: { id } }, 201);
 };
 
@@ -448,9 +459,12 @@ export const put__api_restaurant_test_followups_storeId_steps_stepId_messages_16
   const found=await db.prepare('SELECT id FROM templates WHERE line_account_id=? AND id IN (SELECT value FROM json_each(?))').bind(target.line_account_id,JSON.stringify(templateIds)).all<{id:string}>();
   if(found.results.length!==templateIds.length)return inputError(c,{success:false,error:'この店舗のテンプレートを選んでください'},422,['messageBubbles']);
  }
- const changed=await db.prepare(`UPDATE scenario_steps SET message_bubbles_json=?,message_type=?,message_content=?,template_id=NULL
+ const update=db.prepare(`UPDATE scenario_steps SET message_bubbles_json=?,message_type=?,message_content=?,template_id=NULL
    WHERE id=? AND EXISTS(SELECT 1 FROM rt_store_followup_templates t WHERE t.store_id=? AND t.scenario_id=scenario_steps.scenario_id AND t.template_version=?)`)
-   .bind(JSON.stringify(body.messageBubbles),parts[0].messageType,parts[0].messageContent,stepId,storeId,body.expectedVersion).run();
+   .bind(JSON.stringify(body.messageBubbles),parts[0].messageType,parts[0].messageContent,stepId,storeId,body.expectedVersion);
+ let changed: D1Result;
+ try { [changed]=await db.batch([update,...await mediaDeletionTextGuardStatements(db,[JSON.stringify(body.messageBubbles)])]); }
+ catch(error) { if(isMediaDeletionConflict(error))return c.json({success:false,error:'画像が削除中のため使用できません。'},409);throw error; }
  if(!changed.meta.changes)return c.json({success:false,error:'version_conflict'},409);
  await refreshScenarioReferences(db,target.scenario_id);
  return c.json({success:true,data:{stepId,messageBubbles:body.messageBubbles,version:Number(body.expectedVersion)+1,sendingStatus:'stopped'}});

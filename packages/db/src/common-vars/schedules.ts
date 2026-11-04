@@ -1,3 +1,4 @@
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 import { jstNow } from '../utils.js';
 import { getAccountSetting, getVersionedAccountSetting } from '../account-settings.js';
 import { type CommonVarSchedule } from './types.js';
@@ -38,13 +39,11 @@ export async function createCommonVarSchedule(
   input: { varId: string; effectiveFrom: string; value: string },
 ): Promise<CommonVarSchedule> {
   const id = crypto.randomUUID();
-  await db
-    .prepare(
-      `INSERT INTO common_var_schedules (id, var_id, effective_from, value, applied_at)
-       VALUES (?, ?, ?, ?, NULL)`,
-    )
-    .bind(id, input.varId, input.effectiveFrom, input.value)
-    .run();
+  await db.batch([
+    db.prepare(`INSERT INTO common_var_schedules (id, var_id, effective_from, value, applied_at)
+       VALUES (?, ?, ?, ?, NULL)`).bind(id, input.varId, input.effectiveFrom, input.value),
+    ...await mediaContentDeletionGuard(db, [input.value]),
+  ]);
   return (await db
     .prepare(`SELECT * FROM common_var_schedules WHERE id = ?`)
     .bind(id)

@@ -1,6 +1,7 @@
 import type { ScenarioStep } from '../scenario-step-types.js';
 import { refreshScenarioReferences } from '../template-versions.js';
 import { jstNow } from '../utils.js';
+import { mediaContentDeletionGuard } from '../media/deletion-guard.js';
 import { type CreateScenarioStepInput, type UpdateScenarioStepInput } from './types.js';
 
 
@@ -11,7 +12,7 @@ export async function createScenarioStep(
   const id = crypto.randomUUID();
   const now = jstNow();
 
-  await db
+  const insert = db
     .prepare(
       `INSERT INTO scenario_steps
        (id, scenario_id, step_order, delay_minutes, message_type, message_content,
@@ -42,8 +43,8 @@ export async function createScenarioStep(
       input.questionJson ?? null,
       input.isDraft ? 1 : 0,
       now,
-    )
-    .run();
+    );
+  await db.batch([insert, ...await mediaContentDeletionGuard(db, [input.messageContent])]);
 
   const created = (await db
     .prepare(`SELECT * FROM scenario_steps WHERE id = ?`)
@@ -134,10 +135,10 @@ export async function updateScenarioStep(
 
   if (fields.length > 0) {
     values.push(id);
-    await db
+    const update = db
       .prepare(`UPDATE scenario_steps SET ${fields.join(', ')} WHERE id = ?`)
-      .bind(...values)
-      .run();
+      .bind(...values);
+    await db.batch([update, ...await mediaContentDeletionGuard(db, [updates.message_content])]);
   }
 
   const updated = await db

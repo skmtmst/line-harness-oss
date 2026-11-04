@@ -1,5 +1,6 @@
 import type { AutoReply, CreateAutoReplyInput } from './auto-reply-record-types.js';
 import { jstNow } from './utils.js';
+import { mediaContentDeletionGuard } from './media/deletion-guard.js';
 import { type AutoReplyCreateClaim, type AutoReplyCreateOperation, type AutoReplyCreateIdempotency, type AutoReplyDraftSettings, type AutoReplyVersionRow } from './auto-reply-runs-types.js';
 import { getAutoReplyDraftVersion, getAutoReplyPublishedVersion, getAutoReplyVersionById } from './auto-reply-runs-settings.js';
 
@@ -195,6 +196,7 @@ export async function createAutoReplyWithDraftVersion(
       now,
     ),
     ...claimStatements,
+    ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)]),
     ]);
   } catch (err) {
     // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
@@ -275,6 +277,7 @@ export async function saveAutoReplyDraftVersion(
             SET current_draft_version_id = ?
           WHERE id = ?`,
       ).bind(versionId, autoReplyId),
+      ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)]),
     ]);
     draft = await getAutoReplyVersionById(db, versionId);
     if (draft) {
@@ -289,17 +292,18 @@ export async function saveAutoReplyDraftVersion(
       }
     }
   } else if (expectedVersion === undefined) {
-    await db.prepare(
+    const update = db.prepare(
       `UPDATE auto_reply_versions
           SET line_account_id = ?, definition_snapshot = ?,
               last_test_status = NULL, last_tested_at = NULL,
               last_tested_by_staff_id = NULL, updated_at = ?
         WHERE id = ? AND status = 'draft'`,
-    ).bind(settings.lineAccountId, JSON.stringify(settings), now, draft.id).run();
+    ).bind(settings.lineAccountId, JSON.stringify(settings), now, draft.id);
+    await db.batch([update, ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)])]);
   } else {
     // 版番号の条件を含めた1文の更新。読取と書込のあいだの割込みは
     // 反映行数 0 になり、競合として検出する。
-    const applied = await db.prepare(
+    const update = db.prepare(
       `UPDATE auto_reply_versions
           SET version_number = version_number + 1,
               line_account_id = ?, definition_snapshot = ?,
@@ -312,8 +316,9 @@ export async function saveAutoReplyDraftVersion(
       now,
       draft.id,
       Number(expectedVersion),
-    ).run();
-    if ((applied.meta?.changes ?? 0) !== 1) {
+    );
+    const [applied] = await db.batch([update, ...await mediaContentDeletionGuard(db, [JSON.stringify(settings)])]);
+    if ((applied?.meta?.changes ?? 0) !== 1) {
       throw new Error('AUTO_REPLY_VERSION_CONFLICT');
     }
   }

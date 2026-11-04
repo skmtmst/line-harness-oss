@@ -1,3 +1,4 @@
+import { mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import { materializeInitialMenuAssets } from './style-initial-assets.js';
 import type { PlannedInitialForms } from './style-initial-buttons.js';
 import { catalogDistributionPlan, distributeCatalog } from './style-starter-catalog-distribution.js';
@@ -185,6 +186,7 @@ export async function distributeStarter(
           snapshotGuard(db, a.accountId, b.kind, b.target_id, row.snapshot),
         );
       if (b && row.edited && input.editedAction !== 'new_copy') {
+        statements.push(...await mediaDeletionTextGuardStatements(db, [JSON.stringify(item)]));
         statements.push(
           db
             .prepare(

@@ -1,3 +1,4 @@
+import { mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import { getBroadcastMessageAsset, getFriendFieldByIdForScope, getSupportMarkById, getFormById, jstNow, publishFormVersion } from '@line-crm/db';
 import { DEFAULT_TENANT_ID, layoutToFields, researchFormLayout, type FormAction, type ResearchGate } from '@line-crm/shared';
 
@@ -32,6 +33,7 @@ export async function ensureResearchForm(db: D1Database, assetId: string, accoun
     db.prepare(`INSERT OR IGNORE INTO forms (id,name,description,fields,layout,save_to_metadata,is_active,created_at,updated_at)
       VALUES (?,?,?,?,?,0,0,?,?)`).bind(id, asset.name, JSON.parse(asset.payload_json).description || null, JSON.stringify(layoutToFields(layout)), JSON.stringify(layout), now, now),
     db.prepare('INSERT OR IGNORE INTO form_accounts (form_id,line_account_id) VALUES (?,?)').bind(id, accountId),
+    ...await mediaDeletionTextGuardStatements(db,[JSON.stringify(layout)]),
   ]);
   const result = await publishFormVersion(db, id, 1);
   if (result.kind !== 'published' && !(await getFormById(db, id))?.current_published_version_id) throw new Error('回答画面を準備できませんでした');

@@ -44,6 +44,7 @@ export async function saveCompanySettings(
         JOIN media_versions v ON v.media_id=m.id AND v.r2_key=m.r2_key
         WHERE m.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL
           AND m.archived_at IS NULL AND m.kind='image'
+          AND NOT EXISTS (SELECT 1 FROM media_deletion_jobs j WHERE j.media_id=m.id)
           AND m.mime_type IN ('image/png','image/jpeg','image/webp','image/gif')
           AND v.scan_status='verified' AND v.published_at IS NOT NULL))`)
       .bind(input.companyName, input.loginDisplayName, input.logoMediaId, input.logoBackgroundColor,

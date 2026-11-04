@@ -108,6 +108,28 @@ describe('会社設定のHTTPと実SQLite', () => {
     }
     expect((await request()).body.data.version).toBe(0);
   });
+  test('削除中の画像は会社ロゴに保存しない', async () => {
+    logo('logo');
+    sql.prepare(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+      VALUES('logo','a','["fixture/logo"]','checking','now','now')`).run();
+    const response = await request('PUT', { ...input, logoMediaId: 'logo' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('media_deletion_in_progress');
+    expect((await request()).body.data).toMatchObject({ logoMediaId: null, version: 0 });
+  });
+  test('画像を確認してから会社設定を保存する間に削除が始まると保存しない', async () => {
+    logo('logo'); const original = db.batch.bind(db);
+    db.batch = (async statements => {
+      sql.prepare(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+        VALUES('logo','a','["fixture/logo"]','checking','now','now')`).run();
+      return original(statements);
+    }) as D1Database['batch'];
+    const response = await request('PUT', { ...input, logoMediaId: 'logo' });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('media_deletion_in_progress');
+    expect((await request()).body.data).toMatchObject({ logoMediaId: null, version: 0 });
+    expect(sql.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE action='company_settings.updated'").get()).toEqual({ n: 0 });
+  });
   test('保存直前に画像の所属が変わっても保存しない', async () => {
     logo('logo'); const original = db.batch.bind(db);
     db.batch = (async statements => { sql.exec("UPDATE line_accounts SET tenant_id='tenant-b' WHERE id='a'"); return original(statements); }) as D1Database['batch'];

@@ -1,3 +1,5 @@
+import { mediaDeletedKeyFingerprintGuard } from '@line-crm/db/src/media/deletion-guard.js';
+import { isMediaDeletionConflict, MEDIA_DELETION_TEXT_GUARD_SQL } from '../../features/media/deletion-guard.js';
 import { copyHqMediaStream } from '../hq-media-stream.js';
 import { hqMediaGate } from '../hq-media.js';
 import { resolveHqLiffActions, messageLiffActions } from './liff-actions.js';
@@ -516,6 +518,9 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
   await checkReceipt();
   const begun = await beginHqTemplateStoreResult(db, { runId, tenantId: authority.tenantId, templateId, templateVersionId: p!.template_version_id, targetAccountId: context.targetAccountId, preflightId: p!.id, idempotencyFingerprint: runId, snapshotToken: p!.snapshot_token });
   if (begun.kind === 'conflict_or_missing') fail('INVALID_PREFLIGHT');
+  // 先の店舗で削除中に遭遇した配布は、残りの店舗も同じ理由で止める。
+  const stopped = await db.prepare(`UPDATE hq_template_distribution_results SET status='failed',error_code='MEDIA_DELETION_IN_PROGRESS',finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='pending' AND EXISTS(SELECT 1 FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND error_code='MEDIA_DELETION_IN_PROGRESS')`).bind(runId,authority.tenantId,context.targetAccountId,runId,authority.tenantId).run();
+  if (stopped.meta.changes === 1) return { status: 'failed', reused: false };
   const claimed = await db.prepare(`UPDATE hq_template_distribution_results SET status='staged',attempt_count=attempt_count+1,started_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),finished_at=NULL,error_code=NULL WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='pending'`).bind(runId, authority.tenantId, context.targetAccountId).run();
   if (claimed.meta.changes !== 1) { const row = await read(); if (!row) fail('RESULT_UNAVAILABLE'); return { status: row!.status, reused: true }; }
   const claimedRow = await read();
@@ -531,6 +536,7 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
   let plan: HqTemplateStoreAtomicCommitPlan | null = null;
   const binding: R2RuntimeBinding = {...options,templateVersionId:p!.template_version_id,textOverride:p!.text_override,initialDraft:p!.initial_insert===1};
   try {
+    await db.batch([db.prepare(MEDIA_DELETION_TEXT_GUARD_SQL).bind(JSON.stringify([input.definitionJson])), ...await mediaDeletedKeyFingerprintGuard(db, [input.definitionJson])]);
     await renewClaim();
     const v = await sourceVersion(binding);
     plan = await buildR2Plan(binding,attemptContext,input,v.template_type);
@@ -568,6 +574,8 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
     await renewClaim();
     const statements: HqTemplateStatement[] = [guard(claimCondition, claimBindings), guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND tenant_id=? AND status='consumed' AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, [p!.id, authority.tenantId]), guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [context.targetAccountId, authority.tenantId]), guard(`EXISTS(SELECT 1 FROM hq_template_versions v JOIN hq_templates t ON t.id=v.template_id AND t.tenant_id=v.tenant_id WHERE v.id=? AND v.tenant_id=? AND v.template_id=? AND v.definition_json=? AND t.archived_at IS NULL)`, [input.templateVersionId, authority.tenantId, templateId, version!.definition_json]), guard(`EXISTS(SELECT 1 FROM hq_template_distribution_runs WHERE id=? AND tenant_id=? AND status='running' AND created_by=?)`, [runId, authority.tenantId, authority.actorId]), ...plan.stage.map(o=>guard(`EXISTS(SELECT 1 FROM hq_template_owned_r2_keys WHERE run_id=? AND tenant_id=? AND target_account_id=? AND object_key=? AND owner_token=? AND state='staged')`,[runId,authority.tenantId,context.targetAccountId,o.key,o.ownerToken])), ...plan.dbCommit];
     statements.push(guard('EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND tenant_id=? AND text_override IS ?)',[p!.id,authority.tenantId,p!.text_override ?? null]));
+    statements.push({sql: MEDIA_DELETION_TEXT_GUARD_SQL, bindings: [JSON.stringify([input.definitionJson])]});
+    statements.push({sql: `INSERT INTO media_deletion_guards(blocked) SELECT 1 WHERE EXISTS(SELECT 1 FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND error_code='MEDIA_DELETION_IN_PROGRESS')`, bindings: [runId, authority.tenantId]});
     for (const r of plan.resolutions) statements.push({ sql: `UPDATE hq_template_preflight_resolutions SET resolution_mode=?,target_id=?,expected_revision=?,alias_name=? WHERE preflight_id=? AND tenant_id=? AND source_id=?`, bindings: [r.mode, r.targetId ?? null, r.expectedRevision ?? null, r.aliasName ?? null, p!.id, authority.tenantId, r.sourceId] });
     statements.push({ sql: `UPDATE hq_template_distribution_results SET status='succeeded',finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),error_code=NULL WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND attempt_count=?`, bindings: claimBindings }, { sql: `INSERT INTO audit_events(id,tenant_id,line_account_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,?,?,'business',?,?,'hq_template.distributed','hq_template',?,'success',?)`, bindings: [crypto.randomUUID(), authority.tenantId, context.targetAccountId, authority.actorId, authority.role, templateId, JSON.stringify({ runId })] });
     for(const o of plan.stage)statements.push({sql:`UPDATE hq_template_owned_r2_keys SET state='committed' WHERE run_id=? AND tenant_id=? AND target_account_id=? AND object_key=? AND owner_token=? AND state='staged'`,bindings:[runId,authority.tenantId,context.targetAccountId,o.key,o.ownerToken]});
@@ -575,7 +583,7 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
     statements.push(captureDistributionName(runId, authority.tenantId, context.targetAccountId));
     for (let commitAttempt = 1; commitAttempt <= MAX_IO_ATTEMPTS; commitAttempt++) {
       try {
-        await db.batch(statements.map(s => db.prepare(s.sql).bind(...s.bindings)));
+        await db.batch([...statements.map(s => db.prepare(s.sql).bind(...s.bindings)), ...await mediaDeletedKeyFingerprintGuard(db, [input.definitionJson])]);
         const cleanupPending = !(await reconcileFailedOwnedImages(binding,runId,context.targetAccountId));
         return { status: 'succeeded', reused: false, ...(cleanupPending ? {cleanupPending:true} : {}) };
       } catch (error) {
@@ -597,9 +605,14 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
       const clean = plan ? await cleanupOwnedPlan(binding,runId,context.targetAccountId,plan) : true;
       return { status: row!.status, reused: true, ...(!clean ? {cleanupPending:true} : {}) };
     }
+    let mediaConflict = isMediaDeletionConflict(error);
+    if (!mediaConflict) {
+      try { await db.batch([db.prepare(MEDIA_DELETION_TEXT_GUARD_SQL).bind(JSON.stringify([input.definitionJson])), ...await mediaDeletedKeyFingerprintGuard(db, [input.definitionJson])]); }
+      catch (guardError) { if (isMediaDeletionConflict(guardError)) mediaConflict = true; else throw guardError; }
+    }
     const code = error instanceof Error && 'code' in error ? String(error.code) : error instanceof Error && /^[A-Z][A-Z0-9_]{2,80}$/.test(error.message) ? error.message : '';
     const status = code.includes('UNSUPPORTED') ? 'unsupported' : code === 'VERSION_CONFLICT' || code === VERSION_CONFLICT_MESSAGE ? 'version_conflict' : 'failed';
-    await db.prepare(`UPDATE hq_template_distribution_results SET status=?,error_code=?,finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND attempt_count=?`).bind(status, status === 'unsupported' ? 'UNSUPPORTED_REFERENCE' : status === 'version_conflict' ? 'VERSION_CONFLICT' : code ? 'STORE_PLAN_FAILED' : 'STORE_COMMIT_FAILED', ...claimBindings).run();
+    await db.prepare(`UPDATE hq_template_distribution_results SET status=?,error_code=?,finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND attempt_count=?`).bind(status, mediaConflict ? 'MEDIA_DELETION_IN_PROGRESS' : status === 'unsupported' ? 'UNSUPPORTED_REFERENCE' : status === 'version_conflict' ? 'VERSION_CONFLICT' : code ? 'STORE_PLAN_FAILED' : 'STORE_COMMIT_FAILED', ...claimBindings).run();
     const cleanupPending = plan ? !(await cleanupOwnedPlan(binding,runId,context.targetAccountId,plan)) : false;
     return { status, reused: false, ...(cleanupPending ? {cleanupPending:true} : {}) };
   }

@@ -1,4 +1,5 @@
 import { normalizeScopedTagName, validateMileageRewardDraft, type MileageRewardDraftInput, type HqTemplateStatement } from '@line-crm/db';
+import { MEDIA_DELETION_TEXT_GUARD_SQL } from '../../features/media/deletion-guard.js';
 
 
 import type { HqCatalogTemplateType, HqCatalogTemplateDefinition } from '@line-crm/shared';
@@ -110,6 +111,7 @@ export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,sna
   if(previous)add(`UPDATE mileage_reward_versions SET ${cols.map(k=>`${k}=?`).join(',')},revision=revision+1 WHERE id=? AND reward_id=? AND status='draft'`,[...vals,versionId,id]);
   else add(`INSERT INTO mileage_reward_versions(id,reward_id,version_number,status,${cols.join(',')}) VALUES (?,?,(SELECT COALESCE(MAX(version_number),0)+1 FROM mileage_reward_versions WHERE reward_id=?),'draft',${cols.map(()=>'?').join(',')})`,[versionId,id,id,...vals]);
  }
+ add(MEDIA_DELETION_TEXT_GUARD_SQL,[JSON.stringify([JSON.stringify(def)])]);
  return {statements,resolutions:[{...selected,targetId:id,aliasName:selected.mode==='alias'?name:undefined},...refs.map(r=>({sourceId:r.sourceId,itemKind:r.itemKind,mode:'overwrite' as const,targetId:r.targetId??undefined,expectedRevision:r.expectedRevision??undefined}))],counts:{created:selected.mode==='create'?1:0,overwritten:selected.mode==='overwrite'?1:0,aliased:selected.mode==='alias'?1:0}};
 }
 

@@ -1,4 +1,5 @@
 import { releaseQuotaSlot } from '../features/broadcasts/broadcast-quota-guard/index.js';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 import { storedDeliveryLimit, deliveryLimitFromOptions, limitedDeliveryPlan, optionsWithDeliveryConfirmation } from '../features/broadcasts/broadcast-delivery-limit/index.js';
 import { logger } from '@line-crm/shared/server';
 import { simulationContext } from '../features/broadcasts/broadcast-simulation/index.js';
@@ -330,7 +331,8 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   let updated;
   try {
     updated = await updateBroadcast(c.env.DB, id, updates, body.expectedVersion);
-  } catch {
+  } catch (error) {
+    if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
     logger.error("broadcasts.update_approval_definition_failed");
     return c.json({ success: false, error: '本文と承認状態を保存できませんでした。画面を読み直し、内容を確かめてから保存し直してください。', code: 'BROADCAST_SAVE_FAILED' }, 503);
   }

@@ -1,4 +1,5 @@
 import { logger } from '@line-crm/shared/server';
+import { isMediaDeletionConflict } from '../../features/media/deletion-guard.js';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
@@ -72,6 +73,7 @@ events.post(
         } satisfies EventApplicantBroadcastDraft),
       });
     } catch (error) {
+      if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '削除中の画像は使用できません。別の画像を選んでください。' }, 409);
       // 同じkeyを同時に押した競合だけは、PK衝突を500にせず勝者の結果を再生する。
       const raced = await getBroadcastById(c.env.DB, idempotencyKey);
       if (raced) return replayExisting(raced);

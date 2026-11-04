@@ -49,5 +49,13 @@ export async function checkRestaurantMenuMedia({ testDb, seedRestaurantFixture, 
     const missing = await request('/api/restaurant-test/menu?account_id=account-1', { storeId:'store-ginza', kind:'course', name:'欠けた画像', price:1000, imageMediaId:'missing' });
     expect(missing.status).toBe(400);
     expect(await missing.json()).toMatchObject({ code:'MENU_IMAGE_UNAVAILABLE' });
+    testDb.raw.prepare(`INSERT INTO media_deletion_jobs(media_id,line_account_id,r2_keys_json,status,created_at,updated_at)
+      VALUES('replacement','account-2','["fake/replacement.png"]','checking','now','now')`).run();
+    const duringDelete = await requestWithMethod(path, 'PATCH', { imageMediaId: 'replacement' });
+    expect(duringDelete.status).toBe(409);
+    expect(await duringDelete.json()).toMatchObject({ code: 'media_deletion_in_progress' });
+    const duringDeleteCreate = await request('/api/restaurant-test/menu?account_id=account-1', { storeId:'store-ginza', kind:'course', name:'削除中', price:1000, imageMediaId:'replacement' });
+    expect(duringDeleteCreate.status).toBe(409);
+    expect(testDb.raw.prepare('SELECT image_media_id FROM rt_menu_items WHERE id=?').get(id)).toEqual({ image_media_id: null });
     expect((await requestWithMethod(path, 'PATCH', { description:'x'.repeat(2001) })).status).toBe(400);
 }

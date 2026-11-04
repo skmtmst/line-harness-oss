@@ -1,3 +1,4 @@
+import { mediaDeletedKeyFingerprintGuard } from './deletion-guard.js';
 import { jstNow } from '../utils.js';
 import type { Media, MediaKind } from './primitives.js';
 
@@ -298,6 +299,7 @@ export async function completeNewMediaUpload(
           SET status = 'completed', result_media_id = ?, completed_at = ?
         WHERE id = ? AND line_account_id = ? AND status = 'verified'`,
     ).bind(mediaId, now, session.id, session.line_account_id),
+    ...await mediaDeletedKeyFingerprintGuard(db, [session.r2_key], {checkLiveIds:false}),
   ]);
   const completed = await getMediaUploadSession(db, session.id, session.line_account_id);
   const media = await db.prepare(
@@ -485,6 +487,10 @@ export async function createMediaVersionFromUpload(
             SET status = 'completed', result_media_id = ?, completed_at = ?
           WHERE id = ? AND line_account_id = ? AND status = 'verified'`,
       ).bind(input.mediaId, now, session.id, input.lineAccountId),
+      db.prepare(`INSERT INTO media_deletion_guards(blocked)
+        SELECT 1 WHERE EXISTS (SELECT 1 FROM media_deletion_jobs WHERE media_id = ?)`)
+        .bind(input.mediaId),
+      ...await mediaDeletedKeyFingerprintGuard(db, [session.r2_key], {checkLiveIds:false}),
     ]);
   } catch (error) {
     const latestVersionNo = await getCurrentMediaVersionNo(db, input.mediaId, input.lineAccountId);

@@ -1,4 +1,6 @@
-import { logger } from '@line-crm/shared/server';
+import { claimMediaForSend, releaseMediaSendClaim } from '../features/media/send-claims.js';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
+import { logger, tracedFetch } from '@line-crm/shared/server';
 import { resolveLineSender } from '../services/line-senders.js';
 import { GapError } from '../services/gap-common.js';
 import { inputError } from '../lib/input-errors.js';
@@ -20,6 +22,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
   if (c.get('impersonation')) return c.json({ success: false, code: 'IMPERSONATION_SEND_BLOCKED', error: '代理ログイン中は送れません' }, 403);
   if (c.get('staff').readOnly) return c.json({ success: false, error: 'forbidden' }, 403);
   let leasedConversationId: string | null = null;
+  let mediaSendClaimId: string | null = null;
   try {
     const chatId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
@@ -125,7 +128,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
 
     // LINE APIでメッセージ送信
     const { LineClient } = await import('@line-crm/line-sdk');
-    const lineClient = new LineClient(accessToken);
+    const lineClient = new LineClient(accessToken, { transport: (url, init) => tracedFetch(url, { ...init, signal: AbortSignal.timeout(60_000) }) });
     const messageType = body.messageType ?? 'text';
     let message: Message;
     let renewalMessage: Message | undefined;
@@ -221,6 +224,27 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
     // LINE 側にも同じキーを渡す。DB保存前に通信が切れて再実行されても、
     // LINE API が同一リクエストを二重配信しない。
     const outboundLeaseToken = reservation.leaseToken;
+    const mediaClaimId = crypto.randomUUID();
+    const mediaClaimDeadline = Date.now() + 300_000;
+    try {
+      await claimMediaForSend(c.env.DB, {
+        claimId: mediaClaimId, accountId: friend.line_account_id ?? '',
+        content: JSON.stringify([message, renewalMessage].filter(Boolean)), expiresAt: new Date(mediaClaimDeadline).toISOString(),
+      });
+      mediaSendClaimId = mediaClaimId;
+    } catch (error) {
+      const now = new Date().toISOString();
+      await failOutboundSend(c.env.DB, { key: idempotencyKey, leaseToken: outboundLeaseToken,
+        status: 'failed', code: 'MEDIA_SEND_GUARD_FAILED', retryable: true, nextRetryAt: null, now });
+      if (isMediaDeletionConflict(error)) return c.json({ success: false, code: 'media_deletion_in_progress', error: '画像が削除中のため送信できません。' }, 409);
+      throw error;
+    }
+    if (Date.now() >= mediaClaimDeadline - 60_000) {
+      const now = new Date().toISOString();
+      await failOutboundSend(c.env.DB, { key: idempotencyKey, leaseToken: outboundLeaseToken,
+        status: 'failed', code: 'MEDIA_SEND_CLAIM_EXPIRED', retryable: true, nextRetryAt: null, now });
+      return c.json({ success: false, code: 'MEDIA_SEND_CLAIM_EXPIRED', error: '送信の確認期限が切れました。もう一度お試しください。' }, 409);
+    }
     try {
       await lineClient.pushMessage(friend.line_user_id, [message, ...(renewalMessage ? [renewalMessage] : [])], idempotencyKey);
     } catch (error) {
@@ -366,6 +390,11 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
       }).catch(() => undefined);
     }
     throw err;
+  } finally {
+    if (mediaSendClaimId) await releaseMediaSendClaim(c.env.DB, mediaSendClaimId).catch(() => undefined);
+    if (leasedConversationId) await releaseInboxReplyLease(c.env.DB, {
+      channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
+    }).catch(() => undefined);
   }
 };
 

@@ -61,6 +61,7 @@ export async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'expired media send claims',run:async()=>{const {purgeExpiredMediaSendClaims}=await import('../features/media/send-claims.js');await purgeExpiredMediaSendClaims(env.DB,new Date(event.scheduledTime).toISOString());}},
     {name:'operator push digest',run:async()=>{await sweepOperatorPush(env.DB,env,new Date(event.scheduledTime));await retryOperatorPush(env.DB,env,new Date(event.scheduledTime));}},
     {name:'makeup credit expiry',run:()=>expireMakeup(env.DB,new Date(event.scheduledTime))},
     {name:'AB test decisions (test transport)',run:()=>decideAbTests(env.DB,new Date(event.scheduledTime))},

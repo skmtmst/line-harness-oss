@@ -5,6 +5,7 @@ import { inputError } from '../lib/input-errors.js';
 import { mediaTabCounts } from '../services/tab-counts.js';
 import { fail } from '../lib/fail.js';
 import { getMedia, countMedia, getMediaById, getFolderById, getMediaStorageQuota, getMediaVersionByNo, createMediaUploadSession, getMediaUploadSession, failMediaUploadSession, verifyMediaUploadSession, completeNewMediaUpload, createMediaVersionFromUpload, MediaVersionConflictError, MediaVersionIncompatibleError, type MediaMetadata, type MediaKind } from '@line-crm/db';
+import { isMediaDeletionConflict } from '../features/media/deletion-guard.js';
 
 
 import type { Env } from '../worker-env.js';
@@ -386,6 +387,9 @@ export const post__api_media_id_versions_4 = async (c: Context<Env, "/api/media/
       },
     }, 201);
   } catch (err) {
+    if (isMediaDeletionConflict(err)) {
+      return c.json({ success: false, code: 'media_deletion_in_progress', error: 'この画像は削除中のため版を追加できません。' }, 409);
+    }
     if (err instanceof MediaVersionIncompatibleError) {
       return c.json({
         success: false,
