@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import App from './app.js';
 import CustomerStyleScope from './components/customer-style-scope.js';
 import { api, type EventBookingMine } from './lib/api.js';
@@ -26,6 +26,9 @@ function mount(style: string, route = '/?liffId=fixture') {
   vi.mocked(api.liffConfig).mockResolvedValue({ success: true, data: { accountId: 'a', accountName: '人工事業者', botBasicId: '', style } });
   return render(<MemoryRouter initialEntries={[route]}><CustomerStyleScope><App /><Location /></CustomerStyleScope></MemoryRouter>);
 }
+// Keep cold Vite module transformation outside the first interaction's 1s DOM wait.
+// App still renders its real lazy route and every style keeps the same assertions.
+beforeAll(async () => { await import('./pages/booking.js'); });
 beforeEach(() => {
   vi.mocked(api.customerLook).mockResolvedValue({ success: true, data: { settings: {} } } as never);
   vi.mocked(api.menus).mockResolvedValue({ menus: [menu] });

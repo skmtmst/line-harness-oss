@@ -429,7 +429,7 @@
 .detailColumns[data-detail-columns='restaurant-tables'] { gap: var(--tpl-rs-body-gap); margin-right: 0; }
 .detailColumns[data-detail-columns='restaurant-inventory'] { grid-template-columns: minmax(0, 1fr) var(--tpl-rs-inv-side-w); margin-right: 0; }
 .detailColumns[data-detail-columns='restaurant-ledger'] { grid-template-columns: minmax(0, 1fr) var(--tpl-board-detail-w); gap: var(--polish-space-card); margin-right: 0; }
-.detailColumns[data-detail-columns='restaurant-tables'] { grid-template-columns: minmax(0, 1fr) var(--tpl-floor-aside-w); }
+.detailColumns[data-detail-columns='restaurant-tables'] { grid-template-columns: minmax(0, 640px) minmax(0, 1fr); }
 /* 枠を持つ詳細カードの高さは内容で決め、図面の高さへ引き伸ばさない。 */
 .detailColumns[data-detail-columns='restaurant-tables'] .detailColumnAside { min-height: 600px; border: 1px solid var(--color-border-soft); border-radius: 10px; overflow: hidden; background: var(--color-canvas); }
 .detailColumns[data-detail-columns^='restaurant-'] .detailColumnMain { gap: var(--tpl-rs-body-gap); }

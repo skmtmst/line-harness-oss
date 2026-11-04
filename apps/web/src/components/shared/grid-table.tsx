@@ -36,7 +36,7 @@ export function GridTable({ children, label, design, framed = true, className, p
   design: GridTableDesign
   framed?: boolean
   /** 時刻×担当の盤。既存のカレンダー枠と専用密度を使う。 */
-  presentation?: 'calendar' | 'dashboard' | 'metrics'
+  presentation?: 'calendar' | 'dashboard' | 'metrics' | 'comparison'
   /** 幅と、狭い板での列の並びだけを渡す。 */
   className?: string
 }) {

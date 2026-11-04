@@ -1,0 +1,23 @@
+:root {
+  --hours-confirm-title-size: 18px;
+  --hours-confirm-time-size: 22px;
+  --hours-confirm-after-size: 16px;
+  --hours-confirm-row-height: 60px;
+  --hours-confirm-head-height: 39px;
+  --hours-confirm-footer-height: 70px;
+  --hours-confirm-columns: minmax(100px,160px) minmax(0,1fr) 16px minmax(150px,200px);
+  --hours-card-title-size: 16px;
+  --hours-aside-width: 350px;
+  --hours-today-size: 20px;
+  --hours-weekday-width: 76px;
+  --hours-update-background: #f2f5f3;
+  --hours-calendar-detail-width: 320px;
+  --hours-service-label-min: 110px;
+  --hours-service-hours-min: 150px;
+  --hours-time-column-min: 120px;
+  --hours-service-detail-min: 260px;
+  --hours-history-date-width: 60px;
+  --hours-history-label-min: 100px;
+  --hours-review-date-min: 80px;
+  --hours-editor-backdrop: #1018283d;
+}

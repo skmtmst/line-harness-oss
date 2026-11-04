@@ -3782,6 +3782,37 @@
         ],
         "needed": "共通の予約内容を通らない手組みの再導入を止める"
       }
+    },
+    {
+      "id": "hours-date-selection",
+      "name": "営業時間の日付・曜日の選択",
+      "role": "単日・複数日・期間を緑丸、曜日を共通の曜日ボタンで選ぶ",
+      "rules": [
+        "2026-11-04 営業時間Pen"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/hours-date-calendar.tsx",
+            "apps/web/src/components/shared/hours-date-calendar.module.css",
+            "apps/web/src/components/templates/hours-workspace-frame.tsx",
+            "apps/web/src/components/templates/hours-workspace-frame.module.css"
+          ],
+          "components": [
+            "HoursDateCalendar",
+            "WeekdayButtons",
+            "HoursWorkspaceFrame"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "承認済み営業時間Penの複数日・期間・営業予定・曜日で共用"
+      },
+      "code": {
+        "selectorHint": "data-google-hours-page",
+        "overrideSelectors": [],
+        "signals": []
+      }
     }
   ]
 }

@@ -1,3 +1,4 @@
+import type { D1Database, D1DatabaseSession, D1PreparedStatement } from '@cloudflare/workers-types/index.ts';
 export type D1Timing = {
   count: number;
   duration: number;
