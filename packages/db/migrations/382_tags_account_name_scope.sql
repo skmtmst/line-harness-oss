@@ -17,17 +17,17 @@ PRAGMA defer_foreign_keys = ON;
 -- and its delete action with LIKE, then count all "references tags" tokens
 -- to catch an extra column-level reference inside an already-listed table.
 SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'affiliate_offers' AND lower(sql) LIKE '%tag_id%references tags%' AND lower(sql) NOT LIKE '%references tags%on delete%') THEN '{}' ELSE 'unexpected tags foreign key: affiliate_offers.tag_id' END);
-SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'broadcasts' AND lower(sql) LIKE '%target_tag_id%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: broadcasts.target_tag_id' END);
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'broadcasts' AND instr(lower(sql), 'target_tag_id') > 0 AND substr(lower(sql), instr(lower(sql), 'target_tag_id')) LIKE '%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: broadcasts.target_tag_id' END);
 SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'entry_routes' AND lower(sql) LIKE '%tag_id%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: entry_routes.tag_id' END);
-SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'forms' AND lower(sql) LIKE '%on_submit_tag_id%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: forms.on_submit_tag_id' END);
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'forms' AND instr(lower(sql), 'on_submit_tag_id') > 0 AND substr(lower(sql), instr(lower(sql), 'on_submit_tag_id')) LIKE '%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: forms.on_submit_tag_id' END);
 SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'friend_tag_side_effect_runs' AND lower(sql) LIKE '%tag_id%references tags%on delete cascade%') THEN '{}' ELSE 'unexpected tags foreign key: friend_tag_side_effect_runs.tag_id' END);
 SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'friend_tags' AND lower(sql) LIKE '%tag_id%references tags%on delete cascade%') THEN '{}' ELSE 'unexpected tags foreign key: friend_tags.tag_id' END);
-SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'menus' AND lower(sql) LIKE '%auto_tag_id%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: menus.auto_tag_id' END);
-SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'nen_columns' AND lower(sql) LIKE '%target_tag_id%references tags%on delete set null%' AND lower(sql) LIKE '%completion_tag_id%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign keys: nen_columns' END);
-SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'reminders' AND lower(sql) LIKE '%target_tag_id%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: reminders.target_tag_id' END);
-SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'scenario_steps' AND lower(sql) LIKE '%on_reach_tag_id%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: scenario_steps.on_reach_tag_id' END);
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'menus' AND instr(lower(sql), 'auto_tag_id') > 0 AND substr(lower(sql), instr(lower(sql), 'auto_tag_id')) LIKE '%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: menus.auto_tag_id' END);
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'nen_columns' AND instr(lower(sql), 'target_tag_id') > 0 AND substr(lower(sql), instr(lower(sql), 'target_tag_id')) LIKE '%references tags%on delete set null%' AND instr(lower(sql), 'completion_tag_id') > 0 AND substr(lower(sql), instr(lower(sql), 'completion_tag_id')) LIKE '%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign keys: nen_columns' END);
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'reminders' AND instr(lower(sql), 'target_tag_id') > 0 AND substr(lower(sql), instr(lower(sql), 'target_tag_id')) LIKE '%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: reminders.target_tag_id' END);
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'scenario_steps' AND instr(lower(sql), 'on_reach_tag_id') > 0 AND substr(lower(sql), instr(lower(sql), 'on_reach_tag_id')) LIKE '%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: scenario_steps.on_reach_tag_id' END);
 SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'scenario_triggers' AND lower(sql) LIKE '%tag_id%references tags%on delete cascade%') THEN '{}' ELSE 'unexpected tags foreign key: scenario_triggers.tag_id' END);
-SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'scenarios' AND lower(sql) LIKE '%trigger_tag_id%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: scenarios.trigger_tag_id' END);
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'scenarios' AND instr(lower(sql), 'trigger_tag_id') > 0 AND substr(lower(sql), instr(lower(sql), 'trigger_tag_id')) LIKE '%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: scenarios.trigger_tag_id' END);
 SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'tracked_links' AND lower(sql) LIKE '%tag_id%references tags%on delete set null%') THEN '{}' ELSE 'unexpected tags foreign key: tracked_links.tag_id' END);
 SELECT json(CASE WHEN (
  SELECT COALESCE(SUM(
@@ -72,7 +72,7 @@ SELECT json(CASE WHEN NOT EXISTS(
  SELECT 1 FROM sqlite_schema
  WHERE type = 'table' AND name = 'scenario_triggers'
  AND lower(sql) LIKE '%id%primary key%'
- AND lower(sql) LIKE '%scenario_id%references scenarios%on delete cascade%'
+ AND instr(lower(sql), 'scenario_id') > 0 AND substr(lower(sql), instr(lower(sql), 'scenario_id')) LIKE '%references scenarios%on delete cascade%'
  AND lower(sql) LIKE '%kind%'
  AND lower(sql) LIKE '%tag_id%references tags%on delete cascade%'
  AND lower(sql) LIKE '%created_at%'

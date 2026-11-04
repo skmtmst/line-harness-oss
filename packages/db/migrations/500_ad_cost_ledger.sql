@@ -2,7 +2,12 @@
 -- 外部連携(ad_platforms)の暗号化された秘密を使って媒体から毎日取り込む費用と、
 -- 手入力で足す費用を同じ台帳に置く。金額は最小通貨単位で保存する。
 
-CREATE TABLE ad_cost_entries (
+-- 465_inflow_stop_cancel.sql が「新しく作るDBではこのファイルが先に流れる」ため
+-- 同じ定義を `IF NOT EXISTS` で先に用意しており、そのコメントも「後から流れる
+-- 500・503 は IF NOT EXISTS で飛ぶ」と書いている。ところがここに付いていなかった
+-- ので、465 を当てたあとの本番で `table ad_cost_entries already exists` で落ちた。
+-- 列の定義は 465 と同じで、465 はこのあと cancelled_at と cancel_reason を足す。
+CREATE TABLE IF NOT EXISTS ad_cost_entries (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   -- 取込の場合は元の外部連携、手入力なら NULL

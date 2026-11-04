@@ -292,14 +292,20 @@ const GRANDFATHERED_REBUILDS = new Set([
 ]);
 
 /**
- * These two SQL files were already applied before the D1 LIKE limit check was
- * introduced. Applied migrations are immutable, so exempt only the exact
- * historical bytes from this one newer check. Any edit loses the exemption;
- * all other migration rules still run.
+ * Staging applied the original bytes before the D1 LIKE limit check existed.
+ * Production applied the shorter, D1-compatible corrections. Accept only
+ * these exact, already-applied variants; the original variant alone needs the
+ * LIKE exception. Any further edit is rejected.
  */
-const APPLIED_LONG_LIKE_SHA256: Readonly<Record<string, string>> = {
-  '382_tags_account_name_scope.sql': '90e8d8998269a87d5be65271a77bcc655cabc5d4946c6b7e663e928232c566d4',
-  '440_conversion_draft_and_ingest.sql': 'fd33d639fdf098bc11ef52874b93a976a9365da23aef18b93f41ed55bd2b7784',
+const APPLIED_LONG_LIKE_SHA256: Readonly<Record<string, { original: string; production: string }>> = {
+  '382_tags_account_name_scope.sql': {
+    original: '90e8d8998269a87d5be65271a77bcc655cabc5d4946c6b7e663e928232c566d4',
+    production: 'f1213cf781708271d1e76570e6a8cf83b49edef68eccd12419c1103fe34a9152',
+  },
+  '440_conversion_draft_and_ingest.sql': {
+    original: 'fd33d639fdf098bc11ef52874b93a976a9365da23aef18b93f41ed55bd2b7784',
+    production: '2dacb561e95cc40a332751e089d8df6dc2e6f3449c8e3a53097d64aa5b625c26',
+  },
 };
 
 export function checkMigration(sql: string, fileName?: string): CheckResult {
@@ -318,8 +324,12 @@ export function checkMigration(sql: string, fileName?: string): CheckResult {
     };
   }
 
-  const exactAppliedSql = fileName && APPLIED_LONG_LIKE_SHA256[fileName] ===
-    createHash('sha256').update(sql).digest('hex');
+  const appliedVariants = fileName ? APPLIED_LONG_LIKE_SHA256[fileName] : undefined;
+  const sqlHash = appliedVariants ? createHash('sha256').update(sql).digest('hex') : undefined;
+  if (appliedVariants && sqlHash !== appliedVariants.original && sqlHash !== appliedVariants.production) {
+    return { ok: false, violation: '適用済みの migration を変更できません' };
+  }
+  const exactAppliedSql = appliedVariants && sqlHash === appliedVariants.original;
   const longPattern = exactAppliedSql ? null : tooLongLikePattern(stripped);
   if (longPattern) {
     return {
