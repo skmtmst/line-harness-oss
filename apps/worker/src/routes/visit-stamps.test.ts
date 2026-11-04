@@ -57,6 +57,23 @@ it('店全体の記録を期間・友だち・種類で絞ってページ送り�
  expect((await call('/api/visit-stamps/entries?accountId=shop&pageSize=201')).status).toBe(400);
  expect((await (await call('/api/visit-stamps/entries?accountId=other')).json() as any).data.items).toEqual([]);
 });
+it('押印記録と紙の申請を実時刻で表示し、期間で絞る',async()=>{
+ for(const key of ['earlier','later'])await grantStamps(f.db,{cardId:card,friendId:'friend',accountId:'shop',count:1,reason:'試験',actorId:'staff',requestId:key,kind:'manual'});
+ f.raw.prepare("UPDATE visit_stamp_entries SET created_at=? WHERE idempotency_key=?").run('2026-10-02T01:00:00','earlier');
+ f.raw.prepare("UPDATE visit_stamp_entries SET created_at=? WHERE idempotency_key=?").run('2026-10-01 17:00:00','later');
+ f.raw.prepare(`INSERT INTO visit_stamp_paper_requests(id,card_id,friend_id,line_account_id,photo_url,stamps,submitted_friend_id,created_at,status)
+  VALUES ('p1',?,'friend','shop','photo',1,'friend','2026-10-02T01:00:00','rejected'),('p2',?,'friend','shop','photo',1,'friend','2026-10-01 17:00:00','pending')`).run(card,card);
+ const all=await (await call('/api/visit-stamps/entries?accountId=shop')).json() as any;
+ expect(all.data.items.map((x:any)=>x.createdAt)).toEqual(['2026-10-01T17:00:00Z','2026-10-02T01:00:00+09:00']);
+ const filtered=await (await call('/api/visit-stamps/entries?accountId=shop&from=2026-10-01T16%3A30%3A00Z&to=2026-10-01T17%3A30%3A00Z')).json() as any;
+ expect(filtered.data.items.map((x:any)=>x.createdAt)).toEqual(['2026-10-01T17:00:00Z']);
+ const wallet=await (await call(`/api/visit-stamps/cards/${card}/wallet?accountId=shop&friendId=friend`)).json() as any;
+ expect(wallet.data.entries.map((x:any)=>x.createdAt)).toEqual(['2026-10-01T17:00:00Z','2026-10-02T01:00:00+09:00']);
+ const admin=await (await call('/api/visit-stamps/paper-requests?accountId=shop')).json() as any;
+ expect(admin.data.map((x:any)=>x.created_at)).toEqual(['2026-10-01T17:00:00Z','2026-10-02T01:00:00+09:00']);
+ const customer=await (await call(`/api/liff/visit-stamps/cards/${card}/paper-requests?accountId=shop`)).json() as any;
+ expect(customer.data.map((x:any)=>x.createdAt)).toEqual(['2026-10-01T17:00:00Z','2026-10-02T01:00:00+09:00']);
+});
 it('紙写真は画像・5MB以内・本人だけ。申請の承認と却下理由を本人に返す',async()=>{
  const storage=new Map<string,Uint8Array>();const bucket={put:vi.fn(async(key:string,bytes:Uint8Array)=>{storage.set(key,bytes)}),get:vi.fn(async(key:string)=>storage.has(key)?{body:storage.get(key)}:null),delete:vi.fn(async(key:string)=>{storage.delete(key)})};
  async function upload(file:File){const body=new FormData();body.append('file',file);return app.request(`https://localhost/api/liff/visit-stamps/cards/${card}/paper-photos?accountId=shop`,{method:'POST',headers:{Authorization:'Bearer valid'},body},{DB:f.db,IMAGES:bucket} as unknown as Env['Bindings']);}

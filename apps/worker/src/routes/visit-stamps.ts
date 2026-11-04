@@ -1,6 +1,7 @@
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { storedTimestamp } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { issueStampQr, storefrontQr, stampQrStatus, revokeStampQr, redeemStampQr } from '../services/visit-stamp-qr.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -83,7 +84,8 @@ visitStamps.put('/api/visit-stamps/pins/:staffId',requireRole('owner','admin'),i
 });
 visitStamps.get('/api/visit-stamps/paper-requests',async c=>{
   const a=await account(c,c.req.query('accountId'));
-  return c.json({success:true,data:(await dbFor(c.env).prepare('SELECT * FROM visit_stamp_paper_requests WHERE line_account_id=? ORDER BY created_at DESC LIMIT 200').bind(a).all()).results});
+  const rows=(await dbFor(c.env).prepare(`SELECT * FROM visit_stamp_paper_requests WHERE line_account_id=? ORDER BY julianday(${storedTimestamp('created_at', 'sql')}) DESC LIMIT 200`).bind(a).all<{created_at:string}>()).results;
+  return c.json({success:true,data:rows.map(row=>({...row,created_at:storedTimestamp(row.created_at)}))});
 });
 visitStamps.post('/api/visit-stamps/paper-requests/:id/review',requireRole('owner','admin','staff'),inputJsonBoundary(), async c=>{
   const b=await body(c),db=dbFor(c.env),r=await db.prepare('SELECT line_account_id FROM visit_stamp_paper_requests WHERE id=?').bind(c.req.param('id')).first<{line_account_id:string}>();
@@ -174,18 +176,18 @@ visitStamps.get('/api/visit-stamps/entries',async c=>{
  ||(kind&&!['visit','manual','paper','redeem','reverse','expire','restore'].includes(kind)))throw new StampError('期間・種類・ページを確認してください');
  if(friend)stampId(friend);
  // 共有カードでも実際に押した店舗だけの記録。友だちの検索は共通会員の代表IDも含む。
- const where=`e.line_account_id=? AND (? IS NULL OR julianday(e.created_at)>=julianday(?)) AND (? IS NULL OR julianday(e.created_at)<julianday(?))
+ const where=`e.line_account_id=? AND (? IS NULL OR julianday(${storedTimestamp('e.created_at', 'sql')})>=julianday(?)) AND (? IS NULL OR julianday(${storedTimestamp('e.created_at', 'sql')})<julianday(?))
  AND (? IS NULL OR e.friend_id=? OR EXISTS(SELECT 1 FROM friends x JOIN friends y ON x.user_id=y.user_id WHERE x.id=e.friend_id AND y.id=? AND y.line_account_id=?)) AND (? IS NULL OR e.kind=?)`;
  const args=[a,from??null,from??null,to??null,to??null,friend??null,friend??null,friend??null,a,kind??null,kind??null];
  const total=await db.prepare(`SELECT COUNT(*) AS n FROM visit_stamp_entries e WHERE ${where}`).bind(...args).first<{n:number}>();
- const items=(await db.prepare(`SELECT e.id,e.card_id AS cardId,e.friend_id AS friendId,e.line_account_id AS accountId,e.kind,e.delta,e.actor_id AS actorId,e.reason,e.created_at AS createdAt,e.original_id AS originalId FROM visit_stamp_entries e WHERE ${where} ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?`).bind(...args,pageSize,(page-1)*pageSize).all()).results;
+ const items=(await db.prepare(`SELECT e.id,e.card_id AS cardId,e.friend_id AS friendId,e.line_account_id AS accountId,e.kind,e.delta,e.actor_id AS actorId,e.reason,${storedTimestamp('e.created_at', 'sql')} AS createdAt,e.original_id AS originalId FROM visit_stamp_entries e WHERE ${where} ORDER BY julianday(${storedTimestamp('e.created_at', 'sql')}) DESC,e.id DESC LIMIT ? OFFSET ?`).bind(...args,pageSize,(page-1)*pageSize).all()).results;
  return c.json({success:true,data:buildOffsetListResponse({ items,total:total!.n,page,pageSize, paging: { limit: pageSize, offset: (page - 1) * pageSize }, sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'desc' }] })});
 });
 visitStamps.get('/api/liff/visit-stamps/cards/:id/paper-requests',async c=>{
  const x=await customer(c),card=c.req.param('id');await stampCard(x.db,card,x.tenantId);await stampWallet(x.db,card,x.friendId,x.a);
  // 同じ統合会員でも写真と申請はアップロードした店舗・本人のものだけ公開する。
- const rows=(await x.db.prepare(`SELECT p.id,p.card_id AS cardId,p.photo_url AS photoUrl,p.stamps,p.status,p.reason,p.created_at AS createdAt,p.reviewed_at AS reviewedAt FROM visit_stamp_paper_requests p
- WHERE p.card_id=? AND p.line_account_id=? AND (p.submitted_friend_id=? OR (p.submitted_friend_id IS NULL AND p.friend_id=?)) ORDER BY p.created_at DESC,p.id LIMIT 200`).bind(card,x.a,x.friendId,x.friendId).all()).results;
+ const rows=(await x.db.prepare(`SELECT p.id,p.card_id AS cardId,p.photo_url AS photoUrl,p.stamps,p.status,p.reason,${storedTimestamp('p.created_at', 'sql')} AS createdAt,p.reviewed_at AS reviewedAt FROM visit_stamp_paper_requests p
+ WHERE p.card_id=? AND p.line_account_id=? AND (p.submitted_friend_id=? OR (p.submitted_friend_id IS NULL AND p.friend_id=?)) ORDER BY julianday(${storedTimestamp('p.created_at', 'sql')}) DESC,p.id LIMIT 200`).bind(card,x.a,x.friendId,x.friendId).all()).results;
  return c.json({success:true,data:rows});
 });
 const PHOTO_LIMIT=5*1024*1024;

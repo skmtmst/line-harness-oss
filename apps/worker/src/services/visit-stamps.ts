@@ -1,4 +1,5 @@
 import { logger } from '@line-crm/shared/server';
+import { storedTimestamp } from '@line-crm/shared';
 import type { VisitStampSettings, VisitStampCardInput, VisitStampCard, VisitStampWallet, VisitStampEntry, VisitStampRedemption } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { getStaffById } from '@line-crm/db';
@@ -214,8 +215,8 @@ export async function grantStamps(db:D1Database,input:{cardId:string;friendId:st
   return readStampWallet(db,input.cardId,input.friendId);
 }
 export async function stampEntries(db:D1Database,cardId:string,friendId:string):Promise<VisitStampEntry[]> {
-  return (await db.prepare(`SELECT id,card_id AS cardId,friend_id AS friendId,line_account_id AS accountId,kind,delta,actor_id AS actorId,reason,created_at AS createdAt,original_id AS originalId
-    FROM visit_stamp_entries WHERE card_id=? AND friend_id=? ORDER BY created_at DESC,id LIMIT 200`).bind(cardId,friendId).all<VisitStampEntry>()).results;
+  return (await db.prepare(`SELECT id,card_id AS cardId,friend_id AS friendId,line_account_id AS accountId,kind,delta,actor_id AS actorId,reason,${storedTimestamp('created_at', 'sql')} AS createdAt,original_id AS originalId
+    FROM visit_stamp_entries WHERE card_id=? AND friend_id=? ORDER BY julianday(${storedTimestamp('created_at', 'sql')}) DESC,id LIMIT 200`).bind(cardId,friendId).all<VisitStampEntry>()).results;
 }
 export async function reverseStampEntry(db:D1Database,id:string,tenantId:string,actorId:string,reason:string) {
   if(typeof reason!=='string'||!reason.trim()||reason.length>500)throw new StampError('取消理由を入力してください');
@@ -352,7 +353,7 @@ export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:s
     if(!visit.visited) {
       if(original) {
         const positive=await db.prepare(`SELECT e.id,e.delta FROM visit_stamp_entries e WHERE e.card_id=? AND e.friend_id=? AND e.visit_key=? AND e.delta>0
-          AND NOT EXISTS(SELECT 1 FROM visit_stamp_entries r WHERE r.original_id=e.id) ORDER BY e.created_at DESC LIMIT 1`).bind(card.id,subject,key).first<{id:string;delta:number}>();
+          AND NOT EXISTS(SELECT 1 FROM visit_stamp_entries r WHERE r.original_id=e.id) ORDER BY julianday(${storedTimestamp('e.created_at', 'sql')}) DESC LIMIT 1`).bind(card.id,subject,key).first<{id:string;delta:number}>();
         if(positive)await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,original_id,visit_key,occurred_at)
           SELECT ?,?,?,?,'reverse',?,'来店記録の取消',?,?,?,datetime('now') WHERE ${guard.sql}`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,-positive.delta,'reverse:'+positive.id,positive.id,key,...guard.args).run();
       }
@@ -360,7 +361,7 @@ export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:s
     }
     if(original) {
       const cancelled=await db.prepare(`SELECT r.id,r.delta FROM visit_stamp_entries r WHERE r.card_id=? AND r.friend_id=? AND r.visit_key=? AND r.kind='reverse' AND r.reason='来店記録の取消'
-        AND NOT EXISTS(SELECT 1 FROM visit_stamp_entries e WHERE e.original_id=r.id) ORDER BY r.created_at DESC LIMIT 1`).bind(card.id,subject,key).first<{id:string;delta:number}>();
+        AND NOT EXISTS(SELECT 1 FROM visit_stamp_entries e WHERE e.original_id=r.id) ORDER BY julianday(${storedTimestamp('r.created_at', 'sql')}) DESC LIMIT 1`).bind(card.id,subject,key).first<{id:string;delta:number}>();
       if(cancelled&&card.active&&await featureJobCanRun(db,{accountId:visit.account_id,featureId:'visit_stamps',job:'visit stamps'}))await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,original_id,visit_key,occurred_at)
         SELECT ?,?,?,?,'restore',?,'来店記録の再確認',?,?,?,datetime('now') WHERE ${guard.sql}`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,-cancelled.delta,'restore:'+cancelled.id,cancelled.id,key,...guard.args).run();
       continue;
