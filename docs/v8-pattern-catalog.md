@@ -1254,8 +1254,3 @@
 持ち主は `components/shared/operation-target-summary.tsx`。呼び出し側が実際の操作先のIDと名前を渡し、既存の詳細項目の型でLINEアカウント・店舗（店舗の操作のみ）・動いている環境を表示する。名前と環境を推測しない。正本は [操作する対象の確認](v8-requirements/confirmation-targets.md)。
 
 - スタンプのマスの数と描画用データは visit-stamps/public/preview が公開し、既存displayのslotCount/previewSlotsを再利用する。別のマス数の計算を作らない。
-
-## 営業時間の日付選択と編集パネル
-
-- 2026-11-04承認の営業時間Penでは、日付・曜日の選択は40pxの緑丸と白い数字。正の部品は `shared/hours-date-calendar.tsx`。単日・複数日・期間・営業予定で同じ暦を使う。
-- 右編集は既存 `shared/drawer.tsx` の `width="hours"`（520px）を使う。ほかの引き出しの幅は維持する。カード・ボタン・時刻・選択欄・ラジオは現行の共通部品を使う。
