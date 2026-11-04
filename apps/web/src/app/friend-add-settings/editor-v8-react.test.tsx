@@ -3,7 +3,7 @@ import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-a
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 
 // apiクライアントは起動時にAPI URLを要求する。実通信はfetch差替で止める。
 vi.hoisted(() => {
@@ -255,3 +255,16 @@ test('WEB157: 競合の比較はシナリオと条件の差も表示する',asyn
  expect(document.body.textContent).toContain('友だちの条件')
  expect(document.body.textContent).toContain('changed-scenario')
 });
+
+test('初回案内の複製は変更と作りかけのフォルダを両方確認する', async () => {
+  navigation.query = 'view=edit&id=test-draft&step=basic'
+  await act(async () => { root.render(<FriendAddSettingsPage />) })
+  await eventually(() => expect(host.querySelector('#fa-name')).toBeTruthy())
+  await act(async () => { fireEvent.change(host.querySelector('#fa-name')!, { target: { value: '変更中の案内' } }) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ', exact: true })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' })) })
+  await act(async () => { fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成途中' } }); fireEvent.pointerDown(document.body) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '初回案内の操作' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '複製する' })) })
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('作りかけのフォルダ')
+})

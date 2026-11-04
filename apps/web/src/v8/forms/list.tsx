@@ -1,6 +1,9 @@
 'use client'
 
 import { renderFormDialogs } from './list-dialogs'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { VIEWER_NOTE } from './list-helpers'
 import { loadFormsPage } from './list-load'
 
@@ -13,7 +16,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleCheck,ClipboardList,Inbox,Percent,Plus,TriangleAlert } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { useCallback,useEffect,useMemo,useRef,useState,type MouseEvent as ReactMouseEvent,type ReactNode } from 'react'
+import { useCallback,useContext,useEffect,useMemo,useRef,useState,type MouseEvent as ReactMouseEvent,type ReactNode } from 'react'
 
 import Link from '@/components/shared/list-navigation'
 import { RowNameLink,StatusCell } from '@/components/shared/table'
@@ -25,7 +28,7 @@ import ContextMenu,{ type ContextMenuItem } from '@/components/shared/context-me
 import EmptyList from '@/components/shared/empty-list'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
-import FolderPanel,{ CollapsedFolderActions,FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel,{ FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -156,6 +159,12 @@ export default function FormsListV8() {
   const [renameRevision, setRenameRevision] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState('')
+  const overlayDepth = useContext(OverlayDepthContext)
+  const renameGuard = useUnsavedGuard({
+    dirty: renameTarget !== null && (renameName !== displayFormName(renameTarget.name) || renaming),
+    busy: renameTarget !== null && renaming,
+    onDiscard: () => { setRenameTarget(null); setRenameError('') },
+  })
   /* 受付を止める。止めるにも編集の版が要るので影響口で読む。 */
   const [stopTarget, setStopTarget] = useState<Form | null>(null)
   const [stopScope, setStopScope] = useState<typeof accountScope.current | null>(null)
@@ -873,13 +882,6 @@ export default function FormsListV8() {
     { kind: 'unfiled' as const, id: UNFILED_VALUE, label: '未分類', count: loading || loadError ? null : unfiledCount },
   ]
 
-  const selectedFolderActions = folderRows.find(row => row.id === activeFolderId && row.onDelete)
-
-  const folderSelectOptions = [
-    { value: 'all', label: 'フォルダ：すべて' },
-    ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` })),
-    { value: UNFILED_VALUE, label: 'フォルダ：未分類' },
-  ]
   const selectFolder = (folderId: string) => {
     setActiveFolderId(folderId)
     updateListState({ page: 1 })
@@ -1213,7 +1215,7 @@ export default function FormsListV8() {
     <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null
 
-  const overlays = <>{renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder: folderDeleteScope === accountScope.current ? deletingFolder : null, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder: (value) => { if (value === null) folderDeleteTicket.current = null; setDeletingFolder(value) }, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms, detailGuard })}{detailGuard.dialog}</>
+  const overlays = <>{renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget: deleteScope === accountScope.current ? deleteTarget : null, deleteAccountId: deleteScope?.id ?? null, deleting, deletingFolder: folderDeleteScope === accountScope.current ? deletingFolder : null, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget: renameScope === accountScope.current ? renameTarget : null, renameAccountId: renameScope?.id ?? null, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder: (value) => { if (value === null) folderDeleteTicket.current = null; setDeletingFolder(value) }, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget: (value) => { if (value === null) stopTicket.current = null; setStopTarget(value) }, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget: stopScope === accountScope.current ? stopTarget : null, stopAccountId: stopScope?.id ?? null, visibleForms, detailGuard })}{detailGuard.dialog}<OverlayDepthContext.Provider value={overlayDepth + 2}><UnsavedLeaveDialog open={renameGuard.leaveTarget !== null} busy={renaming} onConfirm={renameGuard.confirmLeave} onCancel={renameGuard.cancelLeave} /></OverlayDepthContext.Provider></>
 
   return (
     /* 一覧の状態（読込中・失敗・空・表）を外から待てるように出す。箱は作らない（display: contents）。 */
@@ -1253,7 +1255,6 @@ export default function FormsListV8() {
           </KpiBand>
         )}
         folderNav={{ rows: folderRows, activeId: activeFolderId, onSelect: selectFolder, createAction: createButton(false) }}
-        collapsedFolders={<>{createButton(false)}<Select size="content" aria-label="フォルダ" value={activeFolderId} onChange={selectFolder} options={folderSelectOptions} />{selectedFolderActions ? <CollapsedFolderActions row={selectedFolderActions} /> : null}</>}
         folders={reviewMode ? undefined : folderPanel}
         toolbar={(
           <>

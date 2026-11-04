@@ -47,6 +47,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import type {
 AutoReplyConflict,
 AutoReplyDryRunResult,
@@ -186,9 +187,10 @@ function AutoReplyWizardV8Inner() {
     if (dirty) setSaveDone(false)
   }, [dirty])
 
-  const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({
     dirty,
     busy: saving,
+    subject: '自動応答の変更',
     /*
      * step・id（作成後に付く）の違いだけが変わる遷移は画面の中の移動。
      * 戻る・進む・URL書き換えで離脱確認を出さない。
@@ -801,7 +803,7 @@ function AutoReplyWizardV8Inner() {
   const renderPreview = (withPhone: boolean) => renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged: editAcknowledged, step, testMessage, triggerSamples, conflictsReadable }, withPhone)
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage step={STEP_ORDER.indexOf(step)} footerPlacement="floating" boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={pageTitle} help={<>
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false} step={STEP_ORDER.indexOf(step)} footerPlacement="floating" boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={pageTitle} help={<>
           {step === 'basic' ? (
             'いまは停止中として作ります。最後の「確認」で有効にします。'
           ) : (
@@ -814,7 +816,7 @@ function AutoReplyWizardV8Inner() {
           <>
             <Button
               type="button"
-              onClick={() => guarded(() => router.push('/auto-replies'))}
+              onClick={() => requestUnsavedAction(() => router.push('/auto-replies'))}
               disabled={saving}
             >
               キャンセル

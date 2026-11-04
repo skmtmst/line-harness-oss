@@ -11,7 +11,10 @@ import { RowNameLink } from '@/components/shared/table';
 
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useFeatureAccess } from '@/lib/use-feature-access';
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -244,11 +247,15 @@ function FolderForm({
 }) {
   const [name, setName] = useState(folder?.name ?? '')
   const [color, setColor] = useState<string | null>(folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value)
-  return <FolderEditorDialog open title={folder ? 'フォルダを直す' : 'フォルダを追加'}
+  const depth = useContext(OverlayDepthContext)
+  const initialColor = folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value
+  const guard = useUnsavedGuard({ dirty: name !== (folder?.name ?? '') || color !== initialColor || busy, busy, onDiscard: onCancel })
+  return <><FolderEditorDialog open title={folder ? 'フォルダを直す' : 'フォルダを追加'}
     description="ウェビナーを分けてしまう箱です。消しても、中のウェビナーは未分類に残ります。"
     name={name} onNameChange={setName} color={color} onColorChange={setColor}
     busy={busy} error={error || undefined} placeholder="例：商品説明"
     onCancel={onCancel} onConfirm={() => onSave(name.trim(), color)} confirmLabel={folder ? '保存する' : '追加する'} />
+    <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></>
 }
 
 /** 表の見出し。骨組みと本物で同じものを使う。 */
@@ -757,7 +764,7 @@ function WebinarList() {
   const selectedFolderRow = folderRows.find(row => row.id === selectedFolder && row.onDelete)
   const folderSelect = (
     <SaveErrorField names={["selectedFolder","selected_folder"]}><Select
-      aria-label="フォルダ"
+      narrowFolderPicker aria-label="フォルダ"
       value={selectedFolder}
       onChange={(value) => { setSelectedFolder(value); setPage(1) }}
       options={[

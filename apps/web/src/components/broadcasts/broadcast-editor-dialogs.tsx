@@ -220,6 +220,7 @@ export function renderBroadcastEditorDialogs({ confirmationBlocked, confirmation
     >
       <div className="space-y-3">
         <OperationTargetSummary accounts={[{ id: testTargetAccountId ?? '' }]} />
+        {ab.hasB && <Notice tone="info">テスト送信は A案で送ります。</Notice>}
         {testRecipientState === 'loading' && <p className="text-sm text-ink-faint">読み込んでいます</p>}
         {testRecipientState === 'error' && <Notice tone="danger">テスト送信先を読み込めませんでした。</Notice>}
         {testRecipientState === 'ready' && testRecipients.length === 0 && (

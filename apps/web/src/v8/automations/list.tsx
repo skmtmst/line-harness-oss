@@ -425,7 +425,7 @@ export default function AutomationListV8() {
   /* ===== フォルダ ===== */
   const folderSelect = (
     <SaveErrorField names={["folderFilter","folder_filter"]}><Select
-      aria-label="フォルダ"
+      narrowFolderPicker aria-label="フォルダ"
       value={folderFilter}
       onChange={setFolderFilter}
       options={managedFolderOptions('automation', folders, { allId: '', unfiledId: UNFILED })}

@@ -233,9 +233,9 @@ describe('1件ずつの削除確認（YfTfJ）', () => {
     expect(text).toContain('いま 2か所で使われています。')
     expect(text).toContain('使われているあいだは削除できません')
     expect(buttonIn(dialog(), '削除する')).toBeUndefined()
-    // 確かめた時点（日本時間）と確認結果を示す。
+    // 確かめた時点（日本時間）と使用先の確認。
     expect(text).toContain('9月16日 10:30 時点で')
-    expect(text).toContain('使用先を確認しました')
+    expect(text).toContain('登録メディアの使用先を確認しました')
     // 開ける先があるときだけリンクにする。無い画面へ送らない。
     const links = [...(dialog()?.querySelectorAll('a') ?? [])]
     expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([['ここを開く', '/templates/edit?id=t-1']])
@@ -289,7 +289,7 @@ describe('使用状況に合わせた削除確認の案内', () => {
     expect(text).toContain('どこでも使っていません。')
     expect(text).not.toContain('使われている場所から外すと削除できます。')
     expect(text).not.toContain('使用先をまとめて差し替えられます。')
-    expect(text).toContain('時点で、使用先を確認しました。')
+    expect(text).toContain('時点で、登録メディアの使用先を確認しました。')
     expect(buttonIn(dialog(), '削除する')).toBeDefined()
     expect(impactCalls('m-1')).toHaveLength(1)
     expect(impactCalls('m-1')[0].params.get('accountId')).toBe('account-a')
@@ -316,7 +316,7 @@ describe('使用状況に合わせた削除確認の案内', () => {
     expect(dialog()?.textContent).toContain('使われている場所を確かめられませんでした。')
     expect(dialog()?.textContent).not.toContain('どこでも使っていません。')
     expect(dialog()?.textContent).not.toContain('使われている場所から外すと削除できます。')
-    expect(dialog()?.textContent).not.toContain('使用先を確認しました。')
+    expect(dialog()?.textContent).not.toContain('登録メディアの使用先を確認しました。')
     expect(buttonIn(dialog(), 'もう一度読み込む')).toBeDefined()
     expect(buttonIn(dialog(), '削除する')).toBeUndefined()
     expect(impactCalls('m-1')).toHaveLength(1)

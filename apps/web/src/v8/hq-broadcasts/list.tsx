@@ -1,5 +1,9 @@
 'use client'
 
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+
 import ListDateTime from '@/components/shared/list-date-time'
 
 import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
@@ -8,7 +12,7 @@ import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send, ArrowUpDown } from 'lucide-react'
 import { type HqBroadcastRun, FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { ListPage, ListPagePagination } from '@/components/templates/list-page';
@@ -112,6 +116,12 @@ export default function HqBroadcastList() {
   const renderedFolderDeleteTicket = folderDeleteTicket.current
   const folderDeleteLock = useRef(false)
   const [folderBusy, setFolderBusy] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const folderGuard = useUnsavedGuard({
+    dirty: folderDialog !== null && (folderName !== (folderDialog.editing?.name ?? '') || folderColor !== (folderDialog.editing ? folderDisplayColor(folderDialog.editing) : FOLDER_SELECT_COLORS[0].value) || folderBusy),
+    busy: folderDialog !== null && folderBusy,
+    onDiscard: () => setFolderDialog(null),
+  })
   const [folderError, setFolderError] = useState('')
 
   const load = useCallback(async () => {
@@ -418,6 +428,7 @@ export default function HqBroadcastList() {
       )}
       overlays={(
         <>
+          <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={folderGuard.leaveTarget !== null} busy={folderBusy} onConfirm={folderGuard.confirmLeave} onCancel={folderGuard.cancelLeave} /></OverlayDepthContext.Provider>
           <FolderEditorDialog
             name={folderName} onNameChange={(next) => { setFolderName(next); setFolderNameError('') }} color={folderColor} onColorChange={setFolderColor}
             nameError={folderNameError || undefined}

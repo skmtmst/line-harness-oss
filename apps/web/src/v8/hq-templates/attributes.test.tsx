@@ -178,6 +178,14 @@ it('情報欄のフォルダをその場で作ると、選んだ色を統括のA
   expect(trigger.querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor).toBe(expected.style.backgroundColor)
   delete document.documentElement.dataset.theme
 })
+it('情報欄のフォルダ名を編集中は移動前に確認する', async () => {
+  render(<><HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} /><a href="/events">イベントへ</a></>)
+  await screen.findByText('愛犬のお名前')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '分類' } })
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})
 
 it('統括の情報欄フォルダ削除窓に対象と環境を出す', async () => {
   mocks.folders.mockResolvedValue([{ id: 'f1', name: '基本情報', revision: 2, color: '#8b5cf6' }])

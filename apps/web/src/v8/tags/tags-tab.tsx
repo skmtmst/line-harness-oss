@@ -6,7 +6,11 @@ import { useListSnapshot } from '@/lib/use-list-snapshot'
 import { useActionError } from '@/lib/use-action-error'
 
 import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { InlineDetailHoldingContext } from '@/components/shared/use-inline-detail-guard'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
 import { Bookmark, Check, CircleDashed, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
@@ -136,6 +140,13 @@ function TagFolderDialog({
   const [color, setColor] = useState<string | null>(group ? folderDisplayColor(group) : DEFAULT_TAG_FOLDER_COLOR)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const dirty = name !== (group?.name ?? '') || color !== (group ? folderDisplayColor(group) : DEFAULT_TAG_FOLDER_COLOR)
+  const guard = useUnsavedGuard({ dirty: dirty || saving, busy: saving, onDiscard: onClose })
+  const depth = useContext(OverlayDepthContext)
+  const onHoldingChange = useContext(InlineDetailHoldingContext)
+  const source = useRef(Symbol('tag-folder'))
+  useLayoutEffect(() => { onHoldingChange?.(source.current, dirty || saving) }, [dirty, saving, onHoldingChange])
+  useLayoutEffect(() => () => { onHoldingChange?.(source.current, false) }, [onHoldingChange])
 
   const save = async () => {
     const trimmed = name.trim()
@@ -150,6 +161,7 @@ function TagFolderDialog({
         setError(res.error)
         return
       }
+      guard.disarm()
       onSaved()
       onClose()
     } catch (saveFailure) {
@@ -172,7 +184,7 @@ function TagFolderDialog({
       colors={TAG_FOLDER_COLORS}
       placeholder="例：VIP" busy={saving} error={error || undefined}
       onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
-    /></SaveErrorScope>
+    /><OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></SaveErrorScope>
   )
 }
 
@@ -845,7 +857,7 @@ export default function TagsTab({
         </>}
         collapsedFolders={<>
           {createButton(false)}
-          <SaveErrorField names={["folder"]}><Select aria-label="フォルダ" size="content" value={folder} onChange={(next) => next === '__manage_folders__' ? setManageFoldersOpen(true) : setFolder(next)} options={[...folderSelectOptions, { value: '__manage_folders__', label: 'フォルダを管理' }]} /></SaveErrorField>
+          <SaveErrorField names={["folder"]}><Select narrowFolderPicker aria-label="フォルダ" size="content" value={folder} onChange={(next) => next === '__manage_folders__' ? setManageFoldersOpen(true) : setFolder(next)} options={[...folderSelectOptions, { value: '__manage_folders__', label: 'フォルダを管理' }]} /></SaveErrorField>
         </>}
         toolbar={narrow ? <ListToolbarFrame layout="stacked"><ListToolbarRow>
           {/* 1152（aPeD8）：1段目＝作る・フォルダ・探す・使用状態、2段目＝付け方・よく使う・右端に表示件数。 */}

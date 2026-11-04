@@ -229,6 +229,10 @@ export function AffiliatePaymentConfirmDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
+  const confirmLock = useRef(false)
+  const targetId = target?.id
+  const session = useRef<{ targetId: string; accountId: string; invalid: boolean } | null>(null)
+  const invalidSession = Boolean(session.current && targetId && (session.current.invalid || session.current.targetId !== targetId || session.current.accountId !== accountId))
   const [issueStatement, setIssueStatement] = useState(false)
   const [statementKey, setStatementKey] = useState('')
   // 確定の実行中は×と同じくEscapeでも閉じない。共通の約束（初期フォーカス・
@@ -242,17 +246,20 @@ export function AffiliatePaymentConfirmDialog({
   const [contact, setContact] = useState<{ friendId: string | null; email: string | null } | null>(null)
 
   const load = useCallback(async () => {
-    if (!target) return
+    const opened = session.current
+    if (!targetId || !opened || opened.invalid || opened.targetId !== targetId || opened.accountId !== accountId) return
     setPhase('loading')
     setPreview(null)
     setContact(null)
     setError('')
     try {
-      const response = await api.affiliates.paymentPreview(target.id, accountId)
+      const response = await api.affiliates.paymentPreview(targetId, accountId)
+      if (session.current !== opened || opened.invalid) return
       if (!response.success) throw new Error(response.error)
       setPreview(response.data)
       setPhase(response.data.conversionCount === 0 ? 'empty' : 'ready')
     } catch (saveFailure) {
+      if (session.current !== opened || opened.invalid) return
       saveErrors.capture(saveFailure)
       setPhase('error');
 
@@ -260,29 +267,43 @@ export function AffiliatePaymentConfirmDialog({
     }
     // 依頼先の連絡手段は別口。ここが落ちても確定の画面自体は止めない。
     try {
-      const detail = await api.affiliates.get(target.id);
+      const detail = await api.affiliates.get(targetId);
+
+      if (session.current !== opened || opened.invalid) return
 
       const row = detail.success && detail.data
         ? (detail.data as typeof detail.data & { friendId?: string | null })
         : null
       setContact(row ? { friendId: row.friendId ?? null, email: row.email ?? null } : null)
     } catch (saveFailure) {
+      if (session.current !== opened || opened.invalid) return
       saveErrors.capture(saveFailure)
       setContact(null)
     }
-  }, [accountId, target, saveErrors])
+  }, [accountId, targetId, saveErrors])
 
   useEffect(() => {
-    if (!target)
- return
+    if (!targetId) {
+      session.current = null
+      return
+    }
+    if (session.current && (session.current.invalid || session.current.targetId !== targetId || session.current.accountId !== accountId)) {
+      session.current.invalid = true
+      setPhase('error')
+      setError('')
+      return
+    }
+    if (session.current) return
+    session.current = { targetId, accountId, invalid: false }
     setIdempotencyKey(crypto.randomUUID())
     setStatementKey(crypto.randomUUID())
     setIssueStatement(true)
     void load()
-  }, [load, target])
+  }, [load, targetId])
 
   const confirmPayment = async () => {
-    if (!target || !preview || phase !== 'ready' || !scope?.accountId || scope.stale || confirmedScope.current !== scope || scope.accountId !== accountId) return
+    if (!target || !preview || phase !== 'ready' || !idempotencyKey || confirmLock.current || !session.current || session.current.invalid || session.current.targetId !== target.id || session.current.accountId !== accountId || !scope?.accountId || scope.stale || confirmedScope.current !== scope || scope.accountId !== accountId) return
+    confirmLock.current = true
     setBusy(true)
     setError('')
     try {
@@ -322,6 +343,7 @@ export function AffiliatePaymentConfirmDialog({
 
       setError('支払いを確定できませんでした。内容を読み直してください。') }
     } finally {
+      confirmLock.current = false
       setBusy(false)
     }
   }
@@ -334,19 +356,22 @@ export function AffiliatePaymentConfirmDialog({
   if (!target) return null
 
   return (
-    <SaveErrorScope errors={saveErrors}><Dialog open title={title} description="確定すると金額が固定され、振込用のデータに入ります。" onCancel={onClose} busy={busy} error={error || undefined} designNode="GqFTV" designWidth={960} footer={(<DialogActions leadingAction={<p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>}>
+    <SaveErrorScope errors={saveErrors}><Dialog open title={title} description="確定すると金額が固定され、振込用のデータに入ります。" onCancel={onClose} busy={busy} error={invalidSession ? undefined : error || undefined} designNode="GqFTV" designWidth={960} footer={(<DialogActions leadingAction={<p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>}>
 
           <>
             <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={16} />キャンセル</Button>
-            {phase === 'ready' && preview ? (<Button type="button" variant="primary" disabled={busy || !scope?.accountId || scope.stale} title={!scope?.accountId || scope.stale ? "対象を確認し直してください" : undefined} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
+            {!invalidSession && phase === 'ready' && preview ? (<Button type="button" variant="primary" disabled={busy || !scope?.accountId || scope.stale} title={!scope?.accountId || scope.stale ? '対象を確認し直してください' : undefined} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
                 <Check size={16} />{`${yen(preview.amount)} で確定する`}
               </Button>) : null}
           </>
         </DialogActions>)}>
         <div className="space-y-3 px-6 py-5">
       <OperationTargetSummary accounts={[{ id: scope?.accountId ?? '' }]} />
-      {(!scope?.accountId || scope.stale) ? <Notice tone="warn" message={!scope?.accountId ? '対象のLINEアカウントを確認できません。閉じてから確認し直してください。' : '対象が変わりました。閉じてから確認し直してください。'} /> : null}
-      {phase === 'loading' ? (
+      {invalidSession ? (
+        <Notice tone="warn">アカウントが変わりました。窓を閉じて選び直してください</Notice>
+      ) : !scope?.accountId || scope.stale ? (
+        <Notice tone="warn" message={!scope?.accountId ? '対象のLINEアカウントを確認できません。閉じてから確認し直してください。' : 'アカウントが変わりました。窓を閉じて選び直してください'} />
+      ) : phase === 'loading' ? (
         <ListState kind="loading" title="確定する内容を読み込んでいます" />
       ) : phase === 'error' ? (
         <ListState

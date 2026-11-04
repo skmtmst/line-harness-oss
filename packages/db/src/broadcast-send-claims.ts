@@ -95,6 +95,8 @@ export interface MarkDispatchedInput {
   attemptNo: number;
   lineAccountId: string | null;
   friendIds: string[];
+  /** キュー処理が取得した版。復旧や停止後の古い処理は送信できない。 */
+  expectedLockVersion?: number;
   at?: string;
 }
 
@@ -114,9 +116,19 @@ export interface MarkDispatchedInput {
 export async function markBroadcastRecipientsDispatched(
   db: D1Database,
   input: MarkDispatchedInput,
-): Promise<void> {
-  if (input.friendIds.length === 0) return;
+): Promise<string[]> {
+  if (input.friendIds.length === 0) return [];
   const now = input.at ?? jstNow();
+  if (input.expectedLockVersion !== undefined) {
+    const statements=input.friendIds.map(friendId=>db.prepare(`UPDATE broadcast_send_claims
+      SET state='claimed',attempt_no=?,dispatched_at=?,settled_at=NULL,error_code=NULL,updated_at=?
+      WHERE broadcast_id=? AND friend_id=? AND ((state='claimed' AND dispatched_at IS NULL)
+        OR (state='failed' AND error_code IN ('line_http_429','stopped_before_dispatch') AND attempt_no=?))
+      AND EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND batch_offset=-1 AND lock_version=?)`)
+      .bind(input.attemptNo,now,now,input.broadcastId,friendId,input.attemptNo,input.broadcastId,input.expectedLockVersion));
+    const results=await db.batch(statements);
+    return input.friendIds.filter((_,i)=>(results[i].meta.changes??0)>0);
+  }
   const statements = input.friendIds.map((friendId) =>
     db
       .prepare(
@@ -144,6 +156,7 @@ export async function markBroadcastRecipientsDispatched(
       ),
   );
   await db.batch(statements);
+  return input.friendIds;
 }
 
 export interface SettleInput {
