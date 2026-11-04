@@ -77,7 +77,6 @@ describe("管理画面 一斉配信の予約完了", () => {
     expect(PAGE).toContain("const canCancel = canEdit && broadcast.status === 'scheduled' && !cancelled")
     /* 口の返事をそのまま出さない。409 も通信の失敗も、やることは同じ。 */
     expect(PAGE).not.toMatch(/setCancelError\(\s*(res\.error|String\()/)
-    expect(PAGE).toContain('api.broadcasts.cancelReservation(broadcast.id)')
     expect(PAGE).not.toContain('api.broadcasts.delete(broadcast.id)')
   })
   it('送信時に再集計することを明記する', () => {

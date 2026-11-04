@@ -28,5 +28,6 @@ export const hqBroadcastsApi={
  recipients:(id:string,accountId:string,cursor=0,limit=50)=>fetchApi<Response<{rows:Array<{friendId:string;displayName:string|null;state:string;attemptNo:number;sentAt:string|null;claimedAt:string;errorCode:string|null}>;total:number;nextCursor:string|null}>>(path(`/${encodeURIComponent(id)}/targets/${encodeURIComponent(accountId)}/recipients?cursor=${cursor}&limit=${limit}`)),
  activity:(id:string,cursor=0,limit=50)=>fetchApi<Response<{rows:Array<{id:string;accountId:string;actorId:string;action:string;createdAt:string}>;nextCursor:string|null}>>(path(`/${encodeURIComponent(id)}/activity?cursor=${cursor}&limit=${limit}`)),
  exportPath:(id:string)=>path(`/${encodeURIComponent(id)}/export.csv`),
- retry:(id:string,accountId:string,expectedVersion:number)=>send<HqBroadcastRun>(`/${encodeURIComponent(id)}/targets/${encodeURIComponent(accountId)}/retry`,{expectedVersion},true),
+ retry:(id:string,accountId:string,expectedVersion:number,confirmation?:{count:number;token:string})=>send<HqBroadcastRun>(`/${encodeURIComponent(id)}/targets/${encodeURIComponent(accountId)}/retry`,{expectedVersion,...(confirmation?{confirmedRecipientCount:confirmation.count,confirmedRecipientToken:confirmation.token}:{})},true),
+ retryPreview:(id:string,accountId:string)=>fetchApi<Response<{count:number;token:string}>>(path(`/${encodeURIComponent(id)}/targets/${encodeURIComponent(accountId)}/retry-preview`)),
 };

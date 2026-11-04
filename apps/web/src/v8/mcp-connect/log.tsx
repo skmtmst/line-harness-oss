@@ -15,6 +15,7 @@ import LogEntryDetails, { type LogEntryFacts } from '@/components/shared/log-ent
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import EmptyList from '@/components/shared/empty-list'
 import ListState from '@/components/shared/list-state'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { ListToolbarEnd, ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 import { useListUrlState } from '@/components/shared/list-url-state'
 import Pagination from '@/components/shared/pagination'
@@ -125,12 +126,13 @@ export default function McpLogV8() {
         title={`「${connection?.name ?? ''}」を止めますか？`}
         description="すぐ使えなくなり、次の呼び出しから断ります。止めた人は記録に残ります。もう一度使うときは、接続を作り直します。"
         confirmLabel="止める"
+        confirmIcon={false}
         destructive
         busy={busy}
         error={error || undefined}
         onConfirm={() => void stop()}
         onCancel={() => { if (!busy) setStopOpen(false) }}
-      /></>}
+      ><OperationTargetSummary accounts={connection?.accounts?.length ? connection.accounts : [{ id: '' }]} compactAccounts /></ConfirmDialog></>}
     >
       {load.kind === 'loading' ? <ListState kind="loading" /> : null}
       {failure ? <ListState kind="error" title={failure.title} description={failure.description} onRetry={failure.retryable ? () => void fetchLogs() : undefined} /> : null}

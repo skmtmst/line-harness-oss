@@ -26,7 +26,7 @@ export default function AdMappingDialog({ item, onClose, onSave }: {
   const [error, setError] = useState('')
   const errors = useSaveFormErrors()
   const dirty = mode !== item.mode || name !== (item.eventName ?? '') || actionId !== (item.googleActionId ?? '')
-  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy })
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy, onDiscard: onClose })
   const save = async () => {
 
     setBusy(true)

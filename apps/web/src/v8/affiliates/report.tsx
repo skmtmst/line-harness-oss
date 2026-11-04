@@ -363,7 +363,7 @@ export default function ReportTab() {
             onStopRequest={(id, name) => setArchiveTarget({ id, name })}
           />
         ) : null}
-        <AffiliateArchiveDialog target={archiveTarget} onClose={() => setArchiveTarget(null)} onChanged={() => { void load() }} />
+        <AffiliateArchiveDialog target={archiveTarget} accountId={accountId} onClose={() => setArchiveTarget(null)} onChanged={() => { void load() }} />
       </>}
     >
       {body}

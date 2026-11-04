@@ -15,6 +15,14 @@ import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
 import { rememberStaffIdentity, readStaffIdentity } from '@/lib/staff-identity-state'
 
 const fixture = vi.hoisted(() => ({ role: 'owner', identity: 'ready', account: 'account-a', style: 'standard', styleSelected: true }))
+const heldImpact = vi.hoisted(() => ({ confirm: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async original => {
+  const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.title === 'オフにする前に確認' && props.onConfirm) heldImpact.confirm = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
 
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -37,7 +45,9 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  heldImpact.confirm = null
   clearFeatureSettingsCache()
+  fixture.role = 'owner'
   fixture.identity = 'ready'
   fixture.account = 'account-a'
   fixture.style = 'standard'
@@ -82,6 +92,53 @@ async function flush() {
 const buttonNames = () => [...host.querySelectorAll('button')].map((button) => button.textContent?.trim() ?? '')
 
 describe('★V8 機能設定の閲覧のみ', () => {
+  it('機能停止の確認に対象アカウントと環境を示す', async () => {
+    fixture.role = 'owner'
+    const originalFetch = globalThis.fetch
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      if (String(input).includes('/api/settings/features/impact')) return response({ success: true, data: { version: 3, impacts: [{ feature: 'scenarios', items: [{ kind: 'scheduled', targetType: '配信', count: 2 }], blocking: true }], requiresConfirmation: true, impactToken: 'fixture' } })
+      return originalFetch(input, init)
+    })
+    try {
+      await act(async () => { root.render(<FeatureSettingsScreen />) })
+      await flush()
+      const toggle = [...host.querySelectorAll('[role="switch"]')].find(el => el.getAttribute('aria-label')?.includes('シナリオ配信'))!
+      expect(toggle).toBeTruthy()
+      await act(async () => { fireEvent.click(toggle) })
+      const reason = host.querySelector<HTMLInputElement>('#feature-settings-reason')!
+      await act(async () => { fireEvent.change(reason, { target: { value: '運用変更' } }) })
+      await act(async () => { fireEvent.click(within(host).getByRole('button', { name: '機能設定を保存' })) })
+      await flush()
+      const dialog = within(document.body).getByRole('alertdialog', { name: 'オフにする前に確認' })
+      expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+      expect(within(dialog).getByText('環境')).toBeTruthy()
+      const impactLabel = within(dialog).getByText('止まるもの')
+      expect(impactLabel.tagName).toBe('DT')
+      expect(impactLabel.nextElementSibling?.textContent).toMatch(/シナリオ配信.*配信\s*2\s*件/)
+      expect(dialog.querySelector('[title="account-a"]')).toBeTruthy()
+      expect(dialog.querySelector('.lucide-trash-2')).toBeNull()
+      const held = heldImpact.confirm!
+      fixture.account = 'account-b'
+      await act(async () => { root.render(<FeatureSettingsScreen />) })
+      expect(within(document.body).queryByRole('alertdialog', { name: 'オフにする前に確認' })).toBeNull()
+      fixture.account = 'account-a'
+      await act(async () => { root.render(<FeatureSettingsScreen />) })
+      const impactCalls = spy.mock.calls.filter(([input]) => String(input).includes('/api/settings/features/impact')).length
+      await act(async () => { await held() })
+      expect(within(document.body).queryByRole('alertdialog', { name: 'オフにする前に確認' })).toBeNull()
+      expect(spy.mock.calls.filter(([input]) => String(input).includes('/api/settings/features/impact'))).toHaveLength(impactCalls)
+      expect(spy.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
+    } finally { spy.mockRestore() }
+  })
+  it('権限がない人の星は無効として共通の表示対象になる', async () => {
+    fixture.style = 'restaurant'
+    fixture.role = 'viewer'
+    await act(async () => { root.render(<FeatureSettingsScreen />) })
+    await flush()
+    const star = within(host).getByRole('button', { name: '予約台帳をお気に入りに入れる' }) as HTMLButtonElement
+    expect(star.disabled).toBe(true)
+    expect(star.parentElement?.hasAttribute('data-disabled')).toBe(true)
+  })
   it('飲食店の機能行で星を選ぶと黄色の状態になり、保存対象になる', async () => {
     fixture.style = 'restaurant'
     await act(async () => { root.render(<FeatureSettingsScreen />) })

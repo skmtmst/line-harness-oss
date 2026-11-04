@@ -11,6 +11,7 @@ import type { StaffMember } from '@line-crm/shared'
  * 差し替えるのは通信と遷移と文脈だけ。画面の判断は差し替えない。
  */
 import React, { act } from 'react'
+import { fireEvent, screen } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -155,6 +156,17 @@ afterEach(async () => {
 })
 
 describe('D009: 未保存のままキャンセルすると確認が出る', () => {
+  it('カルーセルと作りかけのフォルダを両方知らせてから離脱する', async () => {
+    await mountAt('')
+    await act(async () => { typeInto(nameInput()!, '夏の新作セット') })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ', exact: true })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' })) })
+    await act(async () => { fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '編集中' } }); fireEvent.pointerDown(document.body) })
+    await act(async () => { click(cancelLink()!) })
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('作りかけのフォルダ')
+    expect(routing.pushed).toEqual([])
+  })
+
   it('名前を打ってからキャンセルすると確認窓が出て、選ぶまで一覧へ進まない', async () => {
     await mountAt('')
     await act(async () => { typeInto(nameInput()!, '夏の新作セット') })

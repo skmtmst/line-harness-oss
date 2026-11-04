@@ -11,6 +11,136 @@ beforeEach(()=>{f=createTestD1();for(const id of ['shop1','shop2']){f.raw.prepar
 });
 afterEach(()=>{f.raw.close();vi.unstubAllGlobals();});
 describe('統括の一括配信',()=>{
+ it('詳細の読み直しでは宛先をハッシュせず、確認窓の取得時だけ作る',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.prepare("UPDATE broadcasts SET status='sent' WHERE id=?").run(child);
+  f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'friend-shop1','failed','line_http_429')").run(child);
+  const digest=vi.spyOn(crypto.subtle,'digest');const {readHqBroadcastResult,previewHqRetry}=await import('./hq-broadcasts.js');
+  const run=await getHqBroadcastRun(f.db,tenant,r.id);
+  expect((await readHqBroadcastResult(f.db,run)).targets[0].retryableCount).toBe(1);expect(digest).not.toHaveBeenCalled();
+  expect((await previewHqRetry(f.db,run,'shop1')).count).toBe(1);expect(digest).toHaveBeenCalledTimes(1);digest.mockRestore();
+ });
+ it('停止直後の未送信台帳も再送可能人数に含め、送信途中の台帳は含めない',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('pending','U-pending','shop1'),('inflight','U-inflight','shop1')");
+  f.raw.prepare("UPDATE broadcasts SET status='sending',stopped_at=datetime('now') WHERE id=?").run(child);
+  const put=f.raw.prepare('INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code,dispatched_at) VALUES(?,?,?,?,?)');
+  put.run(child,'friend-shop1','failed','line_http_429',null);put.run(child,'pending','claimed',null,null);put.run(child,'inflight','claimed',null,'2026-01-01');
+  const {readHqBroadcastResult}=await import('./hq-broadcasts.js');
+  expect((await readHqBroadcastResult(f.db,await getHqBroadcastRun(f.db,tenant,r.id))).targets[0].retryableCount).toBe(2);
+ });
+ it('停止前の処理が残っていても版を更新して再送できる',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.prepare("UPDATE broadcasts SET status='sending',stopped_at=datetime('now'),batch_offset=-1 WHERE id=?").run(child);
+  f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'friend-shop1','failed','stopped_before_dispatch')").run(child);
+  await retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1','owner',1);
+  expect(f.raw.prepare('SELECT stopped_at,batch_offset,lock_version FROM broadcasts WHERE id=?').get(child)).toEqual({stopped_at:null,batch_offset:0,lock_version:2});
+ });
+ it('人数が同じでも再送対象が変わったら409で止める',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('another','U-another','shop1')");
+  f.raw.prepare("UPDATE broadcasts SET status='sent' WHERE id=?").run(child);
+  f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'friend-shop1','failed','line_http_429')").run(child);
+  const {previewHqRetry}=await import('./hq-broadcasts.js');
+  const preview=await previewHqRetry(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1');
+  f.raw.prepare("UPDATE broadcast_send_claims SET friend_id='another' WHERE broadcast_id=?").run(child);
+  await expect(retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1','owner',1,{count:preview.count,token:preview.token})).rejects.toMatchObject({status:409,currentCount:1});
+  expect(f.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(child)).toEqual({status:'sent'});
+ });
+ it('再送の確定直前に対象が増えたら新しい人数を返して止める',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('late','U-late','shop1')");
+  f.raw.prepare("UPDATE broadcasts SET status='sent' WHERE id=?").run(child);
+  f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'friend-shop1','failed','line_http_429')").run(child);
+  const {previewHqRetry}=await import('./hq-broadcasts.js');
+  const preview=await previewHqRetry(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1');
+  const batch=f.db.batch.bind(f.db);let injected=false;
+  vi.spyOn(f.db,'batch').mockImplementation(async statements=>{
+    if(!injected&&statements.length===4){injected=true;f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'late','failed','line_http_429')").run(child);}
+    return batch(statements);
+  });
+  await expect(retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1','owner',1,{count:preview.count,token:preview.token})).rejects.toMatchObject({status:409,currentCount:2});
+  expect(injected).toBe(true);expect(f.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(child)).toEqual({status:'sent'});
+ });
+ it.each(['ledger','audience'] as const)('送信前の確定直前に対象が変わると原子操作を止める (%s)',async kind=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.prepare("UPDATE broadcasts SET status='draft' WHERE id=?").run(child);
+  if(kind==='ledger'){
+   f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('late','U-late','shop1')");
+   f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'friend-shop1','failed','line_http_429')").run(child);
+  }
+  const {previewHqRetry}=await import('./hq-broadcasts.js');
+  const run=await getHqBroadcastRun(f.db,tenant,r.id),preview=await previewHqRetry(f.db,run,'shop1');
+  const batch=f.db.batch.bind(f.db);let injected=false;
+  vi.spyOn(f.db,'batch').mockImplementation(async statements=>{
+   if(!injected&&statements.length===3){injected=true;
+    if(kind==='ledger')f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,error_code) VALUES(?,'late','failed','line_http_429')").run(child);
+    else f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('late','U-late','shop1')");
+   }
+   return batch(statements);
+  });
+  await expect(retryHqBroadcastTarget(f.db,run,'shop1','owner',1,preview)).rejects.toMatchObject({status:409,currentCount:2});
+  expect(injected).toBe(true);expect(f.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(child)).toEqual({status:'draft'});
+  expect(f.raw.prepare('SELECT state FROM broadcast_send_claims WHERE broadcast_id=? ORDER BY friend_id').all(child)).toEqual(kind==='ledger'?[{state:'failed'},{state:'failed'}]:[]);
+ });
+ it('停止後の未送信を確認情報と一緒に一括で再送対象に固定する',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.prepare("UPDATE broadcasts SET status='sending',stopped_at=datetime('now') WHERE id=?").run(child);
+  f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,dispatched_at) VALUES(?,'friend-shop1','claimed',NULL)").run(child);
+  const {previewHqRetry}=await import('./hq-broadcasts.js');
+  const preview=await previewHqRetry(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1');
+  await retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1','owner',1,{count:preview.count,token:preview.token});
+  expect(f.raw.prepare('SELECT state,attempt_no FROM broadcast_send_claims WHERE broadcast_id=?').get(child)).toEqual({state:'claimed',attempt_no:2});
+ });
+ it('配信できない友だちは確認人数から外し、後で復帰しても勝手に再送しない',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id,is_following) VALUES('offline','U-offline','shop1',0)");
+  f.raw.prepare("UPDATE broadcasts SET status='sending',stopped_at=datetime('now') WHERE id=?").run(child);
+  const put=f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state) VALUES(?,?,'claimed')");
+  put.run(child,'friend-shop1');put.run(child,'offline');
+  const {previewHqRetry}=await import('./hq-broadcasts.js');
+  const preview=await previewHqRetry(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1');
+  expect(preview.count).toBe(1);
+  await retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1','owner',1,{count:preview.count,token:preview.token});
+  expect(f.raw.prepare("SELECT state,error_code FROM broadcast_send_claims WHERE friend_id='offline'").get()).toEqual({state:'failed',error_code:'recipient_unavailable'});
+ });
+ it('送信済みの古い台帳に未送信が残っていても確認対象に含める',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.prepare("UPDATE broadcasts SET status='sent' WHERE id=?").run(child);
+  f.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state,dispatched_at) VALUES(?,'friend-shop1','claimed',NULL)").run(child);
+  const {readHqBroadcastResult}=await import('./hq-broadcasts.js');
+  expect((await readHqBroadcastResult(f.db,await getHqBroadcastRun(f.db,tenant,r.id))).targets[0].retryableCount).toBe(1);
+ });
+ it('送信前に停止した店も確認した対象を固定して再送できる',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.prepare("UPDATE broadcasts SET status='draft',stopped_at=datetime('now') WHERE id=?").run(child);
+  const {previewHqRetry}=await import('./hq-broadcasts.js');
+  const preview=await previewHqRetry(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1');
+  expect(preview.count).toBe(1);
+  await retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1','owner',1,{count:preview.count,token:preview.token});
+  expect(f.raw.prepare('SELECT friend_id,state FROM broadcast_send_claims WHERE broadcast_id=?').all(child)).toEqual([{friend_id:'friend-shop1',state:'claimed'}]);
+ });
+ it('宛先の固定前に停止した送信中の店も人数を確認して再送できる',async()=>{
+  const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+  const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;
+  f.raw.prepare("UPDATE broadcasts SET status='sending',stopped_at=datetime('now'),batch_offset=0 WHERE id=?").run(child);
+  const {previewHqRetry}=await import('./hq-broadcasts.js');
+  const preview=await previewHqRetry(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1');
+  expect(preview.count).toBe(1);
+  await retryHqBroadcastTarget(f.db,await getHqBroadcastRun(f.db,tenant,r.id),'shop1','owner',1,{count:preview.count,token:preview.token});
+  expect(f.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(child)).toEqual({status:'scheduled'});
+  expect(f.raw.prepare('SELECT friend_id,state FROM broadcast_send_claims WHERE broadcast_id=?').all(child)).toEqual([{friend_id:'friend-shop1',state:'claimed'}]);
+ });
  it('人数・残枠を店ごとに返し、足りない店を外した後だけ送れる',async()=>{
   let run=await prepareHqBroadcast(f.db,tenant,'owner',input),check=await preflightHqBroadcast(f.db,run);
   expect(check.map(p=>p.remaining)).toEqual([100,0]);expect(check[1].blockedReasons).toContain('今月の送信枠が足りません');

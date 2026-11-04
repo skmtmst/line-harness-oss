@@ -69,7 +69,7 @@ export default function FolderEditorDialog({ name, nameError, nameRef, onNameCha
    */
   return <Dialog {...dialog} title={normalizeActionLabel(dialog.title)} headerIcon={<Folder />} busy={busy} designWidth={560} designHeaderPadding="24px 24px 0"
     footer={<div className={styles.footer} data-dialog-actions>{footer ?? <>
-      <Button type="button" data-dialog-action="secondary" onClick={dialog.onCancel} disabled={busy}>{cancelLabel}</Button>
+      <Button type="button" data-dialog-action="secondary" data-overlay-close onClick={dialog.onCancel} disabled={busy}>{cancelLabel}</Button>
       <Button type="button" variant="primary" onClick={onConfirm} title={confirmTitle} lockedReason={confirmLockedReason}
         disabled={busy || confirmDisabled || !name.trim()} busy={busy}>{confirmIcon}{confirmLabel}</Button>
     </>}</div>}>

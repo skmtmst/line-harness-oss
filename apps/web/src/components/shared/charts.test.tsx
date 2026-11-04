@@ -53,3 +53,12 @@ it('符号付きは0基準の上下に描き、欠測と観測0を区別する',
  expect(parseFloat(negative.style.height)).toBeGreaterThan(0);expect(parseFloat(negative.style.bottom)).toBeLessThan(parseFloat(positive.style.bottom));
  expect(screen.getByRole('button',{name:'10/3 —'})).toBeTruthy();expect(screen.getByRole('button',{name:'10/4 0人'})).toBeTruthy();
 })
+
+it('時間帯の軸は等間隔を守り、最後の棒も読み上げられる', () => {
+ vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({ x: 0, y: 0, top: 0, left: 0, right: 1000, bottom: 100, width: 1000, height: 100, toJSON: () => ({}) }))
+ const items = Array.from({ length: 24 }, (_, i) => ({ key: String(i), label: `${i}時台`, value: i }))
+ const { container } = render(<ValueBarChart label="時間帯" items={items} showLastAxis={false} />)
+ const labels = [...container.querySelectorAll('[data-chart-axis]:not([hidden])')].map(el => el.textContent)
+ expect(labels).toEqual(Array.from({ length: 12 }, (_, i) => `${i * 2}時台`))
+ expect(screen.getByRole('button', { name: '23時台 23' })).toBeTruthy()
+})
