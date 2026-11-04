@@ -4965,6 +4965,18 @@ CREATE TABLE media_file_scans (
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE media_purge_impact_pending (
+  id TEXT PRIMARY KEY,
+  media_id TEXT NOT NULL,
+  owner_line_account_id TEXT NOT NULL,
+  key_sha256 TEXT NOT NULL,
+  target_tenant_id TEXT,
+  target_line_account_id TEXT,
+  target_kind TEXT NOT NULL,
+  usage_count INTEGER NOT NULL CHECK (usage_count > 0),
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE media_send_claims (
   claim_id TEXT NOT NULL,
   media_id TEXT NOT NULL,
@@ -4978,6 +4990,10 @@ CREATE TABLE media_storage_quotas (
   limit_bytes     INTEGER NOT NULL DEFAULT 10737418240 CHECK (limit_bytes > 0),
   updated_by      TEXT,
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
+CREATE TABLE media_tenant_guards (
+  blocked INTEGER NOT NULL CONSTRAINT media_cross_tenant_reference CHECK (blocked = 0)
 );
 
 CREATE TABLE media_upload_sessions (
@@ -10803,9 +10819,13 @@ CREATE INDEX idx_media_file_scans_subject
 
 CREATE INDEX idx_media_kind ON media(kind, created_at DESC);
 
+CREATE INDEX idx_media_purge_impact_pending_media ON media_purge_impact_pending(media_id,key_sha256);
+
 CREATE INDEX idx_media_send_claims_expiry ON media_send_claims(expires_at);
 
 CREATE INDEX idx_media_send_claims_media ON media_send_claims(media_id, expires_at);
+
+CREATE INDEX idx_media_tenant_banner_owner ON banner_images(media_id,tenant_id);
 
 CREATE INDEX idx_media_upload_sessions_account_status
   ON media_upload_sessions(line_account_id, status, expires_at);

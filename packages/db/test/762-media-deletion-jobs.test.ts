@@ -7,6 +7,7 @@ describe('762 media deletion job', () => {
     const db = new Database(':memory:');
     try {
       db.exec("CREATE TABLE media(id TEXT PRIMARY KEY, r2_key TEXT NOT NULL); INSERT INTO media VALUES('m', 'old-key');");
+      db.exec('CREATE TABLE banner_images(media_id TEXT, tenant_id TEXT, created_at TEXT, id TEXT)');
       db.exec(readFileSync(new URL('../migrations/762_media_deletion_jobs.sql', import.meta.url), 'utf8'));
       db.prepare('INSERT INTO media_deletion_jobs (media_id,line_account_id,r2_keys_json,status,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?)')
         .run('m', 'account', JSON.stringify(['old-key', 'new-key']), 'deleting', 'now', 'now');

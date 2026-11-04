@@ -17,6 +17,26 @@ CREATE TABLE IF NOT EXISTS media_deletion_guards (
   blocked INTEGER NOT NULL CONSTRAINT media_deletion_in_progress CHECK (blocked = 0)
 );
 
+CREATE TABLE IF NOT EXISTS media_tenant_guards (
+  blocked INTEGER NOT NULL CONSTRAINT media_cross_tenant_reference CHECK (blocked = 0)
+);
+
+-- Pending impact snapshots are scoped to the departing account and are removed
+-- with it. Object keys and URLs are never stored in this table.
+CREATE TABLE IF NOT EXISTS media_purge_impact_pending (
+  id TEXT PRIMARY KEY,
+  media_id TEXT NOT NULL,
+  owner_line_account_id TEXT NOT NULL,
+  key_sha256 TEXT NOT NULL,
+  target_tenant_id TEXT,
+  target_line_account_id TEXT,
+  target_kind TEXT NOT NULL,
+  usage_count INTEGER NOT NULL CHECK (usage_count > 0),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_media_purge_impact_pending_media ON media_purge_impact_pending(media_id,key_sha256);
+CREATE INDEX IF NOT EXISTS idx_media_tenant_banner_owner ON banner_images(media_id,tenant_id);
+
 -- A non-reversible fingerprint prevents reuse of a removed object key even
 -- after account-scoped deletion jobs have been purged. No account or URL is kept.
 CREATE TABLE IF NOT EXISTS media_deleted_key_fingerprints (
