@@ -1170,7 +1170,7 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/review', require
   const body = await c.req.json<{ expectedVersion?: number }>();
   if (body.expectedVersion !== saved.version) return fail(c, 409, 'ほかの担当者が営業時間を変更しました。再読み込みしてください。', { code: 'version_conflict' });
   const today = todayIn(ctx.timeZone), limit = hoursDateAdd(today, 366);
-  if (!validateHoursWorkspace(saved.data, today) || saved.data.draft.days.some(d => d.date > limit)) return fail(c, 400, '変更する日付と営業時間を確認してください', {}, ['days']);
+  if (!validateHoursWorkspace(saved.data, '2000-01-01') || saved.data.draft.days.some(d => d.date > limit)) return fail(c, 400, '変更する日付と営業時間を確認してください', {}, ['days']);
   const workspace = saved.data;
   const changes: ChangeRow[] = [];
   const weekly = workspace.draft.weekly ?? ctx.profile.regularHours;
@@ -1179,10 +1179,10 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/review', require
     if (change instanceof Response) return change;
     changes.push(change);
   }
-  const dates = new Map(workspace.draft.days.map(d => [d.date, d]));
+  const dates = new Map(workspace.draft.days.filter(d => d.date >= today).map(d => [d.date, d]));
   const managed = new Set(workspace.holidayManagedDates ?? []);
   const nextManaged = new Set(managed);
-  if (workspace.draft.holidayChanged) {
+  if (workspace.draft.holidayChanged || workspace.draft.weekly) {
     for (const h of upcomingHolidays(today, 366)) {
       if (dates.has(h.date) || ctx.profile.specialHours.some(d => d.date === h.date && !managed.has(d.date))) { nextManaged.delete(h.date); continue; }
       if (workspace.holiday.mode === 'weekly') {
@@ -1203,14 +1203,15 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/review', require
     if (change instanceof Response) return change;
     changes.push(change);
   }
-  if (workspace.draft.serviceIds.length) {
+  const serviceIds = [...new Set([...workspace.draft.serviceIds, ...(workspace.draft.weekly ? workspace.services.filter(s => s.sameWeekdays).map(s => s.id) : [])])];
+  if (serviceIds.length) {
     const types = new Set([...(ctx.profile.moreHoursTypes ?? []).map(t => t.id), ...(ctx.profile.moreHours ?? []).map(t => t.hoursTypeId)]);
     if (ctx.profile.categoryNames?.length) {
       const available = await getMoreHoursTypes({ fetch, accessToken: await accessTokenFor(c, ctx.connection) }, ctx.profile.categoryNames);
       for (const t of available) types.add(t.id);
     }
     const more = new Map((ctx.profile.moreHours ?? []).map(h => [h.hoursTypeId, h]));
-    for (const id of workspace.draft.serviceIds) {
+    for (const id of serviceIds) {
       if (id.startsWith('remove:')) { const type = id.slice(7); if (types.has(type)) more.delete(type); continue; }
       const service = workspace.services.find(s => s.id === id);
       if (!service) { if (types.has(id)) more.delete(id); continue; }

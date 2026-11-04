@@ -32,7 +32,7 @@ export function importServices(data: GoogleProfileData): HoursService[] {
 export function workspaceDay(date: string, data: GoogleProfileData, workspace: HoursWorkspace, holidays: Array<{ date: string }>) {
   const weekly = workspace.draft.weekly ?? data.profile.regularHours
   const draft = workspace.draft.days.find(d => d.date === date)
-  const special = [...data.profile.specialHours.filter(s => (s.date !== date || !draft?.remove) && !(workspace.draft.holidayChanged && workspace.holidayManagedDates?.includes(s.date))), ...workspace.draft.days.filter(d => !d.remove)]
+  const special = [...data.profile.specialHours.filter(s => (s.date !== date || !draft?.remove) && !((workspace.draft.holidayChanged || workspace.draft.weekly) && workspace.holidayManagedDates?.includes(s.date))), ...workspace.draft.days.filter(d => !d.remove)]
   if (draft && !draft.remove) return draft
   return effectiveOpeningDate(date, weekly, special, workspace.holiday, holidays.some(h => h.date === date))
 }

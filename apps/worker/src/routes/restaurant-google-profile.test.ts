@@ -620,6 +620,31 @@ describe('営業時間ツールの店舗別下書きと変更確認', () => {
     const stale = await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } });
     expect(stale.status).toBe(409);
   });
+  it('曜日を休みに変えると、曜日優先の祝日と同じ営業日のサービスにも適用する', async () => {
+    location.moreHours = [{ hoursTypeId: 'TAKEOUT', periods: [p('MONDAY', 17, 22), p('FRIDAY', 17, 22)] }];
+    const workspace = await draft();
+    const profile = await (await call('/api/restaurant-test/google/profile')).json() as any;
+    workspace.data.draft.weekly = { ...profile.profile.regularHours, MONDAY: [] };
+    workspace.data.holiday = { mode: 'custom', periods: [{open:'11:00',close:'22:00'}], overrideClosedWeekday:false };
+    workspace.data.services = [{id:'takeout',kind:'takeout',label:'テイクアウト',googleTypeId:'TAKEOUT',sameWeekdays:true,weekdays:['MONDAY','FRIDAY'],periods:[{open:'17:00',close:'22:00'}],orderDeadline:'',menu:''}];
+    await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } });
+    const response = await call('/api/restaurant-test/google/hours/review', { body: { expectedVersion: 1 } });
+    expect(response.status).toBe(200);
+    const result = await response.json() as any;
+    expect(result.changes.find((c:any)=>c.kind==='special_hours').after).toContainEqual({date:'2026-11-23',closed:true,periods:[]});
+    expect(result.changes.find((c:any)=>c.target.field==='moreHours').after[0].weekly.MONDAY).toEqual([]);
+    expect(patchCalls()).toHaveLength(0);
+  });
+  it('日付が過ぎた下書きが残っていても、新しく指定した将来の日だけ確認できる', async () => {
+    const workspace = await draft();
+    workspace.data.draft.days = [{date:'2026-09-01',closed:true,periods:[]},{date:'2026-12-14',closed:true,periods:[]}];
+    expect((await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } })).status).toBe(200);
+    const response = await call('/api/restaurant-test/google/hours/review', { body: { expectedVersion: 1 } });
+    expect(response.status).toBe(200);
+    const result = await response.json() as any;
+    expect(result.changes[0].target.dates).toEqual(['2026-12-14']);
+    expect(patchCalls()).toHaveLength(0);
+  });
   it('離れた日だけを特別営業時間の確認へ送り、その間の日を変更しない', async () => {
     const workspace = await draft();
     workspace.data.draft.days = [{ date: '2026-12-14', closed: true, periods: [] }, { date: '2026-12-18', closed: true, periods: [] }];
