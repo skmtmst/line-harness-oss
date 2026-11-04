@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest'
 const SRC = path.join(__dirname, '..')
 const QR_PAGES = [
   'components/dashboard/qr-dialog.tsx',
-  'v8/hq/notice-line-dialog.tsx',
+  'components/hq/notice-line-register-dialog.tsx',
   'v8/ops/two-factor.tsx',
   'v8/settings/staff/staff.tsx',
   'app/login/two-factor/setup/page.tsx',
@@ -31,7 +31,8 @@ describe('QRライブラリの表示時読み込み(PERF-09)', () => {
   })
   it('QRを出す画面が qrcode を静的に import していない', () => {
     for (const rel of QR_PAGES) {
-      const source = readUiSource(path.join(SRC, rel), 'utf8')
+      const source = readUiSource(path.join(SRC, rel), 'utf8') + (rel === 'components/hq/notice-line-register-dialog.tsx'
+        ? readUiSource(path.join(SRC, 'v8/hq/notice-line-dialog.tsx'), 'utf8') : '')
       expect(source, rel).not.toMatch(/import\s+QRCode\s+from\s+['"]qrcode['"]/)
       expect(source, rel).not.toMatch(/from\s+['"]qrcode['"]/)
       expect(source, rel).toContain('qr-image')

@@ -449,6 +449,8 @@ jobs:
           pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build
           pnpm --filter web release-log
       - run: pnpm --filter web exec vitest run --config vitest.config.ts --shard=${{ matrix.shard }}/4
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
   web-checks:
     name: Admin lint, typecheck and tests
