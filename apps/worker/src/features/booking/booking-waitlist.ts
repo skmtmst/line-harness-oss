@@ -25,7 +25,7 @@ export async function finishExpiredWaitlists(db: D1Database, accountId?: string,
   const iso = now.toISOString();
   await db.batch([
     db.prepare(`UPDATE booking_waitlist SET status='finished',finish_reason=CASE WHEN status='invited' THEN 'offer_expired' ELSE 'registration_closed' END,updated_at=? WHERE status IN ('waiting','invited') AND ((status='waiting' AND julianday(starts_at)<=julianday(?,'+1 hour')) OR (status='invited' AND (julianday(hold_expires_at)<=julianday(?) OR julianday(starts_at)<=julianday(?)))) AND (? IS NULL OR line_account_id=?)`).bind(iso, iso, iso, iso, accountId ?? null, accountId ?? null),
-    db.prepare(`UPDATE rt_seat_waitlist SET status='finished',finish_reason=CASE WHEN status='invited' THEN 'offer_expired' ELSE 'registration_closed' END,updated_at=? WHERE status IN ('waiting','invited') AND ((status='waiting' AND julianday(starts_at)<=julianday(?,'+1 hour')) OR (status='invited' AND (julianday(hold_expires_at)<=julianday(?) OR julianday(starts_at)<=julianday(?)))) AND (? IS NULL OR store_id IN (SELECT id FROM rt_stores WHERE line_account_id=?))`).bind(iso, iso, iso, iso, accountId ?? null, accountId ?? null),
+    db.prepare(`UPDATE rt_seat_waitlist SET confirmation_revision=confirmation_revision+1, status='finished',finish_reason=CASE WHEN status='invited' THEN 'offer_expired' ELSE 'registration_closed' END,updated_at=? WHERE status IN ('waiting','invited') AND ((status='waiting' AND julianday(starts_at)<=julianday(?,'+1 hour')) OR (status='invited' AND (julianday(hold_expires_at)<=julianday(?) OR julianday(starts_at)<=julianday(?)))) AND (? IS NULL OR store_id IN (SELECT id FROM rt_stores WHERE line_account_id=?))`).bind(iso, iso, iso, iso, accountId ?? null, accountId ?? null),
   ]);
 }
 export async function promoteBookingWaitlist(db: D1Database, slot: WaitlistSlot, _sender?: unknown, liffBaseUrl = '', env?: Env['Bindings']): Promise<PromoteResult> {
@@ -61,13 +61,13 @@ export async function dispatchWaitlistInvites(env: Env['Bindings'], accountId?: 
         if(managed){const {processRestaurantEvents}=await import('../../services/restaurant-events.js');const {processScenarioSourceJobs}=await import('../scenarios/scenario-source-jobs/index.js');await processRestaurantEvents(env,managed.store_id);await processScenarioSourceJobs(env);continue;}
       }
 
-      const claim = await db.prepare(`UPDATE ${table} SET notification_claim_until=? WHERE id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND notified_at IS NULL AND (notification_claim_until IS NULL OR julianday(notification_claim_until)<=julianday(?))`).bind(new Date(Date.now() + 60_000).toISOString(), row.id, now).run();
+      const claim = await db.prepare(`UPDATE ${table} SET ${table === 'rt_seat_waitlist' ? 'confirmation_revision=confirmation_revision+1,' : ''} notification_claim_until=? WHERE id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND notified_at IS NULL AND (notification_claim_until IS NULL OR julianday(notification_claim_until)<=julianday(?))`).bind(new Date(Date.now() + 60_000).toISOString(), row.id, now).run();
       if (!claim.meta.changes) continue;
       try {
         const book = table === 'booking_waitlist' ? waitlistBookUrl(liffBaseUrl, row.id) : `${liffBaseUrl.replace(/\/$/, '')}/booking?seat_waitlist=${encodeURIComponent(row.id)}`;
         const decline = table === 'booking_waitlist' ? waitlistDeclineUrl(liffBaseUrl, row.id) : `${book}&action=decline`;
         const sent = await sendAutomaticBookingLine(env, { accountId: row.account_id, to: row.line_user_id, text: `${formatSlotHeadline(row.starts_at, row.timezone ?? 'Asia/Tokyo')} に空きが出ました。\n${row.detail}\n${new Date(row.hold_expires_at).toLocaleTimeString('ja-JP', { timeZone: row.timezone ?? 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}まで仮押さえしています。\nこの時間で予約する：${book}\n今回は見送る：${decline}`, retryKey: row.notification_retry_key, featureId });
-        if (sent) await db.prepare(`UPDATE ${table} SET notified_at=? WHERE id=? AND status='invited'`).bind(now, row.id).run();
+        if (sent) await db.prepare(`UPDATE ${table} SET ${table === 'rt_seat_waitlist' ? 'confirmation_revision=confirmation_revision+1,' : ''} notified_at=? WHERE id=? AND status='invited'`).bind(now, row.id).run();
       } catch { logger.error("waitlist_invite_send_failed"); }
     }
   }

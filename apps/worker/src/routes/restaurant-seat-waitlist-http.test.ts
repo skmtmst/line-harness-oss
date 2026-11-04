@@ -167,6 +167,25 @@ async function approveFollowup(){
 }
 
 describe('席の空き待ち', () => {
+  test('古い確認では取消も次の組への通知もしない', async () => {
+    const created = await post('/api/restaurant-test/seat-waitlist', { storeId: 'store-s', startsAt: SLOT, guestCount: 2, customerName: '試験', lineUid: 'U-seat-a' });
+    const id = (await created.json() as { data: { id: string } }).data.id;
+    await post('/api/restaurant-test/seat-waitlist', { storeId: 'store-s', startsAt: SLOT, guestCount: 2, customerName: '次の組', lineUid: 'U-next' });
+    testDb.raw.prepare("UPDATE rt_seat_waitlist SET status='invited',table_id='table-1',hold_expires_at=?,confirmation_revision=confirmation_revision+1 WHERE id=?").run(SLOT, id);
+    const response = await del(`/api/restaurant-test/seat-waitlist/${id}?expectedConfirmationRevision=1`);
+    expect(response.status).toBe(409);
+    expect(testDb.raw.prepare('SELECT status FROM rt_seat_waitlist WHERE id=?').get(id)).toEqual({ status: 'invited' });
+    expect(testDb.raw.prepare("SELECT status FROM rt_seat_waitlist WHERE line_uid='U-next'").get()).toEqual({ status: 'waiting' });
+    expect(cardSender).not.toHaveBeenCalled();
+    expect(commonSender).not.toHaveBeenCalled();
+  });
+  test('一致する確認は一度だけ取り消せる', async () => {
+    const created = await post('/api/restaurant-test/seat-waitlist', { storeId: 'store-s', startsAt: SLOT, guestCount: 2, customerName: '試験', lineUid: 'U-seat-a' });
+    const id = (await created.json() as { data: { id: string } }).data.id;
+    expect((await del(`/api/restaurant-test/seat-waitlist/${id}?expectedConfirmationRevision=1`)).status).toBe(200);
+    expect((await del(`/api/restaurant-test/seat-waitlist/${id}?expectedConfirmationRevision=1`)).status).toBe(409);
+    expect(testDb.raw.prepare('SELECT status,confirmation_revision FROM rt_seat_waitlist WHERE id=?').get(id)).toEqual({ status: 'cancelled', confirmation_revision: 2 });
+  });
   test('登録・二重登録は409・一覧・取り消し', async () => {
     const body = {
       storeId: 'store-s', startsAt: SLOT, guestCount: 2,
