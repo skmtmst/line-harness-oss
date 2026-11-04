@@ -77,18 +77,19 @@ it('古い取消日時がある確定応答と未知状態も出欠の対象に�
   expect(isLiveLessonBooking(unknown)).toBe(false)
 })
 
-it('名簿の事前欠席は確定と承認待ちだけに出し、閲覧のみでも理由つきで入口を残す', () => {
+it('名簿の事前欠席は確定と承認待ちだけに出し、閲覧のみには表示しない', () => {
   const future = bookings.map(row => ({ ...row, slot_starts_at: '2099-06-01T01:00:00Z' }))
   const onReportAbsence = vi.fn()
   const roster = { rowId: 'slot-real', head: '', title: '朝ヨガ', meta: '', pay: { label: '', tone: 'neutral' as const }, more: '', payLinkCount: 0, members: future.map(toLessonRosterMember) }
   const view = render(<LessonRoster roster={roster} canWrite={false} onAttend={noop} onAbsent={noop} onClose={noop} onPay={noop} onLine={noop} onCancelClass={noop}
     onReportAbsence={onReportAbsence} absenceAllowed={false} absenceLockedReason="閲覧のみです" />)
-  const controls = screen.getAllByRole('button', { name: '欠席' })
-  expect(controls).toHaveLength(2)
-  fireEvent.click(controls[0]); expect(onReportAbsence).not.toHaveBeenCalled()
+  expect(screen.queryByRole('button', { name: '欠席' })).toBeNull()
+  expect(onReportAbsence).not.toHaveBeenCalled()
   view.rerender(<LessonRoster roster={roster} canWrite onAttend={noop} onAbsent={noop} onClose={noop} onPay={noop} onLine={noop} onCancelClass={noop}
     onReportAbsence={onReportAbsence} absenceAllowed />)
-  fireEvent.click(screen.getAllByRole('button', { name: '欠席' })[1])
+  const controls = screen.getAllByRole('button', { name: '欠席' })
+  expect(controls).toHaveLength(2)
+  fireEvent.click(controls[1])
   expect(onReportAbsence).toHaveBeenCalledWith(expect.objectContaining({ bookingId: 'booking-requested', eventId: 'event-real', startsAt: '2099-06-01T01:00:00Z' }))
 })
 
