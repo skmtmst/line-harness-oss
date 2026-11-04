@@ -137,6 +137,8 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
   const [loadError, setLoadError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<GooglePost | null>(null)
+  const removeTicket = useRef<object | null>(null)
+  const renderedRemoveTicket = removeTicket.current
   const [removeScope, setRemoveScope] = useState<{ id: string; generation: number; store?: { id: string; name?: string | null }; googleLocation?: string | null } | null>(null)
   const [actionError, setActionError] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
@@ -184,14 +186,19 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
 
   const removePost = async () => {
     if (!canPublish || busyId || !confirmRemove) return
+    const requestScope = scope.current
+    const requestTicket = removeTicket.current
     setBusyId(confirmRemove.id)
     setActionError('')
     try {
       await restaurantGoogleApi.removePost(accountId, confirmRemove.id)
+      if (!alive.current || requestScope !== scope.current || requestTicket !== removeTicket.current) return false
+      removeTicket.current = null
       setConfirmRemove(null)
       await load()
       return true
     } catch (err) {
+      if (!alive.current || requestScope !== scope.current || requestTicket !== removeTicket.current) return false
       setActionError(errorMessage(err, '削除できませんでした。'))
       return false
     } finally {
@@ -223,7 +230,7 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
     if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', group: 'view', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
-    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation }); setConfirmRemove(post) } } })
+    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { removeTicket.current = {}; setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation }); setConfirmRemove(post) } } })
     if (!canView) return items.map(item => ({ ...item, disabled: true, lockedReason: undefined }))
     return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
   }
@@ -290,8 +297,8 @@ export function PostsBoard({ accountId, go, store, googleLocation }: { accountId
         confirmLabel="削除する"
         destructive
         busy={busyId === confirmRemove?.id}
-        error={actionError || undefined} onSuccess={() => setConfirmRemove(null)} onConfirm={() => { if (alive.current && canPublishRef.current && removeScope?.generation === scope.current.generation) return removePost() }}
-        onCancel={() => setConfirmRemove(null)}
+        error={actionError || undefined} onSuccess={() => { removeTicket.current = null; setConfirmRemove(null) }} onConfirm={() => { if (renderedRemoveTicket && renderedRemoveTicket === removeTicket.current && alive.current && canPublishRef.current && removeScope?.generation === scope.current.generation) return removePost() }}
+        onCancel={() => { removeTicket.current = null; setConfirmRemove(null) }}
       >{removeScope ? <OperationTargetSummary accounts={[{ id: removeScope.id }]} store={removeScope.store} externalTarget={{ label: 'Googleの店舗', name: removeScope.googleLocation }} /> : null}</ConfirmDialog>
     </>
   )

@@ -36,6 +36,7 @@ export type ScheduledRowView = {
 export default function ScheduleSendDialog({
   open,
   accountId,
+  targetStale = false,
   onClose,
   content,
   hasImage,
@@ -54,6 +55,7 @@ export default function ScheduleSendDialog({
 }: {
   open: boolean
   accountId: string | null
+  targetStale?: boolean
   onClose: () => void
   /** 書く欄の本文（送るもの） */
   content: string
@@ -91,10 +93,10 @@ export default function ScheduleSendDialog({
       confirmLabel={value ? `${shortJst(value)} に予約` : 'この日時で予約する'}
       confirmIcon={<Clock3 aria-hidden="true" />}
       onConfirm={onConfirm}
-      confirmDisabled={Boolean(disabledReason)}
-      confirmDisabledReason={disabledReason}
+      confirmDisabled={Boolean(disabledReason) || targetStale}
+      confirmDisabledReason={targetStale ? '対象が変わりました。閉じてから確認し直してください。' : disabledReason}
     >
-      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />
+      <OperationTargetSummary accounts={[{ id: accountId ?? '', name: accountId ? undefined : '不明' }]} externalTarget={{ label: '対象件数', name: '1人' }} />
       <div className={styles.schBox}>
         <p className={styles.schBoxLabel}>送るもの</p>
         <p className={styles.schBoxValue}>

@@ -140,7 +140,7 @@ beforeEach(() => {
 });
 
 describe('PATCH 承認の版契約(N-208)', () => {
-  test('移行前は一覧・両方の承認経路・確認付き取消が従来どおり動き、移行後は版を使う', async () => {
+  test('版列の有無に応じて一覧・承認・確認付き取消を処理する', async () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     sqlite.raw.exec('ALTER TABLE conversion_events DROP COLUMN approval_revision');
     seedEvent('ev-1', 'cp-1', 'approved');

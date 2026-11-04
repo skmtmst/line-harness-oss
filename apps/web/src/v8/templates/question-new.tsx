@@ -42,6 +42,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TemplateEditFrame } from '@/v8/template-edit/public/frame/index'
 import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
@@ -104,7 +105,12 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
-  const [publishTarget, setPublishTarget] = useState<{ accountId: string; allAccounts: boolean; generation: number } | null>(null)
+  const publishFormKey = JSON.stringify([name, category, folderId, question])
+  const publishFormScope = useRef({ key: publishFormKey })
+  if (publishFormScope.current.key !== publishFormKey) publishFormScope.current = { key: publishFormKey }
+  const [publishTarget, setPublishTarget] = useState<{ accountId: string; allAccounts: boolean; generation: number; version: { expectedVersion: number; expectedDraftRevision: number }; form: typeof publishFormScope.current } | null>(null)
+  const publishTicket = useRef<object | null>(null)
+  const renderedPublishTicket = publishTicket.current
   const canMutate = useFeatureAccess('templates')
   const canMutateRef = useRef(canMutate)
   canMutateRef.current = canMutate
@@ -173,7 +179,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     fields.define(`extras-${index}`, `選択肢 ${index + 1} の追加処理`, () => tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))
     fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (!choice.label.trim() ? 'ボタンの文字を入力してください。' : choice.label.length > 20 ? 'ボタンの文字は20文字以内で入力してください。' : null), { required: true })
   })
-  const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing, subject: '質問への変更' })
   /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。 */
   const questionDraftSnapshot = JSON.stringify([name, question])
   useEffect(() => {
@@ -184,7 +190,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionDraftSnapshot])
 
-  const save = async (questionStatus: 'draft' | 'published'): Promise<boolean> => {
+  const save = async (questionStatus: 'draft' | 'published', confirmedVersion?: { expectedVersion: number; expectedDraftRevision: number }): Promise<boolean> => {
     if (host) {
       if (fields.submit().length > 0) { setError(''); return false }
       setError('')
@@ -207,7 +213,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       folderId,
     }
     try {
-      const result = id ? await api.templates.update(id, { ...payload, ...editVersion.current }) : await api.templates.create(payload)
+      const result = id ? await api.templates.update(id, { ...payload, ...(confirmedVersion ?? editVersion.current) }) : await api.templates.create(payload)
       if (!result.success) { setError(result.error || '保存できませんでした。時間をおいて、もう一度お試しください。'); return false }
       editVersion.current = { expectedVersion: result.data.publishedVersion, expectedDraftRevision: result.data.draftRevision }
       return true
@@ -229,8 +235,11 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const onPublish = async () => {
     if (id && templateAccountId && templateAccountId !== selectedAccountId) return
     if (id && usageCount > 0) {
+      const version = editVersion.current
       if (!selectedAccountId || !canMutateRef.current || loadedScope.current !== scope.current.generation) return
-      setPublishTarget({ accountId: templateAccountId ?? '', allAccounts: templateAccountKnown && templateAccountId === null, generation: scope.current.generation })
+      if (!version || !Number.isSafeInteger(version.expectedVersion) || !Number.isSafeInteger(version.expectedDraftRevision)) { setError('質問の版を確認できません。読み直してから公開してください。'); return }
+      publishTicket.current = {}
+      setPublishTarget({ accountId: templateAccountId ?? '', allAccounts: templateAccountKnown && templateAccountId === null, generation: scope.current.generation, version: { ...version }, form: publishFormScope.current })
       return
     }
     setPublishing(true)
@@ -301,7 +310,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         )}
         footerActions={(
           <>
-            <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
+            <Button type="button" onClick={() => (host ? host.onCancel() : requestUnsavedAction(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy} busy={saving && !publishing}>下書きを保存</Button>
             <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(publishReason)} disabledReason={publishReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
@@ -397,18 +406,20 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         description={`この質問は ${usageCount}か所で使われています。公開すると、シナリオや一斉配信へ新しい内容が届きます。`}
         confirmLabel="公開する"
         busy={saving}
+        confirmDisabled={publishTarget !== null && publishTarget.form !== publishFormScope.current}
+        confirmDisabledReason="内容が変わりました。閉じて確認し直してください。"
         error={error || undefined}
         designNode="cuR8I"
         onConfirm={async () => {
-          if (!alive.current || !canMutateRef.current || !publishTarget || publishTarget.generation !== scope.current.generation) return
+          if (!alive.current || !canMutateRef.current || !publishTarget || !renderedPublishTicket || renderedPublishTicket !== publishTicket.current || publishTarget.generation !== scope.current.generation || publishTarget.form !== publishFormScope.current) return
           setPublishing(true)
           try {
-            if (await save('published')) { setPublishTarget(null); leaveToList() }
+            if (await save('published', publishTarget.version)) { publishTicket.current = null; setPublishTarget(null); leaveToList() }
           } finally {
             setPublishing(false)
           }
         }}
-        onCancel={() => setPublishTarget(null)}
+        onCancel={() => { publishTicket.current = null; setPublishTarget(null) }}
       >{publishTarget ? <OperationTargetSummary allAccounts={publishTarget.allAccounts} accounts={publishTarget.allAccounts ? [] : [{ id: publishTarget.accountId }]} /> : null}</ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="質問への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </></SaveErrorScope>

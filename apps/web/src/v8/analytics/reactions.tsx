@@ -116,7 +116,7 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
         {/* 集計はクリックされた時刻の時間帯。送った時刻ではない。 */}
         <h2 id="reactions-hours-title" className={styles.hoursTitle}>押された時間帯ごとの回数</h2>
         <p className={styles.caption}>こちらで作った中継URLを、相手が押した時刻で時間帯ごとに並べています。送った時刻ではありません。</p>
-        <ValueBarChart label="押された時間帯ごとの回数" unit="回" items={Array.from({length:24},(_,hour)=>({key:String(hour),label:`${hour}時台`,value:overview.trackedClickHours.find(item=>item.hour===hour)?.clicks??0,note:topHours.includes(hour)?'よく押された時間帯':undefined}))} />
+        <ValueBarChart label="押された時間帯ごとの回数" unit="回" showLastAxis={false} items={Array.from({length:24},(_,hour)=>({key:String(hour),label:`${hour}時台`,value:overview.trackedClickHours.find(item=>item.hour===hour)?.clicks??0,note:topHours.includes(hour)?'よく押された時間帯':undefined}))} />
       </section>
     </div>
   </>

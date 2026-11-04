@@ -6,7 +6,11 @@ import { useListSnapshot } from '@/lib/use-list-snapshot'
 import { useActionError } from '@/lib/use-action-error'
 
 import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+import { InlineDetailHoldingContext } from '@/components/shared/use-inline-detail-guard'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
 import { Bookmark, Check, CircleDashed, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
@@ -136,6 +140,13 @@ function TagFolderDialog({
   const [color, setColor] = useState<string | null>(group ? folderDisplayColor(group) : DEFAULT_TAG_FOLDER_COLOR)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const dirty = name !== (group?.name ?? '') || color !== (group ? folderDisplayColor(group) : DEFAULT_TAG_FOLDER_COLOR)
+  const guard = useUnsavedGuard({ dirty: dirty || saving, busy: saving, onDiscard: onClose })
+  const depth = useContext(OverlayDepthContext)
+  const onHoldingChange = useContext(InlineDetailHoldingContext)
+  const source = useRef(Symbol('tag-folder'))
+  useLayoutEffect(() => { onHoldingChange?.(source.current, dirty || saving) }, [dirty, saving, onHoldingChange])
+  useLayoutEffect(() => () => { onHoldingChange?.(source.current, false) }, [onHoldingChange])
 
   const save = async () => {
     const trimmed = name.trim()
@@ -150,6 +161,7 @@ function TagFolderDialog({
         setError(res.error)
         return
       }
+      guard.disarm()
       onSaved()
       onClose()
     } catch (saveFailure) {
@@ -172,7 +184,7 @@ function TagFolderDialog({
       colors={TAG_FOLDER_COLORS}
       placeholder="例：VIP" busy={saving} error={error || undefined}
       onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
-    /></SaveErrorScope>
+    /><OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></SaveErrorScope>
   )
 }
 
@@ -228,6 +240,10 @@ export default function TagsTab({
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const [restoreTarget, setRestoreTarget] = useState<Tag | null>(null)
+  const restoreAccountVersion = useRef({ accountId, generation: 0 })
+  if (restoreAccountVersion.current.accountId !== accountId) restoreAccountVersion.current = { accountId, generation: restoreAccountVersion.current.generation + 1 }
+  const restoreScopeRef = useRef<{ accountId: string | null; generation: number } | null>(null)
+  const restoreScope = restoreScopeRef.current
   const [restoring, setRestoring] = useState(false)
   const [restoreError, setRestoreError] = useState('')
   const { leavingId, leave } = useRowLeaving()
@@ -511,7 +527,7 @@ export default function TagsTab({
       { id: 'copy', label: '複製して作る', external: false, href: `/tags/new?copy=${tag.id}`, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
-    if (tag.status === 'archived') return [list[0], { id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(tag) } }]
+    if (tag.status === 'archived') return [list[0], { id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { restoreScopeRef.current = { accountId, generation: restoreAccountVersion.current.generation }; setRestoreError(''); setRestoreTarget(tag) } }]
     list.push({
         id: 'archive',
         label: '保管する',
@@ -523,9 +539,9 @@ export default function TagsTab({
   }
 
   const confirmRestore = async () => {
-    if (!restoreTarget || !accountId || restoring) return
+    if (!restoreTarget || !restoreScope?.accountId || restoreScopeRef.current !== restoreScope || restoreScope.generation !== restoreAccountVersion.current.generation || restoring) return
     const tag = restoreTarget
-    const account = accountId
+    const account = restoreScope.accountId
     setRestoring(true)
     setRestoreError('')
     try {
@@ -533,6 +549,7 @@ export default function TagsTab({
       if (loadRequestRef.current.accountId !== account) return
       if (!res.success) throw new Error(res.error)
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, status: 'active', version: res.data.version } : item))
+      restoreScopeRef.current = null
       setRestoreTarget(null)
       notifyToast(`「${tag.name}」を保管から戻しました`)
       await load()
@@ -540,7 +557,7 @@ export default function TagsTab({
       if (loadRequestRef.current.accountId === account) setRestoreError(describeApiFailure(error, '保管から戻す操作', { forbidden: 'この操作はオーナーか管理者に頼んでください。' }))
     } finally { setRestoring(false) }
   }
-  useEffect(() => { setRestoreTarget(null); setRestoreError('') }, [accountId])
+  useEffect(() => { restoreScopeRef.current = null; setRestoreTarget(null); setRestoreError('') }, [accountId])
 
   /* 削除は、利用状況にかかわらず確認してから実行する。 */
   const requestArchive = (tag: Tag) => { setDeleteTarget(tag) }
@@ -840,7 +857,7 @@ export default function TagsTab({
         </>}
         collapsedFolders={<>
           {createButton(false)}
-          <SaveErrorField names={["folder"]}><Select aria-label="フォルダ" size="content" value={folder} onChange={(next) => next === '__manage_folders__' ? setManageFoldersOpen(true) : setFolder(next)} options={[...folderSelectOptions, { value: '__manage_folders__', label: 'フォルダを管理' }]} /></SaveErrorField>
+          <SaveErrorField names={["folder"]}><Select narrowFolderPicker aria-label="フォルダ" size="content" value={folder} onChange={(next) => next === '__manage_folders__' ? setManageFoldersOpen(true) : setFolder(next)} options={[...folderSelectOptions, { value: '__manage_folders__', label: 'フォルダを管理' }]} /></SaveErrorField>
         </>}
         toolbar={narrow ? <ListToolbarFrame layout="stacked"><ListToolbarRow>
           {/* 1152（aPeD8）：1段目＝作る・フォルダ・探す・使用状態、2段目＝付け方・よく使う・右端に表示件数。 */}
@@ -937,7 +954,9 @@ export default function TagsTab({
       <ConfirmDialog open={restoreTarget !== null} title={`「${restoreTarget?.name ?? ''}」を保管から戻しますか？`}
         description="同じタグを通常の一覧へ戻します。保管時に付け替えた友だちは、そのまま残ります。"
         confirmLabel="保管から戻す" busy={restoring} error={restoreError}
-        onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
+        onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) { restoreScopeRef.current = null; setRestoreTarget(null) } }}>
+        <OperationTargetSummary accounts={[{ id: restoreScope?.accountId ?? '' }]} externalTarget={{ label: '対象件数', name: restoreTarget ? '1件' : null }} />
+      </ConfirmDialog>
       {deleteTarget && (
         <DeleteTagDialog
           tag={deleteTarget}

@@ -6,7 +6,10 @@ import { RowNameLink } from '@/components/shared/table';
 import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Activity, Archive, Copy, CircleCheck, CircleHelp, FilePen, Lock, MessageSquareMore, Pause, Pencil, Plus, Send, UserPlus } from 'lucide-react';
@@ -196,7 +199,11 @@ function FriendAddList() {
   const loadedScope = useRef(-1)
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
-  const [deleteScope, setDeleteScope] = useState<{ id: string; name?: string; generation: number } | null>(null)
+  const [deleteScope, setDeleteScope] = useState<{ id: string; name?: string; generation: number; ticket: object } | null>(null)
+  const deleteTicket = useRef<object | null>(null)
+  const deleteLock = useRef(false)
+  useEffect(() => () => { deleteTicket.current = null }, [])
+  const [deleteConflict, setDeleteConflict] = useState(false)
   const [data, setData] = useState<FriendAddRuleListData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -213,6 +220,13 @@ function FriendAddList() {
   const [editingFolder, setEditingFolder] = useState<FriendAddRuleFolder | null>(null)
   const [folderError, setFolderError] = useState('')
   const [folderBusy, setFolderBusy] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const closeFolder = () => { setFolderDialogOpen(false); setFolderName(''); setEditingFolder(null) }
+  const folderGuard = useUnsavedGuard({
+    dirty: folderDialogOpen && (folderName !== (editingFolder?.name ?? '') || folderColor !== (editingFolder ? folderDisplayColor(editingFolder) : FOLDER_SELECT_COLORS[0].value) || folderBusy),
+    busy: folderDialogOpen && folderBusy,
+    onDiscard: closeFolder,
+  })
   const folderKey = useRef(crypto.randomUUID())
   const requestSequence = useRef(0)
 
@@ -296,7 +310,8 @@ function FriendAddList() {
   useEffect(() => { setDeleteTarget(null); setDeleteScope(null); setStopTarget(null); setStopScope(null); setStopBusy(false); setStopError('') }, [selectedAccountId])
   const openDeleteTarget = (item: FriendAddRule) => {
     if (!selectedAccountId || item.accountId !== selectedAccountId || loadedScope.current !== accountScope.current.generation || !canEditRef.current) return
-    setDeleteScope({ id: item.accountId, name: accounts.find(account => account.id === item.accountId)?.name, generation: accountScope.current.generation })
+    const ticket = {}; deleteTicket.current = ticket; setDeleteConflict(false)
+    setDeleteScope({ id: item.accountId, name: accounts.find(account => account.id === item.accountId)?.name, generation: accountScope.current.generation, ticket })
     setDeleteTarget(item)
   }
 
@@ -480,30 +495,34 @@ function FriendAddList() {
   /* ===== 削除 ===== */
   const closeDelete = () => {
     if (deleteBusy) return
-    setDeleteTarget(null)
-    setDeleteError('')
+    deleteTicket.current = null; setDeleteTarget(null)
+    setDeleteConflict(false); setDeleteError('')
     if (requestedDeleteId) samePageUrl.replace(`/friend-add-settings?kind=${kind}`)
   }
   const runDelete = async () => {
-    if (!deleteScope || deleteScope.generation !== accountScope.current.generation || !canEditRef.current || !deleteTarget || deleteBusy) return
-    setDeleteBusy(true)
+    if (!deleteScope || deleteScope.ticket !== deleteTicket.current || deleteScope.generation !== accountScope.current.generation || !canEditRef.current || !deleteTarget || deleteTarget.status === 'archived' || !Number.isSafeInteger(deleteTarget.version) || deleteTarget.version < 1 || deleteConflict || deleteBusy || deleteLock.current) return
+    const current = () => deleteScope.ticket === deleteTicket.current && deleteScope.generation === accountScope.current.generation && canEditRef.current
+    deleteLock.current = true; setDeleteBusy(true)
     setDeleteError('')
     try {
-      const response = await api.friendAddRules.archive(deleteScope.id, deleteTarget.id)
+      const response = await api.friendAddRules.archive(deleteScope.id, deleteTarget.id, { version: deleteTarget.version, status: deleteTarget.status })
+      if (!current()) return
       if (!response.success) {
         setDeleteError('保管できませんでした。設定を確認してください。')
         return
       }
-      setDeleteTarget(null)
+      deleteTicket.current = null; setDeleteTarget(null)
       if (requestedDeleteId) samePageUrl.replace(`/friend-add-settings?kind=${kind}`)
       await load()
     } catch (caught) {
+      if (!current()) return
+      if ((caught as { status?: number })?.status === 409) { setDeleteConflict(true); setDeleteError('ほかの人が設定を変えました。読み直してから、もう一度選んでください。'); return }
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
       setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message.replaceAll('削除', '保管')) }
     } finally {
-      setDeleteBusy(false)
+      deleteLock.current = false; setDeleteBusy(false)
     }
   }
 
@@ -938,17 +957,21 @@ function FriendAddList() {
           destructive
           busy={deleteBusy}
           error={deleteError}
+          confirmDisabled={deleteConflict}
+          confirmDisabledReason="読み直してから、もう一度選んでください。"
           onConfirm={() => runDelete()}
           onCancel={closeDelete}
         >
           {deleteScope ? <OperationTargetSummary accounts={[{ id: deleteScope.id, name: deleteScope.name }]} /> : null}
+          {deleteConflict ? <Button onClick={() => { closeDelete(); void load() }}>読み直す</Button> : null}
         </ConfirmDialog>
         <FolderEditorDialog open={folderDialogOpen} title={editingFolder ? 'フォルダを直す' : 'フォルダを追加'}
           description="設定を分けてしまう箱です。"
           name={folderName} onNameChange={setFolderName} color={folderColor} onColorChange={setFolderColor} maxLength={50}
           confirmLabel={editingFolder ? '保存する' : '追加する'} busy={folderBusy} error={folderError || undefined}
-          onCancel={() => { if (!folderBusy) { setFolderDialogOpen(false); setFolderName(''); setEditingFolder(null) } }}
+          onCancel={closeFolder}
           onConfirm={() => createFolder()} />
+        <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={folderGuard.leaveTarget !== null} busy={folderBusy} onConfirm={folderGuard.confirmLeave} onCancel={folderGuard.cancelLeave} /></OverlayDepthContext.Provider>
       </>}
     >
       {listBody}

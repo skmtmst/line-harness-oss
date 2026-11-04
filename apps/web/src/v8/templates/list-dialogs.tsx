@@ -1,6 +1,8 @@
 'use client'
 import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
 import type { useInlineDetailGuard } from '@/components/shared/use-inline-detail-guard'
+import type { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 import type { BroadcastBubble } from '@/lib/api'
 import type { UsageRow } from './words'
@@ -35,6 +37,7 @@ import StatusBadge from '@/components/shared/status-badge'
 const PUBLISH_TONE = { live: 'success', changes: 'warning', draft: 'neutral' } as const
 
 type RenderTemplateDialogsContext = {
+  moveGuard: ReturnType<typeof useUnsavedGuard>
   detailGuard: ReturnType<typeof useInlineDetailGuard>
   folderDeleteAccounts: OperationAccountTarget[]
   cancelFolderDelete: () => void
@@ -108,7 +111,7 @@ type RenderTemplateDialogsContext = {
   templates: Template[]
 }
 
-export function renderTemplateDialogs({ folderDeleteAccounts, cancelFolderDelete, deleteAccounts, bulkDeleteAccounts, activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates, detailGuard }: RenderTemplateDialogsContext) {
+export function renderTemplateDialogs({ moveGuard, folderDeleteAccounts, cancelFolderDelete, deleteAccounts, bulkDeleteAccounts, activeFolderName, activeIndex, activeTemplate, blockedDelete, blockedLoadError, blockedLoading, blockedRows, blockedTotal, blockedUsage, bulkDeleteError, bulkDeleting, canMutateTemplates, confirmDelete, deleteError, deleting, deletingFolder, detailHref, editHref, editingFolder, examples, examplesError, folderBusy, folderDialogOpen, folderError, folders, handleDelete, isTemplateSection, loadFolders, moveDraft, moveError, moveIds, moving, navItems, openMove, panelDetail, panelMove, panelUsageRows, pendingBulkDelete, pendingDelete, pickerOpen, removeFolder, renameTemplate, router, runBulkDelete, runDuplicate, runMove, savedMenu, selectedAccountId, setActiveId, setBlockedDelete, setBlockedUsage, setBulkDeleteError, setDeleteError, setDuplicateError, setEditingFolder, setExamplesRetry, setFolderDialogOpen, setFolderError, setMoveDraft, setMoveError, setMoveIds, setPanelMove, setPendingBulkDelete, setPendingDelete, setPickerOpen, templates, detailGuard }: RenderTemplateDialogsContext) {
   return ((
     <>
       {savedMenu}
@@ -280,8 +283,7 @@ export function renderTemplateDialogs({ folderDeleteAccounts, cancelFolderDelete
         onConfirm={() => runMove()}
         onCancel={() => {
           if (moving) return
-          setMoveIds(null)
-          setMoveError('')
+          moveGuard.guarded(() => { setMoveIds(null); setMoveError('') })
         }}
       >
         <div className={styles.moveBody}>
@@ -345,29 +347,26 @@ export function renderTemplateDialogs({ folderDeleteAccounts, cancelFolderDelete
           busy={detailGuard.busy}
           title={activeTemplate.name}
           description={activeFolderName ?? undefined}
-          onClose={() => detailGuard.protect(() => {
-            setActiveId(null)
-            setPanelMove(false)
-          })}
+          onClose={() => setActiveId(null)}
           hasPrev={activeIndex > 0}
           hasNext={activeIndex >= 0 && activeIndex < navItems.length - 1}
           onPrev={() => setActiveId(navItems[activeIndex - 1]?.id ?? null)}
           onNext={() => setActiveId(navItems[activeIndex + 1]?.id ?? null)}
           actions={{ primary: ((panelMove ? <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => detailGuard.protect(() => { void runMove() })} busyLabel="移動中…">
                     移動する
-                  </Button> : null)) ?? (<Button type="button" variant="primary" onClick={() => detailGuard.protect(() => withViewTransition(() => router.push(detailHref(activeTemplate))))} busyLabel="移動中…">
+                  </Button> : null)) ?? (<Button type="button" variant="primary" onClick={() => requestUnsavedAction(() => detailGuard.protect(() => withViewTransition(() => router.push(detailHref(activeTemplate)))))} busyLabel="移動中…">
                 詳細を見る
               </Button>),
-    secondary: (<Button type="button" variant="secondary" onClick={() => detailGuard.protect(() => withViewTransition(() => router.push(editHref(activeTemplate))))} busyLabel="移動中…">
+    secondary: (<Button type="button" variant="secondary" onClick={() => requestUnsavedAction(() => detailGuard.protect(() => withViewTransition(() => router.push(editHref(activeTemplate)))))} busyLabel="移動中…">
                   編集する
                 </Button>),
-    menuItems: [...(panelDetail.detail?.hasDraft ? [{ allowed: canMutateTemplates, id: 'detail-0', label: "公開する", disabled: panelDetail.publishing, onSelect: () => detailGuard.protect(() => { void panelDetail.publish() }) }] : []),
-        ...([{ allowed: canMutateTemplates, id: 'detail-1', label: "複製する", onSelect: () => detailGuard.protect(() => {
+    menuItems: [...(panelDetail.detail?.hasDraft ? [{ allowed: canMutateTemplates, id: 'detail-0', label: "公開する", disabled: panelDetail.publishing, onSelect: () => requestUnsavedAction(() => detailGuard.protect(() => { void panelDetail.publish() })) }] : []),
+        ...([{ allowed: canMutateTemplates, id: 'detail-1', label: "複製する", onSelect: () => requestUnsavedAction(() => detailGuard.protect(() => {
                     setDuplicateError('');
                     void runDuplicate(activeTemplate);
-                }) }]),
-        ...([{ allowed: canMutateTemplates, id: 'detail-2', label: "フォルダへ移す", onSelect: () => detailGuard.protect(() => openMove([activeTemplate.id])) }]),
-        ...([{ allowed: canMutateTemplates, id: 'detail-3', label: "削除する", onSelect: () => detailGuard.protect(() => handleDelete(activeTemplate)), tone: 'danger' as const }])], primaryAllowed: !panelMove || canMutateTemplates, secondaryAllowed: canMutateTemplates }}
+                })) }]),
+        ...([{ allowed: canMutateTemplates, id: 'detail-2', label: "フォルダへ移す", onSelect: () => requestUnsavedAction(() => detailGuard.protect(() => openMove([activeTemplate.id]))) }]),
+        ...([{ allowed: canMutateTemplates, id: 'detail-3', label: "削除する", onSelect: () => requestUnsavedAction(() => detailGuard.protect(() => handleDelete(activeTemplate))), tone: 'danger' as const }])], primaryAllowed: !panelMove || canMutateTemplates, secondaryAllowed: canMutateTemplates }}
          status={<StatusBadge tone={PUBLISH_TONE[publishStateOf(activeTemplate).tone]}>{publishStateOf(activeTemplate).label}</StatusBadge>}>
 <DetailContent>
           <div className={styles.panelBody}>

@@ -3,6 +3,7 @@ import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import type { MediaItem } from '@line-crm/shared'
 
 /**
@@ -229,4 +230,14 @@ describe('差し替え候補の名前検索（N-205）', () => {
     expect(listbox.textContent).toContain('Bの候補.png')
     expect(listbox.textContent).not.toContain('Aの古い候補')
   })
+})
+it('差し替え先を選んだ後は画面移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/contents')
+  fixture.listQueue.push(ok([media('candidate', '差し替え先.png')]))
+  await renderDialog()
+  await pickEntity('差し替え先', '差し替え先.png')
+  const link = document.createElement('a'); link.href = '/events'; link.textContent = 'イベントへ'; document.body.append(link)
+  await act(async () => { link.click(); await settle() })
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  link.remove()
 })

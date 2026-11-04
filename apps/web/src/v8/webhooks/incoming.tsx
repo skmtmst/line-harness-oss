@@ -5,7 +5,11 @@ const FIELD_REQUIREMENTS = {
   createName: requiredText("名前を入力してください"),
 }
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSearchParams } from 'next/navigation'
 import { LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox, Copy } from 'lucide-react'
@@ -37,7 +41,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
-import { MANAGE_REASON, ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, overviewBandCells, useWebhookOverview } from './shell'
+import { MANAGE_REASON, ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, useWebhookOverview } from './shell'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { shortDateTime } from './words'
 import { useWebhookWriteAccess, canManageWebhooksNow, captureWebhookWriteAccess } from './write-access'
@@ -184,10 +188,30 @@ export default function WebhooksIncomingV8() {
   const [rotateError, setRotateError] = useState('')
   const [rotating, setRotating] = useState(false)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+  const [nameDirty, setNameDirty] = useState(false)
+  const [nameSaving, setNameSaving] = useState(false)
+  const [nameReset, setNameReset] = useState(0)
+  const depth = useContext(OverlayDepthContext)
+  const editingBusy = (showCreate && creating) || (rotateTarget !== null && rotating) || nameSaving
+  const guard = useUnsavedGuard({
+    dirty: Boolean((showCreate && (createName || createSourceFree || createSecret || createSource !== (initialSource || SOURCE_PRESETS[0].value))) || (rotateTarget && rotateSecret) || nameDirty || editingBusy),
+    busy: editingBusy,
+    subject: '受け取り口の変更',
+    onDiscard: () => {
+      if (showCreate) { setShowCreate(false); setCreateName(''); setCreateSource(initialSource || SOURCE_PRESETS[0].value); setCreateSourceFree(''); setCreateSecret('') }
+      if (rotateTarget) { setRotateTarget(null); setRotateSecret('') }
+      setStepUp(null)
+      setNameDirty(false)
+      setNameReset(value => value + 1)
+    },
+  })
 
   // 初回の null → アカウントは見本の選択を保ち、実際に店を替えたときだけ消す。
   useOnAccountSwitch(selectedAccountId, () => {
     setShowCreate(false)
+    setNameDirty(false)
+    setNameSaving(false)
+    setNameReset(value => value + 1)
     setCreateName('')
     setCreateSource(SOURCE_PRESETS[0].value)
     setCreateSourceFree('')
@@ -275,7 +299,7 @@ export default function WebhooksIncomingV8() {
     setUnmatchedStatus('ready')
   }, [selectedAccountId, selectedDetailId])
 
-  const selectInlet = (id: string) => { const select = () => withViewTransition(() => setSelectedId(id)); if (actionsGuard.current) actionsGuard.current(select); else select() }
+  const selectInlet = (id: string) => requestUnsavedAction(() => withViewTransition(() => setSelectedId(id)))
   const moveSelection = (delta: -1 | 1) => {
     if (displayed.length === 0) return
     const current = selected ? displayed.findIndex((item) => item.id === selected.id) : -1
@@ -435,12 +459,12 @@ export default function WebhooksIncomingV8() {
   }
 
   /* ===== 受け取り口を作る（窓 ） ===== */
-  const openCreate = () => {
+  const openCreate = () => guard.guarded(() => {
     if (!canManageWebhooksNow()) return
     setCreateFieldError({})
     if (!createSecret) setCreateSecret(generateSecret())
     setShowCreate(true)
-  }
+  })
   const runCreate = async (stepUpToken?: string) => {
     if (!canManageWebhooksNow()) { setCreateFieldError({ form: management.reason ?? '担当者の確認が終わるまでお待ちください。' }); return }
     const canContinue = captureWebhookWriteAccess()
@@ -670,7 +694,7 @@ export default function WebhooksIncomingV8() {
       <>
         <div className={styles.titleRow}>
           <h2 className={styles.title}>
-            <InlineEdit value={selected.name} label="受け取り口の名前" onSave={renameInlet} canSaveNow={canManageWebhooksNow} lockedReason={management.reason} />
+            <InlineEdit value={selected.name} label="受け取り口の名前" onSave={renameInlet} canSaveNow={canManageWebhooksNow} lockedReason={management.reason} preserveDirtyOnBlur onDirtyChange={setNameDirty} onSavingChange={setNameSaving} resetToken={nameReset} />
           </h2>
           <StatusBadge tone={toggling ? 'neutral' : selected.isActive ? 'success' : 'neutral'}>{toggling ? '切り替え中' : selected.isActive ? '有効' : '停止中'}</StatusBadge>
           <span className={styles.spacer} aria-hidden="true" />
@@ -697,7 +721,7 @@ export default function WebhooksIncomingV8() {
               <span className={styles.fieldLabel}>合言葉（署名）</span>
               <span className={styles.valueBox}>{selected.hasSecret ? '設定済み（再表示しません）' : 'まだ設定していません'}</span>
             </div>
-            {<Button disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true) || !selectedAccountId || loadedAccountId !== selectedAccountId) return; setRotateError(''); setRotateSecret(''); setRotateTarget({ id: selected.id, name: selected.name, accountId: selectedAccountId, scope: accountScopeRef.current }) }}>
+            {<Button disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => guard.guarded(() => { if (!canManageWebhooksNow(true) || !selectedAccountId || loadedAccountId !== selectedAccountId) return; setRotateError(''); setRotateSecret(''); setRotateTarget({ id: selected.id, name: selected.name, accountId: selectedAccountId, scope: accountScopeRef.current }) })}>
                 <RefreshCw size={16} aria-hidden="true" />合言葉を更新する
               </Button>}
           </div>
@@ -866,11 +890,10 @@ export default function WebhooksIncomingV8() {
       stats={<>
         {management.known && !canManage ? <ViewerBand /> : null}
         <WebhookBand
-          cells={overviewBandCells({
-            outgoing: overview.outgoingCount === null ? null : overview.outgoing,
-            incomingCount: overview.incomingCount,
-            summary: overview.summary,
-          })}
+          cells={[
+            { key: 'inlets', title: '受け取り口', icon: <Inbox aria-hidden="true" />, value: overview.incomingCount, unit: '件', detail: '作成した受け取り口' },
+            { key: 'received', title: '過去30日 受け取った', icon: <Inbox aria-hidden="true" />, value: overview.summary?.incoming ?? null, unit: '回', detail: overview.summary ? '受け取りの記録' : '集計を読み込めませんでした' },
+          ]}
         />
       </>}
       overlays={<>
@@ -1010,6 +1033,7 @@ export default function WebhooksIncomingV8() {
           </div>
         </Dialog>
 
+        <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="受け取り口の変更" busy={editingBusy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
         {createdSecret ? (
           <Dialog
             open

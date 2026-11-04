@@ -1,7 +1,10 @@
 'use client'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import type { MediaItem, MediaReplacementImpact } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -45,6 +48,8 @@ export default function MediaReplacementDialog({
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const depth = useContext(OverlayDepthContext)
+  const guard = useUnsavedGuard({ dirty: source !== null && (Boolean(replacementId) || busy), busy: source !== null && busy, onDiscard: onClose })
 
   useEffect(() => {
     requestRef.current += 1
@@ -141,6 +146,7 @@ export default function MediaReplacementDialog({
       const remaining = skipped > 0
         ? `差し替えられなかった${skipped}か所は、元のメディアを使い続けます。`
         : ''
+      guard.disarm()
       onComplete(`${response.data.replacedUsageCount}か所を「${impact.replacement.filename}」へ差し替えました。${remaining}${verification}`)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
@@ -270,6 +276,6 @@ export default function MediaReplacementDialog({
           </div>
         ) : null}
       </div>
-    </Dialog></SaveErrorScope>
+    </Dialog><OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider></SaveErrorScope>
   )
 }

@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 
-/** 移行前は従来の照合に戻す。移行直後も反映されるよう結果は保存しない。 */
+/** 版列の有無に応じて照合し、列情報は毎回取得する。 */
 export async function hasConversionApprovalRevision(db: D1Database): Promise<boolean> {
   const columns = await db.prepare('PRAGMA table_info(conversion_events)').all<{ name: string }>();
   const available = columns.results.some(column => column.name === 'approval_revision');

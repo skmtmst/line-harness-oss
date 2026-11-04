@@ -98,7 +98,7 @@ export default function FolderAddDialog({
   const [nameError, setNameError] = useState('')
   const initialColor = folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value
   const dirty = name !== (folder?.name ?? '') || color !== initialColor
-  const guard = useUnsavedGuard({ dirty: dirty || saving, busy: saving, onDiscard: onClose })
+  const guard = useUnsavedGuard({ dirty: dirty || saving, busy: saving, onDiscard: onClose, subject: 'フォルダの変更' })
   const depth = useContext(OverlayDepthContext)
   const onHoldingChange = useContext(InlineDetailHoldingContext)
   const source = useRef(Symbol('folder'))

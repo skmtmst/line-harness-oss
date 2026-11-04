@@ -106,7 +106,9 @@ test('v8 では ralAc の鍵の表（札・行の右端の「…」）が出る'
   const board = host.querySelector('[data-design-node="ralAc"]')
   expect(board).not.toBeNull()
   expect(board?.textContent).toContain('予約システム連携')
-  expect(board?.textContent).toContain('有効')
+  const row = board?.querySelector('[data-row-id="tok-1"]')
+  expect(row).not.toBeNull()
+  expect(within(row as HTMLElement).getByText('使っている')).toBeTruthy()
   // 行の右端は「…」1つ。入れ替えるはその中。
   expect(board?.querySelector('button[aria-label="「予約システム連携」の操作"]')).not.toBeNull()
   // 板  の作るボタンの文言（本人確認の用途名ではなく表のボタンの文言で見る）。
@@ -132,8 +134,13 @@ test('担当者は鍵の一覧を読み、発行はオーナーの理由付き�
 
 test('旧テーマ属性でも現役の鍵タブが出て ralAc が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="ralAc"]')).not.toBeNull()
-  for (const icon of ['coins', 'gift', 'wallet']) expect(host.querySelector(`[data-design-node="ralAc"] .lucide-${icon}`)).not.toBeNull()
+  const board = host.querySelector('[data-design-node="ralAc"]')
+  expect(board).not.toBeNull()
+  expect(board?.querySelector('[aria-label="外部連携の数の帯"]')).toBeNull()
+  const row = board?.querySelector('[data-row-id="tok-1"]')
+  expect(row).not.toBeNull()
+  expect(within(row as HTMLElement).getByText('予約システム連携')).toBeTruthy()
+  expect(within(row as HTMLElement).getByText('使っている')).toBeTruthy()
 })
 
 test('v8 で行を右クリックすると「…」と同じ止めるが出る', async () => {

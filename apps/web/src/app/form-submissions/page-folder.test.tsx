@@ -416,3 +416,34 @@ describe('行の編集は質問の編集へ行く（R27・実マウント）', (
     expect(items).toContain('削除')
   })
 })
+it('フォーム名の変更中は画面移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/form-submissions')
+  await act(async () => { root.render(<><FormSubmissionsPage /><a href="/events">イベントへ</a></>) })
+  await openRowMenu('箱フォーム')
+  await clickMenuItem('名前を変更')
+  const dialog = [...document.querySelectorAll('[role="dialog"]')].find(element => element.textContent?.includes('回答者に表示されるフォーム名'))!
+  const input = dialog.querySelector('input')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '変更途中')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => { (document.querySelector('a[href="/events"]') as HTMLAnchorElement).click() })
+  expect(document.body.textContent).toContain('保存していない変更があります')
+})
+it('フォーム名の変更窓は破棄の確認を一度だけ出す', async () => {
+  await act(async () => { root.render(<FormSubmissionsPage />) })
+  await openRowMenu('箱フォーム')
+  await clickMenuItem('名前を変更')
+  const dialog = [...document.querySelectorAll('[role="dialog"]')].find(element => element.textContent?.includes('回答者に表示されるフォーム名'))!
+  const input = dialog.querySelector('input')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '変更途中')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => { ([...dialog.querySelectorAll('button')].find(button => button.textContent === 'キャンセル') as HTMLButtonElement).click() })
+  const confirmation = [...document.querySelectorAll('[role="dialog"]')].find(element => element.textContent?.includes('入力を破棄しますか？'))!
+  expect(confirmation).toBeTruthy()
+  await act(async () => { ([...confirmation.querySelectorAll('button')].find(button => button.textContent === '破棄する') as HTMLButtonElement).click() })
+  expect(document.body.textContent).not.toContain('保存していない変更があります')
+  expect(document.body.textContent).not.toContain('回答者に表示されるフォーム名も変わります')
+})

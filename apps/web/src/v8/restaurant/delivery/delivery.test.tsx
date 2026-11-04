@@ -1447,3 +1447,43 @@ it('停止後の一覧読み直し中に切り替えた時も前の店の成功�
   expect(screen.queryByText('1件のサービスの受付を停止しました。')).toBeNull()
   expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m')
 })
+
+it('注文取消の窓を閉じた後は保持した確定から送らない', async () => {
+  fixture.orders.mockResolvedValue(ordersData([order('o1', 'UE-1001')], true))
+  at('/restaurant-test/delivery?id=o1')
+  render(<DeliveryPage />)
+  const detail = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
+  fireEvent.click(await detail.findByRole('button', { name: '注文をキャンセルする' }))
+  const dialog = within(await screen.findByRole('alertdialog', { name: 'この注文をキャンセルしますか？' }))
+  const button = dialog.getByRole('button', { name: 'キャンセルする' })
+  const propsKey = Object.keys(button).find(key => key.startsWith('__reactProps$'))!
+  const held = (button as unknown as Record<string, { onClick: () => void }>)[propsKey].onClick
+  fireEvent.click(dialog.getAllByRole('button', { name: '閉じる' }).at(-1)!)
+  act(() => held())
+  expect(fixture.cancel).not.toHaveBeenCalled()
+})
+
+it('同じ店で停止窓を開き直しても前の窓の確定では送らない', async () => {
+  render(<DeliveryPage />)
+  await screen.findByText('#UE-1001')
+  fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める', exact: true }))
+  const first = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+  const held = fixture.stopSubmit!
+  fireEvent.click(first.getAllByRole('button', { name: '閉じる' }).at(-1)!)
+  fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める', exact: true }))
+  const next = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+  fireEvent.click(next.getByRole('checkbox', { name: /出前館の受付を止める/ }))
+  fireEvent.click(next.getByRole('button', { name: '30分', exact: true }))
+  act(() => held())
+  expect(fixture.stopIntake).not.toHaveBeenCalled()
+})
+
+it('受注画面の説明はできる操作を示す', async () => {
+  render(<DeliveryPage />)
+  await screen.findByText('#UE-1001')
+  const trigger = screen.getByRole('button', { name: 'デリバリー受注の説明' })
+  fireEvent.click(trigger)
+  const note = document.getElementById(trigger.getAttribute('aria-describedby')!)
+  expect(note?.textContent).toContain('新着注文を受け付け')
+  expect(note?.textContent).toContain('注文履歴')
+})
