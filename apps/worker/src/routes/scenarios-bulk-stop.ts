@@ -30,7 +30,7 @@ export async function bulkStopScenarios(c: Context<Env>) {
   };
   const initial = await states();
   if ((await visibleRows(initial)).length !== targets.length || initial.length !== targets.length) {
-    return c.json({ success: false, error: 'シナリオの状態が変わりました。読み直してください', current: [] }, 409);
+    return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
   }
   for (const row of initial) {
     const staff = c.get('staff');

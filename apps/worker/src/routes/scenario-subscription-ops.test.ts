@@ -14,6 +14,7 @@ import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqli
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { bulkStopScenarios } from './scenarios-bulk-stop.js';
 
 const { scenarios } = await import('./scenarios.js');
 
@@ -208,19 +209,70 @@ describe('友だち単位の購読操作（#949 N-054）', () => {
     expect((await bulkStop(Array.from({ length: 51 }, (_, i) => ({ id: `sc-${i}`, revision: 1 })))).status).toBe(400);
     const scoped = app(scopedAdmin);
     const res = await scoped.request('/api/scenarios/bulk-stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: snapshot([{ id: 'sc-1', revision: 1 }, { id: 'sc-2', revision: 1 }]) }) });
-    expect(res.status).toBe(409);
-    expect((await res.json() as { current: unknown[] }).current).toEqual([]);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: 'シナリオが見つかりません' });
     expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1 });
   });
   test('一括停止は配信停止の権限なしでは送らない', async () => {
-    const res = await app(noKeyStaff).request('/api/scenarios/bulk-stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ id: 'sc-1', revision: 1 }] }) });
+    // 共通ミドルウェアの権限拒否を通さず、各シナリオの境界確認を単独で試す。
+    const direct = new Hono<Env>();
+    direct.use('*', async (c, next) => { c.env = { DB: sqlite.db } as Env['Bindings']; c.set('staff', noKeyStaff); await next(); });
+    direct.post('/bulk-stop', bulkStopScenarios);
+    const res = await direct.request('/bulk-stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: snapshot([{ id: 'sc-1', revision: 1 }]) }) });
     expect(res.status).toBe(403);
     expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1 });
+  });
+  test('一括停止は二乗和だけが異なる確認を拒む', async () => {
+    const items = snapshot([{ id: 'sc-1', revision: 1 }]);
+    items[0].rowIdSquareSum++;
+    const res = await app(owner).request('/api/scenarios/bulk-stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
+    expect(res.status).toBe(409);
+    expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1 });
+  });
+  test('一括停止前に担当外の停止済み購読があれば403', async () => {
+    sqlite.raw.prepare("UPDATE friend_scenarios SET friend_id='f-acc2' WHERE id='sub-paused'").run();
+    const res = await app(scopedAdmin).request('/api/scenarios/bulk-stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: snapshot([{ id: 'sc-1', revision: 1 }]) }) });
+    expect(res.status).toBe(403);
+    expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1 });
+  });
+  test('一括停止の直前に購読が担当外へ移ればSQLが拒む', async () => {
+    const original = sqlite.db.batch.bind(sqlite.db);
+    const spy = vi.spyOn(sqlite.db, 'batch').mockImplementation(statements => {
+      if (statements.some(s => (s as unknown as { sql?: string }).sql?.includes('UPDATE scenarios SET is_active=0'))) {
+        sqlite.raw.prepare("UPDATE friend_scenarios SET friend_id='f-acc2' WHERE id='sub-paused'").run();
+      }
+      return original(statements);
+    });
+    try {
+      const res = await app(scopedAdmin).request('/api/scenarios/bulk-stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: snapshot([{ id: 'sc-1', revision: 1 }]) }) });
+      expect(res.status).toBe(409);
+      expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1 });
+    } finally { spy.mockRestore(); }
   });
   test('版なしの従来の一件停止はそのまま動く', async () => {
     const res = await app(owner).request('/api/scenarios/sc-1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: false }) });
     expect(res.status).toBe(200);
     expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 0 });
+  });
+  test('一件停止は確認前に担当外の購読があれば403', async () => {
+    sqlite.raw.prepare("UPDATE friend_scenarios SET friend_id='f-acc2' WHERE id='sub-paused'").run();
+    const res = await app(scopedAdmin).request('/api/scenarios/sc-1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: false }) });
+    expect(res.status).toBe(403);
+    expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1 });
+  });
+  test('版なし一件停止の確認後に購読が担当外へ移れば409', async () => {
+    const original = sqlite.db.prepare.bind(sqlite.db);
+    const spy = vi.spyOn(sqlite.db, 'prepare').mockImplementation(sql => {
+      if (/UPDATE scenarios SET/.test(sql) && sql.includes('friend_scenarios')) {
+        sqlite.raw.prepare("UPDATE friend_scenarios SET friend_id='f-acc2' WHERE id='sub-paused'").run();
+      }
+      return original(sql);
+    });
+    try {
+      const res = await app(scopedAdmin).request('/api/scenarios/sc-1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: false }) });
+      expect(res.status).toBe(409);
+      expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1 });
+    } finally { spy.mockRestore(); }
   });
   test('一括停止の直前にアカウントが変われば何も止めない', async () => {
     const original = sqlite.db.batch.bind(sqlite.db);
@@ -240,6 +292,20 @@ describe('友だち単位の購読操作（#949 N-054）', () => {
     const summary = (active: boolean) => sqlite.raw.prepare(`SELECT COUNT(*) AS activeCount, COALESCE(SUM(rowid),0) AS rowIdSum, COALESCE(SUM((rowid % 104729)*(rowid % 104729)),0) AS rowIdSquareSum FROM friend_scenarios WHERE scenario_id='sc-1' ${active ? "AND status IN ('active','delivering')" : ''}`).get();
     return { expectedContentRevision: revision, expectedSubscriptions: summary(false), expectedActiveSubscriptions: summary(true), expectedReferrers: [] };
   };
+  test('削除の確認後に購読が担当外へ移ればSQLが拒む', async () => {
+    const original = sqlite.db.batch.bind(sqlite.db);
+    const spy = vi.spyOn(sqlite.db, 'batch').mockImplementation(statements => {
+      if (statements.some(s => (s as unknown as { sql?: string }).sql?.includes('DELETE FROM scenarios'))) {
+        sqlite.raw.prepare("UPDATE friend_scenarios SET friend_id='f-acc2' WHERE id='sub-paused'").run();
+      }
+      return original(statements);
+    });
+    try {
+      const res = await app(scopedAdmin).request('/api/scenarios/sc-1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(deleteSnapshot()) });
+      expect(res.status).toBe(409);
+      expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE id='sc-1'").get()).toEqual({ n: 1 });
+    } finally { spy.mockRestore(); }
+  });
   test('シナリオ削除は確認した内容の版と配信中の人数が違えば変更しない', async () => {
     const res = await app(owner).request('/api/scenarios/sc-1', {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
