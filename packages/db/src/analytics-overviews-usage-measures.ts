@@ -135,8 +135,8 @@ export async function collectFeatureUsage(
           (SELECT MAX(t.tapped_at) FROM rich_menu_area_taps t
             WHERE t.line_account_id = ?) AS rich_menus_last,
           (SELECT COUNT(*) FROM form_submissions fs JOIN friends f ON f.id = fs.friend_id
-            WHERE f.line_account_id = ? AND datetime(fs.created_at) >= datetime(?)) AS forms_count,
-          (SELECT MAX(fs.created_at) FROM form_submissions fs JOIN friends f ON f.id = fs.friend_id
+            WHERE f.line_account_id = ? AND julianday(${storedTimestamp('fs.created_at', 'sql')}) >= julianday(?)) AS forms_count,
+          (SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('fs.created_at', 'sql')})) FROM form_submissions fs JOIN friends f ON f.id = fs.friend_id
             WHERE f.line_account_id = ?) AS forms_last,
           (SELECT COUNT(*) FROM media m
             WHERE m.line_account_id = ? AND m.archived_at IS NULL

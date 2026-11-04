@@ -104,6 +104,24 @@ describe('クロス分析', () => {
 
   afterEach(() => sqlite.close());
 
+  it('フォーム回答の時差なし JST を実時刻で期間に含める', async () => {
+    sqlite.exec(`
+      INSERT INTO forms (id, name, fields)
+        VALUES ('form-clock','申込','[{"name":"plan","type":"radio","options":["A","B"]}]');
+      INSERT INTO form_submissions (id, form_id, friend_id, data, created_at) VALUES
+        ('before-clock','form-clock','friend-a','{"plan":"A"}','2026-08-01T03:00:00'),
+        ('inside-clock','form-clock','friend-b','{"plan":"B"}','2026-08-01 01:00:00');
+    `);
+    const queued = await createAnalyticsCrossRun(db, {
+      lineAccountId: 'account-a',
+      query: { ...BASE_QUERY, rowAxis: { kind: 'form_choice', formId: 'form-clock', fieldKey: 'plan' } },
+      timeZone: 'Asia/Tokyo', dataCutoffAt: '2026-08-08T00:00:00.000Z',
+    });
+    const result = await processAnalyticsCrossRun(db, queued.id);
+    expect(result.rowValues.map((value) => value.label)).toContain('B');
+    expect(result.rowValues.map((value) => value.label)).not.toContain('A');
+  });
+
   it('軸・15条件・期間・任意イベントを許可一覧で検証する', () => {
     expect(validateAnalyticsCrossQuery({ ...BASE_QUERY, timeZone: 'Asia/Tokyo' }))
       .toMatchObject({ rowAxis: { kind: 'route' }, filters: [] });

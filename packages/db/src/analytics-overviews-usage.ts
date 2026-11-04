@@ -43,7 +43,7 @@ export async function getAnalyticsUsageOverview(
                 SELECT 1 FROM form_submissions fs JOIN friends fr ON fr.id = fs.friend_id
                  WHERE fs.form_id = f.id AND fs.is_test = 0 AND fr.line_account_id = ?
               ) THEN 1 ELSE 0 END) AS in_use,
-              (SELECT MAX(fs.created_at) FROM form_submissions fs JOIN friends fr ON fr.id = fs.friend_id
+              (SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('fs.created_at', 'sql')})) FROM form_submissions fs JOIN friends fr ON fr.id = fs.friend_id
                 JOIN forms used ON used.id = fs.form_id
                 WHERE fr.line_account_id = ? AND fs.is_test = 0 AND used.status = 'active'
                   AND EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = used.id AND fa.line_account_id = ?)) AS last_used_at

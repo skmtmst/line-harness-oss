@@ -591,7 +591,7 @@ export async function getFriendJourney(
            FROM friends f WHERE f.id = ?
          UNION ALL
          -- form submissions
-         SELECT fs.created_at AS at, 'form' AS type, NULL AS ref_code,
+         SELECT ${storedTimestamp('fs.created_at', 'sql')} AS at, 'form' AS type, NULL AS ref_code,
                 NULL AS affiliate_id, fo.name AS label, NULL AS detail
            FROM form_submissions fs
            LEFT JOIN forms fo ON fo.id = fs.form_id

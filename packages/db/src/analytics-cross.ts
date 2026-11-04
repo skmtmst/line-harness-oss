@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
 import { ANALYTICS_EVENT_TYPES, type AnalyticsEventType } from './analytics-event-types.js';
 
@@ -570,7 +571,7 @@ async function loadAxisMembership(
     ).bind(lineAccountId, axis.formId, broadFrom, broadTo)
       .all<{ friend_id: string; data: string; created_at: string }>();
     for (const row of rows.results) {
-      const occurredAt = Date.parse(row.created_at);
+      const occurredAt = Date.parse(storedTimestamp(row.created_at));
       if (occurredAt < Date.parse(range.from) || occurredAt > Date.parse(range.to)) continue;
       let data: unknown;
       try { data = JSON.parse(row.data); } catch { throw new Error('analytics_cross_form_data_invalid'); }

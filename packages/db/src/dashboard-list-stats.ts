@@ -1,4 +1,5 @@
 import { sqlIdSet } from './id-queries.js';
+import { storedTimestamp } from '@line-crm/shared';
 /**
  * ダッシュボードが1回で読む数。
  *
@@ -254,15 +255,15 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
              (SELECT COUNT(*) FROM forms f
                WHERE f.status = 'active' AND f.is_active = 1 AND ${formScope.sql}) AS published,
              (SELECT COUNT(*) FROM form_submissions fs JOIN forms f ON f.id = fs.form_id
-               WHERE fs.is_test = 0 AND substr(fs.created_at, 1, 7) = ? AND ${formScope.sql}) AS monthly_submits,
+               WHERE fs.is_test = 0 AND strftime('%Y-%m', ${storedTimestamp('fs.created_at', 'sql')}, '+9 hours') = ? AND ${formScope.sql}) AS monthly_submits,
              (SELECT COUNT(*) FROM form_submissions fs JOIN forms f ON f.id = fs.form_id
-               WHERE fs.is_test = 0 AND substr(fs.created_at, 1, 7) = ? AND ${formScope.sql}) AS prev_month_submits,
+               WHERE fs.is_test = 0 AND strftime('%Y-%m', ${storedTimestamp('fs.created_at', 'sql')}, '+9 hours') = ? AND ${formScope.sql}) AS prev_month_submits,
              -- 開いた人はフォームごとの一意数の合計（行の「開いた人数」と同じ数え方）。
              (SELECT COUNT(*) FROM (
                SELECT DISTINCT fo.friend_id, fo.form_id
                  FROM form_opens fo JOIN forms f ON f.id = fo.form_id
                  WHERE fo.is_test = 0 AND fo.friend_id IS NOT NULL
-                   AND substr(fo.opened_at, 1, 7) = ? AND ${formScope.sql}
+                   AND strftime('%Y-%m', ${storedTimestamp('fo.opened_at', 'sql')}, '+9 hours') = ? AND ${formScope.sql}
              )) AS monthly_opens,
              (SELECT COUNT(*) FROM form_submit_claims c JOIN forms f ON f.id = c.form_id
                WHERE c.submission_id IS NOT NULL
