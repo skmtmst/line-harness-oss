@@ -158,10 +158,20 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
       })
     } catch (cause) {
       if (operationScope !== refundScope.current) return
-      if (cause instanceof ApiError && cause.status === 409) void reload()
-      setRefundError(cause instanceof ApiError && cause.status === 409 ? '支払いの内容が変わった可能性があります。窓を閉じて一覧を読み直し、もう一度確認してください。'
-        : cause instanceof ApiError && cause.status === 403 ? '返金する権限がありません。'
-          : '返金できませんでした。Stripe の管理画面で状態を確かめてください。')
+      if (cause instanceof ApiError && cause.status === 409 && cause.code === 'stale_confirmation') {
+        setRefundTarget(null)
+        refundAttempt.current = null
+        void reload()
+        notifyToast('支払いの内容が変わりました。一覧を確認して、もう一度操作してください。', { tone: 'error' })
+        return
+      }
+      setRefundError(cause instanceof ApiError && cause.status === 409 && cause.code === 'simulation_only'
+        ? 'この支払いは模擬返金できません。Stripe の管理画面で状態を確認してください。'
+        : cause instanceof ApiError && cause.status === 409 && cause.code === 'refund_idempotency_conflict'
+          ? '前の操作と返金内容が異なります。窓を閉じて、もう一度操作してください。'
+          : cause instanceof ApiError && cause.status === 409 ? 'この支払いは返金できません。残額と状態を確認してください。'
+            : cause instanceof ApiError && cause.status === 403 ? '返金する権限がありません。'
+              : '返金できませんでした。Stripe の管理画面で状態を確かめてください。')
       return
     } finally {
       if (operationScope === refundScope.current) setRefunding(false)

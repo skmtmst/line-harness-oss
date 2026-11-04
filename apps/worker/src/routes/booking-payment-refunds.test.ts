@@ -50,6 +50,7 @@ describe('模擬の部分返金と監査',()=>{
     expect((await request('refund',confirmed)).status).toBe(200);
     const stale=await request('refund',{...input,idempotencyKey:'stale',expectedRevision:1});
     expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({code:'stale_confirmation'});
     expect(state()).toEqual({status:'paid',refunded_amount:300});
     expect(f.raw.prepare('SELECT COUNT(*) n FROM booking_payment_refunds').get()).toEqual({n:1});
     expect((await request('refund',{...input,idempotencyKey:'next',expectedRevision:2})).status).toBe(200);
@@ -121,7 +122,7 @@ describe('模擬の部分返金と監査',()=>{
   });
   it('本番の接続情報がある店は拒否し、未連結の支払いは通知先なしで返金できる',async()=>{
     f.raw.exec("INSERT INTO booking_payment_connections(line_account_id,provider,provider_account_id,test_mode,connected_at) VALUES('a','stripe','acct_real',0,'2026-10-01')");
-    expect((await request()).status).toBe(409);
+    const live=await request(); expect(live.status).toBe(409); expect(await live.json()).toMatchObject({code:'simulation_only'});
     f.raw.exec('DELETE FROM booking_payment_connections; UPDATE booking_payments SET booking_id=NULL');
     expect(await (await request()).json()).toMatchObject({data:{refund:{notificationStatus:'unavailable',sent:false}}});
   });

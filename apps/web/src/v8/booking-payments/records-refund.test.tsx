@@ -3,14 +3,14 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const net = vi.hoisted(() => ({ records: vi.fn(), refund: vi.fn(), saved: vi.fn() }))
+const net = vi.hoisted(() => ({ records: vi.fn(), refund: vi.fn(), saved: vi.fn(), toast: vi.fn() }))
 vi.mock('@/lib/api/helpers/booking-payment-admin', async (load) => {
   const actual = await load<typeof import('@/lib/api/helpers/booking-payment-admin')>()
   return { ...actual, bookingPaymentAdminApi: { ...actual.bookingPaymentAdminApi, ...net,
     connection: async () => ({ data: { connected: true, testMode: true } }),
   } }
 })
-vi.mock('@/components/shared/toast', () => ({ notifySaved: net.saved, notifyToast: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ notifySaved: net.saved, notifyToast: net.toast }))
 
 import PaymentRecords from './records'
 
@@ -118,10 +118,24 @@ it('アカウント切替後は古い返金の確認を閉じる', async () => {
 
 it('古い版で拒否されたら、画面を読み直すよう理由を出す', async () => {
   const { ApiError } = await import('@/lib/api')
-  net.refund.mockRejectedValueOnce(new ApiError(409, 'conflict'))
+  net.refund.mockRejectedValueOnce(new ApiError(409, 'conflict', 'stale_confirmation'))
   render(<PaymentRecords accountId="account-1" canEdit />)
   await confirm(300)
-  expect(await screen.findByText(/支払いの内容が変わった可能性/)).toBeTruthy()
+  await waitFor(() => expect(net.toast).toHaveBeenCalledWith(expect.stringContaining('支払いの内容が変わりました'), expect.anything()))
+  expect(screen.queryByRole('alertdialog')).toBeNull()
   await waitFor(() => expect(net.records).toHaveBeenCalledTimes(2))
   expect(net.saved).not.toHaveBeenCalled()
+})
+
+it.each([
+  ['simulation_only', 'この支払いは模擬返金できません'],
+  ['refund_not_available', 'この支払いは返金できません'],
+  ['refund_idempotency_conflict', '前の操作と返金内容が異なります'],
+])('409 の %s は対応する理由を出す', async (code, message) => {
+  const { ApiError } = await import('@/lib/api')
+  net.refund.mockRejectedValueOnce(new ApiError(409, 'conflict', code))
+  render(<PaymentRecords accountId="account-1" canEdit />)
+  await confirm(300)
+  expect(await screen.findByText(new RegExp(message))).toBeTruthy()
+  expect(net.toast).not.toHaveBeenCalled()
 })

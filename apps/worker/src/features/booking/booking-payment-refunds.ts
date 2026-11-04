@@ -92,7 +92,17 @@ export async function simulatePaymentRefund(db: D1Database, payment: BookingPaym
     ]);
   }
   const saved = await read();
-  if (!saved) throw new PaymentActionError('refund_not_available', 409);
+  if (!saved) {
+    const current = await db.prepare('SELECT confirmation_revision FROM booking_payments WHERE id=? AND line_account_id=?')
+      .bind(payment.id, account).first<{confirmation_revision:number}>();
+    if (input.expectedRevision !== undefined && current && current.confirmation_revision !== input.expectedRevision) {
+      throw new PaymentActionError('stale_confirmation', 409);
+    }
+    const liveConnection = await db.prepare(`SELECT 1 FROM booking_payment_connections WHERE line_account_id=?
+      AND provider='stripe' AND disconnected_at IS NULL AND test_mode=0`).bind(account).first();
+    if (liveConnection) throw new PaymentActionError('simulation_only', 409);
+    throw new PaymentActionError('refund_not_available', 409);
+  }
   validate(saved);
   const current = await db.prepare('SELECT * FROM booking_payments WHERE id=? AND line_account_id=?')
     .bind(payment.id, account).first<BookingPaymentRecord>();
