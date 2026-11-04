@@ -1,0 +1,23 @@
+-- Confirmation revisions only; existing business data is unchanged.
+ALTER TABLE funnels ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_menu_items ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE auto_replies ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE automation_definitions ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE common_action_bindings ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_google_posts ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_google_connections ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_seat_waitlist ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rt_tables ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE templates ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE traffic_pools ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE account_handovers ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE friend_scenarios ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE scenarios ADD COLUMN content_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE media_file_scans ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE file_scan_configs ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE webhook_interaction_logs ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE booking_payments ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE meet_consultations ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE rich_menu_groups ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE outgoing_webhooks ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE incoming_webhooks ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1;
