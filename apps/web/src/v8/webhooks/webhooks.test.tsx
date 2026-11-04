@@ -253,6 +253,7 @@ describe('外部連携 V8', () => {
 
   it('見本の受信元は初回のアカウント読込で消さず、実際の切替で作る窓と入力を消す', async () => {
     search = 'source=booking'
+    window.history.replaceState(null, '', '/webhooks?source=booking')
     accountId = ''
     await render(<WebhooksIncomingV8 />)
     accountId = 'account-a'
@@ -533,6 +534,7 @@ afterEach(() => { verifiedStaffRole(null) })
 it('管理者が見本の受信元で開いても、作成の窓と入力を保つ', async () => {
   role = verifiedStaffRole('admin')
   search = 'source=booking'
+    window.history.replaceState(null, '', '/webhooks?source=booking')
   await render(<WebhooksIncomingV8 />)
   const dialog = within(document.body).getByRole('dialog', { name: '受け取る設定を追加' })
   expect(dialog.textContent).toContain('予約サービス')

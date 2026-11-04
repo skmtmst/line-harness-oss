@@ -6,6 +6,7 @@ import { api, type HqLineRegistration } from '@/lib/api'
 import { qrToDataURL } from '@/lib/qr-image'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import '@/components/shared/notice-line-tokens.css'
 import styles from './notice-line-dialog.module.css'
 
 const STATUS_INTERVAL_MS = 5000

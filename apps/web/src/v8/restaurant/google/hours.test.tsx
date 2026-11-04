@@ -33,6 +33,9 @@ describe('営業時間ツールの操作',()=>{
  it('日付の選択を全部解除すると、その編集で追加した下書きも取り除く',async()=>{
   await open();const dialog=await dates();await pick(dialog,'2026-11-14');fireEvent.click(within(dialog).getByRole('button',{name:'2026-11-14',exact:true}));await waitFor(()=>expect(stored.draft.days).toEqual([]));expect(within(dialog).getByRole('button',{name:'変更内容を確認'})).toHaveProperty('disabled',true)
  })
+ it('読み取り前の文章を閉じるときは確認し、編集を続ければ入力を保つ',async()=>{
+  await open();fireEvent.click(screen.getByRole('button',{name:'文章で入力'}));const panel=await screen.findByRole('dialog',{name:'文章で入力'});const field=within(panel).getByRole('textbox');fireEvent.change(field,{target:{value:'来週の月曜は休業'}});fireEvent.click(within(panel).getAllByRole('button',{name:'閉じる',exact:true}).at(-1)!);const check=await screen.findByRole('dialog',{name:'入力を破棄しますか？'});fireEvent.click(within(check).getByRole('button',{name:'編集を続ける'}));expect((field as HTMLTextAreaElement).value).toBe('来週の月曜は休業');expect(screen.getByRole('dialog',{name:'文章で入力'})).toBeTruthy()
+ })
  it('サービスの種類の候補だけをEscapeで閉じ、編集パネルは残す',async()=>{
   stored.services=[{id:'takeout',kind:'takeout',label:'テイクアウト',googleTypeId:'TAKEOUT',sameWeekdays:true,weekdays:HOURS_WEEKDAYS,periods:[{open:'17:00',close:'22:00'}],orderDeadline:'',menu:''}];version=1
   await open();fireEvent.click(screen.getByRole('button',{name:'開く'}));fireEvent.click(screen.getByRole('button',{name:'編集',exact:true}));const dialog=await screen.findByRole('dialog',{name:'サービスの営業時間'});const trigger=within(dialog).getByRole('button',{name:'サービスの種類'});fireEvent.click(trigger);fireEvent.keyDown(trigger,{key:'Escape'});expect(within(dialog).getByRole('button',{name:'サービスの種類'}).getAttribute('aria-expanded')).toBe('false');expect(screen.getByRole('dialog',{name:'サービスの営業時間'})).toBeTruthy()

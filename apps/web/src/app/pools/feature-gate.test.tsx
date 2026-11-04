@@ -86,7 +86,7 @@ describe('プール管理の直URL(#860)', () => {
   })
 })
 
-vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null, isSettingsAreaPath: () => true }))
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())

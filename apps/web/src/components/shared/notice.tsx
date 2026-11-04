@@ -3,6 +3,7 @@
 import { Children, Fragment, cloneElement, isValidElement, useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
 import { Check, X } from 'lucide-react'
 import HelpTip from './help-tip'
+import './notice-tokens.css'
 import styles from './notice.module.css'
 import { humanizeErrorText } from './human-error-text'
 import { jstDate } from '@/lib/jst-datetime'
@@ -80,7 +81,7 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   /** カード内などの小さな帯。案内・成功の本文は1行に省略し、title で全文を渡す。警告・危険は折り返す。 */
   compact?: boolean
   /** 枠線のない注意帯を描く板だけで指定する。既定の帯は変えない。 */
-  appearance?: 'soft'
+  appearance?: 'soft' | 'subtle'
   /** 本文（1〜2文）。`children` があるときはそちらが勝つ。 */
   message?: string
   children?: ReactNode

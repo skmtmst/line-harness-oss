@@ -1,0 +1,11 @@
+:root {
+  --tpl-notice-line-status-min-height: 72px;
+  --tpl-notice-line-control-inset: 9px;
+  --tpl-notice-line-qr-size: 170px;
+  --tpl-notice-line-qr-inset: 7px;
+  --tpl-notice-line-qr-image-size: 156px;
+  --tpl-notice-line-account-line-height: 21px;
+  --tpl-notice-line-step-size: 22px;
+  --tpl-notice-line-step-text-gap: 3px;
+  --tpl-notice-line-caveat-line-height: 19px;
+}

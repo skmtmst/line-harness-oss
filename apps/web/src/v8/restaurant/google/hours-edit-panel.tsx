@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { HOURS_WEEKDAYS, HOURS_SERVICE_LABELS, hoursPeriodsProblem, type HoursWorkspace, type HoursWeekday, type HoursService, type HolidayHoursRule, type OpeningPeriod } from '@line-crm/shared'
+import '@/components/shared/google-hours-tokens.css'
 import Drawer from '@/components/shared/drawer'
 import Button from '@/components/shared/button'
 import Radio, { RadioGroup } from '@/components/shared/radio'
@@ -10,6 +11,7 @@ import { Field, OptionalBadge } from '@/components/shared/form-controls'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import TimeField from '@/components/shared/time-field-v8'
 import Notice from '@/components/shared/notice'
+import Disclosure from '@/components/shared/disclosure'
 import Dialog from '@/components/shared/dialog'
 import Card from '@/components/shared/card'
 import { restaurantGoogleApi, type GoogleProfileData, type GoogleChange } from '@/lib/restaurant-google-api'
@@ -20,7 +22,7 @@ import { WEEKDAY_JA, errorMessage } from './format'
 import styles from './hours.module.css'
 
 export type HoursPanel = { kind:'weekly'; weekday?:HoursWeekday } | {kind:'holiday'} | {kind:'dates'; dates?:string[]; mode?:'dates'|'range'; group?:Array<{date:string;name?:string}>} | {kind:'service'; service?:HoursService} | {kind:'text'}
-export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes, onDraft, onReview, onClose, onEditDates, saving, saved, disabled, lockedReason }: { panel:HoursPanel;data:GoogleProfileData;workspace:HoursWorkspace;holidays:Array<{date:string;name:string}>;serviceTypes:Array<{id:string;label:string}>;onDraft:(w:HoursWorkspace)=>void;onReview:()=>void;onClose:()=>void;onEditDates:(dates:string[])=>void;saving:boolean;saved:boolean;disabled:boolean;lockedReason?:string }) {
+export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes, onDraft, onReview, onClose, onEditDates, onUnsavedChange, saving, saved, disabled, lockedReason }: { panel:HoursPanel;data:GoogleProfileData;workspace:HoursWorkspace;holidays:Array<{date:string;name:string}>;serviceTypes:Array<{id:string;label:string}>;onUnsavedChange?:(dirty:boolean)=>void;onDraft:(w:HoursWorkspace)=>void;onReview:()=>void;onClose:()=>void;onEditDates:(dates:string[])=>void;saving:boolean;saved:boolean;disabled:boolean;lockedReason?:string }) {
  const [base]=useState(()=>structuredClone(workspace))
  const weekly=workspace.draft.weekly??data.profile.regularHours
  const first=panel.kind==='weekly'?(panel.weekday??HOURS_WEEKDAYS.find(d=>weekly[d].length)??'MONDAY'):'MONDAY'
@@ -37,6 +39,8 @@ export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes,
  const [question,setQuestion]=useState('')
  const [valid,setValid]=useState(false)
  const [editing,setEditing]=useState(false)
+ const localUnsaved=panel.kind==='text'?Boolean(text.trim())&&!parsed:editing&&(!saved||!valid)
+ useEffect(()=>{onUnsavedChange?.(localUnsaved);return()=>onUnsavedChange?.(false)},[localUnsaved,onUnsavedChange])
  const title=panel.kind==='weekly'?'毎週の営業時間を編集':panel.kind==='holiday'?'祝日の営業時間':panel.kind==='service'?'サービスの営業時間':panel.kind==='text'?'文章で入力':panel.group?'連休の営業時間':'特別営業日の変更'
  const draftWeek=(days:HoursWeekday[],periods:OpeningPeriod[],closed:boolean)=>{
   setEditing(true);setWeekdays(days);setWeekPeriods(periods);setWeekClosed(closed)
@@ -64,7 +68,7 @@ export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes,
   try{const result=await restaurantGoogleApi.proposeHours(data.store.lineAccountId,{source:'text',text:text.trim()});if(result.change){setParsed(result.change);setValid(true);const change=result.change;if(change.kind==='special_hours'){const days=new Map(workspace.draft.days.map(d=>[d.date,d]));for(const day of change.after as import('@line-crm/shared').OpeningDate[])days.set(day.date,day);onDraft({...workspace,draft:{...workspace.draft,days:[...days.values()].sort((a,b)=>a.date.localeCompare(b.date)),reviewIds:[]}})}else if(change.kind==='regular_hours')onDraft({...workspace,draft:{...workspace.draft,weekly:change.after as import('@line-crm/shared').OpeningWeek,reviewIds:[]}})}else setQuestion(result.question??'変更する日付と時間を入力してください。')}
   catch(e){setParseError(errorMessage(e,'変更案を読み取れませんでした。入力内容は残っています。'))}finally{setParsing(false)}
  }
- return <><Drawer open title={title} width="hours" headerIcon={false} heightMode="viewport" dirty={editing&&(!saved||!valid)} showDirtyIndicator={false} busy={parsing} onClose={onClose} footer={<div className={styles.panelFooter}><span className={styles.muted} role="status">{saving?'下書きを保存しています…':saved&&(!editing||valid)?'入力内容は保存されています':'入力内容を確認してください'}</span><div className={styles.actions}><Button size="field" onClick={onClose} disabled={saving}>閉じる</Button><Button size="field" variant="primary" lockedReason={lockedReason} disabled={disabled||saving||!valid} onClick={onReview}>変更内容を確認</Button></div></div>}>
+ return <><Drawer open title={title} width="hours" headerIcon={false} heightMode="viewport" dirty={localUnsaved} showDirtyIndicator={false} busy={parsing} onClose={onClose} footer={<div className={styles.panelFooter}><span className={styles.muted} role="status">{saving?'下書きを保存しています…':saved&&(!editing||valid)?'入力内容は保存されています':'入力内容を確認してください'}</span><div className={styles.actions}><Button size="field" onClick={onClose} disabled={saving}>閉じる</Button><Button size="field" variant="primary" lockedReason={lockedReason} disabled={disabled||saving||!valid} onClick={onReview}>変更内容を確認</Button></div></div>}>
   <div className={styles.editorSections}>
   {panel.kind==='weekly'?<>
     <Field optional={false} contentGap={20} label="同じ営業時間にする曜日"><Weekdays selected={weekdays} disabled={disabled} onChange={days=>draftWeek(days,weekPeriods,weekClosed)}/></Field><p className={styles.muted}>曜日は複数選べます。</p>
@@ -82,11 +86,11 @@ export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes,
     <Checkbox checked={service.sameWeekdays} disabled={disabled} onCheckedChange={sameWeekdays=>draftService({sameWeekdays})}>店舗と同じ曜日に提供する</Checkbox>
     {service.sameWeekdays?<p className={styles.muted}>{HOURS_WEEKDAYS.filter(d=>weekly[d].length).map(d=>WEEKDAY_JA[d]).join('・')}曜日に提供します。店舗の休業日は提供しません。</p>:<Weekdays selected={service.weekdays} disabled={disabled} onChange={weekdays=>draftService({weekdays})}/>}
     <h3>{service.kind==='takeout'?'受け取りできる時間':'営業時間'}</h3><PeriodFields value={service.periods} takeout={service.kind==='takeout'} disabled={disabled} onChange={periods=>draftService({periods})}/>
-    <details className={styles.extra} open={Boolean(service.orderDeadline||service.menu)}><summary>追加の設定<OptionalBadge appearance="parentheses"/></summary><div className={styles.stackLarge}><Field optional={false} label="注文の受付終了"><TimeField value={service.orderDeadline} minuteStep={15} disabled={disabled} onChange={orderDeadline=>draftService({orderDeadline})}/></Field><Field optional={false} label="提供するメニュー"><TextField value={service.menu} maxLength={120} disabled={disabled} placeholder="例：テイクアウトメニュー" onChange={e=>draftService({menu:e.target.value})}/></Field><p className={styles.muted}>受付終了とメニューは、musubo内で使用します。</p></div></details>
+    <Disclosure appearance="section" defaultOpen={Boolean(service.orderDeadline||service.menu)} title={<>追加の設定<OptionalBadge appearance="parentheses"/></>}><div className={styles.stackLarge}><Field optional={false} label="注文の受付終了"><TimeField value={service.orderDeadline} minuteStep={15} disabled={disabled} onChange={orderDeadline=>draftService({orderDeadline})}/></Field><Field optional={false} label="提供するメニュー"><TextField value={service.menu} maxLength={120} disabled={disabled} placeholder="例：テイクアウトメニュー" onChange={e=>draftService({menu:e.target.value})}/></Field><p className={styles.muted}>受付終了とメニューは、musubo内で使用します。</p></div></Disclosure>
     <p className={styles.muted}>Googleに掲載できる内容は、確認画面で確認できます。</p>
     {panel.service?<Button variant="text" textTone="danger" size="compact" disabled={disabled} lockedReason={lockedReason} onClick={()=>setDeleteOpen(true)}>{service.label}の営業時間を削除</Button>:null}
   </>:<>
-    <p className={styles.muted}>変更したい内容を、そのまま入力できます。</p><Field optional={false} label="文章で入力"><TextArea value={text} rows={5} maxLength={500} disabled={disabled||!data.aiAvailable} placeholder="例：12月30日から1月3日まで年末年始のため休業。1月4日から通常どおり営業します。" onChange={e=>{setText(e.target.value);setParsed(null);setValid(false)}}/></Field>
+    <p className={styles.muted}>変更したい内容を、そのまま入力できます。</p><Field optional={false} label="文章で入力"><TextArea value={text} rows={5} maxLength={500} disabled={disabled||!data.aiAvailable} placeholder="例：12月30日から1月3日まで年末年始のため休業。1月4日から通常どおり営業します。" onChange={e=>{setEditing(true);setText(e.target.value);setParsed(null);setValid(false)}}/></Field>
     {data.aiAvailable?<div><Button size="field" disabled={disabled||!text.trim()} busy={parsing} onMouseDown={event=>event.preventDefault()} onClick={parse}>{parsed?'変更案を作り直す':'変更案を作る'}</Button></div>:<p className={styles.muted}>文章で入力できる環境ではありません。日付を選んで変更できます。</p>}
     {question?<Notice tone="info">{question}</Notice>:null}{parseError?<Notice tone="danger">{parseError}</Notice>:null}
     {parsed?<Card padding="default" layout="vertical" gap="normal"><h3>読み取った変更案</h3><strong>{parsed.summary}</strong>{parsed.kind==='special_hours'?<Button variant="text" size="compact" onMouseDown={event=>event.preventDefault()} onClick={()=>onEditDates((parsed.after as import('@line-crm/shared').OpeningDate[]).map(d=>d.date))}>日付や時間を直す</Button>:null}<p className={styles.muted}>読み取った日付を確認してください。Googleにはまだ反映されません。</p></Card>:null}

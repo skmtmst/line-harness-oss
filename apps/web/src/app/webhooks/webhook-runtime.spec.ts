@@ -119,6 +119,7 @@ test('見本リンクの選択を初回読込後も保ち、実アカウント�
   await page.getByRole('dialog', { name: '入力を破棄しますか？', exact: true })
     .getByRole('button', { name: '破棄する', exact: true }).click()
   await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(url => !url.searchParams.has('source'))
   await switchAccount(page)
   await expect(dialog).toBeHidden()
   await page.getByRole('button', { name: '受け取り口を作る', exact: true }).click()
@@ -204,40 +205,31 @@ test('アカウント切替前の遅い失敗応答を切替後の画面へ出�
 })
 
 for (const role of ['admin', 'staff'] as const) {
-  test(`${role} は送り先の変更を操作できず、許可された試し送信だけ使える`, async ({ page }) => {
+  test(`${role} は現在の役割で許可された操作だけを使える`, async ({ page }) => {
     const changes: string[] = []
     page.on('request', (request) => {
       if (new URL(request.url()).pathname.startsWith('/api/webhooks/') && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) changes.push(request.method())
     })
-    await page.route('**/api/staff/me', (route) => route.fulfill({ json: { success: true, data: { id: 'staff-test', role } } }))
+    await page.route('**/api/staff/me', (route) => route.fulfill({ json: { success: true, data: { id: 'staff-test', role, permissionKeys: [], permissionViewKeys: ['/webhooks'] } } }))
     await openWebhooks(page)
-    await expect(page.getByText(/閲覧のみで見ています/)).toBeVisible()
-    await expect(page.getByRole('link', { name: '送り先を作る', exact: true })).toHaveCount(0)
     const name = 'Googleスプレッドシート ／ 顧客台帳'
     if (role === 'admin') {
+      await expect(page.getByRole('link', { name: '送り先を作る', exact: true })).toBeVisible()
       const menu = await openRowMenu(page, name)
-      await expect(menu.getByRole('menuitem', { name: '試しに送る', exact: true })).toBeEnabled()
-      for (const action of ['止める', '動かす', '直す', '鍵を作り直す', '削除する']) {
-        await expect(menu.getByRole('menuitem', { name: action, exact: true })).toHaveCount(0)
+      for (const action of ['止める', '編集する', '試しに送る']) {
+        await expect(menu.getByRole('menuitem', { name: action, exact: true })).toBeEnabled()
+      }
+      for (const action of ['鍵を作り直す', '削除する']) {
+        await expect(menu.getByRole('menuitem', { name: action, exact: true })).toBeDisabled()
       }
     } else {
-      // ：狭い幅では、行き先を明示した閲覧項目がメニューに入る。
-      const row = page.getByRole('row').filter({ hasText: name })
-      const trigger = row.getByRole('button', { name: `「${name}」の操作`, exact: true })
-      if (await trigger.count()) {
-        const menu = await openRowMenu(page, name)
-        const view = menu.getByRole('menuitem', { name: '送信の記録を見る', exact: true })
-        await expect(view).toBeVisible()
-        for (const action of ['止める', '動かす', '直す', '編集する', '鍵を作り直す', '削除する', '試しに送る', '失敗をやり直す']) {
-          await expect(menu.getByRole('menuitem', { name: action, exact: true })).toHaveCount(0)
-        }
-        await view.click()
-      } else {
-        await expect(row.getByRole('button', { name: `「${name}」の設定`, exact: true })).toHaveCount(0)
-        await row.getByRole('link', { name: '中身を見る', exact: true }).click()
+      await expect(page.getByText('この画面の変える操作は、オーナーか管理者だけができます。', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: '送り先を作る', exact: true })).toBeDisabled()
+      const menu = await openRowMenu(page, name)
+      for (const action of ['止める', '編集する', '鍵を作り直す', '削除する']) {
+        await expect(menu.getByRole('menuitem', { name: action, exact: true })).toBeDisabled()
       }
-      await expect(page).toHaveURL((url) => url.pathname === '/webhooks' && url.searchParams.get('tab') === 'interactions')
-      await expect(page.getByRole('table')).toBeVisible()
+      await expect(menu.getByRole('menuitem', { name: '試しに送る', exact: true })).toHaveCount(0)
     }
     expect(changes).toEqual([])
   })

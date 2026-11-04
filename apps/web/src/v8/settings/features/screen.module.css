@@ -343,8 +343,8 @@
 .live {
   display: contents;
 }
-.favoriteButton { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; border: 0; background: transparent; color: #94a3b8; cursor: pointer; }
-.favoriteButton svg { width: 19px; height: 19px; }
+.favoriteButton { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--space-32); height: var(--space-32); border: 0; background: transparent; color: var(--polish-status-neutral-dot); cursor: pointer; }
+.favoriteButton svg { width: var(--polish-feature-favorite-icon); height: var(--polish-feature-favorite-icon); }
 .favoriteButton:disabled { cursor: not-allowed; }
 .favoriteActive { color: var(--color-star-on-edge); }
 .favoriteActive svg { fill: var(--color-star-on); stroke: var(--color-star-on-edge); }

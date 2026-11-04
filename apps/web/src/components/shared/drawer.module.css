@@ -414,7 +414,7 @@ html:root .panel[data-width='hours'] { background: var(--color-canvas); }
 html:root .panel[data-width='hours'] .body { padding: var(--space-24); }
 html:root .panel[data-width='hours'] .footer { padding: var(--space-16) var(--space-24); }
 
-html:root .overlay[data-width='hours'] { background: var(--hours-editor-backdrop, #1018283d); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html:root .overlay[data-width='hours'] { background: var(--hours-editor-backdrop); backdrop-filter: none; -webkit-backdrop-filter: none; }
 html:root .panel[data-width='hours'] { border-radius: 0; }
 html:root .panel[data-width='hours'] .header { min-height: var(--hours-editor-header-height, 80px); padding: 0 var(--space-24); align-items: center; }
 html:root .panel[data-width='hours'] .title { font-size: var(--text-title); }

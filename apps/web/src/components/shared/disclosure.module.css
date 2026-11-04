@@ -18,6 +18,9 @@
   box-shadow: var(--card-shadow);
 }
 
+.root[data-appearance='section'] { border: 0; border-top: 1px solid var(--color-hairline); border-radius: 0; padding-top: var(--space-16); box-shadow: none; }
+.root[data-appearance='section'] .summary { min-height: 0; padding: 0; font-size: var(--polish-text-body); }
+.root[data-appearance='section'] .body { padding: 0; margin-top: var(--space-16); }
 .root[data-appearance='inset'] { box-shadow: none; }
 .root[data-appearance='inset'] .body {
   display: flex;

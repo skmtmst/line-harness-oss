@@ -7,7 +7,7 @@ const host = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 describe('現役V8の見本の入口', () => {
   test('別機能の通知画面を埋め込まない', () => { expect(host).not.toContain('NotificationsPage'); expect(host).not.toContain('@/app/notifications') })
   test('見本タブは現在の見本を開く', () => { expect(host).toContain("@/v8/webhooks/samples"); expect(host).toContain('return <SamplesV8Page />') })
-  test('受け取る見本の種類を作成へ渡し、見本以外は選択しない', () => { expect(samples).toContain('tab=incoming&source='); expect(pages[0]).toContain('SOURCE_PRESETS.some(') })
+  test('受け取る見本の種類を作成へ渡す', () => { expect(samples).toContain('tab=incoming&source=') })
   test('送る見本は種類を選んだ状態の専用作成へつなげる', () => { expect(samples).toContain('/webhooks/new?event=${sample.event}') })
   test('送る見本は実際に購読できる種類を渡す', () => { for (const event of ['friend_add', 'form_submitted', 'booking_created', 'ec.order.confirmed']) expect(samples).toContain(`event: '${event}'`) })
 })

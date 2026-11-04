@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .calendar{min-width:0;width:100%;}
 .heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-12);font-size:var(--text-body);}

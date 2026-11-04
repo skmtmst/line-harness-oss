@@ -1,3 +1,8 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .actions{display:flex;align-items:center;gap:10px}
-.actions select{border:0;background:transparent;color:#475569;font-size:11px;cursor:pointer;max-width:75px}
 .duplicate{display:inline-flex;align-items:center;gap:5px;border:0;border-radius:6px;background:#e9f7ee;color:#00833f;padding:8px 10px;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer}
+
+
+.actions :is(button, input, [role='switch']):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+}

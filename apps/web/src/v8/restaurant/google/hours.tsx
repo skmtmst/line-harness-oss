@@ -1,4 +1,5 @@
 'use client'
+import '@/components/shared/google-hours-tokens.css'
 import { useRef, useState, type ReactNode } from 'react'
 import { CalendarDays, ChevronDown, ChevronRight, History, Info, Pencil, Plus, Utensils } from 'lucide-react'
 import { HOURS_WEEKDAYS, upcomingHolidayGroups, hoursDateAdd, hoursDateRange } from '@line-crm/shared'
@@ -29,8 +30,9 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate }:
  const [panel,setPanel]=useState<HoursPanel|null>(()=>initialMode?initialMode==='weekly'?{kind:'weekly'}:initialMode==='text'?{kind:'text'}:{kind:'dates',dates:initialDate?[initialDate]:[]}:null)
  const [expanded,setExpanded]=useState(false),[history,setHistory]=useState(false),[calendar,setCalendar]=useState(false),[month,setMonth]=useState(''),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[actionError,setActionError]=useState(''),[sent,setSent]=useState<'google'|'local'|null>(null)
  const [calendarDate,setCalendarDate]=useState('')
+ const [editorUnsaved,setEditorUnsaved]=useState(false)
  const operation=useRef(false)
- const {leaveTarget,confirmLeave,cancelLeave}=useUnsavedGuard({dirty:!m.saved,busy:busy||m.saving})
+ const {leaveTarget,confirmLeave,cancelLeave}=useUnsavedGuard({dirty:Boolean(m.config)&&(!m.saved||editorUnsaved),busy:busy||m.saving})
  const review=async()=>{if(!allowed||operation.current)return;operation.current=true;setBusy(true);setActionError('');try{await m.review();setPanel(null);setConfirm(true);setSent(null)}catch(e){setActionError(errorMessage(e,'変更内容を確認できませんでした。入力内容は残っています。'))}finally{setBusy(false);operation.current=false}}
  const send=async()=>{if(!allowed||operation.current||!m.data)return;operation.current=true;setBusy(true);setActionError('');try{for(const change of m.changes){if(['applied','accepted'].includes(change.status))continue;await restaurantGoogleApi.sendChange(accountId,change.id)}const google=m.changes.length>0;await m.complete(google);setConfirm(false);setSent(google?'google':'local')}catch(e){setActionError(errorMessage(e,'Googleに送信できませんでした。入力した内容は残っています。'));const refreshed=await Promise.all(m.changes.map(c=>restaurantGoogleApi.change(accountId,c.id).catch(()=>null)));m.setChanges(m.changes.map((c,i)=>refreshed[i]?.change??c))}finally{setBusy(false);operation.current=false}}
  const close=()=>{void m.flush().then(()=>setPanel(null)).catch(()=>undefined)}
@@ -69,8 +71,8 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate }:
    {sent?<Notice tone="success" heading={sent==='google'?'Googleに営業時間の変更を送信しました':'営業時間の設定を保存しました'}>{sent==='google'?'Googleの表示が変わるまで、時間がかかる場合があります。':''}</Notice>:changed?<div className={styles.updateBar}><Info size={18}/><div><strong>Googleの営業時間を更新</strong><p className={styles.muted}>変更内容を確認してから、Googleに反映できます。</p></div><Button variant="primary" size="field" disabled={disabled||!m.saved} lockedReason={lockedReason} busy={busy} widthReserve="idle" onClick={()=>void review()}>変更内容を確認</Button></div>:null}
   </div>}
   </HoursWorkspaceFrame>
-  {panel?<HoursEditPanel key={JSON.stringify(panel)} panel={panel} data={data} workspace={workspace} holidays={config.holidays} serviceTypes={config.serviceTypes??[]} onDraft={m.update} onReview={()=>void review()} onClose={close} onEditDates={dates=>setPanel({kind:'dates',dates})} saving={m.saving||busy} saved={m.saved} disabled={disabled} lockedReason={lockedReason}/>:null}
+  {panel?<HoursEditPanel key={JSON.stringify(panel)} panel={panel} onUnsavedChange={setEditorUnsaved} data={data} workspace={workspace} holidays={config.holidays} serviceTypes={config.serviceTypes??[]} onDraft={m.update} onReview={()=>void review()} onClose={close} onEditDates={dates=>setPanel({kind:'dates',dates})} saving={m.saving||busy} saved={m.saved} disabled={disabled} lockedReason={lockedReason}/>:null}
   <Drawer open={history} title="営業時間の変更履歴" width="hours" headerIcon={false} heightMode="viewport" onClose={()=>setHistory(false)} footer={<Button size="field" onClick={()=>setHistory(false)}>閉じる</Button>}><div className={styles.stackLarge}>{config.history.length?config.history.map((event,i)=><div className={styles.historyRow} key={`${event.at}-${i}`}><p className={styles.muted}>{formatShortStamp(event.at)}</p><strong>{event.summary}</strong><span className={styles.muted}>{event.staffName}</span></div>):<ListState kind="empty" title="営業時間の変更履歴はありません"/>}</div></Drawer>
-  <UnsavedLeaveDialog open={leaveTarget!==null} subject="保存中の営業時間" onConfirm={confirmLeave} onCancel={cancelLeave}/>
+  <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した営業時間" onConfirm={confirmLeave} onCancel={cancelLeave}/>
  </>
 }

@@ -157,3 +157,7 @@ html:root .table[data-row-sizing='content'] .row:not([data-head]) {
   min-height: var(--polish-table-row);
   padding: var(--grid-table-row-padding);
 }
+
+html:root .table[data-table-presentation='comparison'] .row { min-height: calc(var(--grid-table-row-height) + var(--space-20) + 1px); height: auto; padding: 0 var(--space-12) var(--space-20); font-size: var(--grid-table-font-size); border-bottom: 1px solid var(--color-hairline); box-shadow: none; }
+html:root .table[data-table-presentation='comparison'] .row[data-head] { min-height: var(--grid-table-head-height); padding: var(--space-10) var(--space-12); background: var(--grid-table-head-background); font-size: var(--grid-table-head-font-size); border: 0; border-radius: var(--radius-control); }
+html:root .table[data-table-presentation='comparison'] { gap: var(--grid-table-row-gap); }
