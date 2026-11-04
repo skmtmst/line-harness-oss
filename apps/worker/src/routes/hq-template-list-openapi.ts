@@ -1,5 +1,17 @@
 import { api17TemplateKind } from './api17-openapi.js';
+const catalogStoreUpdate = {
+  get: { tags:['HQ Templates'], summary:'店に届いた統括の新版を確認する', parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}},{name:'accountId',in:'query',required:true,schema:{type:'string'}}], responses:{'200':{description:'判断待ちの新版、または未着'},'403':{description:'閲覧権限なし'},'404':{description:'店舗が見つからない'}} },
+  post: { tags:['HQ Templates'], summary:'店に届いた版を取り込むか現在のまま維持する', parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}},{name:'accountId',in:'query',required:true,schema:{type:'string'}}], requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['decisionId','action','snapshot'],properties:{decisionId:{type:'string'},action:{type:'string',enum:['adopt','keep']},snapshot:{type:'string'}}}}}}, responses:{'200':{description:'判断を保存'},'403':{description:'編集権限なし'},'404':{description:'店舗が見つからない'},'409':{description:'版または店の内容が変更された'}} },
+};
 export const hqTemplateListPaths = {
+'/api/booking/admin/menus/{id}/hq-update': catalogStoreUpdate,
+'/api/mileage/rewards/{id}/hq-update': catalogStoreUpdate,
+'/api/hq/templates/{id}/catalog-redistribution-preview': {
+  post: { tags:['HQ Templates'], summary:'配り直す前に店舗の版と変更を確認する', parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}}], requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['accountIds'],properties:{accountIds:{type:'array',items:{type:'string'}}}}}}}, responses:{'200':{description:'店舗ごとの対象と確認用の版'},'403':{description:'統括または店舗の権限なし'},'409':{description:'対象が変更された'}} },
+},
+'/api/hq/templates/{id}/catalog-redistribution': {
+  post: { tags:['HQ Templates'], summary:'確認した店舗にひな形を配り直す', parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}}], requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['templateVersionId','stores'],properties:{templateVersionId:{type:'string'},stores:{type:'array',items:{type:'object',required:['accountId','snapshot','preflightId'],properties:{accountId:{type:'string'},snapshot:{type:'string'},preflightId:{type:'string'}}}}}}}}}, responses:{'200':{description:'店舗ごとの更新・判断待ち・競合'},'403':{description:'統括または店舗の権限なし'},'409':{description:'ひな形の版が変更された'}} },
+},
 '/api/hq/templates': {
       get: {
         tags: ['HQ Templates'],

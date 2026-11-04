@@ -666,6 +666,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/hq/support/requests',
     'POST /api/hq/support/requests/:id/messages',
     'POST /api/hq/templates',
+    'POST /api/hq/templates/:id/catalog-redistribution',
+    'POST /api/hq/templates/:id/catalog-redistribution-preview',
     'POST /api/hq/templates/:id/distribute',
     'POST /api/hq/templates/:id/duplicate',
     'POST /api/hq/templates/:id/preflight',

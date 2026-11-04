@@ -37,7 +37,7 @@ export function parseCatalogDefinition(type:HqCatalogTemplateType,value:unknown)
 const columns:Record<string,string[]>={
  menus:['id','line_account_id',...bookingKeys.filter(k=>!['autoTagName','paymentMode'].includes(k)),'is_active','deleted_at','auto_tag_id','version','created_at','updated_at','hq_template_id','hq_template_version_id','hq_customized'],
  menu_versions:['id','menu_id','version_number','name','category_label','description','duration_minutes','buffer_after_minutes','base_price','price_mode','sort_order','is_active','rules_json','created_at'],
- mileage_rewards:['id','line_account_id','program_id','name','description','image_url','reward_kind','status','sort_order','current_draft_version_id','current_published_version_id','created_at','updated_at','archived_at','folder_id','hq_template_id','hq_template_version_id','hq_customized'],
+ mileage_rewards:['id','line_account_id','program_id','name','description','image_url','reward_kind','status','sort_order','current_draft_version_id','current_published_version_id','created_at','updated_at','archived_at','folder_id','hq_template_id','hq_template_version_id','hq_customized','hq_stock_cumulative'],
  mileage_reward_versions:['id','reward_id','version_number','status','required_miles','stock_limit','per_friend_limit','starts_at','ends_at','benefit_expires_days','common_action_version_id','failure_policy','customer_message','created_at','published_at','target_conditions','revision'],
  tags:['id','name','status','version','updated_at'],scenarios:['id','name','is_active','updated_at','current_published_version_id'],
  common_actions:['id','name','status','current_published_version_id','archived_at','updated_at'],
@@ -52,8 +52,18 @@ function snapshotSql(type:HqCatalogTemplateType) {
 export async function catalogSnapshot(db:D1Database,accountId:string,type:HqCatalogTemplateType):Promise<string> {
  return (await db.prepare(`SELECT (${snapshotSql(type)}) snapshot`).bind(accountId).first<{snapshot:string}>())!.snapshot;
 }
+export function catalogSnapshotGuard(accountId:string,type:HqCatalogTemplateType,snapshot:string):HqTemplateStatement {
+ return {sql:`SELECT json(CASE WHEN (${snapshotSql(type)})=? THEN '{}' ELSE 'VERSION_CONFLICT' END)`,bindings:[accountId,snapshot]};
+}
 type Row=Record<string,string|number|null>;
 interface Snapshot {targets:Row[];versions:Row[];usage:Array<{id:string;n:number}>;tags:Row[];scenarios:Row[];actions:Row[];actionVersions:Row[];programs:Row[]}
+/** 公開中の景品は、必要マイル以外にも条件が変われば店で確認する。 */
+export function catalogRewardNeedsApproval(target: Row, published: Row, settings: Record<string, unknown>): boolean {
+ if (Number(settings.requiredMiles) > Number(published.required_miles) || settings.rewardKind !== target.reward_kind) return true;
+ const pairs: Array<[string,string]> = [['name','name'],['description','description'],['imageUrl','image_url'],['perFriendLimit','per_friend_limit'],['startsAt','starts_at'],['endsAt','ends_at'],['benefitExpiresDays','benefit_expires_days'],['failurePolicy','failure_policy'],['customerMessage','customer_message']];
+ return pairs.some(([key,column]) => (settings[key] ?? null) !== (target[column] ?? published[column] ?? null))
+  || !!settings.commonActionName || !!settings.targetConditions || !!published.common_action_version_id || !!published.target_conditions;
+}
 function named(rows:Row[],name:unknown):Row {
  if(typeof name!=='string'||!name.trim())throw new HqTemplateError('REFERENCE_UNAVAILABLE',409);
  const matches=rows.filter(r=>normalizeScopedTagName(String(r.name))===normalizeScopedTagName(name));
@@ -92,10 +102,12 @@ export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,sna
  const existing=snap.targets.find(r=>r.id===id),s={...def.settings,name} as unknown as Record<string,unknown>;
  if(existing?.hq_template_id&&origin&&existing.hq_template_id!==origin.templateId)throw new HqTemplateError('VERSION_CONFLICT',409);
  if(!redistribution&&existing?.hq_template_id&&existing.hq_customized===1)throw new HqTemplateError('VERSION_CONFLICT',409);
- const statements:HqTemplateStatement[]=[{sql:`SELECT json(CASE WHEN (${snapshotSql(type)})=? THEN '{}' ELSE 'VERSION_CONFLICT' END)`,bindings:[accountId,snapshot]}];
+ const statements:HqTemplateStatement[]=[catalogSnapshotGuard(accountId,type,snapshot)];
  const add=(sql:string,bindings:HqTemplateStatement['bindings'])=>statements.push({sql,bindings});
  if(redistribution&&origin&&existing?.hq_template_id===origin.templateId&&!adopt){
-  const needsApproval=existing.hq_customized===1||(type==='mileage_reward'&&existing.status==='published');
+  const current=snap.versions.find(v=>v.id===existing.current_published_version_id);
+  if(type==='mileage_reward'&&existing.status==='published'&&!current)throw new HqTemplateError('VERSION_CONFLICT',409);
+  const needsApproval=existing.hq_customized===1||(type==='mileage_reward'&&existing.status==='published'&&!!current&&catalogRewardNeedsApproval(existing,current,s));
   if(existing.hq_template_version_id===origin.versionId||needsApproval){
    if(needsApproval&&existing.hq_template_version_id!==origin.versionId)add(`INSERT OR IGNORE INTO hq_catalog_update_decisions(id,tenant_id,line_account_id,template_id,template_version_id,${type==='booking_menu'?'menu_id':'reward_id'},decision) SELECT ?,a.tenant_id,a.id,?,?,?,'pending' FROM line_accounts a WHERE a.id=?`,[crypto.randomUUID(),origin.templateId,origin.versionId,id,accountId]);
    return {statements,resolutions:[{...selected,targetId:id},...items.slice(1).map(r=>({sourceId:r.sourceId,itemKind:r.itemKind,mode:'overwrite' as const,targetId:r.targetId??undefined,expectedRevision:r.expectedRevision??undefined}))],counts:{created:0,overwritten:0,aliased:0}};
@@ -117,11 +129,21 @@ export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,sna
   const previous=snap.versions.find(v=>v.id===existing?.current_draft_version_id),versionId=previous?String(previous.id):crypto.randomUUID();
   if(existing)add(`UPDATE mileage_rewards SET name=?,description=?,image_url=?,reward_kind=?,current_draft_version_id=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`,[name,d.description,d.imageUrl,d.rewardKind,versionId,id,accountId]);
   else add(`INSERT INTO mileage_rewards(id,line_account_id,program_id,name,description,image_url,reward_kind,status,current_draft_version_id) VALUES (?,?,'default',?,?,?,?,'draft',?)`,[id,accountId,name,d.description,d.imageUrl,d.rewardKind,versionId]);
-  const vals=[d.requiredMiles,d.stockLimit,d.perFriendLimit,d.startsAt,d.endsAt,d.benefitExpiresDays,d.commonActionVersionId,d.failurePolicy,d.customerMessage,d.targetConditions?JSON.stringify(d.targetConditions):null];
+  // 在庫は店舗固有。初回配布では持ち込まず、配り直す場合は公開中または下書きの値を残す。
+  const published=snap.versions.find(v=>v.id===existing?.current_published_version_id);
+  const vals=[d.requiredMiles,published?.stock_limit??previous?.stock_limit??null,d.perFriendLimit,d.startsAt,d.endsAt,d.benefitExpiresDays,d.commonActionVersionId,d.failurePolicy,d.customerMessage,d.targetConditions?JSON.stringify(d.targetConditions):null];
   const cols=['required_miles','stock_limit','per_friend_limit','starts_at','ends_at','benefit_expires_days','common_action_version_id','failure_policy','customer_message','target_conditions'];
   if(previous)add(`UPDATE mileage_reward_versions SET ${cols.map(k=>`${k}=?`).join(',')},revision=revision+1 WHERE id=? AND reward_id=? AND status='draft'`,[...vals,versionId,id]);
   else add(`INSERT INTO mileage_reward_versions(id,reward_id,version_number,status,${cols.join(',')}) VALUES (?,?,(SELECT COALESCE(MAX(version_number),0)+1 FROM mileage_reward_versions WHERE reward_id=?),'draft',${cols.map(()=>'?').join(',')})`,[versionId,id,id,...vals]);
-  if(origin)add('UPDATE mileage_rewards SET hq_template_id=?,hq_template_version_id=?,hq_customized=0 WHERE id=? AND line_account_id=?',[origin.templateId,origin.versionId,id,accountId]);
+  if(redistribution&&existing?.status==='published'){
+   if(!published)throw new HqTemplateError('VERSION_CONFLICT',409);
+   // 店の未使用コードだけを同じ店の新版へ移す。予約済み・発行済みは旧版に残す。
+   if(d.rewardKind==='coupon'&&existing.reward_kind==='coupon')add(`UPDATE mileage_reward_codes SET reward_version_id=? WHERE reward_version_id=? AND status='available' AND NOT EXISTS (SELECT 1 FROM mileage_reward_codes other WHERE other.reward_version_id=? AND other.code_fingerprint=mileage_reward_codes.code_fingerprint)`,[versionId,published.id,versionId]);
+   if(d.rewardKind==='coupon')add(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM mileage_reward_codes WHERE reward_version_id=? AND status='available') THEN '{}' ELSE 'COUPON_CODES_REQUIRED' END)`,[versionId]);
+   add(`UPDATE mileage_reward_versions SET status='published',published_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND reward_id=? AND status='draft'`,[versionId,id]);
+   add(`UPDATE mileage_rewards SET current_published_version_id=?,current_draft_version_id=NULL WHERE id=? AND line_account_id=? AND status='published'`,[versionId,id,accountId]);
+  }
+  if(origin)add('UPDATE mileage_rewards SET hq_template_id=?,hq_template_version_id=?,hq_customized=0,hq_stock_cumulative=1 WHERE id=? AND line_account_id=?',[origin.templateId,origin.versionId,id,accountId]);
  }
  return {statements,resolutions:[{...selected,targetId:id,aliasName:selected.mode==='alias'?name:undefined},...refs.map(r=>({sourceId:r.sourceId,itemKind:r.itemKind,mode:'overwrite' as const,targetId:r.targetId??undefined,expectedRevision:r.expectedRevision??undefined}))],counts:{created:selected.mode==='create'?1:0,overwritten:selected.mode==='overwrite'?1:0,aliased:selected.mode==='alias'?1:0}};
 }

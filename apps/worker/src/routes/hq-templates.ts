@@ -1,5 +1,6 @@
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { searchHqResources } from '../services/hq-templates/resource-search.js';
+import { previewCatalogRedistribution, redistributeCatalog } from '../services/hq-templates/catalog-redistribution.js';
 import { listDistributionTargets } from '../services/hq-templates/distribution-display.js';
 import { testHqForm, issueHqFormTestToken, revokeHqFormTestToken } from '../services/hq-templates/form-test.js';
 import { restoreArchivedTemplate, templateArchiveStatus } from '../services/hq-templates/archive.js';
@@ -245,6 +246,16 @@ hqTemplates.post('/api/hq/templates/:id/test-token',inputJsonBoundary(),async c=
   return c.json({success:true,data:await issueHqFormTestToken(dbFor(c.env),await authority(c),c.req.param('id'),await body(c),c.env.WORKER_URL||new URL(c.req.url).origin)},201);
 });
 hqTemplates.delete('/api/hq/templates/:id/test-tokens/:tokenId',async c=>c.json({success:true,data:await revokeHqFormTestToken(dbFor(c.env),await authority(c),c.req.param('id'),c.req.param('tokenId'))}));
+hqTemplates.post('/api/hq/templates/:id/catalog-redistribution-preview', inputJsonBoundary(), async c => {
+  const input = await body(c);
+  if (!Array.isArray(input.accountIds) || input.accountIds.some(id => typeof id !== 'string' || !id)) throw new HqTemplateError('INVALID_ACCOUNTS');
+  return c.json({ success: true, data: await previewCatalogRedistribution(dbFor(c.env), await authority(c), c.req.param('id'), input.accountIds as string[]) });
+});
+hqTemplates.post('/api/hq/templates/:id/catalog-redistribution', inputJsonBoundary(), async c => {
+  const input = await body(c);
+  if (typeof input.templateVersionId !== 'string' || !input.templateVersionId || !Array.isArray(input.stores) || input.stores.some(value => !value || typeof value !== 'object' || typeof value.accountId !== 'string' || typeof value.preflightId !== 'string' || !value.preflightId || typeof value.snapshot !== 'string' || !/^[a-f0-9]{64}$/.test(value.snapshot))) throw new HqTemplateError('INVALID_SELECTION');
+  return c.json({ success: true, data: await redistributeCatalog(dbFor(c.env), await authority(c), c.req.param('id'), input.templateVersionId, input.stores as Array<{accountId:string;snapshot:string;preflightId:string}>) });
+});
 hqTemplates.post('/api/hq/templates/:id/preflight', inputJsonBoundary(), async c => {
   const input = await body(c);
   if (!Array.isArray(input.accountIds) || input.accountIds.some(v => typeof v !== 'string')) throw new HqTemplateError('INVALID_ACCOUNTS');

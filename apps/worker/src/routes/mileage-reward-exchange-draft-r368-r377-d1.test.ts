@@ -269,6 +269,22 @@ describe('R369 時差付き日時でも公開期間の判定がずれない', ()
 });
 
 describe('R370 在庫があるのに片方へ在庫なしを返さない', () => {
+  it.each([0, 1])('統括景品の版を更新しても過去の交換を在庫に数える（統括由来=%s）', async (fromHq) => {
+    const testDb = createTestD1();
+    seedAccount(testDb, 'account-1');
+    const first = seedFriend(testDb, 'account-1', `hq-stock-first-${fromHq}`);
+    const second = seedFriend(testDb, 'account-1', `hq-stock-second-${fromHq}`);
+    const rewardId = await publishCoupon(testDb, 'account-1', [`old-${fromHq}`], { stockLimit: 1 });
+    testDb.raw.prepare('UPDATE mileage_rewards SET hq_stock_cumulative=? WHERE id=?').run(fromHq, rewardId);
+    await reserveMileageRewardRedemption(testDb.db, { lineAccountId:'account-1', friendId:first.friendId, rewardId, idempotencyKey:`hq-stock-first-${fromHq}`, requestFingerprint:`hq-stock-first-${fromHq}` });
+    await createMileageRewardDraftFromPublished(testDb.db, { id:rewardId, lineAccountId:'account-1' });
+    await importMileageRewardCodes(testDb.db, { rewardId, lineAccountId:'account-1', codes:[{ciphertext:`enc-new-${fromHq}`,fingerprint:`fp-new-${fromHq}`}] });
+    await publishMileageReward(testDb.db, { id:rewardId, lineAccountId:'account-1' });
+    const input={lineAccountId:'account-1',friendId:second.friendId,rewardId,idempotencyKey:`hq-stock-second-${fromHq}`,requestFingerprint:`hq-stock-second-${fromHq}`};
+    if(fromHq) await expect(reserveMileageRewardRedemption(testDb.db,input)).rejects.toMatchObject({code:'out_of_stock'});
+    else expect((await reserveMileageRewardRedemption(testDb.db,input)).kind).toBe('created');
+    testDb.raw.close();
+  });
   it('在庫2個・別々の友だちは各1回成功して異なるコードを渡す', async () => {
     const testDb = createTestD1();
     seedAccount(testDb, 'account-1');

@@ -108,8 +108,8 @@ export async function reserveMileageRewardRedemption(
   if (version.stockLimit != null) {
     const count = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
-        WHERE reward_version_id = ? AND status != 'refunded'`,
-    ).bind(version.id).first<{ count: number }>();
+        WHERE status != 'refunded' AND (reward_version_id = ? OR (reward_id = ? AND EXISTS (SELECT 1 FROM mileage_rewards r WHERE r.id = ? AND r.hq_stock_cumulative = 1)))`,
+    ).bind(version.id, reward.id, reward.id).first<{ count: number }>();
     if ((count?.count ?? 0) >= version.stockLimit) {
       throw new MileageRewardError('out_of_stock', 'この使い道は在庫切れです', 409);
     }
@@ -188,7 +188,7 @@ export async function reserveMileageRewardRedemption(
             ))
             AND (? IS NULL OR (
               SELECT COUNT(*) FROM mileage_redemptions stock
-               WHERE stock.reward_version_id = ? AND stock.status != 'refunded'
+               WHERE stock.status != 'refunded' AND (stock.reward_version_id = ? OR (stock.reward_id = ? AND EXISTS (SELECT 1 FROM mileage_rewards r WHERE r.id = ? AND r.hq_stock_cumulative = 1)))
             ) < ?)
             AND (? IS NULL OR (
               SELECT COUNT(*) FROM mileage_redemptions person_limit
@@ -205,7 +205,7 @@ export async function reserveMileageRewardRedemption(
         now, now, reward.programId, beneficiaryKey, wallet.version, version.requiredMiles,
         reward.programId, input.idempotencyKey,
         code?.id ?? null, code?.id ?? null,
-        version.stockLimit, version.id, version.stockLimit,
+        version.stockLimit, version.id, reward.id, reward.id, version.stockLimit,
         version.perFriendLimit, reward.id, ...sqlIdSet(limitKeys).binds, version.perFriendLimit,
       ),
       db.prepare(
@@ -278,8 +278,8 @@ export async function reserveMileageRewardRedemption(
     if (version.stockLimit != null) {
       const currentStock = await db.prepare(
         `SELECT COUNT(*) AS count FROM mileage_redemptions
-          WHERE reward_version_id = ? AND status != 'refunded'`,
-      ).bind(version.id).first<{ count: number }>();
+          WHERE status != 'refunded' AND (reward_version_id = ? OR (reward_id = ? AND EXISTS (SELECT 1 FROM mileage_rewards r WHERE r.id = ? AND r.hq_stock_cumulative = 1)))`,
+      ).bind(version.id, reward.id, reward.id).first<{ count: number }>();
       if ((currentStock?.count ?? 0) >= version.stockLimit) {
         throw new MileageRewardError('out_of_stock', 'この使い道は在庫切れです', 409);
       }
@@ -314,8 +314,8 @@ export async function reserveMileageRewardRedemption(
   if (version.stockLimit != null) {
     const currentStock = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
-        WHERE reward_version_id = ? AND status != 'refunded'`,
-    ).bind(version.id).first<{ count: number }>();
+        WHERE status != 'refunded' AND (reward_version_id = ? OR (reward_id = ? AND EXISTS (SELECT 1 FROM mileage_rewards r WHERE r.id = ? AND r.hq_stock_cumulative = 1)))`,
+    ).bind(version.id, reward.id, reward.id).first<{ count: number }>();
     if ((currentStock?.count ?? 0) >= version.stockLimit) {
       throw new MileageRewardError('out_of_stock', 'この使い道は在庫切れです', 409);
     }
