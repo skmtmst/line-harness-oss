@@ -1,4 +1,4 @@
-import { createGoogleHoursProfile, GOOGLE_STORE, GOOGLE_CONNECTION, GOOGLE_REVIEWS, GOOGLE_CONNECTION_DATA, GOOGLE_POSTS, GOOGLE_POST_LIST, GOOGLE_PERFORMANCE } from './google-hours-profile-fixture.mjs'
+import { createGoogleHoursWorkspace, createGoogleHoursProfile, GOOGLE_STORE, GOOGLE_CONNECTION, GOOGLE_REVIEWS, GOOGLE_CONNECTION_DATA, GOOGLE_POSTS, GOOGLE_POST_LIST, GOOGLE_PERFORMANCE } from './google-hours-profile-fixture.mjs'
 import { RESTAURANT_LINE_FLOWS, restaurantFollowupRead } from './mock-restaurant-followup.mjs'
 import { templateFolderList } from './mock-template-folders.mjs'
 import {seatBoardEntry} from '../../packages/shared/dist/reservation-board.js'
@@ -1453,8 +1453,7 @@ const RESTAURANT_SNAPSHOT = {
 }
 /*
  * 飲食店向け Googleビジネス（`restaurantGoogleApi`・`/api/restaurant-test/google/*`）。
- * ★V8 Googleビジネスの板（口コミ j0Wcg・返信 x9HIR・投稿 Cfed0・投稿を作る T1j2Sw・
- * パフォーマンス SrmVs・プロフィール JUTGz・設定 CuHXG）の文に寄せた固定データ。
+ * Googleビジネスの口コミ・投稿・営業時間・パフォーマンス・プロフィールの固定データ。
  * 返事の形は本物（apps/worker の restaurant-google）と同じく `data` で包まない。
  */
 const GOOGLE_PROFILE = createGoogleHoursProfile(GOOGLE_STORE)
@@ -3135,6 +3134,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/google/performance') return GOOGLE_PERFORMANCE
   if (method === 'GET' && pathname === '/api/restaurant-test/google/profile') return GOOGLE_PROFILE
+  if (method === 'GET' && pathname === '/api/restaurant-test/google/hours/workspace') return createGoogleHoursWorkspace()
   if (method === 'GET' && pathname === '/api/restaurant-test/terms-agreement') {
     return { success: true, data: { documentKey: 'musubo-terms', agreedVersion: null, agreedAt: null } }
   }

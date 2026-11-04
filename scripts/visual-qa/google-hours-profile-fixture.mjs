@@ -1,3 +1,4 @@
+import { emptyHoursWorkspace } from '../../packages/shared/dist/google-hours-workspace.js'
 export const GOOGLE_STORE = { id: 'store-sby', name: '然 渋谷店', lineAccountId: 'visual-qa-account' }
 export const GOOGLE_CONNECTION = {
   status: 'connected', googleAccountEmail: 'nen.shibuya@gmail.com', locationName: 'locations/nen-shibuya', locationTitle: '然 渋谷店',
@@ -61,3 +62,5 @@ export const createGoogleHoursProfile = (GOOGLE_STORE) => ({
   fetchedAt: '2026-10-02T08:00:00+09:00', stale: false, refreshError: null, pendingChangeCount: 0, writeEnabled: false, aiAvailable: true,
   permissions: { canManageConnection: true, canPublishReply: true, canSendChange: true },
 })
+
+export const createGoogleHoursWorkspace = () => ({success:true,version:0,data:emptyHoursWorkspace(),history:[],holidays:[],serviceTypes:[]})
