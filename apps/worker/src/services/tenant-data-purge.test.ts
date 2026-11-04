@@ -212,6 +212,26 @@ describe('tenant data retention purge', () => {
     expect(count('friends', 'line_account_id = ?', 'acc-t2')).toBe(2);
   });
 
+  test('削除を拒まれた統括は記録して再試行し、別の統括は完了する', async () => {
+    seedTenant('t1', { anchor: jst(-93) }); seedMedia('t1', 'private/t1.png');
+    seedTenant('t2', { anchor: jst(-92) }); seedFriends('t2', 1);
+    sqlite.raw.exec(`CREATE TRIGGER fixture_retention_delete_guard BEFORE DELETE ON media
+      WHEN OLD.id = 'media-t1' BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_USE_LOGICAL_ARCHIVE'); END`);
+    const IMAGES = createR2();
+    const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES }, { now: NOW });
+    expect(result.completed).toBe(1);
+    expect(count('friends', 'line_account_id = ?', 'acc-t2')).toBe(0);
+    expect(count('media', 'id = ?', 'media-t1')).toBe(1);
+    expect(IMAGES.delete).toHaveBeenCalledWith(['private/t1.png']);
+    expect(sqlite.raw.prepare('SELECT data_purged_at FROM tenants WHERE id=?').get('t1')).toEqual({ data_purged_at: null });
+    const audit = sqlite.raw.prepare("SELECT after_json FROM audit_events WHERE tenant_id=? AND action='tenant_data.purge_failed'").get('t1') as { after_json: string };
+    expect(JSON.parse(audit.after_json)).toMatchObject({ table: 'media', failureCode: 'logical_archive_only', r2DeletedBeforeFailure: 1 });
+    expect(audit.after_json).not.toContain('private/t1.png');
+    const retry = await processTenantDataPurge({ DB: sqlite.db, IMAGES }, { now: NOW });
+    expect(retry.tenants).toBe(1);
+    expect(retry.completed).toBe(0);
+  });
+
   /*
    * タグ未設定のフォームも削除対象へ含めるため、利用アカウントから所属を解決する。
    * 別の統括でも共有しているフォームや所属不明のフォームは、他者のデータを消さないよう保持する。

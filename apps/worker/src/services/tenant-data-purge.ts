@@ -5,6 +5,7 @@ import {
   markTenantDataPurged,
   purgeTablesChildFirst,
   recordTenantDataPurgeAudit,
+  recordAuditEvent,
   RETENTION_R2_KEY_COLUMNS,
   tenantScopeCondition,
   toJstString,
@@ -56,6 +57,37 @@ export interface TenantDataPurgeResult {
   deletedObjects: number;
   /** R2の削除に失敗した画像の数。行は消すので次回は拾えない。 */
   failedObjects: number;
+  failedTenants: number;
+}
+
+// DBの生エラーには顧客情報が混ざり得るため、既知のトリガーだけ固定コードに変換する。
+const DELETE_GUARD_CODES: ReadonlyArray<[string, string]> = [
+  ['conversion point with events or usages cannot be deleted', 'referenced_conversion_point'],
+  ['HQ_TEMPLATE_USE_LOGICAL_ARCHIVE', 'logical_archive_only'],
+  ['HQ_TEMPLATE_R2_RECOVERY_LEDGER_IMMUTABLE', 'r2_recovery_ledger'],
+  ['HQ_TEMPLATE_RESULT_RECOVERY_LEDGER_IMMUTABLE', 'result_recovery_ledger'],
+  ['HQ_TEMPLATE_RUN_RECOVERY_LEDGER_IMMUTABLE', 'run_recovery_ledger'],
+  ['published action score version cannot be deleted', 'published_action_score'],
+  ['analytics_funnel_version_immutable', 'immutable_funnel_version'],
+  ['analytics_saved_version_immutable', 'immutable_analysis_version'],
+  ['published auto reply versions cannot be deleted', 'immutable_auto_reply'],
+  ['published automation version cannot be deleted', 'published_automation'],
+  ['common action binding migration history cannot be deleted', 'binding_migration_history'],
+  ['published common action version cannot be deleted', 'published_common_action'],
+  ['published friend-add routing versions cannot be deleted', 'immutable_friend_routing'],
+  ['published friend-add rule versions cannot be deleted', 'immutable_friend_rule'],
+  ['mileage redemption attempt history cannot be deleted', 'redemption_attempt_history'],
+  ['mileage redemption step delivery history cannot be deleted', 'redemption_delivery_history'],
+  ['mileage redemption history cannot be deleted', 'redemption_history'],
+  ['published mileage reward version cannot be deleted', 'published_mileage_reward'],
+  ['published reminder version steps are immutable', 'immutable_reminder_steps'],
+  ['published reminder versions cannot be deleted', 'immutable_reminder_version'],
+  ['published scenario versions cannot be deleted', 'immutable_scenario_version'],
+];
+
+function deleteFailureCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  return DELETE_GUARD_CODES.find(([guard]) => message.includes(guard))?.[1] ?? 'delete_failed';
 }
 
 export async function processTenantDataPurge(
@@ -75,18 +107,26 @@ export async function processTenantDataPurge(
     deletedRows: 0,
     deletedObjects: 0,
     failedObjects: 0,
+    failedTenants: 0,
   };
 
   // 行数の上限は統括をまたいで共有する。1回のcronの仕事量を一定に保つ。
   let budget = ROWS_PER_RUN;
   for (const tenant of tenants) {
     if (budget <= 0) break;
-    const purged = await purgeOneTenant(env, tenant, now, budget);
+    let purged: OneTenantResult;
+    try { purged = await purgeOneTenant(env, tenant, now, budget); }
+    catch {
+      result.failedTenants += 1;
+      logger.error('tenant_data_purge.tenant_failed');
+      continue;
+    }
     budget -= purged.deletedRows;
     result.deletedRows += purged.deletedRows;
     result.deletedObjects += purged.deletedObjects;
     result.failedObjects += purged.failedObjects;
     if (purged.finished) result.completed += 1;
+    if (purged.failure) result.failedTenants += 1;
   }
 
   return result;
@@ -97,6 +137,7 @@ interface OneTenantResult {
   deletedObjects: number;
   failedObjects: number;
   finished: boolean;
+  failure?: { table: string; failureCode: string; r2DeletedBeforeFailure: number };
 }
 
 /**
@@ -152,9 +193,11 @@ async function purgeOneTenant(
 
       // 行を消す前に、同じ行のR2鍵を読んで画像の実体を消す。
       // 読む順と消す順を rowid で揃えるので、両者は必ず同じ行を指す。
+      let r2DeletedBeforeFailure = 0;
       if (keyColumns.length > 0) {
         const objects = await deleteR2Objects(env, table, condition, keyColumns, tenant.id, chunk);
         out.deletedObjects += objects.deleted;
+        r2DeletedBeforeFailure = objects.deleted;
         out.failedObjects += objects.failed;
         if (table === 'form_submission_files' && objects.failed > 0) {
           // 次回も削除を再試行できるよう、R2 キーと親行への参照を保つ。
@@ -163,15 +206,22 @@ async function purgeOneTenant(
         }
       }
 
-      const deleted = await env.DB
-        .prepare(
-          `DELETE FROM ${table}
-            WHERE rowid IN (
-              SELECT ${table}.rowid FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?
-            )`,
-        )
-        .bind(...tenantParams, chunk)
-        .run();
+      let deleted: D1Result;
+      try {
+        deleted = await env.DB
+          .prepare(
+            `DELETE FROM ${table}
+              WHERE rowid IN (
+                SELECT ${table}.rowid FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?
+              )`,
+          )
+          .bind(...tenantParams, chunk)
+          .run();
+      } catch (error) {
+        out.finished = false;
+        out.failure = { table, failureCode: deleteFailureCode(error), r2DeletedBeforeFailure };
+        break tables;
+      }
       const changes = deleted.meta?.changes ?? 0;
       if (changes > 0) {
         byTable[table] = (byTable[table] ?? 0) + changes;
@@ -184,21 +234,36 @@ async function purgeOneTenant(
   }
 
   const finishedAt = out.finished ? now : null;
-  await recordTenantDataPurgeAudit(
-    env.DB,
-    {
-      id: crypto.randomUUID(),
-      tenantId: tenant.id,
-      reason: tenant.purge_requested_at ? 'immediate' : 'expired',
-      retentionAnchorAt: tenant.retention_anchor_at,
-      startedAt,
-      finishedAt,
-      deletedRows: out.deletedRows,
-      deletedRowsByTable: byTable,
-      deletedObjects: out.deletedObjects,
-    },
-    now,
-  );
+  try {
+    await recordTenantDataPurgeAudit(
+      env.DB,
+      {
+        id: crypto.randomUUID(),
+        tenantId: tenant.id,
+        reason: tenant.purge_requested_at ? 'immediate' : 'expired',
+        retentionAnchorAt: tenant.retention_anchor_at,
+        startedAt,
+        finishedAt,
+        deletedRows: out.deletedRows,
+        deletedRowsByTable: byTable,
+        deletedObjects: out.deletedObjects,
+      },
+      now,
+    );
+    if (out.failure) {
+      await recordAuditEvent(env.DB, {
+        category: 'business', action: 'tenant_data.purge_failed', tenantId: tenant.id,
+        actorPrincipalId: 'system:retention', targetKind: 'tenant', targetId: tenant.id,
+        result: 'failed', after: { ...out.failure, deletedRows: out.deletedRows, deletedObjects: out.deletedObjects },
+        retentionClass: 'security', createdAt: now,
+      });
+    }
+  } catch {
+    // 監査できない回を完了扱いにせず、消した件数は他の統括との共通上限に反映する。
+    out.finished = false;
+    out.failure ??= { table: 'tenant_data_purge_audit', failureCode: 'audit_failed', r2DeletedBeforeFailure: 0 };
+    logger.error('tenant_data_purge.audit_failed');
+  }
   if (out.finished) await markTenantDataPurged(env.DB, tenant.id, now);
 
   return out;

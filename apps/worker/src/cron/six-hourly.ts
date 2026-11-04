@@ -169,6 +169,7 @@ export async function runSixHourlyHeavyJobs(
         const result = await processTenantDataPurge(env, {
           now: new Date(event.scheduledTime).toISOString(),
         });
+        if (result.failedTenants) throw new Error('tenant_data_purge_retry_required');
         if (result.anchoredTrials + result.tenants + result.deletedRows > 0) {
           logger.log("tenant_data_retention_purge");
         }
