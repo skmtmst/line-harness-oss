@@ -206,11 +206,11 @@ export const richMenusMethods = {
         { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
       ),
 
-    unpublish: (groupId: string, expectedPublicationGeneration?: number, expectedConfirmationRevision?: number) =>
+    unpublish: (groupId: string, confirmation?:{expectedVersion:number;expectedPublishGeneration:number;expectedIsDefaultForAll:boolean;expectedPages:Array<{id:string;orderIndex:number;lineRichMenuId:string|null}>}) =>
       fetchApi<ApiResponse<{
         pages: Array<{ pageId: string; clearedRichMenuId: string | null }>;
         warnings: string[];
-      }>>(`/api/rich-menu-groups/${groupId}/unpublish`, { method: 'POST', ...(expectedPublicationGeneration === undefined && expectedConfirmationRevision === undefined ? {} : { body: JSON.stringify({ expectedPublicationGeneration, expectedConfirmationRevision }) }) }),
+      }>>(`/api/rich-menu-groups/${groupId}/unpublish`, { method: 'POST',...(confirmation?{body:JSON.stringify(confirmation)}:{}) }),
 
     /** N-151: 公開runの履歴と「いま出ている版」。下書きとの差分フラグも返す。 */
     publishRuns: (groupId: string) =>

@@ -217,6 +217,8 @@ export interface RichMenuDeleteImpact {
     accountId: string;
     name: string;
     status: RichMenuGroup['status'];
+    version: number;
+    publishingGeneration: number;
   };
   currentAudience: {
     value: number;
@@ -235,6 +237,7 @@ export interface RichMenuDeleteImpact {
     pagesWithLineRichMenuId: number;
     isDefaultForAll: boolean;
     publishing: boolean;
+    pages:Array<{id:string;orderIndex:number;lineRichMenuId:string|null}>;
   };
   blockers: Array<
     | 'published'

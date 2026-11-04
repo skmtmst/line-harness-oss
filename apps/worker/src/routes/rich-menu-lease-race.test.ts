@@ -168,34 +168,73 @@ function expireLease() {
 
 describe('実の停止API × 別D1接続の割り込み', () => {
 
-  test('確認後の編集が公開世代を変えなくても古い確認版では取り下げない', async () => {
-    sqlite.prepare("UPDATE rich_menu_groups SET confirmation_revision=2 WHERE id='g1'").run();
-    const res = await setupApp(db).request('/api/rich-menu-groups/g1/unpublish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedPublicationGeneration: 0, expectedConfirmationRevision: 1 }) });
+  test('権利の取得直前に公開世代が変わったらLINEへ触れない', async () => {
+    const racing = hookedDb(db, /UPDATE rich_menu_groups\s+SET publishing_at = \?, publishing_owner/, async () => {
+      sqlite.prepare("UPDATE rich_menu_groups SET publishing_generation=publishing_generation+1 WHERE id='g1'").run();
+    });
+    const res = await setupApp(racing).request('/api/rich-menu-groups/g1/unpublish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedVersion: 1, expectedPublishGeneration: 0, expectedIsDefaultForAll: true, expectedPages: [{ id: 'p1', orderIndex: 0, lineRichMenuId: 'line-old-1' }] }) });
     expect(res.status).toBe(409); expect(fetch).not.toHaveBeenCalled(); expect(groupRow().s).toBe('published');
   });
 
-  test('占有した直後に編集されたら最初の LINE 呼び出しを止める', async () => {
+  test('権利の延長直前に版が変わったらLINEへ触れない', async () => {
     const racing = hookedDb(db, /UPDATE rich_menu_groups\s+SET publishing_at = \?, publishing_expires_at/, async () => {
-      sqlite.prepare("UPDATE rich_menu_groups SET confirmation_revision=confirmation_revision+1 WHERE id='g1'").run();
+      sqlite.prepare("UPDATE rich_menu_groups SET version=version+1 WHERE id='g1'").run();
     });
-    const res = await setupApp(racing).request('/api/rich-menu-groups/g1/unpublish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedPublicationGeneration: 0, expectedConfirmationRevision: 1 }) });
+    const res = await setupApp(racing).request('/api/rich-menu-groups/g1/unpublish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedVersion: 1, expectedPublishGeneration: 0, expectedIsDefaultForAll: true, expectedPages: [{ id: 'p1', orderIndex: 0, lineRichMenuId: 'line-old-1' }] }) });
     expect(res.status).toBe(409); expect(fetch).not.toHaveBeenCalled(); expect(groupRow().s).toBe('published');
   });
-
-  test('確認後に別の公開が入ると、古い世代ではLINEへ取り下げない', async () => {
-    const dbRoute = hookedDb(db, /UPDATE rich_menu_groups\s+SET publishing_at = \?, publishing_owner/, async () => {
-      sqlite.prepare("UPDATE rich_menu_groups SET publishing_generation = publishing_generation + 1 WHERE id = 'g1'").run();
-    });
-    const res = await setupApp(dbRoute).request('/api/rich-menu-groups/g1/unpublish', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ expectedPublicationGeneration: 0 }),
-    });
-    expect(res.status).toBe(409);
-    expect(fetch).not.toHaveBeenCalled();
-    expect(pageRichMenuId()).toBe('line-old-1');
-    expect(groupRow().s).toBe('published');
+  test('取り下げ確認には現在の版・世代・LINE対象を返す',async()=>{
+    const response=await setupApp(db).request('/api/rich-menu-groups/g1/delete-impact');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({data:{group:{version:1,publishingGeneration:0},lineResources:{pages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]}}});
   });
-
+  test('取り下げの確認後に版が変わればLINEへ触れず409を返す',async()=>{
+    sqlite.prepare("UPDATE rich_menu_groups SET version=version+1 WHERE id='g1'").run();
+    const response=await setupApp(db).request('/api/rich-menu-groups/g1/unpublish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:true,expectedPages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]})});
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({code:'RICH_MENU_CONFIRMATION_CHANGED',data:{partial:false,version:2}});
+    expect(groupRow().s).toBe('published');expect(groupRow().g).toBe(0);expect(pageRichMenuId()).toBe('line-old-1');expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  test('公開処理の世代が進んで元に戻った確認はLINEへ触れない',async()=>{
+    sqlite.prepare("UPDATE rich_menu_groups SET publishing_generation=1 WHERE id='g1'").run();
+    const response=await setupApp(db).request('/api/rich-menu-groups/g1/unpublish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:true,expectedPages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]})});
+    expect(response.status).toBe(409);expect(groupRow().s).toBe('published');expect(groupRow().g).toBe(1);expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  test('取り下げ受付直前にページのLINE対象が変わればLINEへ触れない',async()=>{
+    const dbRoute=hookedDb(db,/UPDATE rich_menu_groups\s+SET publishing_at/,async()=>{sqlite.prepare("UPDATE rich_menu_pages SET line_richmenu_id='line-new' WHERE id='p1'").run()});
+    const response=await setupApp(dbRoute).request('/api/rich-menu-groups/g1/unpublish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:true,expectedPages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]})});
+    expect(response.status).toBe(409);expect(groupRow().g).toBe(0);expect(pageRichMenuId()).toBe('line-new');expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  test('取り下げ受付直前にページ順が変われば切り替え先を消さない',async()=>{
+    const dbRoute=hookedDb(db,/UPDATE rich_menu_groups\s+SET publishing_at/,async()=>{sqlite.prepare("UPDATE rich_menu_pages SET order_index=2 WHERE id='p1'").run()});
+    const response=await setupApp(dbRoute).request('/api/rich-menu-groups/g1/unpublish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:true,expectedPages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]})});
+    expect(response.status).toBe(409);expect(groupRow().g).toBe(0);expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  test('確認後に標準表示が変われば取り下げない',async()=>{
+    sqlite.prepare("UPDATE rich_menu_groups SET is_default_for_all=0 WHERE id='g1'").run();
+    const response=await setupApp(db).request('/api/rich-menu-groups/g1/unpublish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:true,expectedPages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]})});
+    expect(response.status).toBe(409);expect(groupRow().g).toBe(0);expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  test('標準表示が別のメニューへ移り元に戻っても古い確認を拒む',async()=>{
+    sqlite.exec("INSERT INTO rich_menu_groups(id,account_id,name,status,size,chat_bar_text,is_default_for_all) VALUES('g2','acc-1','他','published','large','menu',0); INSERT INTO rich_menu_pages(id,group_id,order_index,name,alias_id,line_richmenu_id) VALUES('p2','g2',0,'ページ','alias2','line-2')");
+    const app=setupApp(db),request=(id:string)=>app.request(`/api/rich-menu-groups/${id}/apply-to-tag`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mode:'set-default'})});
+    expect((await request('g2')).status).toBe(200);expect((await request('g1')).status).toBe(200);
+    vi.mocked(fetch).mockClear();
+    const response=await app.request('/api/rich-menu-groups/g1/unpublish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:true,expectedPages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]})});
+    expect(response.status).toBe(409);expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  test('同じ公開対象を確認した取り下げは1回だけLINEへ進む',async()=>{
+    const response=await setupApp(db).request('/api/rich-menu-groups/g1/unpublish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:true,expectedPages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]})});
+    expect(response.status).toBe(200);expect(groupRow().s).toBe('draft');expect(pageRichMenuId()).toBeNull();
+  });
+  test('処理の途中で公開対象が変われば次のLINE操作をしない',async()=>{
+    vi.mocked(fetch).mockImplementationOnce(async()=>{
+      sqlite.prepare("UPDATE rich_menu_pages SET line_richmenu_id='line-new' WHERE id='p1'").run();
+      return new Response('{}',{status:200});
+    });
+    const response=await setupApp(db).request('/api/rich-menu-groups/g1/unpublish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:true,expectedPages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]})});
+    expect(response.status).toBe(409);expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);expect(pageRichMenuId()).toBe('line-new');
+  });
   test('停止の確定直前に別接続が引き継ぐと、409で止まりpage IDもgroupも変えない', async () => {
     const dbTaker = asD1(sqlite);
     let takerGeneration: number | null = null;
@@ -223,7 +262,7 @@ describe('実の停止API × 別D1接続の割り込み', () => {
   });
 
   test('確認した版が一致すれば取り下げが通り、同じ版は再利用できない', async () => {
-    const init = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedPublicationGeneration: 0, expectedConfirmationRevision: 1 }) };
+    const init = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedVersion: 1, expectedPublishGeneration: 0, expectedIsDefaultForAll: true, expectedPages: [{ id: 'p1', orderIndex: 0, lineRichMenuId: 'line-old-1' }] }) };
     expect((await setupApp(db).request('/api/rich-menu-groups/g1/unpublish', init)).status).toBe(200);
     expect(groupRow().s).toBe('draft');
     expect((await setupApp(db).request('/api/rich-menu-groups/g1/unpublish', init)).status).toBe(409);

@@ -1,6 +1,6 @@
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { logger } from '@line-crm/shared/server';
-import { inputError, readBoundedBytes } from '../lib/input-errors.js';
+import { inputError, readBoundedBytes, validatedInputBody } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
 import { getRichMenuGroupById, getRichMenuGroupWithPages, setRichMenuPageImage, pageBelongsToGroup, acquirePublishLease, releasePublishLease, renewPublishLease, markRichMenuGroupUnpublished, getLineAccountById, clearRichMenuAssignmentsForGroup, getRichMenuManualPublishRequestById, getRichMenuManualPublishShells, listRichMenuManualPublishRequests, getLatestRichMenuVersion, recordRichMenuDeviceConfirmation, findRichMenuDeviceConfirmation, ensureRichMenuPublishRun, markRichMenuPublishRun, getLatestRichMenuPublishRun, listRichMenuPublishRunPages, recordAuditEvent, maskAuditIp, auditDeviceFamily, jstNow } from '@line-crm/db';
 import { RICH_MENU_MAX_PAGES } from '@line-crm/shared';
@@ -452,13 +452,15 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return fail(c, 404, 'NOT_FOUND');
   }
-  const body = await c.req.json<{ expectedPublicationGeneration?: unknown; expectedConfirmationRevision?: unknown }>().catch(() => ({} as { expectedPublicationGeneration?: unknown; expectedConfirmationRevision?: unknown }));
-  const expected = body.expectedPublicationGeneration;
-  const expectedConfirmationRevision = body.expectedConfirmationRevision;
-  if (expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(expectedConfirmationRevision) || (expectedConfirmationRevision as number) < 1)) return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
-  if (expected !== undefined && (!Number.isSafeInteger(expected) || (expected as number) < 0)) {
-    return inputError(c, { success: false, error: '確認した公開の世代が不正です' }, 400, ['expectedPublicationGeneration']);
-  }
+  const body=validatedInputBody(c)??{};
+  const hasConfirmation=body.expectedVersion!==undefined||body.expectedPublishGeneration!==undefined||body.expectedIsDefaultForAll!==undefined||body.expectedPages!==undefined;
+  if(hasConfirmation&&(!Number.isSafeInteger(body.expectedVersion)||Number(body.expectedVersion)<1||!Number.isSafeInteger(body.expectedPublishGeneration)||Number(body.expectedPublishGeneration)<0||typeof body.expectedIsDefaultForAll!=='boolean'||!Array.isArray(body.expectedPages)||body.expectedPages.length>RICH_MENU_MAX_PAGES||body.expectedPages.some((page:unknown)=>!page||typeof page!=='object'||typeof (page as {id?:unknown}).id!=='string'||!Number.isSafeInteger((page as {orderIndex?:unknown}).orderIndex)||Number((page as {orderIndex?:unknown}).orderIndex)<0||!((page as {lineRichMenuId?:unknown}).lineRichMenuId===null||typeof (page as {lineRichMenuId?:unknown}).lineRichMenuId==='string'))||new Set(body.expectedPages.map((page:{id:string})=>page.id)).size!==body.expectedPages.length))return inputError(c,{success:false,error:'確認した公開内容を指定してください'},400,[]);
+  const expected=hasConfirmation?{version:Number(body.expectedVersion),generation:Number(body.expectedPublishGeneration),isDefaultForAll:body.expectedIsDefaultForAll as boolean,pages:body.expectedPages as Array<{id:string;orderIndex:number;lineRichMenuId:string|null}>}:undefined;
+  const conflict=async(partial=false)=>{
+    const latest=await getRichMenuGroupWithPages(c.env.DB,groupId);
+    return c.json({success:false,code:'RICH_MENU_CONFIRMATION_CHANGED',error:partial?'公開内容が変わりました。一部の取り下げが進んだ可能性があります。最新の状態を確認してください':'公開内容が変わりました。最新の状態を確認してください',data:latest?{partial,version:latest.version,publishingGeneration:latest.publishing_generation??0,status:latest.status,isDefaultForAll:latest.is_default_for_all===1,pages:latest.pages.map(page=>({id:page.id,orderIndex:page.order_index,lineRichMenuId:page.line_richmenu_id}))}:{partial}},409);
+  };
+
   const account = await getLineAccountById(c.env.DB, group.account_id);
   if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
 
@@ -466,20 +468,21 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   // lease なしで畳むと、同じ group を公開中の実行の owner と期限を消してしまう。
   const unpublishOwner = `unpublish-${crypto.randomUUID()}`;
   const unpublishGeneration = await acquirePublishLease(
-    c.env.DB, groupId, unpublishOwner, new Date().toISOString(), undefined, expected as number | undefined, expectedConfirmationRevision as number | undefined,
+    c.env.DB, groupId, unpublishOwner, new Date().toISOString(),undefined,expected,
   );
   if (unpublishGeneration === null) {
-    const current = await getRichMenuGroupById(c.env.DB, groupId);
-    return c.json({ success: false, error: '公開状態が変わったか、別の操作が進行中です。読み直してください。', data: current ? { publicationGeneration: current.publishing_generation, confirmationRevision: current.confirmation_revision, status: current.status } : null }, 409);
+    if(expected)return conflict();
+    return c.json({ success: false, error: 'already publishing' }, 409);
   }
   const unpublishFence = { owner: unpublishOwner, generation: unpublishGeneration };
-  // lease 取得前に読んだページは古い可能性があるため、取得後に読み直す。
-  const lockedGroup = await getRichMenuGroupWithPages(c.env.DB, groupId);
-  if (!lockedGroup) {
-    await releasePublishLease(c.env.DB, groupId, unpublishFence);
-    return fail(c, 404, 'NOT_FOUND');
+  if(expected){
+    const latest=await getRichMenuGroupWithPages(c.env.DB,groupId);
+    const pages=new Map(expected.pages.map(page=>[page.id,JSON.stringify([page.orderIndex,page.lineRichMenuId])]));
+    if(!latest||latest.version!==expected.version||latest.status!=='published'||(latest.is_default_for_all===1)!==expected.isDefaultForAll||latest.pages.length!==pages.size||latest.pages.some(page=>!pages.has(page.id)||pages.get(page.id)!==JSON.stringify([page.order_index,page.line_richmenu_id]))){
+      await releasePublishLease(c.env.DB,groupId,unpublishFence);return conflict();
+    }
+    group=latest;
   }
-  group = lockedGroup;
 
   // 取り下げも台帳に残す。
   const unpublishRun = await ensureRichMenuPublishRun(c.env.DB, {
@@ -510,13 +513,15 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   };
   try {
     // ページ数ぶんの削除で時間がかかる。外部呼び出しの直前ごとに実時刻で延ばす。
-    let guardedRevision = expectedConfirmationRevision === undefined ? undefined : (expectedConfirmationRevision as number) + 1;
     const heartbeat = async () => {
       const alive = await renewPublishLease(
-        c.env.DB, groupId, unpublishFence, new Date().toISOString(), undefined, guardedRevision,
+        c.env.DB, groupId, unpublishFence, new Date().toISOString(),
       );
       if (!alive) throw new PublishLeaseLostError();
-      if (guardedRevision !== undefined) guardedRevision += 1;
+      if(expected){
+        const latest=await getRichMenuGroupWithPages(c.env.DB,groupId),pages=new Map(expected.pages.map(page=>[page.id,JSON.stringify([page.orderIndex,page.lineRichMenuId])]));
+        if(!latest||latest.version!==expected.version||latest.status!=='published'||(latest.is_default_for_all===1)!==expected.isDefaultForAll||latest.pages.length!==pages.size||latest.pages.some(page=>!pages.has(page.id)||pages.get(page.id)!==JSON.stringify([page.order_index,page.line_richmenu_id])))throw new PublishLeaseLostError();
+      }
     };
     const result = await unpublishRichMenuGroup(groupInput, line, heartbeat);
     // false は失権。書けていないのに成功と返さない。
@@ -535,9 +540,9 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
     });
     await releasePublishLease(c.env.DB, groupId, unpublishFence);
     if (e instanceof PublishLeaseLostError) {
-      const current = await getRichMenuGroupById(c.env.DB, groupId);
+      if(expected)return conflict(true);
       return c.json(
-        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。', data: current ? { publicationGeneration: current.publishing_generation, confirmationRevision: current.confirmation_revision, status: current.status } : null },
+        { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' },
         409,
       );
     }

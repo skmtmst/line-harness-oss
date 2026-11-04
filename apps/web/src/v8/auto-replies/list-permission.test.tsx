@@ -37,7 +37,7 @@ import AutoRepliesList from './list'
 import { clearToastsForTest } from '@/components/shared/toast'
 
 const row: AutoReply = {
-  id: 'rule-a', name: '営業時間', keyword: '営業時間', matchType: 'contains', keywords: null, respondToAll: false,
+  id: 'rule-a', confirmationRevision: 1, name: '営業時間', keyword: '営業時間', matchType: 'contains', keywords: null, respondToAll: false,
   responseType: 'text', responseContent: '10時からです', templateId: null, lineAccountId: 'account-a', isActive: true,
   activeFrom: null, activeUntil: null, cooldownMinutes: null, skipWhenOperatorActive: false, priority: 0, messageKinds: null,
   receiveSources: ['line'], actions: null, responseWeekdays: null, responseHolidayRule: null, oncePerFriend: false,

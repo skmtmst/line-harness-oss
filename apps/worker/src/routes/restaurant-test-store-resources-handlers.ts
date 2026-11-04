@@ -343,11 +343,23 @@ export const delete__api_restaurant_test_menus_id_12 = async (c: Context<Env, "/
     WHERE m.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
     .first<{ id: string; store_id: string }>();
-  if (!menu || !await storeBelongsTo(c,organization.id,menu.store_id)) return c.json({ success: false, error: 'メニューが見つかりません' }, 404);
+  if (!menu || !await storeBelongsTo(c,organization.id,menu.store_id)) return c.json({ success: false, error: 'すでに削除されています' }, 404);
+  let body: { expectedVersion?: number } = {};
+  if (c.req.raw.body) {
+    const raw = await c.req.text();
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) body = parsed as typeof body;
+      else if (/expectedVersion/i.test(raw)) return inputError(c, { success: false, error: '確認した版が正しくありません' }, 400, ['expectedVersion']);
+    } catch {
+      if (/expectedVersion/i.test(raw)) return inputError(c, { success: false, error: '確認した版が正しくありません' }, 400, ['expectedVersion']);
+    }
+  }
+  if (body.expectedVersion !== undefined && (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1)) return inputError(c, { success: false, error: '確認した版が正しくありません' }, 400, ['expectedVersion']);
   const key=`reservation:${menu.store_id}`,owner=crypto.randomUUID();
   if (!await acquireLock(db,key,owner)) return c.json({success:false,code:'resource_busy',error:'店舗を更新中です。少し待ってからお試しください'},409);
   try {
-    const result = await db.prepare(`DELETE FROM rt_menu_items WHERE id = ? AND store_id = ?
+    const result = await db.prepare(`DELETE FROM rt_menu_items WHERE id = ? AND store_id = ? AND (? IS NULL OR confirmation_revision = ?)
       AND NOT EXISTS (SELECT 1 FROM rt_resource_locks l WHERE substr(l.resource_key,1,length('form-course:'||rt_menu_items.id||':'))='form-course:'||rt_menu_items.id||':' AND datetime(l.expires_at)>datetime('now'))
       AND NOT EXISTS (SELECT 1 FROM rt_menu_change_requests WHERE menu_id = rt_menu_items.id)
       AND NOT EXISTS (SELECT 1 FROM restaurant_course_payment_settings WHERE menu_id = rt_menu_items.id)
@@ -363,7 +375,12 @@ export const delete__api_restaurant_test_menus_id_12 = async (c: Context<Env, "/
       AND NOT EXISTS (SELECT 1 FROM style_starter_items f, json_tree(COALESCE(f.source_snapshot,'{}')) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)
       AND NOT EXISTS (SELECT 1 FROM style_starter_items f, json_tree(COALESCE(f.pending_update,'{}')) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)
       AND NOT EXISTS (SELECT 1 FROM style_starter_sets f, json_tree(f.definition_json) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)` )
-      .bind(menu.id,menu.store_id).run();
+      .bind(menu.id,menu.store_id,body.expectedVersion ?? null,body.expectedVersion ?? null).run();
+    if (!result.meta.changes) {
+      const latest = await db.prepare('SELECT * FROM rt_menu_items WHERE id = ? AND store_id = ?').bind(menu.id, menu.store_id).first<{ confirmation_revision: number }>();
+      if (!latest) return c.json({ success: false, error: 'すでに削除されています' }, 404);
+      if (body.expectedVersion !== undefined && latest.confirmation_revision !== body.expectedVersion) return c.json({ success: false, code: 'menu_confirmation_conflict', error: 'メニューが変更されました。最新の内容を確認してください', data: latest }, 409);
+    }
     if (!result.meta.changes) return c.json({ success: false, code:'resource_in_use', error: '予約やフォーム、設定などで使われているメニューは削除できません。停止してください' }, 409);
     auditLog(c,'restaurant.menu.delete',{id:menu.id,kind:'rt_menu_item'});
     return c.json({ success: true, data: { id: menu.id } });

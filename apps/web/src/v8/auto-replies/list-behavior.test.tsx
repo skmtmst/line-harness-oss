@@ -75,7 +75,7 @@ import AutoRepliesListV8 from './list'
 
 const ruleA = {
   id: 'ar-1', name: '営業時間外の自動返信', keyword: '営業時間', matchType: 'contains', keywords: null, respondToAll: false,
-  isActive: true, lifecycleStatus: 'published', hits: { period: 5, total: 20 } as { period: number; total: number } | undefined,
+  isActive: true, confirmationRevision: 1, lifecycleStatus: 'published', hits: { period: 5, total: 20 } as { period: number; total: number } | undefined,
   responseContent: '営業時間外です', responseType: 'text', templateId: null as string | null, keywordMatchMode: 'any',
   activeFrom: null, activeUntil: null, responseWeekdays: null, responseHolidayRule: null, cooldownMinutes: null,
   skipWhenOperatorActive: false, oncePerFriend: false, messageKinds: null, friendConditions: null, folderId: null,
@@ -271,7 +271,7 @@ describe('止める・再開する', () => {
     await waitFor(() => expect(net.stop).toHaveBeenCalledTimes(1))
     const [id, body, key] = net.stop.mock.calls[0]
     expect(id).toBe('ar-1')
-    expect(body).toEqual({ reason: 'キャンペーンが終わったので' })
+    expect(body).toEqual({ reason: 'キャンペーンが終わったので', expectedVersion: 1 })
     expect(typeof key).toBe('string')
     expect(key.length).toBeGreaterThan(0)
   })

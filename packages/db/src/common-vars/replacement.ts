@@ -156,9 +156,14 @@ export async function applyCommonVarReplacementPlan(
   const updates = plan.targets.map((target) => {
     const entries = Object.entries(target.columns);
     const originals = Object.entries(target.originalColumns);
+    const revision = target.table === 'templates' || target.table === 'auto_replies'
+      ? ', confirmation_revision = confirmation_revision + 1'
+      : target.table === 'account_settings'
+        ? ", confirmation_revision = confirmation_revision + CASE WHEN key = 'test_recipients' THEN 1 ELSE 0 END"
+        : '';
     return db.prepare(
       `UPDATE ${target.table}
-          SET ${target.table === 'templates' ? 'confirmation_revision=confirmation_revision+1, ' : ''}${entries.map(([column]) => `${column} = ?`).join(', ')}
+          SET ${entries.map(([column]) => `${column} = ?`).join(', ')}${revision}
         WHERE id = ? AND ${originals.map(([column]) => `${column} IS ?`).join(' AND ')}
           AND EXISTS (
           SELECT 1 FROM common_vars
