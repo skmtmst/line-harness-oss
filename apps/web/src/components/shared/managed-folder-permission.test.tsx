@@ -195,6 +195,36 @@ it.each(['add', 'edit'] as const)('保持した%sの保存確認は最新のcall
   expect(held()).toBe(true)
 })
 
+it.each(['auto_reply', 'common_action', 'mileage_reward'])('%sの追加・編集は未保存の入力を確認してから閉じる', async kind => {
+  render(<Panel kind={kind} canWriteNow={() => true} />)
+  for (const mode of ['add', 'edit'] as const) {
+    await act(async () => mode === 'add' ? control.current!.startAdd() : control.current!.startEdit(folders[0]))
+    const input = screen.getByRole('textbox', { name: 'フォルダ名' }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: '編集中の名前' } })
+    await click(screen.getByRole('button', { name: 'キャンセル' }))
+    expect(screen.getByRole('dialog', { name: '入力を破棄しますか？' })).toBeTruthy()
+    await click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect(input.value).toBe('編集中の名前')
+    await click(screen.getByRole('button', { name: 'キャンセル' }))
+    await click(screen.getByRole('button', { name: '破棄する' }))
+    expect(screen.queryByRole('textbox', { name: 'フォルダ名' })).toBeNull()
+  }
+  expect(api.folders.create).not.toHaveBeenCalled()
+  expect(api.folders.update).not.toHaveBeenCalled()
+})
+
+it.each(['auto_reply', 'common_action', 'mileage_reward'])('%sの行メニューからの編集も未保存の入力を守る', async kind => {
+  render(<Rows kind={kind} canWriteNow={() => true} />)
+  await menu('名前を変える')
+  const input = screen.getByRole('textbox', { name: 'フォルダ名' }) as HTMLInputElement
+  fireEvent.change(input, { target: { value: '変更した名前' } })
+  await click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(screen.getByRole('dialog', { name: '入力を破棄しますか？' })).toBeTruthy()
+  await click(screen.getByRole('button', { name: '編集を続ける' }))
+  expect(input.value).toBe('変更した名前')
+  expect(api.folders.update).not.toHaveBeenCalled()
+})
+
 it('権限復帰だけでは書かず、明示的な再確認で削除は1回', async () => {
   const { rerender } = render(<Rows canWriteNow={() => true} />)
   await menu('消す')

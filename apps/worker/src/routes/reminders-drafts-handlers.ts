@@ -261,6 +261,7 @@ export const get__api_reminders_id_4 = async (c: Context<Env, "/api/reminders/:i
       data: {
         ...(management.has(reminder.id)?{followupManagement:management.get(reminder.id)}:{}),
         id: reminder.id,
+        lineAccountId: reminder.line_account_id ?? null,
         name: reminder.name,
         description: reminder.description,
         isActive: Boolean(reminder.is_active),

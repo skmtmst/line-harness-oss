@@ -3,7 +3,7 @@
 import TextLink from '@/components/shared/text-link'
 import { BroadcastAbResult, abStatusDefinition, useAbResult } from '@/v8/broadcast-ab/public/result/index'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useRef, useState, type ReactNode, type RefObject } from 'react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -254,9 +254,9 @@ export default function BroadcastDetail({
       onReload()
     } catch (cause) {
       if (renderedCancelTicket !== cancelTicket.current || cancelGeneration !== broadcastScope.current.generation) return
-      if (cause instanceof ApiError && cause.status === 409) {
+      if (isSaveConflict(cause)) {
         setCancelConflict(true)
-        setCancelError(cancelConflictMessage(cause.data))
+        setCancelError(cancelConflictMessage(cause instanceof ApiError ? cause.data : undefined))
       } else setCancelError('予約を取り消せませんでした。すでに送信が始まっているかもしれません。状態を読み直してから、もう一度お試しください。')
     } finally {
       setCancelling(false)
@@ -494,13 +494,12 @@ export function CancelReservationDialog({
       designWidth={480}
       designHeaderPadding="24px 24px 0"
       busy={busy}
-      error={error || undefined}
+      error={reviewRequired && onReload ? undefined : error || undefined}
       onCancel={onClose}
       footer={
         <DialogActions>
           {reviewRequired && onReload ? <>
             <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
-            <Button type="button" variant="primary" onClick={onReload} disabled={busy}>読み直す</Button>
           </> : <>
             <Button type="button" variant="danger" onClick={() => { if (!reviewRequired && !target.current.invalid && target.current.key === key) onConfirm() }} disabled={busy || reviewRequired} busy={busy} busyLabel="取り消しています…">
               予約を取り消す
@@ -517,6 +516,7 @@ export function CancelReservationDialog({
       }
     >
       <OperationTargetSummary accounts={accounts} />
+      {reviewRequired && onReload ? <SaveConflictBand title={error || '予約が変更されました'} description="最新の状態を確認してから、もう一度選んでください。" reloadVariant="primary" onReload={onReload} /> : null}
     </Dialog>
   )
 }

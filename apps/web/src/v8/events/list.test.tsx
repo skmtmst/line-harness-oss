@@ -6,7 +6,7 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -35,6 +35,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: account.id, loading: false }),
+  useOptionalAccount: () => ({ selectedAccountId: account.id, loading: false }),
 }))
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-a', name: '対象の店' }, { id: 'account-b', name: 'もう一つの店' }] })) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
@@ -44,6 +45,14 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import EventsListV8 from './list'
+
+it('イベント一覧の畳んだフォルダ欄から追加の窓を開ける', async () => {
+  await render()
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  const menu = document.querySelector('[data-select-menu]') as HTMLElement
+  fireEvent.click(within(menu).getByRole('button', { name: 'フォルダを追加' }))
+  expect(await screen.findByRole('textbox', { name: 'フォルダ名' })).toBeTruthy()
+})
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -123,6 +132,29 @@ afterEach(async () => {
 const createLink = () => [...host.querySelectorAll('a')].find((a) => a.textContent?.includes('イベントを作る'))
 
 describe('V8 イベント予約の一覧', () => {
+  it('フォルダ追加中の名前を、画面を離れる前に確認する', async () => {
+    await render()
+    fireEvent.click(await screen.findByRole('button', { name: 'フォルダを追加' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '作成途中の教室' } })
+    const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+    fireEvent.click(link)
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect((screen.getByRole('textbox', { name: 'フォルダ名' }) as HTMLInputElement).value).toBe('作成途中の教室')
+    link.remove()
+  })
+
+  it('フォルダ編集で色だけ変えても移動前に確認する', async () => {
+    await render()
+    fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「教室」の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '色を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: /フォルダの色/ }))
+    fireEvent.click(screen.getByRole('radio', { name: '赤' }))
+    const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
+    fireEvent.click(link)
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    link.remove()
+  })
   it('詳細でイベント名を編集中に移動すると入力を保って確認する', async () => {
     window.history.replaceState(null, '', '/events?event=ev-1')
     await render()

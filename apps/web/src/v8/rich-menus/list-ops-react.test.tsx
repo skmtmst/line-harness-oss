@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccount: { id: 'account-a', name: '本店' }, selectedAccountId: 'account-a', loading: false }),
+  useOptionalAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -341,7 +342,18 @@ describe('板の印', () => {
     const view = renderList()
     await view.findByText('秋の下書き')
     await waitFor(() => expect(boardOf(view)).toBe('Y9ASp'))
-    expect(view.container.querySelector('[data-template-region="folders"]')).toBeNull()
+    // 列は共通型のコンテナ幅 CSS が畳み、追加窓の状態を保つため部品は残す。
+    expect(view.container.querySelector('[data-template-region="folders"]')).not.toBeNull()
+  })
+
+  test('狭い板でも畳んだフォルダ欄から追加の窓を開ける', async () => {
+    mocks.narrow = true
+    const view = renderList()
+    await view.findByText('秋の下書き')
+    fireEvent.click(view.getByRole('button', { name: 'フォルダ' }))
+    const menu = document.querySelector('[data-select-menu]') as HTMLElement
+    fireEvent.click(within(menu).getByRole('button', { name: 'フォルダを追加' }))
+    expect(await view.findByRole('textbox', { name: 'フォルダ名' })).toBeTruthy()
   })
 })
 

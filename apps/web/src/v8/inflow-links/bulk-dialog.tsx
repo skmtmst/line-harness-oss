@@ -1,6 +1,6 @@
 'use client'
 import FolderSelect from '@/components/shared/folder-select'
-import { useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { ApiError, api } from '@/lib/api'
 import type { EntryRoute } from '@line-crm/shared'
 import { formatNumber } from '@/lib/format'
@@ -30,6 +30,7 @@ export default function BulkRoutesDialog({
   genreOptions,
   onApplied,
   onClose,
+  scopeRef,
   initialAction = null,
 }: {
   /** entry_routes に登録済みの経路だけが対象。 */
@@ -38,10 +39,15 @@ export default function BulkRoutesDialog({
   /** 実行が1回でも終わったら呼ぶ。残った対象のIDを渡す。 */
   onApplied: (remainingIds: string[]) => void
   onClose: () => void
+  scopeRef?: RefObject<{ generation: number }>
   /** 一括バーで押した操作。渡すとその操作を選んだ状態で開く。 */
   initialAction?: BulkRouteAction | null
 }) {
   const saveErrors = useSaveFormErrors()
+  const openedGeneration = useRef(scopeRef?.current.generation)
+  const active = useRef(true)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
+  const current = () => active.current && (!scopeRef || scopeRef.current.generation === openedGeneration.current)
   // 失敗した分だけ残して試し直せるよう、対象は窓の中で持ち直す。
   const [remaining, setRemaining] = useState<EntryRoute[]>(targets)
   const [action, setAction] = useState<BulkRouteAction | null>(initialAction)
@@ -61,11 +67,12 @@ export default function BulkRoutesDialog({
     : []
 
   const run = async () => {
-    if (!action || busy || affected.length === 0) return
+    if (!current() || !action || busy || affected.length === 0) return
     setBusy(true)
     const succeeded: EntryRoute[] = []
     const failed: Array<{ route: EntryRoute; error: string }> = []
     for (const route of affected) {
+      if (!current()) return
       try {
         const res = action === 'move'
           ? await api.entryRoutes.update(route.id, { genre: genre === '' ? null : genre })
@@ -82,6 +89,7 @@ export default function BulkRoutesDialog({
         })
       }
     }
+    if (!current()) return
     setResult({ succeeded, failed })
     setRemaining(failed.map((entry) => entry.route))
     setAction(null)
@@ -91,6 +99,7 @@ export default function BulkRoutesDialog({
 
   const close = () => {
     if (busy) return
+    active.current = false
     onClose()
   }
 
@@ -110,7 +119,7 @@ export default function BulkRoutesDialog({
             </Button>) : null}
         </DialogActions>)}
     >
-      <OperationTargetSummary accounts={[{ id: '', label: '受付先アカウント' }]} />
+      <OperationTargetSummary accounts={[{ id: '', label: '受付先アカウント', name: '不明' }]} />
       <p>受付先の全アカウントは確認できません。</p>
       {result ? (
         <div className="space-y-3">

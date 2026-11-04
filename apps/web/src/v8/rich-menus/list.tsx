@@ -1346,7 +1346,7 @@ export default function RichMenusListV8() {
         </KpiBand>
       </>}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: (id) => { setFolderFilter(id); setPage(1) }, createAction: createButton ?? undefined }}
-      folders={narrow ? undefined : folderPanel}
+      folders={folderPanel}
       toolbar={wideToolbar}
       pagination={listPager}
       overlays={<>

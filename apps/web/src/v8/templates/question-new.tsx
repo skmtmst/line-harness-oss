@@ -42,6 +42,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TemplateEditFrame } from '@/v8/template-edit/public/frame/index'
 import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
@@ -178,7 +179,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     fields.define(`extras-${index}`, `選択肢 ${index + 1} の追加処理`, () => tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))
     fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (!choice.label.trim() ? 'ボタンの文字を入力してください。' : choice.label.length > 20 ? 'ボタンの文字は20文字以内で入力してください。' : null), { required: true })
   })
-  const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing, subject: '質問への変更' })
   /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。 */
   const questionDraftSnapshot = JSON.stringify([name, question])
   useEffect(() => {
@@ -309,7 +310,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         )}
         footerActions={(
           <>
-            <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
+            <Button type="button" onClick={() => (host ? host.onCancel() : requestUnsavedAction(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy} busy={saving && !publishing}>下書きを保存</Button>
             <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(publishReason)} disabledReason={publishReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>

@@ -400,6 +400,22 @@ it('空の種類タブに、ほかの種類の未配布数や通数を混ぜな�
   expect(card?.querySelector('[data-kpi-value]')?.textContent).toContain('0')
   expect(host.textContent).toContain('まだテンプレート')
 })
+it('統括ひな形のフォルダ名を編集中は移動前に確認する', async () => {
+  await render()
+  await act(async () => { buttons().find(button => button.textContent?.includes('フォルダを追加'))!.click() })
+  const input = document.querySelector('[data-folder-name-color] input') as HTMLInputElement
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'ひな形')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const link = document.createElement('a')
+  link.href = '/events'
+  link.textContent = 'イベントへ'
+  document.body.append(link)
+  await act(async () => { link.click() })
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  link.remove()
+})
 
 it('統括ひな形のフォルダ削除窓に対象と環境を出す', async () => {
   await render()

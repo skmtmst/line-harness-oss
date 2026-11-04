@@ -24,3 +24,12 @@ it('広告の対応を連続確定しても1回だけ保存し、拒否の後も
   expect(save).toHaveBeenCalledTimes(2)
   expect(save).toHaveBeenLastCalledWith({ mode: 'manual', eventName: '来店予約', googleActionId: '123' })
 })
+it('同じ画面の表示条件へ移るとき、破棄を選べば編集窓も閉じる', async () => {
+  window.history.replaceState(null, '', '/inflow-links/ad-connections')
+  const close = vi.fn()
+  render(<><AdMappingDialog item={{ pointId: 'point-1', eventType: 'booking_created', automaticEventName: 'Schedule', version: 1, pointName: '予約', provider: 'google', mode: 'manual', eventName: '予約完了', googleActionId: '123' }} onSave={vi.fn()} onClose={close} /><a href="/inflow-links/ad-connections?tab=logs">履歴へ</a></>)
+  fireEvent.change(screen.getByLabelText('予約 googleに返す名前'), { target: { value: '来店予約' } })
+  fireEvent.click(screen.getByRole('link', { name: '履歴へ' }))
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存せずに移動' })) })
+  expect(close).toHaveBeenCalledTimes(1)
+})

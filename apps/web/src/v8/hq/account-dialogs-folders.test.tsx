@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { AccountWithStats } from '@/contexts/account-context'
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 const calls = vi.hoisted(() => ({ list: vi.fn(), update: vi.fn(), move: vi.fn() }))
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
@@ -36,4 +37,69 @@ it('フォルダ取得に失敗したら保存を止め、再読込で復旧で�
   fireEvent.click(retry)
   expect(await screen.findByText('関西')).toBeTruthy()
   expect((screen.getByRole('button', { name: '保存' }) as HTMLButtonElement).disabled).toBe(false)
+})
+
+it('設定の名前を編集中は画面移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/hq')
+  calls.list.mockResolvedValue(folders)
+  render(<><AccountSettingsDialogV8 {...props} /><a href="/events">イベントへ</a></>)
+  await screen.findByText('関西')
+  fireEvent.change(screen.getByLabelText('名前'), { target: { value: '新しい名前' } })
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})
+it('名前だけ保存後にフォルダ移動が失敗しても、名前の更新を重ねずに再試行する', async () => {
+  calls.list.mockResolvedValue({ success: true, data: { folders: [{ id: 'f', name: '関西', color: null, displayOrder: 0 }, { id: 'g', name: '関東', color: null, displayOrder: 1 }] } })
+  calls.update.mockResolvedValue({ success: true, data: {} })
+  calls.move.mockResolvedValueOnce({ success: false, error: 'offline' }).mockResolvedValueOnce({ success: true, data: {} })
+  render(<AccountSettingsDialogV8 {...props} />)
+  await screen.findByText('関西')
+  fireEvent.change(screen.getByLabelText('名前'), { target: { value: '新しい名前' } })
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  fireEvent.click(within(screen.getByRole('option', { name: '関東' })).getByRole('button'))
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存' })) })
+  expect(calls.update).toHaveBeenCalledTimes(1)
+  expect(calls.move).toHaveBeenCalledTimes(1)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存' })) })
+  expect(calls.update).toHaveBeenCalledTimes(1)
+  expect(calls.move).toHaveBeenCalledTimes(2)
+})
+it('設定の入力中にアーカイブを選んだら破棄を確認してから次へ進む', async () => {
+  calls.list.mockResolvedValue(folders)
+  render(<AccountSettingsDialogV8 {...props} />)
+  await screen.findByText('関西')
+  fireEvent.change(screen.getByLabelText('名前'), { target: { value: '新しい名前' } })
+  fireEvent.click(screen.getByRole('button', { name: 'アーカイブ' }))
+  expect(props.onArchive).not.toHaveBeenCalled()
+  const confirmation = await screen.findByRole('dialog', { name: '保存していない変更があります' })
+  fireEvent.click(within(confirmation).getByRole('button', { name: '保存せずに移る' }))
+  expect(props.onArchive).toHaveBeenCalledTimes(1)
+})
+
+it.each(['アーカイブ', 'LINE の登録内容を編集'])('%s に進む前に設定と作りかけのフォルダを確認する', async label => {
+  calls.list.mockResolvedValue(folders)
+  render(<AccountSettingsDialogV8 {...props} canCreateFolder />)
+  await screen.findByText('関西')
+  fireEvent.change(screen.getByLabelText('名前'), { target: { value: '変更した名前' } })
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成途中' } })
+  fireEvent.pointerDown(document.body)
+  fireEvent.click(screen.getByRole('button', { name: label }))
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('作りかけのフォルダ')
+  expect(props.onArchive).not.toHaveBeenCalled()
+  expect(props.onEditRegistration).not.toHaveBeenCalled()
+})
+
+it('設定のキャンセルはフォルダだけを編集中でも破棄を確認する', async () => {
+  calls.list.mockResolvedValue(folders)
+  render(<AccountSettingsDialogV8 {...props} canCreateFolder />)
+  await screen.findByText('関西')
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成途中' } })
+  fireEvent.pointerDown(document.body)
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true }))
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('作りかけのフォルダ')
+  expect(props.onClose).not.toHaveBeenCalled()
 })

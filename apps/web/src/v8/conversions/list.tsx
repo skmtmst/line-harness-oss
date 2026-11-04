@@ -838,7 +838,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   /* 共通のフォルダ（種類 conversion）。すべて・各フォルダ・未分類・追加・「…」（名前・色・並べ替え・消す）。 */
   const folderSelect = (
     <SaveErrorField names={["folderFilter","folder_filter"]}><Select
-      aria-label="フォルダ"
+      narrowFolderPicker aria-label="フォルダ"
       value={folderFilter}
       onChange={setFolderFilter}
       options={managedFolderOptions('conversion', folders, { allId: '', unfiledId: FOLDER_UNFILED })}

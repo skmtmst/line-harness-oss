@@ -1477,3 +1477,13 @@ it('同じ店で停止窓を開き直しても前の窓の確定では送らな�
   act(() => held())
   expect(fixture.stopIntake).not.toHaveBeenCalled()
 })
+
+it('受注画面の説明はできる操作を示す', async () => {
+  render(<DeliveryPage />)
+  await screen.findByText('#UE-1001')
+  const trigger = screen.getByRole('button', { name: 'デリバリー受注の説明' })
+  fireEvent.click(trigger)
+  const note = document.getElementById(trigger.getAttribute('aria-describedby')!)
+  expect(note?.textContent).toContain('新着注文を受け付け')
+  expect(note?.textContent).toContain('注文履歴')
+})

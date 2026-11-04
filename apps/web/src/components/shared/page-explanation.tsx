@@ -50,7 +50,7 @@ export function PageExplanationBody({ children }: { children: ReactNode; keepMou
  * 見出しの「？」をまとめて出す。画面の説明がある時は「この画面の説明」1つ、
  * 題の補足だけの時はこれまでどおり「〇〇の説明」。
  */
-export function PageHelp({ label, help, toggle, explanation }: { label: string; help?: ReactNode; toggle?: ReactNode; explanation?: ReactNode }) {
+export function PageHelp({ label, help, toggle, explanation, reserveSpace }: { label: string; help?: ReactNode; toggle?: ReactNode; explanation?: ReactNode; reserveSpace?: boolean }) {
   if (toggle || explanation) return <PageExplanationTip help={help} extra={explanation} />
-  return help ? <HelpTip label={label}>{help}</HelpTip> : null
+  return help ? <HelpTip label={label} reserveSpace={reserveSpace}>{help}</HelpTip> : null
 }

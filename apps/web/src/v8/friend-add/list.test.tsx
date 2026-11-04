@@ -353,3 +353,16 @@ it('設定の集計が失敗したときは有効0とせず、失敗の理由を
   expect(host.textContent).toContain('読み込めませんでした')
   expect(host.textContent).not.toContain('有効 0')
 })
+it('友だち追加時のフォルダ名を編集中は移動前に確認する', async () => {
+  await render()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' })) })
+  const dialog = screen.getByRole('dialog')
+  await act(async () => { fireEvent.change(within(dialog).getByLabelText('フォルダ名'), { target: { value: '店頭' } }) })
+  const link = document.createElement('a')
+  link.href = '/events'
+  link.textContent = 'イベントへ'
+  document.body.append(link)
+  await act(async () => { fireEvent.click(link) })
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  link.remove()
+})

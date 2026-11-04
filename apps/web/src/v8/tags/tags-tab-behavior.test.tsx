@@ -14,14 +14,14 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useSearchParams: () => new URLSearchParams(),
 }))
 
-const net = vi.hoisted(() => ({ list: vi.fn(), groups: vi.fn() }))
+const net = vi.hoisted(() => ({ list: vi.fn(), groups: vi.fn(), restore: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
     ...actual,
     api: {
       ...actual.api,
-      tags: { ...actual.api.tags, list: net.list },
+      tags: { ...actual.api.tags, list: net.list, restore: net.restore },
       tagGroups: { ...actual.api.tagGroups, list: net.groups },
       listStats: { ...actual.api.listStats, get: vi.fn(async () => ({ success: false as const, error: 'unused' })) },
       featureSettings: { ...actual.api.featureSettings, visibility: vi.fn(async () => ({ success: true as const, data: { features: { friend_fields: true, support_marks: true, saved_searches: true } } })) },
@@ -67,6 +67,33 @@ async function chooseQuick(name: string) {
 }
 
 describe('タグ一覧の値', () => {
+  it('保管から戻す窓に対象を出し、切替後の古い確認を断る', async () => {
+    const items = [tag({ id: 'archived', name: '保管済みタグ', status: 'archived' }), ITEMS[0]!]
+    const view = render(<TagsList accountId="account-a" fixture={{ items, groups: GROUPS }} />)
+    fireEvent.click(screen.getByRole('button', { name: /保管/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'タグ「保管済みタグ」の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '保管から戻す' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
+    const button = within(dialog).getByRole('button', { name: '保管から戻す' })
+    const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+    const old = (button as unknown as Record<string, { onClick: () => void }>)[key].onClick
+    view.rerender(<TagsList accountId="account-b" fixture={{ items, groups: GROUPS }} />)
+    view.rerender(<TagsList accountId="account-a" fixture={{ items, groups: GROUPS }} />)
+    old()
+    expect(net.restore).not.toHaveBeenCalled()
+  })
+  it('戻す確認と同じアカウントを送る', async () => {
+    const items = [tag({ id: 'archived', name: '保管済みタグ', status: 'archived' }), ITEMS[0]!]
+    net.restore.mockResolvedValue({ success: false, error: 'test' })
+    render(<TagsList accountId="account-a" fixture={{ items, groups: GROUPS }} />)
+    fireEvent.click(screen.getByRole('button', { name: /保管/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'タグ「保管済みタグ」の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '保管から戻す' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '保管から戻す' }))
+    expect(net.restore).toHaveBeenCalledWith('archived', 'account-a', 1)
+  })
   it('件数つきで今のアカウントの一覧を読む', async () => {
     render(<TagsList accountId="account-a" />)
     await screen.findAllByText('手で付ける')
