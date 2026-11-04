@@ -373,7 +373,7 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
   }
   const db = dbFor(c.env, current.store_id);
   const update = db.prepare(`UPDATE rt_reservations SET
-    customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
+    confirmation_revision=confirmation_revision+1, customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
     table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, cancel_reason = ?, customer_version=customer_version+1, updated_at = datetime('now')
     WHERE id = ? AND customer_version = ?`).bind(
       next.customer_name, next.customer_phone, next.guest_count, next.starts_at, next.ends_at,

@@ -43,7 +43,7 @@ export const put__api_restaurant_test_tables_layout_1 = async (c: Context<Env, "
   const result=await db.batch([db.prepare(`UPDATE rt_floors SET version=version+1 WHERE id='floor-'||? AND version=? AND (SELECT COUNT(*) FROM rt_tables WHERE store_id=? AND floor_id=rt_floors.id AND id IN(SELECT json_extract(value,'$.id') FROM json_each(?)))=?`).bind(body.storeId,body.expectedVersion,body.storeId,JSON.stringify(rows),rows.length),db.prepare(`WITH positions AS MATERIALIZED (
     SELECT json_extract(value,'$.id') AS id,json_extract(value,'$.floorX') AS x,json_extract(value,'$.floorY') AS y,json_extract(value,'$.joinGroup') AS join_group FROM json_each(?)
   ), eligible AS MATERIALIZED (SELECT t.id FROM rt_tables t JOIN positions p ON p.id=t.id WHERE t.store_id=?)
-  UPDATE rt_tables SET floor_x=(SELECT x FROM positions WHERE id=rt_tables.id),floor_y=(SELECT y FROM positions WHERE id=rt_tables.id),
+  UPDATE rt_tables SET confirmation_revision=confirmation_revision+1, floor_x=(SELECT x FROM positions WHERE id=rt_tables.id),floor_y=(SELECT y FROM positions WHERE id=rt_tables.id),
     join_group=(SELECT join_group FROM positions WHERE id=rt_tables.id),updated_at=datetime('now')
     WHERE id IN (SELECT id FROM eligible) AND (SELECT COUNT(*) FROM eligible)=? AND changes()=1`)
     .bind(JSON.stringify(rows), body.storeId, rows.length)]);
@@ -163,7 +163,7 @@ export const patch__api_restaurant_test_tables_id_4 = async (c: Context<Env, "/a
    const shape=source?.tables.find(t=>t.id===c.req.param('id'));
    if(!target||!shape||!tablePlacementFits(target,{...shape,x:body.floorX??current.floor_x,y:body.floorY??current.floor_y}))return inputError(c,{success:false,error:'座席図の空いている位置を選んでください'},400,['floorX','floorY','floorId']);
   }
-  const update=db.prepare(`UPDATE rt_tables SET code = ?, label = ?, seat_type = ?, min_capacity = ?, max_capacity = ?, is_active = ?, floor_x = ?, floor_y = ?, join_group = ?,floor_id=?, updated_at = datetime('now') WHERE id = ? AND (?=0 OR changes()=1)`)
+  const update=db.prepare(`UPDATE rt_tables SET confirmation_revision=confirmation_revision+1, code = ?, label = ?, seat_type = ?, min_capacity = ?, max_capacity = ?, is_active = ?, floor_x = ?, floor_y = ?, join_group = ?,floor_id=?, updated_at = datetime('now') WHERE id = ? AND (?=0 OR changes()=1)`)
     .bind(code.trim(), label.trim(), seatType, min, max, body.isActive === undefined ? current.is_active : Number(body.isActive), body.floorX ?? current.floor_x, body.floorY ?? current.floor_y, body.joinGroup === undefined ? current.join_group : body.joinGroup?.trim() || null, body.floorId??current.floor_id,c.req.param('id'),Number(changesLayout));
   if(changesLayout){const saved=await db.batch([db.prepare('UPDATE rt_floors SET version=version+1 WHERE id=? AND version=? AND (?=0 OR EXISTS(SELECT 1 FROM rt_floors target WHERE target.id=? AND target.version=?))').bind(current.floor_id,body.expectedVersion!,Number(movingFloor),body.floorId??current.floor_id,body.expectedTargetVersion??0),...(movingFloor?[db.prepare('UPDATE rt_floors SET version=version+1 WHERE id=? AND version=? AND changes()=1').bind(body.floorId!,body.expectedTargetVersion!)]:[]),update]);if(!saved[0].meta.changes)return c.json({success:false,code:'version_conflict',error:'座席図を読み直してください'},409)}else await update.run();
   return c.json({ success: true, data: { id: c.req.param('id') } });

@@ -127,6 +127,55 @@ function del(path: string) {
   }, env);
 }
 
+describe('卓の停止と予約移動の一括確認', () => {
+  function fixture() {
+    if (!testDb.raw.prepare("PRAGMA table_info(rt_reservations)").all().some((row: any) => row.name === 'confirmation_revision')) {
+      testDb.raw.exec('ALTER TABLE rt_reservations ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1');
+    }
+    seedReservation('stop-r1');
+    testDb.raw.prepare("UPDATE rt_reservations SET starts_at='2099-01-01T10:00:00Z', ends_at='2099-01-01T11:00:00Z' WHERE id='stop-r1'").run();
+    seedReservation('stop-r2');
+    testDb.raw.prepare("UPDATE rt_reservations SET starts_at='2099-01-01T12:00:00Z', ends_at='2099-01-01T13:00:00Z' WHERE id='stop-r2'").run();
+    return { storeId: 'store-s', expectedTableRevision: 1, reservations: [
+      { id: 'stop-r1', expectedRevision: 1, targetTableId: null as string | null },
+      { id: 'stop-r2', expectedRevision: 1, targetTableId: null as string | null },
+    ] };
+  }
+  function state() {
+    return { table: testDb.raw.prepare("SELECT is_active, confirmation_revision FROM rt_tables WHERE id='table-1'").get(),
+      reservations: testDb.raw.prepare("SELECT id,table_id,confirmation_revision FROM rt_reservations WHERE id LIKE 'stop-r%' ORDER BY id").all() };
+  }
+  it('古い予約の版では何も変更せず409を返す', async () => {
+    const body = fixture(); const before = state(); body.reservations[1].expectedRevision = 2;
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
+  it('途中の更新が失敗するとすべて巻き戻る', async () => {
+    const body = fixture(); const before = state();
+    testDb.raw.exec("CREATE TRIGGER reject_second_stop BEFORE UPDATE ON rt_reservations WHEN OLD.id='stop-r2' BEGIN SELECT RAISE(ABORT, 'CHECK constraint failed: fixture'); END");
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
+  it('同じ確認の二重実行は一度だけ成功する', async () => {
+    const body = fixture();
+    const responses = await Promise.all([post('/api/restaurant-test/tables/table-1/stop', body), post('/api/restaurant-test/tables/table-1/stop', body)]);
+    expect(responses.map(r => r.status).sort()).toEqual([200,409]);
+    expect(state().table).toEqual({ is_active: 0, confirmation_revision: 2 });
+  });
+  it('確認した予約を入る卓へ移して停止する', async () => {
+    const body = fixture(); body.reservations[0].targetTableId = 'table-2';
+    const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(200);
+    expect(state().reservations).toEqual([{ id: 'stop-r1', table_id: 'table-2', confirmation_revision: 2 }, { id: 'stop-r2', table_id: null, confirmation_revision: 2 }]);
+  });
+  it('確認後に予約が追加されるとすべて保ったまま409になる', async () => {
+    const body = fixture(); seedReservation('stop-r3');
+    testDb.raw.prepare("UPDATE rt_reservations SET starts_at='2099-01-01T14:00:00Z', ends_at='2099-01-01T15:00:00Z' WHERE id='stop-r3'").run();
+    const before = state(); const response = await post('/api/restaurant-test/tables/table-1/stop', body);
+    expect(response.status).toBe(409); expect(state()).toEqual(before);
+  });
+});
+
 beforeEach(() => {
   authMocks.getStaffByApiKey.mockReset();
   authMocks.getStaffByApiKey.mockResolvedValue(null);
