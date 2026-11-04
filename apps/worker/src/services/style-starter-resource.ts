@@ -203,7 +203,7 @@ export async function overwriteResource(
         ),
       db
         .prepare(
-          `UPDATE automation_definitions SET name=?,status='draft',current_draft_version_id=?,updated_at=? WHERE id=? AND line_account_id=?`,
+          `UPDATE automation_definitions SET confirmation_revision = confirmation_revision + 1, name=?,status='draft',current_draft_version_id=?,updated_at=? WHERE id=? AND line_account_id=?`,
         )
         .bind(name, version, now, id, account),
     ];
