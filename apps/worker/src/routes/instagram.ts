@@ -1,6 +1,7 @@
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -315,6 +316,20 @@ instagram.get(
       const instagramId = short.userId || String(profile.id ?? '');
       if (!/^\d{1,24}$/.test(instagramId))
         throw new InstagramError('instagram_business_account_required', 403);
+      // 同じ統括なら複数のLINEアカウントで共有できる。別統括への接続は
+      // Webhook の顧客データを混ぜないため拒否する（DBのトリガーでも守る）。
+      const otherConnection = await c.env.DB.prepare(
+        `SELECT 1 FROM instagram_connections existing
+         JOIN line_accounts old_account ON old_account.id=existing.line_account_id
+         JOIN line_accounts new_account ON new_account.id=?
+         WHERE existing.instagram_id=? AND existing.line_account_id<>?
+           AND COALESCE(old_account.tenant_id,?)<>COALESCE(new_account.tenant_id,?)
+         LIMIT 1`,
+      )
+        .bind(id, instagramId, id, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID)
+        .first();
+      if (otherConnection)
+        throw new InstagramError('instagram_account_other_organization', 409);
       // 画面に出す名前。`page_name` は空にできない列なので、表示名→利用者名→IDの順に埋める。
       const pageName = profile.name || profile.username || instagramId;
       // この方式の合鍵は1本だけ（ページ用と利用者用の区別が無い）。列は両方そのまま使う。
@@ -637,13 +652,17 @@ instagram.post('/api/instagram/webhook', async (c) => {
       !Array.isArray(entry.messaging)
     )
       continue;
-    const row = await c.env.DB.prepare(
-      `SELECT ig.line_account_id,ig.instagram_id FROM instagram_connections ig WHERE (ig.instagram_id=? OR ig.page_id=?) AND EXISTS(SELECT 1 FROM line_accounts la WHERE la.id=ig.line_account_id AND la.is_active=1 AND la.archived_at IS NULL AND ${activeTenantLineAccountSql('la.id')})`,
+    const matches = await c.env.DB.prepare(
+      `SELECT ig.line_account_id,ig.instagram_id,COALESCE(la.tenant_id,'${DEFAULT_TENANT_ID}') tenant_id FROM instagram_connections ig JOIN line_accounts la ON la.id=ig.line_account_id WHERE (ig.instagram_id=? OR ig.page_id=?) AND la.is_active=1 AND la.archived_at IS NULL AND ${activeTenantLineAccountSql('la.id')}`,
     )
       .bind(entry.id, entry.id)
-      .first<{ line_account_id: string; instagram_id: string }>();
-    if (!row) continue;
-    for (const event of entry.messaging ?? []) {
+      .all<{ line_account_id: string; instagram_id: string; tenant_id: string }>();
+    const rows = matches.results;
+    if (!rows.length) continue;
+    // DBに不整合が生じても異なる統括間に受信内容を配らない。
+    if (rows.some((row) => row.tenant_id !== rows[0].tenant_id))
+      continue;
+    for (const row of rows) for (const event of entry.messaging ?? []) {
       const msg = event?.message;
       if (
         typeof msg?.mid !== 'string' ||
