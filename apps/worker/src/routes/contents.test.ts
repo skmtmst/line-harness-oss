@@ -1,4 +1,4 @@
-import './contents-media-test-mocks.js';
+import { deletionMocks } from './contents-media-test-mocks.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -994,7 +994,8 @@ describe('メディアの削除', () => {
     expect(body.code).toBe('media_delete_blocked');
     expect(body.data.usageCount).toBe(5);
     expect(body.data.verified).toBe(true);
-    expect(mocks.deleteMedia).not.toHaveBeenCalled();
+    expect(deletionMocks.finish).not.toHaveBeenCalled();
+    expect(env.IMAGES.delete).not.toHaveBeenCalled();
   });
 
   it('force=1 を付けても使用中は消さない', async () => {
@@ -1009,7 +1010,8 @@ describe('メディアの削除', () => {
     });
     const res = await req('/api/media/md-1?accountId=account-1&force=1', 'DELETE');
     expect(res.status).toBe(409);
-    expect(mocks.deleteMedia).not.toHaveBeenCalled();
+    expect(deletionMocks.finish).not.toHaveBeenCalled();
+    expect(env.IMAGES.delete).not.toHaveBeenCalled();
   });
 
   it('R34: 読み残しがあるときは未確認として止め、確かめられないものは消さない', async () => {
@@ -1021,21 +1023,24 @@ describe('メディアの削除', () => {
     expect(body.code).toBe('media_delete_unverified');
     expect(body.data.verified).toBe(false);
     expect(body.data.canDelete).toBe(false);
-    expect(mocks.deleteMedia).not.toHaveBeenCalled();
+    expect(deletionMocks.finish).not.toHaveBeenCalled();
+    expect(env.IMAGES.delete).not.toHaveBeenCalled();
   });
 
   it('削除時に影響を読み直せなければ削除しない', async () => {
     scanMocks.scanSingleMediaUsage.mockRejectedValueOnce(new Error('D1 unavailable'));
     const res = await req('/api/media/md-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(503);
-    expect(mocks.deleteMedia).not.toHaveBeenCalled();
+    expect(deletionMocks.finish).not.toHaveBeenCalled();
+    expect(env.IMAGES.delete).not.toHaveBeenCalled();
   });
 
-  it('DBの行を先に消す', async () => {
-    // 逆にすると「行はあるが実体が無い」状態になる。この順なら
-    // 孤児のファイルが残るだけで、画面には出てこない。
-    await req('/api/media/md-1?accountId=account-1', 'DELETE');
-    expect(mocks.deleteMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1');
+  it('実体を消してからDBの削除を確定する', async () => {
+    const result = await req('/api/media/md-1?accountId=account-1', 'DELETE');
+    expect(result.status).toBe(200);
+    expect(env.IMAGES.delete).toHaveBeenCalledWith(['key-1']);
+    expect(deletionMocks.finish).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', expect.any(String), expect.any(String));
+    expect(vi.mocked(env.IMAGES.delete).mock.invocationCallOrder.at(-1)).toBeLessThan(deletionMocks.finish.mock.invocationCallOrder.at(-1)!);
   });
 });
 
@@ -1106,7 +1111,8 @@ describe('#667 N-197 編集・削除のAPIはowner/adminのみ', () => {
   it('staffの削除は403で止める', async () => {
     const res = await req('/api/media/md-1?accountId=account-1', 'DELETE', undefined, 'staff');
     expect(res.status).toBe(403);
-    expect(mocks.deleteMedia).not.toHaveBeenCalled();
+    expect(deletionMocks.finish).not.toHaveBeenCalled();
+    expect(env.IMAGES.delete).not.toHaveBeenCalled();
   });
 
   it('staffの影響確認は403で止める', async () => {
@@ -1135,7 +1141,7 @@ describe('#667 N-197 編集・削除のAPIはowner/adminのみ', () => {
   it('adminの削除は通る（使われていなければ）', async () => {
     const res = await req('/api/media/md-1?accountId=account-1', 'DELETE', undefined, 'admin');
     expect(res.status).toBe(200);
-    expect(mocks.deleteMedia).toHaveBeenCalled();
+    expect(deletionMocks.finish).toHaveBeenCalled();
   });
 
   it('ownerの名前変更は通る', async () => {
@@ -1147,7 +1153,7 @@ describe('#667 N-197 編集・削除のAPIはowner/adminのみ', () => {
   it('ownerの削除は通る（使われていなければ）', async () => {
     const res = await req('/api/media/md-1?accountId=account-1', 'DELETE', undefined, 'owner');
     expect(res.status).toBe(200);
-    expect(mocks.deleteMedia).toHaveBeenCalled();
+    expect(deletionMocks.finish).toHaveBeenCalled();
   });
 
   it('ownerの影響確認は通る', async () => {
@@ -2639,5 +2645,5 @@ it('保管庫の削除に失敗したら記録を消さず再試行できる', a
   const response = await req('/api/media/md-1?accountId=account-1', 'DELETE');
   expect(response.status).toBe(503);
   expect(await response.json()).toMatchObject({ code: 'MEDIA_STORAGE_DELETE_FAILED' });
-  expect(mocks.deleteMedia).not.toHaveBeenCalled();
+  expect(deletionMocks.finish).not.toHaveBeenCalled();
 });
