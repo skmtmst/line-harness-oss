@@ -269,13 +269,13 @@ export const scenariosMethods = {
           { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
         ),
       /** 購読を別のシナリオへ移す。返るのは移し先でできた新しい購読。 */
-      move: (subscriptionId: string, targetScenarioId: string, idempotencyKey: string) =>
+      move: (subscriptionId: string, targetScenarioId: string, idempotencyKey: string, confirmation?: { revision: number; status: string }) =>
         fetchApi<ApiResponse<FriendScenarioSubscription>>(
           `/api/scenario-subscriptions/${subscriptionId}/move`,
           {
             method: 'POST',
             headers: { 'Idempotency-Key': idempotencyKey },
-            body: JSON.stringify({ targetScenarioId }),
+            body: JSON.stringify({ targetScenarioId, expectedConfirmationRevision: confirmation?.revision, expectedStatus: confirmation?.status }),
           },
         ),
     },

@@ -105,6 +105,7 @@ export type ScenarioRuns = {
   summary: { active: number; paused: number; completed: number; delivering: number }
   subscriptions: Array<{
     id: string
+    confirmationRevision?: number
     friendId: string
     friendName: string
     status: string
