@@ -54,7 +54,9 @@ function setup(): Database.Database {
     CREATE TABLE line_accounts (id TEXT PRIMARY KEY, tenant_id TEXT);
     CREATE TABLE conversion_points (
       id TEXT PRIMARY KEY, measure_method TEXT NOT NULL, status TEXT NOT NULL,
-      target_url TEXT, line_account_id TEXT, tenant_id TEXT
+      target_url TEXT, line_account_id TEXT, tenant_id TEXT,
+      created_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+      updated_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z'
     );
     INSERT INTO line_accounts (id, tenant_id)
       VALUES ('a1', 'tenant-1'), ('b1', 'tenant-2');
