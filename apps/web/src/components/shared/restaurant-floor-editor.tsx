@@ -7,6 +7,7 @@ import {restaurantTestApi} from '@/lib/restaurant-test-api'
 import {useUnsavedGuard} from '@/lib/use-unsaved-guard'
 import {UnsavedLeaveDialog} from '@/lib/unsaved-leave-dialog'
 import Notice from './notice'
+import Button from './button'
 import RestaurantFloorMap from './restaurant-floor-map'
 import {SaveErrorField,SaveErrorScope,useSaveFormErrors} from './save-form-errors'
 import EntitySelect from './entity-select'
@@ -108,8 +109,8 @@ export default function RestaurantFloorEditor({accountId,storeId,resources,canEd
  const viewBox=visibleViewport?`${visibleViewport.x} ${visibleViewport.y} ${visibleViewport.size} ${visibleViewport.size}`:undefined
  return <SaveErrorScope errors={saveErrors}><div className={styles.editor}>
   {loading?<p className={styles.note} role="status">座席図を読み込み中です。</p>:null}
-  {refreshPending&&dirty?<Notice tone="warn">卓の情報が変わりました。配置の変更は残しています。<button type="button" onClick={()=>guard.guarded(()=>void load())}>最新の座席図を読み込む</button></Notice>:null}
-  {error?<Notice tone="danger">{error}<button type="button" onClick={()=>guard.guarded(()=>void load())}>もう一度読み込む</button></Notice>:null}
+  {refreshPending&&dirty?<Notice tone="warn">卓の情報が変わりました。配置の変更は残しています。<Button type="button" variant="text" size="inline" onClick={()=>guard.guarded(()=>void load())}>最新の座席図を読み込む</Button></Notice>:null}
+  {error?<Notice tone="danger">{error}<Button type="button" variant="text" size="inline" onClick={()=>guard.guarded(()=>void load())}>もう一度読み込む</Button></Notice>:null}
   {draft?<><div className={styles.top}><div className={styles.tabs} role="tablist" aria-label="階・エリア">{floors.map(f=><button type="button" role="tab" aria-selected={f.id===draft.id} key={f.id} className={f.id===draft.id?styles.activeTab:''} onClick={()=>guard.guarded(()=>{setDraft(f);setViewport(initialFloorViewport(f));setSelected('');setZoom(100)})}>{f.name}</button>)}</div>{canEdit?<><button type="button" className={styles.outlineButton} disabled={busy||loading} onClick={()=>openModal('add')}><Plus size={16}/>階・エリアを追加</button><button type="button" className={styles.saveButton} disabled={!dirty||busy||loading} onClick={()=>void save()}><Check size={16} aria-hidden="true"/>座席図を保存</button></>:null}</div>
    {canEdit?<div className={styles.actionLine}><button type="button" className={styles.outlineButton} disabled={busy||loading} onClick={()=>openModal('pattern')}><Plus size={16}/>配置パターンから追加</button><button type="button" className={styles.deleteFloorButton} disabled={busy||loading} onClick={()=>guard.guarded(()=>openModal('delete'))}><Trash2 size={15}/>この階・エリアを削除</button>{selectedTable?<button type="button" className={styles.duplicateInline} disabled={busy||loading} onClick={()=>openModal('duplicate')}><Copy size={15}/>選択した卓を複製</button>:null}</div>:null}
    <div className={styles.mapFrame} onWheel={e=>{if(e.ctrlKey){e.preventDefault();setZoom(z=>Math.min(250,Math.max(50,z+(e.deltaY<0?10:-10))))}}}>
