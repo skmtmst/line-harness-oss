@@ -22,7 +22,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
-import SegmentedControl from '@/components/shared/segmented'
+import RadioCard,{RadioCardGroup} from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import NumberInput from '@/components/shared/number-field'
@@ -81,7 +81,7 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
       setSettings(res.data); setDraft(res.data); setMinutesText(String(res.data.firstResponseMinutes))
     }, (caught) => { if (live) setLoadError(caught) })
     void api.staff.list(accountId).then((res) => {
-      if (live && res.success) {setStaff(res.data.filter((person) => person.isActive && person.role !== 'viewer').map(({id,name})=>({id,name})));setStaffLoaded(true)}
+      if (live && res.success) {setStaff(res.data.filter((person) => person.isActive && (person.inviteStatus ?? 'active') === 'active' && !person.readOnly && person.role !== 'viewer' && (person.role !== 'staff' || person.permissionKeys?.includes('/chats'))).map(({id,name})=>({id,name})));setStaffLoaded(true)}
       else if (live) setStaffError(true)
     }, () => { if (live) setStaffError(true) })
     void api.notifications.teams.list(accountId).then((res) => {
@@ -153,8 +153,9 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
             <div className={styles.body}>
               <section className={styles.card} aria-labelledby="routing-strategy-heading">
                 <h3 id="routing-strategy-heading" className={styles.cardTitle}>割り当て方</h3>
-                <SegmentedControl aria-label="割り当て方" options={STRATEGIES.map(({value,label})=>({value,label}))} value={draft.strategy}
-                  onChange={(strategy) => setDraft({...draft,strategy})} />
+                <RadioCardGroup legend="割り当て方" columns={2}>
+                  {STRATEGIES.map(({value,label})=><RadioCard key={value} name="routing-strategy" value={value} variant="compact" title={label} checked={draft.strategy===value} onChange={()=>setDraft({...draft,strategy:value})} />)}
+                </RadioCardGroup>
                 {draft.strategy !== 'none' ? <>
                   {staffError ? <Notice tone="warn">担当者を読み込めませんでした。引き出しを開き直してください。</Notice> : null}
                   <Field label="対象の人"><EntitySelect aria-label="対象の人" options={staff.map(({id,name})=>({value:id,label:name}))}

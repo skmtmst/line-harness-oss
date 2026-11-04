@@ -7,7 +7,7 @@ vi.mock('@/lib/api/helpers/gap3',()=>({gap3InboxApi:api}))
 const {default:InboxResponse}=await import('./inbox-response')
 afterEach(()=>{cleanup();vi.clearAllMocks()})
 it('新しい記録だけを集計し、削除済みの注記と対象の会話一覧を出す',async()=>{
- api.responseAnalysis.mockResolvedValue({success:true,data:{byStaff:[{staffId:'s',staffDeleted:false,staffName:'担当',count:2,deletedCount:1,medianFirstResponseMinutes:5,withinSlaRate:50}],automatic:{count:0,deletedCount:0,unavailableCount:0},weekly:[]}})
+ api.responseAnalysis.mockResolvedValue({success:true,data:{summary:{medianFirstResponseMinutes:5,withinSlaRate:50,overdueCount:1,totalCount:2},byStaff:[{staffId:'s',staffDeleted:false,staffName:'担当',count:2,deletedCount:1,medianFirstResponseMinutes:5,withinSlaRate:50}],automatic:{count:0,deletedCount:0,unavailableCount:0},weekly:[]}})
  api.responseConversations.mockResolvedValue({success:true,data:{items:[{sampleId:'r',chatId:'c',friendId:'f',friendName:'会話の名前',respondedAt:'2026-11-05T00:00:00Z'}],hasMore:false}})
  render(<InboxResponse accountId="a" />)
  expect(await screen.findByText(/それ以前の返信は含みません/)).toBeTruthy()
