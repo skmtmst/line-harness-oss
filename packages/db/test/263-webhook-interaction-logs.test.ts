@@ -45,6 +45,8 @@ describe('migration 263 Webhookやり取り記録', () => {
       -- この試験で必要な列だけの最小形を用意する。
       CREATE TABLE outgoing_webhooks (
         id TEXT PRIMARY KEY,
+        line_account_id TEXT NOT NULL DEFAULT 'account-a',
+        confirmation_revision INTEGER NOT NULL DEFAULT 1,
         is_active INTEGER NOT NULL DEFAULT 1,
         deleted_at TEXT
       );
@@ -57,6 +59,7 @@ describe('migration 263 Webhookやり取り記録', () => {
       );
     `);
     sqlite.exec(migration);
+    sqlite.exec("ALTER TABLE webhook_interaction_logs ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1");
     db = asD1(sqlite);
   });
 
@@ -277,6 +280,18 @@ describe('migration 263 Webhookやり取り記録', () => {
     expect(byId.get('failed-no-delivery')?.delivery_status).toBeNull();
   });
 
+  it('送り先と記録の版を一度に照合し、古い版では記録を作らない', async () => {
+    sqlite.exec(`INSERT INTO outgoing_webhooks (id, is_active) VALUES ('webhook-a', 1)`);
+    const row = await failedInteraction('cas-failed');
+    const input = { webhookId: 'webhook-a', webhookName: '顧客管理', eventType: 'friend.added', triggerSummary: 'test', requestBodyJson: '{}', idempotencyKey: 'cas-key', expectedInteractionRevision: 1, expectedWebhookRevision: 1 };
+    expect((await claimWebhookInteractionRetryAndInsert(db, row, input)).claimed).toBe(false);
+    expect((await getWebhookInteractionById(db, row.id, 'account-a'))?.status).toBe('failed');
+    expect((await claimWebhookInteractionRetryAndInsert(db, row, { ...input, expectedInteractionRevision: 2, expectedWebhookRevision: 2 })).claimed).toBe(false);
+    expect((await claimWebhookInteractionRetryAndInsert(db, row, { ...input, expectedInteractionRevision: 2 })).claimed).toBe(true);
+    expect((await getWebhookInteractionById(db, row.id, 'account-a'))?.confirmation_revision).toBe(3);
+    expect((await claimWebhookInteractionRetryAndInsert(db, row, { ...input, expectedInteractionRevision: 2 })).claimed).toBe(false);
+  });
+
   it('やり直しの畳み込みと記録作成は一体で、重複した申込は何もしない(R409)', async () => {
     sqlite.exec(`INSERT INTO outgoing_webhooks (id, is_active) VALUES ('webhook-a', 1)`);
     const row = await failedInteraction('failed-a');
@@ -349,6 +364,7 @@ describe('migration 263 Webhookやり取り記録', () => {
 
   it('secret_unavailable を失敗理由として書ける(migration 532, R415)', async () => {
     sqlite.exec(migration532);
+    sqlite.exec("ALTER TABLE webhook_interaction_logs ADD COLUMN confirmation_revision INTEGER NOT NULL DEFAULT 1");
     const row = await createWebhookInteraction(db, {
       id: 'run-secret', lineAccountId: 'account-a', direction: 'outgoing',
       webhookId: 'webhook-a', webhookName: '顧客管理', eventType: 'friend.added',

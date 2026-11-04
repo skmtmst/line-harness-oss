@@ -89,7 +89,7 @@ export async function updateOutgoingWebhook(
     const current = await getOutgoingWebhookById(db, id, lineAccountId);
     return Boolean(current && (options.expectedVersion === undefined || current.version === options.expectedVersion));
   }
-  sets.push('version = version + 1', 'updated_by_staff_id = ?');
+  sets.push('version = version + 1', 'confirmation_revision = confirmation_revision + 1', 'updated_by_staff_id = ?');
   values.push(options.updatedByStaffId ?? null);
   sets.push('updated_at = ?');
   values.push(jstNow());
@@ -111,7 +111,7 @@ export async function deleteOutgoingWebhook(
   expectedVersion?: number,
 ): Promise<boolean> {
   const result = await db.prepare(`UPDATE outgoing_webhooks
-    SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0, updated_at = ?
+    SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0, updated_at = ?, confirmation_revision = confirmation_revision + 1
     WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL AND (? IS NULL OR version = ?)`)
     .bind(jstNow(), deletedByStaffId ?? null, jstNow(), id, lineAccountId, expectedVersion ?? null, expectedVersion ?? null).run();
   return (result.meta.changes ?? 0) > 0;
@@ -127,7 +127,7 @@ export async function restoreOutgoingWebhook(
   lineAccountId: string,
 ): Promise<boolean> {
   const result = await db.prepare(`UPDATE outgoing_webhooks
-    SET deleted_at = NULL, deleted_by_staff_id = NULL, is_active = 0, updated_at = ?
+    SET deleted_at = NULL, deleted_by_staff_id = NULL, is_active = 0, updated_at = ?, confirmation_revision = confirmation_revision + 1
     WHERE id = ? AND line_account_id = ? AND deleted_at IS NOT NULL`)
     .bind(jstNow(), id, lineAccountId).run();
   return (result.meta.changes ?? 0) > 0;

@@ -483,8 +483,21 @@ export const post__api_webhooks_interactions_id_retry_10 = async (c: Context<Env
   try {
     const access = await requireInteractionAccount(c);
     if ('error' in access) return access.error;
+    let body: { confirmed?: unknown; interactionRevision?: unknown; webhookRevision?: unknown } = {};
+    try { body = (await c.req.json()) ?? {}; } catch { /* 旧呼び出しは本文なしでも受け付ける */ }
+    const hasRevision = body.interactionRevision !== undefined || body.webhookRevision !== undefined;
+    if (hasRevision && (!Number.isSafeInteger(body.interactionRevision) || Number(body.interactionRevision) < 1 || !Number.isSafeInteger(body.webhookRevision) || Number(body.webhookRevision) < 1)) {
+      return c.json({ success: false, error: '確認した版が正しくありません' }, 400);
+    }
+    const expected = hasRevision ? { interactionRevision: Number(body.interactionRevision), webhookRevision: Number(body.webhookRevision) } : undefined;
     const original = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
-    if (!original) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!original) return hasRevision ? c.json({ success: false, error: 'confirmation_conflict', current: null }, 409) : c.json({ success: false, error: 'Not found' }, 404);
+    if (expected) {
+      const destination = original.webhook_id ? await getOutgoingWebhookById(c.env.DB, original.webhook_id, access.lineAccountId) : null;
+      if (original.confirmation_revision !== expected.interactionRevision || destination?.confirmation_revision !== expected.webhookRevision || !destination?.is_active) {
+        return c.json({ success: false, error: 'confirmation_conflict', current: { ...serializeInteraction(original), webhookRevision: destination?.confirmation_revision ?? null } }, 409);
+      }
+    }
     /*
       「届いたか分からない」失敗を無条件で再送しない。
       相手先で同じ処理が記録されていないか確かめた、という運用者の確認
@@ -492,23 +505,25 @@ export const post__api_webhooks_interactions_id_retry_10 = async (c: Context<Env
       冪等キーで行うので、届いていても相手先で二重処理されない。
     */
     if (original.failure_reason === 'unknown') {
-      let confirmed = false;
-      try {
-        const body = await c.req.json<{ confirmed?: unknown }>();
-        confirmed = body?.confirmed === true;
-      } catch {
-        confirmed = false;
-      }
-      if (!confirmed) {
+      if (body.confirmed !== true) {
         return c.json({ success: false, error: 'result_unknown_needs_check' }, 409);
       }
     }
-    const retried = await retryWebhookInteraction(c.env.DB, original, webhookKeysOf(c));
+    const retried = expected
+      ? await retryWebhookInteraction(c.env.DB, original, webhookKeysOf(c), expected)
+      : await retryWebhookInteraction(c.env.DB, original, webhookKeysOf(c));
     auditLog(c, 'webhook.interaction.retry',
       { kind: 'webhook_interaction', id: original.id }, { lineAccountId: access.lineAccountId });
     return c.json({ success: true, data: serializeInteraction(retried) });
   } catch (err) {
     const code = err instanceof Error ? err.message : 'retry_failed';
+    if (code === 'confirmation_conflict') {
+      const access = await requireInteractionAccount(c);
+      if ('error' in access) return access.error;
+      const current = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
+      const destination = current?.webhook_id ? await getOutgoingWebhookById(c.env.DB, current.webhook_id, access.lineAccountId) : null;
+      return c.json({ success: false, error: code, current: current ? { ...serializeInteraction(current), webhookRevision: destination?.confirmation_revision ?? null } : null }, 409);
+    }
     if (code === 'not_retryable' || code === 'already_retried') {
       return c.json({ success: false, error: code }, 409);
     }

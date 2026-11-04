@@ -77,6 +77,8 @@ export type WebhookInteractionFailureReason =
  */
 export interface WebhookInteraction {
   id: string;
+  confirmationRevision?: number;
+  webhookRevision?: number | null;
   direction: WebhookInteractionDirection;
   webhookName: string;
   eventType: string;

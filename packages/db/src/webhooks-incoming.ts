@@ -47,7 +47,7 @@ export async function updateIncomingWebhookConfig(
   | { status: 'not_found' }
 > {
   const result = await db.prepare(`UPDATE incoming_webhooks
-    SET identity_match_json = ?, action_refs_json = ?, version = version + 1, updated_at = ?
+    SET identity_match_json = ?, action_refs_json = ?, version = version + 1, updated_at = ?, confirmation_revision = confirmation_revision + 1
     WHERE id = ? AND line_account_id = ? AND version = ? AND deleted_at IS NULL`)
     .bind(
       JSON.stringify(input.identityMatching),
@@ -78,7 +78,7 @@ export async function updateIncomingWebhookMaskedSample(
   receivedAt = jstNow(),
 ): Promise<void> {
   await db.prepare(`UPDATE incoming_webhooks
-    SET latest_masked_sample_json = ?, latest_received_at = ?
+    SET latest_masked_sample_json = ?, latest_received_at = ?, confirmation_revision = confirmation_revision + 1
     WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(JSON.stringify(maskedSample), receivedAt, id, lineAccountId)
     .run();
@@ -172,7 +172,7 @@ export async function updateIncomingWebhook(
     const current = await getIncomingWebhookById(db, id, lineAccountId);
     return Boolean(current && (expectedVersion === undefined || current.version === expectedVersion));
   }
-  sets.push('version = version + 1');
+  sets.push('version = version + 1', 'confirmation_revision = confirmation_revision + 1');
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);

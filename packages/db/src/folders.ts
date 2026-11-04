@@ -246,6 +246,18 @@ export async function deleteFolder(db: D1Database, id: string, expectedRevision?
     WHERE folder_id IN (SELECT id FROM children)
       AND EXISTS (SELECT 1 FROM folders root WHERE root.id = ? AND root.kind = 'scenario'
         AND NOT EXISTS (SELECT 1 FROM children c WHERE c.account_id IS NOT root.account_id OR c.kind <> root.kind))`).bind(id,id), db.prepare(`WITH RECURSIVE children(id, account_id, kind) AS (
+    SELECT id, account_id, kind FROM folders WHERE id = ?
+    UNION SELECT f.id, f.account_id, f.kind FROM folders f JOIN children c ON f.parent_id = c.id
+  ) UPDATE outgoing_webhooks SET confirmation_revision = confirmation_revision + 1
+    WHERE folder_id IN (SELECT id FROM children)
+      AND EXISTS (SELECT 1 FROM folders root WHERE root.id = ? AND root.kind = 'webhook'
+        AND NOT EXISTS (SELECT 1 FROM children c WHERE c.account_id IS NOT root.account_id OR c.kind <> root.kind))`).bind(id,id), db.prepare(`WITH RECURSIVE children(id, account_id, kind) AS (
+    SELECT id, account_id, kind FROM folders WHERE id = ?
+    UNION SELECT f.id, f.account_id, f.kind FROM folders f JOIN children c ON f.parent_id = c.id
+  ) UPDATE incoming_webhooks SET confirmation_revision = confirmation_revision + 1
+    WHERE folder_id IN (SELECT id FROM children)
+      AND EXISTS (SELECT 1 FROM folders root WHERE root.id = ? AND root.kind = 'webhook'
+        AND NOT EXISTS (SELECT 1 FROM children c WHERE c.account_id IS NOT root.account_id OR c.kind <> root.kind))`).bind(id,id), db.prepare(`WITH RECURSIVE children(id, account_id, kind) AS (
     SELECT id, account_id, kind FROM folders WHERE parent_id = ?
     UNION SELECT f.id, f.account_id, f.kind FROM folders f JOIN children c ON f.parent_id = c.id
   ) DELETE FROM folders WHERE id = ? AND NOT EXISTS (
@@ -254,7 +266,7 @@ export async function deleteFolder(db: D1Database, id: string, expectedRevision?
     SELECT 1 FROM tags t WHERE (t.folder_id = folders.id OR t.folder_id IN (SELECT id FROM children))
       AND t.line_account_id IS NOT folders.account_id
   ))`).bind(id, id)]);
-  return Number(result[5].meta?.changes ?? 0) > 0;
+  return Number(result[7].meta?.changes ?? 0) > 0;
 }
 
 /** kind ごとの件数。画面のタブに数字を出すため。 */
