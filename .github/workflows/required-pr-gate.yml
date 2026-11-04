@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: required-pr-gate-${{ github.event.pull_request.number || github.ref }}
@@ -47,20 +48,41 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.head_ref }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "PR差分がない手動実行のため、司令塔の所有パス検査を飛ばします。"
             exit 0
           fi
 
-          # 本番へ昇格するPR（base が main）は、開発版で既に司令塔の経路を通った
-          # 変更をまとめて運ぶだけで、ここで所有パスを新しく書き換えるわけではない。
-          # この検査は lane のPR（機能開発 → 開発版）が所有パスへ勝手に手を入れるのを
-          # 止めるためのものなので、本番昇格には効かせない。
-          # 効かせると、開発版の文書変更を必ず含む本番昇格が常に落ちて、
-          # 本番へ出す手段そのものが無くなる（#1016 で実際に詰まった）。
+          # 本番昇格は検証済みの開発版そのものだけに限る。
+          # main 宛てというだけで所有パスの検査を免除しない。
           if [ "$BASE_REF" = "main" ]; then
-            echo "本番へ昇格するPRのため、所有パスの変更を許可します。"
+            if [[ ! "$HEAD_REF" == codex/masato-production-release-* ]]; then
+              echo "::error::本番昇格専用ブランチではありません。"
+              exit 1
+            fi
+            git fetch --no-tags origin codex/development
+            if ! git merge-base --is-ancestor "$HEAD_SHA" FETCH_HEAD; then
+              echo "::error::PRのHEADが開発版に含まれていません。"
+              exit 1
+            fi
+            stage_runs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-cloudflare-staging.yml/runs?head_sha=$HEAD_SHA&status=success&per_page=100")
+            deployed=false
+            while IFS= read -r run_id; do
+              jobs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")
+              if jq -e '[.jobs[] | select(.name == "deploy") | .steps[]
+                | select(.name == "Deploy Worker to staging" or .name == "Deploy Admin Panel to staging" or .name == "Verify public source revisions")
+                | select(.conclusion == "success")] | length == 3' <<< "$jobs" >/dev/null; then
+                deployed=true
+                break
+              fi
+            done < <(jq -r --arg sha "$HEAD_SHA" '.workflow_runs[] | select(.head_sha == $sha and .event == "workflow_dispatch" and .conclusion == "success") | .id' <<< "$stage_runs")
+            if [ "$deployed" != true ]; then
+              echo "::error::PRのHEADと同じSHAでWorker・管理画面を検証配備した成功記録がありません。"
+              exit 1
+            fi
+            echo "検証済み開発版からの本番昇格を確認しました。"
             exit 0
           fi
 
