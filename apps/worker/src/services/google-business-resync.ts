@@ -244,7 +244,7 @@ export async function processGoogleBusinessDailyMetrics(
         await db.batch(statements.slice(index, index + 50));
       }
       await db
-        .prepare(`UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1, last_metrics_synced_at = ?, updated_at = ? WHERE store_id = ?`)
+        .prepare(`UPDATE rt_google_connections SET last_metrics_synced_at = ?, updated_at = ? WHERE store_id = ?`)
         .bind(input.now, input.now, connection.store_id)
         .run();
       synced += 1;

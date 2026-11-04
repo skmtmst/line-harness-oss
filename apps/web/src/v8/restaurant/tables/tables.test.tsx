@@ -259,6 +259,17 @@ describe('BERxg 座席・卓管理', () => {
     expect(fixture.updateReservation).not.toHaveBeenCalled()
   })
 
+  it.each(['closure_conflict', 'customer_table_conflict'])('卓停止の %s は理由を表示し、移動済みとは表示しない', async code => {
+    fixture.stopTable.mockRejectedValueOnce(new ApiError(409, code, code, { reason: '卓の予約が重なっています' }))
+    render(<TablesPage />)
+    await screen.findByText('卓の詳細')
+    fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '予約を移して止める' }))
+    expect(await screen.findByText('卓の予約が重なっています')).toBeTruthy()
+    expect(screen.queryByText(/件の変更を確認しました/)).toBeNull()
+  })
+
   it('予約の移動中にアカウントが切り替わったら次の変更を送らない', async () => {
     let finish!: (value: unknown) => void
     fixture.stopTable.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))

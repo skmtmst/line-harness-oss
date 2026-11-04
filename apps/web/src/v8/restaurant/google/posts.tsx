@@ -46,6 +46,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   restaurantGoogleApi,
+  type GoogleConnectionData,
   type GooglePost,
   type GooglePostCtaType,
   type GooglePostDraftInput,
@@ -122,7 +123,7 @@ function instagramFact(ig: NonNullable<GooglePost['instagram']>): string {
   return ig.caption ? 'Google と同時に出します（Instagram 用の文章あり）' : 'Google と同時に出します（本文をそのまま使います）'
 }
 
-export function PostsBoard({ accountId, go, store, googleLocation, connection }: { accountId: string; go: GoogleNav; store?: { id: string; name?: string | null }; googleLocation?: string | null; connection?: { id?: string; confirmationRevision?: number } }) {
+export function PostsBoard({ accountId, go, store, googleLocation, connection, onConnectionReloaded }: { accountId: string; go: GoogleNav; store?: { id: string; name?: string | null }; googleLocation?: string | null; connection?: { id?: string; confirmationRevision?: number }; onConnectionReloaded?: (data: GoogleConnectionData) => void }) {
   const scope = useRef({ id: accountId, generation: 0 })
   if (scope.current.id !== accountId) scope.current = { id: accountId, generation: scope.current.generation + 1 }
   const loadedScope = useRef(-1)
@@ -204,6 +205,7 @@ export function PostsBoard({ accountId, go, store, googleLocation, connection }:
           if (!alive.current || generation !== scope.current.generation) return false
           const latest = latestConnection.connection?.id && Number.isSafeInteger(latestConnection.connection.confirmationRevision)
             ? latestPosts.posts.find(item => item.id === confirmRemove.id && item.status === 'published') : undefined
+          onConnectionReloaded?.(latestConnection)
           setData(latestPosts)
           setConfirmRemove(latest ?? null)
           setRemoveScope(previous => previous && latest ? { ...previous, googleLocation: latestConnection.connection?.locationTitle,

@@ -224,7 +224,7 @@ export function useFileScan() {
         setDeleteTarget(latest?.find(item => item.id === deleteTarget.id) ?? null)
       }
       setDeleteError(caught instanceof ApiError && caught.status === 409
-        ? 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
+        ? caught.code === 'file_scan_not_disposable' ? 'しまった・使えないファイルだけ消せます。一覧を読み直してください。' : '確認した内容が変わりました。一覧を読み直してください。'
         : '消せませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       deleteLock.current = false

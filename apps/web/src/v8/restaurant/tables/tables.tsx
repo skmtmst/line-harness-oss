@@ -18,6 +18,7 @@ import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
  * データの口・送る形は今の画面（app/restaurant-test/v8/tables.tsx）と同じ。動きは BEHAVIOR.md。
  */
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { ApiError } from '@/lib/api/transport/errors'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect,useMemo, useRef, useState } from 'react'
 import { Check, Inbox, Plus } from 'lucide-react'
@@ -250,6 +251,11 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         if (!current()) throw new QuietError()
         return { moved, unassigned }
       } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+          const detail = error.data && typeof error.data === 'object' && 'reason' in error.data ? error.data.reason : undefined
+          if (current()) setStopError(typeof detail === 'string' && /[ぁ-んァ-ヶ一-龠]/u.test(detail) ? detail : japaneseDetailOf(error) || '確認した内容が変わりました。読み直してください。')
+          throw new QuietError()
+        }
         const target = accounts.find(account => account.id === selectedAccountId)?.name || '名前を確認できないLINEアカウント'
         const progress = `${target}・${store?.name || '名前を確認できない店舗'}の卓「${table.code}」：予約${moved + unassigned}件の変更を確認しました（別の卓へ${moved}件、未配席${unassigned}件）。${inFlight ? '通信中の変更は結果を確認できません。' : ''}予約台帳と卓の状態を確認してください。`
         if (!current()) { notifyToast(progress, { tone: 'info', duration: 0 }); throw new QuietError() }

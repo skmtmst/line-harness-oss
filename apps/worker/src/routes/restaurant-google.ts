@@ -349,8 +349,8 @@ function publicReview(row: ReviewRow) {
 
 export async function setConnectionStatusForEnv(env: Env['Bindings'], storeId: string, status: ConnectionStatus, error?: string | null): Promise<void> {
   await dbFor(env, storeId)
-    .prepare(`UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + 1, status = ?, last_sync_error = COALESCE(?, last_sync_error), updated_at = ? WHERE store_id = ?`)
-    .bind(status, error ?? null, nowIso(), storeId)
+    .prepare(`UPDATE rt_google_connections SET confirmation_revision = confirmation_revision + CASE WHEN status IS NOT ? THEN 1 ELSE 0 END, status = ?, last_sync_error = COALESCE(?, last_sync_error), updated_at = ? WHERE store_id = ?`)
+    .bind(status, status, error ?? null, nowIso(), storeId)
     .run();
 }
 

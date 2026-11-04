@@ -478,13 +478,24 @@ describe('ファイルの安全確認の設定画面', () => {
     expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('環境')
     mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf({ confirmationRevision: 8, filename: 'new.pdf' })], total: 1, limit: 50, offset: 0 } })
     confirmInDialog('削除する')
-    const message = 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
+    const message = '確認した内容が変わりました。一覧を読み直してください。'
     await waitFor(() => {
       expect(screen.getByText(message)).toBeTruthy()
     })
     expect(mocks.remove).toHaveBeenCalledWith('scan-1', 'acc-1', 7)
     expect(await screen.findByText('「new.pdf」を削除しますか？')).toBeTruthy()
     expect(container.querySelector('p[role="alert"]')).toBeNull()
+  })
+
+  test('消せない状態の409は状態の理由を表示する', async () => {
+    ready()
+    mocks.remove.mockRejectedValueOnce(new ApiError(409, 'しまった・使えないファイルだけ消せます', 'file_scan_not_disposable'))
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    render(<FileScanSettingsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'invoice.pdfのその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+    confirmInDialog('削除する')
+    expect(await screen.findByText('しまった・使えないファイルだけ消せます。一覧を読み直してください。')).toBeTruthy()
   })
 
   test('外の検査を止める失敗（500）は窓の中に理由を出す (D017)', async () => {
