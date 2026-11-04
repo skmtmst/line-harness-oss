@@ -105,3 +105,4 @@ export {
 } from './test-tokens.js';
 
 export { formMediaUsageQueries, formMediaUsageStatements } from './media-references.js';
+export { validRestaurantCoursesSql } from './course-guard.js';

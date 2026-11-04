@@ -76,3 +76,4 @@ export {
 export {
   syncAffiliateConversionMileage,
 } from './affiliate.js';
+export { resolveMileageSource, selectMileageAccountBatch } from './source.js';

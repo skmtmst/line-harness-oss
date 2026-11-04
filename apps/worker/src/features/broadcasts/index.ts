@@ -16,3 +16,4 @@ export { processBroadcastAfterActions } from './broadcast-after-actions.js';
 export { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery-outcome.js';
 export { getBroadcastAudiencePreview } from './broadcast-audience-preview.js';
 export { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';
+export { buildBroadcastAudienceQuery } from './broadcast-audience-query.js';
