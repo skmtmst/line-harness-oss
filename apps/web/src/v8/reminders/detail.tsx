@@ -8,7 +8,7 @@ import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
-import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRight, Check, Copy, Download, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
@@ -181,6 +181,11 @@ function ReminderDetailV8() {
   const tab = tabFromParam(searchParams.get('tab'))
   const runsStatusParam = searchParams.get('runStatus')
   const { selectedAccount, selectedAccountId } = useAccount()
+  const pauseContext = useRef({ accountId: selectedAccountId, reminderId, generation: 0 })
+  if (pauseContext.current.accountId !== selectedAccountId || pauseContext.current.reminderId !== reminderId) pauseContext.current = { accountId: selectedAccountId, reminderId, generation: pauseContext.current.generation + 1 }
+  const pauseRef = useRef<{ generation: number } | null>(null)
+  const openedPause = pauseRef.current
+  const loadSequence = useRef(0)
   const staffRole = useStaffRole()
   const featureAccess = useFeatureAccess('reminders')
   const canManage = featureAccess
@@ -199,6 +204,7 @@ function ReminderDetailV8() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const deleteScope = JSON.stringify([selectedAccountId, reminderId])
   const [confirmedDeleteScope, setConfirmedDeleteScope] = useState('')
+  const [confirmedDeleteGeneration, setConfirmedDeleteGeneration] = useState(-1)
   useEffect(() => { setConfirmDelete(false); setConfirmedDeleteScope('') }, [deleteScope])
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -206,9 +212,12 @@ function ReminderDetailV8() {
   const [confirmPause, setConfirmPause] = useState(false)
   const [pausing, setPausing] = useState(false)
 
-  usePageTitle(data?.reminder.name ? `${data.reminder.name}・リマインダ` : null)
+  usePageTitle(data?.reminder.id === reminderId && data.reminder.name ? `${data.reminder.name}・リマインダ` : null)
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
+    const generation = pauseContext.current.generation
+    const current = () => sequence === loadSequence.current && generation === pauseContext.current.generation
     // id なしで帰ると「読み込んでいます」が永遠に出る。先に止めて文面を出す。
     if (!reminderId) {
       setLoading(false)
@@ -227,10 +236,13 @@ function ReminderDetailV8() {
         api.reminders.runs(reminderId, { limit: 5, offset: 0 }),
         api.reminders.get(reminderId),
       ])
+      if (!current()) return
       if (!runsRes.success) throw new Error(runsRes.error)
+      if (runsRes.data.reminder.id !== reminderId || (reminderRes.success && reminderRes.data.id !== reminderId)) throw new Error('reminder id mismatch')
       setData(runsRes.data)
       if (reminderRes.success) setReminder(reminderRes.data)
     } catch (caught) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.status === 404) {
@@ -241,12 +253,13 @@ function ReminderDetailV8() {
         setError('リマインダの詳細を読み込めませんでした。時間を置いてもう一度お試しください。') }
       }
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
   }, [reminderId, saveErrors])
 
   useEffect(() => {
     void load()
+    return () => { loadSequence.current += 1 }
   }, [load, selectedAccountId])
 
   /*
@@ -254,10 +267,12 @@ function ReminderDetailV8() {
    * 配信予定（status=planned）から数える。
    */
   useEffect(() => {
+    setPlanned([])
+    setPlannedTotal(0)
     if (!reminderId) return
     let cancelled = false
     void api.reminders.runs(reminderId, { status: 'planned', limit: PLANNED_LIMIT }).then((res) => {
-      if (cancelled || !res.success) return
+      if (cancelled || !res.success || res.data.reminder.id !== reminderId) return
       setPlanned(res.data.items)
       setPlannedTotal(res.data.pagination.total)
     }).catch(() => undefined)
@@ -278,15 +293,19 @@ function ReminderDetailV8() {
   const isUnpublishedDraft = data ? !data.reminder.hasPublishedVersion : false
 
   const setReminderActive = async (isActive: boolean): Promise<boolean> => {
-    if (!data || data.reminder.isActive === isActive) return true
+    if (!data || data.reminder.id !== reminderId || pauseContext.current.reminderId !== reminderId) return false
+    if (data.reminder.isActive === isActive) return true
+    const generation = pauseContext.current.generation
     setActionMessage('')
     try {
       const response = await api.reminders.update(reminderId, { isActive })
+      if (generation !== pauseContext.current.generation) return false
       if (!response.success) throw new Error(response.error)
-      setData((current) => current ? { ...current, reminder: { ...current.reminder, isActive } } : current)
+      setData((current) => current?.reminder.id === reminderId ? { ...current, reminder: { ...current.reminder, isActive } } : current)
       setActionMessage(isActive ? 'リマインダを再開しました。' : 'リマインダを一時停止しました。')
       return true
     } catch (caught) {
+      if (generation !== pauseContext.current.generation) return false
       const fieldFailure = saveErrors.capture(caught)
       // API も未公開の再開を 409 で止める。その文面をそのまま出す。
       { if (!fieldFailure)
@@ -300,11 +319,11 @@ function ReminderDetailV8() {
   }
 
   const runPause = async () => {
-    if (pausing) return
+    if (pausing || !openedPause || pauseRef.current !== openedPause || openedPause.generation !== pauseContext.current.generation) return
     setPausing(true)
     const ok = await setReminderActive(false)
     setPausing(false)
-    if (ok) setConfirmPause(false)
+    if (ok) { pauseRef.current = null; setConfirmPause(false) }
   }
 
   const exportCsv = async () => {
@@ -373,7 +392,7 @@ function ReminderDetailV8() {
   /* ===== 削除 ===== */
 
   const runDelete = async () => {
-    if (deleting || confirmedDeleteScope !== deleteScope) return
+    if (deleting || data?.reminder.id !== reminderId || confirmedDeleteScope !== deleteScope || confirmedDeleteGeneration !== pauseContext.current.generation) return
     setDeleting(true)
     setDeleteError('')
     try {
@@ -412,7 +431,7 @@ function ReminderDetailV8() {
         icon: <Trash2 size={16} aria-hidden="true" />,
         tone: 'danger' as const,
         dividerBefore: true,
-        onSelect: () => { setConfirmedDeleteScope(deleteScope); setConfirmDelete(true) },
+        onSelect: () => { setConfirmedDeleteScope(deleteScope); setConfirmedDeleteGeneration(pauseContext.current.generation); setConfirmDelete(true) },
       },
     ] : []),
   ]
@@ -451,7 +470,7 @@ function ReminderDetailV8() {
       <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="リマインダが指定されていません" description="一覧から選び直してください。" backHref="/reminders" backLabel="リマインダ一覧へ戻る" /></SaveErrorScope>
     )
   }
-  if (loading) return <SaveErrorScope errors={saveErrors}><DetailLoading label="リマインダの詳細を読み込んでいます" /></SaveErrorScope>
+  if (loading || (data && data.reminder.id !== reminderId)) return <SaveErrorScope errors={saveErrors}><DetailLoading label="リマインダの詳細を読み込んでいます" /></SaveErrorScope>
   if (missing) {
     return (
       <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" backHref="/reminders" backLabel="リマインダ一覧へ戻る" /></SaveErrorScope>
@@ -493,7 +512,7 @@ function ReminderDetailV8() {
           <div className={styles.sideActions}>
             {canManage && !isUnpublishedDraft ? (
               data.reminder.isActive ? (
-                <Button className={styles.sideAction} onClick={() => setConfirmPause(true)}>
+                <Button className={styles.sideAction} onClick={() => { pauseRef.current = { generation: pauseContext.current.generation }; setConfirmPause(true) }}>
                   <Pause size={16} aria-hidden="true" />一時停止する
                 </Button>
               ) : (
@@ -564,17 +583,17 @@ function ReminderDetailV8() {
               onShowAllRuns={() => selectTab('runs')}
             />
           ) : tab === 'schedule' ? (
-            <ScheduleTab reminderId={reminderId} steps={data.steps} />
+            <ScheduleTab key={`${selectedAccountId}:${reminderId}`} reminderId={reminderId} steps={data.steps} />
           ) : tab === 'runs' ? (
             <RunsTab
               // 概要の警告帯から飛んだとき、絞り込みを確実に掛け直す。
-              key={runsStatusParam ?? ''}
+              key={JSON.stringify([selectedAccountId, reminderId, runsStatusParam])}
               reminderId={reminderId}
               canManage={canManage}
               initialStatus={runsStatusParam === 'permanent_failed' ? 'permanent_failed' : ''}
             />
           ) : (
-            <RegistrantsTab reminderId={reminderId} canManage={canManage} />
+            <RegistrantsTab key={`${selectedAccountId}:${reminderId}`} reminderId={reminderId} canManage={canManage} />
           )}
         </div>
       </DetailColumns></PageContent>
@@ -588,19 +607,19 @@ function ReminderDetailV8() {
           ? `送る予定の ${formatNumber(plannedTotal)} 通が送られなくなります（今後24時間の分は数え切れませんでした）。`
           : `今後24時間で送る予定の ${formatNumber(pauseImpact.count)} 通 が送られなくなります。`}
         busy={pausing}
-        onClose={() => { if (!pausing) setConfirmPause(false) }}
+        onClose={() => { if (!pausing) { pauseRef.current = null; setConfirmPause(false) } }}
         actions={(
           <>
-            <Button onClick={() => setConfirmPause(false)} disabled={pausing}>キャンセル</Button>
-            <Button widthReserve="idle" variant="primary" onClick={() => void runPause()} disabled={pausing} busy={pausing} busyLabel="止めています…">
+            <Button onClick={() => { pauseRef.current = null; setConfirmPause(false) }} disabled={pausing}>キャンセル</Button>
+            <Button widthReserve="idle" variant="primary" onClick={() => void runPause()} disabled={pausing || !openedPause || openedPause.generation !== pauseContext.current.generation} busy={pausing} busyLabel="止めています…">
               <Pause size={16} aria-hidden="true" />一時停止する
             </Button>
           </>
         )}
-      />
+      ><OperationTargetSummary accounts={[{ id: data.reminder.lineAccountId ?? '', name: data.reminder.lineAccountId ? undefined : '不明' }]} externalTarget={{ label: '対象件数', name: '1件' }} /></SheetDialog>
 
       <ConfirmDialog
-        open={confirmDelete && confirmedDeleteScope === deleteScope}
+        open={confirmDelete && confirmedDeleteScope === deleteScope && confirmedDeleteGeneration === pauseContext.current.generation}
         title={`「${data.reminder.name}」を削除しますか`}
         description="登録者への未送信の通知と送信の履歴も消えます。この操作は取り消せません。"
         confirmLabel="削除する"
@@ -609,7 +628,7 @@ function ReminderDetailV8() {
         error={deleteError}
         onConfirm={() => runDelete()}
         onCancel={() => setConfirmDelete(false)}
-      ><OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} /></ConfirmDialog>
+      ><OperationTargetSummary accounts={[{ id: data.reminder.lineAccountId ?? '', name: data.reminder.lineAccountId ? undefined : '不明' }]} /></ConfirmDialog>
     </PageFrame></PageExplanationProvider></SaveErrorScope>
   )
 }
@@ -804,6 +823,9 @@ const RUN_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
 ]
 
 function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string; canManage: boolean; initialStatus: '' | ReminderDeliveryRunStatus }) {
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  const loadSequence = useRef(0)
   const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>(initialStatus)
   const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -815,6 +837,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
   const [notice, setNotice] = useState('')
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setState('loading')
     try {
       const res = await api.reminders.runs(reminderId, {
@@ -823,12 +846,14 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
       })
+      if (!mounted.current || sequence !== loadSequence.current) return
       if (!res.success) throw new Error(res.error)
+      if (res.data.reminder.id !== reminderId) throw new Error('reminder id mismatch')
       setItems(res.data.items)
       setTotal(res.data.pagination.total)
       setState('ready')
     } catch {
-      setState('error')
+      if (mounted.current && sequence === loadSequence.current) setState('error')
     }
   }, [appliedSearch, page, reminderId, status])
 
@@ -838,6 +863,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
   useEffect(() => { if (page > pageCount) setPage(pageCount) }, [page, pageCount])
 
   const retry = async (runId: string) => {
+    if (!mounted.current || !items.some(item => item.id === runId && item.canRetry) || !canManage) return
     setRetryingId(runId)
     setNotice('')
     try {

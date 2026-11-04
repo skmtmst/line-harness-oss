@@ -1267,7 +1267,7 @@ export default function ScenariosListV8() {
   )
 
   const folderSelect = (
-    <SaveErrorField names={["folderFilter","folderId","folder","folder_filter"]}><Select width={narrow ? 152 : undefined} aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
+    <SaveErrorField names={["folderFilter","folderId","folder","folder_filter"]}><Select width={narrow ? 152 : undefined} narrowFolderPicker aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
   )
 
   const filteredCount =

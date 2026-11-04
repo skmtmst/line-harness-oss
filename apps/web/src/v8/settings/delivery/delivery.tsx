@@ -462,6 +462,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           readOnlyBand={role !== null && !canManage}
           readOnlyNeed="manager"
           title="デリバリー連携"
+          helpReserveSpace
           help={`デリバリーサービスへの接続を設定します。Uber Eats の注文の取り込みと注文ごとの操作は、連携の利用準備が整った店舗では受注画面に表示されます。営業状態の変更・メニューの同期はまだ利用できません。${
             anyConnected
               ? 'つながっているサービスの状態をここに出します。お店での入力はありません。うまくいっていない時は musubo が原因を確認し、必要な手続きを行います。'

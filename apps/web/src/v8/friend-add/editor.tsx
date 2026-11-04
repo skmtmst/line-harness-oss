@@ -43,6 +43,7 @@ import { canManageRole,useStaffRole } from '@/lib/staff-role'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import styles from './editor.module.css'
 import { describeFriendAddFailure } from './failure'
 import { MESSAGE_TYPE_LABEL } from './flow'
@@ -212,7 +213,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     && savedSnapshot.current !== editorSnapshot(rule, definition)
 
   /* 未保存の変更がある間、画面外への離脱を確認対話へ寄せる。 */
-  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty: hasUnsavedChanges, busy: saving || enabling || duplicating })
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: hasUnsavedChanges, busy: saving || enabling || duplicating, subject: '追加時の動きへの変更' })
 
   const validateStep = (target: Step) => {
     const skipsScenario = rule.friendKind === 'returning' && definition.returningMode === 'none'
@@ -601,7 +602,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     <SaveErrorScope errors={saveErrors}><CreatePage step={currentIndex}
       boardId={step === 'routes' && narrow ? 'xHpkS' : conflict ? 'h5rm8t' : STEPS[currentIndex].node}
       title="初回案内を作る"
-      actions={canEdit && ruleId ? <RowMenu label="初回案内の操作" triggerProps={{ disabled: saving || enabling || duplicating }} items={[{ id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) }]} /> : undefined}
+      actions={canEdit && ruleId ? <RowMenu label="初回案内の操作" triggerProps={{ disabled: saving || enabling || duplicating }} items={[{ id: 'duplicate', label: '複製する', onSelect: () => requestUnsavedAction(() => void duplicateSaved()) }]} /> : undefined}
       steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} readOnly={!canEdit} summaries={{ basic: rule.name, routes: routeSummary, message: firstSend, actions: `${formatNumber(definition.actions.length)}件のアクション` }} />}
       help={<>
         {step === 'basic'

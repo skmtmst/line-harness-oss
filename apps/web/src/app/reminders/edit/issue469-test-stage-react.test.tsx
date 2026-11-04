@@ -35,11 +35,15 @@ vi.mock('@/lib/api', async (importOriginal) => {
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('@/lib/line-accounts-cache', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/line-accounts-cache')>()),
-  loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-1', name: '確認用アカウント' }] })),
+  loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'account-1', name: '保存済みアカウント' }, { id: 'account-2', name: '未保存アカウント' }] })),
 }))
 
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', loading: false }) }))
+
+vi.mock('@/v8/reminders/edit-messages', () => ({
+  MessagesStageV8: ({ settings, onChange }: { settings: ReminderDraftVersion['settings']; onChange: (value: ReminderDraftVersion['settings']) => void }) => <button onClick={() => onChange({ ...settings, lineAccountId: 'account-2' })}>未保存の設定を変更</button>,
+}))
 
 import ReminderEditV8 from '@/v8/reminders/edit'
 
@@ -95,6 +99,21 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('リマインダ テスト送信段 (N-070)', () => {
+  it('未保存の設定より保存済み下書きの送信元を表示する', async () => {
+    apiMocks.getDraft.mockReturnValue(ok(DRAFT))
+    apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
+    const view = render(<ReminderEditV8 stage="messages" reminderId="rem-1" />)
+    await screen.findByRole('button', { name: '未保存の設定を変更' })
+    fireEvent.click(screen.getByRole('button', { name: '未保存の設定を変更' }))
+    view.rerender(<ReminderEditV8 stage="confirm" reminderId="rem-1" />)
+    await waitFor(() => expect((screen.getAllByRole('button', { name: 'テストを送る' })[0] as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
+    const dialog = screen.getByRole('dialog', { name: 'テスト送信しますか？' })
+    await waitFor(() => expect(dialog.textContent).toContain('保存済みアカウント'))
+    expect(dialog.textContent).not.toContain('未保存アカウント')
+    expect(apiMocks.testDraft).not.toHaveBeenCalled()
+  })
+
   it('テスト送信前に下書きの送信元と環境を示す', async () => {
     apiMocks.getDraft.mockReturnValue(ok(DRAFT))
     apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
@@ -103,7 +122,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'テストを送る' })[0])
     const dialog = screen.getByRole('dialog', { name: 'テスト送信しますか？' })
     expect(dialog.textContent).toContain('LINEアカウント')
-    await waitFor(() => expect(dialog.textContent).toContain('確認用アカウント'))
+    await waitFor(() => expect(dialog.textContent).toContain('保存済みアカウント'))
     expect(dialog.textContent).toContain('環境')
     expect(apiMocks.testDraft).not.toHaveBeenCalled()
   })

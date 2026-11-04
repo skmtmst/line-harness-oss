@@ -46,7 +46,10 @@ import { formatNumber } from '@/lib/format'
 import type { Folder,MediaDeleteImpact,MediaDeleteImpactReference,MediaItem } from '@line-crm/shared'
 import { hasDeliveryAccess } from '@line-crm/shared'
 import { Archive,EyeOff,HardDrive,Images,LayoutGrid,List as ListIcon,Plus } from 'lucide-react'
-import { useCallback,useEffect,useRef,useState } from 'react'
+import { useCallback,useContext,useEffect,useRef,useState } from 'react'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
 import FileScanStoppedBanner from './file-scan-stopped-banner'
 import styles from './list.module.css'
 import { blockedReason,canDelete as canDeleteMedia,checkedAtText,dialogTitle,referenceKindText,referenceNameText,usageText } from './media-delete-impact'
@@ -151,6 +154,14 @@ export default function MediaLibraryListV8() {
   // 名前変更の多重押し防ぎと、札のそばに出す失敗文。一覧全体の欄には出さない。
   const [renamingBusy, setRenamingBusy] = useState(false)
   const [renameError, setRenameError] = useState('')
+  const depth = useContext(OverlayDepthContext)
+  const renameOriginal = renaming ? items.find(item => item.id === renaming.id)?.filename : undefined
+  const editBusy = renamingBusy || (archiveTarget !== null && archiveBusy) || (moveTarget !== null && moveBusy)
+  const guard = useUnsavedGuard({
+    dirty: Boolean((renaming && renaming.value !== renameOriginal) || (archiveTarget && archiveReason) || (moveTarget && moveFolderId !== (moveTarget.folderId ?? '')) || editBusy),
+    busy: editBusy,
+    onDiscard: () => { setRenaming(null); setArchiveTarget(null); setArchiveReason(''); setMoveTarget(null); setMoveFolderId('') },
+  })
   /** 取得中の札。保存URLへ直接行かず、認証と監査を通る口から受け取る。 */
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set())
 
@@ -1098,6 +1109,7 @@ export default function MediaLibraryListV8() {
       )}
       overlays={(
         <>
+        <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={editBusy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></OverlayDepthContext.Provider>
       {/*
         1件ずつの削除確認（設計 `YfTfJ`）。**消せないときは「削除しますか？」と
         聞かない。** 聞いてから断るより、最初から消せないと言うほうが短い。
@@ -1185,7 +1197,7 @@ export default function MediaLibraryListV8() {
 
             <p>
               {impact.verified !== false && impact.usageCount > 0 ? <>使われている場所から外すと削除できます。別のメディアを選ぶと、使用先をまとめて差し替えられます。<br /></> : null}
-              {checkedAtText(impact.checkedAt)} 時点で、{impact.verified === false ? '確認できなかった場所があります。' : 'テンプレート・一斉配信・リッチメニュー・シナリオ・コラム・イベント・ウェビナーの7種類を確認しました。'}
+              {checkedAtText(impact.checkedAt)} 時点で、{impact.verified === false ? '確認できなかった場所があります。' : '登録メディアの使用先を確認しました。'}
             </p>
           </div>
         ) : null}
@@ -1413,19 +1425,19 @@ export default function MediaLibraryListV8() {
                   onPreview={() => setPreview(item)}
                   onToggleMenu={() => setOpenMenuId((currentId) => (currentId === item.id ? null : item.id))}
                   onCloseMenu={() => setOpenMenuId(null)}
-                  onDetail={() => setDetailUrl(item.id)}
+                  onDetail={() => guard.guarded(() => setDetailUrl(item.id))}
                   onDownload={() => { void downloadItem(item) }}
-                  onRenameStart={() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) }}
-                  onRenameCancel={() => setRenaming(null)}
+                  onRenameStart={() => guard.guarded(() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) })}
+                  onRenameCancel={() => guard.guarded(() => setRenaming(null))}
                   onRenameChange={(value) => setRenaming({ id: item.id, value })}
                   onRenameConfirm={() => { void rename() }}
-                  onMoveStart={() => { setMoveError(''); setMoveFolderId(item.folderId ?? ''); setMoveTarget(item) }}
-                  onArchiveStart={() => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) }}
-                  onDeleteStart={() => { void openDelete(item) }}
-                  onReplaceStart={() => {
+                  onMoveStart={() => guard.guarded(() => { setMoveError(''); setMoveFolderId(item.folderId ?? ''); setMoveTarget(item) })}
+                  onArchiveStart={() => guard.guarded(() => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) })}
+                  onDeleteStart={() => guard.guarded(() => { void openDelete(item) })}
+                  onReplaceStart={() => guard.guarded(() => {
                     closeDeleteDialog()
                     setReplacementFor(item)
-                  }}
+                  })}
                 />
               ))}
             </ListPageCards>

@@ -24,6 +24,7 @@ import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
@@ -101,9 +102,12 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   const archiveScope = useRef<{ accountId: string | null; generation: number }>({ accountId, generation: 0 })
   if (archiveScope.current.accountId !== accountId) archiveScope.current = { accountId, generation: archiveScope.current.generation + 1 }
   const openArchiveGeneration = useRef(-1)
+  const restoreScopeRef = useRef<{ accountId: string | null; generation: number } | null>(null)
+  const restoreScope = restoreScopeRef.current
 
   useEffect(() => {
     gateRef.current.invalidate()
+    restoreScopeRef.current = null
     setRestoreTarget(null)
     setRestoreError('')
     setPendingDelete(null)
@@ -297,15 +301,16 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   }
 
   const confirmRestore = async () => {
-    if (!restoreTarget || !accountId || restoring) return
+    if (!restoreTarget || !restoreScope?.accountId || restoreScopeRef.current !== restoreScope || restoreScope.generation !== archiveScope.current.generation || restoring) return
     const mark = restoreTarget
-    const account = accountId
+    const account = restoreScope.accountId
     setRestoring(true)
     setRestoreError('')
     try {
       const res = await api.supportMarks.restore(mark.id, account, mark.version ?? 1)
       if (accountRef.current !== account) return
       if (!res.success) throw new Error(res.error)
+      restoreScopeRef.current = null
       setRestoreTarget(null)
       notifyToast(`「${mark.name}」を保管から戻しました`)
       await load()
@@ -322,7 +327,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => host.onRemove(mark.id) },
     ] : []
     if (!canEdit) return [{ id: 'open', label: '詳しく見る', onSelect: () => openMarkDetail(mark.id) }]
-    if (mark.archivedAt) return [{ id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(mark) } }]
+    if (mark.archivedAt) return [{ id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { restoreScopeRef.current = { accountId, generation: archiveScope.current.generation }; setRestoreError(''); setRestoreTarget(mark) } }]
     return [
       { id: 'edit', label: '編集', external: false, href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}`, onSelect: () => router.push(`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`) },
       {
@@ -515,7 +520,9 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       <ConfirmDialog open={restoreTarget !== null} title={`「${restoreTarget?.name ?? ''}」を保管から戻しますか？`}
         description="同じ対応マークを通常の一覧へ戻します。初期値や自動変更は再開せず、友だちの付け替えはそのまま残ります。"
         confirmLabel="保管から戻す" busy={restoring} error={restoreError}
-        onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
+        onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) { restoreScopeRef.current = null; setRestoreTarget(null) } }}>
+        <OperationTargetSummary accounts={[{ id: restoreScope?.accountId ?? '' }]} externalTarget={{ label: '対象件数', name: restoreTarget ? '1件' : null }} />
+      </ConfirmDialog>
       <ListPageBody
         pagination={status === 'ready' ? (
           // ページ送りは表の下の安全確認のあと、板の下。

@@ -13,6 +13,15 @@ import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { ApiError, type WebinarListItem, type WebinarListParams } from '@/lib/api'
 import WebinarList from './page'
 
+const heldInlineAction = vi.hoisted(() => ({ hold: false, run: null as null | (() => void) }))
+vi.mock('@/components/shared/use-inline-detail-guard', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/use-inline-detail-guard')>()
+  return { ...actual, useInlineDetailGuard: (key: string) => {
+    const guard = actual.useInlineDetailGuard(key)
+    return { ...guard, protect: (action: () => void) => { if (heldInlineAction.hold) { heldInlineAction.run = action; return } return guard.protect(action) } }
+  } }
+})
+
 const mocks = vi.hoisted(() => ({
   accountId: 'account-1' as string | null,
   accounts: [{ id: 'account-1' }, { id: 'account-2' }] as Array<{ id: string }>,
@@ -63,6 +72,8 @@ function folderRow(label: string) {
 }
 
 beforeEach(() => {
+  heldInlineAction.hold = false
+  heldInlineAction.run = null
   vi.clearAllMocks()
   window.history.replaceState(null, '', '/webinars')
   window.dispatchEvent(new PopStateEvent('popstate'))
@@ -137,7 +148,7 @@ describe('フォルダ', () => {
   it('選んだフォルダの名前を変えると、そのフォルダへ保存する', async () => {
     await start()
     await act(async () => { fireEvent.click(folderRow('セミナー')) })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ「セミナー」の操作' })) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /名前を変える/ })) })
     const dialog = screen.getByRole('dialog')
     fireEvent.change(dialog.querySelector('[data-folder-name-color] input')!, { target: { value: '説明会' } })
@@ -146,10 +157,60 @@ describe('フォルダ', () => {
     expect(mocks.createFolder).not.toHaveBeenCalled()
   })
 
+  it('未保存確認の間にアカウントが往復した古い削除操作は開かない', async () => {
+    const view = await start()
+    await waitFor(() => expect(folderRow('セミナー')).toBeTruthy())
+    await act(async () => { fireEvent.click(folderRow('セミナー')) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
+    heldInlineAction.hold = true
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /消す/ })) })
+    expect(heldInlineAction.run).toBeTypeOf('function')
+    mocks.accountId = 'account-2'; view.rerender(<WebinarList />)
+    mocks.accountId = 'account-1'; view.rerender(<WebinarList />)
+    await act(async () => { heldInlineAction.run!() })
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(mocks.deleteFolder).not.toHaveBeenCalled()
+  })
+
+  it('折りたたんだフォルダ欄でも選択したフォルダを操作できる', async () => {
+    const view = await start()
+    await waitFor(() => expect(folderRow('セミナー')).toBeTruthy())
+    await act(async () => { fireEvent.click(folderRow('セミナー')) })
+    expect(view.container.querySelectorAll('[aria-label="フォルダ「セミナー」の操作"]')).toHaveLength(2)
+  })
+
+  it('フォルダ削除は対象と環境を表示し、アカウント切替後は確定できない', async () => {
+    const view = await start()
+    await waitFor(() => expect(folderRow('セミナー')).toBeTruthy())
+    await act(async () => { fireEvent.click(folderRow('セミナー')) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /消す/ })) })
+    const dialog = screen.getByRole('alertdialog')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
+    mocks.accountId = 'account-2'
+    view.rerender(<WebinarList />)
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(mocks.deleteFolder).not.toHaveBeenCalled()
+  })
+
+  it('フォルダ削除の確認中にアカウントを替えると窓が閉じる', async () => {
+    const view = await start()
+    await waitFor(() => expect(folderRow('セミナー')).toBeTruthy())
+    await act(async () => { fireEvent.click(folderRow('セミナー')) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /消す/ })) })
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
+    mocks.accountId = 'account-2'
+    view.rerender(<WebinarList />)
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(mocks.deleteFolder).not.toHaveBeenCalled()
+  })
+
   it('選んだフォルダを消すと確かめてから消し、一覧とフォルダを読み直す', async () => {
     await start()
     await act(async () => { fireEvent.click(folderRow('セミナー')) })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ「セミナー」の操作' })) })
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /消す/ })) })
     const dialog = screen.getByRole('alertdialog')
     expect(dialog.textContent).toContain('いまこのフォルダに入っているのは2 件です')
@@ -344,4 +405,27 @@ it('アーカイブの口は消さずに POST で送る', async () => {
   expect(calls).toHaveLength(1)
   expect(calls[0].method).toBe('POST')
   expect(new URL(calls[0].url).pathname).toBe('/api/webinars/webinar-1/archive')
+})
+it('ウェビナーのフォルダ名を編集中は画面移動前に確認する', async () => {
+  await start()
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  const dialog = screen.getByRole('dialog')
+  fireEvent.change(dialog.querySelector('[data-folder-name-color] input')!, { target: { value: '商品説明' } })
+  const link = document.createElement('a')
+  link.href = '/events'
+  link.textContent = 'イベントへ'
+  document.body.append(link)
+  fireEvent.click(link)
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  link.remove()
+})
+it('フォルダをキャンセルして破棄を選んだら確認は一度で閉じる', async () => {
+  await start()
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '商品説明' } })
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  const confirm = screen.getByRole('dialog', { name: '入力を破棄しますか？' })
+  fireEvent.click(within(confirm).getByRole('button', { name: '破棄する' }))
+  expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+  expect(screen.queryByRole('dialog', { name: 'フォルダを追加する' })).toBeNull()
 })

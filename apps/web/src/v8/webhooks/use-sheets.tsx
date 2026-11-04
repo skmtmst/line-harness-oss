@@ -40,6 +40,9 @@ export function useSheets() {
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId, selectedAccount, accounts } = useAccount()
+  const accountScope = useRef({ id: selectedAccountId, generation: 0 })
+  if (accountScope.current.id !== selectedAccountId) accountScope.current = { id: selectedAccountId, generation: accountScope.current.generation + 1 }
+  const accountGeneration = accountScope.current.generation
   const staffRole = useStaffRole()
   const isOwner = staffRole === 'owner'
   const searchParams = useSearchParams()
@@ -223,12 +226,12 @@ export function useSheets() {
 
   const handleDisconnect = async () => {
     const accountId = selectedAccountId
-    if (!accountId || disconnectFor?.id !== accountId) return
+    if (!accountId || accountScope.current.generation !== accountGeneration || accountRef.current !== accountId || disconnectFor?.id !== accountId) return
     setBusy('disconnect')
     setDisconnectNotice('')
     try {
       const res = await api.webhooks.googleSheets.disconnect(accountId)
-      if (accountRef.current !== accountId) return
+      if (accountScope.current.generation !== accountGeneration || accountRef.current !== accountId) return
       if (!res.success) {
         setActionError('接続を解除できませんでした。状態を読み直してから、もう一度お試しください。')
         setDisconnectFor(null)
@@ -240,12 +243,12 @@ export function useSheets() {
       }
       await load()
     } catch (saveFailure) {
-      if (accountRef.current !== accountId) return
+      if (accountScope.current.generation !== accountGeneration || accountRef.current !== accountId) return
       const fieldFailure = saveErrors.capture(saveFailure)
       { if (!fieldFailure)
       setActionError('接続を解除できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
-      if (accountRef.current === accountId) setBusy(null)
+      if (accountScope.current.generation === accountGeneration && accountRef.current === accountId) setBusy(null)
     }
   }
 

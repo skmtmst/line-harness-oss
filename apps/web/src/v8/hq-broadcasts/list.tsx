@@ -1,5 +1,9 @@
 'use client'
 
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { OverlayDepthContext } from '@/components/shared/overlay-utils'
+
 import ListDateTime from '@/components/shared/list-date-time'
 
 import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
@@ -8,7 +12,7 @@ import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send, ArrowUpDown } from 'lucide-react'
 import { type HqBroadcastRun, FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { ListPage, ListPagePagination } from '@/components/templates/list-page';
@@ -20,6 +24,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions';
@@ -107,7 +112,16 @@ export default function HqBroadcastList() {
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState<string | null>(FOLDER_SELECT_COLORS[0].value)
   const [deletingFolder, setDeletingFolder] = useState<HqFolder | null>(null)
+  const folderDeleteTicket = useRef<object | null>(null)
+  const renderedFolderDeleteTicket = folderDeleteTicket.current
+  const folderDeleteLock = useRef(false)
   const [folderBusy, setFolderBusy] = useState(false)
+  const depth = useContext(OverlayDepthContext)
+  const folderGuard = useUnsavedGuard({
+    dirty: folderDialog !== null && (folderName !== (folderDialog.editing?.name ?? '') || folderColor !== (folderDialog.editing ? folderDisplayColor(folderDialog.editing) : FOLDER_SELECT_COLORS[0].value) || folderBusy),
+    busy: folderDialog !== null && folderBusy,
+    onDiscard: () => setFolderDialog(null),
+  })
   const [folderError, setFolderError] = useState('')
 
   const load = useCallback(async () => {
@@ -192,7 +206,7 @@ export default function HqBroadcastList() {
       count: ready ? countIn(folder.id) : null,
       ...(canManage ? {
         onEdit: () => { setFolderError(''); setFolderNameError(''); setFolderName(folder.name); setFolderColor(folderDisplayColor(folder)); setFolderDialog({ editing: folder }) },
-        onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
+        onDelete: () => { folderDeleteTicket.current = {}; setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
     // 未分類はほかの一覧と同じく、フォルダが1つも無くても出す。読めなかったときは出さない。
@@ -230,12 +244,15 @@ export default function HqBroadcastList() {
     }
   }
   const removeFolder = async () => {
-    if (!deletingFolder || folderBusy) return
+    if (!deletingFolder || folderBusy || !renderedFolderDeleteTicket || renderedFolderDeleteTicket !== folderDeleteTicket.current || folderDeleteLock.current) return
+    folderDeleteLock.current = true
     setFolderBusy(true); setFolderError('')
     try {
       await hqBroadcastsApi.deleteFolder(deletingFolder.id, latestFolder(deletingFolder).revision)
-      await loadFolders()
+      if (renderedFolderDeleteTicket !== folderDeleteTicket.current) return
+      folderDeleteTicket.current = null
       setDeletingFolder(null); setFolderFilter('all')
+      await loadFolders()
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
 
@@ -243,15 +260,17 @@ export default function HqBroadcastList() {
       const failure = describeFolderFailure(caught, 'delete');
 
       if (failure.kind === 'missing') {
+        folderDeleteTicket.current = null
+        setDeletingFolder(null)
         notifyToast(failure.message, { tone: 'error' })
         await loadFolders()
-        setDeletingFolder(null)
         return
       }
       if (failure.kind === 'conflict') await loadFolders()
       { if (!fieldFailure)
       setFolderError(failure.message) }
     } finally {
+      folderDeleteLock.current = false
       setFolderBusy(false)
     }
   }
@@ -409,6 +428,7 @@ export default function HqBroadcastList() {
       )}
       overlays={(
         <>
+          <OverlayDepthContext.Provider value={depth + 2}><UnsavedLeaveDialog open={folderGuard.leaveTarget !== null} busy={folderBusy} onConfirm={folderGuard.confirmLeave} onCancel={folderGuard.cancelLeave} /></OverlayDepthContext.Provider>
           <FolderEditorDialog
             name={folderName} onNameChange={(next) => { setFolderName(next); setFolderNameError('') }} color={folderColor} onColorChange={setFolderColor}
             nameError={folderNameError || undefined}
@@ -431,9 +451,9 @@ export default function HqBroadcastList() {
             destructive
             busy={folderBusy}
             error={folderError || undefined}
-            onCancel={() => { if (!folderBusy) setDeletingFolder(null) }}
+            onCancel={() => { if (!folderBusy && !folderDeleteLock.current) { folderDeleteTicket.current = null; setDeletingFolder(null) } }}
             onConfirm={() => removeFolder()}
-          />
+          ><OperationTargetSummary accounts={[]} /></ConfirmDialog>
         </>
       )}
       toolbar={toolbar}

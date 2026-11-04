@@ -16,13 +16,15 @@ const apiMock = vi.hoisted(() => ({
   registrantsResume: vi.fn(),
 }))
 
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams('id=rem-1'),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   api: { reminders: {
     runs: apiMock.runs,
     get: apiMock.get,
@@ -62,7 +64,7 @@ const RESPONSE = (overrides: Partial<ReminderDeliveryRunsResponse['reminder']> =
 })
 
 beforeEach(() => {
-  apiMock.get.mockResolvedValue({ success: true, data: { steps: [], deliveryMode: 'countdown', triggerType: 'manual' } })
+  apiMock.get.mockResolvedValue({ success: true, data: { id: 'rem-1', steps: [], deliveryMode: 'countdown', triggerType: 'manual' } })
   apiMock.registrantsList.mockResolvedValue({ success: true, data: [] })
   apiMock.update.mockResolvedValue({ success: true, data: {} })
 })

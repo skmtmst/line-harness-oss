@@ -11,6 +11,7 @@ import Button from '@/components/shared/button'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
 import SegmentedControl from '@/components/shared/segmented'
 import FilterChip from '@/components/shared/filter-chip'
@@ -65,6 +66,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
+type BulkConfirmation = { action: BulkOutcome; items: ConversionApprovalItem[]; generation: number }
 type BulkResult = {
   action: BulkOutcome
   succeeded: string[]
@@ -91,6 +93,8 @@ export default function ApprovalsTab() {
   const { readonly, narrow, setCount, focusAffiliateId, accountId } = useAffiliateShell()
   const readAccount = useRef(accountId)
   readAccount.current = accountId
+  const accountScope = useRef({ id: accountId, generation: 0 })
+  if (accountScope.current.id !== accountId) accountScope.current = { id: accountId, generation: accountScope.current.generation + 1 }
 
   const [status, setStatus] = useState<ApprovalStatus>('pending')
   const [affiliateFilter, setAffiliateFilter] = useListUrlValue<string | null>('affiliateFilter', null)
@@ -114,7 +118,8 @@ export default function ApprovalsTab() {
   const [detailItem, setDetailItem] = useState<ConversionApprovalItem | null>(null)
   const [truncatedStatuses, setTruncatedStatuses] = useState<ApprovalStatus[]>([])
   const [loadingMore, setLoadingMore] = useState(false)
-  const [bulkConfirm, setBulkConfirm] = useState<{ action: BulkOutcome; items: ConversionApprovalItem[] } | null>(null)
+  const [bulkConfirm, setBulkConfirm] = useState<BulkConfirmation | null>(null)
+  const activeBulkConfirm = useRef<BulkConfirmation | null>(null)
   const [bulkResult, setBulkResult] = useState<BulkResult | null>(null)
   const [bulkWizard, setBulkWizard] = useState<ConversionApprovalItem[] | null>(null)
 
@@ -226,7 +231,7 @@ export default function ApprovalsTab() {
         setActionError(`${acknowledged.size} 件を保存しました。${leftovers} 件は保存できませんでした。${data.conflicted.length || data.denied.length ? '閉じて最新の判断と権限を確認してください。' : 'もう一度押すと未完了だけやり直します。'}`)
         return false
       }
-      setSelected(new Set()); setBulkConfirm(null)
+      setSelected(new Set()); activeBulkConfirm.current = null; setBulkConfirm(null)
       void loadItems({ fresh: true })
       return true
     } catch (error) {
@@ -253,7 +258,9 @@ export default function ApprovalsTab() {
       return
     }
     setSelected(new Set(retryable.map((item) => item.eventId)))
-    setBulkConfirm({ action: bulkResult.action, items: retryable })
+    const confirmation = { action: bulkResult.action, items: retryable, generation: accountScope.current.generation }
+    activeBulkConfirm.current = confirmation
+    setBulkConfirm(confirmation)
   }, [bulkResult, scoped])
 
   const counts: Record<ApprovalStatus, number> = {
@@ -308,7 +315,9 @@ export default function ApprovalsTab() {
     const targets = from ?? scoped.filter((item) => selected.has(item.eventId) && item.approvalStatus === 'pending')
     if (targets.length === 0) return
     setBulkResult(null)
-    setBulkConfirm({ action, items: targets })
+    const confirmation = { action, items: targets, generation: accountScope.current.generation }
+    activeBulkConfirm.current = confirmation
+    setBulkConfirm(confirmation)
   }, [actioning, scoped, selected])
 
   const openBulkWizard = () => {
@@ -646,9 +655,10 @@ export default function ApprovalsTab() {
             confirmLabel={bulkConfirm.action === 'approved' ? '認める' : '認めない（却下）'}
             destructive={bulkConfirm.action === 'rejected'}
             busy={actioning !== null}
-            error={actionError || undefined} confirmDisabled={bulkReviewRequired} confirmDisabledReason="閉じて最新の判断と権限を確認してください。" onSuccess={() => setBulkConfirm(null)} onConfirm={() => runBulkDecide(bulkConfirm.action, bulkConfirm.items)}
-            onCancel={() => { setBulkConfirm(null); void loadItems({ fresh: true, preserveSelection: true }) }}
+            error={actionError || undefined} confirmDisabled={bulkReviewRequired || bulkConfirm.generation !== accountScope.current.generation} confirmDisabledReason="閉じて最新の判断と権限を確認してください。" onSuccess={() => { activeBulkConfirm.current = null; setBulkConfirm(null) }} onConfirm={() => activeBulkConfirm.current === bulkConfirm && bulkConfirm.generation === accountScope.current.generation ? runBulkDecide(bulkConfirm.action, bulkConfirm.items) : false}
+            onCancel={() => { activeBulkConfirm.current = null; setBulkConfirm(null); void loadItems({ fresh: true, preserveSelection: true }) }}
           >
+            <OperationTargetSummary accounts={Array.from(new Map(bulkConfirm.items.map(item => [item.lineAccountId ?? '', { id: item.lineAccountId ?? '', name: item.lineAccountId ? item.lineAccountName : '不明' }])).values())} showAccountCount />
             <ul className={styles.resultList}>
               {bulkConfirm.items.map((item) => (
                 <li key={item.eventId}>{`${personName(item.friendName)}／${item.affiliateName ?? '紹介者名を読み込めませんでした'}／${item.offerName ?? '案件は未設定'}`}</li>

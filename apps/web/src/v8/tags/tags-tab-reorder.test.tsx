@@ -125,3 +125,18 @@ describe('V8 タグの並び替えの保存の失敗', () => {
   expect(document.querySelectorAll('[role="radiogroup"][aria-label="フォルダの色"] [role="radio"]')).toHaveLength(9)
   expect(document.querySelector('[role="radio"][aria-checked="true"]')?.getAttribute('aria-label')).toContain('緑')
  })
+it('タグ一覧のフォルダ名を編集中は移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/tags')
+  await act(async () => { root.render(<TagsList fixture={{ items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }} />) })
+  const add = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('フォルダを追加'))!
+  await act(async () => add.click())
+  const input = document.querySelector('[data-folder-name-color] input')!
+  await act(async () => { fireEvent.change(input, { target: { value: '新しい分類' } }) })
+  const link = document.createElement('a')
+  link.href = '/events'
+  link.textContent = 'イベントへ'
+  document.body.append(link)
+  await act(async () => link.click())
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  link.remove()
+})
