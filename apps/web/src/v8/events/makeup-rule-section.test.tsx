@@ -135,6 +135,7 @@ it.each(['staff', 'viewer', null])('権限が%sのとき編集を理由付きで
   expect(button.hasAttribute('data-permission-locked')).toBe(true)
   fireEvent.focus(button)
   expect(screen.getByRole('tooltip').textContent).toMatch(/権限|管理者/)
+  if (role === null) expect(screen.getByRole('tooltip').textContent).toBe('操作する権限を確認しています。')
   fireEvent.click(button)
   expect(screen.queryByRole('dialog')).toBeNull(); expect(mocks.save).not.toHaveBeenCalled()
 })
