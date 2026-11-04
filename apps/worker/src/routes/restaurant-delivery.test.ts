@@ -1522,7 +1522,7 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     const rows = connectionRows();
     expect(rows).toHaveLength(1);
     // 状態は勝手に変えず、理由の符号だけを足す。
-    expect(rows[0]).toMatchObject({ status: 'connected', last_error: 'auth_expired' });
+    expect(rows[0]).toMatchObject({ status: 'connected', last_error: 'auth_expired', version: 2 });
     expect(JSON.stringify(rows[0])).not.toContain(PROVIDER_FREE_TEXT);
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);
   });
@@ -1751,29 +1751,24 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       expect(res.status).toBe(409);
       expect(await res.json()).toMatchObject({ code: 'auth_expired' });
       expect(calls).toHaveLength(0);
-
       const rows = connectionRows();
       expect(rows[0]).toMatchObject({ status: 'expired', last_error: 'auth_expired', version: 2 });
     });
-
     it('鍵が無い環境では、復号できないことだけを伝える', async () => {
       await seedLoggedIn();
       // 置いたあとで鍵を外す。鍵が変わった場合も同じ道を通る。
       delete (env as Record<string, unknown>).LINE_CREDENTIAL_ENCRYPTION_KEY;
       const calls = stubUberApi();
-
       const res = await call(STORES_PATH);
       expect(res.status).toBe(409);
       expect(await res.json()).toMatchObject({ code: 'encryption_key_missing' });
       expect(calls).toHaveLength(0);
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(ENC_KEY);
     });
-
     it('一覧が取れないときは分類済みの符号だけを残す', async () => {
       await seedLoggedIn({ status: 'connected' });
       // 401は再試行しない相手の拒否。権限切れとして扱う。
       stubUberApi({ listStatus: 401 });
-
       const { res, trace } = await withInvocation('http', async () => ({
         res: await call(STORES_PATH), trace: currentInvocation()!,
       }));
@@ -1785,13 +1780,18 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       const body = (await res.json()) as Record<string, unknown>;
       expect(body).toMatchObject({ code: 'auth_expired' });
       expect(JSON.stringify(body)).not.toContain(PROVIDER_FREE_TEXT);
-
       const rows = connectionRows();
       expect(rows[0]).toMatchObject({ status: 'expired', last_error: 'auth_expired' });
       expect(JSON.stringify(rows)).not.toContain(PROVIDER_FREE_TEXT);
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);
       // 取れなかったときに古い候補を消したままにしない（画面が空にならないこと）。
       expect(candidateRows()).toHaveLength(0);
+    });
+    it('一覧取得の一時的な失敗も接続の版を進める', async () => {
+      await seedLoggedIn({ status: 'connected' });
+      stubUberApi({ listStatus: 500 });
+      expect((await call(STORES_PATH)).status).toBe(502);
+      expect(connectionRows()[0]).toMatchObject({ status: 'connected', version: 2 });
     });
 
     it('IDとSecretが無い環境では一覧も確定も止める', async () => {
@@ -1903,7 +1903,7 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       expect(rows[0]).toMatchObject({
         status: 'pending_store',
         provisioned_at: null,
-        last_error: 'pos_activation_unknown',
+        last_error: 'pos_activation_unknown', version: 3,
       });
       expect(JSON.stringify(rows)).not.toContain(PROVIDER_FREE_TEXT);
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);

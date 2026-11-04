@@ -333,7 +333,7 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
         // すでにある接続だけに理由を残す。新規の失敗では行を作らない。
         await db
           .prepare(
-            `UPDATE rt_delivery_uber_connections SET last_error = ?, updated_at = ? WHERE store_id = ?
+            `UPDATE rt_delivery_uber_connections SET last_error = ?, version = version + 1, updated_at = ? WHERE store_id = ?
              AND COALESCE(last_error, '') NOT IN
                ('${POS_ACTIVATION_STARTED}', '${POS_ACTIVATION_UNKNOWN}',
                 'pos_deactivation_started', 'pos_deactivation_unknown',
