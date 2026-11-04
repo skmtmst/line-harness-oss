@@ -39,6 +39,7 @@ const scopedSubStaff: AuthenticatedStaff = {
   id: 'staff-scoped-sub', name: '店1だけ購読を触れる', role: 'staff', readOnly: false, tenantId: 'tenant-1',
   permissionKeys: ['/scenarios', 'scenario.subscription.edit', 'scenario.step_run.retry'],
 };
+const scopedAdmin: AuthenticatedStaff = { id: 'scoped-admin', name: '店1管理者', role: 'admin', readOnly: false, tenantId: 'tenant-1' };
 
 function app(staff: AuthenticatedStaff) {
   const instance = new Hono<Env>();
@@ -88,6 +89,7 @@ function seed(): void {
     ['staff-retry', '再送だけ', 'staff', 'key-retry', 'all', '["/scenarios","scenario.step_run.retry"]'],
     ['staff-none', '権限なし', 'staff', 'key-none', 'all', '[]'],
     ['staff-scoped-sub', '店1だけ', 'staff', 'key-scoped-sub', 'accounts', '["/scenarios","scenario.subscription.edit","scenario.step_run.retry"]'],
+    ['scoped-admin', '店1管理者', 'admin', 'key-scoped-admin', 'accounts', '[]'],
   ] as const;
   for (const [id, name, role, apiKey, scope, keys] of staffRows) {
     raw.prepare(
@@ -99,6 +101,7 @@ function seed(): void {
     `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at)
      VALUES ('staff-scoped-sub', 'acc-1', '2026-09-01T00:00:00.000Z')`,
   ).run();
+  raw.prepare(`INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at) VALUES ('scoped-admin', 'acc-1', '2026-09-01T00:00:00.000Z')`).run();
 
   // シナリオと公開版（再開・移し先は固定版の通を読む）。
   const stepsSnapshot = JSON.stringify([
@@ -164,6 +167,66 @@ beforeEach(() => {
 });
 
 describe('友だち単位の購読操作（#949 N-054）', () => {
+  const bulkStop = (items: Array<{ id: string; revision: number }>) => app(owner).request('/api/scenarios/bulk-stop', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }),
+  });
+  test('一括停止は一つでも版が古ければ何も止めず 409', async () => {
+    sqlite.raw.prepare("UPDATE scenarios SET content_revision=2 WHERE id='sc-move'").run();
+    const res = await bulkStop([{ id: 'sc-1', revision: 1 }, { id: 'sc-move', revision: 1 }]);
+    expect(res.status).toBe(409);
+    expect((await res.json() as { current: unknown[] }).current).toHaveLength(2);
+    expect(sqlite.raw.prepare("SELECT id,is_active,content_revision FROM scenarios WHERE id IN ('sc-1','sc-move') ORDER BY id").all()).toEqual([
+      { id: 'sc-1', is_active: 1, content_revision: 1 }, { id: 'sc-move', is_active: 1, content_revision: 2 },
+    ]);
+  });
+  test('一括停止の途中に失敗すれば全部元に戻る', async () => {
+    sqlite.raw.exec("CREATE TRIGGER fail_stop BEFORE UPDATE ON scenarios WHEN NEW.id='sc-move' AND NEW.is_active=0 BEGIN SELECT RAISE(ABORT, 'fixture failure'); END");
+    const res = await bulkStop([{ id: 'sc-1', revision: 1 }, { id: 'sc-move', revision: 1 }]);
+    expect(res.status).toBe(500);
+    expect(sqlite.raw.prepare("SELECT id,is_active,content_revision FROM scenarios WHERE id IN ('sc-1','sc-move') ORDER BY id").all()).toEqual([
+      { id: 'sc-1', is_active: 1, content_revision: 1 }, { id: 'sc-move', is_active: 1, content_revision: 1 },
+    ]);
+  });
+  test('一括停止を同時に二回押しても一回しか通らない', async () => {
+    const items = [{ id: 'sc-1', revision: 1 }, { id: 'sc-move', revision: 1 }];
+    const responses = await Promise.all([bulkStop(items), bulkStop(items)]);
+    expect(responses.map(r => r.status).sort()).toEqual([200, 409]);
+    expect(sqlite.raw.prepare("SELECT id,is_active,content_revision FROM scenarios WHERE id IN ('sc-1','sc-move') ORDER BY id").all()).toEqual([
+      { id: 'sc-1', is_active: 0, content_revision: 2 }, { id: 'sc-move', is_active: 0, content_revision: 2 },
+    ]);
+  });
+  test('一括停止は50件を超える指定と見えない対象を拒む', async () => {
+    expect((await bulkStop(Array.from({ length: 51 }, (_, i) => ({ id: `sc-${i}`, revision: 1 })))).status).toBe(400);
+    const scoped = app(scopedAdmin);
+    const res = await scoped.request('/api/scenarios/bulk-stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ id: 'sc-1', revision: 1 }, { id: 'sc-2', revision: 1 }] }) });
+    expect(res.status).toBe(409);
+    expect((await res.json() as { current: unknown[] }).current).toEqual([]);
+    expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1 });
+  });
+  test('一括停止は配信停止の権限なしでは送らない', async () => {
+    const res = await app(noKeyStaff).request('/api/scenarios/bulk-stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ id: 'sc-1', revision: 1 }] }) });
+    expect(res.status).toBe(403);
+    expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 1 });
+  });
+  test('版なしの従来の一件停止はそのまま動く', async () => {
+    const res = await app(owner).request('/api/scenarios/sc-1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: false }) });
+    expect(res.status).toBe(200);
+    expect(sqlite.raw.prepare("SELECT is_active FROM scenarios WHERE id='sc-1'").get()).toEqual({ is_active: 0 });
+  });
+  test('一括停止の直前にアカウントが変われば何も止めない', async () => {
+    const original = sqlite.db.batch.bind(sqlite.db);
+    const spy = vi.spyOn(sqlite.db, 'batch').mockImplementation(statements => {
+      if (statements.some(s => (s as unknown as { sql?: string }).sql?.includes('UPDATE scenarios SET is_active=0'))) {
+        sqlite.raw.prepare("UPDATE scenarios SET line_account_id='acc-2' WHERE id='sc-1'").run();
+      }
+      return original(statements);
+    });
+    try {
+      const res = await bulkStop([{ id: 'sc-1', revision: 1 }, { id: 'sc-move', revision: 1 }]);
+      expect(res.status).toBe(409);
+      expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE id IN ('sc-1','sc-move') AND is_active=0").get()).toEqual({ n: 0 });
+    } finally { spy.mockRestore(); }
+  });
   test('シナリオ削除は確認した内容の版と配信中の人数が違えば変更しない', async () => {
     const res = await app(owner).request('/api/scenarios/sc-1', {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },

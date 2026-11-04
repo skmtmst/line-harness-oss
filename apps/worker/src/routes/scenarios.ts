@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess, requirePermission } from '../middleware/role-guard.js';
+import { bulkStopScenarios } from './scenarios-bulk-stop.js';
 
 import { get__api_scenarios_id_question_answers_1, post__api_scenarios_id_question_answers_executionId_resume_2, patch__api_scenarios_reorder_3, get__api_scenarios_4, get__api_scenarios_id_5, post__api_scenarios_6, put__api_scenarios_id_7, get__api_scenarios_id_move_referrers_8, delete__api_scenarios_id_9, post__api_scenarios_id_steps_10 } from './scenarios-drafts-handlers.js';
 import { requireVisibleScenario, scenarioPermission, requireScenarioEditBoundary } from './scenarios-definition.js';
@@ -11,6 +12,8 @@ import { put__api_scenarios_id_steps_stepId_1, delete__api_scenarios_id_steps_st
 import { post__api_scenarios_id_publish_1, get__api_scenarios_id_actions_2, post__api_scenarios_id_actions_3, put__api_scenarios_id_actions_actionId_4, delete__api_scenarios_id_actions_actionId_5, post__api_scenarios_id_test_send_6, post__api_scenarios_id_steps_stepId_test_send_7, get__api_scenarios_id_triggers_8, post__api_scenarios_id_triggers_9, get__api_scenarios_id_draft_10, delete__api_scenarios_id_triggers_triggerId_11, post__api_scenario_subscriptions_subscriptionId_pause_12, post__api_scenario_subscriptions_subscriptionId_resume_13, post__api_scenario_subscriptions_subscriptionId_retry_14, post__api_scenario_subscriptions_subscriptionId_move_15 } from './scenarios-publication-handlers.js';
 
 const scenarios = new Hono<Env>();
+
+scenarios.post('/api/scenarios/bulk-stop', requireDeliveryAccess('scenarios', 'publish'), inputJsonBoundary(), bulkStopScenarios);
 
 scenarios.get('/api/scenarios/:id/question-answers', requireDeliveryAccess('scenarios'), requireVisibleScenario, get__api_scenarios_id_question_answers_1);
 
