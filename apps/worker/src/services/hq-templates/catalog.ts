@@ -74,22 +74,33 @@ export function catalogReferences(def:HqCatalogTemplateDefinition,snapshot:strin
  return items;
 }
 export interface CatalogItem {sourceId:string;itemKind:string;name:string;targetId:string|null;expectedRevision:string|null;duplicate:boolean;allowedModes:Array<'create'|'overwrite'|'alias'>;operation?:'reuse'}
-export function inspectCatalog(def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType):CatalogItem[] {
+export function inspectCatalog(def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType,originTemplateId?:string):CatalogItem[] {
  const snap=JSON.parse(snapshot) as Snapshot,name=def.settings.name,same=snap.targets.filter(r=>normalizeScopedTagName(String(r.name))===normalizeScopedTagName(name));
+ const owned=originTemplateId?snap.targets.filter(r=>r.hq_template_id===originTemplateId):[];
+ if(owned.length>1)throw new HqTemplateError('VERSION_CONFLICT',409);
+ if(owned.length===1){const row=owned[0];return [{sourceId:type,itemKind:type,name,targetId:String(row.id),expectedRevision:JSON.stringify(row),duplicate:true,allowedModes:['overwrite']},...catalogReferences(def,snapshot,type)];}
  if(type==='booking_menu'){return [{sourceId:type,itemKind:type,name,targetId:null,expectedRevision:null,duplicate:!!same.length,allowedModes:['create']},...catalogReferences(def,snapshot,type)];}
  if(same.length>1)throw new HqTemplateError('VERSION_CONFLICT',409);
  const row=same[0],versions=snap.versions.filter(v=>v.reward_id===row?.id),used=snap.usage.some(u=>u.id===row?.id&&u.n>0);
  const safe=!!row&&!used&&(row.status==='draft'&&!row.archived_at&&!row.current_published_version_id&&versions.every(v=>v.status==='draft'));
  return [{sourceId:type,itemKind:type,name,targetId:row?String(row.id):null,expectedRevision:row?JSON.stringify(row):null,duplicate:!!row,allowedModes:(row?safe?['overwrite','alias']:['alias']:['create']) as Array<'create'|'overwrite'|'alias'>},...catalogReferences(def,snapshot,type)];
 }
-export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType,resolutions:readonly HqTemplateResolution[],origin?:{templateId:string;versionId:string}) {
- const snap=JSON.parse(snapshot) as Snapshot,items=inspectCatalog(def,snapshot,type),root=items[0],selected=resolutions.find(r=>r.sourceId===type);
+export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType,resolutions:readonly HqTemplateResolution[],origin?:{templateId:string;versionId:string},redistribution=false,adopt=false) {
+ const snap=JSON.parse(snapshot) as Snapshot,items=inspectCatalog(def,snapshot,type,redistribution?origin?.templateId:undefined),root=items[0],selected=resolutions.find(r=>r.sourceId===type);
  if(!selected||resolutions.length!==items.length||!root.allowedModes.includes(selected.mode)||items.slice(1).some(i=>!resolutions.some(r=>r.sourceId===i.sourceId&&r.mode==='overwrite')))throw new HqTemplateError('SELECTION_REQUIRED',409);
  const id=selected.mode==='overwrite'?root.targetId!:crypto.randomUUID(),name=selected.mode==='alias'?nextAlias(def.settings.name,snap.targets.map(r=>String(r.name))):def.settings.name;
  const existing=snap.targets.find(r=>r.id===id),s={...def.settings,name} as unknown as Record<string,unknown>;
  if(existing?.hq_template_id&&origin&&existing.hq_template_id!==origin.templateId)throw new HqTemplateError('VERSION_CONFLICT',409);
+ if(!redistribution&&existing?.hq_template_id&&existing.hq_customized===1)throw new HqTemplateError('VERSION_CONFLICT',409);
  const statements:HqTemplateStatement[]=[{sql:`SELECT json(CASE WHEN (${snapshotSql(type)})=? THEN '{}' ELSE 'VERSION_CONFLICT' END)`,bindings:[accountId,snapshot]}];
  const add=(sql:string,bindings:HqTemplateStatement['bindings'])=>statements.push({sql,bindings});
+ if(redistribution&&origin&&existing?.hq_template_id===origin.templateId&&!adopt){
+  const needsApproval=existing.hq_customized===1||(type==='mileage_reward'&&existing.status==='published');
+  if(existing.hq_template_version_id===origin.versionId||needsApproval){
+   if(needsApproval&&existing.hq_template_version_id!==origin.versionId)add(`INSERT OR IGNORE INTO hq_catalog_update_decisions(id,tenant_id,line_account_id,template_id,template_version_id,${type==='booking_menu'?'menu_id':'reward_id'},decision) SELECT ?,a.tenant_id,a.id,?,?,?,'pending' FROM line_accounts a WHERE a.id=?`,[crypto.randomUUID(),origin.templateId,origin.versionId,id,accountId]);
+   return {statements,resolutions:[{...selected,targetId:id},...items.slice(1).map(r=>({sourceId:r.sourceId,itemKind:r.itemKind,mode:'overwrite' as const,targetId:r.targetId??undefined,expectedRevision:r.expectedRevision??undefined}))],counts:{created:0,overwritten:0,aliased:0}};
+  }
+ }
  const refs=items.slice(1),tagId=s.autoTagName?refs.find(r=>r.sourceId===`tag:${s.autoTagName}`)!.targetId:null;
  if(type==='booking_menu') {
   if((JSON.parse(snapshot) as {style?:string}).style==='ec')throw new HqTemplateError('BOOKING_NOT_USED',422);

@@ -4,6 +4,7 @@ import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hqTemplates } from './hq-templates.js';
 import type { Env } from '../worker-env.js';
 import type { HqCatalogTemplateType } from '@line-crm/shared';
+import { catalogSnapshot, inspectCatalog, parseCatalogDefinition, planCatalog } from '../services/hq-templates/catalog.js';
 let f:SqliteD1,app:Hono<Env>,staff:Env['Variables']['staff'];
 const defs={booking_menu:{schemaVersion:1,settings:{name:'初回相談',duration_minutes:60,base_price:3000}},mileage_reward:{schemaVersion:1,settings:{name:'お礼',rewardKind:'coupon',requiredMiles:100}}};
 interface Detail {template:{id:string;revision:number;template_type:string};definition:unknown}
@@ -77,6 +78,33 @@ test('別の統括ひな形から配られた同名の景品の出所を上書�
  const result=await run(second,await check(second),'overwrite');
  expect(result.body.data.stores[0].status).toBe('version_conflict');
  expect(f.raw.prepare('SELECT hq_template_id,hq_customized FROM mileage_rewards').get()).toEqual({hq_template_id:first,hq_customized:0});
+});
+test.each(['booking_menu','mileage_reward'] as const)('%s: 店で変更した品への再配布は変更を守り判断待ちを残す',async type=>{
+ const id=await create(type);
+ expect((await run(id,await check(id))).body.data.status).toBe('completed');
+ const table=type==='booking_menu'?'menus':'mileage_rewards';
+ const item=f.raw.prepare(`SELECT id FROM ${table}`).get() as {id:string};
+ f.raw.prepare(`UPDATE ${table} SET name=? WHERE id=?`).run('店の変更',item.id);
+ const detail=await call<Detail>(`/${id}`);
+ const next={...defs[type],settings:{...defs[type].settings,name:'本部の新しい名前'}};
+ expect((await call(`/${id}`,'PATCH',{name:'新版',definition:next,expectedRevision:detail.body.data.template.revision})).status).toBe(200);
+ const version=f.raw.prepare('SELECT current_version_id id FROM hq_templates WHERE id=?').get(id) as {id:string};
+ const snapshot=await catalogSnapshot(f.db,'a',type), definition=parseCatalogDefinition(type,next);
+ const items=inspectCatalog(definition,snapshot,type,id);
+ expect(items[0]).toMatchObject({targetId:item.id,allowedModes:['overwrite']});
+ const selections=items.map(row=>({sourceId:row.sourceId,itemKind:row.itemKind,mode:'overwrite' as const}));
+ const plan=planCatalog('a',definition,snapshot,type,selections,{templateId:id,versionId:version.id},true);
+ await f.db.batch(plan.statements.map(s=>f.db.prepare(s.sql).bind(...s.bindings)));
+ expect(f.raw.prepare(`SELECT name,hq_customized FROM ${table} WHERE id=?`).get(item.id)).toEqual({name:'店の変更',hq_customized:1});
+ expect(f.raw.prepare('SELECT template_version_id,decision FROM hq_catalog_update_decisions').get()).toEqual({template_version_id:version.id,decision:'pending'});
+});
+test('従来の景品配布でも店で変更された品を上書きしない',async()=>{
+ const id=await create('mileage_reward');
+ expect((await run(id,await check(id))).body.data.status).toBe('completed');
+ f.raw.exec("UPDATE mileage_rewards SET description='店の変更' WHERE line_account_id='a'");
+ const result=await run(id,await check(id),'overwrite');
+ expect(result.body.data.stores[0].status).toBe('version_conflict');
+ expect(f.raw.prepare('SELECT description,hq_customized FROM mileage_rewards').get()).toEqual({description:'店の変更',hq_customized:1});
 });
 test.each(['booking_menu','mileage_reward'] as const)('%s: 不正な値・他店ID・権限外を拒み、監査失敗時も店を作らない',async type=>{
  const base=defs[type];
