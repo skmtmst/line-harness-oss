@@ -198,11 +198,18 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       ...(!editing?{isActive:draft.isActive}:{}),
       ...(editing&&draft.isActive&&!editing.is_active?{isActive:true}:{}),
     }
-    const ok = editing
-      ? await mutate(() => restaurantTestApi.updateTable(selectedAccountId, editing.id, body), '卓を更新しました。', setEditorError)
-      : store
-        ? await mutate(() => restaurantTestApi.createTable(selectedAccountId, { storeId: store.id, ...body }), '卓を追加しました。', setEditorError)
-        : false
+    let ok = false
+    try {
+      const options = { rethrow: () => true }
+      ok = editing
+        ? await mutate(() => restaurantTestApi.updateTable(selectedAccountId, editing.id, body), '卓を更新しました。', options)
+        : store
+          ? await mutate(() => restaurantTestApi.createTable(selectedAccountId, { storeId: store.id, ...body }), '卓を追加しました。', options)
+          : false
+    } catch (cause) {
+      if (!saveErrors.capture(cause)) setEditorError(japaneseDetailOf(cause) || '卓を保存できませんでした。')
+      return
+    }
     if (ok) {
       setEditor(null)
       if(editing&&editing.is_active&&!draft.isActive){

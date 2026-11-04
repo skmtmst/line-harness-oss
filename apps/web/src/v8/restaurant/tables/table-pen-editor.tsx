@@ -4,6 +4,7 @@ import {Plus} from 'lucide-react'
 import type {RestaurantFloor} from '@line-crm/shared'
 import {restaurantChairPositions} from '@line-crm/shared'
 import {reservationBoardApi} from '@/lib/api/helpers/reservation-board'
+import {SaveErrorField} from '@/components/shared/save-form-errors'
 import type {Draft} from './tables'
 import styles from './table-pen-editor.module.css'
 
@@ -20,10 +21,10 @@ export default function TablePenEditor({draft,onChange,floors,accountId,storeId,
  return <div className={styles.columns}>
   <section className={styles.col}><h3>基本情報</h3>
    <div className={styles.two}>
-    <label><Label required>卓番</Label><input aria-label="卓番" required value={draft.code} aria-invalid={!!errors.code} onChange={e=>change('code',e.target.value)} placeholder="例：3"/>{errors.code&&<small>{errors.code}</small>}</label>
-    <label><Label required>表示名</Label><input aria-label="表示名" required value={draft.label} aria-invalid={!!errors.label} onChange={e=>change('label',e.target.value)} placeholder="例：テーブル3"/>{errors.label&&<small>{errors.label}</small>}</label>
-    <label><Label required>最小人数</Label><input aria-label="最小人数" aria-required="true" required type="number" min="1" value={draft.minCapacity} aria-invalid={!!errors.minCapacity} onChange={e=>onCapacity('minCapacity',e.target.value)}/>{errors.minCapacity&&<small>{errors.minCapacity}</small>}</label>
-    <label><Label required>最大人数</Label><input aria-label="最大人数" aria-required="true" required type="number" min="1" value={draft.maxCapacity} aria-invalid={!!errors.maxCapacity} onChange={e=>onCapacity('maxCapacity',e.target.value)}/>{errors.maxCapacity&&<small>{errors.maxCapacity}</small>}</label>
+    <label><Label required>卓番</Label><SaveErrorField names={['code']}><input aria-label="卓番" required value={draft.code} aria-invalid={!!errors.code} onChange={e=>change('code',e.target.value)} placeholder="例：3"/></SaveErrorField>{errors.code&&<small>{errors.code}</small>}</label>
+    <label><Label required>表示名</Label><SaveErrorField names={['label']}><input aria-label="表示名" required value={draft.label} aria-invalid={!!errors.label} onChange={e=>change('label',e.target.value)} placeholder="例：テーブル3"/></SaveErrorField>{errors.label&&<small>{errors.label}</small>}</label>
+    <label><Label required>最小人数</Label><SaveErrorField names={['minCapacity','min_capacity']}><input aria-label="最小人数" aria-required="true" required type="number" min="1" value={draft.minCapacity} aria-invalid={!!errors.minCapacity} onChange={e=>onCapacity('minCapacity',e.target.value)}/></SaveErrorField>{errors.minCapacity&&<small>{errors.minCapacity}</small>}</label>
+    <label><Label required>最大人数</Label><SaveErrorField names={['maxCapacity','max_capacity']}><input aria-label="最大人数" aria-required="true" required type="number" min="1" value={draft.maxCapacity} aria-invalid={!!errors.maxCapacity} onChange={e=>onCapacity('maxCapacity',e.target.value)}/></SaveErrorField>{errors.maxCapacity&&<small>{errors.maxCapacity}</small>}</label>
    </div>
    <label className={styles.block}><Label required>階・エリア</Label><select aria-label="階・エリア" aria-invalid={!!errors.floorId} required value={draft.floorId} onChange={e=>change('floorId',e.target.value)}>{floors.map(f=><option key={f.id} value={f.id}>{f.kind==='area'?floors.find(p=>p.id===f.parentFloorId)?.name+' / ':''}{f.name}</option>)}</select>{errors.floorId&&<small>{errors.floorId}</small>}</label>
    <div className={styles.addLine}><button type="button" onClick={()=>{setAdding(adding?null:'floor');setParent(floors.find(f=>f.kind!=='area')?.id??'')}}><Plus size={15}/>階・エリアを追加</button><span>追加後にこの卓へ設定できます</span></div>
