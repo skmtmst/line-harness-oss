@@ -551,20 +551,19 @@ export async function saveScenarioDraft(
   }
   const now = jstNow();
   const json = JSON.stringify(actions);
-  let result: D1Result<unknown>;
-  if (input.expectedVersion === 0) {
-    result = await db.prepare(
-      `INSERT OR IGNORE INTO scenario_drafts
+  const write = input.expectedVersion === 0
+    ? db.prepare(`INSERT OR IGNORE INTO scenario_drafts
          (scenario_id, line_account_id, version, after_actions_json, updated_by, created_at, updated_at)
-       VALUES (?, ?, 1, ?, ?, ?, ?)`,
-    ).bind(input.scenarioId, input.lineAccountId, json, input.staffId, now, now).run();
-  } else {
-    result = await db.prepare(
-      `UPDATE scenario_drafts
+       VALUES (?, ?, 1, ?, ?, ?, ?)`)
+      .bind(input.scenarioId, input.lineAccountId, json, input.staffId, now, now)
+    : db.prepare(`UPDATE scenario_drafts
           SET after_actions_json = ?, version = version + 1, updated_by = ?, updated_at = ?
-        WHERE scenario_id = ? AND line_account_id = ? AND version = ?`,
-    ).bind(json, input.staffId, now, input.scenarioId, input.lineAccountId, input.expectedVersion).run();
-  }
+        WHERE scenario_id = ? AND line_account_id = ? AND version = ?`)
+      .bind(json, input.staffId, now, input.scenarioId, input.lineAccountId, input.expectedVersion);
+  const [result] = await db.batch([
+    write,
+    db.prepare(`UPDATE scenarios SET content_revision=content_revision+1 WHERE id=? AND changes()=1`).bind(input.scenarioId),
+  ]);
   if (Number(result.meta.changes ?? 0) === 0) {
     throw new ScenarioContractError(
       'version_conflict',

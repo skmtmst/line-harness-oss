@@ -283,7 +283,7 @@ export const post__api_scenarios_6 = async (c: Context<Env, "/api/scenarios">) =
 
 
     if (body.lineAccountId) {
-      await c.env.DB.prepare(`UPDATE scenarios SET line_account_id = ? WHERE id = ?`)
+      await c.env.DB.prepare(`UPDATE scenarios SET content_revision = content_revision + 1, line_account_id = ? WHERE id = ?`)
         .bind(body.lineAccountId, scenario.id).run();
     }
 
@@ -309,6 +309,8 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       triggerType?: ScenarioTriggerType;
       triggerTagId?: string | null;
       isActive?: boolean;
+      expectedContentRevision?: number;
+      expectedSubscriptions?: Array<{ id: string; revision: number }>;
       /** isActive: false で止めるときの理由（任意・200字まで）。 */
       reason?: string;
       deliveryMode?: DeliveryMode;
@@ -321,6 +323,14 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       onCompleteScenarioId?: string | null;
     }>();
 
+    if (body.expectedContentRevision !== undefined && (!Number.isSafeInteger(body.expectedContentRevision) || body.expectedContentRevision < 1)) {
+      return inputError(c, { success: false, error: 'invalid_confirmation_revision' }, 400, ['expectedContentRevision']);
+    }
+    if (body.expectedSubscriptions !== undefined && (body.expectedContentRevision === undefined || !Array.isArray(body.expectedSubscriptions)
+      || body.expectedSubscriptions.some(item => !item || typeof item.id !== 'string' || !item.id || !Number.isSafeInteger(item.revision) || item.revision < 1)
+      || new Set(body.expectedSubscriptions.map(item => item.id)).size !== body.expectedSubscriptions.length)) {
+      return inputError(c, { success: false, error: 'invalid_confirmation_subscriptions' }, 400, ['expectedSubscriptions']);
+    }
     if (body.reason !== undefined && (
       body.isActive !== false
       || typeof body.reason !== 'string'
@@ -394,9 +404,11 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       on_complete_mode: body.onCompleteMode,
       on_complete_scenario_id:
         body.onCompleteScenarioId === undefined ? undefined : (body.onCompleteScenarioId || null),
-    }, body.isActive === false ? {
-      stop: { reason: body.reason?.trim() || null, staffId: c.get('staff')!.id },
-    } : undefined);
+    }, {
+      ...(body.isActive === false ? { stop: { reason: body.reason?.trim() || null, staffId: c.get('staff')!.id } } : {}),
+      expectedRevision: body.expectedContentRevision,
+      expectedSubscriptions: body.expectedSubscriptions,
+    });
 
     if (!updated) {
       return fail(c, 404, 'SCENARIO_NOT_FOUND');
@@ -404,6 +416,10 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
 
     return c.json({ success: true, data: serializeScenario(updated) });
   } catch (err) {
+    if (err instanceof Error && err.message === 'SCENARIO_CONFIRMATION_CONFLICT') {
+      const current = await getScenarioById(c.env.DB, c.req.param('id'));
+      return c.json({ success: false, error: 'scenario_confirmation_conflict', data: current ? serializeScenario(current) : null }, 409);
+    }
     throw err;
   }
 };
@@ -432,10 +448,26 @@ export const get__api_scenarios_id_move_referrers_8 = async (c: Context<Env, "/a
 export const delete__api_scenarios_id_9 = async (c: Context<Env, "/api/scenarios/:id">) => {
   try {
     const id = c.req.param('id');
-    await deleteScenario(c.env.DB, id);
+    const body = await c.req.json<{ expectedContentRevision?: unknown; expectedSubscriptions?: unknown; expectedReferrers?: unknown }>().catch(() => null);
+    const revision = body?.expectedContentRevision;
+    const subscriptions = body?.expectedSubscriptions;
+    const referrers = body?.expectedReferrers;
+    if (revision !== undefined || subscriptions !== undefined || referrers !== undefined) {
+      if (!Number.isSafeInteger(revision) || Number(revision) < 1 || !Array.isArray(subscriptions)
+        || subscriptions.some(item => !item || typeof item.id !== 'string' || !item.id || !Number.isSafeInteger(item.revision) || item.revision < 1)
+        || new Set(subscriptions.map(item => item.id)).size !== subscriptions.length
+        || !Array.isArray(referrers) || referrers.some(item => !item || typeof item.id !== 'string' || !item.id || !Number.isSafeInteger(item.revision) || item.revision < 1)
+        || new Set(referrers.map(item => item.id)).size !== referrers.length)
+        return inputError(c, { success: false, error: 'invalid_confirmation' }, 400, ['expectedContentRevision', 'expectedSubscriptions', 'expectedReferrers']);
+    }
+    await deleteScenario(c.env.DB, id, revision === undefined ? undefined : { expectedRevision: revision as number, expectedSubscriptions: subscriptions as Array<{id: string; revision: number}>, expectedReferrers: referrers as Array<{id: string; revision: number}> });
     return c.json({ success: true, data: null });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
+    if (code === 'SCENARIO_CONFIRMATION_CONFLICT') {
+      const current = await getScenarioById(c.env.DB, c.req.param('id'));
+      return c.json({ success: false, error: 'scenario_confirmation_conflict', data: current ? serializeScenario(current) : null }, 409);
+    }
     if (code === 'SCENARIO_HAS_DEPENDENTS' || /FOREIGN KEY/i.test(code)) {
       return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
     }

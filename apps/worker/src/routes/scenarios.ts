@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess, requirePermission } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 import { get__api_scenarios_id_question_answers_1, post__api_scenarios_id_question_answers_executionId_resume_2, patch__api_scenarios_reorder_3, get__api_scenarios_4, get__api_scenarios_id_5, post__api_scenarios_6, put__api_scenarios_id_7, get__api_scenarios_id_move_referrers_8, delete__api_scenarios_id_9, post__api_scenarios_id_steps_10 } from './scenarios-drafts-handlers.js';
 import { requireVisibleScenario, scenarioPermission, requireScenarioEditBoundary } from './scenarios-definition.js';
@@ -33,6 +34,21 @@ scenarios.use('/api/scenarios/:id', requireVisibleScenario);
 scenarios.use('/api/scenarios/:id/*', requireVisibleScenario);
 
 scenarios.get('/api/scenarios/:id', scenarioPermission('view'), get__api_scenarios_id_5);
+
+scenarios.get('/api/scenarios/:id/confirmation', requireScenarioEditBoundary, async (c) => {
+  const row = await c.env.DB.prepare(`SELECT s.content_revision AS contentRevision,
+    (SELECT COUNT(DISTINCT friend_id) FROM friend_scenarios WHERE scenario_id=s.id AND status='active') AS activeCount,
+    (SELECT json_group_array(json_object('id', id, 'revision', confirmation_revision)) FROM
+      (SELECT id, confirmation_revision FROM friend_scenarios WHERE scenario_id=s.id ORDER BY id)) AS subscriptions,
+    (SELECT json_group_array(json_object('id', id, 'revision', content_revision, 'accountId', line_account_id)) FROM
+      (SELECT id, content_revision, line_account_id FROM scenarios WHERE on_complete_scenario_id=s.id ORDER BY id)) AS referrers
+    FROM scenarios s WHERE s.id=?`).bind(c.req.param('id')).first<{ contentRevision: number; activeCount: number; subscriptions: string; referrers: string }>();
+  if (!row) return c.json({ success: false, error: 'SCENARIO_NOT_FOUND' }, 404);
+  const referrers = c.req.query('purpose') === 'delete' ? JSON.parse(row.referrers) as Array<{ id: string; revision: number; accountId: string | null }> : [];
+  if (referrers.length && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), referrers.map(item => item.accountId)))
+    return c.json({ success: false, error: '関連する設定を確認できないため操作できません' }, 409);
+  return c.json({ success: true, data: { contentRevision: row.contentRevision, activeCount: row.activeCount, subscriptions: JSON.parse(row.subscriptions), referrers: referrers.map(({ id, revision }) => ({ id, revision })) } });
+});
 
 // POST /api/scenarios - create
 scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBoundary({"name":["string"],"description":["null","string"],"triggerType":["string"],"triggerTagId":["null","string"],"isActive":["boolean"],"lineAccountId":["null","string"],"deliveryMode":["string"],"allowConcurrent":["boolean"],"folderId":["null","string"]}), post__api_scenarios_6);

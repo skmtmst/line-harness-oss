@@ -72,6 +72,13 @@ export const scenariosPaths = {
       responses: { '200': { description: 'Deleted' } },
     },
   },
+  '/api/scenarios/{id}/confirmation': {
+    get: {
+      tags: ['Scenarios'], summary: '停止・削除の確認対象と版を取得',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      responses: { '200': { description: 'Content revision, active count and subscription revisions' }, '403': { description: 'Scenario edit permission required' }, '404': { description: 'Not found in account scope' } },
+    },
+  },
   '/api/scenarios/{id}/preview': {
     get: {
       tags: ['Scenarios'], summary: 'シナリオの配信時系列を確認',

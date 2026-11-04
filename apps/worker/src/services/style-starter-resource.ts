@@ -241,7 +241,7 @@ export async function overwriteResource(
     return [
       db
         .prepare(
-          `UPDATE scenarios SET name=?,is_active=0,updated_at=? WHERE id=? AND line_account_id=?`,
+          `UPDATE scenarios SET content_revision = content_revision + 1, name=?,is_active=0,updated_at=? WHERE id=? AND line_account_id=?`,
         )
         .bind(name, now, id, account),
       db

@@ -431,9 +431,12 @@ export const put__api_restaurant_test_followups_storeId_steps_stepId_messages_16
   const found=await db.prepare('SELECT id FROM templates WHERE line_account_id=? AND id IN (SELECT value FROM json_each(?))').bind(target.line_account_id,JSON.stringify(templateIds)).all<{id:string}>();
   if(found.results.length!==templateIds.length)return inputError(c,{success:false,error:'この店舗のテンプレートを選んでください'},422,['messageBubbles']);
  }
- const changed=await db.prepare(`UPDATE scenario_steps SET message_bubbles_json=?,message_type=?,message_content=?,template_id=NULL
+ const [changed]=await db.batch([
+  db.prepare(`UPDATE scenario_steps SET message_bubbles_json=?,message_type=?,message_content=?,template_id=NULL
    WHERE id=? AND EXISTS(SELECT 1 FROM rt_store_followup_templates t WHERE t.store_id=? AND t.scenario_id=scenario_steps.scenario_id AND t.template_version=?)`)
-   .bind(JSON.stringify(body.messageBubbles),parts[0].messageType,parts[0].messageContent,stepId,storeId,body.expectedVersion).run();
+   .bind(JSON.stringify(body.messageBubbles),parts[0].messageType,parts[0].messageContent,stepId,storeId,body.expectedVersion),
+  db.prepare(`UPDATE scenarios SET content_revision=content_revision+1 WHERE id=? AND changes()=1`).bind(target.scenario_id),
+ ]);
  if(!changed.meta.changes)return c.json({success:false,error:'version_conflict'},409);
  await refreshScenarioReferences(db,target.scenario_id);
  return c.json({success:true,data:{stepId,messageBubbles:body.messageBubbles,version:Number(body.expectedVersion)+1,sendingStatus:'stopped'}});

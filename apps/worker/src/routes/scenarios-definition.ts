@@ -96,6 +96,7 @@ function serializeScenario(row: DbScenario) {
     // null は全アカウント共通、UUID は特定アカウント所属を表す。管理画面で、共通のシナリオと所属先を失ったシナリオを区別できるよう返す。
     lineAccountId: (row as { line_account_id?: string | null }).line_account_id ?? null,
     isActive: Boolean(row.is_active),
+    contentRevision: row.content_revision,
     stoppedReason: row.stopped_reason ?? null,
     stoppedBy: row.stopped_by ?? null,
     stoppedAt: row.stopped_at ?? null,

@@ -21,7 +21,7 @@ function insertRow(table: PortableTable, row: DbRow): HqTemplateStatement {
 }
 function updateScenarioRow(row: DbRow, id: string, accountId: string): HqTemplateStatement {
   const columns = Object.keys(row).filter(column => !['id', 'line_account_id', 'created_at', 'updated_at'].includes(column));
-  return { sql: `UPDATE scenarios SET ${columns.map(column => `${column}=?`).join(',')},updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [...columns.map(column => row[column]), id, accountId] };
+  return { sql: `UPDATE scenarios SET content_revision = content_revision + 1, ${columns.map(column => `${column}=?`).join(',')},updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`, bindings: [...columns.map(column => row[column]), id, accountId] };
 }
 const formReferenceKey = (kind: string, sourceId: string) => `${kind}:${sourceId}`;
 function formReferenceSelection(reference: { kind: string; sourceId: string }, context: HqTemplateAdapterContext) {
