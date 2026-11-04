@@ -1,8 +1,5 @@
 // @vitest-environment happy-dom
-/*
- * 86: 店の切り替えは［店舗：…］の選ぶ欄1つに統一（下線のタブは使わない）。
- * 店が1つしか無い時は選ぶ欄を出さない。対象：Googleビジネス。
- */
+/* Googleビジネスは画面右上の共通LINEアカウント選択を使い、独自の店舗選択を出さない。 */
 import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -36,19 +33,21 @@ function connection(stores: Array<{ id: string; name: string; line_account_id: s
 
 afterEach(cleanup)
 
-describe('86 Googleビジネス：店の切り替えは選ぶ欄1つ', () => {
-  it('2店以上の時は［店舗：…］の選ぶ欄を出し、下線のタブは出さない', async () => {
+describe('Googleビジネス：共通アカウントの選択を使う', () => {
+  it('複数店舗が返っても画面内の店舗選択を出さず、選択中のアカウントを読み込む', async () => {
     connectionFn.mockResolvedValue(connection([
       { id: 's1', name: '渋谷店', line_account_id: 'a' },
       { id: 's2', name: '新宿店', line_account_id: 'b' },
     ]))
     render(<GoogleV8 />)
-    expect(await screen.findByRole('button', { name: '店舗' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Googleビジネス' })).toBeTruthy()
+    expect(connectionFn).toHaveBeenCalledWith('a')
+    expect(screen.queryByRole('button', { name: '店舗' })).toBeNull()
     expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
     expect(screen.queryByText('設定')).toBeNull()
   })
 
-  it('店が1つしか無い時は選ぶ欄を出さない', async () => {
+  it('店舗が1つの時も同じ表示にする', async () => {
     connectionFn.mockResolvedValue(connection([{ id: 's1', name: '渋谷店', line_account_id: 'a' }]))
     render(<GoogleV8 />)
     expect(await screen.findByRole('heading', { name: 'Googleビジネス' })).toBeTruthy()
