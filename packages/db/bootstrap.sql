@@ -4563,6 +4563,7 @@ CREATE TABLE inbox_response_samples (
  id TEXT PRIMARY KEY,
  account_id TEXT NOT NULL REFERENCES line_accounts(id),
  staff_id TEXT REFERENCES staff_members(id) ON DELETE SET NULL,
+ reply_kind TEXT NOT NULL DEFAULT 'manual' CHECK(reply_kind IN ('manual','automatic')),
  pending_since TEXT,
  due_at TEXT,
  responded_at TEXT NOT NULL,
@@ -12530,6 +12531,13 @@ WHEN NEW.id != OLD.id
   OR NEW.tenant_id != OLD.tenant_id
   OR NEW.version != OLD.version
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_VERSION_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER inbox_response_samples_automatic AFTER INSERT ON messages_log
+WHEN NEW.direction='outgoing' AND NEW.source IN ('auto_reply','qa')
+BEGIN
+ INSERT INTO inbox_response_samples(id,account_id,staff_id,reply_kind,pending_since,due_at,responded_at,is_first_response)
+ SELECT lower(hex(randomblob(16))),f.line_account_id,NULL,'automatic',NULL,NULL,NEW.created_at,0
+ FROM friends f WHERE f.id=NEW.friend_id AND f.line_account_id IS NOT NULL; END;
 
 CREATE TRIGGER inbox_response_samples_manual AFTER UPDATE OF last_operator_message_at ON chats
 WHEN NEW.last_operator_message_at IS NOT NULL

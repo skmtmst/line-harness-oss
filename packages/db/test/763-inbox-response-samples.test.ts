@@ -19,6 +19,8 @@ it('過去分は作らず、手動の返事ごとに担当と当時の期限を�
    {account_id:'a',staff_id:'s',pending_since:'2026-11-05T00:00:00Z',due_at:'2026-11-05T00:30:00Z',responded_at:'2026-11-05T00:20:00Z',is_first_response:1},
    {account_id:'a',staff_id:'s',pending_since:null,due_at:null,responded_at:'2026-11-05T00:21:00Z',is_first_response:0},
   ]);
+  raw.exec("INSERT INTO messages_log(id,friend_id,direction,message_type,content,source,created_at) VALUES('m','f','outgoing','text','private text','auto_reply','2026-11-05T00:22:00Z')");
+  expect(raw.prepare("SELECT reply_kind,staff_id,due_at,is_first_response FROM inbox_response_samples WHERE reply_kind='automatic'").get()).toEqual({reply_kind:'automatic',staff_id:null,due_at:null,is_first_response:0});
   expect((raw.prepare('PRAGMA table_info(inbox_response_samples)').all() as Array<{name:string}>).map(x=>x.name)).not.toContain('friend_id');
   expect((raw.prepare('PRAGMA table_info(inbox_response_samples)').all() as Array<{name:string}>).map(x=>x.name)).not.toContain('chat_id');
  } finally {raw.close()}
@@ -28,7 +30,7 @@ it('既存の会話を変えずに追加し、過去の返事を作り直さな�
  const raw=new Database(':memory:');
  try {
   raw.exec(`CREATE TABLE line_accounts(id TEXT PRIMARY KEY); CREATE TABLE staff_members(id TEXT PRIMARY KEY);
-   CREATE TABLE friends(id TEXT PRIMARY KEY,line_account_id TEXT); CREATE TABLE chats(id TEXT PRIMARY KEY,friend_id TEXT,assignee_staff_id TEXT,pending_since TEXT,first_response_at TEXT,sla_due_at TEXT,last_operator_message_at TEXT);
+   CREATE TABLE friends(id TEXT PRIMARY KEY,line_account_id TEXT); CREATE TABLE messages_log(id TEXT PRIMARY KEY,friend_id TEXT,direction TEXT,source TEXT,created_at TEXT); CREATE TABLE chats(id TEXT PRIMARY KEY,friend_id TEXT,assignee_staff_id TEXT,pending_since TEXT,first_response_at TEXT,sla_due_at TEXT,last_operator_message_at TEXT);
    INSERT INTO line_accounts VALUES('a'); INSERT INTO friends VALUES('f','a');
    INSERT INTO chats VALUES('c','f',NULL,'2026-10-01T00:00:00Z','2026-10-01T00:10:00Z',NULL,'2026-10-01T00:10:00Z');`);
   raw.exec(readFileSync(new URL('../migrations/763_inbox_response_samples.sql',import.meta.url),'utf8'));
