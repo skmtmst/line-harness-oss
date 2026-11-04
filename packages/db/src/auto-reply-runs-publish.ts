@@ -58,6 +58,7 @@ export async function publishAutoReplyDraftVersion(
     expectedSnapshot?: string;
     expectedStoppedAt?: string | null;
     expectedIsActive?: number;
+    tenantId?: string | null;
   },
 ): Promise<AutoReplyVersionRow> {
   const replay = await db.prepare(
@@ -165,7 +166,7 @@ export async function publishAutoReplyDraftVersion(
       ...snapshotGuardBinds,
       ...stopGuardBinds,
     ),
-    ...await mediaContentDeletionGuard(db, [draft.definition_snapshot], settings.lineAccountId ? [settings.lineAccountId] : []),
+    ...await mediaContentDeletionGuard(db, [draft.definition_snapshot], settings.lineAccountId ? [settings.lineAccountId] : [], input.tenantId),
   ]);
   const published = await getAutoReplyVersionById(db, draft.id);
   const ruleAfter = await db.prepare(`SELECT * FROM auto_replies WHERE id = ?`)
@@ -196,6 +197,7 @@ export async function publishAutoReplyDraftVersion(
 export async function ensureAutoReplyPublishedVersion(
   db: D1Database,
   rule: AutoReply,
+  context?: { lineAccountId?: string | null; tenantId?: string | null },
 ): Promise<AutoReplyVersionRow> {
   const snapshot = autoReplyDefinitionSnapshot(rule);
   const current = await getAutoReplyPublishedVersion(db, rule.id);
@@ -247,6 +249,7 @@ export async function ensureAutoReplyPublishedVersion(
       /* 読めない旧版は引き継がない */
     }
   }
+  const mediaAccountId = rule.line_account_id ?? context?.lineAccountId;
   await db.batch([
     db.prepare(
       `UPDATE auto_reply_versions SET status = 'retired', updated_at = ?
@@ -262,7 +265,7 @@ export async function ensureAutoReplyPublishedVersion(
       `UPDATE auto_replies SET current_published_version_id = ?, lifecycle_status = 'published'
         WHERE id = ?`,
     ).bind(id, rule.id),
-    ...await mediaContentDeletionGuard(db, [snapshotToSave], rule.line_account_id ? [rule.line_account_id] : []),
+    ...await mediaContentDeletionGuard(db, [snapshotToSave], mediaAccountId ? [mediaAccountId] : [], context?.tenantId),
   ]);
 
   const saved = await db

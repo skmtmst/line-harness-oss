@@ -91,7 +91,7 @@ describe('NEN campaign tenant scope', () => {
     });
     expect(response.status).toBe(200);
     expect(mocks.saveNenCampaignAccountSetting).toHaveBeenCalledWith(
-      expect.anything(), 'own-account', expect.objectContaining({ title: '自社アカウントの見出し' }),
+      expect.anything(), 'own-account', expect.objectContaining({ title: '自社アカウントの見出し' }), 'tenant-a',
     );
   });
 

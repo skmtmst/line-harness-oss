@@ -775,6 +775,7 @@ async function executeOperation(
             fieldId,
             value,
             updatedBy: run.created_by,
+            tenantId: run.tenant_id,
             field: { type: def.resolved_type, options_json: def.options_json },
           });
         } catch (error) {
@@ -979,7 +980,7 @@ async function executeUndo(
            ON CONFLICT(friend_id, field_id) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by`,
         ).bind(item.friend_id, fieldId, value, now, 'bulk-undo'));
       const mediaValues=entries.map(entry=>friendMediaCandidate(entry.value,entry.type));
-      await db.batch([...writes,...mediaTenantGuardByQuery(db,mediaValues,'SELECT line_account_id AS account_id FROM friends WHERE id=?',[item.friend_id]),
+      await db.batch([...writes,...mediaTenantGuardByQuery(db,mediaValues,'SELECT line_account_id AS account_id FROM friends WHERE id=?',[item.friend_id],undoRun.tenant_id),
         ...friendMediaIdGuards(db,entries),...await mediaContentDeletionGuard(db,mediaValues)]);
       break;
     }

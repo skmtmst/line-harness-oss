@@ -18,6 +18,7 @@ import type { EcEvent } from '../features/ec-commerce/member-snapshot/index.js';
 import { createFeatureJobGate, featureJobCanRun } from './feature-enforcement.js';
 import { createEccubeCoupon } from './eccube-coupon.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
+import { mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 
 const FOLLOW_UP_KEYS = ['arrival_check', 'review_request', 'cross_sell'] as const;
 // 1 回の cron 実行で送る件数。cron は 5 分ごとなので、
@@ -158,13 +159,15 @@ async function readAccountSetting(db: D1Database, lineAccountId: string, key: st
   return row?.value ?? null;
 }
 
-async function writeAccountSetting(db: D1Database, lineAccountId: string, key: string, value: string): Promise<void> {
+async function writeAccountSetting(db: D1Database, lineAccountId: string, key: string, value: string, guards: D1PreparedStatement[] = []): Promise<void> {
   const now = jstNow();
-  await db.prepare(
+  const statement = db.prepare(
     `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(line_account_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-  ).bind(crypto.randomUUID(), lineAccountId, key, value, now, now).run();
+  ).bind(crypto.randomUUID(), lineAccountId, key, value, now, now);
+  if (guards.length) await db.batch([statement, ...guards]);
+  else await statement.run();
 }
 
 type DeliveryJob = {
@@ -611,12 +614,15 @@ export async function saveNenCampaignAccountSetting(
   db: D1Database,
   lineAccountId: string,
   campaign: CampaignRow,
+  tenantId?: string | null,
 ): Promise<void> {
+  const value = JSON.stringify({ ...campaign, updated_at: jstNow() });
   await writeAccountSetting(
     db,
     lineAccountId,
     campaignAccountSettingKey(campaign.campaign_key),
-    JSON.stringify({ ...campaign, updated_at: jstNow() }),
+    value,
+    await mediaDeletionTextGuardStatements(db, [value], [lineAccountId], tenantId),
   );
 }
 

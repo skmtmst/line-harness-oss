@@ -42,15 +42,36 @@ export function mediaTenantGuardByQuery(db: D1Database, values: Array<string | n
 
 export function mediaReferenceCandidates(values: Array<string | null | undefined>): string[] {
   const candidates = new Set<string>();
+  let bytes = 2;
+  const add = (candidate: string) => {
+    if (!candidate || candidates.has(candidate)) return;
+    if (candidate.length > 2048 || candidates.size >= 4096) throw new Error('media_reference_limit_exceeded');
+    bytes += new TextEncoder().encode(JSON.stringify(candidate)).length + 1;
+    if (bytes > 1_000_000) throw new Error('media_reference_limit_exceeded');
+    candidates.add(candidate);
+  };
   for (const value of mediaReferenceVariants(values)) {
-    for (const word of [value, ...(value.match(/https?:\/\/[^\s<>"'`]+/g) ?? []), ...(value.match(/[a-zA-Z0-9_.~%/-]+/g) ?? []).filter(word => word.includes('/') || /\.[a-z0-9]{2,8}$/i.test(word))]) {
+    const standalone = /^[a-zA-Z0-9_.~%-]+$/.test(value);
+    const pathValue = /^(?:\/?[a-zA-Z0-9_.~%-]+\/)/.test(value) && !/[<>"'`\r\n]/.test(value);
+    function* words() {
+      if (pathValue) yield value;
+      for (const match of value.matchAll(/https?:\/\/[^\s<>"'`]+|[a-zA-Z0-9_.~%/-]+/g)) yield match[0];
+    }
+    for (const word of words()) {
+      if (!standalone && !word.includes('/') && !/%2f/i.test(word) && !/\.[a-z0-9]{2,8}$/i.test(word)) continue;
+      if (word.length > 2048) throw new Error('media_reference_limit_exceeded');
       let path = word.replace(/[),.;!?]+$/, '');
+      add(path);
       try { path = new URL(path).pathname; } catch { /* text or key */ }
-      try { path = decodeURIComponent(path); } catch { /* retain original */ }
-      const parts=path.replace(/^\/+/, '').split('/');
-      for (let index=0;index<parts.length;index++) if (parts[index]) candidates.add(parts.slice(index).join('/'));
-      const live=path.match(/\/(?:api\/)?media\/([^/]+)\/content(?:$|[?#])/);
-      if (live) candidates.add(live[1]);
+      let decoded=path;
+      try { decoded = decodeURIComponent(path); } catch { /* retain original */ }
+      for (const variant of new Set([path,decoded])) {
+        const parts=variant.replace(/^\/+/, '').split('/');
+        if (parts.length > 64) throw new Error('media_reference_limit_exceeded');
+        for (let index=0;index<parts.length;index++) if (parts[index]) add(parts.slice(index).join('/'));
+        const live=variant.match(/\/(?:api\/)?media\/([^/]+)\/content(?:$|[?#])/);
+        if (live) add(live[1]);
+      }
     }
   }
   return [...candidates];
@@ -90,33 +111,18 @@ export async function mediaContentDeletionGuard(db: D1Database, values: Array<st
 
 /** Build an atomic check for stored URLs and keys; no raw keys are persisted here. */
 export async function mediaDeletedKeyFingerprintGuard(db: D1Database, values: Array<string | null | undefined>, options: { checkLiveIds?: boolean } = {}): Promise<D1PreparedStatement[]> {
-  const candidates = new Set<string>();
+  const candidates = mediaReferenceCandidates(values);
   const liveIds = new Set<string>();
-  const visit = (value: unknown, depth = 0): void => {
-    if (depth > 32) throw new Error('media_reference_too_nested');
-    if (value == null) return;
-    if (Array.isArray(value)) { for (const item of value) visit(item, depth + 1); return; }
-    if (typeof value === 'object') { for (const item of Object.values(value)) visit(item, depth + 1); return; }
-    if (typeof value !== 'string' || !value) return;
-    let parsed: unknown = value;
-    try { parsed = JSON.parse(value); } catch { /* plain text */ }
-    if (parsed !== value) visit(parsed, depth + 1);
-    const words = [value, ...(value.match(/https?:\/\/[^\s<>"'`]+/g) ?? []), ...(value.match(/(?:\/images\/|media\/)[a-zA-Z0-9._~%/\-]+/g) ?? [])];
-    const variants = words.flatMap(word => [word, word.replace(/[),.;!?]+$/, '')]);
-    for (const word of variants) {
-      candidates.add(word);
-      let path = word;
-      try { path = new URL(word).pathname; } catch { /* R2 key */ }
-      try { path = decodeURIComponent(path); } catch { /* preserve original */ }
-      path = path.replace(/^\/+/, '');
-      const parts = path.split('/');
-      for (let index = 0; index < parts.length; index++) candidates.add(parts.slice(index).join('/'));
-      const live = path.match(/^(?:api\/)?media\/([^/]+)\/content$/);
-      if (live && (word.startsWith('/') || /^https?:\/\//.test(word)) && options.checkLiveIds !== false) liveIds.add(live[1]);
+  if (options.checkLiveIds !== false) for (const value of mediaReferenceVariants(values)) {
+    for (const match of value.matchAll(/(?:https?:\/\/[^\s<>"'`]+|\/(?:api\/)?media\/[^\s<>"'`]+)/g)) {
+      let path = match[0].replace(/[),.;!?]+$/, '');
+      try { path = new URL(path).pathname; } catch { /* relative URL */ }
+      try { path = decodeURIComponent(path); } catch { /* retain original */ }
+      const live = path.match(/^\/(?:api\/)?media\/([^/]+)\/content(?:$|[?#])/);
+      if (live) liveIds.add(live[1]);
     }
-  };
-  for (const value of values) visit(value);
-  const hashes = await Promise.all([...candidates].filter(Boolean).map(async value => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))), b => b.toString(16).padStart(2, '0')).join('')));
+  }
+  const hashes = await Promise.all(candidates.map(async value => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))), b => b.toString(16).padStart(2, '0')).join('')));
   if (!hashes.length && !liveIds.size) return [];
   return [db.prepare(`INSERT INTO media_tenant_guards(blocked)
     SELECT 1 WHERE EXISTS (SELECT 1 FROM json_each(?) live WHERE NOT EXISTS(SELECT 1 FROM media WHERE id=live.value))`).bind(JSON.stringify([...liveIds])),

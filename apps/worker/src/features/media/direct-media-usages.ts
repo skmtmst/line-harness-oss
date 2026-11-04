@@ -43,6 +43,7 @@ export async function findDirectMediaUsages(db: D1Database, media: { id: string;
     `SELECT 'EC通知' AS kind, image_url FROM ec_notification_settings`,
     `SELECT 'EC通知（店舗）' AS kind, image_url FROM ec_notification_account_settings`,
     `SELECT 'キャンペーン通知' AS kind, image_url FROM nen_campaign_settings`,
+    `SELECT 'キャンペーン通知（店舗）' AS kind, value FROM account_settings WHERE key LIKE 'nen.campaign.%'`,
     `SELECT 'アカウントの共有画像' AS kind, og_default_image_url FROM line_accounts`,
     `SELECT 'アカウントの画像' AS kind, icon_url FROM line_accounts`,
     `SELECT 'LINEプロフィール画像' AS kind, line_picture_url FROM line_accounts`,

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 
 const accountAccess = vi.hoisted(() => ({ canAccessAllLineAccounts: vi.fn(async () => true) }));
 vi.mock('../services/account-access.js', async (importOriginal) => ({
@@ -102,6 +103,19 @@ beforeEach(() => {
 });
 
 describe('M507 配信設定の同時保存は古い画面からを409で止める', () => {
+  it('版付き保存でも別統括の画像は拒み設定を変更しない', async () => {
+    testDb.raw.exec(`INSERT INTO tenants(id,name) VALUES('t1','A'),('t2','B');
+      UPDATE line_accounts SET tenant_id='t1' WHERE id='account-a';
+      INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('account-b','channel-b','B','x','x','t2');
+      INSERT INTO media(id,line_account_id,r2_key,filename,mime_type,size_bytes,kind) VALUES('other','account-b','images/other.png','other.png','image/png',1,'image');`);
+    const path='/api/nen-campaigns/settings/review_request?lineAccountId=account-a';
+    expect((await put(path,settingBody('元の見出し'))).status).toBe(200);
+    const version=accountSettingUpdatedAt();
+    const instance=app(); instance.onError(unhandledWorkerError);
+    const response=await instance.request(path,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({...settingBody('変更後',version!),imageUrl:'https://example.test/images/other.png'})});
+    expect(response.status).toBe(404);
+    expect(accountSettingUpdatedAt()).toBe(version);
+  });
   it('版を送らない従来の保存はそのまま通る', async () => {
     const response = await put(
       '/api/nen-campaigns/settings/review_request?lineAccountId=account-a',

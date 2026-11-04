@@ -74,6 +74,36 @@ describe('自動応答の下書き・試験・公開版', () => {
     db = asD1(sqlite);
   });
 
+  it('アカウント未設定の公開は操作した統括の画像だけを許す', async () => {
+    sqlite.exec(`INSERT INTO tenants(id,name) VALUES('t1','A'),('t2','B');
+      INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a','a','A','x','x','t1'),('b','b','B','x','x','t2');
+      INSERT INTO media(id,line_account_id,r2_key,filename,mime_type,size_bytes,kind) VALUES('own','a','images/own.png','own.png','image/png',1,'image'),('other','b','images/other.png','other.png','image/png',1,'image');`);
+    const makeDraft=async (image:string) => {
+      const created=await createAutoReplyWithDraftVersion(db,settings({lineAccountId:null}));
+      sqlite.prepare("UPDATE auto_reply_versions SET definition_snapshot=json_set(definition_snapshot,'$.responseContent',?) WHERE id=?")
+        .run(`https://example.invalid/images/${image}.png`,created.version.id);
+      await recordAutoReplyDraftTest(db,created.version.id,{succeeded:true,staffId:'staff'});
+      return created;
+    };
+    const own=await makeDraft('own');
+    await expect(publishAutoReplyDraftVersion(db,own.rule.id,{staffId:'staff',idempotencyKey:'own',tenantId:'t1'})).resolves.toMatchObject({status:'published'});
+    const other=await makeDraft('other');
+    await expect(publishAutoReplyDraftVersion(db,other.rule.id,{staffId:'staff',idempotencyKey:'other',tenantId:'t1'})).rejects.toThrow('media_cross_tenant_reference');
+  });
+
+  it('実行時に共通の自動応答の版を作るときは受信アカウントで照合する', async () => {
+    sqlite.exec(`INSERT INTO tenants(id,name) VALUES('t1','A'),('t2','B');
+      INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a','a','A','x','x','t1'),('b','b','B','x','x','t2');
+      INSERT INTO media(id,line_account_id,r2_key,filename,mime_type,size_bytes,kind) VALUES('own','a','images/own.png','own.png','image/png',1,'image'),('other','b','images/other.png','other.png','image/png',1,'image');`);
+    const makeRule=async (image:string) => {
+      const created=await createAutoReplyWithDraftVersion(db,settings({lineAccountId:null}));
+      sqlite.prepare('UPDATE auto_replies SET response_content=? WHERE id=?').run(`https://example.invalid/images/${image}.png`,created.rule.id);
+      return (await getAutoReplyById(db,created.rule.id))!;
+    };
+    await expect(ensureAutoReplyPublishedVersion(db,await makeRule('own'),{lineAccountId:'a'})).resolves.toMatchObject({status:'published'});
+    await expect(ensureAutoReplyPublishedVersion(db,await makeRule('other'),{lineAccountId:'a'})).rejects.toThrow('media_cross_tenant_reference');
+  });
+
   it('通知とタグ付けの設定を同じ版に保存し、読み直しても変えない', async () => {
     const actions = JSON.stringify([{actionType:'notify_staff',config:{notificationRuleId:'r',notificationRuleVersion:2,message:'受信箱を確認してください'},onFailure:'stop'},{actionType:'tag',config:{op:'add',tagIds:['t']},onFailure:'continue'}]);
     const created = await createAutoReplyWithDraftVersion(db,settings({actions}));

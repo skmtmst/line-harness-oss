@@ -1,3 +1,4 @@
+import { mediaReferenceCandidates, mediaReferenceVariants } from '@line-crm/db/src/media/deletion-guard.js';
 import { mediaDeletionTextGuardStatements } from '../features/media/deletion-guard.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
@@ -343,7 +344,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireDeliveryAcce
   // 版を送らない従来の呼び出しは、以前とまったく同じ書き方で通す。
   // どちらの場合も新しい版を返す（画面が次の保存へ進めるため）。
   if (expectedUpdatedAt === null) {
-    await saveNenCampaignAccountSetting(c.env.DB, accountId, next);
+    await saveNenCampaignAccountSetting(c.env.DB, accountId, next, c.get('staff')?.tenantId);
     auditLog(c, 'nen.campaign.save', {kind:'nen_campaign', id:key}, {lineAccountId:accountId});
     const savedSetting = await getNenCampaign(c.env.DB, key, accountId);
     return c.json({ success: true, data: { updatedAt: savedSetting?.updated_at ?? next.updated_at } });
@@ -364,12 +365,13 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireDeliveryAcce
     }, 409);
   }
   const nextValue = JSON.stringify(next);
+  const mediaGuards = await mediaDeletionTextGuardStatements(c.env.DB, [nextValue], [accountId], c.get('staff')?.tenantId);
   if (!saved) {
-    const inserted = await c.env.DB.prepare(
+    const [inserted] = await c.env.DB.batch([c.env.DB.prepare(
       `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(line_account_id, key) DO NOTHING`,
-    ).bind(crypto.randomUUID(), accountId, settingKey, nextValue, next.updated_at, next.updated_at).run();
+    ).bind(crypto.randomUUID(), accountId, settingKey, nextValue, next.updated_at, next.updated_at), ...mediaGuards]);
     if ((inserted.meta?.changes ?? 0) === 0) {
       const latest = await getNenCampaign(c.env.DB, key, accountId);
       return c.json({
@@ -379,9 +381,9 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireDeliveryAcce
       }, 409);
     }
   } else {
-    const written = await c.env.DB.prepare(
+    const [written] = await c.env.DB.batch([c.env.DB.prepare(
       `UPDATE account_settings SET value = ?, updated_at = ? WHERE line_account_id = ? AND key = ? AND value = ?`,
-    ).bind(nextValue, next.updated_at, accountId, settingKey, saved.value).run();
+    ).bind(nextValue, next.updated_at, accountId, settingKey, saved.value), ...mediaGuards]);
     if ((written.meta?.changes ?? 0) === 0) {
       const latest = await getNenCampaign(c.env.DB, key, accountId);
       return c.json({
@@ -428,7 +430,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireDeli
     ...current,
     is_enabled: body.isEnabled ? 1 : 0,
     updated_at: jstNow(),
-  });
+  }, c.get('staff')?.tenantId);
   auditLog(c, body.isEnabled ? 'nen.campaign.enable' : 'nen.campaign.stop', {kind:'nen_campaign', id:key}, {lineAccountId:accountId});
   return c.json({ success: true });
 });
@@ -1277,6 +1279,46 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
   // 紹介文が消える。既定文のまま古くなるより、人が直した内容が消えるほうが
   // 害が大きいため、編集済みの内容を優先する。
   // https://github.com/kentavndng/line-harness-board/issues/711
+  const targetAccount = lineAccountId ?? existing?.line_account_id;
+  // A shared EC signature cannot select an owner when several accounts exist.
+  // Check and omit only the image inside the same transaction as the column write.
+  if (!targetAccount && fields.imageUrl) {
+    const variants = mediaReferenceVariants([fields.imageUrl]);
+    const candidates = mediaReferenceCandidates(variants);
+    const hashes = await Promise.all(candidates.map(async value => Array.from(
+      new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))),
+      byte => byte.toString(16).padStart(2, '0'),
+    ).join('')));
+    const hasLiveUrl = variants.some(value => /\/(?:api\/)?media\/[^/]+\/content(?:$|[?#])/.test(value));
+    const check = (n: number) => `(EXISTS (
+      SELECT 1 FROM media m WHERE m.id IN (SELECT value FROM json_each(?${n})
+        UNION SELECT found.id FROM media found JOIN json_each(?${n}) c ON found.r2_key=c.value
+        UNION SELECT v.media_id FROM media_versions v JOIN json_each(?${n}) c ON v.r2_key=c.value)
+    ) OR EXISTS (SELECT 1 FROM media_deleted_key_fingerprints f JOIN json_each(?${n + 1}) h ON h.value=f.sha256)
+      OR EXISTS (SELECT 1 FROM media_deletion_jobs j JOIN json_each(?${n + 2}) c
+        WHERE j.status IN ('checking','deleting') AND (instr(c.value, '/media/' || j.media_id || '/content') > 0
+          OR EXISTS (SELECT 1 FROM json_each(j.r2_keys_json) k WHERE length(k.value)>0 AND instr(c.value,k.value)>0)))
+      OR ?${n + 3}=1)`;
+    const checkBinds = [JSON.stringify(candidates), JSON.stringify(hashes), JSON.stringify(variants), hasLiveUrl ? 1 : 0];
+    const result = await c.env.DB.batch([
+      c.env.DB.prepare(`SELECT ${check(1)} AS blocked`).bind(...checkBinds),
+      c.env.DB.prepare(`INSERT INTO platform_audit_logs(id,staff_id,action,reason,detail)
+        SELECT ?5,'system','eccube.column.image_rejected','MEDIA_TENANT_UNDETERMINED','{"count":1}' WHERE ${check(1)}`)
+        .bind(...checkBinds, crypto.randomUUID()),
+      c.env.DB.prepare(`INSERT INTO nen_columns
+        (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url, published_at, delivery_status, line_account_id, created_at, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, CASE WHEN ${check(14)} THEN NULL ELSE ?9 END, ?10, 'draft', ?11, ?12, ?13)
+        ON CONFLICT(slug) DO UPDATE SET external_id=excluded.external_id, title=excluded.title,
+          category=excluded.category, excerpt=excluded.excerpt, article_url=excluded.article_url,
+          image_url=CASE WHEN ${check(14)} THEN nen_columns.image_url ELSE excluded.image_url END,
+          published_at=excluded.published_at, line_account_id=COALESCE(excluded.line_account_id,nen_columns.line_account_id), updated_at=excluded.updated_at`)
+        .bind(id, typeof body.external_id === 'string' ? body.external_id : body.slug, body.slug, fields.title,
+          fields.category, fields.excerpt, fields.introText, fields.articleUrl, fields.imageUrl,
+          fields.publishedAt, lineAccountId, now, now, ...checkBinds),
+    ]);
+    const blocked = (result[0].results?.[0] as {blocked?: number} | undefined)?.blocked === 1;
+    return c.json({ success: true, data: { id, ...(blocked ? { imageRejection: { reasonCode: 'MEDIA_TENANT_UNDETERMINED', count: 1 } } : {}) } });
+  }
   const insert = c.env.DB.prepare(
     `INSERT INTO nen_columns
       (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url, published_at, delivery_status, line_account_id, created_at, updated_at)

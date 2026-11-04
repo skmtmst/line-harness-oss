@@ -1,3 +1,12 @@
+/** Expire abandoned checks; deleting jobs remain available for an immediate retry. */
+export async function releasePurgeMediaLeases(db:D1Database, input:{mediaIds:string[];owner:string;now:string}):Promise<void> {
+  if (!input.mediaIds.length) return;
+  await db.prepare(`UPDATE media_deletion_jobs SET lease_owner=NULL,
+    lease_expires_at=CASE WHEN status='checking' THEN ? ELSE NULL END,updated_at=?
+    WHERE lease_owner=? AND media_id IN (SELECT value FROM json_each(?))`)
+    .bind(input.now,input.now,input.owner,JSON.stringify(input.mediaIds)).run();
+}
+
 /** Acquire a bounded batch without a read/write gap or per-image round trips. */
 export async function lockPurgeMedia(db:D1Database, input:{
   media:Array<{id:string;accountId:string}>; tenantId:string; tenantMarker:string;

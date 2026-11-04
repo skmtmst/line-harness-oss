@@ -11,7 +11,7 @@ import {
   type TenantRetention,
 } from '@line-crm/db';
 import { captureMediaPurgeImpacts, finishMediaPurgeImpacts, type PurgeMediaKey } from './tenant-media-impact.js';
-import { beginPurgeMedia, lockPurgeMedia, renewPurgeMedia } from './tenant-purge-media-lock.js';
+import { beginPurgeMedia, lockPurgeMedia, releasePurgeMediaLeases, renewPurgeMedia } from './tenant-purge-media-lock.js';
 import { preserveForeignBanners } from './tenant-purge-banner-placeholder.js';
 
 
@@ -251,10 +251,7 @@ async function deleteR2Objects(
   if (!env.IMAGES) return { deleted: 0, failed: keys.length };
   const lockedMedia: string[] = [];
   const releaseLeases = async () => {
-    if (!lockedMedia.length) return;
-    await env.DB.prepare(`UPDATE media_deletion_jobs SET lease_owner=NULL,lease_expires_at=NULL,updated_at=?
-      WHERE lease_owner=? AND media_id IN (SELECT value FROM json_each(?))`)
-      .bind(now,purgeOwner,JSON.stringify(lockedMedia)).run();
+    await releasePurgeMediaLeases(env.DB,{mediaIds:lockedMedia,owner:purgeOwner,now});
   };
   if (table === 'media' || table === 'media_versions') {
     const media = new Map<string, string>();

@@ -16,6 +16,9 @@ export class UnexpectedRouteError extends HTTPException {
  * 障害の識別番号を共通の依頼番号へ接続する。入力や例外の自由文は記録しない。
  */
 export const unhandledWorkerError: ErrorHandler<Env> = (error, c) => {
+  if (String(error).includes('media_reference_limit_exceeded')) {
+    return c.json({ success: false, code: 'media_reference_limit_exceeded', error: '画像参照が多すぎるか、URL が長すぎます。内容を分けてください。' }, 400);
+  }
   if (String(error).includes('media_cross_tenant_reference')) {
     return c.json({ success: false, code: 'media_unavailable', error: '使えない画像です。' }, 404);
   }

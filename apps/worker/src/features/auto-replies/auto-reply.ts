@@ -584,7 +584,7 @@ export async function matchAndReply(
   let rule: AutoReply | undefined;
   let ruleVersionId = '';
   for (const evaluation of candidateEvaluations) {
-    const version = await ensureAutoReplyPublishedVersion(db, evaluation.rule);
+    const version = await ensureAutoReplyPublishedVersion(db, evaluation.rule, { lineAccountId: lineAccountId ?? friend.line_account_id });
     await recordAutoReplyEvaluationDetail(db, {
       evaluationId,
       autoReplyId: evaluation.rule.id,

@@ -8,6 +8,17 @@ vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: 
 import { UnexpectedRouteError, unhandledWorkerError } from './unhandled-error.js';
 afterEach(() => vi.restoreAllMocks());
 
+it('画像参照の上限超過は理由付き400にし、障害通知を送らない', async () => {
+  report.mockClear();
+  const app = new Hono<Env>();
+  app.get('/api/test', () => { throw new Error('media_reference_limit_exceeded'); });
+  app.onError(unhandledWorkerError);
+  const response = await app.request('/api/test', {}, {} as Env['Bindings']);
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({ code: 'media_reference_limit_exceeded' });
+  expect(report).not.toHaveBeenCalled();
+});
+
 it('削除中画像のDB競合を理由付き409にし、障害通知を送らない', async () => {
   report.mockClear();
   const app = new Hono<Env>();

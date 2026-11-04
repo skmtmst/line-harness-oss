@@ -9,6 +9,11 @@ import {
 
 function asD1(sqlite: Database.Database): D1Database {
   return {
+    async batch(statements: D1PreparedStatement[]) {
+      const results=[];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    },
     prepare(sql: string) {
       const statement = sqlite.prepare(sql);
       const bound = (params: unknown[]): D1PreparedStatement => ({
@@ -32,6 +37,14 @@ let db: D1Database;
 beforeEach(() => {
   sqlite = new Database(':memory:');
   sqlite.exec(`
+    CREATE TABLE media (id TEXT PRIMARY KEY, line_account_id TEXT, r2_key TEXT);
+    CREATE TABLE media_versions (media_id TEXT, r2_key TEXT);
+    CREATE TABLE line_accounts (id TEXT PRIMARY KEY, tenant_id TEXT);
+    CREATE TABLE banner_images (tenant_id TEXT, media_id TEXT);
+    CREATE TABLE media_tenant_guards (blocked INTEGER CHECK (blocked=0));
+    CREATE TABLE media_deletion_guards (blocked INTEGER CHECK (blocked=0));
+    CREATE TABLE media_deletion_jobs (media_id TEXT, status TEXT, r2_keys_json TEXT);
+    CREATE TABLE media_deleted_key_fingerprints (sha256 TEXT);
     CREATE TABLE nen_campaign_settings (
       campaign_key TEXT PRIMARY KEY, label TEXT NOT NULL, category TEXT NOT NULL,
       trigger_event TEXT, delay_days INTEGER NOT NULL, delivery_time TEXT NOT NULL,

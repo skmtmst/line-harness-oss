@@ -922,6 +922,7 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
         friendId,
         entries: pending.map((item) => ({ fieldId: item.fieldId, value: item.value, type:item.field.type })),
         updatedBy: staff?.id ?? 'unknown',
+        tenantId: staff?.tenantId,
         now: jstNow(),
       });
     }
@@ -1018,6 +1019,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
       entries: friendIds.map((friendId) => ({ friendId, value: checked.value })),
       fieldType: field.type,
       updatedBy: staff?.id ?? 'unknown',
+      tenantId: staff?.tenantId,
       now: jstNow(),
     });
     return c.json({ success: true, data: { updated: friendIds.length } });

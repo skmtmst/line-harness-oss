@@ -391,6 +391,7 @@ describe('自動応答の試験と公開', () => {
     expect(accepted.status).toBe(200);
     expect(mocks.publishAutoReplyDraftVersion).toHaveBeenCalledWith(db, 'rule-draft', {
       staffId: 'staff-a',
+      tenantId: 'tenant-a',
       idempotencyKey: 'publish-test-0002',
       // m26c /: 公開前チェック時の内容と停止状態を渡す。
       expectedSnapshot: JSON.stringify(settings()),

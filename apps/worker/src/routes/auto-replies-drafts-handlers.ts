@@ -438,6 +438,7 @@ export const post__api_auto_replies_id_publish_10 = async (c: Context<Env, "/api
       // 同じキーの再実行はDB helperが公開済みの結果を返す。
       const replay = await publishAutoReplyDraftVersion(c.env.DB, id, {
         staffId: c.get('staff')?.id ?? null,
+        tenantId: c.get('staff')?.tenantId,
         idempotencyKey: requestKey,
       });
       return c.json({
@@ -476,6 +477,7 @@ export const post__api_auto_replies_id_publish_10 = async (c: Context<Env, "/api
     }
     const published = await publishAutoReplyDraftVersion(c.env.DB, id, {
       staffId: c.get('staff')?.id ?? null,
+      tenantId: c.get('staff')?.tenantId,
       idempotencyKey: requestKey,
       expectedSnapshot: version.definition_snapshot,
       expectedStoppedAt: ruleBefore?.stopped_at ?? null,

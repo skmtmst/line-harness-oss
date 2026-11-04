@@ -750,6 +750,7 @@ describe('一括変更', () => {
         { friendId: 'f-2', value: 'ポチ' },
       ],
       updatedBy: 'u-1',
+      tenantId: 'tenant-1',
       now: '2026-09-14T00:00:00.000+09:00',
     });
   });
@@ -970,6 +971,7 @@ describe('値の型検証（N-042 単票）', () => {
         { fieldId: 'ff-sel', value: 'opt-1', type: 'select' },
       ],
       updatedBy: 'u-1',
+      tenantId: 'tenant-1',
       now: '2026-09-14T00:00:00.000+09:00',
     });
   });
@@ -1018,6 +1020,7 @@ describe('値の型検証（N-042 単票）', () => {
       friendId: 'f-1',
       entries: [{ fieldId: 'ff-num', value: '1000', type: 'number' }],
       updatedBy: 'u-1',
+      tenantId: 'tenant-1',
       now: '2026-09-14T00:00:00.000+09:00',
     });
   });
@@ -1033,6 +1036,7 @@ describe('値の型検証（N-042 単票）', () => {
       friendId: 'f-1',
       entries: [{ fieldId: 'ff-1', value: null, type: 'text' }],
       updatedBy: 'u-1',
+      tenantId: 'tenant-1',
       now: '2026-09-14T00:00:00.000+09:00',
     });
   });
@@ -1071,6 +1075,7 @@ describe('値の型検証（N-042 一括）', () => {
         { friendId: 'f-2', value: '1000' },
       ],
       updatedBy: 'u-1',
+      tenantId: 'tenant-1',
       now: '2026-09-14T00:00:00.000+09:00',
     });
   });
@@ -1088,6 +1093,7 @@ describe('値の型検証（N-042 一括）', () => {
         { friendId: 'f-2', value: 'opt-1' },
       ],
       updatedBy: 'u-1',
+      tenantId: 'tenant-1',
       now: '2026-09-14T00:00:00.000+09:00',
     });
   });

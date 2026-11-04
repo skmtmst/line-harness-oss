@@ -37,6 +37,11 @@ function database() {
     discount_amount: 500, validity_days: 31, updated_at: '2026-08-01 00:00:00',
   };
   const db = {
+    async batch(statements: Array<{run:()=>Promise<unknown>}>) {
+      const results=[];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    },
     prepare(sql: string) {
       let binds: unknown[] = [];
       const statement = {

@@ -982,7 +982,7 @@ export function friendMediaIdGuards(db:D1Database, entries:Array<{value:string|n
 
 export async function friendFieldValueStatements(
   db: D1Database,
-  input: { friendId: string; fieldId: string; value: string | null; updatedBy: string; field?: FriendFieldValueCheckTarget; sourceType?: string; sourceId?: string },
+  input: { friendId: string; fieldId: string; value: string | null; updatedBy: string; field?: FriendFieldValueCheckTarget; sourceType?: string; sourceId?: string; tenantId?: string | null },
 ): Promise<D1PreparedStatement[]> {
   let value = input.value;
   if (input.field) {
@@ -1001,7 +1001,7 @@ export async function friendFieldValueStatements(
           source_type = excluded.source_type, source_id = excluded.source_id`)
         .bind(input.friendId,input.fieldId,value,input.updatedBy,now,input.sourceType ?? null,input.sourceId ?? null);
   return [statement, ...friendFieldReminderTargetStatements(db, [{ friendId: input.friendId, fieldId: input.fieldId, value }], now),
-    ...mediaTenantGuardByQuery(db,[mediaValue], 'SELECT line_account_id AS account_id FROM friends WHERE id=?',[input.friendId]), ...friendMediaIdGuards(db,[{value,type:fieldType}]), ...await mediaContentDeletionGuard(db,[mediaValue])];
+    ...mediaTenantGuardByQuery(db,[mediaValue], 'SELECT line_account_id AS account_id FROM friends WHERE id=?',[input.friendId],input.tenantId), ...friendMediaIdGuards(db,[{value,type:fieldType}]), ...await mediaContentDeletionGuard(db,[mediaValue])];
 }
 
 
@@ -1026,6 +1026,7 @@ export async function setFriendFieldValuesBulk(
     fieldType?: string;
     updatedBy: string;
     now: string;
+    tenantId?: string | null;
   },
 ): Promise<number> {
   const statements = input.entries.map((entry) =>
@@ -1046,7 +1047,7 @@ export async function setFriendFieldValuesBulk(
   const mediaValues = input.entries.map(entry=>friendMediaCandidate(entry.value,input.fieldType));
   await db.batch([...statements, ...friendFieldReminderTargetStatements(db,
     input.entries.map(entry => ({ ...entry, fieldId: input.fieldId })), input.now),
-    ...mediaTenantGuardByQuery(db,mediaValues, 'SELECT DISTINCT line_account_id AS account_id FROM friends WHERE id IN (SELECT value FROM json_each(?))', [JSON.stringify(input.entries.map(entry=>entry.friendId))]),
+    ...mediaTenantGuardByQuery(db,mediaValues, 'SELECT DISTINCT line_account_id AS account_id FROM friends WHERE id IN (SELECT value FROM json_each(?))', [JSON.stringify(input.entries.map(entry=>entry.friendId))],input.tenantId),
     ...friendMediaIdGuards(db,input.entries.map(entry=>({value:entry.value,type:input.fieldType}))), ...await mediaContentDeletionGuard(db,mediaValues)]);
   return statements.length;
 }
@@ -1064,6 +1065,7 @@ export async function setFriendFieldValuesForFriend(
     entries: Array<{ fieldId: string; value: string | null; type?: string }>;
     updatedBy: string;
     now: string;
+    tenantId?: string | null;
   },
 ): Promise<number> {
   const statements = input.entries.map((entry) =>
@@ -1084,7 +1086,7 @@ export async function setFriendFieldValuesForFriend(
   const mediaValues = input.entries.map(entry=>friendMediaCandidate(entry.value,entry.type));
   await db.batch([...statements, ...friendFieldReminderTargetStatements(db,
     input.entries.map(entry => ({ ...entry, friendId: input.friendId })), input.now),
-    ...mediaTenantGuardByQuery(db,mediaValues, 'SELECT line_account_id AS account_id FROM friends WHERE id=?',[input.friendId]),
+    ...mediaTenantGuardByQuery(db,mediaValues, 'SELECT line_account_id AS account_id FROM friends WHERE id=?',[input.friendId],input.tenantId),
     ...friendMediaIdGuards(db,input.entries), ...await mediaContentDeletionGuard(db,mediaValues)]);
   return statements.length;
 }

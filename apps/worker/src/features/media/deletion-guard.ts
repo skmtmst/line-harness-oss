@@ -35,8 +35,8 @@ export const MEDIA_DELETION_TEXT_GUARD_SQL = `INSERT INTO media_deletion_guards(
         OR instr(content.value, '/media/' || j.media_id || '/content') > 0
         OR EXISTS (SELECT 1 FROM json_each(j.r2_keys_json) key WHERE length(key.value) > 0 AND instr(content.value, key.value) > 0)))`;
 
-export async function mediaDeletionTextGuardStatements(db: D1Database, values: Array<string | null | undefined>, accountIds?: string[]): Promise<D1PreparedStatement[]> {
+export async function mediaDeletionTextGuardStatements(db: D1Database, values: Array<string | null | undefined>, accountIds?: string[], tenantId?: string | null): Promise<D1PreparedStatement[]> {
   const content = mediaReferenceVariants(values);
   if (!content.length) return [];
-  return [...(accountIds ? mediaTenantGuard(db, content, accountIds) : []), ...await mediaDeletedKeyFingerprintGuard(db, content), db.prepare(MEDIA_DELETION_TEXT_GUARD_SQL).bind(JSON.stringify(content))];
+  return [...(accountIds ? mediaTenantGuard(db, content, accountIds, tenantId) : []), ...await mediaDeletedKeyFingerprintGuard(db, content), db.prepare(MEDIA_DELETION_TEXT_GUARD_SQL).bind(JSON.stringify(content))];
 }
