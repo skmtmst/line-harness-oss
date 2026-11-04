@@ -27,6 +27,41 @@ const put = (body: object) => app().request('/api/webhooks/outgoing/wh1?lineAcco
 }, { DB: db.db });
 describe('送り先の版の競合', () => {
 
+  test('確認版が古い試し送信は外部へ出さず 409', async () => {
+    db.raw.prepare('UPDATE outgoing_webhooks SET confirmation_revision=2 WHERE id=?').run('wh1');
+    const external = vi.fn(async () => new Response('', { status: 200 })); vi.stubGlobal('fetch', external);
+    try { const res = await app().request('/api/webhooks/outgoing/wh1/test?lineAccountId=a1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedConfirmationRevision: 1 }) }, { DB: db.db }); expect(res.status).toBe(409); expect(external).not.toHaveBeenCalled(); } finally { vi.unstubAllGlobals(); }
+  });
+  test('確認版が古い送り先の削除と更新は 409', async () => {
+    db.raw.prepare('UPDATE outgoing_webhooks SET confirmation_revision=2 WHERE id=?').run('wh1');
+    expect((await put({ name: '変更しない', expectedConfirmationRevision: 1 })).status).toBe(409);
+    expect((await app().request('/api/webhooks/outgoing/wh1?lineAccountId=a1&expectedConfirmationRevision=1', { method: 'DELETE' }, { DB: db.db })).status).toBe(409);
+  });
+  test('確認版が古い受信口の削除と更新は 409', async () => {
+    db.raw.prepare("INSERT INTO incoming_webhooks (id,name,source_type,line_account_id,confirmation_revision) VALUES ('in1','受信','custom','a1',2)").run();
+    expect((await app().request('/api/webhooks/incoming/in1?lineAccountId=a1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: '変更しない', expectedConfirmationRevision: 1 }) }, { DB: db.db })).status).toBe(409);
+    expect((await app().request('/api/webhooks/incoming/in1?lineAccountId=a1&expectedConfirmationRevision=1', { method: 'DELETE' }, { DB: db.db })).status).toBe(409);
+  });
+
+  test('確認版が合えば試し送信は一度通り、版なしも従来どおり', async () => {
+    const external = vi.fn(async (url: string | URL | Request) => String(url).includes('cloudflare-dns.com/dns-query')
+      ? Response.json({ Status: 0, Answer: [{ name: 'example.test.', type: String(url).includes('AAAA') ? 28 : 1, TTL: 60, data: String(url).includes('AAAA') ? '2606:4700:4700::1111' : '93.184.216.34' }] }) : new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', external);
+    try { for (const body of [{ expectedConfirmationRevision: 1 }, {}]) { const res = await app().request('/api/webhooks/outgoing/wh1/test?lineAccountId=a1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, { DB: db.db }); expect(res.status).toBe(200); expect(await res.json()).toMatchObject({ data: { delivered: true } }); } expect(external.mock.calls.filter(([url]) => String(url) === 'https://example.test/hook')).toHaveLength(2); } finally { vi.unstubAllGlobals(); }
+  });
+  test.each(['outgoing', 'incoming'])('%s は同じ確認版の削除を一度だけ通す', async kind => {
+    if (kind === 'incoming') db.raw.prepare("INSERT INTO incoming_webhooks (id,name,source_type,line_account_id) VALUES ('in1','受信','custom','a1')").run();
+    const id = kind === 'incoming' ? 'in1' : 'wh1'; const url = `/api/webhooks/${kind}/${id}?lineAccountId=a1&expectedConfirmationRevision=1`;
+    const results = await Promise.all([app().request(url, { method: 'DELETE' }, { DB: db.db }), app().request(url, { method: 'DELETE' }, { DB: db.db })]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 409]);
+    expect(db.raw.prepare(`SELECT confirmation_revision FROM ${kind}_webhooks WHERE id=?`).get(id)).toEqual({ confirmation_revision: 2 });
+  });
+  test.each(['outgoing', 'incoming'])('%s は版を送らない削除も受け付ける', async kind => {
+    if (kind === 'incoming') db.raw.prepare("INSERT INTO incoming_webhooks (id,name,source_type,line_account_id) VALUES ('in1','受信','custom','a1')").run();
+    const id = kind === 'incoming' ? 'in1' : 'wh1';
+    expect((await app().request(`/api/webhooks/${kind}/${id}?lineAccountId=a1`, { method: 'DELETE' }, { DB: db.db })).status).toBe(200);
+  });
+
   test('確認した送り先が変わったら試し送信しない', async () => {
     await put({ expectedVersion: 1, name: '更新後' });
     const external = vi.fn();

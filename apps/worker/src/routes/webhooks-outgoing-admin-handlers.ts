@@ -47,6 +47,7 @@ export const get__api_webhooks_outgoing_id_1 = async (c: Context<Env, "/api/webh
         createdAt: item.created_at,
         updatedAt: item.updated_at,
         version: item.version ?? 1,
+        confirmationRevision: item.confirmation_revision,
         updatedBy: item.updated_by_staff_id ?? null,
       },
     });
@@ -150,8 +151,6 @@ export const put__api_webhooks_outgoing_id_3 = async (c: Context<Env, "/api/webh
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
-    const existing = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
-    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{
       name?: string;
       url?: string;
@@ -160,18 +159,22 @@ export const put__api_webhooks_outgoing_id_3 = async (c: Context<Env, "/api/webh
       isActive?: boolean;
       maxRetries?: unknown;
       expectedVersion?: number;
+      expectedConfirmationRevision?: number;
       folderId?: unknown;
     }>();
+    const existing = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
+    if (!existing) return body.expectedConfirmationRevision === undefined ? c.json({ success: false, error: 'Not found' }, 404) : c.json({ success: false, code: 'VERSION_CONFLICT', error: '対象が変わりました。読み直してください。', data: null }, 409);
     if (body.expectedVersion !== undefined &&
         (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1)) {
       return inputError(c, { success: false, error: 'expectedVersion は1以上の整数を指定してください' }, 400, ["expectedVersion"]);
     }
+    if (body.expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(body.expectedConfirmationRevision) || body.expectedConfirmationRevision < 1)) return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
     const conflict = (current: typeof existing) => fail(c, 409, 'VERSION_CONFLICT', {
       error: '送り先が更新されています。読み直してください',
-      data: { currentVersion: current.version ?? 1, updatedBy: current.updated_by_staff_id ?? null,
+      data: { currentVersion: current.version ?? 1, confirmationRevision: current.confirmation_revision, updatedBy: current.updated_by_staff_id ?? null,
         updatedAt: current.updated_at },
     });
-    if (body.expectedVersion !== undefined && body.expectedVersion !== (existing.version ?? 1)) {
+    if ((body.expectedVersion !== undefined && body.expectedVersion !== (existing.version ?? 1)) || (body.expectedConfirmationRevision !== undefined && body.expectedConfirmationRevision !== existing.confirmation_revision)) {
       return conflict(existing);
     }
     // 秘密値の入れ替えを伴う更新は鍵・トークンの操作（V）。
@@ -240,9 +243,9 @@ export const put__api_webhooks_outgoing_id_3 = async (c: Context<Env, "/api/webh
       ...body,
       eventTypes: body.eventTypes?.map((item) => item.trim()),
       maxRetries,
-    }, webhookKeysOf(c), { expectedVersion: body.expectedVersion, updatedByStaffId: c.get('staff')?.id });
+    }, webhookKeysOf(c), { expectedVersion: body.expectedVersion, expectedConfirmationRevision: body.expectedConfirmationRevision, updatedByStaffId: c.get('staff')?.id });
     const updated = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
-    if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!updated) return body.expectedConfirmationRevision === undefined ? c.json({ success: false, error: 'Not found' }, 404) : c.json({ success: false, code: 'VERSION_CONFLICT', error: '対象が変わりました。読み直してください。', data: null }, 409);
     if (saved === false) return conflict(updated);
     //  動かす/止める・合言葉の入れ直し・その他の変更を分けて記録する。
     if (body.isActive !== undefined) {
@@ -271,6 +274,7 @@ export const put__api_webhooks_outgoing_id_3 = async (c: Context<Env, "/api/webh
         consecutiveFailures: updated.consecutive_failures ?? 0,
         lastFailedAt: updated.last_failed_at ?? null,
         version: updated.version ?? 1,
+        confirmationRevision: updated.confirmation_revision,
         updatedBy: updated.updated_by_staff_id ?? null,
         createdAt: updated.created_at,
         updatedAt: updated.updated_at,
@@ -292,15 +296,17 @@ export const post__api_webhooks_outgoing_id_test_4 = async (c: Context<Env, "/ap
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
-    const request = await c.req.json<{ expectedVersion?: unknown }>().catch(() => ({} as { expectedVersion?: unknown }));
+    const request = await c.req.json<{ expectedVersion?: unknown; expectedConfirmationRevision?: unknown }>().catch(() => ({} as { expectedVersion?: unknown; expectedConfirmationRevision?: unknown }));
     const expectedVersion = request.expectedVersion;
+    const expectedConfirmationRevision = request.expectedConfirmationRevision;
+    if (expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(expectedConfirmationRevision) || (expectedConfirmationRevision as number) < 1)) return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
     if (expectedVersion !== undefined && (!Number.isSafeInteger(expectedVersion) || (expectedVersion as number) < 1)) {
       return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedVersion']);
     }
     const webhook = await getOutgoingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
-    if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
-    if (expectedVersion !== undefined && webhook.version !== expectedVersion) {
-      return c.json({ success: false, code: 'version_conflict', error: '送り先が変わりました。読み直してください。', data: { version: webhook.version, url: webhook.url } }, 409);
+    if (!webhook) return expectedConfirmationRevision === undefined ? c.json({ success: false, error: 'Not found' }, 404) : c.json({ success: false, code: 'version_conflict', error: '送り先が変わりました。読み直してください。', data: null }, 409);
+    if ((expectedVersion !== undefined && webhook.version !== expectedVersion) || (expectedConfirmationRevision !== undefined && webhook.confirmation_revision !== expectedConfirmationRevision)) {
+      return c.json({ success: false, code: 'version_conflict', error: '送り先が変わりました。読み直してください。', data: { version: webhook.version, confirmationRevision: webhook.confirmation_revision, url: webhook.url } }, 409);
     }
     if (!webhook.is_active) return c.json({ success: false, error: '止めている送り先は試せません' }, 409);
     // 緊急停止 : webhook_outgoing 停止中は試し送信も受け付けない。
@@ -336,13 +342,13 @@ export const post__api_webhooks_outgoing_id_test_4 = async (c: Context<Env, "/ap
       eventType: 'webhook.test', triggerSummary: '管理画面から1回試した', requestBodyJson: body,
       idempotencyKey: eventId,
     });
-    if (expectedVersion !== undefined) {
+    if (expectedVersion !== undefined || expectedConfirmationRevision !== undefined) {
       const current = await getOutgoingWebhookById(c.env.DB, webhook.id, lineAccountId);
-      if (!current || current.version !== expectedVersion || !current.is_active) {
+      if (!current || (expectedVersion !== undefined && current.version !== expectedVersion) || (expectedConfirmationRevision !== undefined && current.confirmation_revision !== expectedConfirmationRevision) || !current.is_active) {
         await finishWebhookInteraction(c.env.DB, interaction.id, lineAccountId, {
           status: 'failed', attemptCount: 0, durationMs: 0, failureReason: 'processing_failed',
         });
-        return c.json({ success: false, code: 'version_conflict', error: '送り先が変わりました。読み直してください。', data: current ? { version: current.version, url: current.url } : null }, 409);
+        return c.json({ success: false, code: 'version_conflict', error: '送り先が変わりました。読み直してください。', data: current ? { version: current.version, confirmationRevision: current.confirmation_revision, url: current.url } : null }, 409);
       }
     }
     const started = Date.now();
@@ -379,16 +385,18 @@ export const delete__api_webhooks_outgoing_id_5 = async (c: Context<Env, "/api/w
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
-    const existing = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
-    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const rawVersion = c.req.query('expectedVersion');
+    const rawConfirmationRevision = c.req.query('expectedConfirmationRevision');
+    const existing = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
+    if (!existing) return rawConfirmationRevision === undefined ? c.json({ success: false, error: 'Not found' }, 404) : c.json({ success: false, code: 'VERSION_CONFLICT', error: '対象が変わりました。読み直してください。', data: null }, 409);
+    if (rawConfirmationRevision !== undefined && (!/^[1-9]\d*$/.test(rawConfirmationRevision) || !Number.isSafeInteger(Number(rawConfirmationRevision)))) return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
     if (rawVersion !== undefined && (!/^[1-9]\d*$/.test(rawVersion) || !Number.isSafeInteger(Number(rawVersion)))) {
       return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedVersion']);
     }
-    const deleted = await deleteOutgoingWebhook(c.env.DB, id, lineAccountId, c.get('staff')?.id, rawVersion === undefined ? undefined : Number(rawVersion));
-    if (rawVersion !== undefined && !deleted) {
+    const deleted = await deleteOutgoingWebhook(c.env.DB, id, lineAccountId, c.get('staff')?.id, rawVersion === undefined ? undefined : Number(rawVersion), rawConfirmationRevision === undefined ? undefined : Number(rawConfirmationRevision));
+    if ((rawVersion !== undefined || rawConfirmationRevision !== undefined) && !deleted) {
       const current = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
-      return c.json({ success: false, code: 'VERSION_CONFLICT', error: '送り先が変わりました。読み直してください。', data: current ? { currentVersion: current.version, url: current.url } : null }, 409);
+      return c.json({ success: false, code: 'VERSION_CONFLICT', error: '送り先が変わりました。読み直してください。', data: current ? { currentVersion: current.version, confirmationRevision: current.confirmation_revision, url: current.url } : null }, 409);
     }
     auditLog(c, 'webhook.outgoing.delete', { kind: 'outgoing_webhook', id }, { lineAccountId });
     return c.json({ success: true, data: null });

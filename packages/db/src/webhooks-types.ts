@@ -2,6 +2,7 @@ import type { WebhookInteractionFailureReason } from './webhook-failure-types.js
 
 
 export interface IncomingWebhookRow {
+  confirmation_revision?: number;
   folder_id?: string | null;
   id: string;
   name: string;

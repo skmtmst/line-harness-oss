@@ -123,6 +123,7 @@ export async function updateIncomingWebhook(
   updates: Partial<{ name: string; sourceType: string; secret: string; isActive: boolean; folderId: unknown }>,
   keys?: WebhookKeyInput | string,
   expectedVersion?: number,
+  expectedConfirmationRevision?: number,
 ): Promise<boolean> {
   const folderId = await readFolderAssignment(db, 'webhook', lineAccountId, updates.folderId);
   const sets: string[] = [];
@@ -170,15 +171,15 @@ export async function updateIncomingWebhook(
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
   if (sets.length === 0) {
     const current = await getIncomingWebhookById(db, id, lineAccountId);
-    return Boolean(current && (expectedVersion === undefined || current.version === expectedVersion));
+    return Boolean(current && (expectedVersion === undefined || current.version === expectedVersion) && (expectedConfirmationRevision === undefined || current.confirmation_revision === expectedConfirmationRevision));
   }
   sets.push('version = version + 1', 'confirmation_revision = confirmation_revision + 1');
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
   values.push(lineAccountId);
-  const result = await db.prepare(`UPDATE incoming_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL AND (? IS NULL OR version = ?)`)
-    .bind(...values, expectedVersion ?? null, expectedVersion ?? null).run();
+  const result = await db.prepare(`UPDATE incoming_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL AND (? IS NULL OR version = ?) AND (? IS NULL OR confirmation_revision = ?)`)
+    .bind(...values, expectedVersion ?? null, expectedVersion ?? null, expectedConfirmationRevision ?? null, expectedConfirmationRevision ?? null).run();
   return (result.meta.changes ?? 0) > 0;
 }
 
@@ -193,11 +194,12 @@ export async function deleteIncomingWebhook(
   lineAccountId: string,
   deletedByStaffId?: string,
   expectedVersion?: number,
+  expectedConfirmationRevision?: number,
 ): Promise<boolean> {
   const result = await db.prepare(`UPDATE incoming_webhooks
-    SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0, version = version + 1, updated_at = ?
-    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL AND (? IS NULL OR version = ?)`)
-    .bind(jstNow(), deletedByStaffId ?? null, jstNow(), id, lineAccountId, expectedVersion ?? null, expectedVersion ?? null).run();
+    SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0, version = version + 1, updated_at = ?, confirmation_revision = confirmation_revision + 1
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL AND (? IS NULL OR version = ?) AND (? IS NULL OR confirmation_revision = ?)`)
+    .bind(jstNow(), deletedByStaffId ?? null, jstNow(), id, lineAccountId, expectedVersion ?? null, expectedVersion ?? null, expectedConfirmationRevision ?? null, expectedConfirmationRevision ?? null).run();
   return (result.meta.changes ?? 0) > 0;
 }
 
@@ -211,7 +213,7 @@ export async function restoreIncomingWebhook(
   lineAccountId: string,
 ): Promise<boolean> {
   const result = await db.prepare(`UPDATE incoming_webhooks
-    SET deleted_at = NULL, deleted_by_staff_id = NULL, is_active = 0, version = version + 1, updated_at = ?
+    SET deleted_at = NULL, deleted_by_staff_id = NULL, is_active = 0, version = version + 1, updated_at = ?, confirmation_revision = confirmation_revision + 1
     WHERE id = ? AND line_account_id = ? AND deleted_at IS NOT NULL`)
     .bind(jstNow(), id, lineAccountId).run();
   return (result.meta.changes ?? 0) > 0;
