@@ -1,6 +1,6 @@
 import { storedTimestamp } from '@line-crm/shared';
 export type { Affiliate } from './affiliate-record-types.js';
-import type { Affiliate } from './affiliate-record-types.js';
+import { normalizeAffiliateTime, type Affiliate } from './affiliate-record-types.js';
 import { sqlIdSet } from './id-queries.js';
 import { readFolderAssignment } from './folder-assignment.js';
 import { jstNow } from './utils.js';
@@ -51,11 +51,11 @@ export async function getAffiliates(
   const scoped = scope ? affiliateScopeSql(scope) : null;
   const result = await db
     .prepare(
-      `SELECT * FROM affiliates${scoped ? ` WHERE ${scoped.sql}` : ''} ORDER BY created_at DESC`,
+      `SELECT * FROM affiliates${scoped ? ` WHERE ${scoped.sql}` : ''} ORDER BY julianday(${storedTimestamp('created_at', 'sql')}) DESC`,
     )
     .bind(...(scoped?.binds ?? []))
     .all<Affiliate>();
-  return result.results;
+  return result.results.map((affiliate) => normalizeAffiliateTime(affiliate)!);
 }
 
 export async function getAffiliateById(
@@ -64,20 +64,20 @@ export async function getAffiliateById(
   scope?: AffiliateScope,
 ): Promise<Affiliate | null> {
   const scoped = scope ? affiliateScopeSql(scope) : null;
-  return db
+  return normalizeAffiliateTime(await db
     .prepare(`SELECT * FROM affiliates WHERE id = ?${scoped ? ` AND ${scoped.sql}` : ''}`)
     .bind(id, ...(scoped?.binds ?? []))
-    .first<Affiliate>();
+    .first<Affiliate>());
 }
 
 export async function getAffiliateByCode(
   db: D1Database,
   code: string,
 ): Promise<Affiliate | null> {
-  return db
+  return normalizeAffiliateTime(await db
     .prepare(`SELECT * FROM affiliates WHERE code = ?`)
     .bind(code)
-    .first<Affiliate>();
+    .first<Affiliate>());
 }
 
 export interface CreateAffiliateInput {
@@ -112,12 +112,12 @@ async function findAffiliateByOperationId(
   lineAccountId: string,
   operationId: string,
 ): Promise<Affiliate | null> {
-  return db
+  return normalizeAffiliateTime(await db
     .prepare(
       `SELECT * FROM affiliates WHERE tenant_id = ? AND line_account_id = ? AND operation_id = ?`,
     )
     .bind(tenantId, lineAccountId, operationId)
-    .first<Affiliate>();
+    .first<Affiliate>());
 }
 
 function isOperationIdConflict(err: unknown): boolean {

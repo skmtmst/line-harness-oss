@@ -1,4 +1,4 @@
-
+import { storedTimestamp } from '@line-crm/shared';
 // =============================================================================
 // Affiliates — Affiliate & Tracking System
 // =============================================================================
@@ -23,4 +23,8 @@ export interface Affiliate {
   payout_cycle: string | null;
   /** 成果が出たときに本人へ知らせるか */
   notify_on_conversion: number;
+}
+
+export function normalizeAffiliateTime(affiliate: Affiliate | null): Affiliate | null {
+  return affiliate ? { ...affiliate, created_at: storedTimestamp(affiliate.created_at) } : null;
 }

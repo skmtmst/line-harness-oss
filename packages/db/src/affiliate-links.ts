@@ -1,5 +1,5 @@
 import { jstNow } from './utils.js';
-import type { Affiliate } from './affiliate-record-types.js';
+import { normalizeAffiliateTime, type Affiliate } from './affiliate-record-types.js';
 // =============================================================================
 // Affiliate Links — ASP ref-code CRUD + slug generation
 // =============================================================================
@@ -245,10 +245,10 @@ export async function getAffiliateByFriendId(
   lineAccountId?: string | null,
 ): Promise<Affiliate | null> {
   const hasAccount = arguments.length >= 3;
-  return db
+  return normalizeAffiliateTime(await db
     .prepare(
       `SELECT * FROM affiliates WHERE friend_id = ?${hasAccount ? ' AND line_account_id IS ?' : ''}`,
     )
     .bind(friendId, ...(hasAccount ? [lineAccountId ?? null] : []))
-    .first<Affiliate>();
+    .first<Affiliate>());
 }
