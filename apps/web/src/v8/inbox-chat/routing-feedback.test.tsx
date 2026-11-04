@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 const fx = vi.hoisted(() => ({ save: vi.fn(), notify: vi.fn(), close: vi.fn(), saved: vi.fn() }))
@@ -8,7 +8,7 @@ vi.mock('@/components/shared/toast', () => ({ notifySaved: fx.notify }))
 vi.mock('@/lib/api/helpers/gap1', () => ({ inboxRoutingApi: { get: async () => ({ data: { strategy:'none', targets:[], unassignedCount:1, enabled: false, firstResponseMinutes: 30, businessHoursOnly: false, escalateTeamId: null, version: 1 } }), save: fx.save } }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
-  return { ...actual, api: { ...actual.api, staff: { list: async () => ({success:true,data:[{id:'s',name:'担当 A',isActive:true,role:'staff'}]}) }, notifications: { teams: { list: async () => ({ success: true, data: [] }) } } } }
+  return { ...actual, api: { ...actual.api, staff: { list: async () => ({success:true,data:[{id:'s',name:'担当 A',isActive:true,role:'staff'}]}) }, notifications: { teams: { list: async () => ({ success: true, data: [{id:'team',name:'対応チーム',staffIds:['s'],archivedAt:null}] }) } } } }
 })
 import Drawer from './routing-drawer'
 const view = (accountId = 'A') => <Drawer open accountId={accountId} onClose={fx.close} onSaved={fx.saved} />
@@ -52,8 +52,20 @@ it('保存中にアカウントを替えたら旧設定の結果を新画面へ�
 it('割り当て方と対象者を保存する', async () => {
   render(view())
   fireEvent.click(await screen.findByRole('button', {name:'均等'}))
-  fireEvent.click(screen.getByRole('combobox', {name:'対象の人'}))
-  fireEvent.click(await screen.findByRole('option', {name:'担当 A'}))
+  fireEvent.click(screen.getByRole('button', {name:'対象の人'}))
+  fireEvent.click(await screen.findByRole('checkbox', {name:'担当 A'}))
+  fireEvent.click(screen.getByRole('button', {name:'選ぶ（1件）'}))
   await act(async () => { fireEvent.click(screen.getByRole('button', {name:'保存する',exact:true})) })
   expect(fx.save).toHaveBeenCalledWith('A', expect.objectContaining({strategy:'even',targets:[{staffId:'s',priority:1,cap:10}],expectedVersion:1}))
+})
+
+it('チームを選ぶと、その時点のメンバーを重複なく対象に加える', async () => {
+  render(view())
+  fireEvent.click(await screen.findByRole('button', {name:'均等'}))
+  const select=await screen.findByRole('button', {name:'チームから人を追加'})
+  await waitFor(()=>expect((select as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(select)
+  fireEvent.click(within(await screen.findByRole('option',{name:'対応チーム'})).getByRole('button',{name:'対応チーム'}))
+  await act(async () => { fireEvent.click(screen.getByRole('button', {name:'保存する',exact:true})) })
+  expect(fx.save).toHaveBeenCalledWith('A',expect.objectContaining({targets:[{staffId:'s',priority:1,cap:10}]}))
 })

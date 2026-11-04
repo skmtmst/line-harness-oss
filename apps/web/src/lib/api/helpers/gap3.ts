@@ -8,11 +8,14 @@ const account=(p:string,a:string)=>`${p}?account_id=${e(a)}`;
 const json=(method:string,body:unknown,key?:string)=>({method,body:JSON.stringify(body),...(key?{headers:{'Idempotency-Key':key}}:{})});
 const query=(p:string,values:Record<string,string|number|undefined>)=>{const q=new URLSearchParams();for(const [k,v]of Object.entries(values))if(v!==undefined)q.set(k,String(v));return `${p}${p.includes('?')?'&':'?'}${q}`;};
 export type InboxAssignmentRun={id:string;status:string;total:number;assigned:number;skipped:number;failed:number};
+export type InboxResponseAnalysis={byStaff:Array<{staffId:string|null;staffDeleted:boolean;deletedCount:number;staffName:string;medianFirstResponseMinutes:number|null;withinSlaRate:number|null;count:number}>;automatic:{count:number;deletedCount:number;unavailableCount:number}|null;weekly:Array<{week:string;count:number}>};
 export const gap3InboxApi={
  get:(a:string)=>fetchApi<Result<{strategy:InboxStrategy;targets:InboxRoutingTarget[];enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;version:number}>>(account('/api/inbox/routing-settings',a)),
  save:(a:string,b:{strategy:InboxStrategy;targets:InboxRoutingTarget[];enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;expectedVersion:number;escalateTeamId?:string|null})=>fetchApi<Result<unknown>>(account('/api/inbox/routing-settings',a),json('PUT',b)),
  applyUnassigned:(a:string,key:string)=>fetchApi<Result<InboxAssignmentRun>>(account('/api/inbox/routing/apply-unassigned',a),json('POST',{},key)),
  assignmentRun:(a:string,id:string)=>fetchApi<Result<InboxAssignmentRun>>(account(`/api/inbox/routing/apply-unassigned/${e(id)}`,a)),
+ responseConversations:(a:string,from:string,to:string,staffId:string|null,staffDeleted:boolean,offset=0,kind:'manual'|'automatic'='manual')=>fetchApi<Result<{items:Array<{sampleId:string;respondedAt:string;chatId:string;friendId:string;friendName:string|null}>;hasMore:boolean}>>(query('/api/analytics/inbox-response/conversations',{account_id:a,from,to,staffId:staffId??'',staffDeleted:staffDeleted?'1':'0',offset,kind})),
+ responseAnalysis:(a:string,from:string,to:string)=>fetchApi<Result<InboxResponseAnalysis>>(query('/api/analytics/inbox-response',{account_id:a,from,to})),
  presence:(away:boolean)=>fetchApi<Result<{away:boolean}>>('/api/me/presence',json('PUT',{away})),
  icons:(a:string,offset=0)=>fetchApi<Result<{items:Array<{id:string;url:string;name:string}>;nextOffset:number|null}>>(query(`/api/line-accounts/${e(a)}/sender-icons`,{offset})),
 };

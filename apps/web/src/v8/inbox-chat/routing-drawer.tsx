@@ -30,7 +30,6 @@ import { Field } from '@/components/shared/form-controls'
 import { ApiError, api } from '@/lib/api'
 import { inboxRoutingApi } from '@/lib/api/helpers/gap1'
 import { gap3InboxApi, type InboxAssignmentRun } from '@/lib/api/helpers/gap3'
-import MultiSelect from '@/components/shared/multi-select'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import styles from './routing-drawer.module.css'
 
@@ -45,7 +44,7 @@ const STRATEGIES = [
   { value: 'random_weighted', label: 'ランダム＋優先度', ready: true },
 ] as const
 
-type Team = { id: string; name: string }
+type Team = { id: string; name: string; staffIds: string[] }
 
 export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
   accountId: string
@@ -62,6 +61,7 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
   const [teams, setTeams] = useState<Team[]>([])
   const [staff, setStaff] = useState<Array<{id:string;name:string}>>([])
   const [staffError, setStaffError] = useState(false)
+  const [staffLoaded, setStaffLoaded] = useState(false)
   const [run, setRun] = useState<InboxAssignmentRun | null>(null)
   const [starting, setStarting] = useState(false)
   const runKey = useRef<string | null>(null)
@@ -75,17 +75,17 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
     if (!open) return
     let live = true
     if (keyAccount.current !== accountId) { runKey.current=null; keyAccount.current=accountId }
-    setSettings(null); setDraft(null); setLoadError(null); setError(''); setRun(null); setStaff([]); setStaffError(false)
+    setSettings(null); setDraft(null); setLoadError(null); setError(''); setRun(null); setStaff([]); setStaffError(false); setStaffLoaded(false)
     void inboxRoutingApi.get(accountId).then((res) => {
       if (!live) return
       setSettings(res.data); setDraft(res.data); setMinutesText(String(res.data.firstResponseMinutes))
     }, (caught) => { if (live) setLoadError(caught) })
     void api.staff.list(accountId).then((res) => {
-      if (live && res.success) setStaff(res.data.filter((person) => person.isActive && person.role !== 'viewer').map(({id,name})=>({id,name})))
+      if (live && res.success) {setStaff(res.data.filter((person) => person.isActive && person.role !== 'viewer').map(({id,name})=>({id,name})));setStaffLoaded(true)}
       else if (live) setStaffError(true)
     }, () => { if (live) setStaffError(true) })
     void api.notifications.teams.list(accountId).then((res) => {
-      if (live && res.success) setTeams(res.data.filter((team) => !team.archivedAt).map((team) => ({ id: team.id, name: team.name })))
+      if (live && res.success) setTeams(res.data.filter((team) => !team.archivedAt).map((team) => ({ id: team.id, name: team.name, staffIds: team.staffIds })))
     }, () => {})
     return () => { live = false }
   }, [open, accountId])
@@ -157,9 +157,15 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
                   onChange={(strategy) => setDraft({...draft,strategy})} />
                 {draft.strategy !== 'none' ? <>
                   {staffError ? <Notice tone="warn">担当者を読み込めませんでした。引き出しを開き直してください。</Notice> : null}
-                  <Field label="対象の人"><MultiSelect aria-label="対象の人" options={staff.map(({id,name})=>({value:id,label:name}))}
+                  <Field label="対象の人"><EntitySelect aria-label="対象の人" options={staff.map(({id,name})=>({value:id,label:name}))}
                     values={(draft.targets ?? []).map((target)=>target.staffId)} onChange={(ids)=>setDraft({...draft,targets:ids.map((id,index)=>
                       (draft.targets ?? []).find((target)=>target.staffId===id) ?? {staffId:id,priority:index+1,cap:10})})} /></Field>
+                  {teams.length ? <Field label="チームから人を追加"><Select aria-label="チームから人を追加" size="full" disabled={!staffLoaded} value="" options={[{value:'',label:'チームを選ぶ'},...teams.map(team=>({value:team.id,label:team.name}))]} onChange={(id)=>{
+                    const team=teams.find(item=>item.id===id);if(!team)return
+                    const current=draft.targets ?? [],known=new Set(current.map(item=>item.staffId))
+                    const added=team.staffIds.filter(staffId=>!known.has(staffId)&&staff.some(person=>person.id===staffId))
+                    setDraft({...draft,targets:[...current,...added.map((staffId,index)=>({staffId,priority:Math.min(100,current.length+index+1),cap:10}))]})
+                  }} /><p className={styles.note}>選んだ時点のチームの人を対象に追加します。チームの人が変わったときは選び直してください。</p></Field> : null}
                   {(draft.targets ?? []).map((target) => <div className={styles.pair} key={target.staffId}>
                     <Field label={`${staff.find((person)=>person.id===target.staffId)?.name ?? target.staffId} の優先度`}>
                       <NumberInput min={1} max={100} value={target.priority} onChange={(event)=>setDraft({...draft,targets:(draft.targets ?? []).map((item)=>item.staffId===target.staffId?{...item,priority:Number(event.target.value)}:item)})} />
