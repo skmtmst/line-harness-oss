@@ -1157,6 +1157,7 @@
 ## 追加された文書
 
 - [本番全体更新の候補](release-log/unreleased/2071-masato-full-production-candidate.md) — 反映履歴、確認 2026-11-03。
+- [本番全体更新の隔離リリース](release-log/unreleased/2078-masato-production-release.md) — 反映履歴、確認 2026-11-04。
 - [instagram app review](instagram-app-review.md)
 - [instagram privacy section draft](instagram-privacy-section-draft.md)
 - [instagram production rollout](instagram-production-rollout.md)
