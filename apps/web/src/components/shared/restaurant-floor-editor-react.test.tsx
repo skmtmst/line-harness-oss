@@ -12,6 +12,19 @@ const floor={id:'f',storeId:'s',name:'1階',width:500,height:300,version:7,outli
 const props={accountId:'a',storeId:'s',resources:[{id:'t',label:'T1',active:true,capacity:2}],onSelect:vi.fn()}
 beforeEach(()=>{api.floors.mockResolvedValue({data:[floor]});api.saveFloor.mockRejectedValue(new Error('409'));api.createFloor.mockReset();api.deleteFloor.mockReset();tableApi.createTable.mockReset();tableApi.deleteTable.mockReset()})
 afterEach(()=>{cleanup();vi.clearAllMocks()})
+it('保存操作を座席図の上に常時表示し、変更がある時だけ押せる',async()=>{
+ api.saveFloor.mockResolvedValue({})
+ render(<RestaurantFloorEditor {...props} canEdit/>)
+ const table=await screen.findByRole('button',{name:'T1'})
+ const save=screen.getByRole('button',{name:'座席図を保存'}) as HTMLButtonElement
+ expect(screen.getByRole('tablist',{name:'階・エリア'}).parentElement?.contains(save)).toBe(true)
+ expect(save.disabled).toBe(true)
+ fireEvent.keyDown(table,{key:'ArrowRight'})
+ expect(save.disabled).toBe(false)
+ fireEvent.click(save)
+ await waitFor(()=>expect(save.disabled).toBe(true))
+ expect(api.saveFloor).toHaveBeenCalledTimes(1)
+})
 it('競合の保存失敗でも配置を残し、取得した版で保存する',async()=>{
  render(<RestaurantFloorEditor {...props} canEdit/>)
  const table=await screen.findByRole('button',{name:'T1'});fireEvent.keyDown(table,{key:'ArrowRight'});
