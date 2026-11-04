@@ -5116,6 +5116,7 @@
   }
 ,
   "hq_store_response_samples": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "inbox_response_samples": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
   "member_rank_notices": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
   "ec_auto_line_attribution_events": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_entitlement_notices": {"category":"purge","scope":{"by":"lineAccount","column":"line_account_id"}},

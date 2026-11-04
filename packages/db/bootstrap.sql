@@ -4559,6 +4559,16 @@ CREATE TABLE inbox_reply_leases (
   PRIMARY KEY (channel, conversation_id)
 );
 
+CREATE TABLE inbox_response_samples (
+ id TEXT PRIMARY KEY,
+ account_id TEXT NOT NULL REFERENCES line_accounts(id),
+ staff_id TEXT REFERENCES staff_members(id) ON DELETE SET NULL,
+ pending_since TEXT,
+ due_at TEXT,
+ responded_at TEXT NOT NULL,
+ is_first_response INTEGER NOT NULL CHECK(is_first_response IN (0,1))
+);
+
 CREATE TABLE inbox_routing_settings (
  account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), strategy TEXT NOT NULL DEFAULT 'none' CHECK(strategy='none'),
  sla_enabled INTEGER NOT NULL DEFAULT 0 CHECK(sla_enabled IN (0,1)),
@@ -11789,6 +11799,8 @@ CREATE INDEX idx_webinars_account_status_folder
 
 CREATE INDEX inbox_assignment_recent ON inbox_assignment_logs(account_id,staff_id,decided_at);
 
+CREATE INDEX inbox_response_samples_period ON inbox_response_samples(account_id,responded_at,staff_id);
+
 CREATE INDEX makeup_friend_status ON booking_makeup_credits(line_account_id,friend_id,status,expires_at);
 
 CREATE INDEX mcp_call_logs_connection ON mcp_call_logs(connection_id,at,id);
@@ -12518,6 +12530,17 @@ WHEN NEW.id != OLD.id
   OR NEW.tenant_id != OLD.tenant_id
   OR NEW.version != OLD.version
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_VERSION_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER inbox_response_samples_manual AFTER UPDATE OF last_operator_message_at ON chats
+WHEN NEW.last_operator_message_at IS NOT NULL
+BEGIN
+ INSERT INTO inbox_response_samples(id,account_id,staff_id,pending_since,due_at,responded_at,is_first_response)
+ SELECT lower(hex(randomblob(16))), f.line_account_id, NEW.assignee_staff_id,
+   CASE WHEN OLD.pending_since IS NOT NULL AND OLD.first_response_at IS NULL THEN OLD.pending_since ELSE NULL END,
+   CASE WHEN OLD.pending_since IS NOT NULL AND OLD.first_response_at IS NULL THEN OLD.sla_due_at ELSE NULL END,
+   NEW.last_operator_message_at,
+   CASE WHEN OLD.pending_since IS NOT NULL AND OLD.first_response_at IS NULL AND julianday(NEW.last_operator_message_at)>=julianday(OLD.pending_since) THEN 1 ELSE 0 END
+ FROM friends f WHERE f.id=NEW.friend_id AND f.line_account_id IS NOT NULL; END;
 
 CREATE TRIGGER incoming_webhooks_folder_delete AFTER DELETE ON folders
 BEGIN UPDATE incoming_webhooks SET folder_id = NULL WHERE folder_id = OLD.id; END;
