@@ -1,4 +1,4 @@
-> 文書：Googleビジネス（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：Googleビジネス（V8）の動き｜区分：今の説明｜最終確認：2026-11-04（日本時間）
 
 # Googleビジネス（V8）の動き
 
@@ -16,7 +16,7 @@
 - `?google=connected|reconnected|select_location|error:*`：旧URLから来たときはSNS連携へ移す。Google認可の新しい戻り先もSNS連携。
 
 ## 呼ぶ口（今の画面と同じ `restaurantGoogleApi`）
-- 接続：`connection`（＋店舗を選ぶ欄のために `restaurantTestApi.snapshot` の店舗）。店舗を選ぶと、その店舗の LINE アカウントへ切り替える。
+- 接続：`connection`。この画面に店舗を選ぶ欄は置かず、画面右上で選択中の LINE アカウントの店舗を表示する。切り替えは共通のアカウント選択で行う。
 - 口コミ：`listReviews`（評価・状態・並び・検索 300ms・20件ずつ）、`syncReviews`（最終同期が古いと開いたとき1回）、`review`・`generateDraft`（押すだけ。長さや調子の指定は無い）・`saveDraft`・`publishReply`（409 already_replied・502 の扱いも同じ）。
 - 投稿：`posts`（状態・種類で絞る）・`syncPosts`・`cancelPost`・`removePost`（確認の小窓）・`post`・`createPost`・`savePost`・`publishPost`。画像は登録メディアから選ぶか、端末からアップロード（道具は入口が渡す。src/v8 から @/app を読まないため）。
 - パフォーマンス：`performance(7|28|90)`（既定28日）。
