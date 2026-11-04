@@ -1,8 +1,8 @@
-import { broadcastAudienceToken } from '../broadcasts/broadcast-audience-snapshot.js';
+import { broadcastAudienceToken } from '../broadcasts/broadcast-audience-snapshot/index.js';
 import { StampError } from '../../services/visit-stamps.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import type { HqBroadcastInput } from '@line-crm/shared';
-import { buildBroadcastAudienceQuery } from '../broadcasts/broadcast-audience-query.js';
+import { buildBroadcastAudienceQuery } from '../broadcasts/broadcast-audience-query/index.js';
 import { restrictSegmentInput, scopeStoredBroadcastSegmentQuery } from '../../services/segment-query-scope.js';
 import { resolveHqBroadcastAudience } from './hq-broadcast-audience.js';
 

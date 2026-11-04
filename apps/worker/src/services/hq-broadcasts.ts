@@ -1,4 +1,4 @@
-import { hqAudienceSnapshot, HqAudienceConflict, type HqConfirmedAudience } from '../features/hq-broadcasts/hq-audience-confirmation.js';
+import { hqAudienceSnapshot, HqAudienceConflict, type HqConfirmedAudience } from '../features/hq-broadcasts/hq-audience-confirmation/index.js';
 export { getHqBroadcastRun, expandAccountName, mappedHqContent, preflightHqBroadcast } from '../features/hq-broadcasts/preflight/index.js';
 import { assertHqDeliveryOptions, getHqBroadcastRun, expandAccountName, mappedHqContent, preflightHqBroadcast } from '../features/hq-broadcasts/preflight/index.js';
 import type { RunRow, Target } from '../features/hq-broadcasts/preflight/index.js';

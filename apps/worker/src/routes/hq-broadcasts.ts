@@ -1,4 +1,4 @@
-import { hqAudienceSnapshot, HqAudienceConflict, type HqConfirmedAudience } from '../features/hq-broadcasts/hq-audience-confirmation.js';
+import { hqAudienceSnapshot, HqAudienceConflict, type HqConfirmedAudience } from '../features/hq-broadcasts/hq-audience-confirmation/index.js';
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { getBroadcastApprovalThreshold } from '../features/broadcasts/broadcast-approval/index.js';

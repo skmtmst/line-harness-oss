@@ -19,9 +19,25 @@ type SchemaObject = { type: string; name: string; sql: string };
 it('既存行を保ち、指定した版の列と購読の検索索引を追加する', () => {
   const db = new Database(':memory:');
   try {
-    db.exec(readFileSync(new URL('../bootstrap.sql', import.meta.url), 'utf8'));
     db.pragma('foreign_keys = OFF');
     db.pragma('ignore_check_constraints = ON');
+    const bootstrap = readFileSync(new URL('../bootstrap.sql', import.meta.url), 'utf8');
+    // 実スキーマの対象表だけを使い、数百の無関係な表とトリガーの構築を避ける。
+    for (const table of [...tables, 'rt_menu_change_requests']) {
+      const sql = bootstrap.match(new RegExp(`^CREATE TABLE\\s+(?:IF NOT EXISTS\\s+)?["\\x60\\[]?${table}["\\x60\\]]?\\s*\\([\\s\\S]*?;(?=\\s*\\n\\s*\\n|\\s*$)`, 'm'))?.[0];
+      if (!sql) throw new Error(`テーブル定義が見つかりません: ${table}`);
+      db.exec(sql);
+    }
+    const fixtureTables = new Set<string>([...tables, 'rt_menu_change_requests']);
+    for (const match of bootstrap.matchAll(/^CREATE (?:UNIQUE )?INDEX\s+[^\s]+\s+ON\s+["`\[]?(\w+)["`\]]?\s*\([\s\S]*?;(?=\s*\n\s*\n|\s*$)/gm)) {
+      if (fixtureTables.has(match[1])) db.exec(match[0]);
+    }
+    for (const name of ['rt_menu_change_apply', 'rt_menu_published_insert', 'rt_menu_published_update']) {
+      const sql = bootstrap.split('\n').find((line) => line.startsWith(`CREATE TRIGGER ${name} `));
+      if (!sql) throw new Error(`トリガーが見つかりません: ${name}`);
+      db.exec(sql);
+    }
+    db.exec('CREATE TABLE untouched_fixture (id INTEGER PRIMARY KEY, value TEXT); CREATE INDEX untouched_fixture_value ON untouched_fixture(value); CREATE TRIGGER untouched_fixture_trigger AFTER INSERT ON untouched_fixture BEGIN UPDATE untouched_fixture SET value = NEW.value WHERE id = NEW.id; END;');
     db.exec('DROP INDEX idx_friend_scenarios_scenario_status');
     const originalTriggers = [
       ['rt_menu_change_apply', '569_restaurant_booking_policy.sql'],
