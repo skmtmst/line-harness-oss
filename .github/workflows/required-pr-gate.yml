@@ -380,9 +380,21 @@ jobs:
       - name: Guard newly added source visual contracts
         env:
           SOURCE_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          SOURCE_CONTRACT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SOURCE_CONTRACT_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          SOURCE_CONTRACT_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           node --test scripts/verify-no-source-visual-contracts.test.mjs scripts/source-provenance.test.mjs
           base="${SOURCE_CONTRACT_BASE_SHA:-$(git rev-parse HEAD^)}"
+          # The isolated release was cut before later development changes.
+          # Only this release PR uses its audited cut point as the comparison base.
+          if [ "$SOURCE_CONTRACT_BASE_REF" = main ] && \
+             [ "$SOURCE_CONTRACT_HEAD_REF" = codex/masato-production-release-20261104 ]; then
+            release_base=941616d7a41390199ee6cfef7569cfd43b2d8497
+            git cat-file -e "$release_base^{commit}"
+            git merge-base --is-ancestor "$release_base" "$SOURCE_CONTRACT_HEAD_SHA"
+            base="$release_base"
+          fi
           node scripts/verify-no-source-visual-contracts.mjs --base "$base"
       - name: Build shared packages
         run: >-

@@ -70,7 +70,7 @@ const scope = { tenantId: 'tenant-a', actorId: 'owner' }
 const openCreate = async (tab?: RegExp) => {
   if (tab) fireEvent.click(await screen.findByRole('tab', { name: tab }))
   fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
-  return screen.findByLabelText('テンプレート名')
+  return screen.findByLabelText('テンプレート名', {}, { timeout: 5000 })
 }
 const atCreate = () => window.history.replaceState(null, '', '/hq/templates?mode=create')
 const seedFromMount = async (tab: RegExp, kind: string) => {

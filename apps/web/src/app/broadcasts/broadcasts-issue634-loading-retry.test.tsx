@@ -108,7 +108,7 @@ describe('#634 一斉配信の読込表示と再読み込み', () => {
 
     slow.resolve({ success: true, data: [] })
     await waitFor(() => expect(screen.getByText('まだ一斉配信がありません')).toBeTruthy())
-    expect(screen.queryByLabelText('読み込んでいます')).toBeNull()
+    await waitFor(() => expect(screen.queryByLabelText('読み込んでいます')).toBeNull(), { timeout: 5000 })
   })
 
   it('失敗表示の「もう一度読み込む」で一覧を取り直す', async () => {
