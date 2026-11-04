@@ -74,7 +74,7 @@ RT_DELIVERY_UBEREATS_ENVIRONMENT = "sandbox"
 GOOGLE_BUSINESS_OAUTH_CLIENT_ID = "904803281314-ufqj5bmmhqnl9hv58uigo4ct6jvfmdkg.apps.googleusercontent.com"
 GOOGLE_BUSINESS_WRITE_ENABLED = "false"
 # 通常のGoogle書き込みは止めたまま、承認済みの1アカウントだけ投稿テストを許可する。
-# 対象は「然-NEN- TEST-2」。口コミ返信・店舗情報変更・削除は引き続き停止。
+# 対象は「然-NEN- TEST-2」。口コミ返信・店舗情報変更は停止。投稿削除はテスト後の片付けで使う。
 GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = "d121d6b6-7d49-4dda-a37e-0bc7457ffbc9"
 WORKER_NAME = "nen-line-stg"
 ADMIN_PAGES_PROJECT = "nen-line-stg-admin"
