@@ -102,6 +102,7 @@ function ok(data, extra = {}) {
  */
 async function respond(url, staffMe, role) {
   const path = url.pathname
+  if (path === '/admin/version') return ok({ version: '0.24.0', deploy_env: 'test' })
   if (path === '/api/auth/session') {
     return ok(
       { id: 'staff-me', name: '権限確認テスト', role, email: null, permissionKeys: [] },
@@ -109,6 +110,9 @@ async function respond(url, staffMe, role) {
     )
   }
   if (path === '/api/staff/me') return staffMe()
+  if (/^\/api\/line-accounts\/[^/]+\/follower-import$/.test(path)) return ok({ phase: 'complete' })
+  if (path === '/api/settings/features/visibility') return ok({ features: { media: true }, favoriteItemIds: [], restaurantHiddenItemIds: [] })
+  if (path === '/api/dashboard/style') return ok({ style: 'line' })
   if (path === '/api/line-accounts') return ok(ACCOUNTS)
   if (path === '/api/folders') return ok(FOLDERS)
   if (path === '/api/media') {
@@ -137,9 +141,9 @@ async function respond(url, staffMe, role) {
  * `onRequest` で「本当に呼んだか」を数える。
  */
 async function stubApi(page, { role = 'owner', staffMe, onRequest = () => {} } = {}) {
-  const respondStaffMe = staffMe ?? (async () => ok({ id: `${role}-1`, name: `${role} test`, role, email: null }))
+  const respondStaffMe = staffMe ?? (async () => ok({ id: `${role}-1`, name: `${role} test`, role, email: null, permissionKeys: ['/contents'], permissionViewKeys: ['/contents'] }))
   await page.route(
-    (url) => url.pathname.startsWith('/api/'),
+    (url) => url.pathname.startsWith('/api/') || url.pathname === '/admin/version',
     async (route) => {
       const request = route.request()
       if (request.method() === 'OPTIONS') {
@@ -239,13 +243,12 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
       onRequest: management.onRequest,
     })
 
-    await openContents(page, 'domcontentloaded')
-    await expect(permissionNote(page)).toHaveCount(0)
-    await expectManagementHidden(page)
+    await page.goto(`${BASE}/contents`, { waitUntil: 'domcontentloaded' })
+    await expect(page.getByRole('button', { name: 'メディアを登録する', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('menu')).toHaveCount(0)
     expect(management.requests).toEqual([])
-    await page.keyboard.press('Escape')
-
     releaseRole()
+    await expect(page.getByText(MEDIA_NAME, { exact: true }).first()).toBeVisible()
     await expect(permissionNote(page)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'メディアを登録する', exact: true }).first()).toBeVisible()
     await openUsage(page)
@@ -273,6 +276,7 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
     const management = managementRequestLog()
     await stubApi(page, {
       role: 'staff',
+      staffMe: async () => ok({ id: 'staff-viewer', name: 'Staff', role: 'staff', permissionKeys: [], permissionViewKeys: ['/contents'] }),
       onRequest: management.onRequest,
     })
 
@@ -292,7 +296,7 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
       const management = managementRequestLog()
       await stubApi(page, {
         role: 'staff',
-        staffMe: async () => ok({ id: 'viewer-1', name: 'Viewer', role: 'staff', email: null, ...restriction }),
+        staffMe: async () => ok({ id: 'viewer-1', name: 'Viewer', role: 'staff', email: null, permissionKeys: ['/contents'], permissionViewKeys: ['/contents'], ...restriction }),
         onRequest: management.onRequest,
       })
       await openContents(page)
@@ -320,9 +324,11 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
         onRequest: management.onRequest,
       })
 
-      await openContents(page)
-      await expect(permissionNote(page)).toContainText('操作権限を確認できないため、安全のため管理操作を止めています')
-      await expectManagementHidden(page)
+      await page.goto(`${BASE}/contents`, { waitUntil: 'networkidle' })
+      await expect(page.locator('[data-page-pending="identity"]')).toBeVisible()
+      await expect(page.getByRole('button', { name: /もう一度/ }).first()).toBeVisible()
+      await expect(page.getByRole('button', { name: 'メディアを登録する', exact: true })).toHaveCount(0)
+      await expect(page.getByRole('menu')).toHaveCount(0)
       expect(management.requests).toEqual([])
       await expect(page.getByRole('heading', { name: MEDIA_NAME, exact: true })).toHaveCount(0)
     })

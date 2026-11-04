@@ -300,3 +300,8 @@
     min-height: 0;
   }
 }
+
+@media(min-width:1024px){
+ :root .main:has([data-google-hours-page]){margin:0;border:0;border-radius:0;background:var(--color-shell);box-shadow:none;}
+ :root .content:has(>[data-google-hours-page]){padding:14px 24px 24px;}
+}

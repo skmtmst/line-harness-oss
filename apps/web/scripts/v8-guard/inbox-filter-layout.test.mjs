@@ -41,7 +41,7 @@ function Fixture(){
 ` },
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
   tsconfig: `${webRoot}/tsconfig.json`,
-  define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
+  define: { 'process.env': '{}', 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
   plugins: [{ name: 'inbox-fixture', setup(builder) {
     builder.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: 'navigation', namespace: 'fixture' }))
     builder.onResolve({ filter: /^@\/contexts\/account-context$/ }, () => ({ path: 'account', namespace: 'fixture' }))
@@ -90,7 +90,7 @@ for (const width of [1152, 1440]) {
     try {
       const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
       const errors = []
-      page.on('pageerror', error => errors.push(error.message))
+      page.on('pageerror', error => { errors.push(error.message); console.error('inbox fixture:', error.message) })
       await page.route('http://127.0.0.1:8788/**', route => route.fulfill({ json: { success: true, data: { role: 'viewer', readOnly: true } } }))
       await page.setContent(`<html data-theme="v8"><style id="fixture-globals">${globalsCss}</style><style>${css}body{margin:0}main{padding:24px}#tools{width:480px}output{display:block;margin-top:24px}</style><div id="root"></div></html>`)
       await page.addScriptTag({ content: compiled.outputFiles[0].text })
@@ -177,7 +177,7 @@ for (const width of [1152, 1440]) {
       await panel.getByRole('button', { name: '期限で絞り込む' }).click()
       await page.getByRole('option', { name: '1時間以上待ち', exact: true }).getByRole('button').click()
       await expect(page.locator('output')).toContainText('"quickFilter":"overdue"')
-      await panel.getByRole('button', { name: '担当者で絞り込む（パネル）' }).click()
+      await panel.getByRole('button', { name: '担当者で絞り込む' }).click()
       const picker = page.getByRole('dialog').last()
       await expect(picker.getByText('未読 27件', { exact: true })).toBeVisible()
       await picker.getByRole('radio', { name: '未割り当て', exact: true }).check()
@@ -199,7 +199,7 @@ for (const width of [1152, 1440]) {
         await page.screenshot({ path: resolve(outputDir, `inbox-filter-${width}.png`) })
         writeFileSync(resolve(outputDir, `inbox-filter-${width}.json`), JSON.stringify({ width, layout, nameWeights, immediateWeight, brokenWeight, brokenLayout, restoredLayout, panelStyle, noCandidatesStyle, restoredStyle, panel: rect, errors }, null, 2))
       }
-      await panel.getByRole('button', { name: '閉じる', exact: true }).click()
+      await panel.getByRole('button', { name: '絞り込みを閉じる', exact: true }).click()
       await expect(panel).toHaveCount(0)
       await expect(filter).toBeFocused()
       assert.deepEqual(errors, [])

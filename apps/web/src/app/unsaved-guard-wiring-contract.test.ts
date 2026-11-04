@@ -112,6 +112,7 @@ const GUARDED = [
   'v8/reminders/new/new.tsx',
   'app/reminders/new/page.tsx',
   'v8/restaurant/google/profile-edit.tsx',
+  'v8/restaurant/google/hours.tsx',
   // 卓の割り当て方（jmVYJ）。下の帯で保存する変更を、離れる前に確認する。
   'v8/restaurant/tables/assign.tsx',
   'v8/restaurant/google/profile-hours.tsx',
@@ -197,6 +198,7 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  'v8/restaurant/google/hours-edit-panel.tsx': 'v8/restaurant/google/hours.tsx',
   'components/shared/folder-row-actions.tsx': 'components/shared/folder-add-dialog.tsx',
   // タブ枠は子の名前編集を保持し、確認は子の共通ガードが担当する。
   'v8/tags/list.tsx': 'components/shared/use-inline-detail-guard.tsx',

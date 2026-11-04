@@ -111,14 +111,13 @@ describe.each(['viewer', null])('Googleの閲覧状態 %s', current => {
     role(current); const go = vi.fn()
     render(<ProfileBoard accountId="a" go={go} />)
     await screen.findByText('合成店')
-    for (const name of ['営業時間を変える', '今日を休みにする', '今日は早く閉める', 'プロフィールを編集する', '同期する']) locked(name, current)
+    for (const name of ['プロフィールを編集する', '同期する']) locked(name, current)
     await act(async () => {
-      await fixture.handlers.get('今日を休みにする')?.()
       await fixture.handlers.get('同期する')?.()
       await fixture.handlers.get('プロフィールを編集する')?.()
     })
     expect(go).not.toHaveBeenCalled(); expect(fixture.proposeHours).not.toHaveBeenCalled(); expect(fixture.syncProfile).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: '祝日の営業時間を確認する' })).toHaveProperty('disabled', false)
+    expect(screen.getByRole('button', { name: '営業時間を開く' })).toHaveProperty('disabled', false)
     expect(document.querySelector('[data-read-only-notice]')).toBeNull()
   })
   it.each(['disconnected', 'pending_location', 'connected'])('設定の %s でもAPIの許可だけでは操作できない', async status => {
