@@ -173,7 +173,7 @@ CREATE TABLE account_handovers (
   resolved_at         TEXT,
   executed_at         TEXT,
   completed_at        TEXT
-, declared_friend_total INTEGER, rolled_back_at TEXT, rolled_back_by TEXT, rollback_note TEXT);
+, declared_friend_total INTEGER, rolled_back_at TEXT, rolled_back_by TEXT, rollback_note TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE account_health_logs (
   id              TEXT PRIMARY KEY,
@@ -212,7 +212,7 @@ CREATE TABLE account_settings (
   key             TEXT NOT NULL,
   value           TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), confirmation_revision INTEGER NOT NULL DEFAULT 1,
   UNIQUE(line_account_id, key)
 );
 
@@ -1126,7 +1126,7 @@ CREATE TABLE auto_replies (
 , active_from TEXT, active_until TEXT, cooldown_minutes INTEGER, skip_when_operator_active INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0, message_kinds_json TEXT
   CHECK (message_kinds_json IS NULL OR json_valid(message_kinds_json)), friend_conditions_json TEXT
   CHECK (friend_conditions_json IS NULL OR json_valid(friend_conditions_json)), lifecycle_status TEXT NOT NULL DEFAULT 'published'
-  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), stopped_at TEXT, stopped_by_staff_id TEXT, stop_reason TEXT, stop_idempotency_key TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
+  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), stopped_at TEXT, stopped_by_staff_id TEXT, stop_reason TEXT, stop_idempotency_key TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE auto_reply_action_runs (
   id                  TEXT PRIMARY KEY,
@@ -1269,7 +1269,7 @@ CREATE TABLE automation_definitions (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE automation_logs (
   id             TEXT PRIMARY KEY,
@@ -2016,7 +2016,7 @@ CREATE TABLE "booking_payments" (
   paid_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL, refunded_at TEXT, receipt_url TEXT, refunded_amount INTEGER NOT NULL DEFAULT 0
-  CHECK(typeof(refunded_amount)='integer' AND refunded_amount>=0 AND refunded_amount<=amount), actor_label TEXT, action_reason TEXT,
+  CHECK(typeof(refunded_amount)='integer' AND refunded_amount>=0 AND refunded_amount<=amount), actor_label TEXT, action_reason TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1,
   UNIQUE (line_account_id, idempotency_key)
 );
 
@@ -2215,7 +2215,7 @@ CREATE TABLE "bookings" (
   cancelled_at                 TEXT,
   completed_at                 TEXT,
   created_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)), cancel_claim_id TEXT, waitlist_entry_id TEXT, meeting_mode TEXT CHECK(meeting_mode IN('online','in_person')), meeting_url TEXT, meeting_location TEXT, consultation_outcome TEXT CHECK(consultation_outcome IN('considering','won','lost')), outcome_recorded_at TEXT, outcome_recorded_by TEXT, cancellation_reason TEXT, designation TEXT NOT NULL DEFAULT 'unspecified' CHECK(designation IN('designated','any','unspecified')), entry_point TEXT, policy_snapshot_json TEXT CHECK(policy_snapshot_json IS NULL OR json_valid(policy_snapshot_json)), meeting_url_source TEXT CHECK(meeting_url_source IN('staff','menu','manual')), nominated INTEGER NOT NULL DEFAULT 0 CHECK(nominated IN(0,1)), nomination_fee_at_booking INTEGER NOT NULL DEFAULT 0 CHECK(nomination_fee_at_booking >= 0), series_id TEXT REFERENCES booking_series(id), series_index INTEGER, routing_rule_index INTEGER, routing_form_version_id TEXT REFERENCES form_versions(id), group_id TEXT REFERENCES booking_groups(id), person_label TEXT, group_index INTEGER, deposit_snapshot_json TEXT, booking_payment_method_id TEXT REFERENCES booking_payment_methods(id),
+  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)), cancel_claim_id TEXT, waitlist_entry_id TEXT, meeting_mode TEXT CHECK(meeting_mode IN('online','in_person')), meeting_url TEXT, meeting_location TEXT, consultation_outcome TEXT CHECK(consultation_outcome IN('considering','won','lost')), outcome_recorded_at TEXT, outcome_recorded_by TEXT, cancellation_reason TEXT, designation TEXT NOT NULL DEFAULT 'unspecified' CHECK(designation IN('designated','any','unspecified')), entry_point TEXT, policy_snapshot_json TEXT CHECK(policy_snapshot_json IS NULL OR json_valid(policy_snapshot_json)), meeting_url_source TEXT CHECK(meeting_url_source IN('staff','menu','manual')), nominated INTEGER NOT NULL DEFAULT 0 CHECK(nominated IN(0,1)), nomination_fee_at_booking INTEGER NOT NULL DEFAULT 0 CHECK(nomination_fee_at_booking >= 0), series_id TEXT REFERENCES booking_series(id), series_index INTEGER, routing_rule_index INTEGER, routing_form_version_id TEXT REFERENCES form_versions(id), group_id TEXT REFERENCES booking_groups(id), person_label TEXT, group_index INTEGER, deposit_snapshot_json TEXT, booking_payment_method_id TEXT REFERENCES booking_payment_methods(id), confirmation_revision INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
@@ -2514,7 +2514,7 @@ CREATE TABLE common_action_bindings (
   consumer_path            TEXT NOT NULL DEFAULT '',
   created_by               TEXT,
   created_at               TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at               TEXT NOT NULL DEFAULT (datetime('now')), confirmation_revision INTEGER NOT NULL DEFAULT 1,
   UNIQUE (line_account_id, consumer_type, consumer_id, consumer_path, common_action_id)
 );
 
@@ -3167,7 +3167,7 @@ CREATE TABLE event_bookings (
     answer_snapshot_json IS NULL OR json_valid(answer_snapshot_json)
   ), first_participation INTEGER CHECK (first_participation IN (0, 1)), first_participation_attended_count INTEGER CHECK (
     first_participation_attended_count IS NULL OR first_participation_attended_count >= 0
-  ), first_participation_checked_at TEXT, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)), approval_expires_at TEXT, participation_mode TEXT NOT NULL DEFAULT 'classroom' CHECK(participation_mode IN('classroom','online')), absence_reported_at TEXT, lock_version INTEGER NOT NULL DEFAULT 1 CHECK(lock_version>0),
+  ), first_participation_checked_at TEXT, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)), approval_expires_at TEXT, participation_mode TEXT NOT NULL DEFAULT 'classroom' CHECK(participation_mode IN('classroom','online')), absence_reported_at TEXT, lock_version INTEGER NOT NULL DEFAULT 1 CHECK(lock_version>0), confirmation_revision INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (event_id) REFERENCES events(id),
   FOREIGN KEY (slot_id) REFERENCES event_slots(id),
@@ -3389,7 +3389,7 @@ CREATE TABLE file_scan_configs (
   stopped_notified_at  TEXT,
   updated_by           TEXT,
   updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE "folders" (
   id            TEXT PRIMARY KEY,
@@ -3968,7 +3968,7 @@ CREATE TABLE "friend_scenarios" (
   started_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   next_delivery_at   TEXT,
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, previous_scenario_id TEXT, published_version_id TEXT REFERENCES scenario_versions (id), pause_reason TEXT);
+, previous_scenario_id TEXT, published_version_id TEXT REFERENCES scenario_versions (id), pause_reason TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE friend_scores (
   id              TEXT PRIMARY KEY,
@@ -4043,7 +4043,7 @@ CREATE TABLE funnels (
   window_days  INTEGER NOT NULL DEFAULT 30,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 , line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, status TEXT NOT NULL DEFAULT 'active'
-  CHECK (status IN ('active', 'stopped', 'archived')));
+  CHECK (status IN ('active', 'stopped', 'archived')), confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE google_calendar_connections (
   id            TEXT PRIMARY KEY,
@@ -4645,7 +4645,7 @@ CREATE TABLE incoming_webhooks (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
-  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
+  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE instagram_connections (
  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), page_id TEXT NOT NULL,
@@ -4944,7 +4944,7 @@ CREATE TABLE media_file_scans (
   released_by      TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE media_storage_quotas (
   line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -5072,7 +5072,7 @@ CREATE TABLE meet_consultations (
                     CHECK (status IN ('confirmed', 'cancelled', 'completed')),
   created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, booking_id TEXT, booking_version INTEGER, cancel_claim_id TEXT, staff_id TEXT REFERENCES staff(id), attendance TEXT CHECK(attendance IN('visited','late','no_show')), consultation_outcome TEXT CHECK(consultation_outcome IN('considering','won','lost')), outcome_recorded_at TEXT, outcome_recorded_by TEXT, schedule_revision INTEGER NOT NULL DEFAULT 0 CHECK(schedule_revision>=0));
+, booking_id TEXT, booking_version INTEGER, cancel_claim_id TEXT, staff_id TEXT REFERENCES staff(id), attendance TEXT CHECK(attendance IN('visited','late','no_show')), consultation_outcome TEXT CHECK(consultation_outcome IN('considering','won','lost')), outcome_recorded_at TEXT, outcome_recorded_by TEXT, schedule_revision INTEGER NOT NULL DEFAULT 0 CHECK(schedule_revision>=0), confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE member_rank_history(id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES line_accounts(id),friend_id TEXT NOT NULL REFERENCES friends(id),from_tier_id TEXT,to_tier_id TEXT NOT NULL,reason TEXT NOT NULL,notified INTEGER NOT NULL DEFAULT 0 CHECK(notified=0),at TEXT NOT NULL);
 
@@ -6425,7 +6425,7 @@ CREATE TABLE outgoing_webhooks (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), updated_by_staff_id TEXT);
+, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), updated_by_staff_id TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE photo_reward_policies (
   id TEXT PRIMARY KEY,
@@ -6953,7 +6953,7 @@ CREATE TABLE rich_menu_groups (
   default_open        INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, publishing_owner TEXT, publishing_expires_at TEXT, publishing_generation INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1);
+, publishing_owner TEXT, publishing_expires_at TEXT, publishing_generation INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE rich_menu_manual_publish_requests (
   id                    TEXT PRIMARY KEY,
@@ -7484,7 +7484,7 @@ CREATE TABLE rt_google_connections (
   total_review_count INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, last_posts_synced_at TEXT, last_metrics_synced_at TEXT);
+, last_posts_synced_at TEXT, last_metrics_synced_at TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE rt_google_location_candidates (
   id TEXT PRIMARY KEY,
@@ -7591,7 +7591,7 @@ CREATE TABLE rt_google_posts (
   checked_at TEXT,
   deleted_at TEXT,
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, instagram_enabled INTEGER NOT NULL DEFAULT 0 CHECK(instagram_enabled IN (0,1)), instagram_caption TEXT, instagram_status TEXT NOT NULL DEFAULT 'none' CHECK(instagram_status IN ('none','pending','published','failed','skipped')), instagram_media_id TEXT, instagram_permalink TEXT, instagram_error TEXT, instagram_published_at TEXT);
+, instagram_enabled INTEGER NOT NULL DEFAULT 0 CHECK(instagram_enabled IN (0,1)), instagram_caption TEXT, instagram_status TEXT NOT NULL DEFAULT 'none' CHECK(instagram_status IN ('none','pending','published','failed','skipped')), instagram_media_id TEXT, instagram_permalink TEXT, instagram_error TEXT, instagram_published_at TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE rt_google_profiles (
   store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -7769,7 +7769,7 @@ CREATE TABLE rt_menu_items (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'archived')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, published_once INTEGER NOT NULL DEFAULT 0 CHECK (published_once IN (0, 1)), publication_history_unknown INTEGER NOT NULL DEFAULT 0 CHECK (publication_history_unknown IN (0, 1)), description TEXT, image_media_id TEXT REFERENCES media(id));
+, published_once INTEGER NOT NULL DEFAULT 0 CHECK (published_once IN (0, 1)), publication_history_unknown INTEGER NOT NULL DEFAULT 0 CHECK (publication_history_unknown IN (0, 1)), description TEXT, image_media_id TEXT REFERENCES media(id), confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE rt_opening_hours_settings (
   store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -7904,7 +7904,7 @@ CREATE TABLE "rt_reservations" (
   source_updated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT, dining_snapshot_json TEXT CHECK(dining_snapshot_json IS NULL OR json_valid(dining_snapshot_json)), departed_at TEXT, staff_id TEXT REFERENCES staff(id));
+, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT, dining_snapshot_json TEXT CHECK(dining_snapshot_json IS NULL OR json_valid(dining_snapshot_json)), departed_at TEXT, staff_id TEXT REFERENCES staff(id), confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE rt_resource_locks (
   resource_key TEXT PRIMARY KEY,
@@ -7955,7 +7955,7 @@ CREATE TABLE "rt_seat_waitlist" (
   created_at            TEXT NOT NULL DEFAULT (datetime('now')),
   ends_at TEXT, finish_reason TEXT, notification_retry_key TEXT, notification_claim_until TEXT, last_processed_at TEXT,
   updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE rt_seat_waitlist_table_links (
  waitlist_id TEXT NOT NULL REFERENCES rt_seat_waitlist(id) ON DELETE CASCADE,
@@ -8100,7 +8100,7 @@ CREATE TABLE rt_tables (
   join_group TEXT,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')), floor_id TEXT REFERENCES rt_floors(id), shape TEXT NOT NULL DEFAULT 'rectangle' CHECK(shape IN ('rectangle','circle','long','counter','sofa')), width REAL NOT NULL DEFAULT 80 CHECK(width>0), height REAL NOT NULL DEFAULT 64 CHECK(height>0), rotation REAL NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), floor_id TEXT REFERENCES rt_floors(id), shape TEXT NOT NULL DEFAULT 'rectangle' CHECK(shape IN ('rectangle','circle','long','counter','sofa')), width REAL NOT NULL DEFAULT 80 CHECK(width>0), height REAL NOT NULL DEFAULT 64 CHECK(height>0), rotation REAL NOT NULL DEFAULT 0, confirmation_revision INTEGER NOT NULL DEFAULT 1,
   UNIQUE(store_id, code)
 );
 
@@ -8307,7 +8307,7 @@ CREATE TABLE scenarios (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), current_published_version_id TEXT, stopped_reason TEXT
-  CHECK (stopped_reason IS NULL OR length(stopped_reason) <= 200), stopped_by TEXT, stopped_at TEXT);
+  CHECK (stopped_reason IS NULL OR length(stopped_reason) <= 200), stopped_by TEXT, stopped_at TEXT, content_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE scheduled_chat_sends (
   id TEXT PRIMARY KEY,
@@ -8854,7 +8854,7 @@ CREATE TABLE "templates" (
   CHECK (draft_question_json IS NULL OR json_valid(draft_question_json)), draft_question_status TEXT
   CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT, draft_revision INTEGER NOT NULL DEFAULT 0, message_bubbles_json TEXT
   CHECK(message_bubbles_json IS NULL OR (json_valid(message_bubbles_json) AND json_type(message_bubbles_json)='array' AND json_array_length(message_bubbles_json) BETWEEN 1 AND 5)), draft_message_bubbles_json TEXT
-  CHECK(draft_message_bubbles_json IS NULL OR (json_valid(draft_message_bubbles_json) AND json_type(draft_message_bubbles_json)='array' AND json_array_length(draft_message_bubbles_json) BETWEEN 1 AND 5)), deleted_at TEXT);
+  CHECK(draft_message_bubbles_json IS NULL OR (json_valid(draft_message_bubbles_json) AND json_type(draft_message_bubbles_json)='array' AND json_array_length(draft_message_bubbles_json) BETWEEN 1 AND 5)), deleted_at TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE tenant_data_purge_audit (
   id TEXT PRIMARY KEY,
@@ -8963,7 +8963,7 @@ CREATE TABLE traffic_pools (
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-);
+, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE uid_migration_delivery_consents (
  item_id TEXT NOT NULL REFERENCES uid_migration_items(id),
@@ -9210,7 +9210,7 @@ CREATE TABLE "webhook_interaction_logs" (
   started_at         TEXT NOT NULL,
   completed_at       TEXT,
   created_at         TEXT NOT NULL
-);
+, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE webinar_action_executions (
   id               TEXT PRIMARY KEY,
@@ -10521,6 +10521,8 @@ CREATE INDEX idx_friend_scenarios_next_delivery_at ON friend_scenarios (next_del
 CREATE INDEX idx_friend_scenarios_published_version
   ON friend_scenarios (published_version_id)
   WHERE published_version_id IS NOT NULL;
+
+CREATE INDEX idx_friend_scenarios_scenario_status ON friend_scenarios(scenario_id, status);
 
 CREATE INDEX idx_friend_scenarios_status ON friend_scenarios (status);
 
