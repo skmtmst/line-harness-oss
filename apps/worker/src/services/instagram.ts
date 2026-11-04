@@ -406,7 +406,14 @@ export async function instagramShortToken(
   const d = Array.isArray(r.data) ? (r.data[0] ?? {}) : r;
   if (typeof d.access_token !== 'string' || d.access_token === '')
     throw new InstagramError('invalid_meta_token');
-  const userId = String(d.user_id ?? '');
+  // Meta can return a numeric user_id larger than Number.MAX_SAFE_INTEGER.
+  // Converting that parsed number to a string would save a rounded, unusable ID.
+  const userId =
+    typeof d.user_id === 'string'
+      ? d.user_id
+      : typeof d.user_id === 'number' && Number.isSafeInteger(d.user_id)
+        ? String(d.user_id)
+        : '';
   const scopes = instagramGrantedScopes(d);
   return {
     token: d.access_token,

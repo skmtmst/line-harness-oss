@@ -310,10 +310,10 @@ instagram.get(
             'id,username,name,biography,profile_picture_url,followers_count,media_count',
         },
       );
-      // 投稿に使うIDは、合鍵の引き換えで返る Instagram の利用者ID。
-      // 形がおかしいときだけプロフィール側のIDで拾う。どちらも数字でなければ
-      // 投稿の口が無い（プロアカウントになっていない）とみなす。
-      const instagramId = short.userId || String(profile.id ?? '');
+      // /me の文字列IDを優先する。認可応答の user_id は大きな JSON 数値で
+      // 返る場合があり、JavaScript で丸められると投稿先が存在しないIDになる。
+      const profileId = typeof profile.id === 'string' ? profile.id : '';
+      const instagramId = /^\d{1,24}$/.test(profileId) ? profileId : short.userId;
       if (!/^\d{1,24}$/.test(instagramId))
         throw new InstagramError('instagram_business_account_required', 403);
       // 同じ統括なら複数のLINEアカウントで共有できる。別統括への接続は

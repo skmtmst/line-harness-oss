@@ -228,6 +228,39 @@ it('別のInstagramアカウントも別のLINEアカウントへ接続できる
     { line_account_id: 'a3', instagram_id: '21' },
   ]);
 });
+it('認可応答の数値IDが丸められても、プロフィールの正確な文字列IDで接続する', async () => {
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal('fetch', vi.fn(async (url: URL | string, init?: RequestInit) => {
+    const path = new URL(String(url)).pathname;
+    if (path.endsWith('/oauth/access_token')) return Response.json({ data: [{
+      access_token: 'short_mock', user_id: 39493407693639108,
+      permissions: 'instagram_business_basic,instagram_business_content_publish',
+    }] });
+    if (path.endsWith('/me')) return Response.json({ id: '39493407693639108', username: 'test_ig' });
+    return original(url, init);
+  }));
+
+  expect((await connectAccount('a1')).searchParams.get('instagram')).toBe('connected');
+  expect(db.raw.prepare('SELECT instagram_id FROM instagram_connections').get()).toEqual({
+    instagram_id: '39493407693639108',
+  });
+});
+it('正確な文字列IDが取れないときは、丸めた数値IDを保存しない', async () => {
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal('fetch', vi.fn(async (url: URL | string, init?: RequestInit) => {
+    const path = new URL(String(url)).pathname;
+    if (path.endsWith('/oauth/access_token')) return Response.json({ data: [{
+      access_token: 'short_mock', user_id: 39493407693639108,
+      permissions: 'instagram_business_basic,instagram_business_content_publish',
+    }] });
+    if (path.endsWith('/me')) return Response.json({ username: 'test_ig' });
+    return original(url, init);
+  }));
+
+  const back = await connectAccount('a1');
+  expect(back.searchParams.get('instagram_code')).toBe('instagram_business_account_required');
+  expect(db.raw.prepare('SELECT COUNT(*) AS n FROM instagram_connections').get()).toEqual({ n: 0 });
+});
 it('閲覧のみ・別アカウント・偽state・再利用・期限切れを拒否する', async () => {
   expect(
     (
