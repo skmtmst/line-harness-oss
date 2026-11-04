@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
@@ -66,7 +67,7 @@ booking.get('/api/booking/admin/waitlist', async (c) => {
     .all();
   const slots=await c.env.DB.prepare(`SELECT staff_id,starts_at,SUM(status='waiting') waiting,SUM(status='invited') invited,SUM(status IN ('finished','converted','cancelled')) finished FROM booking_waitlist WHERE line_account_id=? GROUP BY staff_id,starts_at ORDER BY starts_at DESC LIMIT 100`).bind(accountId).all();
   const seats=await c.env.DB.prepare(`SELECT w.store_id,w.starts_at,SUM(w.status='waiting') waiting,SUM(w.status='invited') invited,SUM(w.status IN ('finished','converted','cancelled')) finished FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=? GROUP BY w.store_id,w.starts_at ORDER BY w.starts_at DESC LIMIT 100`).bind(accountId).all();
-  return c.json({waitlist:rows.results,slots:slots.results,seatSlots:seats.results,seatWaitlist:(await c.env.DB.prepare(`SELECT w.*,s.name store_name FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=? ORDER BY w.starts_at DESC,w.created_at LIMIT 100`).bind(accountId).all()).results});
+  return c.json({waitlist:rows.results,slots:slots.results,seatSlots:seats.results,seatWaitlist:(await c.env.DB.prepare(`SELECT w.*,s.name store_name FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=? ORDER BY w.starts_at DESC,julianday(${storedTimestamp('w.created_at', 'sql')}) LIMIT 100`).bind(accountId).all()).results});
 });
 
 booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 'staff'), async (c) => {

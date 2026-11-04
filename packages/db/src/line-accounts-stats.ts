@@ -1,4 +1,4 @@
-import { lineTokenExpiry, lineWebhookSilence, LINE_CONNECTION_CHECK_TTL_MS, DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { lineTokenExpiry, lineWebhookSilence, LINE_CONNECTION_CHECK_TTL_MS, storedTimestamp, DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { type LineAccountConnectionIssue, type LineAccountListStats } from './line-accounts-types.js';
 
 
@@ -127,9 +127,7 @@ export async function getLineAccountListStats(
            INNER JOIN account_health_logs health ON health.id = (
              SELECT recent.id FROM account_health_logs recent
               WHERE recent.line_account_id = requested.line_account_id
-              ORDER BY julianday(CASE WHEN substr(recent.created_at, -1) = 'Z'
-                OR substr(recent.created_at, -6, 1) IN ('+', '-') THEN recent.created_at
-                ELSE recent.created_at || 'Z' END) DESC, recent.id DESC LIMIT 1
+              ORDER BY julianday(${storedTimestamp('recent.created_at', 'sql')}) DESC, recent.id DESC LIMIT 1
            )
        ), combined_checks AS (
          SELECT id, line_account_id, check_kind, result, checked_at,
@@ -140,9 +138,7 @@ export async function getLineAccountListStats(
            FROM latest_bot_health
        ), normalized_checks AS (
          SELECT checks.*,
-                strftime('%Y-%m-%dT%H:%M:%fZ', CASE
-                  WHEN substr(checked_at, -1) = 'Z' OR substr(checked_at, -6, 1) IN ('+', '-') THEN checked_at
-                  ELSE checked_at || 'Z' END) AS checked_instant
+                strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('checked_at', 'sql')}) AS checked_instant
            FROM combined_checks checks
        ), ranked_checks AS (
          SELECT checks.line_account_id, checks.check_kind, checks.result, checks.checked_instant AS checked_at,
@@ -233,7 +229,7 @@ export async function getLineAccountListStats(
     const credentialsChangedAfterCheck = [row.channel_access_token_updated_at, row.channel_secret_updated_at]
       .some(value => {
         if (!value) return false;
-        const instant = Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value.replace(' ', 'T')}Z`);
+        const instant = Date.parse(storedTimestamp(value));
         return !Number.isFinite(instant) || instant > checkedAt;
       });
     const age = Date.now() - checkedAt;

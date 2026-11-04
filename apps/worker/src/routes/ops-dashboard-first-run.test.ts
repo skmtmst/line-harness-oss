@@ -93,6 +93,9 @@ describe('最初の10分のまとめ', () => {
     expect(detail).toMatchObject({ startedAt: at(0), minutes: 4 });
     const { body } = await read();
     expect(body).toMatchObject({ accounts: 1, minutesToFirstMessage: { median: 4, reached: 1 } });
+    testDb.raw.prepare('UPDATE line_accounts SET created_at=? WHERE id=?').run(at(0).replace(/\+09:00$/, ''), 'legacy-utc');
+    expect(await firstRunTimes(testDb.db, 'legacy-utc')).toMatchObject({ startedAt: at(0), minutes: 4 });
+    expect((await read()).body).toMatchObject({ accounts: 1, minutesToFirstMessage: { median: 4, reached: 1 } });
   });
 
   it('各段まで進んだ数・分の中央値と75%点・10分以内・6段の全部を数える', async () => {

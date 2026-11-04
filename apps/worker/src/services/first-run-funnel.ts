@@ -1,7 +1,7 @@
 import { isSavedFeatureConfiguration } from '@line-crm/db';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { instant } from './style-analytics-core.js';
-import { sqliteUtcTimestamp } from '@line-crm/shared';
+import { storedTimestamp } from '@line-crm/shared';
 
 /**
  * 公開した振り分けの版から、始まるシナリオの ID を読む。
@@ -109,7 +109,7 @@ export async function firstRunFunnel(
     `SELECT id, created_at FROM line_accounts
       WHERE archived_at IS NULL AND COALESCE(tenant_id, ?) <> ?`,
   ).bind(input.excludeTenantId, input.excludeTenantId).all<{ id: string; created_at: string | null }>();
-  const ids = (all.results ?? []).filter((row) => within(row.created_at ? sqliteUtcTimestamp(row.created_at) : null, from, to)).map((row) => row.id);
+  const ids = (all.results ?? []).filter((row) => within(row.created_at ? storedTimestamp(row.created_at) : null, from, to)).map((row) => row.id);
   if (ids.length === 0) return summarize([], new Set());
 
   const set = sqlIdSet(ids);
@@ -167,7 +167,7 @@ export async function firstRunFunnel(
     ];
     if (steps.every(Boolean)) done.add(row.id);
   }
-  return summarize((times.results ?? []).map(row => ({ ...row, created_at: row.created_at ? sqliteUtcTimestamp(row.created_at) : null })), done);
+  return summarize((times.results ?? []).map(row => ({ ...row, created_at: row.created_at ? storedTimestamp(row.created_at) : null })), done);
 }
 
 /** 2 つの時刻の差を分（切り上げ・0 未満は 0）。読めなければ null。 */

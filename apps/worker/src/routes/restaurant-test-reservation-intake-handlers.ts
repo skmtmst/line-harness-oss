@@ -1,5 +1,5 @@
 import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
-import { normalizePhone, phoneProblem } from '@line-crm/shared';
+import { normalizePhone, phoneProblem, storedTimestamp } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { RESERVATION_FILTER_STATUSES } from './restaurant-reservation-filter.js';
 import type { SeatWaitlistEntryLike } from './restaurant-context-types.js';
@@ -462,7 +462,7 @@ export const get__api_restaurant_test_seat_waitlist_7 = async (c: Context<Env, "
          FROM rt_seat_waitlist w
          LEFT JOIN rt_tables t ON t.id = w.table_id
         WHERE ${conditions.join(' AND ')}
-        ORDER BY w.starts_at ASC, w.created_at ASC, w.rowid ASC LIMIT 100`,
+        ORDER BY w.starts_at ASC, julianday(${storedTimestamp('w.created_at', 'sql')}) ASC, w.rowid ASC LIMIT 100`,
     )
     .bind(...values)
     .all();

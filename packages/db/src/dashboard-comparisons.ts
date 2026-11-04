@@ -1,4 +1,4 @@
-import { sqliteUtcTimestamp } from '@line-crm/shared';
+import { storedTimestamp } from '@line-crm/shared';
 import {
   DASHBOARD_COMPARISON_BETTER,
   jstDate,
@@ -66,7 +66,7 @@ export async function getDashboardComparisons(
     .prepare('SELECT created_at FROM line_accounts WHERE id = ?')
     .bind(input.lineAccountId)
     .first<{ created_at: string | null }>()
-    .then((row) => toTime(row?.created_at ? sqliteUtcTimestamp(row.created_at) : null));
+    .then((row) => toTime(row?.created_at ? storedTimestamp(row.created_at) : null));
   /** 比べる期間の初めにアカウントがあり、記録がその期間の終わりまでに始まっていたか。 */
   const recordedThrough = async (
     window: { previousFrom: Date; previousTo: Date },

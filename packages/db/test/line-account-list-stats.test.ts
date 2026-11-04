@@ -144,7 +144,7 @@ describe('LINEアカウント一覧の一括集計', () => {
 
  test('手動確認と定期のbot確認を同じ時刻で比較し、復旧とWebhookの問題を別々に残す', async () => {
    sqlite.exec(`INSERT INTO account_health_logs (id,line_account_id,error_code,error_count,check_period,risk_level,created_at)
-     VALUES ('cron-a','account-a',401,1,'5m','normal','2026-09-15T10:05:00'),
+     VALUES ('cron-a','account-a',401,1,'5m','normal','2026-09-15 10:05:00'),
             ('cron-b','account-b',NULL,0,'5m','warning','2026-09-15T19:05:00+09:00');`);
    let stats = await getLineAccountListStats(db, ['account-a', 'account-b']);
    expect(stats['account-a'].connection).toMatchObject({ status: 'warn', checkedAt: '2026-09-15T10:05:00.000Z', issues: [{ kind: 'bot_info', httpStatus: 401 }] });
@@ -179,7 +179,7 @@ describe('LINEアカウント一覧の一括集計', () => {
 
  test('定期ログをUTC/JSTの文字順で取り違えず、入力されたトークン期限はJSTとして読む', async () => {
    sqlite.exec(`INSERT INTO account_health_logs(id,line_account_id,error_code,error_count,check_period,risk_level,created_at)
-     VALUES('jst-old','account-a',401,1,'5m','normal','2026-09-15T10:05:00'),
+     VALUES('jst-old','account-a',401,1,'5m','normal','2026-09-15T19:05:00'),
            ('utc-new','account-a',NULL,0,'5m','normal','2026-09-15T10:06:00Z');`);
    const deadline = new Date(Date.now()+8*60*60_000).toISOString().replace(/Z$/,'');
    sqlite.prepare('UPDATE line_accounts SET token_expires_at=? WHERE id=?').run(deadline,'account-a');

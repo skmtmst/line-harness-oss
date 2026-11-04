@@ -123,7 +123,7 @@ export { lineTokenExpiry, LINE_TOKEN_CAUTION_DAYS, LINE_TOKEN_REFRESH_DAYS } fro
 export type { LineTokenExpiry } from './line-token-expiry.js';
 export { lineAccountConnectionState, lineConnectionRisk } from './line-connection-state.js';
 export type { LineConnection, LineConnectionIssue } from './line-connection-state.js';
-export { lineObservationTime, lineWebhookSilence, sqliteUtcTimestamp, LINE_WEBHOOK_SILENCE_MS, LINE_CONNECTION_CHECK_TTL_MS } from './line-observation-time.js';
+export { lineObservationTime, lineWebhookSilence, storedTimestamp, LINE_WEBHOOK_SILENCE_MS, LINE_CONNECTION_CHECK_TTL_MS } from './line-observation-time.js';
 export { STARTER_CATALOG_KINDS } from './style-starter-catalog.js';
 export type { StarterCatalogKind, StarterCatalogSelection, StarterCatalogDefinition, StarterCatalogOption, StarterCatalogItemState, StarterCatalogApplyResult, StarterCatalogDetails } from './style-starter-catalog.js';
 

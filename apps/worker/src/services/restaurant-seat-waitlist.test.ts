@@ -25,6 +25,13 @@ describe('席のキャンセル待ち・先着順', () => {
     expect(await insertSeatWaitlistEntry(test.db,{...input,customerPhone:'090abc12345678'})).toEqual({ok:false,error:'invalid_phone'});
     expect(test.raw.prepare('SELECT COUNT(*) n FROM rt_seat_waitlist').get()).toEqual({n:1});
   });
+  it('UTC 旧形式と時差付きの待ちを実時刻順に案内する', async () => {
+    add('older', 2, 'test-user-0'); add('newer', 2, 'test-user-1');
+    const day = slot.slice(0, 10);
+    test.raw.prepare('UPDATE rt_seat_waitlist SET created_at=? WHERE id=?').run(`${day}T19:00:00+09:00`, 'older');
+    test.raw.prepare('UPDATE rt_seat_waitlist SET created_at=? WHERE id=?').run(`${day} 11:00:00`, 'newer');
+    expect(await promote()).toMatchObject({ promoted: true, entry: { id: 'older' } });
+  });
   it('先頭に入らない卓では後ろの小さい組も追い越さない', async () => { add('first', 6); add('second', 2, 'test-user-1'); expect(await promote()).toMatchObject({ promoted: false, reason: 'no_fitting_table' }); expect((await promote('large')).promoted).toBe(true); expect((await promote()).promoted).toBe(true); });
   it('卓の滞在時間を仮押さえし、別の人の予約は拒否する', async () => { add('w0'); await promote(); expect(() => reserve('steal', 'test-user-1')).toThrow('restaurant_table_conflict'); expect(() => reserve('ok', 'test-user-0', 'w0')).not.toThrow(); expect(test.raw.prepare("SELECT status FROM rt_seat_waitlist WHERE id='w0'").get()).toMatchObject({ status: 'converted' }); });
   it('予約が残る卓には案内を出さない', async () => { reserve('full', 'test-user-7'); add('w0'); expect((await promote()).promoted).toBe(false); });

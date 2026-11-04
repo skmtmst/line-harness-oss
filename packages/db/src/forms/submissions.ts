@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import type { FormSubmission, FormDestinationWriteStatus } from '../form-submission-types.js';
 import { type FormSubmissionPeriod, submissionPeriodSql } from '../form-submission-period.js';
 import { sqlIdSet } from '../id-queries.js';
@@ -16,11 +17,11 @@ export async function getFormSubmissions(
     .prepare(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
-       WHERE fs.form_id = ? AND fs.is_test = 0${options.lineAccountId ? ' AND f.line_account_id=?' : ''}${period.sql} ORDER BY julianday(fs.created_at) DESC LIMIT ?`,
+       WHERE fs.form_id = ? AND fs.is_test = 0${options.lineAccountId ? ' AND f.line_account_id=?' : ''}${period.sql} ORDER BY julianday(${storedTimestamp('fs.created_at', 'sql')}) DESC LIMIT ?`,
     )
     .bind(formId, ...(options.lineAccountId ? [options.lineAccountId] : []), ...period.bindings, boundedListLimit(limit, MAX_LIST_LIMIT))
     .all<FormSubmission & { friend_name: string | null }>();
-  return result.results;
+  return result.results.map(row => ({ ...row, created_at: storedTimestamp(row.created_at) }));
 }
 
 /**
@@ -65,12 +66,12 @@ export async function getFormSubmissionsPage(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
        WHERE fs.form_id = ? AND fs.is_test = 0${accountClause}${searchClause}${period.sql}
-       ORDER BY julianday(fs.created_at) DESC, fs.id DESC
+       ORDER BY julianday(${storedTimestamp('fs.created_at', 'sql')}) DESC, fs.id DESC
        LIMIT ? OFFSET ?`,
     )
     .bind(formId, ...accountBindings, ...searchBindings, ...period.bindings, limit, offset)
     .all<FormSubmission & { friend_name: string | null }>();
-  return { items: result.results, total: count?.total ?? 0, page, limit };
+  return { items: result.results.map(row => ({ ...row, created_at: storedTimestamp(row.created_at) })), total: count?.total ?? 0, page, limit };
 }
 
 /** 友だち詳細欄で使う、フォーム名・質問定義つきの最新回答履歴。 */
@@ -89,12 +90,12 @@ export async function getFormSubmissionsByFriend(
        JOIN forms f ON f.id = fs.form_id
        LEFT JOIN form_versions fv ON fv.id = fs.form_version_id AND fv.form_id = fs.form_id
        WHERE fs.friend_id = ? AND fs.is_test = 0
-       ORDER BY julianday(fs.created_at) DESC
+       ORDER BY julianday(${storedTimestamp('fs.created_at', 'sql')}) DESC
        LIMIT ?`,
     )
     .bind(friendId, safeLimit)
     .all<FriendFormSubmission>();
-  return result.results;
+  return result.results.map(row => ({ ...row, created_at: storedTimestamp(row.created_at) }));
 }
 
 /**
@@ -134,8 +135,8 @@ export async function getFormSubmissionsByFriendCursor(
     const sep = input.cursor.lastIndexOf('|');
     const cursorCreatedAt = sep > 0 ? input.cursor.slice(0, sep) : input.cursor;
     const cursorId = sep > 0 ? input.cursor.slice(sep + 1) : '';
-    cursorClause = ' AND (julianday(fs.created_at) < julianday(?) OR (julianday(fs.created_at) = julianday(?) AND fs.id < ?))';
-    bindings.push(cursorCreatedAt, cursorCreatedAt, cursorId);
+    cursorClause = ` AND (julianday(${storedTimestamp('fs.created_at', 'sql')}) < julianday(?) OR (julianday(${storedTimestamp('fs.created_at', 'sql')}) = julianday(?) AND fs.id < ?))`;
+    bindings.push(storedTimestamp(cursorCreatedAt), storedTimestamp(cursorCreatedAt), cursorId);
   }
   const result = await db
     .prepare(
@@ -146,12 +147,12 @@ export async function getFormSubmissionsByFriendCursor(
        JOIN forms f ON f.id = fs.form_id
        LEFT JOIN form_versions fv ON fv.id = fs.form_version_id AND fv.form_id = fs.form_id
        WHERE fs.friend_id = ? AND fs.is_test = 0${cursorClause}
-       ORDER BY julianday(fs.created_at) DESC, fs.id DESC
+       ORDER BY julianday(${storedTimestamp('fs.created_at', 'sql')}) DESC, fs.id DESC
        LIMIT ?`,
     )
     .bind(...bindings, safeLimit + 1)
     .all<FriendFormSubmission>();
-  const items = result.results.slice(0, safeLimit);
+  const items = result.results.slice(0, safeLimit).map(row => ({ ...row, created_at: storedTimestamp(row.created_at) }));
   const hasMore = result.results.length > safeLimit;
   const last = items[items.length - 1];
   return {

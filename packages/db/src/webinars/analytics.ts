@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { type WebinarParticipantStat, type WebinarAnalyticsSummaryRow, type WebinarDailyStat } from './types.js';
 import { followTimeSql } from '../utils.js';
 
@@ -29,7 +30,7 @@ export async function getWebinarParticipantStats(
                 JOIN webinars wf ON wf.id = wc.webinar_id
                 WHERE wc.webinar_id = v.webinar_id
                   AND fs.friend_id = v.friend_id
-                  AND julianday(fs.created_at) >= ${followTimeSql('wf.created_at')}
+                  AND julianday(${storedTimestamp('fs.created_at', 'sql')}) >= ${followTimeSql('wf.created_at')}
               ) AS form_submitted_at
        FROM webinar_viewers v
        LEFT JOIN friends f ON f.id = v.friend_id
@@ -61,7 +62,7 @@ export async function getWebinarAnalyticsSummary(
          FROM form_submissions fs
          JOIN webinar_ctas wc ON wc.form_id = fs.form_id
          JOIN webinars w ON w.id = wc.webinar_id
-         WHERE wc.webinar_id = ? AND julianday(fs.created_at) >= ${followTimeSql('w.created_at')}
+         WHERE wc.webinar_id = ? AND julianday(${storedTimestamp('fs.created_at', 'sql')}) >= ${followTimeSql('w.created_at')}
        )
        SELECT
          (SELECT COUNT(DISTINCT friend_id) FROM webinar_registrations
@@ -113,11 +114,11 @@ export async function getWebinarDailyStats(
        ), views AS (
          SELECT friend_id, joined_at, cta_clicked_at FROM webinar_viewers WHERE webinar_id = ?
        ), submissions AS (
-         SELECT fs.friend_id, date(fs.created_at, '+9 hours') AS stat_date
+         SELECT fs.friend_id, date(${storedTimestamp('fs.created_at', 'sql')}, '+9 hours') AS stat_date
          FROM form_submissions fs
          JOIN webinar_ctas wc ON wc.form_id = fs.form_id
          JOIN webinars w ON w.id = wc.webinar_id
-         WHERE wc.webinar_id = ? AND julianday(fs.created_at) >= ${followTimeSql('w.created_at')}
+         WHERE wc.webinar_id = ? AND julianday(${storedTimestamp('fs.created_at', 'sql')}) >= ${followTimeSql('w.created_at')}
        ), dates AS (
          SELECT substr(created_at, 1, 10) AS stat_date FROM regs
          UNION SELECT substr(joined_at, 1, 10) FROM views

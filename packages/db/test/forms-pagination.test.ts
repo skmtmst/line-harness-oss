@@ -27,7 +27,7 @@ describe('getFormSubmissionsPage', () => {
     expect(result.items).toHaveLength(1);
     expect(calls[0].bindings).toEqual(['form-1']);
     expect(calls[1].bindings).toEqual(['form-1', 20, 20]);
-    expect(calls[1].sql).toContain('ORDER BY julianday(fs.created_at) DESC, fs.id DESC');
+    expect(calls[1].sql).toContain('DESC, fs.id DESC');
     expect(calls[1].sql).toContain('LIMIT ? OFFSET ?');
   });
 

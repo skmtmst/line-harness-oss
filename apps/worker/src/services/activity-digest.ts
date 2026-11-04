@@ -1,4 +1,4 @@
-import { jstCalendar as japanCalendar, sqliteUtcTimestamp } from '@line-crm/shared';
+import { jstCalendar as japanCalendar, storedTimestamp } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
   computeUnansweredInbox,
@@ -109,7 +109,7 @@ function normalizeJstTimestamp(value: string): string {
 }
 
 function normalizeUtcTimestamp(value: string): string {
-  const parsed = new Date(sqliteUtcTimestamp(value));
+  const parsed = new Date(storedTimestamp(value));
   return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
 }
 
@@ -241,9 +241,9 @@ export async function getActivityDigest(
          INNER JOIN forms fm ON fm.id = fs.form_id
          LEFT JOIN friends f ON f.id = fs.friend_id
          LEFT JOIN line_accounts la ON la.id = f.line_account_id
-        WHERE julianday(fs.created_at) >= julianday(?)
+        WHERE julianday(${storedTimestamp('fs.created_at', 'sql')}) >= julianday(?)
           ${formsScope.clause}
-        ORDER BY julianday(fs.created_at) DESC
+        ORDER BY julianday(${storedTimestamp('fs.created_at', 'sql')}) DESC
         LIMIT ?`,
     ).bind(sinceUtc, ...formsScope.bindings, queryLimit).all<RawFormSubmissionRow>(),
     db.prepare(

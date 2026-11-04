@@ -1,5 +1,5 @@
 import type { LineAccountConnectionCheck } from '@line-crm/db';
-import { LINE_CONNECTION_CHECK_TTL_MS } from '@line-crm/shared';
+import { LINE_CONNECTION_CHECK_TTL_MS, storedTimestamp } from '@line-crm/shared';
 
 type Check = { checked_at: string; account_revision: number };
 
@@ -7,7 +7,7 @@ type Check = { checked_at: string; account_revision: number };
 export function isConnectionCheckFresh(checks: Check[], revision: number, now = Date.now()): boolean {
   if (!checks.length) return false;
   const value = checks[0].checked_at;
-  const at = Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value.replace(' ', 'T')}Z`);
+  const at = Date.parse(storedTimestamp(value));
   const age = now - at;
   return Number.isFinite(age) && age >= 0 && age < LINE_CONNECTION_CHECK_TTL_MS
     && checks.every(row => row.account_revision === revision);

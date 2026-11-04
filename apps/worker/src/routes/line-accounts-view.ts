@@ -1,4 +1,4 @@
-import { lineTokenExpiry } from '@line-crm/shared';
+import { lineTokenExpiry, storedTimestamp } from '@line-crm/shared';
 import type { LineAccount as DbLineAccount } from '@line-crm/db';
 
 export function serializeLineAccount(row: DbLineAccount) {
@@ -37,8 +37,8 @@ export function serializeLineAccount(row: DbLineAccount) {
     capacityWarnAt: row.capacity_warn_at ?? null,
     iconUrl: row.icon_url ?? null,
     parentLineAccountId: row.parent_line_account_id ?? null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: storedTimestamp(row.created_at),
+    updatedAt: storedTimestamp(row.updated_at),
     channelAccessTokenConfigured: Boolean(
       row.channel_access_token_encrypted || row.channel_access_token,
     ),

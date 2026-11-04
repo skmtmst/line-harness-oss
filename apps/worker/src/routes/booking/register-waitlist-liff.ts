@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { liffBookingInputError, liffBookingJson } from '../liff-booking-response.js';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
@@ -103,7 +104,7 @@ booking.get('/api/liff/booking/seat-waitlist',async(c)=>{
  const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return liffBookingInputError(c, {error:caller.error}, caller.status, []);
  if(!restaurantTestEnabled(c.env))return liffBookingJson(c, {error:'not_found'},404);
  await finishExpiredWaitlists(c.env.DB,caller.accountId);
- const rows=await c.env.DB.prepare(`SELECT w.id,w.store_id,w.starts_at,w.ends_at,w.guest_count,w.status,w.hold_minutes,w.hold_expires_at,w.created_at,s.name store_name FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=? AND w.line_uid=? AND (? IS NULL OR w.id=?) ORDER BY w.starts_at DESC,w.created_at LIMIT 100`).bind(caller.accountId,caller.lineUserId,c.req.query('id')??null,c.req.query('id')??null).all();
+ const rows=await c.env.DB.prepare(`SELECT w.id,w.store_id,w.starts_at,w.ends_at,w.guest_count,w.status,w.hold_minutes,w.hold_expires_at,w.created_at,s.name store_name FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=? AND w.line_uid=? AND (? IS NULL OR w.id=?) ORDER BY w.starts_at DESC,julianday(${storedTimestamp('w.created_at', 'sql')}) LIMIT 100`).bind(caller.accountId,caller.lineUserId,c.req.query('id')??null,c.req.query('id')??null).all();
  return liffBookingJson(c, {waitlist:rows.results});
 });
 

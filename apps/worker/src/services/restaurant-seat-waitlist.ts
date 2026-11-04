@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { openSeatTables } from './restaurant-closures.js';
 import { assignRestaurantTable } from '../features/booking/booking-assignment/index.js';
 import { d1AssignmentSettingsStore } from '../features/booking/booking-assignment-settings/index.js';
@@ -15,7 +16,7 @@ export async function promoteSeatWaitlist(db: D1Database, slot: SeatWaitlistSlot
   const store = await db.prepare('SELECT line_account_id,status FROM rt_stores WHERE id=?').bind(slot.storeId).first<{ line_account_id: string | null; status: string ;}>();
   if (!store || store.status !== 'active') return { promoted: false, reason: 'unavailable' };
   await finishExpiredWaitlists(db, store.line_account_id ?? undefined);
-  const next = await db.prepare(`SELECT * FROM rt_seat_waitlist WHERE store_id=? AND julianday(starts_at)=julianday(?) AND status='waiting' ORDER BY created_at,rowid LIMIT 1`).bind(slot.storeId, slot.startsAt).first<SeatWaitlistEntry>();
+  const next = await db.prepare(`SELECT * FROM rt_seat_waitlist WHERE store_id=? AND julianday(starts_at)=julianday(?) AND status='waiting' ORDER BY julianday(${storedTimestamp('created_at', 'sql')}),rowid LIMIT 1`).bind(slot.storeId, slot.startsAt).first<SeatWaitlistEntry>();
   if (!next) return { promoted: false, reason: 'empty' };
   const ends = next.ends_at ?? new Date(Date.parse(next.starts_at) + 120 * 60_000).toISOString();
   let tableId = slot.tableId;

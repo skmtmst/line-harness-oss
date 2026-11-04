@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 
 // ── Submissions ───────────────────────────────────────────────────────────────
 
@@ -17,6 +18,6 @@ export interface FormSubmissionPeriod { from?: string; until?: string }
 
 /** SQLite defaults without an offset are UTC; compare all instants in JST. */
 export function submissionPeriodSql(column: string, period: FormSubmissionPeriod = {}) {
-  const date = `datetime(${column}, '+9 hours')`;
+  const date = `datetime(${storedTimestamp(column, 'sql')}, '+9 hours')`;
   return { sql: `${period.from ? ` AND ${date}>=datetime(?)` : ''}${period.until ? ` AND ${date}<datetime(?)` : ''}`, bindings: [...(period.from ? [period.from] : []), ...(period.until ? [period.until] : [])] };
 }

@@ -12,11 +12,11 @@ it('時差なし UTC と時差付きの回答を実時刻順に並べ、次の�
     INSERT INTO forms VALUES ('f','フォーム','[]');
     INSERT INTO friends VALUES ('person','友だち','account');
     INSERT INTO form_submissions VALUES
-      ('old','f','person',NULL,0,'{}','2026-11-01T10:00:00+09:00'),
+      ('old','f','person',NULL,0,'{}','2026-11-01T10:00:00.000'),
       ('new','f','person',NULL,0,'{}','2026-11-01 02:00:00');`);
   const db = asD1(sqlite);
   const page = await getFormSubmissionsPage(db, 'f', { limit: 2 });
-  expect(page.items.map(item => item.id)).toEqual(['new', 'old']);
+  expect(page.items.map(item => [item.id, item.created_at])).toEqual([['new', '2026-11-01T02:00:00Z'], ['old', '2026-11-01T10:00:00.000+09:00']]);
   const first = await getFormSubmissionsByFriendCursor(db, 'person', { limit: 1 });
   const next = await getFormSubmissionsByFriendCursor(db, 'person', { limit: 1, cursor: first.nextCursor });
   expect(first.items.map(item => item.id)).toEqual(['new']);
