@@ -74,6 +74,8 @@ function makeRespond(tags, onPatch) {
     }
     if (path === '/api/staff/me') return ok({ id: 'staff-me', name: '確認用', role: 'owner', email: null })
     if (path === '/api/line-accounts') return ok([ACCOUNT])
+    if (/^\/api\/line-accounts\/[^/]+\/follower-import$/.test(path)) return ok({ phase: 'complete' })
+    if (path === '/api/dashboard/style') return ok({ style: 'standard', styleSelected: true })
     if (path === '/api/tag-groups') return ok([])
     if (path === '/api/tags' && method === 'GET') return ok(Object.values(tags))
     const idMatch = /^\/api\/tags\/([^/]+)$/.exec(path)

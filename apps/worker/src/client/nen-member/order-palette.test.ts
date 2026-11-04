@@ -3,7 +3,8 @@ import { act } from 'react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
-afterEach(()=>{vi.unstubAllGlobals();vi.resetModules();document.head.innerHTML='';document.documentElement.removeAttribute('style');window.history.replaceState(null,'','/');});
+let unmount: (() => void) | undefined;
+afterEach(async()=>{await act(async()=>unmount?.());unmount=undefined;vi.unstubAllGlobals();vi.resetModules();document.head.innerHTML='';document.documentElement.removeAttribute('style');window.history.replaceState(null,'','/');});
 test('購入履歴とECへの操作は共通の配色の変更に追従する',async()=>{
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
   window.history.replaceState(null,'','/?tab=orders');
@@ -13,7 +14,7 @@ test('購入履歴とECへの操作は共通の配色の変更に追従する',a
   style.textContent=readFileSync(join(__dirname,'styles.css'),'utf8').replace(/^@import[^;]+;$/gm,'');document.head.append(style);
   document.body.innerHTML='<div id="app"></div>';
   const {mountNenMember}=await import('./main.js');
-  await act(async()=>mountNenMember(document.getElementById('app')!,{liffId:'fixture',lineUserId:'friend',idToken:'fixture'}));
+  await act(async()=>{unmount=mountNenMember(document.getElementById('app')!,{liffId:'fixture',lineUserId:'friend',idToken:'fixture'});});
   const page=document.querySelector('.nm-portal-orders-page'),link=document.querySelector('.nm-order-primary-link');
   expect(page).not.toBeNull();expect(link).not.toBeNull();
   document.documentElement.style.setProperty('--photo-ink','rgb(1, 2, 3)');

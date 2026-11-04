@@ -119,6 +119,7 @@ for (const width of [1152,1440,1920]) test(`MFA input and centered auth buttons 
   expect(errors).toEqual([])
 })
 for (const width of [1152,1440,1920]) test(`policy confirmation and authenticator settings at ${width}`, async ({ page }) => {
+  await page.addInitScript(() => { localStorage.setItem('lh_selected_account','visual-qa-account'); sessionStorage.setItem('lh_auth_selection_cleared','1') })
   await page.setViewportSize({ width, height: 1000 })
   let required = true, writes = 0
   await page.route('**/api/**', async route => {
@@ -128,17 +129,19 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and authenticato
       if (method === 'PUT') { required = route.request().postDataJSON().required; writes++ }
       data = { required, canEdit: true, configured: true, notice: null, registered: 4, total: 6, relogin: false }
     }
+    if (path === '/api/auth/passkeys/self') data = []
     if (path === '/api/auth/two-factor/self') data = { staffId: 'visual-qa-owner', enabledAt: '2026-10-12T03:00:00Z', canEdit: true, configured: true, notice: null }
     if (path === '/api/auth/step-up') data = { token: 'fixture-step-up-grant' }
     if (data) return route.fulfill({ status: 200, json: { success: true, data } })
     return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   await page.goto('/staff')
-  await expect(page.getByRole('heading', { name: '自分の二段階認証' })).toBeVisible()
-  await detailTypography(page, '認証アプリ')
-  await detailTypography(page, '登録済み')
-  await page.getByRole('heading', { name: '自分の二段階認証' }).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('heading', { name: '二段階認証', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: '認証アプリ', exact: true })).toContainText('登録済み')
+  await page.getByRole('heading', { name: '二段階認証', exact: true }).scrollIntoViewIfNeeded()
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`personal-${width}.png`), fullPage: true })
+  await page.getByRole('tab', { name: '役割と権限', exact: true }).click()
+  await detailTypography(page, '登録済み')
   await page.getByRole('switch', { name: 'ログインで二段階認証を必須にする' }).click()
   const dialog = page.getByRole('dialog', { name: '二段階認証の必須をオフにしますか' })
   await expect(dialog).toBeVisible()
@@ -214,6 +217,8 @@ async function useIndustryFixture(page, style = 'salon', legacyMeet = false) {
   // Use the same mock responder without a second network request. Navigation can
   // cancel a prefetch while route.fetch() is waiting, before its later fulfill.
   const { mockFetch } = await import('../../../scripts/v8-guard/mock-local.mjs')
+  const { styleDashboardMock } = await import('../../../../../scripts/visual-qa/style-dashboard-mock.mjs')
+  styleDashboardMock('PUT', '/api/dashboard/style', new URLSearchParams(), { style })
   await page.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'visual-qa-account')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
@@ -251,7 +256,8 @@ for (const [style, heading] of [['standard', 'ダッシュボード'], ['ec', '�
     await dialog.getByRole('button', { name: '閉じる', exact: true }).click()
     await expect(dialog).toHaveCount(0)
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole('heading', { name: heading, exact: true, level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true, level: 1 })).toBeVisible()
+    if (['restaurant','salon','consult','lesson'].includes(style)) await expect(page.locator(`[data-style-dashboard="${style}"]`)).toBeVisible()
   }
 })
 
@@ -360,7 +366,7 @@ for (const style of ['salon', 'ec']) test(`discarding unsaved ${style} setup nev
     await styleChoiceButtons(selection).nth(STYLE_CHOICE_ORDER.indexOf(style)).click()
     await selection.getByRole('button', { name: 'このスタイルにする', exact: true }).click()
     await selection.getByRole('button', { name: '次へ', exact: true }).click()
-    const question = page.getByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })
+    const question = page.getByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
     await expect(question.getByRole('button', { name: '途中保存して閉じる', exact: true })).toBeEnabled()
     await expect.poll(() => question.evaluate(dialog => {
       const bounds = dialog.getBoundingClientRect()

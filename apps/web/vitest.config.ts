@@ -32,7 +32,8 @@ export default defineConfig({
   },
   test: {
     css: { include: [/target-missing\.module\.css/, /kpi-card\.module\.css/, /kpi-band-v8\.css/] },
-    maxWorkers: process.env.CI ? 2 : 4,
+    // Four CI shards run independently; keep each runner below its memory limit.
+    maxWorkers: process.env.CI ? 1 : 4,
     // Vitest 4 restoreAllMocks no longer clears standalone vi.fn call history.
     clearMocks: true,
     // 全画面のソースを読む見張りの試験は、CI が混むと既定の 5 秒を超える。待つ上限だけ伸ばす（速さの見張りは別の検査）。

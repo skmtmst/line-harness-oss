@@ -162,7 +162,7 @@ it('本物の読む門は人数のPOST1経路だけに使う', () => {
   }
   const paths = sources(root);
   expect(paths.flatMap(path => readGateUses(readFileSync(path, 'utf8')))).toEqual([{ method: 'POST', path: '/api/segments/count' }]);
-});
+}, 30_000);
 it('別の経路・別名での追加も棚卸しが拾い、importだけは拾わない', () => {
   const header = "import {requireReadOperationPermission as readGate} from './role-guard.js'; const stored = readGate(); const alias = readGate;";
   expect(readGateUses(header)).toEqual([]);

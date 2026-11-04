@@ -1,3 +1,4 @@
+import type { D1Database, R2Bucket, Fetcher, Ai, ImagesBinding, SendEmail, Queue } from '@cloudflare/workers-types/index.ts';
 import type { CodexMentionQueueMessage } from './services/codex-cloud-types.js';
 
 export type WorkerBindings = {
