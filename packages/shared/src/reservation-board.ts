@@ -17,9 +17,10 @@ export type ReservationBoardMove =
  | {kind:'seats';expectedVersion:number;startsAt:string;endsAt:string;tableId:string|null;guestCount?:number};
 export interface RestaurantFloor {
  id:string;storeId:string;name:string;width:number;height:number;version:number;
+ kind?:'floor'|'area';parentFloorId?:string|null;sortOrder?:number;
  outline: Array<{x:number;y:number}>;
  fixtures: Array<{id:string;kind:'wall'|'entrance'|'kitchen'|'toilet'|'window';x:number;y:number;width:number;height:number}>;
- tables: Array<{joinGroup?:string|null;id:string;x:number;y:number;width:number;height:number;rotation:number;shape:'rectangle'|'circle'|'long'|'counter'|'sofa'}>;
+ tables: Array<{joinGroup?:string|null;id:string;x:number;y:number;width:number;height:number;rotation:number;shape:'rectangle'|'circle'|'long'|'counter'|'sofa';seatType?:string;seatDetailType?:string;minCapacity?:number;maxCapacity?:number;smokingPolicy?:'non_smoking'|'smoking'|'heated_tobacco';shoesAllowed?:boolean;partition?:'open'|'semi_private'|'private';acceptsReservations?:boolean;visibleOnMap?:boolean;chairArrangement?:'both'|'one'|'all';chairSide?:'top'|'right'|'bottom'|'left'}>;
 }
 export type RestaurantFloorWrite = Omit<RestaurantFloor,'version'> & {expectedVersion:number};
 /** visited は来店。退店済みは卓を解放し、予定終了は記録として維持する。 */

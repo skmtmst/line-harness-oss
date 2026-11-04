@@ -35,8 +35,8 @@ export function RequiredBadge({ appearance = 'badge' }: { appearance?: 'badge' |
  * 「任意」の札（・：括弧なし・11px/17・左に6・文と同じ行）。
  * 必須のような丸い地は付けず、薄い灰の文字だけ。
  */
-export function OptionalBadge() {
-  return <span aria-hidden="true" className={styles.optional}>任意</span>
+export function OptionalBadge({ appearance }: { appearance?: 'parentheses' } = {}) {
+  return <span aria-hidden="true" className={styles.optional} data-appearance={appearance}>{appearance === 'parentheses' ? '（任意）' : '任意'}</span>
 }
 
 /** 複合入力欄の下にも、Field と同じ誤りの文を置く（中身が無ければ何も出さない）。 */
@@ -62,6 +62,7 @@ export function Field({
   requirement,
   requiredAppearance,
   optional,
+  optionalAppearance,
   labelHidden = false,
   labelSize = 'standard',
   note,
@@ -94,6 +95,7 @@ export function Field({
   requiredAppearance?: 'badge' | 'text'
   /** 任意の入力欄。既存の OptionalBadge をラベルの横に置く。 */
   optional?: boolean
+  optionalAppearance?: 'parentheses'
   /** 探す欄など自身に読み上げ名がある欄では、視覚上のラベル行を省く。 */
   labelHidden?: boolean
   labelSize?: 'standard' | 'compact'
@@ -222,7 +224,7 @@ export function Field({
               何も伝わらない。 */}
         </label>
         {actualRequired && <RequiredBadge />}
-        {optional !== false && !actualRequired && <OptionalBadge />}
+        {optional !== false && !actualRequired && <OptionalBadge appearance={optionalAppearance} />}
         {hasHelp ? (
           <HelpTip label={`${helpLabel ?? (typeof shownLabel === 'string' ? shownLabel : 'この欄')}の説明`}>
             {actualHelp}

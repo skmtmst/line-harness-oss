@@ -1456,6 +1456,42 @@ describe('V8 店の名簿とログイン権限',()=>{
 });
 
 describe('V8 フロア配置と結合グループ',()=>{
+ it('空のエリアだけ履歴を残して削除し、同じ名前を作り直せる',async()=>{
+  seedRestaurantFixture();
+  const path='/api/restaurant-test/floors?account_id=account-1';
+  const created=await request(path,{storeId:'store-ginza',name:'テラス',kind:'area',parentFloorId:'floor-store-ginza'});
+  expect(created.status).toBe(201);const id=(await created.json() as any).data.id;
+  expect((await requestWithMethod(`/api/restaurant-test/floors/${id}?account_id=account-1`,'DELETE',{storeId:'store-ginza',expectedVersion:1})).status).toBe(200);
+  const archived=testDb.raw.prepare('SELECT name,archived_name,archived_at FROM rt_floors WHERE id=?').get(id) as {name:string;archived_name:string;archived_at:string};
+  expect(archived.name).toBe('__archived__'+id);expect(archived.archived_name).toBe('テラス');expect(archived.archived_at).toBeTruthy();
+  const floors=await request('/api/restaurant-test/floors?account_id=account-1&storeId=store-ginza');
+  expect((await floors.json() as any).data.some((f:any)=>f.id===id)).toBe(false);
+  expect((await request(path,{storeId:'store-ginza',name:'テラス',kind:'area',parentFloorId:'floor-store-ginza'})).status).toBe(201);
+ });
+ it('卓・子エリア・最後の階が残る場合は削除を拒否する',async()=>{
+  seedRestaurantFixture();
+  const path='/api/restaurant-test/floors?account_id=account-1';
+  const area=await request(path,{storeId:'store-ginza',name:'テラス',kind:'area',parentFloorId:'floor-store-ginza'});
+  const areaId=(await area.json() as any).data.id;
+  const del=(id:string,version=1)=>requestWithMethod(`/api/restaurant-test/floors/${id}?account_id=account-1`,'DELETE',{storeId:'store-ginza',expectedVersion:version});
+  expect((await del('floor-store-ginza')).status).toBe(409);
+  const table=await request('/api/restaurant-test/tables?account_id=account-1',{storeId:'store-ginza',floorId:areaId,code:'T-AREA',label:'テラス卓',seatType:'table',minCapacity:1,maxCapacity:2});
+  expect(table.status).toBe(201);
+  expect((await del(areaId,2)).status).toBe(409);
+  expect((await del(areaId,1)).status).toBe(409);
+  expect(testDb.raw.prepare('SELECT archived_at FROM rt_floors WHERE id=?').get(areaId)).toEqual({archived_at:null});
+ });
+ it('Penの階・エリアと卓の席条件を保存し、座席図へ返す',async()=>{
+  seedRestaurantFixture();
+  const area=await request('/api/restaurant-test/floors?account_id=account-1',{storeId:'store-ginza',name:'テラス',kind:'area',parentFloorId:'floor-store-ginza'});
+  expect(area.status).toBe(201);const areaId=(await area.json() as any).data.id;
+  const created=await request('/api/restaurant-test/tables?account_id=account-1',{storeId:'store-ginza',floorId:areaId,code:'T-PEN',label:'テラス1',seatType:'table',seatDetailType:'zashiki',minCapacity:1,maxCapacity:5,shape:'long',width:120,height:64,smokingPolicy:'non_smoking',partition:'semi_private',shoesAllowed:false,visibleOnMap:true,chairArrangement:'both',chairSide:null,isActive:false});
+  expect(created.status).toBe(201);const id=(await created.json() as any).data.id;
+  expect(testDb.raw.prepare('SELECT seat_detail_type,shape,width,height,smoking_policy,partition_type,shoes_allowed,is_active FROM rt_tables WHERE id=?').get(id)).toEqual({seat_detail_type:'zashiki',shape:'long',width:120,height:64,smoking_policy:'non_smoking',partition_type:'semi_private',shoes_allowed:0,is_active:0});
+  const floors=await request('/api/restaurant-test/floors?account_id=account-1&storeId=store-ginza');
+  const returned=(await floors.json() as any).data.find((f:any)=>f.id===areaId);
+  expect(returned).toMatchObject({kind:'area',parentFloorId:'floor-store-ginza',tables:[expect.objectContaining({id,seatDetailType:'zashiki',maxCapacity:5,shoesAllowed:false})]});
+ });
  it('座標を省略した卓追加は空き位置に置き、重なり・店の外への変更を保存しない',async()=>{
   seedRestaurantFixture();
   const url='/api/restaurant-test/tables?account_id=account-1';
@@ -1465,7 +1501,7 @@ describe('V8 フロア配置と結合グループ',()=>{
   const placed=testDb.raw.prepare('SELECT floor_x,floor_y FROM rt_tables WHERE id=?').get(id);
   const original=testDb.raw.prepare("SELECT width FROM rt_tables WHERE id='table-ginza'").get() as {width:number};
   expect((placed as {floor_x:number}).floor_x).toBeGreaterThanOrEqual(original.width);
-  expect(placed).toMatchObject({floor_y:0});
+  expect(placed).toMatchObject({floor_y:20});
   const version=testDb.raw.prepare("SELECT version FROM rt_floors WHERE id='floor-store-ginza'").get();
   expect(version).toEqual({version:2});
   expect((await request(url,{...input,code:'T3',floorX:0,floorY:0})).status).toBe(400);

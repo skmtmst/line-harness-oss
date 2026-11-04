@@ -4647,20 +4647,20 @@ CREATE TABLE incoming_webhooks (
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
   '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
-CREATE TABLE instagram_connections (
+CREATE TABLE "instagram_connections" (
  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), page_id TEXT NOT NULL,
- instagram_id TEXT NOT NULL UNIQUE, page_name TEXT NOT NULL, username TEXT,
+ instagram_id TEXT NOT NULL, page_name TEXT NOT NULL, username TEXT,
  page_token_encrypted TEXT NOT NULL, user_token_encrypted TEXT NOT NULL,
  expires_at TEXT NOT NULL, data_access_expires_at TEXT, profile_json TEXT, posts_json TEXT,
  refreshed_at TEXT NOT NULL, synced_at TEXT, connected_by TEXT NOT NULL,
- version INTEGER NOT NULL DEFAULT 1
-, scopes TEXT NOT NULL DEFAULT '');
+ version INTEGER NOT NULL DEFAULT 1, scopes TEXT NOT NULL DEFAULT ''
+);
 
-CREATE TABLE instagram_messages (
- id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+CREATE TABLE "instagram_messages" (
+ id TEXT NOT NULL, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
  instagram_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
  content TEXT NOT NULL, attachments_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(attachments_json)), received_at TEXT NOT NULL, created_at TEXT NOT NULL,
- UNIQUE(line_account_id,id)
+ PRIMARY KEY(line_account_id,id)
 );
 
 CREATE TABLE instagram_oauth_states (
@@ -7405,7 +7405,7 @@ CREATE TABLE rt_floors (
  width REAL NOT NULL DEFAULT 1000 CHECK(width>0), height REAL NOT NULL DEFAULT 700 CHECK(height>0),
  outline_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(outline_json)),
  fixtures_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(fixtures_json)),
- version INTEGER NOT NULL DEFAULT 1, UNIQUE(store_id,name)
+ version INTEGER NOT NULL DEFAULT 1, kind TEXT NOT NULL DEFAULT 'floor' CHECK(kind IN ('floor','area')), parent_floor_id TEXT REFERENCES rt_floors(id), sort_order INTEGER NOT NULL DEFAULT 0, archived_at TEXT, archived_name TEXT, UNIQUE(store_id,name)
 );
 
 CREATE TABLE rt_gbp_posts (
@@ -8100,7 +8100,7 @@ CREATE TABLE rt_tables (
   join_group TEXT,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')), floor_id TEXT REFERENCES rt_floors(id), shape TEXT NOT NULL DEFAULT 'rectangle' CHECK(shape IN ('rectangle','circle','long','counter','sofa')), width REAL NOT NULL DEFAULT 80 CHECK(width>0), height REAL NOT NULL DEFAULT 64 CHECK(height>0), rotation REAL NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), floor_id TEXT REFERENCES rt_floors(id), shape TEXT NOT NULL DEFAULT 'rectangle' CHECK(shape IN ('rectangle','circle','long','counter','sofa')), width REAL NOT NULL DEFAULT 80 CHECK(width>0), height REAL NOT NULL DEFAULT 64 CHECK(height>0), rotation REAL NOT NULL DEFAULT 0, smoking_policy TEXT NOT NULL DEFAULT 'non_smoking' CHECK(smoking_policy IN ('non_smoking','smoking','heated_tobacco')), partition_type TEXT NOT NULL DEFAULT 'open' CHECK(partition_type IN ('open','semi_private','private')), shoes_allowed INTEGER NOT NULL DEFAULT 1 CHECK(shoes_allowed IN (0,1)), visible_on_map INTEGER NOT NULL DEFAULT 1 CHECK(visible_on_map IN (0,1)), chair_arrangement TEXT NOT NULL DEFAULT 'both' CHECK(chair_arrangement IN ('both','one','all')), chair_side TEXT CHECK(chair_side IN ('top','right','bottom','left')), seat_detail_type TEXT CHECK(seat_detail_type IN ('table','counter','horigotatsu','zashiki','private_room','terrace')),
   UNIQUE(store_id, code)
 );
 
@@ -10689,7 +10689,9 @@ CREATE INDEX idx_incoming_webhooks_folder ON incoming_webhooks(line_account_id, 
 
 CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
 
-CREATE INDEX idx_instagram_messages_account_time ON instagram_messages(line_account_id,received_at,id);
+CREATE INDEX idx_instagram_connections_instagram_id ON instagram_connections(instagram_id);
+
+CREATE INDEX idx_instagram_messages_account_time_754 ON instagram_messages(line_account_id,received_at,id);
 
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);
@@ -11313,6 +11315,8 @@ CREATE UNIQUE INDEX idx_rt_customer_request ON rt_reservations(store_id,line_uid
 
 CREATE INDEX idx_rt_email_digests_store_date
   ON rt_email_digests (store_id, target_date, media_id);
+
+CREATE INDEX idx_rt_floors_active_store ON rt_floors(store_id,archived_at,sort_order);
 
 CREATE INDEX idx_rt_followup_targets_approval ON rt_store_followup_targets(approval_id);
 
@@ -12527,6 +12531,10 @@ CREATE TRIGGER incoming_webhooks_folder_update BEFORE UPDATE OF folder_id, line_
 WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
 ) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER instagram_connection_tenant_insert BEFORE INSERT ON instagram_connections WHEN EXISTS(SELECT 1 FROM instagram_connections existing JOIN line_accounts old_account ON old_account.id=existing.line_account_id JOIN line_accounts new_account ON new_account.id=NEW.line_account_id WHERE existing.instagram_id=NEW.instagram_id AND existing.line_account_id<>NEW.line_account_id AND COALESCE(old_account.tenant_id,'00000000-0000-4000-8000-000000000001')<>COALESCE(new_account.tenant_id,'00000000-0000-4000-8000-000000000001')) BEGIN SELECT RAISE(ABORT,'instagram_cross_tenant'); END;
+
+CREATE TRIGGER instagram_connection_tenant_update BEFORE UPDATE OF instagram_id,line_account_id ON instagram_connections WHEN EXISTS(SELECT 1 FROM instagram_connections existing JOIN line_accounts old_account ON old_account.id=existing.line_account_id JOIN line_accounts new_account ON new_account.id=NEW.line_account_id WHERE existing.instagram_id=NEW.instagram_id AND existing.line_account_id<>NEW.line_account_id AND COALESCE(old_account.tenant_id,'00000000-0000-4000-8000-000000000001')<>COALESCE(new_account.tenant_id,'00000000-0000-4000-8000-000000000001')) BEGIN SELECT RAISE(ABORT,'instagram_cross_tenant'); END;
 
 CREATE TRIGGER line_account_tag_links_scope
 BEFORE INSERT ON line_account_tag_links

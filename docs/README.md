@@ -462,6 +462,8 @@
 
 ## 反映履歴
 
+- [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)
+- [座席・卓管理のPenデザイン反映](release-log/unreleased/2074-masato-table-pen.md)
 - [Googleビジネスのパフォーマンス取得](release-log/unreleased/2026-11-04-masato-google-performance-sync.md)
 - [保存前の確認と配信操作の安全修正](release-log/unreleased/2075-kenta-safety.md)
 - [統括・運営メンバー画面の本人パスキー設定と一覧配置](release-log/unreleased/2026-11-03-masato-hq-ops-passkeys-ui.md)
@@ -1143,6 +1145,11 @@
 - [飲食の卓・メニューの参照](engineering/restaurant-resource-references.md) — 削除時の参照確認（説明、確認日：2026-11-03）。
 - [LINE通知の運用上の騒音を減らす](release-log/unreleased/2037-masato-operation-alert-line-noise.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [通知量の警告](release-log/unreleased/2039-masato-operation-alert-quota.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [座席図の形・階と入口の操作改善](release-log/unreleased/2081-masato-restaurant-floor-layout.md) — 反映履歴、確認 2026-11-04。
+- [座席図の保存ボタンを見つけやすくする](release-log/unreleased/2083-masato-seat-save-visible.md) — 反映履歴、確認 2026-11-04。
+- [座席図の幅と保存操作をPenにそろえる](release-log/unreleased/2084-masato-seat-map-pen-proportion.md) — 反映履歴、確認 2026-11-04。
+- [座席図の保存ボタンを読みやすくする](release-log/unreleased/2085-masato-seat-save-contrast.md) — 反映履歴、確認 2026-11-04。
+- [検証管理画面の配備先を現在のPagesへそろえる](release-log/unreleased/2087-masato-staging-admin-target.md) — 反映履歴、確認 2026-11-04。
 - [担当者・登録・未保存の保護と利用数の改善](release-log/unreleased/2060-kenta-assignee-registration-guards.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [操作案内と予約・LIFFの改善](release-log/unreleased/2061-kenta-operations-reservations.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [操作案内と予約・配信の改善](release-log/unreleased/2062-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
@@ -1153,3 +1160,10 @@
 - [編集内容の保護と操作確認の改善](release-log/unreleased/2067-kenta-edit-confirmation.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [保存と操作確認の改善](release-log/unreleased/2068-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [Googleビジネスの店舗選択](release-log/unreleased/2076-masato-google-store-selector.md) — 反映履歴、確認 2026-11-04。
+
+- [営業時間のPen照合と操作確認](testing/google-hours-pen-qa.md) — 承認済み18画面と営業時間タブの検査。
+
+- [Googleビジネスの営業時間タブ](release-log/unreleased/2082-masato-google-hours.md) — 営業時間の設定と確認の反映履歴。
+- [検証用 Google 投稿先の切替](release-log/unreleased/2086-masato-test2-google-post-test.md) — 反映履歴、確認 2026-11-04。
+- [Instagram投稿先IDの保存修正](release-log/unreleased/2088-masato-instagram-id-precision.md) — 反映履歴、確認 2026-11-04。
+- [TEST2投稿テスト後の検証設定復旧](release-log/unreleased/2089-masato-restore-google-test-gate.md) — 反映履歴、確認 2026-11-04。

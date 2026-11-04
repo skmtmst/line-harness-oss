@@ -413,6 +413,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'DELETE /api/ops/announcements/:id',
     'DELETE /api/ops/support/tickets/:id/draft',
     'DELETE /api/restaurant-test/delivery/ubereats/connection',
+    'DELETE /api/restaurant-test/floors/:id',
     'DELETE /api/restaurant-test/followups/:storeId/bindings/:stepId',
     'DELETE /api/restaurant-test/menus/:id',
     'DELETE /api/restaurant-test/tables/:id',
@@ -765,6 +766,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/restaurant-test/google/connect/select-location',
     'POST /api/restaurant-test/google/connect/start',
     'POST /api/restaurant-test/google/disconnect',
+    'POST /api/restaurant-test/google/hours/review',
     'POST /api/restaurant-test/google/posts/:id/instagram/retry',
     'POST /api/restaurant-test/google/posts/:id/publish',
     'POST /api/restaurant-test/google/posts/:id/remove',
@@ -820,6 +822,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     // 新しい保存口も担当者には拒否する。許可を増やす表ではない。
     'PUT /api/restaurant-test/followups/:storeId/steps/:stepId/messages',
     'PUT /api/restaurant-test/gbp/reviews/:id/draft',
+    'PUT /api/restaurant-test/google/hours/workspace',
     'PUT /api/restaurant-test/inventory/:id',
     'PUT /api/restaurant-test/inventory/allocation',
     'PUT /api/restaurant-test/line-flows/:id',

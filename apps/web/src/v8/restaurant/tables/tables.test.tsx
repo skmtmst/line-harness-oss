@@ -100,20 +100,20 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'T5' } })
     fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '窓側' } })
     fireEvent.change(screen.getByLabelText('最小人数'), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: /^卓を作る$/ }))
     expect(await screen.findByText('最小人数は1以上の整数にしてください。')).toBeTruthy()
     expect(fixture.createTable).not.toHaveBeenCalled()
   })
 
-  it('数4・フロアマップ・卓の詳細・自動配席ルールが出て、結合グループに札が付く', async () => {
+  it('Penの数4・フロアマップ・卓の詳細を表示し、古いルールカードを残さない', async () => {
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
     const board = document.querySelector('[data-design-node="BERxg"]')!
     const icons = document.querySelectorAll('[data-kpi-icon] svg')
     expect(icons).toHaveLength(4)
     for (const icon of icons) expect(icon.classList.contains('lucide-inbox')).toBe(true)
-    for (const label of ['卓数', '総席数', '結合可能', '個室', '卓の詳細', '自動配席ルール']) expect(board.textContent).toContain(label)
-    expect(screen.getByText('結合のルール')).not.toBeNull()
+    for (const label of ['卓数', '総席数', '結合可能', '個室', '卓の詳細']) expect(board.textContent).toContain(label)
+    expect(screen.queryByText('結合のルール')).toBeNull()
     expect(screen.getByText('T3 · 窓側4人卓')).not.toBeNull()
   })
 
@@ -299,14 +299,14 @@ describe('BERxg 座席・卓管理', () => {
     expect(screen.getByRole('dialog').textContent).toContain('予約台帳と卓の状態を確認')
   })
 
-  it('卓を作るは窓（gBrCz）から createTable へ送る', async () => {
+  it('卓を作るは窓（ljShF）から createTable へ送る', async () => {
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
     fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
-    expect(document.querySelector('[data-design-node="gBrCz"]')).not.toBeNull()
+    expect(document.querySelector('[data-design-node="ljShF"]')).not.toBeNull()
     fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'T5' } })
     fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '窓側2人卓' } })
-    fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: /^卓を作る$/ }))
     await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', code: 'T5', label: '窓側2人卓', minCapacity: 1, maxCapacity: 2 })))
   })
 
@@ -323,7 +323,7 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
     fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'S1' } })
     fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '新宿2人卓' } })
-    fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: /^卓を作る$/ }))
     await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-2', code: 'S1' })))
   })
 
@@ -338,9 +338,11 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
     fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'T5' } })
     fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '2階2人卓' } })
-    fireEvent.click(screen.getByRole('button', { name: '配置・結合グループ' }))
-    await pickEntity('階・エリア', '2階')
-    fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: '階・エリア' }))
+    const floorPicker = screen.getByRole('dialog', { name: '階・エリアを選ぶ' })
+    fireEvent.click(within(floorPicker).getByRole('radio', { name: '2階' }))
+    fireEvent.click(within(floorPicker).getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: /^卓を作る$/ }))
     await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ floorId: 'floor-2', expectedTargetVersion: 7 })))
     expect(fixture.createTable.mock.calls[0][1]).toMatchObject({floorX:undefined,floorY:undefined})
   })
@@ -349,7 +351,7 @@ describe('BERxg 座席・卓管理', () => {
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
     fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
-    fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: /^卓を作る$/ }))
     const code = screen.getByLabelText('卓番')
     await waitFor(() => expect(document.activeElement).toBe(code))
     expect(code.getAttribute('aria-invalid')).toBe('true')
@@ -408,33 +410,28 @@ it('共通タブを外し、tablesの画面内操作を保つ', async () => {
   expect(screen.queryByRole('tablist', {name:'店の中の画面'})).toBeNull()
 })
 
-it('新しい卓の位置を片方だけ指定したら入力を残して送らない',async()=>{
+it('長方形は縦長を選べ、最大人数に合わせる椅子のプレビューを示す',async()=>{
  render(<TablesPage />);await screen.findByText('卓の詳細')
  fireEvent.click(screen.getByRole('button',{name:/卓を作る/}))
- fireEvent.change(screen.getByLabelText('卓番'),{target:{value:'T9'}})
- fireEvent.change(screen.getByLabelText('表示名'),{target:{value:'新しい卓'}})
- fireEvent.click(screen.getByRole('button',{name:'配置・結合グループ'}))
- fireEvent.change(screen.getByLabelText('横の位置'),{target:{value:'200'}})
- fireEvent.click(screen.getByRole('button',{name:/^追加する$/}))
- expect(fixture.createTable).not.toHaveBeenCalled()
- expect(screen.getByLabelText('縦の位置').getAttribute('aria-invalid')).toBe('true')
- expect((screen.getByLabelText('横の位置') as HTMLInputElement).value).toBe('200')
- expect((screen.getByLabelText('表示名') as HTMLInputElement).value).toBe('新しい卓')
+ const dialog=screen.getByRole('dialog',{name:'卓を作る'})
+ fireEvent.change(within(dialog).getByLabelText('卓番'),{target:{value:'T9'}})
+ fireEvent.change(within(dialog).getByLabelText('表示名'),{target:{value:'新しい卓'}})
+ fireEvent.change(within(dialog).getByLabelText('最大人数'),{target:{value:'6'}})
+ fireEvent.click(within(dialog).getByRole('button',{name:'長方形'}))
+ fireEvent.click(within(dialog).getByRole('button',{name:'縦長'}))
+ expect(dialog.textContent).toContain('椅子6席を自動配置')
+ fireEvent.click(within(dialog).getByRole('button',{name:'卓を作る'}))
+ await waitFor(()=>expect(fixture.createTable).toHaveBeenCalledWith('account-1',expect.objectContaining({shape:'long',width:64,height:120,maxCapacity:6})))
 })
 
-it('配置の詳細を閉じても、自分で指定した位置を保存する',async()=>{
+it('卓を作るには古い位置入力とつまんで置くを出さない',async()=>{
  render(<TablesPage />);await screen.findByText('卓の詳細')
  fireEvent.click(screen.getByRole('button',{name:/卓を作る/}))
- fireEvent.change(screen.getByLabelText('卓番'),{target:{value:'T9'}})
- fireEvent.change(screen.getByLabelText('表示名'),{target:{value:'新しい卓'}})
- fireEvent.click(screen.getByRole('button',{name:'配置・結合グループ'}))
- fireEvent.change(screen.getByLabelText('横の位置'),{target:{value:'200'}})
- fireEvent.change(screen.getByLabelText('縦の位置'),{target:{value:'100'}})
- fireEvent.click(screen.getByRole('button',{name:'配置・結合グループを閉じる'}))
- fireEvent.click(screen.getByRole('button',{name:/^追加する$/}))
- await waitFor(()=>expect(fixture.createTable).toHaveBeenCalledWith('account-1',expect.objectContaining({floorX:200,floorY:100})))
+ const dialog=screen.getByRole('dialog',{name:'卓を作る'})
+ expect(within(dialog).queryByLabelText('横の位置')).toBeNull()
+ expect(within(dialog).queryByLabelText('縦の位置')).toBeNull()
+ expect(within(dialog).queryByText('長い卓')).toBeNull()
 })
-
 
 describe('卓の停止で移す予約と残す来店履歴', () => {
   const arrived = () => [
@@ -498,15 +495,15 @@ it.each([400, 409, 500])('卓の追加が%sで失敗したら窓の中に理由�
   render(<TablesPage />)
   await screen.findByText('卓の詳細')
   fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
-  const dialog = document.querySelector('[data-design-node="gBrCz"]') as HTMLElement
+  const dialog = document.querySelector('[data-design-node="ljShF"]') as HTMLElement
   fireEvent.change(within(dialog).getByLabelText('卓番'), { target: { value: 'K1' } })
   fireEvent.change(within(dialog).getByLabelText('表示名'), { target: { value: '試験卓' } })
-  fireEvent.click(within(dialog).getByRole('button', { name: /^追加する$/ }))
+  fireEvent.click(within(dialog).getByRole('button', { name: /^卓を作る$/ }))
   await waitFor(() => expect(within(dialog).getByRole('alert').textContent?.trim()).toBeTruthy())
   expect((within(dialog).getByLabelText('卓番') as HTMLInputElement).value).toBe('K1')
   expect((within(dialog).getByLabelText('表示名') as HTMLInputElement).value).toBe('試験卓')
-  fireEvent.click(within(dialog).getByRole('button', { name: /^追加する$/ }))
-  await waitFor(() => expect(document.querySelector('[data-design-node="gBrCz"]')).toBeNull())
+  fireEvent.click(within(dialog).getByRole('button', { name: /^卓を作る$/ }))
+  await waitFor(() => expect(document.querySelector('[data-design-node="ljShF"]')).toBeNull())
   expect(fixture.createTable).toHaveBeenCalledTimes(2)
 })
 
@@ -527,9 +524,9 @@ it('稼働中の卓だけを総席数に数える', async () => {
   expect(value).toBe('20')
 })
 
-it('自動配席の説明ではダッシュボードと同じウォークインの言葉を使う', async () => {
+it('最新Penでは旧自動配席の説明カードを表示しない', async () => {
   render(<TablesPage />)
   await screen.findByText('卓の詳細')
-  expect(screen.getByText(/電話・ウォークインも同じ候補を使います/)).toBeTruthy()
+  expect(screen.queryByText('自動配席ルール')).toBeNull()
   expect(screen.queryByText(/直接来店も同じ候補を使います/)).toBeNull()
 })

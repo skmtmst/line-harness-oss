@@ -28,12 +28,14 @@ export function RowMore({ subject, items }: { subject: string; items: ActionMenu
  * （題の段のあと 14 の間・各段 14・下の線の上 14）で置く。
  * onSubmit を渡すと中身を form にする（Enter で保存できる）。
  */
-export function RsDialog({ open, title, titleNote, width, top, tone, busy, designNode, titleIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, footerPlain = false, footerGap, actionsPlacement = 'body', footerNote, onCancel, onSubmit, noValidate = false, actions, children }: {
+export function RsDialog({ open, title, titleNote, width, exactWidth = false, minHeight, top, tone, busy, designNode, titleIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, footerPlain = false, footerGap, actionsPlacement = 'body', footerNote, onCancel, onSubmit, noValidate = false, actions, children }: {
   open: boolean
   title: string
   /** 題の下の小さな補足（絵の窓の頭が題＋1行のとき）。渡さないときは出ない。 */
   titleNote?: ReactNode
   width: number
+  exactWidth?: boolean
+  minHeight?: number
   top: number
   tone?: 'default' | 'destructive'
   busy?: boolean
@@ -116,6 +118,8 @@ export function RsDialog({ open, title, titleNote, width, top, tone, busy, desig
       designTitleRow={titleRow}
       confirmation={plainTitle || undefined}
       designWidth={width}
+      exactDesignWidth={exactWidth}
+      designMinHeight={minHeight}
       designTop={top}
       designHeaderHeight={headerHeight}
       designContentPadding={actionsPlacement === 'footer' ? 'var(--space-16) var(--space-24) 0' : contentPadding}

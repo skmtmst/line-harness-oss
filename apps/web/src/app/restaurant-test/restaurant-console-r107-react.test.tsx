@@ -47,7 +47,7 @@ describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
     fireEvent.click(within(panel).getByRole('button', { name: /のその他操作$/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
     fireEvent.change(screen.getByDisplayValue('窓際'), { target: { value: '奥席' } })
-    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 'table-1', expect.objectContaining({ label: '奥席' })))
     await waitFor(() => expect((within(panel).getByRole('button', { name: /のその他操作$/ }) as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(within(panel).getByRole('button', { name: /のその他操作$/ }))

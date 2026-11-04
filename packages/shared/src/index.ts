@@ -88,6 +88,7 @@ export * from "./fixed-friend-fields";
 export * from './affiliate-bank.js';
 export * from './form-availability.js';
 export * from './reservation-board.js';
+export * from './restaurant-chair-layout.js';
 export * from './restaurant-external-links.js';
 
 export * from './jst-datetime.js';
@@ -140,3 +141,5 @@ export * from './restaurant-reservation-form.js';
 export type { RestaurantFollowupManagement } from './restaurant-followup-management.js';
 
 export { lineMessagePreview } from './line-message-preview.js';
+export { HOURS_WEEKDAYS, HOURS_SERVICE_LABELS, emptyHoursWorkspace, hoursDateAdd, hoursWeekday, validHoursDate, hoursDateRange, hoursPeriodsProblem, effectiveOpeningDate, upcomingHolidayGroups } from './google-hours-workspace.js';
+export type { HoursWeekday, OpeningPeriod, OpeningWeek, OpeningDate, HolidayHoursRule, HoursServiceKind, HoursService, HoursWorkspace, HoursWorkspaceEvent, HoursWorkspaceData } from './google-hours-workspace.js';

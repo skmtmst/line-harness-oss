@@ -289,6 +289,7 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/google/profile'],
   ['POST', '/api/restaurant-test/google/profile/sync'],
   ['GET', '/api/restaurant-test/google/holidays'],
+  ['GET', '/api/restaurant-test/google/hours/workspace'],
   ['GET', '/api/restaurant-test/google/photos'],
   ['POST', '/api/restaurant-test/google/hours/propose'],
   ['POST', '/api/restaurant-test/google/profile/propose'],

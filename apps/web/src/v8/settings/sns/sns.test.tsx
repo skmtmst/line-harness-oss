@@ -345,8 +345,14 @@ describe('Instagram のログインから戻ったときの帯', () => {
     expect(await screen.findByText('Instagram とつなげませんでした。ビジネスアカウント（またはクリエイターアカウント）でログインして、もう一度お試しください。')).toBeTruthy()
   })
 
-  // Worker の折り返しは原因調べ用の手がかりをURLへ添えるが、画面は instagram の値だけを見る。
-  // 手がかりが増えても帯の文言や出方は変わらず、画面に技術的な言葉を出さないことを確かめる。
+  it('別の統括で使用中なら管理者への確認を案内する', async () => {
+    fixture.search.value = 'instagram=failed&instagram_code=instagram_account_other_organization'
+    setup('disconnected')
+
+    expect(await screen.findByText('このInstagramは別の統括で使用されています。統括の管理者に確認してください。')).toBeTruthy()
+  })
+
+  // その他の診断情報は画面に出さず、通常の失敗案内を保つ。
   it('原因調べの手がかりがURLに付いていても帯の文言は変わらない', async () => {
     fixture.search.value = 'instagram=failed&instagram_code=instagram_business_account_required&instagram_detail=GET+v21.0%2Fme%2Faccounts+status%3D400&instagram_scopes=pages_show_list&instagram_pages=1%2F0%2F1'
     setup('disconnected')

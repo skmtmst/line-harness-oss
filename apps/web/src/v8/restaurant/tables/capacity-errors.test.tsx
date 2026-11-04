@@ -17,7 +17,7 @@ import { snapshotOf } from '../booking-kit/test-data'
 const minReason = '最小人数は1以上の整数にしてください。'
 const maxReason = '最大人数は最小人数以上の整数にしてください。'
 const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
-const submit = () => fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^(追加する|保存する)$/ }))
+const submit = () => fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^(卓を作る|変更を保存)$/ }))
 const invalid = (label: string) => screen.getByLabelText(label).getAttribute('aria-invalid') === 'true'
 async function openNew() {
   render(<TablesPage />)
@@ -92,7 +92,7 @@ describe('卓の人数の理由', () => {
   it('修正後の追加は最新の人数と既存の送信項目で1回だけ行う', async () => {
     await openNew(); change('最小人数', '5'); submit(); change('最大人数', '6'); submit()
     await waitFor(() => expect(api.createTable).toHaveBeenCalledTimes(1))
-    expect(api.createTable).toHaveBeenCalledWith('account-1', { storeId: 'store-1', floorId: 'floor-store-1', expectedTargetVersion: undefined, expectedVersion: 1, code: 'T5', label: '窓側', seatType: 'table', minCapacity: 5, maxCapacity: 6, floorX: undefined, floorY: undefined, joinGroup: null })
+    expect(api.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', floorId: 'floor-store-1', expectedTargetVersion: undefined, expectedVersion: 1, code: 'T5', label: '窓側', seatType: 'table', minCapacity: 5, maxCapacity: 6, floorX: undefined, floorY: undefined, joinGroup: null, shape: 'rectangle', smokingPolicy: 'non_smoking', shoesAllowed: true, visibleOnMap: true }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
   it('新規を閉じ直すと初期人数と理由なしへ戻る', async () => {

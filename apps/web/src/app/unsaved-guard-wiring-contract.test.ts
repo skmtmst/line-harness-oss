@@ -112,6 +112,7 @@ const GUARDED = [
   'v8/reminders/new/new.tsx',
   'app/reminders/new/page.tsx',
   'v8/restaurant/google/profile-edit.tsx',
+  'v8/restaurant/google/hours.tsx',
   // 卓の割り当て方（jmVYJ）。下の帯で保存する変更を、離れる前に確認する。
   'v8/restaurant/tables/assign.tsx',
   'v8/restaurant/google/profile-hours.tsx',
@@ -197,6 +198,7 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  'v8/restaurant/google/hours-edit-panel.tsx': 'v8/restaurant/google/hours.tsx',
   'components/shared/folder-row-actions.tsx': 'components/shared/folder-add-dialog.tsx',
   // タブ枠は子の名前編集を保持し、確認は子の共通ガードが担当する。
   'v8/tags/list.tsx': 'components/shared/use-inline-detail-guard.tsx',
@@ -423,6 +425,8 @@ const EXEMPTIONS: Record<string, string> = {
     'app/restaurant-test/v8/menu.tsx と同じ画面の★V8版（MJoJR）。メニューの追加・変更は窓（NkmwU）の中で、閉じると戻る',
   'v8/restaurant/tables/tables.tsx':
     'app/restaurant-test/v8/tables.tsx と同じ画面の★V8版（BERxg）。卓の追加・変更は窓（gBrCz）の中で、閉じると戻る',
+  'components/shared/restaurant-table-pen-editor.tsx':
+    '卓の追加・変更フォーム本体。下書きは親の tables.tsx が持ち、親の窓を閉じると保存前の値を破棄する。',
   'v8/scenario-first-step/first-step.tsx':
     'app/scenarios/first-step-v8.tsx と同じ画面の★V8版（V6xAo）。番兵の要否は元の画面（first-step/page.tsx・未判定）と一緒に決めるため同じ扱い',
   'v8/nen-pets/editor.tsx':

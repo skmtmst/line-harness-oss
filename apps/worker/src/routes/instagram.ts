@@ -1,6 +1,7 @@
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -309,12 +310,26 @@ instagram.get(
             'id,username,name,biography,profile_picture_url,followers_count,media_count',
         },
       );
-      // 投稿に使うIDは、合鍵の引き換えで返る Instagram の利用者ID。
-      // 形がおかしいときだけプロフィール側のIDで拾う。どちらも数字でなければ
-      // 投稿の口が無い（プロアカウントになっていない）とみなす。
-      const instagramId = short.userId || String(profile.id ?? '');
+      // /me の文字列IDを優先する。認可応答の user_id は大きな JSON 数値で
+      // 返る場合があり、JavaScript で丸められると投稿先が存在しないIDになる。
+      const profileId = typeof profile.id === 'string' ? profile.id : '';
+      const instagramId = /^\d{1,24}$/.test(profileId) ? profileId : short.userId;
       if (!/^\d{1,24}$/.test(instagramId))
         throw new InstagramError('instagram_business_account_required', 403);
+      // 同じ統括なら複数のLINEアカウントで共有できる。別統括への接続は
+      // Webhook の顧客データを混ぜないため拒否する（DBのトリガーでも守る）。
+      const otherConnection = await c.env.DB.prepare(
+        `SELECT 1 FROM instagram_connections existing
+         JOIN line_accounts old_account ON old_account.id=existing.line_account_id
+         JOIN line_accounts new_account ON new_account.id=?
+         WHERE existing.instagram_id=? AND existing.line_account_id<>?
+           AND COALESCE(old_account.tenant_id,?)<>COALESCE(new_account.tenant_id,?)
+         LIMIT 1`,
+      )
+        .bind(id, instagramId, id, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID)
+        .first();
+      if (otherConnection)
+        throw new InstagramError('instagram_account_other_organization', 409);
       // 画面に出す名前。`page_name` は空にできない列なので、表示名→利用者名→IDの順に埋める。
       const pageName = profile.name || profile.username || instagramId;
       // この方式の合鍵は1本だけ（ページ用と利用者用の区別が無い）。列は両方そのまま使う。
@@ -389,8 +404,8 @@ instagram.post(
       cfg = ready(c),
       r = await connection(c, id);
     if (expired(r)) throw new InstagramError('meta_token_expired', 409);
-    // 期限を延ばすだけの口。Instagram は同じ合鍵を延長するので、つながっている相手も
-    // 許可の範囲も変わらない（Facebook ページの照合は無くなった）。
+    // Instagram は同じ合鍵を延長するので、つながっている相手と許可の範囲は変わらない。
+    // 投稿先IDは /me の正確な値で照合し、古い丸め済みIDだけ修復する。
     const long = await instagramRefreshToken(
       cfg,
       await decryptInstagramCredential(
@@ -398,6 +413,13 @@ instagram.post(
         cfg.encryptionKey,
       ),
     );
+    // 既に保存された丸め済みIDも、接続確認時に同じ合鍵の /me から修復する。
+    const profile = await instagramGraph<InstagramProfile>(cfg, 'me', long.token, {
+      fields: 'id,username',
+    });
+    const exactId = typeof profile.id === 'string' ? profile.id : '';
+    if (!/^\d{1,24}$/.test(exactId))
+      throw new InstagramError('instagram_business_account_required', 403);
     // 合鍵は1本だけなので、2つの列へ同じものを入れ直す。
     const token = await encryptInstagramCredential(
         long.token,
@@ -405,9 +427,11 @@ instagram.post(
       ),
       user = token;
     const saved = await c.env.DB.prepare(
-      'UPDATE instagram_connections SET page_token_encrypted=?,user_token_encrypted=?,expires_at=?,data_access_expires_at=?,scopes=?,refreshed_at=?,version=version+1 WHERE line_account_id=? AND version=?',
+      'UPDATE instagram_connections SET page_id=?,instagram_id=?,page_token_encrypted=?,user_token_encrypted=?,expires_at=?,data_access_expires_at=?,scopes=?,refreshed_at=?,version=version+1 WHERE line_account_id=? AND version=?',
     )
       .bind(
+        exactId,
+        exactId,
         token,
         user,
         long.expiresAt,
@@ -637,13 +661,17 @@ instagram.post('/api/instagram/webhook', async (c) => {
       !Array.isArray(entry.messaging)
     )
       continue;
-    const row = await c.env.DB.prepare(
-      `SELECT ig.line_account_id,ig.instagram_id FROM instagram_connections ig WHERE (ig.instagram_id=? OR ig.page_id=?) AND EXISTS(SELECT 1 FROM line_accounts la WHERE la.id=ig.line_account_id AND la.is_active=1 AND la.archived_at IS NULL AND ${activeTenantLineAccountSql('la.id')})`,
+    const matches = await c.env.DB.prepare(
+      `SELECT ig.line_account_id,ig.instagram_id,COALESCE(la.tenant_id,'${DEFAULT_TENANT_ID}') tenant_id FROM instagram_connections ig JOIN line_accounts la ON la.id=ig.line_account_id WHERE (ig.instagram_id=? OR ig.page_id=?) AND la.is_active=1 AND la.archived_at IS NULL AND ${activeTenantLineAccountSql('la.id')}`,
     )
       .bind(entry.id, entry.id)
-      .first<{ line_account_id: string; instagram_id: string }>();
-    if (!row) continue;
-    for (const event of entry.messaging ?? []) {
+      .all<{ line_account_id: string; instagram_id: string; tenant_id: string }>();
+    const rows = matches.results;
+    if (!rows.length) continue;
+    // DBに不整合が生じても異なる統括間に受信内容を配らない。
+    if (rows.some((row) => row.tenant_id !== rows[0].tenant_id))
+      continue;
+    for (const row of rows) for (const event of entry.messaging ?? []) {
       const msg = event?.message;
       if (
         typeof msg?.mid !== 'string' ||

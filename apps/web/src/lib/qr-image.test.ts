@@ -31,7 +31,8 @@ describe('QRライブラリの表示時読み込み(PERF-09)', () => {
   })
   it('QRを出す画面が qrcode を静的に import していない', () => {
     for (const rel of QR_PAGES) {
-      const source = readUiSource(path.join(SRC, rel), 'utf8')
+      const source = readUiSource(path.join(SRC, rel), 'utf8') + (rel === 'components/hq/notice-line-register-dialog.tsx'
+        ? readUiSource(path.join(SRC, 'v8/hq/notice-line-dialog.tsx'), 'utf8') : '')
       expect(source, rel).not.toMatch(/import\s+QRCode\s+from\s+['"]qrcode['"]/)
       expect(source, rel).not.toMatch(/from\s+['"]qrcode['"]/)
       expect(source, rel).toContain('qr-image')
