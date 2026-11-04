@@ -1166,3 +1166,4 @@
 - [Googleビジネスの営業時間タブ](release-log/unreleased/2082-masato-google-hours.md) — 営業時間の設定と確認の反映履歴。
 - [検証用 Google 投稿先の切替](release-log/unreleased/2086-masato-test2-google-post-test.md) — 反映履歴、確認 2026-11-04。
 - [Instagram投稿先IDの保存修正](release-log/unreleased/2088-masato-instagram-id-precision.md) — 反映履歴、確認 2026-11-04。
+- [TEST2投稿テスト後の検証設定復旧](release-log/unreleased/2089-masato-restore-google-test-gate.md) — 反映履歴、確認 2026-11-04。
