@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import { updateAutoReply, deleteAutoReply, restoreAutoReply } from '@line-crm/db';
+import { updateAutoReply, deleteAutoReply, restoreAutoReply, ensureAutoReplyPublishedVersion, getAutoReplyById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -99,6 +99,15 @@ describe('機能08 点検: 自動応答の専用停止口と履歴を残す削�
     expect((await invoke('rule-1','version-current-002',3)).status).toBe(200);
     expect(testDb.raw.prepare("SELECT confirmation_revision FROM auto_replies WHERE id='rule-1'").get()).toEqual({confirmation_revision:4});
     expect((await invoke('rule-2','version-legacy-003')).status).toBe(200);
+  });
+
+  it('実行版が作り直されても確認した停止を受け付ける', async () => {
+    const row = (await getAutoReplyById(testDb.db, 'rule-1'))!;
+    await ensureAutoReplyPublishedVersion(testDb.db, row);
+    expect(revision()).toBe(1);
+    const response = await stop(app(testDb.db), 'rule-1', {headers:{'Idempotency-Key':'runtime-version-01'},body:JSON.stringify({expectedVersion:1})});
+    expect(response.status).toBe(200);
+    expect(testDb.raw.prepare("SELECT is_active FROM auto_replies WHERE id='rule-1'").get()).toEqual({is_active:0});
   });
 
   it('JSON以外の版指定は拒み、版のない従来本文は受け付ける', async () => {

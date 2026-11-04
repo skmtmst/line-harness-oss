@@ -75,6 +75,32 @@ export function registerRestaurantMenuConfirmationTests(context: {
     expect(testDb.raw.prepare('SELECT name, confirmation_revision FROM rt_menu_items WHERE id=?').get(id)).toEqual({name:'割り込み',confirmation_revision:2});
   });
 
+  it('すでに削除済み、または読み取り後に削除されたメニューは404を返す', async () => {
+    const testDb = context.testDb();
+    seedRestaurantFixture();
+    const path = '/api/restaurant-test/menus/missing?account_id=account-1';
+    const missing = await requestWithMethod(path, 'DELETE', {expectedVersion:1});
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({error:'すでに削除されています'});
+    const create = await request('/api/restaurant-test/menu?account_id=account-1', {storeId:'store-ginza',kind:'course',name:'削除候補',price:1000,status:'draft'});
+    const id = (await create.json() as {data:{id:string}}).data.id;
+    const prepare = testDb.db.prepare.bind(testDb.db);
+    testDb.db.prepare = (sql: string) => {
+      const statement = prepare(sql);
+      if (!sql.includes('DELETE FROM rt_menu_items')) return statement;
+      const bind = statement.bind.bind(statement);
+      statement.bind = (...args: unknown[]) => {
+        const bound = bind(...args), run = bound.run.bind(bound);
+        bound.run = async () => { testDb.raw.prepare('DELETE FROM rt_menu_items WHERE id=?').run(id); return run(); };
+        return bound;
+      };
+      return statement;
+    };
+    const raced = await requestWithMethod(`/api/restaurant-test/menus/${id}?account_id=account-1`, 'DELETE', {expectedVersion:1});
+    expect(raced.status).toBe(404);
+    expect(await raced.json()).toMatchObject({error:'すでに削除されています'});
+  });
+
   it('版なしの従来本文は受け付け、読めない版の指定は拒む', async () => {
     context.seedRestaurantFixture();
     const create = async () => (await (await context.request('/api/restaurant-test/menu?account_id=account-1', {storeId:'store-ginza',kind:'course',name:'本文の互換',price:1000,status:'draft'})).json() as {data:{id:string}}).data.id;

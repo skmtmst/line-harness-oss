@@ -343,7 +343,7 @@ export const delete__api_restaurant_test_menus_id_12 = async (c: Context<Env, "/
     WHERE m.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
     .first<{ id: string; store_id: string }>();
-  if (!menu || !await storeBelongsTo(c,organization.id,menu.store_id)) return c.json({ success: false, error: 'メニューが見つかりません' }, 404);
+  if (!menu || !await storeBelongsTo(c,organization.id,menu.store_id)) return c.json({ success: false, error: 'すでに削除されています' }, 404);
   let body: { expectedVersion?: number } = {};
   if (c.req.raw.body) {
     const raw = await c.req.text();
@@ -376,9 +376,10 @@ export const delete__api_restaurant_test_menus_id_12 = async (c: Context<Env, "/
       AND NOT EXISTS (SELECT 1 FROM style_starter_items f, json_tree(COALESCE(f.pending_update,'{}')) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)
       AND NOT EXISTS (SELECT 1 FROM style_starter_sets f, json_tree(f.definition_json) j WHERE j.key='courseId' AND j.value=rt_menu_items.id)` )
       .bind(menu.id,menu.store_id,body.expectedVersion ?? null,body.expectedVersion ?? null).run();
-    if (!result.meta.changes && body.expectedVersion !== undefined) {
+    if (!result.meta.changes) {
       const latest = await db.prepare('SELECT * FROM rt_menu_items WHERE id = ? AND store_id = ?').bind(menu.id, menu.store_id).first<{ confirmation_revision: number }>();
-      if (latest && latest.confirmation_revision !== body.expectedVersion) return c.json({ success: false, code: 'menu_confirmation_conflict', error: 'メニューが変更されました。最新の内容を確認してください', data: latest }, 409);
+      if (!latest) return c.json({ success: false, error: 'すでに削除されています' }, 404);
+      if (body.expectedVersion !== undefined && latest.confirmation_revision !== body.expectedVersion) return c.json({ success: false, code: 'menu_confirmation_conflict', error: 'メニューが変更されました。最新の内容を確認してください', data: latest }, 409);
     }
     if (!result.meta.changes) return c.json({ success: false, code:'resource_in_use', error: '予約やフォーム、設定などで使われているメニューは削除できません。停止してください' }, 409);
     auditLog(c,'restaurant.menu.delete',{id:menu.id,kind:'rt_menu_item'});

@@ -96,20 +96,20 @@ describe('自動応答の下書き・試験・公開版', () => {
     expect(revision(created.rule.id)).toBe(before + 1);
   });
 
-  it('実行用の公開版を新しく作ると確認版を進める', async () => {
+  it('実行用の公開版を新しく作っても確認版を変えない', async () => {
     const created = await createAutoReplyWithDraftVersion(db, settings());
     const before = revision(created.rule.id);
     await ensureAutoReplyPublishedVersion(db, (await getAutoReplyById(db, created.rule.id))!);
-    expect(revision(created.rule.id)).toBe(before + 1);
+    expect(revision(created.rule.id)).toBe(before);
   });
 
-  it('既存の公開版を指し直すと確認版を進める', async () => {
+  it('既存の公開版を指し直しても確認版を変えない', async () => {
     const created = await createAutoReplyWithDraftVersion(db, settings());
     await ensureAutoReplyPublishedVersion(db, (await getAutoReplyById(db, created.rule.id))!);
     sqlite.prepare('UPDATE auto_replies SET current_published_version_id=NULL WHERE id=?').run(created.rule.id);
     const before = revision(created.rule.id);
     await ensureAutoReplyPublishedVersion(db, (await getAutoReplyById(db, created.rule.id))!);
-    expect(revision(created.rule.id)).toBe(before + 1);
+    expect(revision(created.rule.id)).toBe(before);
   });
 
   it('公開版だけのルールに社内メモを保存すると確認版を進める', async () => {
