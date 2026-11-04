@@ -84,6 +84,7 @@ export default function AccountHandoverV8() {
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
   const [refreshing, setRefreshing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [executeConfirmation, setExecuteConfirmation] = useState<{ id: string; revision: number | undefined } | null>(null)
   const [executing, setExecuting] = useState(false)
   const [executeError, setExecuteError] = useState('')
   /** 本人確認の窓（X-3: 本実行・切り戻しで使う）。 */
@@ -96,6 +97,7 @@ export default function AccountHandoverV8() {
   /** 申告の数の欄。絵に無いので、事前確認の結果の右上から開く。 */
   const [declaredOpen, setDeclaredOpen] = useState(false)
   const [rollbackOpen, setRollbackOpen] = useState(false)
+  const [rollbackConfirmation, setRollbackConfirmation] = useState<{ id: string; revision: number | undefined } | null>(null)
   const [rollingBack, setRollingBack] = useState(false)
   const [rollbackError, setRollbackError] = useState('')
   /** 人が書き換えた判断（保存するまで下書き）。 */
@@ -103,6 +105,7 @@ export default function AccountHandoverV8() {
   const [savingDecisions, setSavingDecisions] = useState(false)
   const [decisionError, setDecisionError] = useState('')
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelConfirmation, setCancelConfirmation] = useState<{ id: string; revision: number | undefined } | null>(null)
   const [cancelling, setCancelling] = useState(false)
   /*
    * 段4で書き換えた判断は「判断を保存する」まで端末にしか無い（下の帯が「まだ保存していません」と出す）。
@@ -282,13 +285,14 @@ export default function AccountHandoverV8() {
 
   /** 段6。切り戻し。本実行から7日間だけ。 */
   const runRollback = async () => {
-    if (!handover || rollingBack) return
+    if (!handover || rollingBack || !rollbackOpen || !rollbackConfirmation || rollbackConfirmation.id !== handover.id) return
+    if (!rollbackConfirmation.revision) { setRollbackError('切り戻せませんでした。期限（7日間）を過ぎていないか確かめてください。'); return }
     setRollingBack(true)
     setRollbackError('')
     try {
       const token = await stepUpGate('account_handover.execute', '引き継ぎの切り戻し')
       if (token === null) { setRollingBack(false); return }
-      const res = await api.accountHandovers.rollback(handover.id, undefined, token)
+      const res = await api.accountHandovers.rollback(rollbackConfirmation.id, undefined, token, rollbackConfirmation.revision)
       if (!res.success) throw new Error(res.error)
       setRollbackOpen(false)
       const detail = await api.accountHandovers.get(handover.id)
@@ -306,10 +310,11 @@ export default function AccountHandoverV8() {
 
   /** 進行中の引き継ぎを取り消す。終わった引き継ぎは消せない。 */
   const runCancel = async () => {
-    if (!handover || cancelling) return
+    if (!handover || cancelling || !cancelOpen || !cancelConfirmation || cancelConfirmation.id !== handover.id) return false
+    if (!cancelConfirmation.revision) { setExecuteError('取り消せませんでした。しばらくおいてから、もう一度お試しください。'); return false }
     setCancelling(true)
     try {
-      const res = await api.accountHandovers.cancel(handover.id)
+      const res = await api.accountHandovers.cancel(cancelConfirmation.id, cancelConfirmation.revision)
       if (!res.success) throw new Error(res.error)
       setCancelOpen(false)
       await load()
@@ -327,13 +332,14 @@ export default function AccountHandoverV8() {
 
   /** 段5。本実行。確認の窓と本人確認を済ませてから進める（X-3）。 */
   const executeHandover = async () => {
-    if (!handover || executing) return
+    if (!handover || executing || !confirmOpen || !executeConfirmation || executeConfirmation.id !== handover.id) return
+    if (!executeConfirmation.revision) { setExecuteError('本実行できませんでした。しばらくおいてから、もう一度お試しください。'); return }
     setExecuting(true)
     setExecuteError('')
     try {
       const token = await stepUpGate('account_handover.execute', '友だちの引き継ぎを本実行する')
       if (token === null) { setExecuting(false); return }
-      const result = await api.accountHandovers.execute(handover.id, token)
+      const result = await api.accountHandovers.execute(executeConfirmation.id, token, executeConfirmation.revision)
       if (!result.success) {
         setExecuteError(result.error)
         return
@@ -589,10 +595,10 @@ export default function AccountHandoverV8() {
         </p>} actions={<>
         {/* 取り消しは進行中だけ。変更なので見るだけの人には出さない。 */}
         {canManage && handover.status !== 'completed' && handover.status !== 'failed' && handover.status !== 'cancelled' ? (
-          <Button type="button" onClick={() => { setExecuteError(''); setCancelOpen(true) }}>引き継ぎをやめる</Button>
+          <Button type="button" onClick={() => { setExecuteError(''); setCancelConfirmation({ id: handover.id, revision: handover.confirmationRevision }); setCancelOpen(true) }}>引き継ぎをやめる</Button>
         ) : null}
         {canManage && handover.status !== 'completed' ? (
-          <Button type="button" variant="primary" disabled={executeDisabled} title={executeDisabled ? unresolved > 0 ? '全員の判断を決めてください' : executing ? '実行しています' : '事前確認と判断の状態を確かめてください' : undefined} busy={executing} busyLabel="実行中…" onClick={() => { setExecuteError(''); setConfirmOpen(true) }}>
+          <Button type="button" variant="primary" disabled={executeDisabled} title={executeDisabled ? unresolved > 0 ? '全員の判断を決めてください' : executing ? '実行しています' : '事前確認と判断の状態を確かめてください' : undefined} busy={executing} busyLabel="実行中…" onClick={() => { setExecuteError(''); setExecuteConfirmation({ id: handover.id, revision: handover.confirmationRevision }); setConfirmOpen(true) }}>
             <Play size={16} aria-hidden="true" />本実行する{unresolved > 0 ? `（あと ${unresolved} 人）` : ''}
           </Button>
         ) : null}
@@ -604,7 +610,7 @@ export default function AccountHandoverV8() {
           <Card surface="standard" layout="vertical" contentPadding="var(--polish-space-card)" gap="var(--tpl-acd-ho-list-gap)" className={styles.card}>
             <h3 className={styles.cardTitle}>移した友だちを元へ戻す</h3>
             <p className={styles.list}>{formatDateTime(handover.rollbackDeadline)} まで切り戻せます。動かした友だちだけを元のアカウントへ戻します。</p>
-            <span><Button type="button" variant="danger" onClick={() => { setRollbackError(''); setRollbackOpen(true) }}>切り戻す</Button></span>
+            <span><Button type="button" variant="danger" onClick={() => { setRollbackError(''); setRollbackConfirmation({ id: handover.id, revision: handover.confirmationRevision }); setRollbackOpen(true) }}>切り戻す</Button></span>
           </Card>
         ) : null}
       {handover.rolledBackAt ? (
