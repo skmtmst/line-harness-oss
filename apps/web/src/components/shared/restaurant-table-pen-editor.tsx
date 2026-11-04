@@ -6,6 +6,7 @@ import {restaurantChairPositions} from '@line-crm/shared'
 import {reservationBoardApi} from '@/lib/api/helpers/reservation-board'
 import {SaveErrorField} from '@/components/shared/save-form-errors'
 import EntitySelect from './entity-select'
+import Toggle from './toggle'
 import styles from './restaurant-table-pen-editor.module.css'
 
 export type Draft = {
@@ -46,7 +47,7 @@ export default function TablePenEditor({draft,onChange,floors,accountId,storeId,
    <div className={styles.field}><Label>間仕切り</Label><Choice items={[[ 'open','オープン'],['semi_private','半個室'],['private','個室']]} value={draft.partition} onChange={v=>change('partition',v)}/></div>
    <div className={styles.field}><Label>土足</Label><Choice items={[[ 'yes','土足可'],['no','土足不可']]} value={draft.shoesAllowed?'yes':'no'} onChange={v=>change('shoesAllowed',v==='yes')}/></div>
    <div className={styles.field}><Label>予約受付</Label><Choice items={[[ 'yes','受付中'],['no','停止中']]} value={draft.isActive?'yes':'no'} onChange={v=>change('isActive',v==='yes')}/></div>
-   <div className={styles.field}><Label>座席表に表示</Label><label className={styles.switchRow}><input type="checkbox" checked={draft.visibleOnMap} onChange={e=>change('visibleOnMap',e.target.checked)}/><span>表示する</span></label><p>座席表での表示を切り替えます。予約可否は「予約受付」で管理します。</p></div>
+   <div className={styles.field}><Label>座席表に表示</Label><div className={styles.switchRow}><Toggle className={styles.switchControl} checked={draft.visibleOnMap} onChange={value=>change('visibleOnMap',value)} label="座席表に表示"/><span>表示する</span></div><p>座席表での表示を切り替えます。予約可否は「予約受付」で管理します。</p></div>
    {draft.shape==='long'&&draft.seatType!=='counter'?<div className={styles.field}><Label>椅子の配置</Label><Choice items={[[ 'both','両側'],['one','片側'],['all','四方']]} value={draft.chairArrangement} onChange={v=>change('chairArrangement',v)}/></div>:null}
    {(draft.seatType==='counter'||draft.chairArrangement==='one')?<div className={styles.field}><Label>椅子を置く側</Label><Choice items={[[ 'top','上'],['right','右'],['bottom','下'],['left','左']]} value={draft.chairSide} onChange={v=>change('chairSide',v)}/></div>:null}
    <div className={styles.preview}><strong>椅子の自動配置プレビュー</strong><p>最大{draft.maxCapacity||'0'}名 × {draft.shape==='long'?'長方形':draft.shape==='circle'?'丸':'四角'}の卓 → 椅子{chairs.length}席を自動配置</p><div className={styles.previewCanvas}><div className={styles.previewTable} data-shape={draft.shape} data-orientation={draft.orientation}>{chairs.map((chair,index)=><i key={index} className={styles.previewChair} data-side={chair.side} style={{'--offset':chair.offset} as React.CSSProperties}/>)}<span>{draft.minCapacity}〜{draft.maxCapacity}名</span></div></div><p className={styles.footnote}>卓の形と最大人数に合わせて自動配置します。</p></div>

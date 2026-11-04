@@ -25,10 +25,10 @@
 .shapeIcon i{display:block;border:2px solid currentColor}
 .rectangle{width:27px;height:27px}.circle{width:29px;height:29px;border-radius:50%}.long{width:42px;height:20px}
 .switchRow{display:flex;align-items:center;gap:8px;color:#00833f;font-weight:700}
-.switchRow input{appearance:none;width:42px;height:25px;border-radius:30px;background:#c9d0d4;position:relative;cursor:pointer}
-.switchRow input:checked{background:#00833f}
-.switchRow input:before{content:'';position:absolute;width:19px;height:19px;top:3px;left:3px;border-radius:50%;background:#fff;transition:transform .2s}
-.switchRow input:checked:before{transform:translateX(17px)}
+:root .switchControl{width:42px;height:25px;border-radius:30px;background:#c9d0d4;position:relative;cursor:pointer}
+:root .switchControl[aria-checked=true]{background:#00833f}
+:root .switchControl::after{width:19px;height:19px;top:3px;left:3px;border-radius:50%;background:#fff;transition:transform .2s}
+:root .switchControl[aria-checked=true]::after{transform:translateX(17px)}
 .preview{border-radius:9px;background:#f5f6f7;padding:14px;min-height:145px;margin-top:35px}
 .preview strong{font-size:12px}.preview p{margin:5px 0 0;color:#65717d;font-size:11px}
 .previewCanvas{height:75px;display:flex;align-items:center;justify-content:center}

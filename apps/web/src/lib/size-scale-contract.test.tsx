@@ -177,14 +177,21 @@ describe('共通の値を使うクラスの描画を保つ', () => {
 /*
  * 11px の文字は使わない。補足も 12px の段を読む。
  * 左メニュー（sidebar.module.css）は左メニューの直しの持ち物なので、その直しが入るまで数に入れない。
+ * 飲食店の卓画面は利用者が承認した最新Penの11px指定を正本とする。
+ * その3ファイルだけを除外し、他画面の規則は維持する。
  */
 describe('11px の文字を使わない', () => {
   const PENDING_LEFT_MENU = 'components/layout/sidebar.module.css'
+  const PEN_TABLE_EXACT_SIZES = new Set([
+    'components/shared/restaurant-floor-editor.module.css',
+    'components/shared/restaurant-table-header-actions.module.css',
+    'components/shared/restaurant-table-pen-editor.module.css',
+  ])
   const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
     const path = join(dir, name)
     return statSync(path).isDirectory() ? walk(path) : [path]
   })
-  const sources = walk(SRC).filter((path) => /\.(css|tsx)$/.test(path) && !/\.test\./.test(path) && !path.endsWith(PENDING_LEFT_MENU))
+  const sources = walk(SRC).filter((path) => /\.(css|tsx)$/.test(path) && !/\.test\./.test(path) && !path.endsWith(PENDING_LEFT_MENU) && !PEN_TABLE_EXACT_SIZES.has(path.slice(SRC.length + 1)))
   const ELEVEN = /font-size:\s*11px|text-\[11px\]|fontSize[=:]\s*\{?\s*['"]?11(?:px)?['"]?\s*\}?(?![\d.])|--(?![a-z0-9-]*(?:pad|gap|lh|after|shift|inset|offset))[a-z0-9-]*(?:size|text|font|caption|note|desc|label|title|key|heading|th|xs)[a-z0-9-]*:\s*11px/
 
   it('画面・部品・共通の値に 11px の文字の大きさが無い', () => {
