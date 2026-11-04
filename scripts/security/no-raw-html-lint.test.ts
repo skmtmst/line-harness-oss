@@ -1,9 +1,12 @@
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { ESLint } from 'eslint';
 
+const eslint = new ESLint({ overrideConfigFile: resolve('eslint.config.mjs') });
+beforeAll(async () => { await eslint.lintText('export const mark = 1', { filePath: resolve('apps/web/src/components/shared/lint-warmup.tsx') }); });
+
 describe('HTML の文字列を画面へ差し込まない', () => {
-  const lint = (code: string) => new ESLint({ overrideConfigFile: resolve('eslint.config.mjs') })
+  const lint = (code: string) => eslint
     .lintText(code, { filePath: resolve('apps/web/src/components/shared/raw-html-fixture.tsx') })
     .then(([result]) => result.messages.filter((message) => message.ruleId === 'react/no-danger'));
 
@@ -19,7 +22,7 @@ describe('HTML の文字列を画面へ差し込まない', () => {
 });
 
 describe('閉じるの「×」を文字で描かない', () => {
-  const lint = (code: string) => new ESLint({ overrideConfigFile: resolve('eslint.config.mjs') })
+  const lint = (code: string) => eslint
     .lintText(code, { filePath: resolve('apps/web/src/components/shared/close-glyph-fixture.tsx') })
     .then(([result]) => result.messages.filter((message) => message.ruleId === 'no-restricted-syntax'));
 
@@ -36,7 +39,7 @@ describe('閉じるの「×」を文字で描かない', () => {
 });
 
 describe('なめらかなスクロールを直書きしない', () => {
-  const lint = (code: string) => new ESLint({ overrideConfigFile: resolve('eslint.config.mjs') })
+  const lint = (code: string) => eslint
     .lintText(code, { filePath: resolve('apps/web/src/components/shared/scroll-fixture.tsx') })
     .then(([result]) => result.messages.filter((message) => message.ruleId === 'no-restricted-syntax'));
 

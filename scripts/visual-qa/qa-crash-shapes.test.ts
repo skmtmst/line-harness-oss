@@ -45,7 +45,7 @@ describe('点検で落ちた3画面の偽 API の形', () => {
     })
 
     let lastError: unknown
-    for (let attempt = 0; attempt < 50; attempt += 1) {
+    for (let attempt = 0; attempt < 250; attempt += 1) {
       try {
         const response = await fetch(`${baseUrl}/__mock-fingerprint`)
         if (response.ok) return

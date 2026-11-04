@@ -272,6 +272,8 @@ jobs:
         with:
           node-version: '22.23.4'
           cache: pnpm
+      - name: Install repository audit tools
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - run: pnpm install --frozen-lockfile
       - name: Guard shared pattern ownership
         env:
@@ -395,6 +397,31 @@ jobs:
       - name: Verify LIFF security headers and public SDK compatibility
         run: node scripts/security/browser-headers.mjs worker
 
+  web-unit-checks:
+    name: Admin behavior tests (${{ matrix.shard }}/4)
+    needs: changes
+    if: needs.changes.outputs.full_suite == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      NEXT_PUBLIC_API_URL: https://nen-line-stg.skmtmst.workers.dev
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.23.4'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Admin test dependencies
+        run: |
+          pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build
+          pnpm --filter web release-log
+      - run: pnpm --config.enable-pre-post-scripts=false --filter web test --shard=${{ matrix.shard }}/4
+
   web-checks:
     name: Admin lint, typecheck and tests
     needs: changes
@@ -419,7 +446,6 @@ jobs:
       - name: Reject restored legacy admin appearance
         run: node apps/web/scripts/verify-v8-only.mjs
       - run: pnpm --config.enable-pre-post-scripts=false --filter web typecheck
-      - run: pnpm --config.enable-pre-post-scripts=false --filter web test
       # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
       # 専用の設定が無く、**どのワークフローからも一度も呼ばれていなかった**(#704)。
       # #704 で繋いだところ2試験が落ち、原因が画面側の不具合だと分かったので
@@ -801,6 +827,7 @@ jobs:
       - worker-checks
       - worker-build
       - web-checks
+      - web-unit-checks
       - web-build
       - mcp-checks
       - docs-checks
@@ -815,6 +842,7 @@ jobs:
           WORKER_CHECKS_RESULT: ${{ needs.worker-checks.result }}
           WORKER_BUILD_RESULT: ${{ needs.worker-build.result }}
           WEB_CHECKS_RESULT: ${{ needs.web-checks.result }}
+          WEB_UNIT_RESULT: ${{ needs.web-unit-checks.result }}
           WEB_BUILD_RESULT: ${{ needs.web-build.result }}
           MCP_CHECKS_RESULT: ${{ needs.mcp-checks.result }}
           DOCS_CHECKS_RESULT: ${{ needs.docs-checks.result }}
@@ -827,6 +855,7 @@ jobs:
             "$WORKER_CHECKS_RESULT" \
             "$WORKER_BUILD_RESULT" \
             "$WEB_CHECKS_RESULT" \
+            "$WEB_UNIT_RESULT" \
             "$WEB_BUILD_RESULT" \
             "$MCP_CHECKS_RESULT" \
             "$DOCS_CHECKS_RESULT" \

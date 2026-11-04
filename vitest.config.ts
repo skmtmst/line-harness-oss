@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 // use their own configs; CI runs shared in UTC and Asia/Bangkok.
 export default defineConfig({
   test: {
-    maxWorkers: 4,
+    maxWorkers: process.env.CI ? 2 : 4,
     // Vitest 4 restoreAllMocks no longer clears standalone vi.fn call history.
     clearMocks: true,
     environment: 'node',

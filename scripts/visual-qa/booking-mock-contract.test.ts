@@ -34,7 +34,7 @@ describe('予約の空き枠：偽 API と Worker の応答契約', () => {
       env: { ...process.env, PORT: String(port) },
       stdio: 'ignore',
     })
-    for (let attempt = 0; attempt < 50; attempt++) {
+    for (let attempt = 0; attempt < 250; attempt++) {
       try {
         if ((await fetch(`${baseUrl}/__mock-fingerprint`)).ok) return
       } catch { /* 起動待ち */ }

@@ -107,7 +107,7 @@ for (const width of [1152, 1440]) for (const delay of [0, 600]) {
     try {
       await direct('/templates')
       // 実際のSPAリンクを押す。リンクが無い場合は直接URLで代用しない。
-      for (const path of ['/settings']) {
+      for (const path of ['/settings/customer-look']) {
         const link = page.locator(`a[href="${path}"]:visible`).first()
         await link.waitFor()
         await observe(`画面間 ${path}`, () => link.click(), path)
