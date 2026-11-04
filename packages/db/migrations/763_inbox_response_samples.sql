@@ -39,22 +39,24 @@ CREATE TABLE inbox_response_deleted_weekly (
  week TEXT NOT NULL,
  on_time INTEGER NOT NULL DEFAULT 0,
  overdue INTEGER NOT NULL DEFAULT 0,
- no_deadline INTEGER NOT NULL DEFAULT 0
+ no_deadline INTEGER NOT NULL DEFAULT 0,
+ automatic INTEGER NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX inbox_response_deleted_weekly_key ON inbox_response_deleted_weekly(account_id,ifnull(staff_id,''),staff_deleted,week);
 CREATE TRIGGER inbox_response_samples_deleted BEFORE DELETE ON inbox_response_samples
-WHEN OLD.chat_id IS NOT NULL AND OLD.reply_kind='manual' AND OLD.is_first_response=1
+WHEN OLD.chat_id IS NOT NULL AND (OLD.reply_kind='automatic' OR (OLD.reply_kind='manual' AND OLD.is_first_response=1))
  AND EXISTS(SELECT 1 FROM line_accounts WHERE id=OLD.account_id)
 BEGIN
- INSERT INTO inbox_response_deleted_weekly(account_id,staff_id,staff_deleted,week,on_time,overdue,no_deadline)
+ INSERT INTO inbox_response_deleted_weekly(account_id,staff_id,staff_deleted,week,on_time,overdue,no_deadline,automatic)
  VALUES(OLD.account_id,OLD.staff_id,OLD.staff_deleted,date(OLD.responded_at,'+09:00','weekday 0','-6 days'),
-  CASE WHEN julianday(OLD.responded_at)<=julianday(OLD.due_at) THEN 1 ELSE 0 END,
-  CASE WHEN julianday(OLD.responded_at)>julianday(OLD.due_at) THEN 1 ELSE 0 END,
-  CASE WHEN OLD.due_at IS NULL THEN 1 ELSE 0 END)
- ON CONFLICT DO UPDATE SET on_time=on_time+excluded.on_time,overdue=overdue+excluded.overdue,no_deadline=no_deadline+excluded.no_deadline; END;
+  CASE WHEN OLD.reply_kind='manual' AND julianday(OLD.responded_at)<=julianday(OLD.due_at) THEN 1 ELSE 0 END,
+  CASE WHEN OLD.reply_kind='manual' AND julianday(OLD.responded_at)>julianday(OLD.due_at) THEN 1 ELSE 0 END,
+  CASE WHEN OLD.reply_kind='manual' AND OLD.due_at IS NULL THEN 1 ELSE 0 END,
+  CASE WHEN OLD.reply_kind='automatic' THEN 1 ELSE 0 END)
+ ON CONFLICT DO UPDATE SET on_time=on_time+excluded.on_time,overdue=overdue+excluded.overdue,no_deadline=no_deadline+excluded.no_deadline,automatic=automatic+excluded.automatic; END;
 -- Merge deleted staff into one anonymous bucket before their foreign keys are cleared.
 CREATE TRIGGER inbox_response_deleted_staff BEFORE DELETE ON staff_members
 BEGIN
- UPDATE inbox_response_samples SET staff_deleted=1 WHERE staff_id=OLD.id; INSERT INTO inbox_response_deleted_weekly(account_id,staff_id,staff_deleted,week,on_time,overdue,no_deadline)
- SELECT account_id,NULL,1,week,SUM(on_time),SUM(overdue),SUM(no_deadline) FROM inbox_response_deleted_weekly WHERE staff_id=OLD.id GROUP BY account_id,week
- ON CONFLICT DO UPDATE SET on_time=on_time+excluded.on_time,overdue=overdue+excluded.overdue,no_deadline=no_deadline+excluded.no_deadline; DELETE FROM inbox_response_deleted_weekly WHERE staff_id=OLD.id; END;
+ UPDATE inbox_response_samples SET staff_deleted=1 WHERE staff_id=OLD.id; INSERT INTO inbox_response_deleted_weekly(account_id,staff_id,staff_deleted,week,on_time,overdue,no_deadline,automatic)
+ SELECT account_id,NULL,1,week,SUM(on_time),SUM(overdue),SUM(no_deadline),SUM(automatic) FROM inbox_response_deleted_weekly WHERE staff_id=OLD.id GROUP BY account_id,week
+ ON CONFLICT DO UPDATE SET on_time=on_time+excluded.on_time,overdue=overdue+excluded.overdue,no_deadline=no_deadline+excluded.no_deadline,automatic=automatic+excluded.automatic; DELETE FROM inbox_response_deleted_weekly WHERE staff_id=OLD.id; END;
