@@ -1,5 +1,6 @@
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
+import { storedTimestamp } from '@line-crm/shared';
 import { parseReservationFilter } from './restaurant-reservation-filter.js';
 import { deriveStoreLineStatuses, isValidTimezone, uniqueStoreConflict } from './restaurant-store-status.js';
 import type { RestaurantStoreRow, SelectedRestaurantStore } from './restaurant-context-types.js';
@@ -265,7 +266,7 @@ export const get__api_restaurant_test_snapshot_13 = async (c: Context<Env, "/api
     dbFor(c.env).prepare(`SELECT * FROM rt_approval_requests
       WHERE organization_id = ? AND (? IS NULL OR store_id = ?)
       ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'returned' THEN 1 ELSE 2 END,
-        created_at DESC LIMIT 100`).bind(orgId, scopedStoreId, scopedStoreId).all(),
+        created_at DESC LIMIT 100`).bind(orgId, scopedStoreId, scopedStoreId).all<Record<string, unknown> & { created_at: string; updated_at: string }>(),
     dbFor(c.env).prepare(`SELECT COUNT(*) AS total FROM rt_reservations r
       JOIN rt_stores s ON s.id = r.store_id
       WHERE ${reservationFilter.where}`).bind(...reservationFilter.params).first<{ total: number }>(),
@@ -308,7 +309,7 @@ export const get__api_restaurant_test_snapshot_13 = async (c: Context<Env, "/api
       organization: publicOrganization(organization),
       stores: storesWithLineStatus,
       memberships: memberships.results,
-      approvals: approvals.results,
+      approvals: approvals.results.map(row => ({ ...row, created_at: storedTimestamp(row.created_at), updated_at: storedTimestamp(row.updated_at) })),
       reservations: reservations.results,
       reservationTotal: reservationTotal?.total ?? 0,
       tables: tables.results,
