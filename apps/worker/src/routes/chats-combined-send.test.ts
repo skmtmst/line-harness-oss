@@ -199,3 +199,11 @@ test('ブロック後のまとめて送信は送信0回', async () => {
   expect(await response.json()).toMatchObject({ code: 'FRIEND_NOT_FOLLOWING' });
   expect(pushMessage).not.toHaveBeenCalled();
 });
+
+test.each(['send','send-combined'])('手動返信 %s は定期処理前でも当時の期限を記録する',async kind=>{
+ sqlite.raw.exec(`INSERT INTO inbox_routing_settings(account_id,sla_enabled,sla_first_response_minutes,sla_business_hours_only,updated_at) VALUES('acc-1',1,30,0,'now');
+ INSERT INTO chats(id,friend_id,status,last_customer_message_at,pending_since,created_at,updated_at) VALUES('reply-chat','fr-1','unread','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z','now','now');`);
+ const response=await app().request(`/api/chats/fr-1/${kind}`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':KEY1},body:JSON.stringify(kind==='send'?{content:'返信です',revision:0}:{text:'返信です',image:IMAGE,revision:0})});
+ expect(response.status).toBe(200);
+ expect(sqlite.raw.prepare('SELECT chat_id,pending_since,due_at,is_first_response FROM inbox_response_samples').get()).toEqual({chat_id:'reply-chat',pending_since:'2026-01-01T00:00:00Z',due_at:'2026-01-01T00:30:00.000Z',is_first_response:1});
+});

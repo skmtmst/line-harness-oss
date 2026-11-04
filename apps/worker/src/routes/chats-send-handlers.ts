@@ -1,4 +1,5 @@
 import { logger } from '@line-crm/shared/server';
+import { refreshInboxSlaForChat } from '../services/inbox-sla.js';
 import { resolveLineSender } from '../services/line-senders.js';
 import { GapError } from '../services/gap-common.js';
 import { inputError } from '../lib/input-errors.js';
@@ -303,6 +304,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
     }
 
     // チャットの最終メッセージ日時を更新（chat.id を直接使う — friend_id で呼ばれても resolveOrCreateChat 済み）
+    try { await refreshInboxSlaForChat(c.env.DB, chat.id); } catch { logger.error('inbox_sla.deadline_snapshot_failed'); }
     await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: sentAt });
     const updatedChat = await getChatById(c.env.DB, chat.id);
     await inboxEventStatement(c.env.DB, {
