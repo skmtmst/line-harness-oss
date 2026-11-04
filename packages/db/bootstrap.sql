@@ -10691,7 +10691,7 @@ CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_accou
 
 CREATE INDEX idx_instagram_connections_instagram_id ON instagram_connections(instagram_id);
 
-CREATE INDEX idx_instagram_messages_account_time ON instagram_messages(line_account_id,received_at,id);
+CREATE INDEX idx_instagram_messages_account_time_754 ON instagram_messages(line_account_id,received_at,id);
 
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);
