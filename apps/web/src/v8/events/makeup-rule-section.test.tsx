@@ -128,16 +128,27 @@ it('保存の競合では入力を保って比較・最新の読取へ進み、�
   await waitFor(() => expect(saved).toHaveBeenCalledWith({ ...initial, monthlyCap: 5 }, 10, 9))
 })
 
-it.each(['staff', 'viewer', null])('権限が%sのとき、設定を読めても編集操作を表示しない', role => {
+it.each(['staff', 'viewer', null])('権限が%sのとき編集を理由付きでロックする', role => {
   mocks.role = role; render(view())
-  expect(screen.queryByRole('button', { name: '振替の決まりを編集する' })).toBeNull()
+  const button = screen.getByRole('button', { name: '振替の決まりを編集する' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect(button.hasAttribute('data-permission-locked')).toBe(true)
+  fireEvent.focus(button)
+  expect(screen.getByRole('tooltip').textContent).toMatch(/権限|管理者/)
+  fireEvent.click(button)
   expect(screen.queryByRole('dialog')).toBeNull(); expect(mocks.save).not.toHaveBeenCalled()
 })
 
-it('代理ログイン中は編集操作を表示しない', () => {
+it('代理ログイン中は編集を理由付きでロックする', () => {
   rememberSessionSnapshot({ impersonation: { id: 'proxy', mode: 'read' } as never, unfamiliarAt: null, stepUpMethod: 'none' })
   render(view())
-  expect(screen.queryByRole('button', { name: '振替の決まりを編集する' })).toBeNull()
+  const button = screen.getByRole('button', { name: '振替の決まりを編集する' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect(button.hasAttribute('data-permission-locked')).toBe(true)
+  fireEvent.focus(button)
+  expect(screen.getByRole('tooltip').textContent).toContain('代理ログイン中')
+  fireEvent.click(button)
+  expect(screen.queryByRole('dialog')).toBeNull(); expect(mocks.save).not.toHaveBeenCalled()
 })
 
 it('途中で代理ログインへ切り替わると、開いている窓からも送れない', async () => {

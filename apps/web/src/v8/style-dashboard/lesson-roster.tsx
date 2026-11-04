@@ -54,7 +54,7 @@ export function LessonRoster({ roster, canWrite, onClose, onPay, onAttend, onAbs
             <span className={styles.rosterName}><strong>{m.name}</strong><span className={styles.cellSub}>{m.sub}</span></span>
             <span className={styles.grow} />
             {m.pay.label === '—' ? <span className={styles.cellMuted}>—</span> : <StatusBadge tone={m.pay.tone}>{m.pay.label}</StatusBadge>}
-            {absenceAllowed && onReportAbsence && m.canReportAbsence && m.bookingId && m.eventId && m.startsAt && Date.parse(m.startsAt) > Date.now() ? <Button size="compact"
+            {onReportAbsence && m.canReportAbsence && m.bookingId && m.eventId && m.startsAt && Date.parse(m.startsAt) > Date.now() ? <Button size="compact"
               lockedReason={absenceLockedReason} disabled={!absenceAllowed} onClick={() => onReportAbsence(m)}>欠席</Button> : null}
             <span className={styles.rosterAttend}>
               {m.attend === 'done' ? <span className={styles.attendDone}>✓ 出席</span> : m.attend === 'absent' ? <span className={styles.cellMuted}>欠席</span> : m.attend === 'cancel' ? <span className={styles.cellMuted}>取消</span> : canWrite && m.attend === 'button' && m.bookingId ? (

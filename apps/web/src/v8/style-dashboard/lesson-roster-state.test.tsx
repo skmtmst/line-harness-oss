@@ -77,13 +77,22 @@ it('古い取消日時がある確定応答と未知状態も出欠の対象に�
   expect(isLiveLessonBooking(unknown)).toBe(false)
 })
 
-it('名簿の事前欠席は確定と承認待ちだけに出し、閲覧のみには表示しない', () => {
+it('名簿の事前欠席は確定と承認待ちだけに出し、閲覧のみは理由付きでロックする', () => {
   const future = bookings.map(row => ({ ...row, slot_starts_at: '2099-06-01T01:00:00Z' }))
   const onReportAbsence = vi.fn()
   const roster = { rowId: 'slot-real', head: '', title: '朝ヨガ', meta: '', pay: { label: '', tone: 'neutral' as const }, more: '', payLinkCount: 0, members: future.map(toLessonRosterMember) }
   const view = render(<LessonRoster roster={roster} canWrite={false} onAttend={noop} onAbsent={noop} onClose={noop} onPay={noop} onLine={noop} onCancelClass={noop}
     onReportAbsence={onReportAbsence} absenceAllowed={false} absenceLockedReason="閲覧のみです" />)
-  expect(screen.queryByRole('button', { name: '欠席' })).toBeNull()
+  const locked = screen.getAllByRole('button', { name: '欠席' })
+  expect(locked).toHaveLength(2)
+  for (const button of locked) {
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    expect(button.hasAttribute('data-permission-locked')).toBe(true)
+    fireEvent.focus(button)
+    expect(screen.getByRole('tooltip').textContent).toContain('閲覧のみです')
+    fireEvent.click(button)
+    fireEvent.blur(button)
+  }
   expect(onReportAbsence).not.toHaveBeenCalled()
   view.rerender(<LessonRoster roster={roster} canWrite onAttend={noop} onAbsent={noop} onClose={noop} onPay={noop} onLine={noop} onCancelClass={noop}
     onReportAbsence={onReportAbsence} absenceAllowed />)

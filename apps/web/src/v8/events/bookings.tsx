@@ -295,7 +295,7 @@ function Bookings({ eventId }: { eventId: string }) {
   }
 
   const occurrence = applicants?.occurrence ?? null
-  const absenceAction = (bookingId: string, name: string, startsAt: string | undefined) => absence.allowed && startsAt && Date.parse(startsAt) > Date.now() ? <Button
+  const absenceAction = (bookingId: string, name: string, startsAt: string | undefined) => startsAt && Date.parse(startsAt) > Date.now() ? <Button
     data-booking-id={bookingId} data-booking-action="absence"
     size="compact" lockedReason={absence.lockedReason} disabled={!absence.allowed || busy || marking.has(bookingId)}
     onClick={() => absence.open({ bookingId, eventId, name, startsAt })}>欠席</Button> : null

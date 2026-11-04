@@ -243,12 +243,18 @@ it.each([0, 1])('名簿の入口%sから欠席し、正規の読取で人数と�
   expect(elements(view.container).filter(el => el.getAttribute('data-booking-action') === 'absence')).toHaveLength(0)
 })
 
-it('閲覧のみでは申込者と予約記録の両方に欠席操作を表示しない', async () => {
+it('閲覧のみでは申込者と予約記録の欠席操作を理由付きでロックする', async () => {
   accountMock.role = 'viewer'
   apiMocks.listBookings.mockResolvedValue({ items: [{ id: 'booking-1', event_id: 'event-1', slot_id: 'slot-1', friend_id: 'friend-booking', status: 'confirmed', slot_starts_at: '2099-06-01T01:00:00Z', friend_display_name: '申込 太郎' }], total: 1 })
   const view = await mount(<EventBookingsPage />)
   expect(view.container.textContent).toContain('申込 太郎')
-  expect(elements(view.container).filter(el => el.getAttribute('data-booking-action') === 'absence')).toHaveLength(0)
+  const buttons = elements(view.container).filter(el => el.getAttribute('data-booking-action') === 'absence')
+  expect(buttons).toHaveLength(2)
+  for (const button of buttons) {
+    await expectPermissionLocked(button)
+    expect(document.querySelector('[role=tooltip]')?.textContent).toMatch(/権限|閲覧|オーナー|管理者/)
+  }
+  expect(document.querySelector('[role=dialog], [role=alertdialog]')).toBeNull()
   expect(apiMocks.absence).not.toHaveBeenCalled()
 })
 
