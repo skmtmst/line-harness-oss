@@ -18,9 +18,9 @@ export async function routingInput(db:D1Database,a:string,b:Record<string,unknow
  }
  return {strategy:strategy as RoutingSettings['strategy'],targets};
 }
-export async function assignInbox(db:D1Database,a:string,friendId:string,now=new Date(),random=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296,mutationToken?:string,claimAttempt?:number){
+export async function assignInbox(db:D1Database,a:string,friendId:string,now=new Date(),random=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296,mutationToken?:string,claimAttempt?:number,pendingOnly=false){
  const config=await routingSettings(db,a);if(config.strategy==='none')return false;
- const c=await db.prepare("SELECT c.id,c.pending_since,c.last_customer_message_at FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.friend_id=? AND f.line_account_id=? AND c.operator_id IS NULL AND c.assignee_staff_id IS NULL AND c.status!='resolved'").bind(friendId,a).first<{id:string;pending_since:string|null;last_customer_message_at:string|null}>();if(!c)return false;
+ const c=await db.prepare("SELECT c.id,c.pending_since,c.last_customer_message_at FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.friend_id=? AND f.line_account_id=? AND c.operator_id IS NULL AND c.assignee_staff_id IS NULL AND c.status!='resolved' AND (?=0 OR (c.pending_since IS NOT NULL AND c.first_response_at IS NULL))").bind(friendId,a,pendingOnly?1:0).first<{id:string;pending_since:string|null;last_customer_message_at:string|null}>();if(!c)return false;
  const tz=await getAccountTimeZone(db,a),day=tzDateStr(tz,now),time=tzHHMM(tz,now),eligible=[];
  for(const t of config.targets){
  const s=await db.prepare(`SELECT m.*,p.away,p.last_seen_at FROM staff_members m JOIN staff_presence p ON p.staff_id=m.id WHERE m.id=? AND m.is_active=1 AND m.access_level!='read_only' AND p.away=0 AND julianday(p.last_seen_at)>=julianday(?,'-30 minutes')`).bind(t.staffId,now.toISOString()).first<{id:string;role:'owner'|'admin'|'staff';tenant_id:string}>();
@@ -37,12 +37,13 @@ export async function assignInbox(db:D1Database,a:string,friendId:string,now=new
  // cannot notify twice and a later conversation can raise a fresh alert.
  const cycle=c.pending_since??c.last_customer_message_at??'unknown';
  await db.prepare(`INSERT OR IGNORE INTO notifications(id,event_type,title,body,channel,status,metadata,line_account_id,category)
- SELECT ?,'inbox_assignment_unavailable','割り当てできませんでした','割り当てられる人がいません。受信箱を確認してください。','in_app','sent',?,?,'error'
+ SELECT CASE WHEN ? IS NULL THEN ? ELSE 'inbox-unassigned-run:'||(SELECT run_id FROM friend_bulk_run_items WHERE id=?) END,'inbox_assignment_unavailable','割り当てできませんでした','割り当てられる人がいません。受信箱を確認してください。','dashboard','sent',json_object('teamId',(SELECT escalate_team_id FROM inbox_routing_settings WHERE account_id=?),'chatId',CASE WHEN ? IS NULL THEN ? ELSE NULL END),?,'error'
  FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.id=? AND f.line_account_id=?
  AND c.operator_id IS NULL AND c.assignee_staff_id IS NULL AND c.status!='resolved'
+ AND (?=0 OR (c.pending_since IS NOT NULL AND c.first_response_at IS NULL))
  AND COALESCE(c.pending_since,c.last_customer_message_at,'unknown')=?
  AND (? IS NULL OR EXISTS(SELECT 1 FROM friend_bulk_run_items WHERE id=? AND status='running' AND attempt_count=?))`)
- .bind(`inbox-unassigned:${c.id}:${cycle}`,JSON.stringify({chatId:friendId}),a,c.id,a,cycle,claimAttempt??null,mutationToken??null,claimAttempt??null).run();
+ .bind(mutationToken??null,`inbox-unassigned:${c.id}:${cycle}`,mutationToken??null,a,mutationToken??null,friendId,a,c.id,a,pendingOnly?1:0,cycle,claimAttempt??null,mutationToken??null,claimAttempt??null).run();
  return false;
  }
  eligible.sort((a,b)=>(config.strategy==='even'?a.count-b.count:0)||a.priority-b.priority||a.last.localeCompare(b.last));
@@ -51,7 +52,7 @@ export async function assignInbox(db:D1Database,a:string,friendId:string,now=new
  else {const equal=eligible.filter(t=>t.count===pick.count&&t.priority===pick.priority&&t.last===pick.last);pick=equal[Math.floor(random()*equal.length)]??pick;}
  const token=mutationToken??crypto.randomUUID();
  const results=await db.batch([
- db.prepare(`UPDATE chats SET assignee_staff_id=?,assigned_by='auto',assigned_at=?,assignment_token=?,revision=revision+1 WHERE id=? AND operator_id IS NULL AND assignee_staff_id IS NULL AND status!='resolved' AND (SELECT count(*) FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.assignee_staff_id=? AND c.status!='resolved' AND c.last_customer_message_at IS NOT NULL AND (c.last_operator_message_at IS NULL OR julianday(c.last_customer_message_at)>julianday(c.last_operator_message_at)))<? AND (? IS NULL OR EXISTS(SELECT 1 FROM friend_bulk_run_items WHERE id=? AND status='running' AND attempt_count=?))`).bind(pick.staffId,now.toISOString(),token,c.id,a,pick.staffId,pick.cap,claimAttempt??null,mutationToken??null,claimAttempt??null),
+ db.prepare(`UPDATE chats SET assignee_staff_id=?,assigned_by='auto',assigned_at=?,assignment_token=?,revision=revision+1 WHERE id=? AND operator_id IS NULL AND assignee_staff_id IS NULL AND status!='resolved' AND (?=0 OR (pending_since IS NOT NULL AND first_response_at IS NULL)) AND (SELECT count(*) FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.assignee_staff_id=? AND c.status!='resolved' AND c.last_customer_message_at IS NOT NULL AND (c.last_operator_message_at IS NULL OR julianday(c.last_customer_message_at)>julianday(c.last_operator_message_at)))<? AND (? IS NULL OR EXISTS(SELECT 1 FROM friend_bulk_run_items WHERE id=? AND status='running' AND attempt_count=?))`).bind(pick.staffId,now.toISOString(),token,c.id,pendingOnly?1:0,a,pick.staffId,pick.cap,claimAttempt??null,mutationToken??null,claimAttempt??null),
  db.prepare('INSERT INTO inbox_assignment_logs(id,account_id,chat_id,staff_id,strategy,decided_at,mutation_token) SELECT ?,?,?,?,?,?,? WHERE changes()=1 AND EXISTS(SELECT 1 FROM chats WHERE id=? AND assignment_token=?)').bind(crypto.randomUUID(),a,c.id,pick.staffId,config.strategy,now.toISOString(),token,c.id,token)]);
  return !!results[0].meta.changes;
 }

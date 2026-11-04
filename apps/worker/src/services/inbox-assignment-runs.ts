@@ -13,7 +13,9 @@ export async function createInboxAssignmentRun(db:D1Database, account:string, ac
     SELECT lower(hex(randomblob(16))),?,f.id,?,ROW_NUMBER() OVER (ORDER BY c.last_customer_message_at,c.id),'queued',? || ':' || f.id,?
     FROM chats c JOIN friends f ON f.id=c.friend_id
     WHERE f.line_account_id=? AND c.operator_id IS NULL AND c.assignee_staff_id IS NULL AND c.status!='resolved'
-      AND EXISTS(SELECT 1 FROM friend_bulk_runs WHERE id=? AND status='preparing')`).bind(id,account,id,now,account,id),
+      AND (?=0 OR (c.pending_since IS NOT NULL AND c.first_response_at IS NULL))
+      AND EXISTS(SELECT 1 FROM friend_bulk_runs WHERE id=? AND status='preparing')
+    ORDER BY c.last_customer_message_at,c.id LIMIT 500`).bind(id,account,id,now,account,fixedId ? 1 : 0,id),
   db.prepare(`UPDATE friend_bulk_runs SET target_count=(SELECT count(*) FROM friend_bulk_run_items WHERE run_id=?),
     status=CASE WHEN EXISTS(SELECT 1 FROM friend_bulk_run_items WHERE run_id=?) THEN 'queued' ELSE 'success' END,
     completed_at=CASE WHEN EXISTS(SELECT 1 FROM friend_bulk_run_items WHERE run_id=?) THEN NULL ELSE ? END,updated_at=?

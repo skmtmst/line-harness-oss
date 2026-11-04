@@ -19,7 +19,9 @@ function setup(): Database.Database {
   const sqlite = new Database(':memory:');
   sqlite.exec(`
     PRAGMA foreign_keys = ON;
-    CREATE TABLE line_accounts (id TEXT PRIMARY KEY);
+    CREATE TABLE line_accounts (id TEXT PRIMARY KEY, tenant_id TEXT);
+    CREATE TABLE staff_members (id TEXT PRIMARY KEY, tenant_id TEXT, is_active INTEGER, access_level TEXT, role TEXT);
+    CREATE TABLE operator_notification_teams (id TEXT PRIMARY KEY, line_account_id TEXT, staff_ids TEXT, archived_at TEXT);
     CREATE TABLE notification_rules (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, event_type TEXT NOT NULL,
       conditions TEXT NOT NULL DEFAULT '{}', channels TEXT NOT NULL DEFAULT '["webhook"]',

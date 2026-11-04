@@ -64,9 +64,9 @@ inboxSla.get('/api/analytics/inbox-response/conversations',async c=>{
  const results=await c.env.DB.prepare(`SELECT s.id AS sampleId,s.responded_at AS respondedAt,c.id AS chatId,f.id AS friendId,f.display_name AS friendName
   FROM inbox_response_samples s JOIN chats c ON c.id=s.chat_id JOIN friends f ON f.id=c.friend_id
   WHERE s.account_id=? AND f.line_account_id=? AND s.reply_kind=? AND (?=1 OR s.is_first_response=1)
-   AND julianday(s.responded_at)>=julianday(?) AND julianday(s.responded_at)<julianday(?)
+   AND s.responded_at>=? AND s.responded_at<?
    AND s.staff_id IS ? AND s.staff_deleted=?
-  ORDER BY julianday(s.responded_at) DESC,s.id LIMIT 51 OFFSET ?`)
+  ORDER BY s.responded_at DESC,s.id DESC LIMIT 51 OFFSET ?`)
   .bind(account,account,automatic?'automatic':'manual',automatic?1:0,start,end,target||null,deleted?1:0,offset).all<{sampleId:string;respondedAt:string;chatId:string;friendId:string;friendName:string|null}>();
  return c.json({success:true,data:{items:results.results.slice(0,50),hasMore:results.results.length>50}});
 });

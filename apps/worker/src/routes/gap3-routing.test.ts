@@ -109,3 +109,75 @@ test('営業時間の開始後に未割当を再試行し、同じ営業時間�
  expect(d.raw.prepare('SELECT count(*) n FROM friend_bulk_runs').get()).toEqual({n:1});
  expect(d.raw.prepare('SELECT count(*) n FROM friend_bulk_run_items').get()).toEqual({n:1});
 });
+
+test('営業開始の再割当は返事待ちだけを最大500件選び、複数件で通知は1通',async()=>{
+ const {createInboxAssignmentRun}=await import('../services/inbox-assignment-runs.js');
+ const {processFriendBulkRun}=await import('../features/friends/friend-bulk-runs.js');
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ d.raw.exec("UPDATE staff_presence SET away=1; UPDATE chats SET pending_since='2026-10-16T04:00:00Z',first_response_at=NULL WHERE id='c'");
+ const addFriend=d.raw.prepare('INSERT INTO friends(id,line_user_id,line_account_id) VALUES(?,?,?)');
+ const addChat=d.raw.prepare("INSERT INTO chats(id,friend_id,status,pending_since,first_response_at,last_customer_message_at,created_at,updated_at) VALUES(?,?,'unread',?,?, '2026-10-16T04:00:00Z','now','now')");
+ d.raw.transaction(()=>{for(let i=0;i<503;i++){addFriend.run(`open-f-${i}`,`open-u-${i}`,'a');addChat.run(`open-c-${i}`,`open-f-${i}`,'2026-10-16T04:00:00Z',i===0?'2026-10-16T04:01:00Z':null)}})();
+ const run=await createInboxAssignmentRun(d.db,'a','o','t','opening','r5-open:a:1');
+ expect(run.total).toBe(500);
+ expect(d.raw.prepare("SELECT count(*) n FROM friend_bulk_run_items WHERE run_id=? AND friend_id='open-f-0'").get(run.id)).toEqual({n:0});
+ await processFriendBulkRun(d.db,run.id,{now:'2026-10-16T04:01:00Z',limit:5});
+ expect(d.raw.prepare("SELECT count(*) n FROM notifications WHERE event_type='inbox_assignment_unavailable'").get()).toEqual({n:1});
+});
+
+test('割当の直前に上限へ達して更新0件なら、古い同じ印があっても記録しない',async()=>{
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ d.raw.exec("UPDATE chats SET assignment_token='race-token' WHERE id='c'");
+ const original=d.db.batch.bind(d.db);
+ vi.spyOn(d.db,'batch').mockImplementationOnce(async statements=>{
+  d.raw.exec("INSERT INTO chats(id,friend_id,assignee_staff_id,status,last_customer_message_at,created_at,updated_at) VALUES('cap-race','f2','s','unread','2026-10-16T04:00:00Z','now','now')");
+  return original(statements);
+ });
+ expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'),()=>0,'race-token')).toBe(false);
+ expect(d.raw.prepare("SELECT count(*) n FROM inbox_assignment_logs WHERE mutation_token='race-token'").get()).toEqual({n:0});
+});
+
+test('割当不能の通知は指定した責任者チームだけに届く',async()=>{
+ const {getNotificationCenter,getNotificationCenterCounts,markNotificationRead}=await import('@line-crm/db');
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ d.raw.exec(`INSERT INTO operator_notification_teams(id,line_account_id,name,staff_ids,created_at,updated_at) VALUES('team','a','責任者','["s"]','now','now'); UPDATE inbox_routing_settings SET escalate_team_id='team' WHERE account_id='a'; UPDATE staff_presence SET away=1`);
+ await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'));
+ const eligible=await getNotificationCenter(d.db,{lineAccountId:'a',staffId:'s'});
+ const outside=await getNotificationCenter(d.db,{lineAccountId:'a',staffId:'o'});
+ expect(eligible).toHaveLength(1);expect(outside).toHaveLength(0);
+ expect((await getNotificationCenterCounts(d.db,{lineAccountId:'a',staffId:'o'})).all).toBe(0);
+ expect(await markNotificationRead(d.db,{notificationId:eligible[0].id,lineAccountId:'a',staffId:'o'})).toBe(false);
+});
+
+test('一時失敗は時刻を置いて自動で再試行し、3回で止める',async()=>{
+ const {processFriendBulkRun}=await import('../features/friends/friend-bulk-runs.js');
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ const response=await gapCall(app(),'/api/inbox/routing/apply-unassigned?account_id=a','POST',{},'retry-limit');
+ const id=(await response.json() as {data:{id:string}}).data.id;
+ const original=d.db.prepare.bind(d.db);
+ const spy=vi.spyOn(d.db,'prepare').mockImplementation(sql=>{if(sql.includes('SELECT strategy,targets_json FROM inbox_assignment_settings'))throw new Error('一時的な失敗');return original(sql)});
+ try {
+  await processFriendBulkRun(d.db,id,{now:'2026-10-16T04:01:00.000Z'});
+  expect(d.raw.prepare('SELECT status,attempt_count FROM friend_bulk_run_items WHERE run_id=?').get(id)).toEqual({status:'waiting',attempt_count:1});
+  await processFriendBulkRun(d.db,id,{now:'2026-10-16T04:01:30.000Z'});
+  expect(d.raw.prepare('SELECT attempt_count FROM friend_bulk_run_items WHERE run_id=?').get(id)).toEqual({attempt_count:1});
+  await processFriendBulkRun(d.db,id,{now:'2026-10-16T04:02:00.000Z'});
+  await processFriendBulkRun(d.db,id,{now:'2026-10-16T04:04:00.000Z'});
+  expect(d.raw.prepare('SELECT status,attempt_count FROM friend_bulk_run_items WHERE run_id=?').get(id)).toEqual({status:'temporary_failure',attempt_count:3});
+ } finally {spy.mockRestore()}
+});
+
+test('一時失敗からの自動再試行が成功しても割当は1回',async()=>{
+ const {processFriendBulkRun}=await import('../features/friends/friend-bulk-runs.js');
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ const response=await gapCall(app(),'/api/inbox/routing/apply-unassigned?account_id=a','POST',{},'retry-success');
+ const id=(await response.json() as {data:{id:string}}).data.id;
+ const original=d.db.prepare.bind(d.db);let fail=true;
+ const spy=vi.spyOn(d.db,'prepare').mockImplementation(sql=>{if(fail&&sql.includes('SELECT strategy,targets_json FROM inbox_assignment_settings')){fail=false;throw new Error('一時的な失敗')}return original(sql)});
+ try {
+  await processFriendBulkRun(d.db,id,{now:'2026-10-16T04:01:00.000Z'});
+  await processFriendBulkRun(d.db,id,{now:'2026-10-16T04:02:00.000Z'});
+  expect(d.raw.prepare('SELECT status,attempt_count FROM friend_bulk_run_items WHERE run_id=?').get(id)).toEqual({status:'success',attempt_count:2});
+  expect(d.raw.prepare('SELECT count(*) n FROM inbox_assignment_logs').get()).toEqual({n:1});
+ } finally {spy.mockRestore()}
+});

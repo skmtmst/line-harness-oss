@@ -60,3 +60,18 @@ test('SLA-17 SLA-18: スタッフ・閲覧のみの設定変更と他店の読�
  expect((await gapCall(gapApp(d,[inboxSla],gapOwner,true),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
  expect((await gapCall(a(),'/api/inbox/routing-settings?account_id=b')).status).toBe(404);
 });
+
+test('通知の確定前に別の処理が段を変えたら、存在しない通知を理由に段を進めない',async()=>{
+ await gapCall(a(),'/api/inbox/routing-settings?account_id=a','PUT',body);
+ const chat=await upsertChatOnMessage(d.db,'f');await refreshInboxSla(d.db,'a');
+ const original=d.db.batch.bind(d.db);
+ const spy=vi.spyOn(d.db,'batch').mockImplementationOnce(async statements=>{
+  d.raw.prepare('UPDATE chats SET sla_notified_stage=1 WHERE id=?').run(chat.id);
+  return original(statements);
+ });
+ try {
+  await processInboxSla(d.db,new Date('2026-10-16T01:31:00Z'));
+  expect(d.raw.prepare('SELECT sla_notified_stage FROM chats WHERE id=?').get(chat.id)).toEqual({sla_notified_stage:1});
+  expect(d.raw.prepare("SELECT count(*) n FROM notifications WHERE event_type='inbox_sla'").get()).toEqual({n:0});
+ } finally {spy.mockRestore()}
+});

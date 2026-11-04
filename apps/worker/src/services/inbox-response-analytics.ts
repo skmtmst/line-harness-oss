@@ -11,15 +11,15 @@ function date(value:string):number {
 export function inboxResponsePeriod(from:string,to:string) {
  const first=date(from),last=date(to);
  if(last<first || last-first>365*86400000 || new Date(first).getUTCDay()!==1 || new Date(last).getUTCDay()!==0)throw new GapError('invalid_period');
- const start=`${from}T00:00:00+09:00`,end=`${addDays(to,1)}T00:00:00+09:00`;
+ const start=new Date(`${from}T00:00:00+09:00`).toISOString(),end=new Date(`${addDays(to,1)}T00:00:00+09:00`).toISOString();
  return {start,end};
 }
 /** Ordinary staff may only see their own rows. Deleted conversations retain only weekly counts. */
 export async function inboxResponseAnalytics(db:D1Database,account:string,from:string,to:string,ownStaffId:string|null) {
  const {start,end}=inboxResponsePeriod(from,to);
  const filter=`account_id=? AND reply_kind='manual' AND is_first_response=1 AND pending_since IS NOT NULL
-  AND julianday(responded_at)>=julianday(?) AND julianday(responded_at)<julianday(?) AND (? IS NULL OR staff_id=?)`;
- const binds=[account,start,end,ownStaffId,ownStaffId];
+  AND responded_at>=? AND responded_at<?${ownStaffId === null ? '' : ' AND staff_id=?'}`;
+ const binds=ownStaffId === null ? [account,start,end] : [account,start,end,ownStaffId];
  const totalMedian=await db.prepare(`WITH ranked AS (
   SELECT (julianday(responded_at)-julianday(pending_since))*1440 AS minutes,
    ROW_NUMBER() OVER(ORDER BY julianday(responded_at)-julianday(pending_since)) AS rn,COUNT(*) OVER() AS total
@@ -60,7 +60,7 @@ export async function inboxResponseAnalytics(db:D1Database,account:string,from:s
 
  const deletedAutomatic=ownStaffId===null ? await db.prepare(`SELECT COALESCE(SUM(automatic),0) AS count FROM inbox_response_deleted_weekly WHERE account_id=? AND week>=? AND week<=?`).bind(account,from,to).first<{count:number}>() : null;
  const automatic=ownStaffId===null ? await db.prepare(`SELECT COUNT(*) AS count,SUM(CASE WHEN chat_id IS NULL THEN 1 ELSE 0 END) AS unavailable FROM inbox_response_samples WHERE account_id=? AND reply_kind='automatic'
-  AND julianday(responded_at)>=julianday(?) AND julianday(responded_at)<julianday(?)`).bind(account,start,end).first<{count:number;unavailable:number|null}>() : null;
+  AND responded_at>=? AND responded_at<?`).bind(account,start,end).first<{count:number;unavailable:number|null}>() : null;
  const due=merged.reduce((sum,row)=>sum+row.due_count,0),onTime=merged.reduce((sum,row)=>sum+row.on_time,0);
  const manualCount=merged.reduce((sum,row)=>sum+row.count,0),automaticCount=automatic ? automatic.count+(deletedAutomatic?.count??0):0;
  return {summary:{medianFirstResponseMinutes:totalMedian?.median??null,withinSlaRate:due?Math.round(onTime*10000/due)/100:null,overdueCount:due-onTime,totalCount:manualCount+automaticCount},byStaff:merged.map(r=>({staffId:r.staff_id,staffDeleted:Boolean(r.staff_deleted),staffName:r.staff_name,medianFirstResponseMinutes:r.median,deletedCount:r.deleted_count,

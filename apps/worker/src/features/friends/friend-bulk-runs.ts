@@ -644,7 +644,7 @@ async function executeOperation(
     // Recover a successful assignment even if the worker stopped before recording
     // the item result. The assignment and its receipt share the item's token.
     if (await db.prepare('SELECT 1 FROM inbox_assignment_logs WHERE mutation_token=? AND account_id=?').bind(item.id,account).first()) return {status:'success'};
-    const assigned = await assignInbox(db,account,friend.id,new Date(now),undefined,item.id,attempt);
+    const assigned = await assignInbox(db,account,friend.id,new Date(now),undefined,item.id,attempt,run.id.startsWith('r5-open:'));
     const receipt = assigned || await db.prepare('SELECT 1 FROM inbox_assignment_logs WHERE mutation_token=? AND account_id=?').bind(item.id,account).first();
     return {status:receipt?'success':'skipped'};
   }
@@ -1088,11 +1088,14 @@ export async function processFriendBulkRun(
       const failure = error instanceof ItemExecutionError
         ? error
         : new ItemExecutionError('execution_failed', '一括操作を実行できませんでした', true);
+      const attempt = claimed.attempt_count ?? 1;
+      const retryInbox = (operation as {kind:string}).kind === 'inbox_auto_assign' && failure.retryable && attempt < 3;
       await updateFriendBulkRunItem(db, item.id, {
-        status: failure.retryable ? 'temporary_failure' : 'permanent_failure',
+        status: retryInbox ? 'waiting' : failure.retryable ? 'temporary_failure' : 'permanent_failure',
         ...((operation as {kind:string}).kind === 'inbox_auto_assign' ? {expectedAttempt:claimed.attempt_count} : {}),
         errorCode: failure.code,
         errorMessage: failure.message,
+        ...(retryInbox ? {retryAt:addMinutes(now, attempt)} : {}),
         now,
       });
     }
