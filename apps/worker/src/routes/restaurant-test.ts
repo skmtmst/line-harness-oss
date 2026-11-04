@@ -285,7 +285,7 @@ for(const action of ['preview','create','patch'] as const) {
     return c.json({success:true,data:{...preview,confirmationSnapshot:JSON.stringify({input,periods,rows})}});
    }
    let expectedRows: string | undefined;
-   if(action==='create' && b.expectedSnapshot!==undefined){
+   if(b.expectedSnapshot!==undefined){
     if(typeof b.expectedSnapshot!=='string'||b.expectedSnapshot.length>90000)return inputError(c,{success:false,error:'invalid_confirmation'},400,['expectedSnapshot']);
     let expected: { input: unknown; periods: unknown; rows: unknown };
     try{expected=JSON.parse(b.expectedSnapshot);}catch{return inputError(c,{success:false,error:'invalid_confirmation'},400,['expectedSnapshot']);}
@@ -296,8 +296,15 @@ for(const action of ['preview','create','patch'] as const) {
    const values=[input.startDate,input.endDate,Number(input.allDay),input.startTime,input.endTime,input.kind,input.memo,JSON.stringify(input.tableIds),JSON.stringify(periods),Number(input.notifyMedia)];
    try {
     if(action==='patch'){
-     const saved=await db.prepare(`UPDATE rt_closures SET start_date=?,end_date=?,all_day=?,start_time=?,end_time=?,kind=?,memo=?,table_ids_json=?,periods_json=?,notify_media=?,version=version+1,updated_at=datetime('now')
-     WHERE id=? AND store_id=? AND version=? AND archived_at IS NULL`).bind(...values,id,input.storeId,b.expectedVersion).run();
+     const write=db.prepare(`UPDATE rt_closures SET start_date=?,end_date=?,all_day=?,start_time=?,end_time=?,kind=?,memo=?,table_ids_json=?,periods_json=?,notify_media=?,version=version+1,updated_at=datetime('now')
+     WHERE id=? AND store_id=? AND version=? AND archived_at IS NULL`).bind(...values,id,input.storeId,b.expectedVersion);
+     let saved: D1Result;
+     if(expectedRows===undefined) saved=await write.run();
+     else {
+      const snapshot=restaurantClosureSnapshotQuery(input,periods);
+      const results=await db.batch([db.prepare(`SELECT json(CASE WHEN (${snapshot.sql})=? THEN '{}' ELSE 'CLOSURE_CONFIRMATION_CHANGED' END)`).bind(...snapshot.binds,expectedRows),write]);
+      saved=results[1];
+     }
      if(!saved.meta.changes)return c.json({success:false,error:'version_conflict'},409);
     }else {
      const write=db.prepare(`INSERT INTO rt_closures(start_date,end_date,all_day,start_time,end_time,kind,memo,table_ids_json,periods_json,notify_media,id,store_id,created_by,created_by_name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)

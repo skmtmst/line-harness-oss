@@ -93,6 +93,22 @@ describe('休業の確認', () => {
   expect((await request('/api/restaurant-test/closures?account_id=account-1',{...input,expectedSnapshot:latest.confirmationSnapshot})).status).toBe(201);
  });
 
+ it('休業編集は予約の変更を409で拒み、一致と旧呼び出しを受け付ける',async()=>{
+  seedRestaurantFixture();
+  testDb.raw.prepare("INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,status) VALUES('future-edit','store-ginza','manual','予約',2,'2099-01-02T04:00:00Z','2099-01-02T05:00:00Z','confirmed')").run();
+  const input={storeId:'store-ginza',startDate:'2099-01-02',endDate:'2099-01-02',allDay:true,kind:'temporary_closed',tableIds:[]};
+  const created=(await (await request('/api/restaurant-test/closures?account_id=account-1',input)).json() as any).data.closure;
+  const preview=async()=> (await (await request('/api/restaurant-test/closures/preview?account_id=account-1',{...input,excludeId:created.id})).json() as any).data;
+  const patch=async(body:unknown)=>app().request(`/api/restaurant-test/closures/${created.id}?account_id=account-1`,{method:'PATCH',headers:{Authorization:'Bearer owner-key','Content-Type':'application/json'},body:JSON.stringify(body)},env);
+  const first=await preview();
+  expect((await requestWithMethod('/api/restaurant-test/reservations/future-edit?account_id=account-1','PATCH',{note:'変更'})).status).toBe(200);
+  expect((await patch({...input,expectedVersion:created.version,expectedSnapshot:first.confirmationSnapshot})).status).toBe(409);
+  expect(testDb.raw.prepare('SELECT version FROM rt_closures WHERE id=?').get(created.id)).toEqual({version:created.version});
+  const latest=await preview();
+  expect((await patch({...input,expectedVersion:created.version,expectedSnapshot:latest.confirmationSnapshot})).status).toBe(200);
+  expect((await patch({...input,expectedVersion:created.version+1})).status).toBe(200);
+ });
+
  it('予約を編集すると確認専用の版が進む',async()=>{
   seedRestaurantFixture();const url='/api/restaurant-test/reservations/reservation-ginza?account_id=account-1';
   expect((await requestWithMethod(url,'PATCH',{note:'確認用の編集'})).status).toBe(200);
