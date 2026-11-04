@@ -26,18 +26,25 @@ export async function verifyPublicBuild(workerUrl, workerSha, adminUrl, adminSha
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const args = process.argv.slice(2)
+async function runCli(args) {
   if (args.length !== 4) throw new Error('使い方: verify-public-build.mjs <Worker URL|-> <Worker SHA> <Admin URL|-> <Admin SHA>')
   // CDNの反映待ちだけを読み取りで再試行する。配備し直さない。
   for (let attempt = 1; ; attempt++) {
     try {
       await verifyPublicBuild(...args)
       console.log(`公開SHA一致: Worker=${args[0] === '-' ? '対象外' : args[1]} Admin=${args[2] === '-' ? '対象外' : args[3]}`)
-      break
+      return
     } catch (error) {
       if (attempt >= 15) throw error
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const args = process.argv.slice(2)
+  runCli(args).catch(error => {
+    console.error(error instanceof Error ? error.message : '公開SHA照合に失敗しました')
+    process.exitCode = 1
+  })
 }
