@@ -16,7 +16,7 @@ export async function processBookingWaitlists(env: Env['Bindings'], accountId?: 
   for (const slot of seats.results) {
     const tables = await db.prepare('SELECT id FROM rt_tables WHERE store_id=? AND is_active=1 ORDER BY max_capacity,id').bind(slot.store_id).all<{ id: string ;}>();
     try { for (let i = 0; i < tables.results.length; i++) { let promoted = false; for (const table of tables.results) { const result = await promoteSeatWaitlist(db, { storeId: slot.store_id, startsAt: slot.starts_at, tableId: table.id }, undefined, env.LIFF_URL ?? '', env); if (result.promoted) { promoted = true; break; } } if (!promoted) break; } } catch { logger.error("restaurant_booking.process_seat_waitlist_failed"); }
-    await db.prepare('UPDATE rt_seat_waitlist SET confirmation_revision=confirmation_revision+1, last_processed_at=? WHERE store_id=? AND starts_at=?').bind(new Date().toISOString(), slot.store_id, slot.starts_at).run();
+    await db.prepare('UPDATE rt_seat_waitlist SET last_processed_at=? WHERE store_id=? AND starts_at=?').bind(new Date().toISOString(), slot.store_id, slot.starts_at).run();
   }
   await dispatchWaitlistInvites(env, accountId);
 }

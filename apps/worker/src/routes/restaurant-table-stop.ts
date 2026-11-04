@@ -36,6 +36,9 @@ export async function stopRestaurantTable(c: Context<Env>) {
   steps.push(clearAssertions(db));
   try { await db.batch(steps); }
   catch (error) {
+    const conflict = /closure_conflict|customer_table_conflict/i.exec(String(error))?.[0];
+    if (conflict) return c.json({ success: false, code: conflict, error: conflict,
+      reason: conflict === 'closure_conflict' ? '臨時休業・貸切と重なります' : '同じ卓に重なる予約または仮押さえがあります' }, 409);
     if (!/CHECK constraint|restaurant_table_conflict/i.test(String(error))) throw error;
     const currentTable = await db.prepare('SELECT id,is_active,confirmation_revision FROM rt_tables WHERE id=? AND store_id=?').bind(tableId,body.storeId).first();
     const currentReservations = await db.prepare(`SELECT r.id,r.status,r.table_id,r.confirmation_revision FROM rt_reservations r WHERE r.store_id=? AND r.status NOT IN ('cancelled','no_show','completed','visited','seated') AND r.departed_at IS NULL AND julianday(r.ends_at)>julianday(?) AND (r.table_id=? OR EXISTS(SELECT 1 FROM rt_reservation_table_links l WHERE l.reservation_id=r.id AND l.table_id=?)) LIMIT 201`).bind(body.storeId,asOf,tableId,tableId).all();

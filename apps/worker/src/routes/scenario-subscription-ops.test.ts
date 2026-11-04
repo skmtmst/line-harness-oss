@@ -246,12 +246,19 @@ describe('友だち単位の購読操作（#949 N-054）', () => {
   test('版を送らない古いシナリオ削除は従来どおり', async () => {
     expect((await app(owner).request('/api/scenarios/sc-1', { method: 'DELETE' })).status).toBe(200);
   });
-  test('削除済みの古い確認は 409 を返し、版なしは従来の 404 を保つ', async () => {
+  test('削除済みのシナリオは版付きも版なしも 404 を返す', async () => {
     const request = (body?: unknown) => app(owner).request('/api/scenarios/missing', { method: 'DELETE', ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
     const conflict = await request({ expectedContentRevision: 1, expectedActiveCount: 0 });
-    expect(conflict.status).toBe(409);
-    expect((await conflict.json() as { current: unknown }).current).toBeNull();
+    expect(conflict.status).toBe(404);
     expect((await request()).status).toBe(404);
+  });
+  test('別の統括から見えないシナリオは版付きでも404を返す', async () => {
+    const response = await app({ ...owner, tenantId: 'other-tenant' }).request('/api/scenarios/sc-1', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedContentRevision: 1, expectedActiveCount: 2 }),
+    });
+    expect(response.status).toBe(404);
+    expect(sqlite.raw.prepare("SELECT COUNT(*) n FROM scenarios WHERE id='sc-1'").get()).toEqual({ n: 1 });
   });
   test('通を変更したあと古い確認ではシナリオを消さない', async () => {
     const added = await app(owner).request('/api/scenarios/sc-1/steps', {

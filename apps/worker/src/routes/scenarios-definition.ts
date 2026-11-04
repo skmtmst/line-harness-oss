@@ -80,10 +80,6 @@ export async function requireVisibleScenario(c: Context<Env>, next: () => Promis
     c.get('staff'),
     [(scenario as { line_account_id?: string | null }).line_account_id ?? null],
   )) {
-    if (c.req.method === 'DELETE' && c.req.path.split('/').length === 4) {
-      const body = await c.req.raw.clone().json().catch(() => null) as { expectedContentRevision?: unknown } | null;
-      if (body?.expectedContentRevision !== undefined) return c.json({ success: false, error: 'シナリオの状態が変わりました。読み直してください', current: null }, 409);
-    }
     return fail(c, 404, 'SCENARIO_NOT_FOUND');
   }
   await next();

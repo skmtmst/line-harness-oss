@@ -47,6 +47,15 @@
       "parentColumn": "id"
     }
   },
+  "account_handover_moves": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "handover_id",
+      "parent": "account_handovers",
+      "parentColumn": "id"
+    }
+  },
   "account_handovers": {
     "category": "purge",
     "scope": {

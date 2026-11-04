@@ -169,7 +169,7 @@ export async function processScenarioSourceJobs(env: Env['Bindings'], send: Sour
                 await send(env, j, messages);
             }
             if (j.source_kind === 'restaurant_waitlist')
-                await db.prepare("UPDATE rt_seat_waitlist SET confirmation_revision=confirmation_revision+1, notified_at=?,notification_claim_until=NULL WHERE id=? AND notification_retry_key=? AND status='invited'").bind(new Date().toISOString(), j.source_id, j.idempotency_key).run();
+                await db.prepare("UPDATE rt_seat_waitlist SET notified_at=?,notification_claim_until=NULL WHERE id=? AND notification_retry_key=? AND status='invited'").bind(new Date().toISOString(), j.source_id, j.idempotency_key).run();
             if ((await db.prepare("UPDATE scenario_source_jobs SET status='sent',lease_until=NULL,message_log_id=? WHERE id=? AND lease_until=? AND status='running'").bind(logId, j.id, lease).run()).meta.changes)
                 sent++;
         }
