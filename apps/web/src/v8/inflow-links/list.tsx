@@ -448,9 +448,6 @@ export default function InflowListV8({
   const unconfiguredCount = accountRows.filter(isUnconfigured).length
   const hasFriendsCount = accountRows.filter((row) => (row.stats?.friendCount ?? 0) > 0).length
   const genreNames = availableGenres.map((genre) => genre.name)
-  const tileGenreSub = genreNames.length === 0
-    ? 'フォルダはまだありません'
-    : genreNames.slice(0, 3).join('・') + (genreNames.length > 3 ? 'など' : '')
   const adNamesSub = adConnected === null
     ? '読み込めませんでした'
     : adConnected.names.length === 0
@@ -529,7 +526,7 @@ export default function InflowListV8({
   const selectGenre = (id: string) => { setSelectedGenre(id); setPage(1) }
   const folderSelect = (
     <SaveErrorField names={["selectedGenre","selected_genre"]}><Select
-      aria-label="フォルダ"
+      narrowFolderPicker aria-label="フォルダ"
       value={selectedGenre}
       onChange={selectGenre}
       options={[
@@ -856,7 +853,7 @@ export default function InflowListV8({
             value={routeCountAvailable ? accountRouteCount : null}
             unit={routeCountAvailable ? '件' : ''}
             loading={loading}
-            detail={routeCountAvailable ? tileGenreSub : loading ? '読み込んでいます' : '読み込めませんでした'}
+            detail={routeCountAvailable ? '停止中を含むすべての経路' : loading ? '読み込んでいます' : '読み込めませんでした'}
           />
           <KpiCard
             presentation="band"

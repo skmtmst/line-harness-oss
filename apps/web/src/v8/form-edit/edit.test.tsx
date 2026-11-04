@@ -683,7 +683,7 @@ describe('統括の保存結果と離脱', () => {
   async function leaveBySaving() {
     fireEvent.click(getPageAction({ name: 'キャンセル' }))
     const dialog = within(await screen.findByRole('dialog', { name: '保存していない変更があります' }))
-    fireEvent.click(dialog.getByRole('button', { name: '下書きに保存して移る' }))
+    await act(async () => { fireEvent.click(dialog.getByRole('button', { name: '下書きに保存して移る' })) })
   }
 
   it('離れる窓からの保存は確定を待ち、成功してから予定した操作を一度だけ行う', async () => {
@@ -709,6 +709,7 @@ describe('統括の保存結果と離脱', () => {
     expect(input.value).toBe('保存したい名前')
     expect(onCancel).not.toHaveBeenCalled()
     expect(navigation.push).not.toHaveBeenCalled()
+    await waitFor(() => expect((getPageAction({ name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(getPageAction({ name: 'キャンセル' }))
     expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
     expect(formsUpdate).not.toHaveBeenCalled()

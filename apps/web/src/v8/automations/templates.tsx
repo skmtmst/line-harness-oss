@@ -3,8 +3,8 @@ import SegmentedControl from '@/components/shared/segmented'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Activity, FileWarning, Filter, LayoutTemplate, ListChecks, RefreshCw } from 'lucide-react'
-import { api, fetchApi, type AutomationListItem, type AutomationTemplateSummary } from '@/lib/api'
+import { LayoutTemplate, RefreshCw } from 'lucide-react'
+import { api, type AutomationListItem, type AutomationTemplateSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage, ListPageCards, ListPageSection } from '@/components/templates/list-page'
@@ -15,16 +15,13 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import {
   AUTOMATIONS_DESCRIPTION,
-  AutomationBand,
   AutomationTabs,
   ViewerBand,
   automationTabHref,
   useAutomationManage,
   useAutomationTabCounts,
-  type BandCell,
 } from './shell'
 import styles from './templates.module.css'
-import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
@@ -33,10 +30,9 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
  *
  * 2026-10-07 src/v8 に一から書いた（今の V8 は 8%）。データの口・下書きを作る動き・権限・失敗時の扱いは
  * 今までの V8（app/automations/templates-v8.tsx）と同じ（BEHAVIOR.md）。違いは見せ方だけ——
- * 型（ListPage）に、タブ・数の帯（ルールの一覧と同じ）・きっかけの札の段・4列のカード・注記を渡す。
+ * 型（ListPage）に、タブ・きっかけの札の段・4列のカード・注記を渡す。
  */
 
-type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
 
 /** 札に出すきっかけの数（絵は「すべて」＋6つ。残りは「すべて」から見る）。 */
@@ -78,8 +74,6 @@ export default function AutomationTemplatesV8() {
   const [items, setItems] = useState<AutomationTemplateSummary[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [rules, setRules] = useState<AutomationListItem[] | null>(null)
-  const [summary, setSummary] = useState<{ executionCount30d: number; failureCount30d: number } | null>(null)
-  const [skipped, setSkipped] = useState<number | null>(null)
   const [trigger, setTrigger] = useState('')
   const [creating, setCreating] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
@@ -96,19 +90,14 @@ export default function AutomationTemplatesV8() {
     setStatus('loading')
     setActionError('')
     try {
-      const [templatesRes, listRes, runsRes] = await Promise.all([
+      const [templatesRes, listRes] = await Promise.all([
         api.automations.templates(selectedAccountId),
         api.automations.list({ accountId: selectedAccountId }).catch(() => null),
-        fetchApi<ApiResponse<{ summary: { skipped: number } }>>(
-          `/api/automation-runs?lineAccountId=${encodeURIComponent(selectedAccountId)}&limit=1`,
-        ).catch(() => null),
       ])
       if (requestId !== requestRef.current) return
       if (!templatesRes.success) throw new Error(templatesRes.error)
       setItems(templatesRes.data)
       setRules(listRes && listRes.success ? listRes.data : null)
-      setSummary(listRes && listRes.success ? listRes.summary ?? null : null)
-      setSkipped(runsRes && runsRes.success ? runsRes.data.summary.skipped : null)
       setStatus('ready')
     } catch (saveFailure) {
       if (requestId !== requestRef.current) return
@@ -161,17 +150,6 @@ export default function AutomationTemplatesV8() {
       setCreating(null)
     }
   }
-
-  /* ===== 数の帯（ルールの一覧と同じ4つ） ===== */
-  const activeCount = currentRules ? currentRules.filter((rule) => rule.isActive).length : 0
-  const stoppedCount = currentRules ? currentRules.length - activeCount : 0
-  const neverRunCount = currentRules ? currentRules.filter((rule) => rule.isActive && rule.executionCount30d === 0).length : 0
-  const cells: BandCell[] = [
-    { key: 'rules', title: 'ルール', icon: <ListChecks size={16} aria-hidden="true" />, value: currentRules ? currentRules.length : null, unit: '件', detail: rules ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
-    { key: 'runs', title: '今月動いた', icon: <Activity size={16} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
-    { key: 'failed', title: '失敗', icon: <FileWarning size={16} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={16} aria-hidden="true" />, value: skipped, unit: '回', detail: rules ? `稼働中で直近30日動いていないルール ${neverRunCount}` : emptyValue('unknown') },
-  ]
 
   /* ===== 本文 ===== */
   let body: ReactNode
@@ -260,7 +238,6 @@ export default function AutomationTemplatesV8() {
       tabs={<AutomationTabs active="templates" counts={tabCounts} />}
       stats={<>
         {viewerOnly ? <ViewerBand /> : null}
-        <AutomationBand label="ルールの数の帯" cells={cells} />
       </>}
     >
       {status === 'ready' && items.length > 0 ? body : <ListPageSection>{body}</ListPageSection>}

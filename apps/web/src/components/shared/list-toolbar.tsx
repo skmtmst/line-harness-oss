@@ -286,7 +286,11 @@ export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanEl
 
 /** : the shared end owns order; keep each control and its handler intact. */
 function orderedTrailingTools(nodes: ReactNode, accessory?: ReactNode): ReactNode[] {
-  const flatten = (items: ReactNode): ReactNode[] => Children.toArray(items).flatMap(node => isValidElement<{ children?: ReactNode }>(node) && node.type === Fragment ? flatten(node.props.children) : [node])
+  const flatten = (items: ReactNode, prefix = ''): ReactNode[] => Children.toArray(items).flatMap((node, index) => {
+    if (!isValidElement<{ children?: ReactNode }>(node)) return [node]
+    const key = `${prefix}${node.key ?? index}`
+    return node.type === Fragment ? flatten(node.props.children, `${key}/`) : [cloneElement(node, { key })]
+  })
   const rank = (node: ReactNode) => ({ search: 0, filter: 0, sort: 1, count: 2, action: 3 })[toolbarRole(node)]
   const tools = flatten(nodes).sort((a, b) => rank(a) - rank(b))
   if (!accessory) return tools

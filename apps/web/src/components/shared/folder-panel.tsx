@@ -1,6 +1,7 @@
 'use client'
 
-import { Children, Fragment, isValidElement, useState, type CSSProperties, type ReactNode } from 'react'
+import { Children, Fragment, isValidElement, useContext, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { FolderNarrowContext, folderRowIds } from './folder-narrow-context'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import HelpTip from './help-tip'
 import { usePermissionLockTip } from './permission-lock-tip'
@@ -165,6 +166,7 @@ export default function FolderPanel({
   addFolderDisabled = false,
   addFolderLockedReason,
   addFolderTitle,
+  hideNarrowAdd = false,
   addFolderNote,
   children,
   createAction,
@@ -200,6 +202,8 @@ export default function FolderPanel({
   onAddFolder?: () => void
   addFolderLabel?: string
   addFolderDisabled?: boolean
+  /** 畳んだ選択欄には追加を出さない。広い列の権限表示は保つ。 */
+  hideNarrowAdd?: boolean
   /** 入力不足とは別の権限理由。 */
   addFolderLockedReason?: string
   addFolderTitle?: string
@@ -209,6 +213,16 @@ export default function FolderPanel({
   children?: ReactNode
 }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const registerNarrowAction = useContext(FolderNarrowContext)
+  const narrowKey = useRef(Symbol('folder-add'))
+  const latestAdd = useRef(onAddFolder)
+  latestAdd.current = onAddFolder
+  const rowIds = folderRowIds(rows)
+  const canRegisterAdd = Boolean(onAddFolder || addFolderLockedReason)
+  useLayoutEffect(() => {
+    if (!registerNarrowAction || readOnly || hideNarrowAdd || !canRegisterAdd) return
+    return registerNarrowAction({ key: narrowKey.current, rowIds, label: addFolderLabel, disabled: disabled || addFolderDisabled, lockedReason: addFolderLockedReason, run: () => latestAdd.current?.() })
+  }, [registerNarrowAction, rowIds, addFolderLabel, disabled, addFolderDisabled, addFolderLockedReason, readOnly, hideNarrowAdd, canRegisterAdd])
   const addLock = usePermissionLockTip<HTMLButtonElement>(addFolderLockedReason)
   const notes = takeFolderNotes(children), addNotes = takeFolderNotes(addFolderNote)
   const hasExplanation = (!readOnly && heading === 'フォルダ') || headingHelp || notes.help.length > 0 || addNotes.help.length > 0

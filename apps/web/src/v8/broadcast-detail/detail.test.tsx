@@ -225,6 +225,7 @@ describe('V8 一斉配信の詳細', () => {
     expect(dialog.textContent).toContain('ほかの人が予約を変えました。読み直してから、もう一度選んでください')
     expect(dialog.querySelector('[data-save-conflict]')).not.toBeNull()
     expect([...dialog.querySelectorAll('button')].some(button => button.textContent?.trim() === '予約を取り消す')).toBe(false)
+    expect(cancel).toHaveBeenCalledTimes(1)
     const reloadButton = [...dialog.querySelectorAll('button')].find(button => button.textContent?.trim() === '最新を読み込んで続ける')!
     await act(async () => reloadButton.click())
     expect(reload).toHaveBeenCalledTimes(1)

@@ -116,3 +116,14 @@ it.each(['staff', 'owner', 'admin'])('保存した検索が0件でも作成リ�
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it('項目IDがない編集画面は取得を待たずに見出しと一覧への戻り先を出す', async () => {
+  state.role = verifiedStaffRole('owner')
+  state.query = ''
+  const { api } = await import('@/lib/api')
+  const list = vi.spyOn(api.friendFields, 'list')
+  render(<main><FieldEdit /></main>)
+  expect(screen.getByRole('heading', { level: 1, name: '編集する友だち情報欄が指定されていません' })).toBeTruthy()
+  expect(screen.getByRole('link', { name: '友だち情報欄の一覧へ戻る' }).getAttribute('href')).toBe('/tags?tab=fields')
+  expect(list).not.toHaveBeenCalled()
+})

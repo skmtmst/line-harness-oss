@@ -41,7 +41,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
-import { MANAGE_REASON, ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, overviewBandCells, useWebhookOverview } from './shell'
+import { MANAGE_REASON, ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, useWebhookOverview } from './shell'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { shortDateTime } from './words'
 import { useWebhookWriteAccess, canManageWebhooksNow, captureWebhookWriteAccess } from './write-access'
@@ -890,11 +890,10 @@ export default function WebhooksIncomingV8() {
       stats={<>
         {management.known && !canManage ? <ViewerBand /> : null}
         <WebhookBand
-          cells={overviewBandCells({
-            outgoing: overview.outgoingCount === null ? null : overview.outgoing,
-            incomingCount: overview.incomingCount,
-            summary: overview.summary,
-          })}
+          cells={[
+            { key: 'inlets', title: '受け取り口', icon: <Inbox aria-hidden="true" />, value: overview.incomingCount, unit: '件', detail: '作成した受け取り口' },
+            { key: 'received', title: '過去30日 受け取った', icon: <Inbox aria-hidden="true" />, value: overview.summary?.incoming ?? null, unit: '回', detail: overview.summary ? '受け取りの記録' : '集計を読み込めませんでした' },
+          ]}
         />
       </>}
       overlays={<>
