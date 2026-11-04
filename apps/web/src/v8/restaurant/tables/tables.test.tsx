@@ -9,7 +9,7 @@ vi.hoisted(() => {
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
 })
 
-const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), deleteTable: vi.fn(), updateTable: vi.fn(), updateReservation: vi.fn(), saveTableLayout: vi.fn() }))
+const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), deleteTable: vi.fn(), updateTable: vi.fn(), updateReservation: vi.fn(), stopTable: vi.fn(), saveTableLayout: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const floorApi = vi.hoisted(() => ({ floors: vi.fn() }))
 const assignmentApi = vi.hoisted(() => ({ getTables: vi.fn(), saveTables: vi.fn() }))
@@ -26,9 +26,14 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRo
 import TablesPage from './tables'
 import { pickMoveTarget } from './move'
 import { ApiError } from '@/lib/api/transport/errors'
-import { at, reservation, snapshotOf, store, tables } from '../booking-kit/test-data'
+import { at, reservation, snapshotOf as rawSnapshotOf, store, tables } from '../booking-kit/test-data'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
+
+function snapshotOf(over: Record<string, unknown> = {}) {
+  const snapshot = rawSnapshotOf(over)
+  return { ...snapshot, tables: snapshot.tables.map(t => ({ confirmation_revision: 1, ...t })), reservations: (snapshot.reservations as Array<Record<string, unknown>>).map(r => ({ confirmation_revision: 1, ...r })) }
+}
 
 /* T3 に先の予約が2件：1件目は T4 が空いている、2件目は同じ時間の T4・個室A が埋まっている（4名は入る卓が無い）。 */
 const upcoming = [
@@ -49,7 +54,7 @@ beforeEach(() => {
   assignmentApi.saveTables.mockImplementation(async (_account, _store, input) => ({ success: true, data: { ...assignment, ...input, version: 5 } }))
   floorApi.floors.mockResolvedValue({ success: true, data: [] })
   fixture.snapshot.mockResolvedValue({ data: snapshotOf({ reservations: upcoming }) })
-  for (const fn of [fixture.createTable, fixture.deleteTable, fixture.updateTable, fixture.updateReservation, fixture.saveTableLayout]) fn.mockResolvedValue({ success: true })
+  for (const fn of [fixture.createTable, fixture.deleteTable, fixture.updateTable, fixture.updateReservation, fixture.stopTable, fixture.saveTableLayout]) fn.mockReset().mockResolvedValue({ success: true })
 })
 afterEach(() => { cleanup(); clearToastsForTest(); vi.useRealTimers(); vi.clearAllMocks() })
 
@@ -250,51 +255,50 @@ describe('BERxg 座席・卓管理', () => {
     const dialog = document.querySelector('[data-design-node="eY9F3"]') as HTMLElement
     expect(dialog.textContent).toContain('これから先の予約が 2 件')
     fireEvent.click(within(dialog).getByRole('button', { name: '予約を移して止める' }))
-    await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't3', { isActive: false }))
-    expect(fixture.updateReservation).toHaveBeenNthCalledWith(1, 'account-1', 'r1', { tableId: 't4', expectedVersion: 1 })
-    expect(fixture.updateReservation).toHaveBeenNthCalledWith(2, 'account-1', 'r2', { tableId: null, expectedVersion: 1 })
+    await waitFor(() => expect(fixture.stopTable).toHaveBeenCalledWith('account-1', 't3', expect.objectContaining({ storeId: 'store-1', expectedTableRevision: 1, reservations: [{ id: 'r1', targetTableId: 't4', expectedRevision: 1 }, { id: 'r2', targetTableId: null, expectedRevision: 1 }] })))
+    expect(fixture.updateReservation).not.toHaveBeenCalled()
   })
 
   it('予約の移動中にアカウントが切り替わったら次の変更を送らない', async () => {
     let finish!: (value: unknown) => void
-    fixture.updateReservation.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    fixture.stopTable.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
     const view = render(<><ToastHost /><TablesPage /></>)
     await screen.findByText('卓の詳細')
     fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '予約を移して止める' }))
-    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(fixture.stopTable).toHaveBeenCalledTimes(1))
     account.selectedAccountId = 'account-2'
     await act(async () => { view.rerender(<><ToastHost /><TablesPage /></>) })
     await act(async () => { finish({ success: true }); await Promise.resolve() })
-    expect(fixture.updateReservation).toHaveBeenCalledTimes(1)
+    expect(fixture.stopTable).toHaveBeenCalledTimes(1)
     expect(fixture.updateTable).not.toHaveBeenCalled()
-    expect(await screen.findByText(/1件の変更を確認/)).toBeTruthy()
+    expect(await screen.findByText(/2件の変更を確認/)).toBeTruthy()
   })
 
   it('途中で移動に失敗したら確認できた件数と再確認の必要を表示する', async () => {
-    fixture.updateReservation.mockResolvedValueOnce({ success: true }).mockRejectedValueOnce(new Error('network'))
+    fixture.stopTable.mockRejectedValueOnce(new Error('network'))
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
     fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '予約を移して止める' }))
-    expect(await screen.findByText(/1件の変更を確認/)).toBeTruthy()
+    expect(await screen.findByText(/0件の変更を確認/)).toBeTruthy()
     expect(screen.getByRole('dialog').textContent).toContain('結果を確認')
     expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'キャンセル' }).closest('[data-dialog-actions]')).not.toBeNull()
     expect(fixture.updateTable).not.toHaveBeenCalled()
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '予約を移して止める' }))
-    expect(fixture.updateReservation).toHaveBeenCalledTimes(2)
+    expect(fixture.stopTable).toHaveBeenCalledTimes(1)
   })
 
   it('卓の停止結果が不明なら予約の変更件数と確認先を表示する', async () => {
-    fixture.updateTable.mockRejectedValueOnce(new Error('network'))
+    fixture.stopTable.mockRejectedValueOnce(new Error('network'))
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
     fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '予約を移して止める' }))
-    expect(await screen.findByText(/2件の変更を確認/)).toBeTruthy()
+    expect(await screen.findByText(/0件の変更を確認/)).toBeTruthy()
     expect(screen.getByRole('dialog').textContent).toContain('通信中の変更は結果を確認できません')
     expect(screen.getByRole('dialog').textContent).toContain('予約台帳と卓の状態を確認')
   })
@@ -359,7 +363,7 @@ describe('BERxg 座席・卓管理', () => {
   })
 
   it('予約の移動で失敗したときは卓を止めず、確認窓を残す', async () => {
-    fixture.updateReservation.mockRejectedValueOnce(new Error('予約を移せませんでした。'))
+    fixture.stopTable.mockRejectedValueOnce(new Error('予約を移せませんでした。'))
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
     fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
@@ -463,9 +467,8 @@ describe('卓の停止で移す予約と残す来店履歴', () => {
       fireEvent.click(within(screen.getByRole('option', { name: '未配席に戻す（予約台帳で割り当てる）' })).getByRole('button'))
     }
     fireEvent.click(within(dialog).getByRole('button', { name: mode === 'move' ? '予約を移して止める' : '未配席に戻して止める' }))
-    await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't3', { isActive: false }))
-    expect(fixture.updateReservation).toHaveBeenCalledExactlyOnceWith('account-1', 'future', { tableId: mode === 'move' ? 't4' : null, expectedVersion: 7 })
-    expect(fixture.updateReservation.mock.invocationCallOrder[0]).toBeLessThan(fixture.updateTable.mock.invocationCallOrder[0])
+    await waitFor(() => expect(fixture.stopTable).toHaveBeenCalledWith('account-1', 't3', expect.objectContaining({ reservations: [{ id: 'future', targetTableId: mode === 'move' ? 't4' : null, expectedRevision: 1 }] })))
+    expect(fixture.updateReservation).not.toHaveBeenCalled()
   })
 
   it('履歴と終了済みの予約だけなら移動も未配席更新もせず卓だけを止める', async () => {
@@ -476,7 +479,7 @@ describe('卓の停止で移す予約と残す来店履歴', () => {
     expect(dialog.textContent).toContain('これから先の予約はありません')
     expect(within(dialog).queryByRole('button', { name: 'この予約をどうしますか' })).toBeNull()
     fireEvent.click(within(dialog).getByRole('button', { name: '止める', exact: true }))
-    await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't3', { isActive: false }))
+    await waitFor(() => expect(fixture.stopTable).toHaveBeenCalledWith('account-1', 't3', expect.objectContaining({ reservations: [] })))
     expect(fixture.updateReservation).not.toHaveBeenCalled()
   })
 

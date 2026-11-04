@@ -117,7 +117,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const [deleteError, setDeleteError] = useState('')
   const [stopId, setStopId] = useState('')
   const [deleteScope, setDeleteScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
-  const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object } | null>(null)
+  const [stopScope, setStopScope] = useState<{ scope: typeof renderedScope; ticket: object; table: RestaurantTable; reservations: RestaurantReservation[]; asOf: string } | null>(null)
   const deleteTicket = useRef<object | null>(null)
   const stopTicket = useRef<object | null>(null)
   const [stopError, setStopError] = useState('')
@@ -127,15 +127,9 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   useEffect(()=>{if(addRequest>0)openNew()},[addRequest]) // eslint-disable-line react-hooks/exhaustive-deps
   const editing = editor && editor !== 'new' ? rows.find((row) => row.id === editor) ?? null : null
   const deleting = deleteScope?.scope === scope.current && deleteScope.ticket === deleteTicket.current ? rows.find((row) => row.id === deleteId) : undefined
-  const stopping = stopScope?.scope === scope.current && stopScope.ticket === stopTicket.current ? rows.find((row) => row.id === stopId) : undefined
-  const now = Date.now()
+  const stopping = stopScope?.scope === scope.current && stopScope.ticket === stopTicket.current && stopScope.table.id === stopId ? stopScope.table : undefined
   /* この卓に入っている、これから先の予約（取消・無断キャンセル・来店済みは除く）。 */
-  const upcoming = useMemo(() => (stopping
-    ? data.reservations
-      .filter((item) => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(stopping.id) && !['cancelled', 'no_show', 'completed', 'visited', 'seated'].includes(item.status) && !item.departed_at)
-      .filter((item) => new Date(item.ends_at).getTime() > now)
-      .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-    : []), [data.reservations, stopping, now])
+  const upcoming = stopping ? stopScope!.reservations : []
 
   const openNew = () => {
     setEditorError('')
@@ -238,18 +232,22 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     void mutate(async () => {
       try {
         const taken: RestaurantReservation[] = data.reservations.filter((item) => item.table_id !== table.id)
+        const moves: Array<{ id: string; expectedRevision: number; targetTableId: string | null }> = []
         for (const item of reservations) {
           if (!current()) throw new QuietError()
-          const target = moveMode === 'move' ? pickMoveTarget(item, rows.filter((row) => row.id !== table.id), taken) : null
-          inFlight = true
-          await restaurantTestApi.updateReservation(selectedAccountId, item.id, { tableId: target?.id ?? null, expectedVersion: item.customer_version ?? 1 })
-          inFlight = false
-          if (target) { moved += 1; taken.push({ ...item, table_id: target.id }) } else { unassigned += 1 }
+          const target = moveMode === 'move' ? pickMoveTarget(item, rows.filter((row) => row.id !== table.id && row.id !== item.table_id), taken) : null
+          if (!item.confirmation_revision) throw new Error('予約を読み直してください')
+          moves.push({ id: item.id, expectedRevision: item.confirmation_revision, targetTableId: target?.id ?? null })
+          if (target) taken.push({ ...item, table_id: target.id })
         }
         if (!current()) throw new QuietError()
+        if (!table.confirmation_revision) throw new Error('卓を読み直してください')
         inFlight = true
-        await restaurantTestApi.updateTable(selectedAccountId, table.id, { isActive: false })
+        await restaurantTestApi.stopTable(selectedAccountId, table.id, { storeId: table.store_id, expectedTableRevision: table.confirmation_revision, asOf: stopScope.asOf, reservations: moves })
         inFlight = false
+        moved = moves.filter(move => move.targetTableId !== null).length
+        unassigned = moves.length - moved
+        if (!current()) throw new QuietError()
         return { moved, unassigned }
       } catch (error) {
         const target = accounts.find(account => account.id === selectedAccountId)?.name || '名前を確認できないLINEアカウント'
@@ -322,7 +320,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
                 <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} /></span>
                 <TableRowActions table={item} canEdit={canEdit} busy={busy} pendingAccount={!snapshotAccountCurrent} onEdit={openEdit} onResume={resume}
                   onDelete={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteError(''); setDeleteId(table.id) }}
-                  onStop={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket }); setStopError(''); stopProgressRef.current = false; setStopProgress(''); setMoveMode('move'); setStopId(table.id) }} />
+                  onStop={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}, asOf = new Date().toISOString(); const reservations = data.reservations.filter(item => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(table.id) && !['cancelled','no_show','completed','visited','seated'].includes(item.status) && !item.departed_at && new Date(item.ends_at).getTime() > Date.parse(asOf)).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)); stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket, table, reservations, asOf }); setStopError(''); stopProgressRef.current = false; setStopProgress(''); setMoveMode('move'); setStopId(table.id) }} />
               </li>
             ))}
           </ul>
