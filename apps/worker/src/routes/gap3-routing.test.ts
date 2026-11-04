@@ -104,6 +104,7 @@ test('営業時間の開始後に未割当を再試行し、同じ営業時間�
  await retryInboxAssignmentAtOpening(d.db,new Date('2026-10-15T23:59:00Z'));
  expect(d.raw.prepare('SELECT count(*) n FROM friend_bulk_runs').get()).toEqual({n:0});
  await retryInboxAssignmentAtOpening(d.db,new Date('2026-10-16T00:01:00Z'));
+ d.raw.exec("UPDATE staff_members SET is_active=0 WHERE id='o'; UPDATE staff_members SET role='admin' WHERE id='s'");
  await retryInboxAssignmentAtOpening(d.db,new Date('2026-10-16T00:02:00Z'));
  expect(d.raw.prepare('SELECT count(*) n FROM friend_bulk_runs').get()).toEqual({n:1});
  expect(d.raw.prepare('SELECT count(*) n FROM friend_bulk_run_items').get()).toEqual({n:1});

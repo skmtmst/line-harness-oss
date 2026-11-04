@@ -2,8 +2,8 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { GapError } from './gap-common.js';
 
 /** Reuse the existing durable bulk-run ledger without changing its public operation API. */
-export async function createInboxAssignmentRun(db:D1Database, account:string, actor:string, tenant:string|null|undefined, key:string) {
- const tenantId=tenant??DEFAULT_TENANT_ID, id=crypto.randomUUID(), now=new Date().toISOString();
+export async function createInboxAssignmentRun(db:D1Database, account:string, actor:string, tenant:string|null|undefined, key:string, fixedId?:string) {
+ const tenantId=tenant??DEFAULT_TENANT_ID, id=fixedId??crypto.randomUUID(), now=new Date().toISOString();
  const selection=JSON.stringify({kind:'inbox_unassigned',accountId:account});
  const operation=JSON.stringify({kind:'inbox_auto_assign',accountId:account});
  await db.batch([
@@ -20,7 +20,7 @@ export async function createInboxAssignmentRun(db:D1Database, account:string, ac
     WHERE id=? AND status='preparing'`).bind(id,id,id,now,now,id),
  ]);
  const run=await db.prepare(`SELECT id,selection_json,operation_json,status,target_count,success_count,skipped_count,temporary_failure_count,permanent_failure_count
-   FROM friend_bulk_runs WHERE tenant_id=? AND created_by=? AND idempotency_key=?`).bind(tenantId,actor,key).first<Run>();
+   FROM friend_bulk_runs WHERE tenant_id=? AND ((? IS NOT NULL AND id=?) OR (? IS NULL AND created_by=? AND idempotency_key=?))`).bind(tenantId,fixedId??null,id,fixedId??null,actor,key).first<Run>();
  if(!run || run.operation_json!==operation || run.selection_json!==selection) throw new GapError('idempotency_conflict',409);
  return result(run);
 }
@@ -46,6 +46,6 @@ export async function retryInboxAssignmentAtOpening(db:D1Database,now:Date) {
   if(!account.actor)continue;
   const windows=await businessWindows(db,account.id,now.toISOString(),1);
   const window=windows.find(([start,end])=>start<=now.getTime() && now.getTime()<end);
-  if(window)await createInboxAssignmentRun(db,account.id,account.actor,account.tenant_id,`r5-open:${account.id}:${window[0]}`);
+  if(window){const id=`r5-open:${account.id}:${window[0]}`;await createInboxAssignmentRun(db,account.id,account.actor,account.tenant_id,id,id);}
  }
 }
