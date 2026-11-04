@@ -514,6 +514,21 @@ describe('始めた直後の知らせ', () => {
     expect(link.getAttribute('title')).toBe('開始日時：10月2日 10:00')
   })
 
+  it('集計と試算が両方不明のときは0人と言わず、実際に0人なら0人と示す', async () => {
+    stubStats(undefined)
+    calls.simulate.mockResolvedValue({ success: false, error: 'offline' })
+    await render({ showStarted: true })
+    let band = screen.getAllByRole('status').find(el => el.textContent?.includes('配信を始めました'))!
+    expect(band.textContent).not.toContain('0 人へ')
+    expect(band.textContent).toContain('人数を確認できません')
+    act(() => root.unmount())
+    root = createRoot(host)
+    stubStats(0)
+    await render({ showStarted: true })
+    band = screen.getAllByRole('status').find(el => el.textContent?.includes('配信を始めました'))!
+    expect(band.textContent).toContain('予約中の 0 人へ')
+  })
+
   it('開始の記録が読めないときは、開始日時を作らず読み直しを案内する。始めていない時は帯を出さない', async () => {
     calls.runs.mockResolvedValue({ success: false, error: 'offline' })
     await render({ showStarted: true })

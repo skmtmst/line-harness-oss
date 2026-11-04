@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { EntryRoute } from '@line-crm/shared'
-import { becameLines, buildRows, isUnconfigured } from './rows'
+import { becameLines, buildRows, isUnconfigured, matchesFilter } from './rows'
 
 const route = (overrides: Partial<EntryRoute>): EntryRoute => ({
   id: 'er-1', refCode: 'r1', genre: null, name: '経路', tagId: null, scenarioId: null,
@@ -24,4 +24,13 @@ describe('流入経路の「動き」（WEB033）', () => {
     expect(isUnconfigured(row)).toBe(true)
     expect(becameLines(row, undefined, undefined)).toEqual(['—', '何も付けない'])
   })
+})
+
+it('友だち数が不明の経路は0人の絞り込みに含めず、実際の0人は含める', () => {
+  const [unknown] = buildRows([route({})], [], null)
+  const zero = { ...unknown, stats: { refCode: 'r1', name: null, friendCount: 0, clickCount: 0, latestAt: null } }
+  expect(matchesFilter(unknown, 'no-friends')).toBe(false)
+  expect(matchesFilter(unknown, 'has-friends')).toBe(false)
+  expect(matchesFilter(zero, 'no-friends')).toBe(true)
+  expect(matchesFilter(zero, 'has-friends')).toBe(false)
 })
