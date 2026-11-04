@@ -408,10 +408,10 @@ export const restaurantDeliveryApi = {
   },
 
   /** 確認窓で明示的に確定したときだけ、Uber Eats の接続を解除する。 */
-  ubereatsDisconnect(accountId: string): Promise<UberConnectionMutationData> {
+  ubereatsDisconnect(accountId: string, expectedVersion?: number): Promise<UberConnectionMutationData> {
     return fetchApi<UberConnectionMutationData>(withAccount(`${BASE}/ubereats/connection`, accountId), {
       method: 'DELETE',
-      body: JSON.stringify({ confirmed: true }),
+      body: JSON.stringify({ confirmed: true, ...(expectedVersion === undefined ? {} : { expectedVersion }) }),
     })
   },
 

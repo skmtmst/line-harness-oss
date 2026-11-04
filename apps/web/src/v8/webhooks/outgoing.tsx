@@ -269,11 +269,11 @@ export default function WebhooksOutgoingV8() {
 
   /* ===== 試しに送る ===== */
   const runTest = async (item: OutgoingWebhookOverview, accountId: string, scope: object) => {
-    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== scope || testingId !== null) return
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId || accountScopeRef.current !== scope || testingId !== null || !Number.isSafeInteger(item.version) || (item.version ?? 0) < 1) return
     setTestingId(item.id)
     setTestNotice(null)
     try {
-      const response = await api.webhooks.outgoing.test(item.id, accountId)
+      const response = await api.webhooks.outgoing.test(item.id, accountId, item.version!)
       if (accountRef.current !== accountId || accountScopeRef.current !== scope) return
       if (!response.success) throw new Error(response.error)
       if (response.data.delivered) {

@@ -52,6 +52,7 @@ export const richMenusMethods = {
         isDefaultForAll: boolean;
         status: 'draft' | 'published';
         publishingAt: string | null;
+        publicationGeneration?: number;
         targetingCondition: string | null;
         targetingPriority: number;
         targetingEnabled: boolean;
@@ -204,11 +205,11 @@ export const richMenusMethods = {
         { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
       ),
 
-    unpublish: (groupId: string) =>
+    unpublish: (groupId: string, expectedPublicationGeneration?: number) =>
       fetchApi<ApiResponse<{
         pages: Array<{ pageId: string; clearedRichMenuId: string | null }>;
         warnings: string[];
-      }>>(`/api/rich-menu-groups/${groupId}/unpublish`, { method: 'POST' }),
+      }>>(`/api/rich-menu-groups/${groupId}/unpublish`, { method: 'POST', ...(expectedPublicationGeneration === undefined ? {} : { body: JSON.stringify({ expectedPublicationGeneration }) }) }),
 
     /** N-151: 公開runの履歴と「いま出ている版」。下書きとの差分フラグも返す。 */
     publishRuns: (groupId: string) =>

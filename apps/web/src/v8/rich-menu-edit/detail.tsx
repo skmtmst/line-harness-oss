@@ -41,6 +41,7 @@ type Group = {
   isDefaultForAll: boolean
   targetingEnabled: boolean
   updatedAt?: string
+  publicationGeneration?: number
 }
 
 export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
@@ -90,7 +91,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
   const [unpublishOpen, setUnpublishOpen] = useState(false)
-  const [unpublishScope, setUnpublishScope] = useState<{ groupId: string; accountId: string; generation: number } | null>(null)
+  const [unpublishScope, setUnpublishScope] = useState<{ groupId: string; accountId: string; generation: number; publicationGeneration: number } | null>(null)
   const [unpublishing, setUnpublishing] = useState(false)
   const [duplicateOpen, setDuplicateOpen] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
@@ -296,7 +297,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     setUnpublishing(true)
     setDialogError('')
     try {
-      const res = await api.richMenuGroups.unpublish(unpublishScope.groupId)
+      const res = await api.richMenuGroups.unpublish(unpublishScope.groupId, unpublishScope.publicationGeneration)
       if (!alive.current || generation !== scope.current.generation) return
       if (!res.success) throw new Error(res.error)
       const warningTexts = [...new Set((res.data?.warnings ?? []).map(unpublishWarningText))]
@@ -356,7 +357,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const failed = progress?.failed === true
   const menuItems: ActionMenuItem[] = [
     { id: 'duplicate', label: '複製する', onSelect: () => { setDialogError(''); setDuplicateOpen(true) } },
-    { id: 'unpublish', label: 'LINEから取り下げる', onSelect: () => { if (!group.accountId || group.id !== groupId || groupGeneration.current !== scope.current.generation || !operationPermission.current) return; setDialogError(''); setUnpublishScope({ groupId, accountId: group.accountId, generation: scope.current.generation }); setUnpublishOpen(true) } },
+    { id: 'unpublish', label: 'LINEから取り下げる', onSelect: () => { if (!group.accountId || group.id !== groupId || groupGeneration.current !== scope.current.generation || !operationPermission.current || !Number.isSafeInteger(group.publicationGeneration) || (group.publicationGeneration ?? -1) < 0) return; setDialogError(''); setUnpublishScope({ groupId, accountId: group.accountId, generation: scope.current.generation, publicationGeneration: group.publicationGeneration! }); setUnpublishOpen(true) } },
     { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, disabled: true, disabledReason: '公開中は消せません。先にLINEから取り下げてください', onSelect: () => {} },
   ]
 

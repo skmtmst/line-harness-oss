@@ -372,17 +372,18 @@ async function sendCustomerTestNotification(args: {
   api: { testSend: typeof api.ecCommerce.testSend }
   setting: EcNotificationSetting
   accountId: string
+  expectedRecipientIds: string[]
   guard: CustomerMutationGuard
 }): Promise<
   | { kind: 'applied'; tone: 'success' | 'error'; message: string }
   | { kind: 'stale' }
 > {
-  const { setting, accountId, guard } = args
+  const { setting, accountId, expectedRecipientIds, guard } = args
   try {
     const result = await args.api.testSend({
       eventType: setting.eventType, accountId, title: setting.title || '',
       introText: setting.introText, outroText: setting.outroText, buttonLabel: setting.buttonLabel,
-      buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
+      buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl, expectedRecipientIds,
     })
     if (!result.success) throw new Error(result.error)
     // 別アカウントへ切り替わった後の応答は、いまの画面へ出さない。
@@ -1210,10 +1211,10 @@ function LineNotificationsPage() {
   }
   const confirmTestSend = () => {
     const target = testSendDraft
-    return canChangeRef.current && target && target.scope === testAccountScope.current && target.generation === testRecipientGeneration.current && target.accountId === selectedAccountRef.current ? testSend(target.setting) : undefined
+    return canChangeRef.current && target && target.scope === testAccountScope.current && target.generation === testRecipientGeneration.current && target.accountId === selectedAccountRef.current && testRecipients.state === 'ready' && testRecipients.items.length > 0 ? testSend(target.setting, testRecipients.items.map((item) => item.id)) : undefined
   }
 
-  const testSend = async (setting: EcNotificationSetting) => {
+  const testSend = async (setting: EcNotificationSetting, expectedRecipientIds: string[]) => {
     if (!canChange) return
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     const accountId = selectedAccountId
@@ -1225,6 +1226,7 @@ function LineNotificationsPage() {
       api: { testSend: api.ecCommerce.testSend },
       setting,
       accountId,
+      expectedRecipientIds,
       guard,
     })
     if (outcome.kind === 'stale') return

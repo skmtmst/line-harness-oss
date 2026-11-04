@@ -41,7 +41,7 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 const SUMMARY = { total: 10, outgoing: 8, incoming: 2, succeeded: 10, failed: 0, resultUnknown: 0, outgoingFailed: 0, retryable: 0, averageDurationMs: 400 }
 const inlet = (id: string, name: string) => ({ id, name, sourceType: 'form', hasSecret: true, isActive: true, createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
 const destination = (id: string, name: string, url = 'https://crm.example.com/line/hook?token=secret-path') => ({
-  id, name, url, eventTypes: ['friend_add'], isActive: true, hasSecret: true, folderId: null,
+  id, name, url, eventTypes: ['friend_add'], isActive: true, hasSecret: true, folderId: null, version: 3,
   deliverySummary: { total: 0, failed: 0, pending: 0, canRetry: false, lastResult: null },
 })
 
@@ -500,6 +500,7 @@ describe('試し送信は送り先を確かめてから送る', () => {
     route = (url, method) => method === 'POST' && url.includes('/test') ? json({ success: true, data: { delivered: true, responseStatus: 200 } }) : undefined
     await act(async () => { confirmButton('この送り先へ送る').click() })
     expect(writes().map((call) => call.url)).toEqual([`${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/outgoing/out-1/test?lineAccountId=account-a`])
+    expect(writes()[0].body).toEqual({ expectedVersion: 3 })
   })
 })
 

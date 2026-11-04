@@ -129,10 +129,10 @@ export const webhooksMethods = {
           `/api/webhooks/outgoing/${id}/restore?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST' },
         ),
-      test: (id: string, lineAccountId: string) =>
+      test: (id: string, lineAccountId: string, expectedVersion?: number) =>
         fetchApi<ApiResponse<{ delivered: boolean; responseStatus: number | null }>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}/test?lineAccountId=${encodeURIComponent(lineAccountId)}`,
-          { method: 'POST' },
+          { method: 'POST', ...(expectedVersion === undefined ? {} : { body: JSON.stringify({ expectedVersion }) }) },
         ),
     },
     interactions: {

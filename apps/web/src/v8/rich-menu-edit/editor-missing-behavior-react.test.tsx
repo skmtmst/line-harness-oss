@@ -14,7 +14,7 @@ const group = {
   id: 'g1', accountId: 'account-1', name: 'メニュー', chatBarText: 'メニュー',
   size: 'large', defaultPageId: 'p1', isDefaultForAll: false, status: 'published',
   targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }), targetingPriority: 2, targetingEnabled: true,
-  folderId: null, defaultOpen: true, version: 1,
+  folderId: null, defaultOpen: true, version: 1, publicationGeneration: 3,
   pages: [{ id: 'p1', orderIndex: 0, name: '1枚目', aliasId: '', lineRichmenuId: null, imageR2Key: 'img', imageContentType: 'image/jpeg', areas: [] }],
 }
 vi.mock('next/navigation', async () => {
@@ -150,7 +150,7 @@ describe('現役V8へ残す旧編集の動き', () => {
     expect(net.unpublish).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: 'LINEから取り下げる' }))
     await waitFor(() => expect(net.push).toHaveBeenCalledWith('/rich-menus'))
-    expect(net.unpublish).toHaveBeenCalledExactlyOnceWith('g1')
+    expect(net.unpublish).toHaveBeenCalledExactlyOnceWith('g1', 3)
   })
   it('取り下げ失敗は確認を残して再試行できる', async () => {
     net.unpublish.mockRejectedValueOnce(new Error('down'))
