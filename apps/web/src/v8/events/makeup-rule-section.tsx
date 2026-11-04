@@ -43,7 +43,7 @@ export function MakeupRuleSection({ accountId, event, busy, onSaved, onEditState
   const [open, setOpen] = useState(false)
   const allowed = manager && !lock && Boolean(rule) && Number.isInteger(event.version) && event.version! >= 1 && !busy
   return <FormSection id="event-makeup-rule" title="振替の決まり" description="欠席した方に渡す振替の条件を設定します。"
-    action={<Button lockedReason={lock} disabled={!allowed} onClick={() => { if (allowed) setOpen(true) }}>振替の決まりを編集する</Button>}>
+    action={manager && !session?.impersonation ? <Button lockedReason={lock} disabled={!allowed} onClick={() => { if (allowed) setOpen(true) }}>振替の決まりを編集する</Button> : undefined}>
     {rule ? <p>{makeupRuleSummary(rule)}</p> : <Notice tone="warn" message="振替の決まりを読み戻せませんでした。イベントを読み直してから設定してください。" />}
     {open && rule ? <MakeupRuleDialog key={`${accountId}:${event.id}`} accountId={accountId} event={event} initial={rule}
       lockedReason={lock} allowed={allowed} onEditState={onEditState} onCancel={() => setOpen(false)} onSaved={(saved, revision, previousRevision) => {

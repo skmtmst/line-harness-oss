@@ -128,10 +128,16 @@ it('保存の競合では入力を保って比較・最新の読取へ進み、�
   await waitFor(() => expect(saved).toHaveBeenCalledWith({ ...initial, monthlyCap: 5 }, 10, 9))
 })
 
-it.each(['staff', 'viewer', null])('権限が%sのとき、設定を読めても書き込み口を開かない', role => {
+it.each(['staff', 'viewer', null])('権限が%sのとき、設定を読めても編集操作を表示しない', role => {
   mocks.role = role; render(view())
-  fireEvent.click(screen.getByRole('button', { name: '振替の決まりを編集する' }))
+  expect(screen.queryByRole('button', { name: '振替の決まりを編集する' })).toBeNull()
   expect(screen.queryByRole('dialog')).toBeNull(); expect(mocks.save).not.toHaveBeenCalled()
+})
+
+it('代理ログイン中は編集操作を表示しない', () => {
+  rememberSessionSnapshot({ impersonation: { id: 'proxy', mode: 'read' } as never, unfamiliarAt: null, stepUpMethod: 'none' })
+  render(view())
+  expect(screen.queryByRole('button', { name: '振替の決まりを編集する' })).toBeNull()
 })
 
 it('途中で代理ログインへ切り替わると、開いている窓からも送れない', async () => {
