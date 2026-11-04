@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
-import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import StatusAction from '@/components/shared/status-action'
 import { fetchApi } from '@/lib/api'
 
 type Pending = { id: string; name: string; version: number; snapshot: string; definition: { settings: Record<string, unknown> } }
@@ -14,11 +15,12 @@ export default function CatalogUpdate({ accountId, targetId, kind, canEdit, onCh
   const [pending, setPending] = useState<Pending | null>(null)
   const [error, setError] = useState('')
   const [choice, setChoice] = useState<'adopt' | 'keep' | null>(null)
+  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const path = `${kind === 'booking_menu' ? '/api/booking/admin/menus' : '/api/mileage/rewards'}/${encodeURIComponent(targetId)}/hq-update?accountId=${encodeURIComponent(accountId)}`
   useEffect(() => {
     let live = true
-    setPending(null); setError(''); setChoice(null)
+    setPending(null); setError(''); setChoice(null); setOpen(false)
     void Promise.resolve().then(() => fetchApi<{ success: true; data: Pending | null }>(path)).then(result => {
       if (!live) return
       const data = result?.data
@@ -40,10 +42,11 @@ export default function CatalogUpdate({ accountId, targetId, kind, canEdit, onCh
   if (!pending && !error) return null
   const settings = pending?.definition.settings
   return <>
-    {error && <Notice tone="warn" density="compact">{error}</Notice>}
-    {pending && <Notice tone="info" density="compact" footer={canEdit ? <><Button onClick={() => setChoice('keep')} disabled={busy}>店の版を維持</Button><Button onClick={() => setChoice('adopt')} disabled={busy}>統括の新版を採用</Button></> : undefined}>
-      統括「{pending.name}」の版 {pending.version} が届いています。新版：{String(settings?.name ?? '')}{kind === 'booking_menu' ? `・${String(settings?.duration_minutes ?? '—')}分・${String(settings?.base_price ?? '—')}円` : `・${String(settings?.requiredMiles ?? '—')}マイル`}。
-    </Notice>}
+    {error && <StatusAction title={error} onClick={() => setOpen(true)}>更新を確認できません</StatusAction>}
+    {pending && <StatusAction onClick={() => setOpen(true)}>統括の新版を確認</StatusAction>}
+    <Dialog open={open} title="統括の新しい版" onCancel={() => setOpen(false)} cancelLabel="戻る" confirmLabel="統括の新版を採用" onConfirm={pending && canEdit ? () => { setOpen(false); setChoice('adopt') } : undefined} footerLead={pending && canEdit ? <Button disabled={busy} onClick={() => { setOpen(false); setChoice('keep') }}>店の版を維持</Button> : undefined}>
+      {error || (pending ? `統括「${pending.name}」の版 ${pending.version} が届いています。新版：${String(settings?.name ?? '')}${kind === 'booking_menu' ? `・${String(settings?.duration_minutes ?? '—')}分・${String(settings?.base_price ?? '—')}円` : `・${String(settings?.requiredMiles ?? '—')}マイル`}。` : '')}
+    </Dialog>
     <ConfirmDialog open={choice !== null} title={choice === 'adopt' ? '統括の新版を採用しますか？' : '店の版を維持しますか？'} description={choice === 'adopt' ? '確認した統括の版を反映します。' : '現在の店の内容を残し、今回の版を見送ります。'} confirmLabel={choice === 'adopt' ? '採用する' : '維持する'} busy={busy} onConfirm={() => void decide()} onCancel={() => { if (!busy) setChoice(null) }} />
   </>
 }

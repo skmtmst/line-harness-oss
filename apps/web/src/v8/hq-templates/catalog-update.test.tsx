@@ -11,6 +11,7 @@ it.each(['booking_menu','mileage_reward'] as const)('%s の新版は確認した
   fetchApi.mockResolvedValueOnce({ success: true, data: { id: 'd', name: '本部', version: 2, snapshot: 'a'.repeat(64), definition: { settings: { name: '新版', duration_minutes: 60, base_price: 1000, requiredMiles: 90 } } } }).mockResolvedValueOnce({ success: true, data: { decision: 'adopted' } })
   const changed = vi.fn()
   const { rerender } = render(<CatalogUpdate accountId="a" targetId="r" kind={kind} canEdit={false} onChanged={changed} />)
+  fireEvent.click(await screen.findByRole('button', { name: '統括の新版を確認' }))
   expect(await screen.findByText(/統括「本部」の版 2/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: '統括の新版を採用' })).toBeNull()
   rerender(<CatalogUpdate accountId="a" targetId="r" kind={kind} canEdit onChanged={changed} />)
@@ -23,6 +24,7 @@ it.each(['booking_menu','mileage_reward'] as const)('%s の新版は確認した
 it('壊れた更新情報を受け取っても一覧を壊さず、確認できなかったことを示す', async () => {
   fetchApi.mockResolvedValueOnce({ success: true, data: { id: 'incomplete' } })
   render(<CatalogUpdate accountId="a" targetId="r" kind="booking_menu" canEdit onChanged={() => {}} />)
+  fireEvent.click(await screen.findByRole('button', { name: '更新を確認できません' }))
   expect(await screen.findByText(/統括からの更新を確認できませんでした/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: '統括の新版を採用' })).toBeNull()
 })
