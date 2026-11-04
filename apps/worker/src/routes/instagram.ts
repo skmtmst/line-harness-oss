@@ -315,6 +315,15 @@ instagram.get(
       const instagramId = short.userId || String(profile.id ?? '');
       if (!/^\d{1,24}$/.test(instagramId))
         throw new InstagramError('instagram_business_account_required', 403);
+      // 投稿先とWebhookの所属を曖昧にしないため、1つのInstagramは1つの
+      // LINEアカウントにだけ接続する。重複を一般的なログイン失敗にしない。
+      const otherConnection = await c.env.DB.prepare(
+        'SELECT 1 FROM instagram_connections WHERE instagram_id=? AND line_account_id<>? LIMIT 1',
+      )
+        .bind(instagramId, id)
+        .first();
+      if (otherConnection)
+        throw new InstagramError('instagram_account_already_connected', 409);
       // 画面に出す名前。`page_name` は空にできない列なので、表示名→利用者名→IDの順に埋める。
       const pageName = profile.name || profile.username || instagramId;
       // この方式の合鍵は1本だけ（ページ用と利用者用の区別が無い）。列は両方そのまま使う。

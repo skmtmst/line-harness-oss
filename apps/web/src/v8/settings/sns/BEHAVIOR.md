@@ -31,7 +31,7 @@
 - 接続済み：行「接続しているアカウント」＝`@ユーザー名（ビジネス）`、行「できること」＝「写真つき投稿の同時公開」。ボタンの行は［接続を確かめる］（`POST /api/instagram/refresh`）＋右端に［接続を解除する］（確認の小窓 → `DELETE /api/instagram/connection`・`expectedVersion` に `connection.version` を渡す）。
 - 「設定がありません」（`unconfigured`／この環境に Meta の設定が無い）：注記だけを出し、**押せないボタンは置かない**（「出す＝使える」）。
 - 閲覧のみ（owner・admin 以外）には接続・解除・確認のボタンを置かない。
-- 戻り先：Instagram のログインから戻ると `/settings/sns?instagram=connected`（または `failed`）。帯でうまくいった／失敗を知らせ、閉じると `router.replace` で印を消す。
+- 戻り先：Instagram のログインから戻ると `/settings/sns?instagram=connected`（または `failed`）。帯でうまくいった／失敗を知らせ、閉じると `router.replace` で印を消す。同じInstagramが別のLINEアカウントに接続済みなら、その接続の解除が必要と知らせる。接続の自動移動はしない。
 - ボタンの中の印：この版の `lucide-react` に Instagram の印が無いので、写真の印（`Camera`）を使う（`aria-hidden`。読み上げはボタンのことばだけ）。
 
 ## 今の口で出せないもの

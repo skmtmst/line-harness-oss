@@ -186,6 +186,23 @@ it('Instagramログイン→暗号化保存→更新→新着同期→切断を�
     db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
   ).toEqual({ n: 0 });
 });
+it('同じInstagramが別のLINEアカウントに接続済みなら元の接続を守って理由を返す', async () => {
+  db.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a3','3','3','','','t1')");
+  await connect();
+  const start = await app().request('/api/instagram/oauth/start?lineAccountId=a3', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  const state = new URL(((await start.json()) as Payload).data.url).searchParams.get('state')!;
+  const callback = await req('/api/instagram/oauth/callback?' + new URLSearchParams({ state, code: 'mock_code' }));
+  const back = new URL(callback.headers.get('location')!);
+
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  expect(back.searchParams.get('instagram_code')).toBe('instagram_account_already_connected');
+  expect(db.raw.prepare('SELECT line_account_id FROM instagram_connections').get()).toEqual({ line_account_id: 'a1' });
+  expect(db.raw.prepare('SELECT COUNT(*) AS n FROM instagram_oauth_states').get()).toEqual({ n: 0 });
+});
 it('閲覧のみ・別アカウント・偽state・再利用・期限切れを拒否する', async () => {
   expect(
     (
