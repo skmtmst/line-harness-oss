@@ -30,6 +30,7 @@ test.each(['booking_menu','mileage_reward'] as const)('%s: 共通の保存・配
  const table=type==='booking_menu'?'menus':'mileage_rewards';
  const row=f.raw.prepare(`SELECT * FROM ${table} WHERE line_account_id='a'`).get() as Record<string,unknown>;
  expect(type==='booking_menu'?row.is_active:row.status).toBe(type==='booking_menu'?0:'draft');
+ if(type==='mileage_reward') expect(row).toMatchObject({hq_template_id:id,hq_customized:0});
  const updated=await check(id);
  if(type==='booking_menu'){
   expect(updated.stores[0].items[0].allowedModes).toEqual(['create']);
@@ -69,6 +70,13 @@ test('景品は同名の公開処理と対象タグを店内のIDへ固定し、
  const p=await check(id);f.raw.exec("UPDATE common_actions SET status='archived' WHERE id='action'");
  expect((await run(id,p,'overwrite')).body.data.stores[0].status).toBe('version_conflict');
  expect((await call(`/${id}/preflight`,'POST',{accountIds:['b']})).status).toBe(409);
+});
+test('別の統括ひな形から配られた同名の景品の出所を上書きしない',async()=>{
+ const first=await create('mileage_reward'), second=await create('mileage_reward');
+ expect((await run(first,await check(first))).body.data.status).toBe('completed');
+ const result=await run(second,await check(second),'overwrite');
+ expect(result.body.data.stores[0].status).toBe('version_conflict');
+ expect(f.raw.prepare('SELECT hq_template_id,hq_customized FROM mileage_rewards').get()).toEqual({hq_template_id:first,hq_customized:0});
 });
 test.each(['booking_menu','mileage_reward'] as const)('%s: 不正な値・他店ID・権限外を拒み、監査失敗時も店を作らない',async type=>{
  const base=defs[type];
