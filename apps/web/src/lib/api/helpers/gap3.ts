@@ -7,10 +7,12 @@ const e=encodeURIComponent;
 const account=(p:string,a:string)=>`${p}?account_id=${e(a)}`;
 const json=(method:string,body:unknown,key?:string)=>({method,body:JSON.stringify(body),...(key?{headers:{'Idempotency-Key':key}}:{})});
 const query=(p:string,values:Record<string,string|number|undefined>)=>{const q=new URLSearchParams();for(const [k,v]of Object.entries(values))if(v!==undefined)q.set(k,String(v));return `${p}${p.includes('?')?'&':'?'}${q}`;};
+export type InboxAssignmentRun={id:string;status:string;total:number;assigned:number;skipped:number;failed:number};
 export const gap3InboxApi={
  get:(a:string)=>fetchApi<Result<{strategy:InboxStrategy;targets:InboxRoutingTarget[];enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;version:number}>>(account('/api/inbox/routing-settings',a)),
  save:(a:string,b:{strategy:InboxStrategy;targets:InboxRoutingTarget[];enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;expectedVersion:number;escalateTeamId?:string|null})=>fetchApi<Result<unknown>>(account('/api/inbox/routing-settings',a),json('PUT',b)),
- applyUnassigned:(a:string)=>fetchApi<Result<{assigned:number;skipped:number}>>(account('/api/inbox/routing/apply-unassigned',a),json('POST',{})),
+ applyUnassigned:(a:string,key:string)=>fetchApi<Result<InboxAssignmentRun>>(account('/api/inbox/routing/apply-unassigned',a),json('POST',{},key)),
+ assignmentRun:(a:string,id:string)=>fetchApi<Result<InboxAssignmentRun>>(account(`/api/inbox/routing/apply-unassigned/${e(id)}`,a)),
  presence:(away:boolean)=>fetchApi<Result<{away:boolean}>>('/api/me/presence',json('PUT',{away})),
  icons:(a:string,offset=0)=>fetchApi<Result<{items:Array<{id:string;url:string;name:string}>;nextOffset:number|null}>>(query(`/api/line-accounts/${e(a)}/sender-icons`,{offset})),
 };

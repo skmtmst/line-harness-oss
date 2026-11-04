@@ -287,6 +287,7 @@ export async function updateFriendBulkRunItem(
     errorMessage?: string | null;
     retryAt?: string | null;
     now: string;
+    expectedAttempt?: number;
   },
 ): Promise<void> {
   const completed = ['success', 'skipped', 'temporary_failure', 'permanent_failure'].includes(input.status)
@@ -297,7 +298,7 @@ export async function updateFriendBulkRunItem(
         SET status = ?, before_json = COALESCE(?, before_json),
             after_json = COALESCE(?, after_json), error_code = ?, error_message = ?,
             retry_at = ?, lease_expires_at = NULL, completed_at = ?, updated_at = ?
-      WHERE id = ?`,
+      WHERE id = ? AND (? IS NULL OR (status = 'running' AND attempt_count = ?))`,
   ).bind(
     input.status,
     input.before === undefined ? null : JSON.stringify(input.before),
@@ -307,7 +308,7 @@ export async function updateFriendBulkRunItem(
     input.retryAt ?? null,
     completed,
     input.now,
-    itemId,
+    itemId, input.expectedAttempt ?? null, input.expectedAttempt ?? null,
   ).run();
 }
 

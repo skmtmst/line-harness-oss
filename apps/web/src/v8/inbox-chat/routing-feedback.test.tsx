@@ -5,10 +5,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 const fx = vi.hoisted(() => ({ save: vi.fn(), notify: vi.fn(), close: vi.fn(), saved: vi.fn() }))
 vi.mock('@/components/shared/toast', () => ({ notifySaved: fx.notify }))
-vi.mock('@/lib/api/helpers/gap1', () => ({ inboxRoutingApi: { get: async () => ({ data: { enabled: false, firstResponseMinutes: 30, businessHoursOnly: false, escalateTeamId: null, version: 1 } }), save: fx.save } }))
+vi.mock('@/lib/api/helpers/gap1', () => ({ inboxRoutingApi: { get: async () => ({ data: { strategy:'none', targets:[], unassignedCount:1, enabled: false, firstResponseMinutes: 30, businessHoursOnly: false, escalateTeamId: null, version: 1 } }), save: fx.save } }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
-  return { ...actual, api: { ...actual.api, notifications: { teams: { list: async () => ({ success: true, data: [] }) } } } }
+  return { ...actual, api: { ...actual.api, staff: { list: async () => ({success:true,data:[{id:'s',name:'担当 A',isActive:true,role:'staff'}]}) }, notifications: { teams: { list: async () => ({ success: true, data: [] }) } } } }
 })
 import Drawer from './routing-drawer'
 const view = (accountId = 'A') => <Drawer open accountId={accountId} onClose={fx.close} onSaved={fx.saved} />
@@ -47,4 +47,13 @@ it('保存中にアカウントを替えたら旧設定の結果を新画面へ�
   expect(fx.notify).not.toHaveBeenCalled()
   expect(fx.saved).not.toHaveBeenCalled()
   expect(fx.close).not.toHaveBeenCalled()
+})
+
+it('割り当て方と対象者を保存する', async () => {
+  render(view())
+  fireEvent.click(await screen.findByRole('button', {name:'均等'}))
+  fireEvent.click(screen.getByRole('combobox', {name:'対象の人'}))
+  fireEvent.click(await screen.findByRole('option', {name:'担当 A'}))
+  await act(async () => { fireEvent.click(screen.getByRole('button', {name:'保存する',exact:true})) })
+  expect(fx.save).toHaveBeenCalledWith('A', expect.objectContaining({strategy:'even',targets:[{staffId:'s',priority:1,cap:10}],expectedVersion:1}))
 })

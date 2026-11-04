@@ -1,3 +1,4 @@
+import { assignInbox } from '../../services/inbox-assignment.js';
 import { canAssignChatTo, chatAssigneeId, staffIdFromChatAssignee } from '../../services/chat-assignees.js';
 import {accountClause} from './friend-bulk-scope.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -85,6 +86,7 @@ interface ItemRow {
   status: string;
   before_json: string | null;
   after_json: string | null;
+  attempt_count?: number;
 }
 
 export class FriendBulkRunError extends Error {
@@ -636,6 +638,16 @@ async function executeOperation(
 ): Promise<{ status: 'success' | 'skipped' | 'waiting'; before?: unknown; after?: unknown; retryAt?: string }> {
   const friend = await requireFriend(db, item);
   const attempt = Number((item as unknown as { attempt_count?: number }).attempt_count ?? 1);
+  if ((operation as {kind:string}).kind === 'inbox_auto_assign') {
+    const account = (operation as unknown as {accountId:string}).accountId;
+    if (friend.line_account_id !== account) return {status:'skipped'};
+    // Recover a successful assignment even if the worker stopped before recording
+    // the item result. The assignment and its receipt share the item's token.
+    if (await db.prepare('SELECT 1 FROM inbox_assignment_logs WHERE mutation_token=? AND account_id=?').bind(item.id,account).first()) return {status:'success'};
+    const assigned = await assignInbox(db,account,friend.id,new Date(now),undefined,item.id,attempt);
+    const receipt = assigned || await db.prepare('SELECT 1 FROM inbox_assignment_logs WHERE mutation_token=? AND account_id=?').bind(item.id,account).first();
+    return {status:receipt?'success':'skipped'};
+  }
   switch (operation.kind) {
     case 'add_tag':
     case 'remove_tag': {
@@ -1048,7 +1060,12 @@ export async function processFriendBulkRun(
   }
   const plan = run.execution_plan_json ? JSON.parse(run.execution_plan_json) as ActionDefinition[] : null;
   const executors = options.executors ?? createAutomationActionExecutors(options.executorDependencies);
-  const items = await getFriendBulkRunItemRows(db, runId) as ItemRow[];
+  const items = (operation as {kind:string}).kind === 'inbox_auto_assign'
+    ? (await db.prepare(`SELECT * FROM friend_bulk_run_items WHERE run_id=? AND
+        (status='queued' OR (status='waiting' AND retry_at IS NOT NULL AND retry_at<=?)
+         OR (status='running' AND lease_expires_at IS NOT NULL AND lease_expires_at<=?))
+        ORDER BY ordinal LIMIT ?`).bind(runId,now,now,options.limit ?? DEFAULT_PROCESS_LIMIT).all<ItemRow>()).results
+    : await getFriendBulkRunItemRows(db, runId) as ItemRow[];
   let processed = 0;
   for (const item of items) {
     if (processed >= (options.limit ?? DEFAULT_PROCESS_LIMIT)) break;
@@ -1061,6 +1078,7 @@ export async function processFriendBulkRun(
         : await executeOperation(db, run, claimed, operation, plan, executors, now);
       await updateFriendBulkRunItem(db, item.id, {
         status: result.status,
+        ...((operation as {kind:string}).kind === 'inbox_auto_assign' ? {expectedAttempt:claimed.attempt_count} : {}),
         before: result.before,
         after: result.after,
         retryAt: 'retryAt' in result ? result.retryAt : null,
@@ -1072,6 +1090,7 @@ export async function processFriendBulkRun(
         : new ItemExecutionError('execution_failed', '一括操作を実行できませんでした', true);
       await updateFriendBulkRunItem(db, item.id, {
         status: failure.retryable ? 'temporary_failure' : 'permanent_failure',
+        ...((operation as {kind:string}).kind === 'inbox_auto_assign' ? {expectedAttempt:claimed.attempt_count} : {}),
         errorCode: failure.code,
         errorMessage: failure.message,
         now,
