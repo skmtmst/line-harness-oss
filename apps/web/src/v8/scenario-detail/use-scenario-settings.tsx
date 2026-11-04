@@ -162,7 +162,7 @@ export function useScenarioSettings({
     setStopError('')
     try {
       if (!stopConfirmationValid()) return
-      const res = await api.scenarios.update(id, { isActive: false, expectedContentRevision: stopConfirmation.contentRevision, expectedSubscriptions: stopConfirmation.subscriptions })
+      const res = await api.scenarios.update(id, { isActive: false, expectedContentRevision: stopConfirmation.contentRevision, expectedSubscriptions: { activeCount: stopConfirmation.activeCount, rowIdSum: stopConfirmation.rowIdSum, rowIdSquareSum: stopConfirmation.rowIdSquareSum } })
       if (!res.success) {
         setStopError(res.error)
         return

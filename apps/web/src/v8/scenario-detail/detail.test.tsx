@@ -70,7 +70,7 @@ vi.mock('@/lib/api', async importOriginal => ({
       create: createScenario,
       get: getScenario,
       update: updateScenario,
-      confirmation: vi.fn(async () => ({ success: true, data: { contentRevision: 1, activeCount: 116, subscriptions: [], referrers: [] } })),
+      confirmation: vi.fn(async () => ({ success: true, data: { contentRevision: 1, activeCount: 116, rowIdSum: 0, rowIdSquareSum: 0, referrers: [] } })),
       simulate: vi.fn(async () => ({ success: true, data: { audience: { newStartPlanned: 116 }, steps: [] } })),
       runs: vi.fn(async () => ({
         success: true,
@@ -402,7 +402,7 @@ describe('整理後も保存・開始・停止と通の状態を保つ', () => {
     const dialog = await screen.findByRole('alertdialog')
     expect(updateScenario).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する', exact: true }))
-    await waitFor(() => expect(updateScenario).toHaveBeenCalledWith('sc-1', { isActive: false, expectedContentRevision: 1, expectedSubscriptions: [] }))
+    await waitFor(() => expect(updateScenario).toHaveBeenCalledWith('sc-1', { isActive: false, expectedContentRevision: 1, expectedSubscriptions: { activeCount: 116, rowIdSum: 0, rowIdSquareSum: 0 } }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   })
 

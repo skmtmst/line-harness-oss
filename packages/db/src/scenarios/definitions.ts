@@ -93,7 +93,7 @@ export async function updateScenario(
   db: D1Database,
   id: string,
   updates: UpdateScenarioInput,
-  options?: { stop?: { reason: string | null; staffId: string }; expectedRevision?: number; expectedSubscriptions?: Array<{ id: string; revision: number }> },
+  options?: { stop?: { reason: string | null; staffId: string }; expectedRevision?: number; expectedSubscriptions?: { activeCount: number; rowIdSum: number; rowIdSquareSum: number } },
 ): Promise<Scenario | null> {
   const now = jstNow();
   const fields: string[] = [];
@@ -167,17 +167,17 @@ export async function updateScenario(
   values.push(now);
   values.push(id);
 
-  const expected = options?.expectedSubscriptions === undefined ? null : JSON.stringify(options.expectedSubscriptions);
+  // 複数の購読が同時に入れ替わると、3つの集計が偶然一致する可能性がある。
+  const expected = options?.expectedSubscriptions;
   const updated = await db
     .prepare(`UPDATE scenarios SET content_revision = content_revision + 1, ${fields.join(', ')}
       WHERE id = ? AND (? IS NULL OR content_revision = ?)
-      AND (? IS NULL OR ((SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=scenarios.id)=json_array_length(?)
-        AND NOT EXISTS (SELECT 1 FROM friend_scenarios fs WHERE fs.scenario_id=scenarios.id
-          AND NOT EXISTS (SELECT 1 FROM json_each(?) expected WHERE json_extract(expected.value,'$.id')=fs.id
-            AND json_extract(expected.value,'$.revision')=fs.confirmation_revision))))`)
-    .bind(...values, options?.expectedRevision ?? null, options?.expectedRevision ?? null, expected, expected, expected)
+      AND (? IS NULL OR ((SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?
+        AND (SELECT COALESCE(SUM(rowid),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?
+        AND (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?))`)
+    .bind(...values, options?.expectedRevision ?? null, options?.expectedRevision ?? null, expected?.activeCount ?? null, expected?.activeCount ?? null, expected?.rowIdSum ?? null, expected?.rowIdSquareSum ?? null)
     .run();
-  if (!updated.meta.changes && (options?.expectedRevision !== undefined || expected !== null)) throw new Error('SCENARIO_CONFIRMATION_CONFLICT');
+  if (!updated.meta.changes && (options?.expectedRevision !== undefined || expected !== undefined)) throw new Error('SCENARIO_CONFIRMATION_CONFLICT');
 
   return db
     .prepare(`SELECT * FROM scenarios WHERE id = ?`)
@@ -204,7 +204,7 @@ export async function updateScenario(
  *   mode='pause'（何もしない）へ戻し、整合した設定にする。削除の確認窓で
  *   参照元の名前を見せてから消す（窓側の役目）。
  */
-export async function deleteScenario(db: D1Database, id: string, confirmation?: { expectedRevision: number; expectedSubscriptions: Array<{ id: string; revision: number }>; expectedReferrers: Array<{ id: string; revision: number }> }): Promise<void> {
+export async function deleteScenario(db: D1Database, id: string, confirmation?: { expectedRevision: number; expectedSubscriptions: { activeCount: number; rowIdSum: number; rowIdSquareSum: number }; expectedReferrers: Array<{ id: string; revision: number }> }): Promise<void> {
   const dependent = await db.prepare(
     `SELECT id FROM affiliate_offers WHERE scenario_id = ? LIMIT 1`,
   ).bind(id).first<{ id: string }>();
@@ -220,19 +220,18 @@ export async function deleteScenario(db: D1Database, id: string, confirmation?: 
   ).bind(id).all<{ id: string }>();
   const referrerIds = confirmation ? confirmation.expectedReferrers.map(row => row.id) : referrers.results.map((row) => row.id);
 
-  const expected = confirmation ? JSON.stringify(confirmation.expectedSubscriptions) : null;
+  const expected = confirmation?.expectedSubscriptions;
   const expectedReferrers = confirmation ? JSON.stringify(confirmation.expectedReferrers) : null;
   try { await db.batch([
     confirmation ? db.prepare(`DELETE FROM scenarios WHERE id=? AND content_revision=?
-      AND (SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=scenarios.id)=json_array_length(?)
-      AND NOT EXISTS (SELECT 1 FROM friend_scenarios fs WHERE fs.scenario_id=scenarios.id
-        AND NOT EXISTS (SELECT 1 FROM json_each(?) expected WHERE json_extract(expected.value,'$.id')=fs.id
-          AND json_extract(expected.value,'$.revision')=fs.confirmation_revision))
+      AND (SELECT COUNT(*) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?
+      AND (SELECT COALESCE(SUM(rowid),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?
+        AND (SELECT COALESCE(SUM((rowid % 104729) * (rowid % 104729)),0) FROM friend_scenarios WHERE scenario_id=scenarios.id AND status='active')=?
       AND (SELECT COUNT(*) FROM scenarios ref WHERE ref.on_complete_scenario_id=scenarios.id)=json_array_length(?)
       AND NOT EXISTS (SELECT 1 FROM scenarios ref WHERE ref.on_complete_scenario_id=scenarios.id
         AND NOT EXISTS (SELECT 1 FROM json_each(?) expected WHERE json_extract(expected.value,'$.id')=ref.id
           AND json_extract(expected.value,'$.revision')=ref.content_revision))`)
-      .bind(id, confirmation.expectedRevision, expected, expected, expectedReferrers, expectedReferrers)
+      .bind(id, confirmation.expectedRevision, expected!.activeCount, expected!.rowIdSum, expected!.rowIdSquareSum, expectedReferrers, expectedReferrers)
       : db.prepare(`DELETE FROM scenarios WHERE id = ?`).bind(id),
     ...(confirmation ? [db.prepare(`SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'scenario_delete_conflict' END)`)] : []),
     db.prepare(`DELETE FROM scenario_publish_keys WHERE scenario_id = ?`).bind(id),

@@ -310,7 +310,7 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       triggerTagId?: string | null;
       isActive?: boolean;
       expectedContentRevision?: number;
-      expectedSubscriptions?: Array<{ id: string; revision: number }>;
+      expectedSubscriptions?: { activeCount: number; rowIdSum: number; rowIdSquareSum: number };
       /** isActive: false で止めるときの理由（任意・200字まで）。 */
       reason?: string;
       deliveryMode?: DeliveryMode;
@@ -326,9 +326,7 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
     if (body.expectedContentRevision !== undefined && (!Number.isSafeInteger(body.expectedContentRevision) || body.expectedContentRevision < 1)) {
       return inputError(c, { success: false, error: 'invalid_confirmation_revision' }, 400, ['expectedContentRevision']);
     }
-    if (body.expectedSubscriptions !== undefined && (body.expectedContentRevision === undefined || !Array.isArray(body.expectedSubscriptions)
-      || body.expectedSubscriptions.some(item => !item || typeof item.id !== 'string' || !item.id || !Number.isSafeInteger(item.revision) || item.revision < 1)
-      || new Set(body.expectedSubscriptions.map(item => item.id)).size !== body.expectedSubscriptions.length)) {
+    if (body.expectedSubscriptions !== undefined && (body.expectedContentRevision === undefined || !validSubscriptionSummary(body.expectedSubscriptions))) {
       return inputError(c, { success: false, error: 'invalid_confirmation_subscriptions' }, 400, ['expectedSubscriptions']);
     }
     if (body.reason !== undefined && (
@@ -418,7 +416,8 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
   } catch (err) {
     if (err instanceof Error && err.message === 'SCENARIO_CONFIRMATION_CONFLICT') {
       const current = await getScenarioById(c.env.DB, c.req.param('id'));
-      return c.json({ success: false, error: 'scenario_confirmation_conflict', data: current ? serializeScenario(current) : null }, 409);
+      if (!current) return fail(c, 404, 'SCENARIO_NOT_FOUND');
+      return c.json({ success: false, error: 'scenario_confirmation_conflict', data: serializeScenario(current) }, 409);
     }
     throw err;
   }
@@ -453,20 +452,19 @@ export const delete__api_scenarios_id_9 = async (c: Context<Env, "/api/scenarios
     const subscriptions = body?.expectedSubscriptions;
     const referrers = body?.expectedReferrers;
     if (revision !== undefined || subscriptions !== undefined || referrers !== undefined) {
-      if (!Number.isSafeInteger(revision) || Number(revision) < 1 || !Array.isArray(subscriptions)
-        || subscriptions.some(item => !item || typeof item.id !== 'string' || !item.id || !Number.isSafeInteger(item.revision) || item.revision < 1)
-        || new Set(subscriptions.map(item => item.id)).size !== subscriptions.length
+      if (!Number.isSafeInteger(revision) || Number(revision) < 1 || !validSubscriptionSummary(subscriptions)
         || !Array.isArray(referrers) || referrers.some(item => !item || typeof item.id !== 'string' || !item.id || !Number.isSafeInteger(item.revision) || item.revision < 1)
         || new Set(referrers.map(item => item.id)).size !== referrers.length)
         return inputError(c, { success: false, error: 'invalid_confirmation' }, 400, ['expectedContentRevision', 'expectedSubscriptions', 'expectedReferrers']);
     }
-    await deleteScenario(c.env.DB, id, revision === undefined ? undefined : { expectedRevision: revision as number, expectedSubscriptions: subscriptions as Array<{id: string; revision: number}>, expectedReferrers: referrers as Array<{id: string; revision: number}> });
+    await deleteScenario(c.env.DB, id, revision === undefined ? undefined : { expectedRevision: revision as number, expectedSubscriptions: subscriptions as { activeCount: number; rowIdSum: number; rowIdSquareSum: number }, expectedReferrers: referrers as Array<{id: string; revision: number}> });
     return c.json({ success: true, data: null });
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
     if (code === 'SCENARIO_CONFIRMATION_CONFLICT') {
       const current = await getScenarioById(c.env.DB, c.req.param('id'));
-      return c.json({ success: false, error: 'scenario_confirmation_conflict', data: current ? serializeScenario(current) : null }, 409);
+      if (!current) return fail(c, 404, 'SCENARIO_NOT_FOUND');
+      return c.json({ success: false, error: 'scenario_confirmation_conflict', data: serializeScenario(current) }, 409);
     }
     if (code === 'SCENARIO_HAS_DEPENDENTS' || /FOREIGN KEY/i.test(code)) {
       return c.json({ success: false, error: '他の機能から使われているため削除できません。先に連携を外してください。' }, 409);
@@ -599,3 +597,9 @@ export const post__api_scenarios_id_steps_10 = async (c: Context<Env, "/api/scen
     throw err;
   }
 };
+
+function validSubscriptionSummary(value: unknown): value is { activeCount: number; rowIdSum: number; rowIdSquareSum: number } {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return Number.isSafeInteger(v.activeCount) && Number(v.activeCount) >= 0 && Number.isSafeInteger(v.rowIdSum) && Number(v.rowIdSum) >= 0 && Number.isSafeInteger(v.rowIdSquareSum) && Number(v.rowIdSquareSum) >= 0;
+}

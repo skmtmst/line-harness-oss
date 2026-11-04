@@ -200,7 +200,7 @@ function stubScenario(patch: Partial<typeof base>) {
 }
 
 function stubStats(activeNow: number | undefined) {
-  calls.confirmation.mockResolvedValue(activeNow === undefined ? { success: false, error: 'offline' } : ok({ contentRevision: 1, activeCount: activeNow, subscriptions: [], referrers: [] }))
+  calls.confirmation.mockResolvedValue(activeNow === undefined ? { success: false, error: 'offline' } : ok({ contentRevision: 1, activeCount: activeNow, rowIdSum: 0, rowIdSquareSum: 0, referrers: [] }))
   calls.stats.mockResolvedValue(activeNow === undefined
     ? { success: false, error: 'offline' }
     : ok({ enrolledTotal: 40, activeNow, completed: 12, paused: 0, steps: [] }))
@@ -345,7 +345,7 @@ describe('シナリオ全体を削除する確認', () => {
     await render()
     const dialog = await openDeleteScenario()
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '削除する' })) })
-    await waitFor(() => expect(calls.remove).toHaveBeenCalledWith('sc-1', { contentRevision: 1, activeCount: 116, subscriptions: [], referrers: [] }))
+    await waitFor(() => expect(calls.remove).toHaveBeenCalledWith('sc-1', { contentRevision: 1, activeCount: 116, rowIdSum: 0, rowIdSquareSum: 0, referrers: [] }))
     await waitFor(() => expect(calls.push).toHaveBeenCalledWith(expect.stringMatching(/^\/scenarios(\?|$)/)))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
   })
