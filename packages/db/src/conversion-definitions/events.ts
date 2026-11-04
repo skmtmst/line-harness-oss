@@ -1,3 +1,4 @@
+import { hasConversionApprovalRevision } from '../conversion-approval-revision.js';
 import { type ConversionDefinitionScope, type ConversionDefinitionEventItem, type DefinitionEventRow } from './types.js';
 import { currentDefinitionForMutation } from './revisions.js';
 
@@ -70,10 +71,11 @@ export async function listConversionDefinitionEvents(
     : 'NULL';
   const cancelledSql = ledgerChecks.length > 0 ? `(${ledgerChecks.join(' OR ')})` : '0';
 
+  const hasRevision = await hasConversionApprovalRevision(db);
   const rows = await db
     .prepare(
       `SELECT ce.id, ce.friend_id, f.display_name AS friend_name,
-              ce.approval_status, ce.value_snapshot, ce.metadata, ce.created_at,
+              ce.approval_status, ${hasRevision ? 'ce.approval_revision' : 'NULL AS approval_revision'}, ce.value_snapshot, ce.metadata, ce.created_at,
               ${cancelledSql} AS cancelled,
               ${reversedSql} AS reversed,
               ${latestReversalSql} AS latest_reversal_id
@@ -99,6 +101,7 @@ export async function listConversionDefinitionEvents(
           ? 'pending'
           : row.approval_status === 'rejected' ? 'rejected' : 'confirmed',
       approvalStatus: row.approval_status,
+      approvalRevision: row.approval_revision,
       cancelled,
       reversed: row.reversed === 1,
       latestReversalId: row.latest_reversal_id,

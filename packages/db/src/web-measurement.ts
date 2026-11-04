@@ -1,3 +1,4 @@
+import { hasConversionApprovalRevision } from './conversion-approval-revision.js';
 import { sqlIdSet } from './id-queries.js';
 import { jstNow, jstDateString } from './utils.js';
 
@@ -325,6 +326,7 @@ export async function appendConversionReversal(
     actorName?: string | null;
     expectedReversalId?: string | null;
     expectedApprovalStatus?: 'pending' | 'approved' | 'rejected' | null;
+    expectedApprovalRevision?: number;
     expectedCancelled?: boolean;
   },
 ): Promise<ConversionReversal> {
@@ -338,6 +340,8 @@ export async function appendConversionReversal(
   const id = crypto.randomUUID();
   const now = jstNow();
   const conditional = input.expectedReversalId !== undefined;
+  const hasRevision = conditional && await hasConversionApprovalRevision(db);
+  const checkRevision = hasRevision && input.expectedApprovalRevision !== undefined;
   const tables = conditional ? await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('affiliate_adjustments','affiliate_reward_entries')").all<{ name: string }>() : null;
   const names = new Set(tables?.results.map((row) => row.name) ?? []);
   const affiliateCancelled = names.has('affiliate_adjustments') && names.has('affiliate_reward_entries')
@@ -351,12 +355,13 @@ export async function appendConversionReversal(
        ${conditional ? `WHERE (SELECT r.id FROM conversion_event_reversals r
          WHERE r.conversion_event_id = ? ORDER BY r.created_at DESC, r.rowid DESC LIMIT 1) IS ?
        AND EXISTS (SELECT 1 FROM conversion_events ce WHERE ce.id = ? AND ce.approval_status IS ?
+         ${!checkRevision ? '' : 'AND ce.approval_revision = ?'}
          AND (COALESCE((SELECT r.kind FROM conversion_event_reversals r WHERE r.conversion_event_id = ce.id ORDER BY r.created_at DESC, r.rowid DESC LIMIT 1) = 'reverse', 0) OR ${affiliateCancelled}) = ?)` : ''}`,
     )
     .bind(
       id, input.conversionEventId, input.kind, input.reason.trim(),
       input.actorId ?? null, input.actorName ?? null, now,
-      ...(conditional ? [input.conversionEventId, input.expectedReversalId, input.conversionEventId, input.expectedApprovalStatus, input.expectedCancelled ? 1 : 0] : []),
+      ...(conditional ? [input.conversionEventId, input.expectedReversalId, input.conversionEventId, input.expectedApprovalStatus, ...(checkRevision ? [input.expectedApprovalRevision] : []), input.expectedCancelled ? 1 : 0] : []),
     )
     .run();
   if (conditional && result.meta.changes === 0) throw new Error('conversion_event_stale');
