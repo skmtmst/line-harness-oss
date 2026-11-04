@@ -252,6 +252,53 @@ describe('実の停止API × 別D1接続の割り込み', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(groupRow().s).toBe('published');
   });
+  test('旧形式の公開世代だけを送った場合も古い世代は取り下げない', async () => {
+    sqlite.prepare("UPDATE rich_menu_groups SET publishing_generation=1 WHERE id='g1'").run();
+    const response = await setupApp(db).request('/api/rich-menu-groups/g1/unpublish', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedPublicationGeneration: 0 }),
+    });
+    expect(response.status).toBe(409);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(groupRow()).toMatchObject({ s: 'published', g: 1, o: null });
+    expect(pageRichMenuId()).toBe('line-old-1');
+  });
+  test('旧形式の公開世代と確認版が一致すれば取り下げられる', async () => {
+    const response = await setupApp(db).request('/api/rich-menu-groups/g1/unpublish', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedPublicationGeneration: 0, expectedConfirmationRevision: 1 }),
+    });
+    expect(response.status).toBe(200);
+    expect(groupRow().s).toBe('draft');
+    expect(pageRichMenuId()).toBeNull();
+    expect(fetch).toHaveBeenCalled();
+  });
+  test('取り下げの取得直前に確認版だけが変わればLINEへ触れない', async () => {
+    const racing = hookedDb(db, /UPDATE rich_menu_groups\s+SET publishing_at = \?, publishing_owner/, async () => {
+      sqlite.prepare("UPDATE rich_menu_groups SET confirmation_revision=confirmation_revision+1 WHERE id='g1'").run();
+    });
+    const response = await setupApp(racing).request('/api/rich-menu-groups/g1/unpublish', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedConfirmationRevision: 1 }),
+    });
+    expect(response.status).toBe(409);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(groupRow()).toMatchObject({ s: 'published', g: 0, o: null });
+    expect(pageRichMenuId()).toBe('line-old-1');
+  });
+  test('取り下げの延長直前に確認版だけが変わればLINEへ触れない', async () => {
+    const racing = hookedDb(db, /UPDATE rich_menu_groups\s+SET publishing_at = \?, publishing_expires_at/, async () => {
+      sqlite.prepare("UPDATE rich_menu_groups SET confirmation_revision=confirmation_revision+1 WHERE id='g1'").run();
+    });
+    const response = await setupApp(racing).request('/api/rich-menu-groups/g1/unpublish', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedConfirmationRevision: 1 }),
+    });
+    expect(response.status).toBe(409);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(groupRow()).toMatchObject({ s: 'published', o: null });
+    expect(pageRichMenuId()).toBe('line-old-1');
+  });
   test('公開処理の世代が進んで元に戻った確認はLINEへ触れない',async()=>{
     sqlite.prepare("UPDATE rich_menu_groups SET publishing_generation=1 WHERE id='g1'").run();
     const response=await setupApp(db).request('/api/rich-menu-groups/g1/unpublish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:true,expectedPages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]})});
