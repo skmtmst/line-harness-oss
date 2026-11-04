@@ -17,7 +17,7 @@ import ColorWell from '@/components/shared/color-well'
 import {Field,FieldError} from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import SectionHeader from '@/components/shared/section-header'
-import Disclosure from '@/components/shared/disclosure'
+import Disclosure, { DisclosureNote } from '@/components/shared/disclosure'
 import CustomerDesignPicker from '@/components/shared/customer-design-picker'
 import CustomerLookPreview from '@/components/shared/customer-look-preview'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -74,7 +74,7 @@ export default function CustomerLookScreen() {
       <Field label="主の色"><ColorWell disabled={!canEdit||saving} label="主の色" value={draft.primaryColor??customerPalette(DEFAULT_CUSTOMER_LOOK).main} allowAlpha={false} allowClear={false} onChange={value=>value&&patch({primaryColor:value})}/></Field>
        <Field label="背景の色"><ColorWell disabled={!canEdit||saving} label="背景の色" value={draft.backgroundColor??customerPalette(DEFAULT_CUSTOMER_LOOK).background} allowAlpha={false} allowClear={false} onChange={value=>value&&patch({backgroundColor:value})}/></Field>
        <Field label="見出しの書体"><Select disabled={!canEdit||saving} aria-label="見出しの書体" value={draft.headingFont} onChange={headingFont=>patch({headingFont:headingFont as CustomerLook['headingFont']})} options={[{value:'default',label:'型に合わせる'},{value:'mincho',label:'明朝'},{value:'marugothic',label:'丸いゴシック'},{value:'sans',label:'ゴシック'}]}/></Field>
-     </>:<p>型の色と書体を使っています。自分で決めるときは、上の「カスタム」を選んでください。</p>}</Disclosure>
+     </>:<DisclosureNote>型の色と書体を使っています。自分で決めるときは、上の「カスタム」を選んでください。</DisclosureNote>}</Disclosure>
     </Card>
    </>}
  </SettingsPage><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} subject="デザインの変更" onSave={save} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave}/></SaveErrorScope>

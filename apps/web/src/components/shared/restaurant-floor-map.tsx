@@ -42,13 +42,14 @@ export default function RestaurantFloorMap({floor,labels,onSelect,onChange,onFlo
  {penTableStyle&&selectedId===t.id?<rect className={styles.selection} x={-17} y={-18} width={t.width+34} height={t.height+42} rx={7}/>:null}
  {chairs.map((chair,index)=>{const horizontal=chair.side==='top'||chair.side==='bottom';const x=horizontal?chair.offset*t.width-10:chair.side==='left'?-10:t.width+4;const y=horizontal?chair.side==='top'?-10:t.height+4:chair.offset*t.height-10;return <rect key={index} className={styles.chair} x={x} y={y} width={horizontal?20:6} height={horizontal?6:20} rx="3"/>})}
  {t.shape==='circle'?<ellipse cx={t.width/2} cy={t.height/2} rx={t.width/2} ry={t.height/2}/>:<rect width={t.width} height={t.height} rx={penTableStyle?10:t.shape==='counter'?t.height/2:8}/>}
+ <title>{r?.label??t.id}</title>
  {penTableStyle?<>
   <text x={t.width/2} y={t.height/2-8}>{r?`${t.minCapacity??1}〜${t.maxCapacity??r.capacity}名`:'—'}</text>
   <g transform={`translate(${t.width/2-19} ${t.height/2+2})`} className={styles.seatMarks}>
    {t.smokingPolicy==='smoking'?<Cigarette x={0} y={0} width={16} height={16}/>:<CigaretteOff x={0} y={0} width={16} height={16} className={styles.prohibitedMark}/>}
    {t.shoesAllowed===false?<Footprints x={23} y={0} width={16} height={16} className={styles.prohibitedMark}/>:<Footprints x={23} y={0} width={16} height={16}/>}
   </g>
-  <text className={styles.tableCaption} x={t.width/2} y={t.height+24}>{r?.label??t.id}</text>
- </>:<><text x={t.width/2} y={t.height/2}>{r?.label??t.id}</text><text x={t.width/2} y={t.height/2+18}>{r?`${r.capacity}人卓${r.active===false?'・停止中':''}`:'—'}</text></>}
+  <foreignObject x={0} y={t.height+15} width={t.width} height={18}><div className={`${styles.tableLabel} ${styles.tableCaption}`} title={r?.label??t.id}>{r?.label??t.id}</div></foreignObject>
+ </>:<><foreignObject x={0} y={t.height/2-12} width={t.width} height={18}><div className={styles.tableLabel} title={r?.label??t.id}>{r?.label??t.id}</div></foreignObject><text x={t.width/2} y={t.height/2+18}>{r?`${r.capacity}人卓${r.active===false?'・停止中':''}`:'—'}</text></>}
  </g>})}</svg>
 }

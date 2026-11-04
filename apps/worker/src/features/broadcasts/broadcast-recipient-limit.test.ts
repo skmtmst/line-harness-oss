@@ -9,7 +9,7 @@ vi.mock('@line-crm/line-sdk', () => ({ LineClient: class {
 vi.mock('../../services/stealth.js', async original => ({ ...await original<Record<string,unknown>>(), sleep: async () => {}, calculateStaggerDelay: () => 0 }));
 const { processBroadcastSend, processQueuedBroadcasts, processScheduledBroadcasts, guardScheduledBroadcastQuota } = await import('./broadcast.js');
 const { renewLimitedReservation, freezeLimitedAudience } = await import('./broadcast-delivery-limit.js');
-const { getBroadcastById, requestBroadcastStop, resumeBroadcastSending, beginBroadcastRetryAttempt, reopenFailedClaims } = await import('@line-crm/db');
+const { getBroadcastById, requestBroadcastStop, resumeBroadcastSending, beginBroadcastRetryAttempt, reopenFailedClaims, recoverStalledBroadcasts } = await import('@line-crm/db');
 const { tryReserveQuotaSlot } = await import('./broadcast-quota-guard.js');
 const { LineClient } = await import('@line-crm/line-sdk');
 function seed(store: SqliteD1, deliveryLimit: unknown) {
@@ -20,6 +20,21 @@ function seed(store: SqliteD1, deliveryLimit: unknown) {
 beforeEach(() => { line.batches=[];line.broadcastCalls=0;vi.stubGlobal('fetch',vi.fn(async input => new Response(JSON.stringify(String(input).endsWith('/consumption')?{totalUsage:8}:{type:'limited',value:10}),{status:200}))); });
 afterEach(() => { vi.unstubAllGlobals();vi.restoreAllMocks(); });
 describe('配信先の上限と残り通数', () => {
+  it.each([false,true])('上限を確認した配信が自動復旧しても確認印を保ち送り切る（差し込み=%s）',async personalized=>{
+    const store=createTestD1();try {
+      seed(store,{upToRemainingQuota:true});
+      if(personalized)store.raw.exec("UPDATE broadcasts SET message_content='{{name}} さん' WHERE id='limited'");
+      const client=new LineClient('unused');await processBroadcastSend(store.db,client,'limited');
+      store.raw.prepare("UPDATE broadcasts SET batch_offset=-1,batch_lock_at=datetime('now','-1 hour'),success_count=? WHERE id='limited'").run(personalized?1:0);
+      await recoverStalledBroadcasts(store.db);
+      const row=(await getBroadcastById(store.db,'limited'))!;
+      expect(row.lock_version).toBe(2);
+      expect(JSON.parse(row.message_options_json!).deliveryLimitConfirmation.version).toBe(2);
+      await processQueuedBroadcasts(store.db,client);
+      expect(line.batches.flat()).toHaveLength(2);
+      expect((await getBroadcastById(store.db,'limited'))!.status).toBe('sent');
+    }finally{store.raw.close();}
+  });
   it('サーバーの確認の印が無ければ、直接呼ばれても送らない', async () => {
     const store=createTestD1();try {
       seed(store,{upToRemainingQuota:false,maxRecipients:2});

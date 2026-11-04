@@ -3,6 +3,7 @@ import { cleanup,fireEvent,render,screen,within } from '@testing-library/react'
 import React from 'react'
 import { afterEach,expect,test,vi } from 'vitest'
 import List from './list'
+import styles from './list.module.css'
 const push = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/friends' }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...props}>{children}</a> }))
@@ -10,7 +11,8 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false }) }))
-vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
+let narrow = false
+vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => narrow }))
 vi.mock('@/lib/operators-cache', () => ({ loadOperators: async () => [] }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
@@ -20,7 +22,7 @@ vi.mock('@/lib/api', async original => {
     friendStats: { get: async () => ({ success: false }) }, tags: { list: async () => ({ success: true, data: [] }) }, scenarios: { list: async () => ({ success: true, data: [] }) },
   } }
 })
-afterEach(() => { cleanup(); sessionStorage.clear() })
+afterEach(() => { cleanup(); sessionStorage.clear(); localStorage.removeItem('friends.visibleColumns'); narrow = false })
 test('友だち行で同じ対応状態は一度、異なるマークと担当は残す', async () => {
   render(<List />)
   const same = (await screen.findByText('同じマークの人')).closest('tr')!
@@ -42,4 +44,25 @@ test('友だち行で同じ対応状態は一度、異なるマークと担当�
   fireEvent.click(within(same).getByRole('checkbox'))
   expect(same.hasAttribute('aria-selected')).toBe(false)
   expect((within(same).getByRole('checkbox') as HTMLInputElement).checked).toBe(false)
+})
+
+test.each([false, true])('表示列が対応・シナリオ・最新・情報欄の幅に対応する（狭い表示: %s）', async (isNarrow) => {
+  narrow = isNarrow
+  localStorage.setItem('friends.visibleColumns', JSON.stringify(['support', 'scenario', 'latest', 'fixed:name']))
+  const view = render(<List />)
+  await screen.findByText('同じマークの人')
+  const table = view.container.querySelector('table')!
+  const headers = [...table.querySelectorAll('thead th')]
+  const columns = [...table.querySelectorAll('colgroup col')]
+  for (const [label, expected] of [
+    ['対応・担当', isNarrow ? styles.colSupportNarrow : styles.colSupport],
+    ['シナリオ', isNarrow ? styles.colScenarioNarrow : styles.colScenario],
+    ['最新の受信', isNarrow ? styles.colLatestNarrow : undefined],
+    ['名前', isNarrow ? styles.colFieldNarrow : undefined],
+  ] as const) {
+    const index = headers.findIndex(header => header.textContent?.trim() === label)
+    expect(index, label).toBeGreaterThanOrEqual(0)
+    const columnIndex = headers.slice(0, index).reduce((sum, header) => sum + header.colSpan, 0)
+    if (expected) expect(columns[columnIndex]?.className).toBe(expected)
+  }
 })

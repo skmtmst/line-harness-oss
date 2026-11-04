@@ -73,6 +73,7 @@ export type ReminderDeliveryRun = RunRecord & {
 export type ReminderDeliveryRunsResponse = {
   reminder: {
     id: string
+    lineAccountId?: string | null
     name: string
     isActive: boolean
     /** 公開版スナップショットのライフサイクル。 */

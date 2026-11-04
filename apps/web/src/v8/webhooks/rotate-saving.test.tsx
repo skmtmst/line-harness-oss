@@ -53,3 +53,13 @@ it.each(['incoming', 'outgoing'] as const)('%sの合言葉の保存中は×・�
   expect(screen.getByRole('dialog')).toBeTruthy()
   await act(async () => resolve({ success: true }))
 })
+it('送信先の新しい鍵を編集中は画面移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/webhooks')
+  render(<><Outgoing /><a href="/events">イベントへ</a></>)
+  await act(async () => {})
+  fireEvent.click(screen.getByRole('button', { name: '「予約台帳」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '鍵を作り直す' }))
+  fireEvent.change(screen.getByLabelText('新しい鍵'), { target: { value: 'test-secret' } })
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+})

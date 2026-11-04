@@ -57,7 +57,7 @@ const base = {
 }
 const company = { ...base, id: 'v-company', folderId: 'f-shop', name: '会社名', varKey: 'company_name', value: '株式会社NEN', usageCount: 15 }
 const hours = { ...base, id: 'v-hours', folderId: null, name: '営業時間', varKey: 'hours', value: '10時から', usageCount: 3 }
-const SHOP = { id: 'f-shop', kind: 'common_var', name: '店舗案内', parentId: null, displayOrder: 0, color: '#2f6fde', itemCount: 1 }
+const SHOP = { id: 'f-shop', kind: 'common_var', accountId: 'account-a', name: '店舗案内', parentId: null, displayOrder: 0, color: '#2f6fde', itemCount: 1 }
 
 let host: HTMLDivElement
 let root: Root

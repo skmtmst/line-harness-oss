@@ -57,6 +57,7 @@ export const adsMethods = {
       return fetchApi<ApiResponse<{
         conversionCost?: import('@line-crm/shared').AdConversionCostSummary
         rows: Array<{
+          lineAccountId?: string | null
           sourceLabel: string
           adPlatformId: string | null
           entryRouteId: string | null
@@ -78,6 +79,7 @@ export const adsMethods = {
         /** R275: 手入力の記録は1行ずつ返す。取消済みも履歴として出す。 */
         manualEntries?: Array<{
           id: string
+          lineAccountId?: string | null
           sourceLabel: string
           day: string
           amountMinor: number

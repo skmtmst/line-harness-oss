@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import {afterEach,beforeEach,expect,it,vi} from 'vitest'
-import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react'
+import {cleanup,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import RestaurantFloorEditor from './restaurant-floor-editor'
 const api=vi.hoisted(()=>({floors:vi.fn(),saveFloor:vi.fn(),createFloor:vi.fn()}))
 const tableApi=vi.hoisted(()=>({createTable:vi.fn(),deleteTable:vi.fn()}))
@@ -68,4 +68,14 @@ it('複製の途中で失敗したら作成済みの卓を取り消す',async()=
 it('閲覧のみにはつまんで置く札を出さない',async()=>{
  render(<RestaurantFloorEditor {...props} canEdit={false}/>);await screen.findByRole('button',{name:'T1'})
  expect(screen.queryByRole('group',{name:'つまんで置く'})).toBeNull()
+})
+
+it('長い卓名は枠内で一行に省略し、全文を確認できる',async()=>{
+ const name='窓側のとても長い名前の特別なテーブル'
+ render(<RestaurantFloorEditor {...props} resources={[{...props.resources[0],label:name}]} canEdit={false}/>)
+ const table=await screen.findByRole('button',{name})
+ const label=within(table).getByTitle(name)
+ expect(label.textContent).toBe(name)
+ expect(label.closest('foreignObject')?.getAttribute('width')).toBe('80')
+ expect(label.className).toContain('tableLabel')
 })

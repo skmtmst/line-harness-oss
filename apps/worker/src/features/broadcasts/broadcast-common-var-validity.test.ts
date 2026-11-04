@@ -247,6 +247,54 @@ describe('N-188 予約配信の共通情報snapshot', () => {
     });
   });
 
+  it.each([
+    ['一致', 4, 200, 'draft'],
+    ['不一致', 3, 409, 'scheduled'],
+    ['版なし', undefined, 200, 'draft'],
+  ] as const)('予約取消の版が%sなら対象を安全に判定する', async (_label, expectedVersion, status, expectedStatus) => {
+    const store = createTestD1();
+    seedAccount(store.raw, 'account-a');
+    seedScheduled(store.raw, 'broadcast-version', 'account-a');
+    store.raw.prepare("UPDATE broadcasts SET lock_version = 4 WHERE id = 'broadcast-version'").run();
+    const response = await broadcastApp(store.db).request('/api/broadcasts/broadcast-version/cancel', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(expectedVersion === undefined ? {} : { expectedVersion }),
+    }, { DB: store.db } as Env['Bindings']);
+    expect(response.status).toBe(status);
+    expect(store.raw.prepare("SELECT status FROM broadcasts WHERE id = 'broadcast-version'").get()).toEqual({ status: expectedStatus });
+    expect(store.raw.prepare("SELECT lock_version FROM broadcasts WHERE id = 'broadcast-version'").get()).toEqual({ lock_version: status === 200 ? 5 : 4 });
+    if (status === 409) expect(await response.json()).toMatchObject({ code: 'VERSION_CONFLICT', data: { id: 'broadcast-version', version: 4, status: 'scheduled' } });
+  });
+
+  it('予約取消の読み取り後に別の人が変更した場合もSQLが古い版を断る', async () => {
+    const store = createTestD1();
+    seedAccount(store.raw, 'account-a');
+    seedScheduled(store.raw, 'broadcast-race', 'account-a');
+    store.raw.prepare("UPDATE broadcasts SET lock_version = 4 WHERE id = 'broadcast-race'").run();
+    const prepare = store.db.prepare.bind(store.db);
+    vi.spyOn(store.db, 'prepare').mockImplementation((sql: string) => {
+      const statement = prepare(sql);
+      if (!sql.includes("SET status = 'draft', scheduled_at = NULL, batch_lock_at = NULL")) return statement;
+      const bind = statement.bind.bind(statement);
+      statement.bind = (...args: unknown[]) => {
+        const bound = bind(...args);
+        const run = bound.run.bind(bound);
+        bound.run = async () => {
+          store.raw.prepare("UPDATE broadcasts SET lock_version = 5, title = '更新後' WHERE id = 'broadcast-race'").run();
+          return run();
+        };
+        return bound;
+      };
+      return statement;
+    });
+    const response = await broadcastApp(store.db).request('/api/broadcasts/broadcast-race/cancel', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedVersion: 4 }),
+    }, { DB: store.db } as Env['Bindings']);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'VERSION_CONFLICT', data: { version: 5, title: '更新後' } });
+    expect(store.raw.prepare("SELECT status FROM broadcasts WHERE id = 'broadcast-race'").get()).toEqual({ status: 'scheduled' });
+  });
+
   it('予約取消は次の予約へ旧試行を持ち越さないよう両snapshot列を消す', async () => {
     const store = createTestD1();
     seedAccount(store.raw, 'account-a');
@@ -263,6 +311,7 @@ describe('N-188 予約配信の共通情報snapshot', () => {
       { DB: store.db } as Env['Bindings'],
     );
     expect(response.status).toBe(200);
+    expect(store.raw.prepare("SELECT lock_version FROM broadcasts WHERE id = 'broadcast-cancel'").get()).toEqual({ lock_version: 2 });
     expect(store.raw.prepare(`
       SELECT status, scheduled_at, common_var_snapshot, common_var_snapshot_at
         FROM broadcasts WHERE id = 'broadcast-cancel'
