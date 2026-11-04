@@ -600,3 +600,95 @@ describe('休業・貸切からGoogleの変更案',()=>{
   const res=await call('/api/restaurant-test/google/hours/from-closure',{body:{closureId:'closure',expectedVersion:1,includePrivateEvent:true}});expect(res.status).toBe(409);expect((await res.json() as any).code).toBe('partial_tables');
  });
 });
+
+describe('営業時間ツールの店舗別下書きと変更確認', () => {
+  async function draft() {
+    await call('/api/restaurant-test/google/profile');
+    const response = await call('/api/restaurant-test/google/hours/workspace');
+    expect(response.status).toBe(200);
+    return await response.json() as import('@line-crm/shared').HoursWorkspaceData;
+  }
+  it('下書きだけを保存し、再読み込みで復元する。古い版は上書きしない', async () => {
+    const workspace = await draft();
+    workspace.data.draft.days = [{ date: '2026-12-14', closed: true, periods: [] }, { date: '2026-12-18', closed: true, periods: [] }];
+    const saved = await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } });
+    expect(saved.status).toBe(200);
+    const restored = await (await call('/api/restaurant-test/google/hours/workspace')).json() as typeof workspace;
+    expect(restored.data.draft.days.map(d => d.date)).toEqual(['2026-12-14', '2026-12-18']);
+    expect(restored.version).toBe(1);
+    expect(patchCalls()).toHaveLength(0);
+    const stale = await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } });
+    expect(stale.status).toBe(409);
+  });
+  it('離れた日だけを特別営業時間の確認へ送り、その間の日を変更しない', async () => {
+    const workspace = await draft();
+    workspace.data.draft.days = [{ date: '2026-12-14', closed: true, periods: [] }, { date: '2026-12-18', closed: true, periods: [] }];
+    await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } });
+    const response = await call('/api/restaurant-test/google/hours/review', { body: { expectedVersion: 1 } });
+    expect(response.status).toBe(200);
+    const result = await response.json() as { changes: Array<{ target: { dates: string[] }; after: unknown }> };
+    expect(result.changes[0].target.dates).toEqual(['2026-12-14', '2026-12-18']);
+    expect(patchCalls()).toHaveLength(0);
+  });
+  it('祝日用の営業を設定しても、個別に休業指定した祝日は保持する', async () => {
+    location.specialHours = { specialHourPeriods: [{ startDate: { year: 2026, month: 11, day: 23 }, closed: true }] };
+    const workspace = await draft();
+    workspace.data.holiday = { mode: 'custom', periods: [{ open: '11:00', close: '22:00' }], overrideClosedWeekday: true };
+    workspace.data.draft.holidayChanged = true;
+    await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } });
+    const result = await (await call('/api/restaurant-test/google/hours/review', { body: { expectedVersion: 1 } })).json() as { changes: Array<{ target: { dates: string[] } }> };
+    expect(result.changes.flatMap(c => c.target.dates)).not.toContain('2026-11-23');
+    expect(patchCalls()).toHaveLength(0);
+  });
+  it('サービスのGoogle時間だけを送り、メニューと受付締切を送らず、ほかの種類を保持する', async () => {
+    location.moreHours = [{ hoursTypeId: 'TAKEOUT', periods: [p('MONDAY', 17, 21)] }, { hoursTypeId: 'DELIVERY', periods: [p('FRIDAY', 17, 22)] }];
+    const workspace = await draft();
+    workspace.data.services = [{ id: 'TAKEOUT', kind: 'takeout', label: 'テイクアウト', googleTypeId: 'TAKEOUT', sameWeekdays: false, weekdays: ['MONDAY'], periods: [{ open: '17:00', close: '22:00' }], orderDeadline: '21:30', menu: 'テイクアウトメニュー' }];
+    workspace.data.draft.serviceIds = ['TAKEOUT'];
+    await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } });
+    const response = await call('/api/restaurant-test/google/hours/review', { body: { expectedVersion: 1 } });
+    expect(response.status).toBe(200);
+    const result = await response.json() as { changes: Array<{ id: string }> };
+    const sent = await send(result.changes[0].id);
+    expect(sent.status).toBe(200);
+    const body = JSON.parse(String(patchCalls()[0].init?.body));
+    expect(body.moreHours).toHaveLength(2);
+    expect(body.moreHours.find((h: { hoursTypeId: string }) => h.hoursTypeId === 'DELIVERY').periods).toMatchObject([p('FRIDAY', 17, 22)]);
+    expect(JSON.stringify(body)).not.toContain('21:30');
+    expect(JSON.stringify(body)).not.toContain('テイクアウトメニュー');
+  });
+  it('スタッフと範囲外のアカウントから保存・確認を起動できない', async () => {
+    const workspace = await draft();
+    useStaffRole('staff');
+    const denied = await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', token: 'staff-session', body: { expectedVersion: 0, data: workspace.data } });
+    expect(denied.status).toBe(403);
+    expect((await call('/api/restaurant-test/google/hours/review', { token: 'staff-session', body: { expectedVersion: 0 } })).status).toBe(403);
+    authMocks.lineAccounts = authMocks.lineAccounts.filter(a => a.id !== 'account-2');
+    expect((await call('/api/restaurant-test/google/hours/workspace')).status).toBe(403);
+  });
+  it('削除したサービスだけをGoogleから外し、別のサービスを保持する', async () => {
+    location.moreHours = [{ hoursTypeId: 'TAKEOUT', periods: [p('MONDAY', 17, 21)] }, { hoursTypeId: 'DELIVERY', periods: [p('FRIDAY', 17, 22)] }];
+    const workspace = await draft();
+    workspace.data.draft.serviceIds = ['remove:TAKEOUT'];
+    await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } });
+    const response = await call('/api/restaurant-test/google/hours/review', { body: { expectedVersion: 1 } });
+    expect(response.status).toBe(200);
+    const result = await response.json() as { changes: Array<{ id: string }> };
+    expect((await send(result.changes[0].id)).status).toBe(200);
+    const body = JSON.parse(String(patchCalls()[0].init?.body));
+    expect(body.moreHours.map((h: { hoursTypeId: string }) => h.hoursTypeId)).toEqual(['DELIVERY']);
+  });
+  it('祝日の独自設定を曜日どおりに戻すと、自動作成した特別営業時間だけを外す', async () => {
+    location.specialHours = { specialHourPeriods: [{ startDate: { year: 2026, month: 11, day: 23 }, closed: true }, { startDate: { year: 2027, month: 1, day: 1 }, closed: true }] };
+    const workspace = await draft();
+    workspace.data.holidayManagedDates = ['2026-11-23'];
+    workspace.data.draft.holidayChanged = true;
+    workspace.data.holiday.mode = 'weekly';
+    await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } });
+    const response = await call('/api/restaurant-test/google/hours/review', { body: { expectedVersion: 1 } });
+    expect(response.status).toBe(200);
+    const result = await response.json() as { changes: Array<{ after: Array<{ date: string; remove?: boolean }> }> };
+    expect(result.changes.flatMap(c=>c.after)).toEqual([expect.objectContaining({date:'2026-11-23',remove:true})]);
+    expect(patchCalls()).toHaveLength(0);
+  });
+});

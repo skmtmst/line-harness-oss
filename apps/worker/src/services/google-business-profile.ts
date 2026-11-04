@@ -11,7 +11,7 @@ import { authorizedJson, type RequestOptions } from './google-business.js';
 const BUSINESS_INFO_URL = 'https://mybusinessbusinessinformation.googleapis.com/v1';
 const MEDIA_URL = 'https://mybusiness.googleapis.com/v4';
 
-export const PROFILE_READ_MASK = 'name,title,storefrontAddress,phoneNumbers,websiteUri,regularHours,specialHours,openInfo,profile,metadata';
+export const PROFILE_READ_MASK = 'name,title,storefrontAddress,phoneNumbers,websiteUri,regularHours,specialHours,moreHours,categories,openInfo,profile,metadata';
 export const DESCRIPTION_MAX_LENGTH = 750;
 export const MAX_PERIODS_PER_DAY = 3;
 export const MAX_SPECIAL_DAYS_AHEAD = 366;
@@ -53,6 +53,9 @@ export interface GoogleProfile {
   openStatus: string | null; // OPEN / CLOSED_TEMPORARILY / CLOSED_PERMANENTLY
   regularHours: WeeklyHours;
   specialHours: SpecialDay[];
+  moreHours?: Array<{ hoursTypeId: string; weekly: WeeklyHours }>;
+  moreHoursTypes?: Array<{ id: string; label: string }>;
+  categoryNames?: string[];
   /** Google が返した specialHours の原文。送信時、変更しない日はこの原文をそのまま送り返す（変換で意味が変わるのを防ぐ）。 */
   rawSpecialHours: GoogleSpecialHourPeriod[];
   mapsUri: string | null;
@@ -93,6 +96,8 @@ interface RawLocation {
   websiteUri?: string;
   regularHours?: { periods?: GoogleTimePeriod[] };
   specialHours?: { specialHourPeriods?: GoogleSpecialHourPeriod[] };
+  moreHours?: Array<{ hoursTypeId: string; periods?: GoogleTimePeriod[] }>;
+  categories?: { primaryCategory?: { name?: string; moreHoursTypes?: Array<{ hoursTypeId: string; localizedDisplayName?: string; displayName?: string }> }; additionalCategories?: Array<{ name?: string }> };
   openInfo?: { status?: string };
   profile?: { description?: string };
   metadata?: { mapsUri?: string };
@@ -331,6 +336,9 @@ export async function normalizeProfile(raw: RawLocation, locationName: string): 
     openStatus: raw.openInfo?.status ?? null,
     regularHours,
     specialHours,
+    moreHours: (raw.moreHours ?? []).map(h => ({ hoursTypeId: h.hoursTypeId, weekly: weeklyFromGoogle(h.periods) })).sort((a, b) => a.hoursTypeId.localeCompare(b.hoursTypeId)),
+    moreHoursTypes: (raw.categories?.primaryCategory?.moreHoursTypes ?? []).map(h => ({ id: h.hoursTypeId, label: h.localizedDisplayName ?? h.displayName ?? h.hoursTypeId })),
+    categoryNames: [raw.categories?.primaryCategory?.name, ...(raw.categories?.additionalCategories ?? []).map(c => c.name)].filter((n): n is string => Boolean(n)),
     mapsUri: raw.metadata?.mapsUri ?? null,
   };
   return { ...base, rawSpecialHours: raw.specialHours?.specialHourPeriods ?? [], fingerprint: await fingerprintOf(base) };
@@ -352,6 +360,17 @@ export async function getProfile(options: RequestOptions, locationName: string):
   url.searchParams.set('readMask', PROFILE_READ_MASK);
   const raw = await authorized<RawLocation>(options, url.toString());
   return normalizeProfile(raw, locationName);
+}
+
+export async function getMoreHoursTypes(options: RequestOptions, names: string[]): Promise<Array<{ id: string; label: string }>> {
+  if (!names.length) return [];
+  const url = new URL(`${BUSINESS_INFO_URL}/categories:batchGet`);
+  for (const name of names.slice(0, 10)) url.searchParams.append('names', name);
+  url.searchParams.set('languageCode', 'ja');
+  url.searchParams.set('regionCode', 'JP');
+  url.searchParams.set('view', 'FULL');
+  const raw = await authorized<{ categories?: Array<{ moreHoursTypes?: Array<{ hoursTypeId: string; localizedDisplayName?: string; displayName?: string }> }> }>(options, url.toString());
+  return [...new Map((raw.categories ?? []).flatMap(c => c.moreHoursTypes ?? []).map(t => [t.hoursTypeId, { id: t.hoursTypeId, label: t.localizedDisplayName ?? t.displayName ?? t.hoursTypeId }])).values()];
 }
 
 /** Google 側からの変更提案（getGoogleUpdated）。diffMask が空なら提案なし。 */
@@ -397,6 +416,7 @@ export async function getGoogleUpdates(options: RequestOptions, locationName: st
 }
 
 export type ProfilePatch =
+  | { field: 'moreHours'; value: Array<{ hoursTypeId: string; weekly: WeeklyHours }> }
   | { field: 'regularHours'; value: WeeklyHours }
   | { field: 'specialHours'; value: SpecialDay[] }
   /** 変更しない日は Google の原文をそのまま、変更する日だけ画面の値から作る。 */
@@ -410,6 +430,8 @@ export type ProfilePatch =
 /** updateMask と本文を組み立てる。呼び出し側は送信前に最新との照合を済ませていること。 */
 export function buildPatch(patch: ProfilePatch): { updateMask: string; body: Record<string, unknown> } {
   switch (patch.field) {
+    case 'moreHours':
+      return { updateMask: 'moreHours', body: { moreHours: patch.value.map(h => ({ hoursTypeId: h.hoursTypeId, periods: weeklyToGoogle(h.weekly).periods })) } };
     case 'regularHours':
       return { updateMask: 'regularHours', body: { regularHours: weeklyToGoogle(patch.value) } };
     case 'specialHours':

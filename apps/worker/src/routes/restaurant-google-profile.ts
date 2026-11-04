@@ -38,6 +38,7 @@ import {
   formatPeriods,
   getGoogleUpdates,
   getProfile,
+  getMoreHoursTypes,
   isValidDate,
   isValidTime,
   listMedia,
@@ -58,6 +59,8 @@ import {
   type WeeklyHours,
 } from '../services/google-business-profile.js';
 import { holidayNameOf, upcomingHolidays } from '../services/jp-holidays.js';
+import { effectiveOpeningDate, hoursDateAdd, HOURS_SERVICE_LABELS } from '@line-crm/shared';
+import { restaurantGoogleHoursWorkspace, readHoursWorkspace, validateHoursWorkspace } from './restaurant-google-hours-workspace.js';
 import {
   GoogleAiTimeout,
   accessTokenFor,
@@ -127,7 +130,7 @@ interface ChangeRow {
 type ChangeTarget =
   | { dates: string[] }
   | { weekdays: Weekday[] }
-  | { field: 'title' | 'phone' | 'websiteUri' | 'description' | 'address' }
+  | { field: 'title' | 'phone' | 'websiteUri' | 'description' | 'address' | 'moreHours' }
   | { field: 'photo'; action: 'add' | 'delete' };
 
 /** 1日分の変更前後（special_hours）。 */
@@ -276,6 +279,8 @@ function profilePayload(profile: GoogleProfile, extras: ProfileExtras, timeZone:
       openStatus: profile.openStatus,
       regularHours: profile.regularHours,
       specialHours: profile.specialHours.filter((s) => s.date >= today),
+      moreHours: profile.moreHours ?? [],
+      moreHoursTypes: profile.moreHoursTypes ?? [],
       mapsUri: profile.mapsUri,
     },
     today: { date: today, weekday: todayWeekday, holidayName: holidayNameOf(today), ...todayHours },
@@ -441,6 +446,7 @@ async function proposeSpecial(
   source: ChangeSource,
   days: DayHours[],
   inputText: string | null,
+  explicitDates = false,
 ): Promise<ChangeRow | Response> {
   const today = todayIn(timeZone);
   const seen = new Set<string>();
@@ -461,7 +467,7 @@ async function proposeSpecial(
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((d) => (d.remove ? { date: d.date, remove: true, closed: (profile.regularHours[weekdayOf(d.date)] ?? []).length === 0, periods: profile.regularHours[weekdayOf(d.date)] ?? [] } : { date: d.date, closed: d.closed, periods: d.closed ? [] : d.periods }));
   const before: DayHours[] = sorted.map((d) => daySlice(profile, d.date));
-  const unchanged = sorted.every((d, i) => !d.remove && d.closed === before[i].closed && formatPeriods(d.periods) === formatPeriods(before[i].periods));
+  const unchanged = sorted.every((d, i) => !d.remove && (!explicitDates || before[i].special) && d.closed === before[i].closed && formatPeriods(d.periods) === formatPeriods(before[i].periods));
   if (unchanged) return fail(c, 409, 'すでにその営業時間になっています', { code: 'unchanged' });
   const impact = await countReservationImpact(c, store.id, timeZone, new Map(sorted.map((d) => [d.date, { closed: d.closed, periods: d.periods }])));
   return insertChange(c, store, {
@@ -953,6 +959,8 @@ function sliceOf(profile: GoogleProfile, row: ChangeRow): unknown {
   }
   if (row.kind === 'profile' && 'field' in target) {
     switch (target.field) {
+      case 'moreHours':
+        return profile.moreHours ?? [];
       case 'title':
         return profile.title;
       case 'phone':
@@ -1024,6 +1032,8 @@ function buildSendPatch(latest: GoogleProfile, row: ChangeRow): ProfilePatch {
   const target = parseJson<ChangeTarget>(row.target_json, { dates: [] });
   const field = 'field' in target ? target.field : null;
   switch (field) {
+    case 'moreHours':
+      return { field: 'moreHours', value: after as NonNullable<GoogleProfile['moreHours']> };
     case 'title':
       return { field: 'title', value: after as string };
     case 'phone':
@@ -1150,4 +1160,74 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/from-closure',re
  }
  const change=await proposeSpecial(c,store,cached.profile,timeZone,'calendar',days,null);
  return change instanceof Response?change:c.json({success:true,change:publicChange(change)});
+});
+
+restaurantGoogleProfile.route('/', restaurantGoogleHoursWorkspace);
+restaurantGoogleProfile.post('/api/restaurant-test/google/hours/review', requireRole('owner', 'admin'), inputJsonBoundary({ expectedVersion: ['number'] }), async c => {
+  const ctx = await requireOpenProfile(c);
+  if (ctx instanceof Response) return ctx;
+  const saved = await readHoursWorkspace(c, ctx.store);
+  const body = await c.req.json<{ expectedVersion?: number }>();
+  if (body.expectedVersion !== saved.version) return fail(c, 409, 'ほかの担当者が営業時間を変更しました。再読み込みしてください。', { code: 'version_conflict' });
+  const today = todayIn(ctx.timeZone), limit = hoursDateAdd(today, 366);
+  if (!validateHoursWorkspace(saved.data, today) || saved.data.draft.days.some(d => d.date > limit)) return fail(c, 400, '変更する日付と営業時間を確認してください', {}, ['days']);
+  const workspace = saved.data;
+  const changes: ChangeRow[] = [];
+  const weekly = workspace.draft.weekly ?? ctx.profile.regularHours;
+  if (workspace.draft.weekly && WEEKDAYS.some(d => canonical(weekly[d]) !== canonical(ctx.profile.regularHours[d]))) {
+    const change = await proposeRegular(c, ctx.store, ctx.profile, ctx.timeZone, 'weekly', weekly, null);
+    if (change instanceof Response) return change;
+    changes.push(change);
+  }
+  const dates = new Map(workspace.draft.days.map(d => [d.date, d]));
+  const managed = new Set(workspace.holidayManagedDates ?? []);
+  const nextManaged = new Set(managed);
+  if (workspace.draft.holidayChanged) {
+    for (const h of upcomingHolidays(today, 366)) {
+      if (dates.has(h.date) || ctx.profile.specialHours.some(d => d.date === h.date && !managed.has(d.date))) { nextManaged.delete(h.date); continue; }
+      if (workspace.holiday.mode === 'weekly') {
+        if (managed.has(h.date) && ctx.profile.specialHours.some(d => d.date === h.date)) dates.set(h.date, { date: h.date, closed: !weekly[weekdayOf(h.date)].length, periods: weekly[weekdayOf(h.date)], remove: true });
+        nextManaged.delete(h.date);
+        continue;
+      }
+      dates.set(h.date, effectiveOpeningDate(h.date, weekly, [], workspace.holiday, true));
+      nextManaged.add(h.date);
+    }
+  }
+  const changedDays = [...dates.values()].filter(d => {
+    const before = effectiveHoursFor(ctx.profile, d.date);
+    return d.remove || !before.special || canonical({ closed: d.closed, periods: d.periods }) !== canonical({ closed: before.closed, periods: before.periods });
+  });
+  if (changedDays.length) {
+    const change = await proposeSpecial(c, ctx.store, ctx.profile, ctx.timeZone, 'calendar', changedDays, null, true);
+    if (change instanceof Response) return change;
+    changes.push(change);
+  }
+  if (workspace.draft.serviceIds.length) {
+    const types = new Set([...(ctx.profile.moreHoursTypes ?? []).map(t => t.id), ...(ctx.profile.moreHours ?? []).map(t => t.hoursTypeId)]);
+    if (ctx.profile.categoryNames?.length) {
+      const available = await getMoreHoursTypes({ fetch, accessToken: await accessTokenFor(c, ctx.connection) }, ctx.profile.categoryNames);
+      for (const t of available) types.add(t.id);
+    }
+    const more = new Map((ctx.profile.moreHours ?? []).map(h => [h.hoursTypeId, h]));
+    for (const id of workspace.draft.serviceIds) {
+      if (id.startsWith('remove:')) { const type = id.slice(7); if (types.has(type)) more.delete(type); continue; }
+      const service = workspace.services.find(s => s.id === id);
+      if (!service) { if (types.has(id)) more.delete(id); continue; }
+      if (!service.googleTypeId) continue;
+      if (!types.has(service.googleTypeId)) return fail(c, 400, `${service.label || HOURS_SERVICE_LABELS[service.kind]}はこの店舗のGoogle営業時間に対応していません`, {}, ['services']);
+      const serviceWeekly = emptyWeekly();
+      for (const day of WEEKDAYS) {
+        if (!weekly[day].length || (!service.sameWeekdays && !service.weekdays.includes(day))) continue;
+        serviceWeekly[day] = service.periods;
+        const endMinute = (p: HoursPeriod) => { const end = Number(p.close.slice(0, 2)) * 60 + Number(p.close.slice(3)); const start = Number(p.open.slice(0, 2)) * 60 + Number(p.open.slice(3)); return end <= start ? end + 1440 : end; };
+        for (const p of service.periods) if (!weekly[day].some(storePeriod => p.open >= storePeriod.open && endMinute(p) <= endMinute(storePeriod))) return fail(c, 400, `${WEEKDAY_JA[day]}曜日の店舗の営業時間内に設定してください`, {}, ['periods']);
+      }
+      more.set(service.googleTypeId, { hoursTypeId: service.googleTypeId, weekly: serviceWeekly });
+    }
+    const after = [...more.values()].sort((a, b) => a.hoursTypeId.localeCompare(b.hoursTypeId));
+    const before = [...(ctx.profile.moreHours ?? [])].sort((a, b) => a.hoursTypeId.localeCompare(b.hoursTypeId));
+    if (canonical(before) !== canonical(after)) changes.push(await insertChange(c, ctx.store, { kind: 'profile', source: 'profile_edit', summary: 'サービス別の営業時間を変更', target: { field: 'moreHours' }, before, after, impact: 0, baseFingerprint: ctx.profile.fingerprint }));
+  }
+  return c.json({ success: true, changes: changes.map(publicChange), version: saved.version, holidayManagedDates: [...nextManaged].filter(d => d >= today && !workspace.draft.days.some(day => day.date === d)).sort() });
 });
