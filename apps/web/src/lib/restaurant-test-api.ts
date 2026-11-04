@@ -50,6 +50,7 @@ export type SeatVisitMark = {
 }
 export type SeatWaitlistEntry = {
   id: string; store_id: string; starts_at: string; guest_count: number; customer_name: string;
+  confirmation_revision?: number;
   status: 'waiting' | 'invited' | 'converted' | 'cancelled' | 'finished'; hold_minutes: number;
   table_id: string | null; table_label?: string | null;
   invited_at: string | null; hold_expires_at: string | null; notified_at: string | null; created_at: string
@@ -189,9 +190,9 @@ export const restaurantTestApi = {
     )
   },
   /** 席の空き待ちを取り消す。 */
-  cancelSeatWaitlist: (accountId: string, id: string) =>
+  cancelSeatWaitlist: (accountId: string, id: string, expectedConfirmationRevision?: number) =>
     fetchApi<{ success: true; data: { status: string } }>(
-      withAccount(`/api/restaurant-test/seat-waitlist/${id}`, accountId),
+      withAccount(`/api/restaurant-test/seat-waitlist/${id}${expectedConfirmationRevision === undefined ? '' : `?expectedConfirmationRevision=${expectedConfirmationRevision}`}`, accountId),
       { method: 'DELETE' },
     ),
   importReservation: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/inbound/reservations', accountId), { method: 'POST', body: JSON.stringify(body) }),
