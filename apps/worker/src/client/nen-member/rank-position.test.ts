@@ -2,7 +2,8 @@
 import { act } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
 
-afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
+let unmount: (() => void) | undefined;
+afterEach(async () => { await act(async () => unmount?.()); unmount = undefined; vi.unstubAllGlobals(); vi.resetModules(); });
 
 const ranks = [
   { key: 'regular', name: 'レギュラー', thresholdYen: 0, mileRatePercent: 1 },
@@ -26,7 +27,7 @@ test.each([
     photoStats: { submittedCount: 0, pendingCount: 0, adoptedCount: 0, earnedPoints: 0 } };
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ data: member }))));
   const { mountNenMember } = await import('./main.js');
-  await act(async () => mountNenMember(document.getElementById('app')!, { liffId: 'sample', lineUserId: 'sample', idToken: 'sample' }));
+  await act(async () => { unmount = mountNenMember(document.getElementById('app')!, { liffId: 'sample', lineUserId: 'sample', idToken: 'sample' }); });
   const sheet = document.querySelector('.nm-membership-sheet')!;
   expect(sheet.textContent).toContain(name);
   expect(Boolean(sheet.querySelector('.nm-rank-levels'))).toBe(known);

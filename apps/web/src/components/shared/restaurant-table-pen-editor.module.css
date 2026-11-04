@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 .columns{display:grid;grid-template-columns:1fr 1fr;gap:24px;color:#202124;font-size:13px}
 .col{min-width:0;display:flex;flex-direction:column;gap:16px}
 .col:nth-child(2){gap:20px}
@@ -43,3 +45,7 @@
 .previewChair[data-side=left]{left:-10px;top:calc(var(--offset)*100% - 8px);width:6px;height:16px}
 .previewChair[data-side=right]{right:-10px;top:calc(var(--offset)*100% - 8px);width:6px;height:16px}
 @media(max-width:760px){.columns{grid-template-columns:1fr}.col{gap:14px}}
+
+
+.columns :is(button, input, [role='switch']):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+}

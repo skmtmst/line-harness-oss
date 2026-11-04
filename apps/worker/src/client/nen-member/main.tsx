@@ -746,4 +746,4 @@ function App({ ctx }: { ctx: Ctx }) {
   </main>;
 }
 
-export function mountNenMember(container: HTMLElement, ctx: Ctx) { root?.unmount(); root = createRoot(container); root.render(<StrictMode><App ctx={ctx} /></StrictMode>); }
+export function mountNenMember(container: HTMLElement, ctx: Ctx) { root?.unmount(); root = createRoot(container); root.render(<StrictMode><App ctx={ctx} /></StrictMode>); const mounted = root; return () => { mounted.unmount(); if (root === mounted) root = null; }; }

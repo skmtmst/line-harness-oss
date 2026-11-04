@@ -319,7 +319,7 @@
   gap: var(--tpl-ml-dlg-gap);
   margin-top: var(--tpl-ml-dlg-pull);
 }
-.dlgTargetBody { margin-top: 12px; }
+.dlgTargetBody { margin-top: var(--space-12); }
 .dlgGroup {
   display: flex;
   flex-direction: column;

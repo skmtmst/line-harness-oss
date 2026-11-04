@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { act } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
-afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); window.history.replaceState(null, '', '/'); });
+let unmount: (() => void) | undefined;
+afterEach(async () => { await act(async () => unmount?.()); unmount = undefined; vi.unstubAllGlobals(); vi.resetModules(); window.history.replaceState(null, '', '/'); });
 
 test.each(['http', 'offline'] as const)('UI2-C03: 会員の日記の%s失敗は履歴なしと分け、再試行で回復する', async failure => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -15,7 +16,7 @@ test.each(['http', 'offline'] as const)('UI2-C03: 会員の日記の%s失敗は�
     return new Response(JSON.stringify({ data: [] }), { status: fail ? 503 : 200 });
   }));
   const { mountNenMember } = await import('./main.js');
-  await act(async () => mountNenMember(document.getElementById('app')!, { liffId: 'store', lineUserId: 'friend', idToken: 'token' }));
+  await act(async () => { unmount = mountNenMember(document.getElementById('app')!, { liffId: 'store', lineUserId: 'friend', idToken: 'token' }); });
   expect(document.body.textContent).toContain('読み込めませんでした');
   expect(document.body.textContent).not.toContain('まだ記録がありません');
   fail = false;

@@ -6,13 +6,13 @@
 絵：口コミ `j0Wcg`・返信を作る `x9HIR`・投稿 `Cfed0`・投稿を作る `T1j2Sw`・パフォーマンス `SrmVs`・プロフィール `JUTGz`。接続設定は「設定 → SNS連携」で行う。
 
 ## 受け付ける URL と指定（今の画面と同じ名前・同じ意味）
-- `?tab=reviews|posts|performance|profile`：タブ。未接続のときはSNS連携への案内を表示する。旧 `?tab=settings` はSNS連携へ移す。
+- `?tab=reviews|posts|hours|performance|profile`：タブ。未接続のときはSNS連携への案内を表示する。旧 `?tab=settings` はSNS連携へ移す。
 - `?tab=reviews&view=draft&id=<口コミ>`：返信を作る。id が無いときは一覧。
 - `?tab=posts&view=new&kind=standard|event|offer`：投稿を作る（kind 既定は standard）。`view=edit&id=`：直す。`view=confirm&id=`：公開前の確認。
 - `?tab=profile&view=confirm&id=<変更案>`：現役の V8 外枠と共通部品で変更の確認を出す。複数の変更案はカンマ区切りで1件ずつ確認して送る。
 - `?tab=profile&view=history&result=all|applied|pending|failed`：現役の V8 の変更履歴。種類・結果・期間・検索で絞り、CSVで出力し、変更案のある行から確認画面を開く。
 - `?tab=profile&view=edit`：現役の V8 の共通部品で店舗名・住所・電話・サイト・紹介文・写真を編集する。変更した項目だけ変更案を作って確認画面へ移る。
-- `?tab=profile&view=hours&mode=text|calendar|weekly&date=YYYY-MM-DD`：現役の V8 の共通部品で営業時間を変更する。文章/日付指定/毎週の3方式。日付指定は共通の暦と登録済み/変更する日の一覧で日を選び、複数日を保持する。
+- 旧 `?tab=profile&view=hours&mode=text|calendar|weekly&date=YYYY-MM-DD` は営業時間タブを表示する。プロフィールには営業時間の編集を重複させない。
 - `?google=connected|reconnected|select_location|error:*`：旧URLから来たときはSNS連携へ移す。Google認可の新しい戻り先もSNS連携。
 
 ## 呼ぶ口（今の画面と同じ `restaurantGoogleApi`）
@@ -65,3 +65,11 @@ Googleへの返信・投稿・プロフィールの最終確認には、操作�
 ## 返信文を編集中の離脱
 
 返信文の未保存の変更がある場合は、共通の離脱確認で「このまま移ると、返信文の変更が消えます。」と示し、「編集を続ける」と「保存せずに移る」を選べる。編集を続ける・×では入力と編集先を保ち、保存せずに移るを選んだ時だけ既存の離脱を続ける。窓の操作から保存や返信送信は始めない。
+
+## 営業時間タブ（2026-11-04承認のPen）
+
+- `?tab=hours` は営業時間の一覧。曜日・祝日・日付指定・サービスを右520pxの編集パネルで変更する。複数の日付と連続期間は同じ緑丸の暦で選択する。
+- `/hours/workspace` は店舗とLINEアカウントを組にして下書き・祝日ルール・サービスの任意設定を保存する。版が合わない保存は409で止め、入力を保持する。別アカウントの下書きは読まない。
+- 祝日は直近3祝日を起点とし、同じ連休は最終日まで週末を含めて表示する。個別の日付指定を最優先し、連休の一括変更は個別休業を初期選択から外す。祝日設定は366日以内の特別営業時間の案に展開し、確認後だけGoogleへ送る。自動送信Cronは追加しない。
+- サービスの種類と曜日・時間はGoogleの対応種類を確認してmoreHoursへ送る。受付終了・メニューとGoogle非対応のサービスはmusubo内に保存する。Google側のほかのサービスは消さない。
+- 下書きは入力後に保存し、確認画面から既存の変更案・競合照合・送信権限・環境の送信停止を通す。送信失敗と結果不明では入力と変更案IDを保持する。通常の曜日の変更前に特定の日付を送信し、通常時間の変更が特定日の比較を乱さないようにする。

@@ -46,6 +46,7 @@ import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { shortDateTime } from './words'
 import { useWebhookWriteAccess, canManageWebhooksNow, captureWebhookWriteAccess } from './write-access'
 import styles from './incoming.module.css'
+import { useInitialWebhookSource } from './use-initial-source'
 import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import IncomingActions from './incoming-actions'
@@ -167,9 +168,8 @@ export default function WebhooksIncomingV8() {
   const [togglingIds, setTogglingIds] = useState<string[]>([])
   const [optimisticActive, setOptimisticActive] = useState<Record<string, boolean>>({})
 
-  /* 見本タブから `?source=` 付きで来たときは、作る窓を開いて種類を選んでおく（管理画面 と同じ）。 */
   const requestedSource = searchParams.get('source') ?? ''
-  const initialSource = SOURCE_PRESETS.some((preset) => preset.value === requestedSource) ? requestedSource : ''
+  const initialSource = useInitialWebhookSource(requestedSource, SOURCE_PRESETS)
   const [showCreate, setShowCreate] = useState(initialSource !== '')
   const [createName, setCreateName] = useState('')
   const [createSource, setCreateSource] = useState<string>(initialSource || SOURCE_PRESETS[0].value)

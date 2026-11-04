@@ -142,7 +142,7 @@ describe('予約の取消の成功（WEB317）', () => {
     await act(async () => { confirm.click() })
     expect(await screen.findByText(message)).toBeTruthy()
     const readsBeforeClose = apiMocks.getCount
-    await act(async () => { Array.from(dialog.querySelectorAll('button')).find(button => button.textContent?.trim() === '閉じる')!.click() })
+    await act(async () => { dialog.querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')!.click() })
     await waitFor(() => expect(apiMocks.getCount).toBeGreaterThan(readsBeforeClose))
     await screen.findByRole('button', { name: '予約を取り消す…' })
     expect(screen.queryByRole('dialog')).toBeNull()
