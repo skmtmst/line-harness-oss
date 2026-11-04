@@ -98,7 +98,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
       D1_STAGING_DATABASE_NAME: ${{ secrets.D1_STAGING_DATABASE_NAME }}
       STAGING_API_URL: https://stg-api.musubo.jp
-      STAGING_PAGES_PROJECT: nen-line-stg-admin
+      STAGING_PAGES_PROJECT: nen-line-stg-admin-git
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -447,7 +447,7 @@ jobs:
           fi
           npx wrangler pages deploy apps/web/out \
             --project-name "$STAGING_PAGES_PROJECT" \
-            --branch main \
+            --branch codex/development \
             --commit-hash "$source_sha" \
             --commit-message "staging API URL config replay from $source_sha"
 
