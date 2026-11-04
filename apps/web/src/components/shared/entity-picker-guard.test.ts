@@ -19,3 +19,9 @@ test('状態などの定数とのフォルダ例外、共通窓は通す', () =>
   expect(inspectPickers(`import Choice from '@/components/shared/select'; const view = <Choice aria-label="フォルダ" options={folders.map(f => ({ value: f.id, label: f.name }))} />`)).toHaveLength(0)
   expect(inspectPickers(`import EntitySelect from '@/components/shared/entity-select'; const view = <EntitySelect options={tags.map(t => ({ value: t.id, label: t.name }))} />`)).toHaveLength(0)
 })
+
+test('共通選択窓の候補カテゴリ絞り込みだけは保存先の実体選択と区別する', () => {
+  const code = `import Select from './select'; const view = <Select aria-label="候補の絞り込み" options={categories.map(c => ({ value: c.id, label: c.label }))} />`
+  expect(inspectPickers(code, 'components/shared/entity-picker.tsx')).toHaveLength(0)
+  expect(inspectPickers(code, 'components/other-picker.tsx')).toHaveLength(1)
+})

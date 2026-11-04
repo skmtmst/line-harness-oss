@@ -19,7 +19,7 @@ import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect,useMemo, useRef, useState } from 'react'
-import { Copy, Grid2X2, Inbox, Plus } from 'lucide-react'
+import { Grid2X2, Inbox, Plus } from 'lucide-react'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -35,7 +35,9 @@ import TableRowActions from './table-row-actions'
 import TablesAssignBoard from './assign'
 import { useSearchParams } from 'next/navigation'
 import { Scale, Map as MapIcon } from 'lucide-react'
-import TablePenEditor from './table-pen-editor'
+import TablePenEditor, {type Draft} from '@/components/shared/restaurant-table-pen-editor'
+import RestaurantTableHeaderActions from '@/components/shared/restaurant-table-header-actions'
+import RestaurantFloorPanel from '@/components/shared/restaurant-floor-panel'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
@@ -61,13 +63,6 @@ const SEAT_TYPE_LABEL: Record<string, string> = {
 
 function seatTypeLabel(value: string): string {
   return SEAT_TYPE_LABEL[value] ?? value
-}
-
-export type Draft = {
-  code: string; label: string; seatType: string; minCapacity: string; maxCapacity: string
-  floorX: string; floorY: string; joinGroup: string;floorId:string
-  shape:'rectangle'|'circle'|'long';orientation:'horizontal'|'vertical';smokingPolicy:'non_smoking'|'smoking'|'heated_tobacco';partition:'open'|'semi_private'|'private';shoesAllowed:boolean;isActive:boolean;visibleOnMap:boolean;chairArrangement:'both'|'one'|'all';chairSide:'top'|'right'|'bottom'|'left'
-  seatDetailType:'table'|'counter'|'horigotatsu'|'zashiki'|'private_room'|'terrace'
 }
 
 type MoveMode = 'move' | 'unassign'
@@ -289,7 +284,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         <KpiCard title="結合可能" value={groups.size} unit="組" detail="結合グループ" icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={<Inbox size={16} aria-hidden />} presentation="band" />
       </StatRow>
-      <DetailColumns variant="restaurant-tables" asideLabel="卓の詳細を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title="卓の詳細" headerActions={<div className={styles.detailHeaderActions}>{canEdit?<button type="button" className={styles.duplicateAction} disabled={!selectedId} onClick={()=>setDuplicateRequest(n=>n+1)}><Copy size={15}/>選択した卓を複製</button>:null}<select aria-label="卓の表示" value={statusFilter} onChange={e=>setStatusFilter(e.target.value as typeof statusFilter)}><option value="all">すべて</option><option value="active">有効</option><option value="suspended">停止中</option></select></div>}>
+      <DetailColumns variant="restaurant-tables" asideLabel="卓の詳細を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title="卓の詳細" headerActions={<RestaurantTableHeaderActions canEdit={canEdit} selectedId={selectedId} onDuplicate={()=>setDuplicateRequest(n=>n+1)} statusFilter={statusFilter} onStatusFilter={setStatusFilter}/>}>
           <ul className={styles.detailList}>
             {visibleRows.map((item) => (
               <li key={item.id} className={`${styles.detailRow} ${item.id === selectedId ? styles.detailRowSelected : ''}`}>
@@ -305,9 +300,9 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
             ))}
           </ul>
         </DetailPreview>} asideLayout="detail">
-        <div className={styles.floorPanel}>
+        <RestaurantFloorPanel>
           {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} refreshKey={JSON.stringify(rows.map(t=>[t.id,t.floor_id,t.floor_version,t.label,t.min_capacity,t.max_capacity,t.shape,t.width,t.height,t.smoking_policy,t.shoes_allowed,t.visible_on_map,t.chair_arrangement,t.chair_side,t.is_active]))} resources={rows.map(t=>({id:t.id,label:t.label,capacity:t.max_capacity,active:!!t.is_active}))} existingCodes={rows.map(t=>t.code)} canEdit={canEdit} onSelect={setSelectedId} selectedId={selectedId} duplicateRequest={duplicateRequest} onCreated={async()=>{await ctx.reload()}}/>:null}
-        </div>
+        </RestaurantFloorPanel>
       </DetailColumns>
       <RsDialog open={Boolean(deleting)} title="この卓を削除しますか？" width={480} top={300} busy={busy}
         onCancel={() => { if (deleteScope?.ticket === deleteTicket.current) { deleteTicket.current = null; setDeleteId('') } }} actions={<>

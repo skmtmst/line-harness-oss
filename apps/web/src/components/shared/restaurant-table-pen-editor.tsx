@@ -5,8 +5,15 @@ import type {RestaurantFloor} from '@line-crm/shared'
 import {restaurantChairPositions} from '@line-crm/shared'
 import {reservationBoardApi} from '@/lib/api/helpers/reservation-board'
 import {SaveErrorField} from '@/components/shared/save-form-errors'
-import type {Draft} from './tables'
-import styles from './table-pen-editor.module.css'
+import EntitySelect from './entity-select'
+import styles from './restaurant-table-pen-editor.module.css'
+
+export type Draft = {
+  code: string; label: string; seatType: string; minCapacity: string; maxCapacity: string
+  floorX: string; floorY: string; joinGroup: string; floorId: string
+  shape: 'rectangle'|'circle'|'long'; orientation: 'horizontal'|'vertical'; smokingPolicy: 'non_smoking'|'smoking'|'heated_tobacco'; partition: 'open'|'semi_private'|'private'; shoesAllowed: boolean; isActive: boolean; visibleOnMap: boolean; chairArrangement: 'both'|'one'|'all'; chairSide: 'top'|'right'|'bottom'|'left'
+  seatDetailType: 'table'|'counter'|'horigotatsu'|'zashiki'|'private_room'|'terrace'
+}
 
 type Props={draft:Draft;onChange:(draft:Draft)=>void;floors:RestaurantFloor[];accountId:string;storeId:string;onFloorAdded:()=>Promise<void>;errors:Partial<Record<keyof Draft,string>>;onCapacity:(field:'minCapacity'|'maxCapacity',value:string)=>void}
 const seatTypes:[Draft['seatDetailType'],string][]=[['table','テーブル'],['counter','カウンター'],['horigotatsu','掘りごたつ'],['zashiki','座敷']]
@@ -26,9 +33,9 @@ export default function TablePenEditor({draft,onChange,floors,accountId,storeId,
     <label><Label required>最小人数</Label><SaveErrorField names={['minCapacity','min_capacity']}><input aria-label="最小人数" aria-required="true" required type="number" min="1" value={draft.minCapacity} aria-invalid={!!errors.minCapacity} onChange={e=>onCapacity('minCapacity',e.target.value)}/></SaveErrorField>{errors.minCapacity&&<small>{errors.minCapacity}</small>}</label>
     <label><Label required>最大人数</Label><SaveErrorField names={['maxCapacity','max_capacity']}><input aria-label="最大人数" aria-required="true" required type="number" min="1" value={draft.maxCapacity} aria-invalid={!!errors.maxCapacity} onChange={e=>onCapacity('maxCapacity',e.target.value)}/></SaveErrorField>{errors.maxCapacity&&<small>{errors.maxCapacity}</small>}</label>
    </div>
-   <label className={styles.block}><Label required>階・エリア</Label><select aria-label="階・エリア" aria-invalid={!!errors.floorId} required value={draft.floorId} onChange={e=>change('floorId',e.target.value)}>{floors.map(f=><option key={f.id} value={f.id}>{f.kind==='area'?floors.find(p=>p.id===f.parentFloorId)?.name+' / ':''}{f.name}</option>)}</select>{errors.floorId&&<small>{errors.floorId}</small>}</label>
+   <div className={styles.block}><Label required>階・エリア</Label><EntitySelect aria-label="階・エリア" size="full" invalid={!!errors.floorId} value={draft.floorId} onChange={value=>change('floorId',value)} options={floors.map(f=>({value:f.id,label:`${f.kind==='area'?(floors.find(p=>p.id===f.parentFloorId)?.name??'')+' / ':''}${f.name}`}))}/>{errors.floorId&&<small>{errors.floorId}</small>}</div>
    <div className={styles.addLine}><button type="button" onClick={()=>{setAdding(adding?null:'floor');setParent(floors.find(f=>f.kind!=='area')?.id??'')}}><Plus size={15}/>階・エリアを追加</button><span>追加後にこの卓へ設定できます</span></div>
-   {adding?<div className={styles.addBox}><Choice items={[[ 'floor','階を追加'],['area','エリアを追加']]} value={adding} onChange={setAdding}/>{adding==='area'?<label><Label required>所属する階</Label><select value={parent} onChange={e=>setParent(e.target.value)}>{floors.filter(f=>f.kind!=='area').map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select></label>:null}<label><Label required>{adding==='floor'?'階の名前':'エリアの名前'}</Label><input value={name} onChange={e=>setName(e.target.value)} placeholder={adding==='floor'?'例：2階':'例：テラス'}/></label>{floorError?<small>{floorError}</small>:null}<button type="button" disabled={saving} onClick={()=>void addFloor()}>追加する</button></div>:null}
+   {adding?<div className={styles.addBox}><Choice items={[[ 'floor','階を追加'],['area','エリアを追加']]} value={adding} onChange={setAdding}/>{adding==='area'?<div className={styles.block}><Label required>所属する階</Label><EntitySelect aria-label="所属する階" size="full" value={parent} onChange={setParent} options={floors.filter(f=>f.kind!=='area').map(f=>({value:f.id,label:f.name}))}/></div>:null}<label><Label required>{adding==='floor'?'階の名前':'エリアの名前'}</Label><input value={name} onChange={e=>setName(e.target.value)} placeholder={adding==='floor'?'例：2階':'例：テラス'}/></label>{floorError?<small>{floorError}</small>:null}<button type="button" disabled={saving} onClick={()=>void addFloor()}>追加する</button></div>:null}
    <div className={styles.field}><Label required>席タイプ</Label><Choice items={draft.seatDetailType==='private_room'?[...seatTypes,['private_room','個室']]:draft.seatDetailType==='terrace'?[...seatTypes,['terrace','テラス']]:seatTypes} value={draft.seatDetailType} onChange={v=>onChange({...draft,seatDetailType:v,seatType:v==='counter'?'counter':v==='private_room'||v==='terrace'?v:'table'})}/></div>
    <div className={styles.field}><Label required>卓の形</Label><div className={styles.shapes}>{([['rectangle','四角'],['circle','丸'],['long','長方形']] as [Draft['shape'],string][]).map(([value,label])=><button type="button" key={value} className={draft.shape===value?styles.shapeActive:styles.shape} onClick={()=>change('shape',value)} aria-pressed={draft.shape===value}><span className={styles.shapeIcon}><i className={styles[value]}/></span><span>{label}</span></button>)}</div></div>
    {draft.shape==='long'?<div className={styles.field}><Label>配置する向き</Label><Choice items={[[ 'horizontal','横長'],['vertical','縦長']]} value={draft.orientation} onChange={v=>change('orientation',v)}/></div>:null}
