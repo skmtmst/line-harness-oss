@@ -1,4 +1,4 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { jstCalendar as japanCalendar, storedTimestamp } from '@line-crm/shared';
 import {markInsightFailed} from '../broadcast-insight-retry.js';
 export {markInsightFailed} from '../broadcast-insight-retry.js';
 import { sqlIdSet } from '../id-queries.js';
@@ -100,6 +100,10 @@ export interface Broadcast {
   approval_confirmed_count?: number | null;
 }
 
+function normalizeBroadcastTime(row: Broadcast): Broadcast {
+  return { ...row, created_at: storedTimestamp(row.created_at) };
+}
+
 function broadcastListQuery(
   accountId?: string,
   scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
@@ -163,8 +167,8 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
   if (opts?.from || opts?.until) {
     // 範囲のOR条件を括り、期間が別アカウントへ漏れないようにする。
     sql = `SELECT * FROM (${sql}) b WHERE 1 = 1`;
-    if (opts.from) { sql += ' AND julianday(COALESCE(b.sent_at, b.scheduled_at, b.created_at)) >= julianday(?)'; params.push(opts.from); }
-    if (opts.until) { sql += ' AND julianday(COALESCE(b.sent_at, b.scheduled_at, b.created_at)) < julianday(?)'; params.push(opts.until); }
+    if (opts.from) { sql += ` AND julianday(COALESCE(b.sent_at, b.scheduled_at, ${storedTimestamp('b.created_at', 'sql')})) >= julianday(?)`; params.push(opts.from); }
+    if (opts.until) { sql += ` AND julianday(COALESCE(b.sent_at, b.scheduled_at, ${storedTimestamp('b.created_at', 'sql')})) < julianday(?)`; params.push(opts.until); }
   }
   sql += ` ORDER BY COALESCE(b.sent_at, b.scheduled_at, b.created_at) ${opts?.order === 'asc' ? 'ASC' : 'DESC'}`;
   return { sql, params };
@@ -181,7 +185,7 @@ export async function getBroadcasts(db: D1Database, accountId?: string,
     if(opts.status){query.sql+=' AND b.status=?';query.params.push(opts.status);}
     if(opts.dueAt){query.sql+=' AND b.scheduled_at IS NOT NULL AND julianday(b.scheduled_at)<=julianday(?)';query.params.push(opts.dueAt);}
   }
-  return (await db.prepare(query.sql).bind(...query.params).all<Broadcast>()).results;
+  return (await db.prepare(query.sql).bind(...query.params).all<Broadcast>()).results.map(normalizeBroadcastTime);
 }
 
 /** 集計はSQLで返し、本文・台帳は表示ページの分だけ読み込む。 */
@@ -216,15 +220,15 @@ export async function getBroadcastListPage(db:D1Database, accountId:string|undef
   if(opts.displayStatuses){conditions.push('display_status IN (SELECT value FROM json_each(?))');filterBinds.push(JSON.stringify(opts.displayStatuses));}
   const filtered=`SELECT * FROM (${classified})${conditions.length?' WHERE '+conditions.join(' AND '):''}`;
   const total=await db.prepare(`SELECT COUNT(*) n FROM (${filtered})`).bind(...binds,...filterBinds).first<{n:number}>();
-  const items=await db.prepare(`${filtered} ORDER BY julianday(COALESCE(sent_at,scheduled_at,created_at)) ${opts.order==='asc'?'ASC':'DESC'},id ${opts.order==='asc'?'ASC':'DESC'} LIMIT ? OFFSET ?`).bind(...binds,...filterBinds,opts.limit,opts.offset).all<Broadcast>();
-  return {items:items.results,total:total?.n??0,drafts:draftRow?.n??0,statusCounts};
+  const items=await db.prepare(`${filtered} ORDER BY julianday(COALESCE(sent_at,scheduled_at,${storedTimestamp('created_at', 'sql')})) ${opts.order==='asc'?'ASC':'DESC'},id ${opts.order==='asc'?'ASC':'DESC'} LIMIT ? OFFSET ?`).bind(...binds,...filterBinds,opts.limit,opts.offset).all<Broadcast>();
+  return {items:items.results.map(normalizeBroadcastTime),total:total?.n??0,drafts:draftRow?.n??0,statusCounts};
 }
 
 export async function getBroadcastById(
   db: D1Database,
   id: string,
 ): Promise<Broadcast | null> {
-  return db
+  const row = await db
     .prepare(
       `SELECT b.*,
        (SELECT purpose FROM broadcast_execution_contexts x WHERE x.broadcast_id=b.id) AS purpose,
@@ -241,6 +245,7 @@ WHERE b.id = ?`,
     )
     .bind(id)
     .first<Broadcast>();
+  return row ? normalizeBroadcastTime(row) : null;
 }
 
 export interface CreateBroadcastInput {

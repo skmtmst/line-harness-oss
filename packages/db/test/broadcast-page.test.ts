@@ -1,9 +1,26 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { getBroadcastListPage, getBroadcasts } from '../src/broadcasts/index.js';
+import { getBroadcastById, getBroadcastListPage, getBroadcasts } from '../src/broadcasts/index.js';
 import { deriveBroadcastDisplayStatus } from '../src/broadcast-ledger-display.js';
 import { asD1 } from './d1-test-helper.js';
+test('配信の作成日時を実時刻で表示し、下書きの期間と並びに使う', async()=>{
+ const raw=new Database(':memory:');raw.exec(readFileSync(new URL('../bootstrap.sql',import.meta.url),'utf8'));
+ try {
+  raw.pragma('foreign_keys=OFF');
+  raw.exec(`INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id,created_at) VALUES
+   ('earlier','earlier','text','本文','all','draft','a','2026-10-02T01:00:00'),
+   ('later','later','text','本文','all','draft','a','2026-10-01 17:00:00')`);
+  const db=asD1(raw),scope={allowedAccountIds:['a'],canSeeUnassigned:false};
+  const page=await getBroadcastListPage(db,undefined,scope,{order:'desc',limit:20,offset:0,now:'2026-10-03T00:00:00Z'});
+  expect(page.items.map(({id,created_at})=>[id,created_at])).toEqual([
+   ['later','2026-10-01T17:00:00Z'],['earlier','2026-10-02T01:00:00+09:00'],
+  ]);
+  expect((await getBroadcasts(db,undefined,scope,{from:'2026-10-01T16:30:00Z',until:'2026-10-01T17:30:00Z'})).map(x=>x.id)).toEqual(['later']);
+  expect((await getBroadcasts(db,undefined,scope,{from:'2026-10-01T15:30:00Z',until:'2026-10-01T16:30:00Z'})).map(x=>x.id)).toEqual(['earlier']);
+  expect(await getBroadcastById(db,'later')).toMatchObject({created_at:'2026-10-01T17:00:00Z'});
+ }finally{raw.close();}
+});
 test('SCALE-01 状態の札・件数・フォルダ・ページ切替は元の10状態の契約を保つ', async()=>{
  const raw=new Database(':memory:');raw.exec(readFileSync(new URL('../bootstrap.sql',import.meta.url),'utf8'));
  try {
