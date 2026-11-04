@@ -55,6 +55,8 @@ export interface ReservedProps {
   confirmCancel: () => void
   cancelling: boolean
   cancelError: string
+  cancelConflict?: boolean
+  reloadCancel?: () => void
   cancelled: boolean
 }
 
@@ -77,6 +79,8 @@ export default function Reserved({
   confirmCancel,
   cancelling,
   cancelError,
+  cancelConflict,
+  reloadCancel,
   cancelled,
 }: ReservedProps) {
   const scheduledLabel = broadcast.scheduledAt ? formatBroadcastDateTime(broadcast.scheduledAt) : '日時未設定'
@@ -143,6 +147,8 @@ export default function Reserved({
           : '予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。'}
         busy={cancelling}
         error={cancelError}
+        reviewRequired={cancelConflict}
+        onReload={reloadCancel}
         onConfirm={confirmCancel}
         onClose={closeCancel}
       />

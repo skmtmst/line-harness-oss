@@ -3,6 +3,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { SelectCreateContext } from './select-types'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 const held = vi.hoisted(() => ({ start: undefined as undefined | (() => void) }))
 // Render the real row; also keep the parent's callback to simulate an already queued event.
 vi.mock('./select-menu', async original => {

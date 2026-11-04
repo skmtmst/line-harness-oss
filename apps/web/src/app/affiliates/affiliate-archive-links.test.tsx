@@ -18,6 +18,7 @@ vi.mock('@/lib/api', async (original) => ({
   ...await original<typeof import('@/lib/api')>(),
   api: {
     affiliates: {
+      get: async () => ({ success: true, data: { lineAccountId: 'account-a' } }),
       archiveImpact: async () => ({
         success: true,
         data: { activeLinks: 1, unsettledReward: 5000, pendingConversions: 2 },

@@ -470,7 +470,7 @@ export default function OpsAnnouncementEditV8() {
         error={formError}
         onConfirm={() => remove()}
         onCancel={() => { if (!busy) setDeleting(false) }}
-      />
+      ><OperationTargetSummary accounts={[]} /></ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </SaveErrorScope>
   )

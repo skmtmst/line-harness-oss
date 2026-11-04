@@ -10,6 +10,7 @@
  *   5. 送っているあいだは確定を押せない。
  */
 import React, { act } from 'react'
+import { setTextControlValue } from '@/test-utils/text-control'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
@@ -278,6 +279,66 @@ describe('確認の窓に並べるもの', () => {
 })
 
 describe('画面内の最終確認（IDEA-06）', () => {
+  it('A/B有効なら最終段で送信を止め、実際の送信へ進まない', async () => {
+    await render({ step: null })
+    await click('B 案を追加', container)
+    await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign currentStep="confirm" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
+    await settle()
+    expect(button('今すぐ送る', container).disabled).toBe(true)
+    expect(container.textContent).toContain('B案を消すとA案を配信できます')
+    await click('今すぐ送る', container)
+    expect(mocks.confirm).not.toHaveBeenCalled()
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
+  it('B案を消すとA案だけを実際の送信経路へ渡せる', async () => {
+    await render({ step: null })
+    await click('B 案を追加', container)
+    const bEditor = container.querySelector('[data-message-composer] [role="textbox"][placeholder="テキストを入力"]')!
+    await act(async () => { setTextControlValue(bEditor as HTMLElement, 'B案だけの本文') })
+    expect(bEditor.textContent).toContain('B案だけの本文')
+    await act(async () => { fireEvent.click(container.querySelector('button[aria-label="A/B の案の操作"]')!) }); await flush()
+    await click('B 案を消す')
+    await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign currentStep="confirm" tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
+    await settle()
+    await click('今すぐ送る', container); await settle(200)
+    const opened = dialog()!
+    const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))!
+    await act(async () => { fireEvent.click(acknowledgement) }); await flush()
+    await click('37 人に送る', opened)
+    expect(mocks.confirm).toHaveBeenCalledTimes(1)
+    const saved = JSON.stringify(mocks.create.mock.calls) + JSON.stringify(mocks.update.mock.calls)
+    expect(saved).not.toContain('B案だけの本文')
+    expect(saved).toContain('8月限定キャンペーン')
+  })
+
+  it('確認窓を開いた後にA/Bが有効になっても確定は送信しない', async () => {
+    await render()
+    await click('今すぐ送る', container); await settle(200)
+    expect(dialog()).not.toBeNull()
+    const props = { visualQaAugustCampaign: true, tags: [{ id: 'exclude', name: '配信不要' } as never], initialCondition: { operator: 'OR' as const, rules: [{ type: 'tag_exists' as const, value: 'vip' }] }, onSuccess: mocks.success, onCancel: () => {} }
+    await act(async () => { root.render(<BroadcastForm {...props} />) }); await flush()
+    await click('B 案を追加', container)
+    await act(async () => { root.render(<BroadcastForm {...props} currentStep="confirm" />) }); await settle(200)
+    const opened = dialog()!
+    const ack = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))
+    if (ack && !ack.checked) await act(async () => { fireEvent.click(ack) })
+    const confirm = button('37 人に送る', opened)
+    const key = Object.keys(confirm).find(item => item.startsWith('__reactProps$'))!
+    const handler = (confirm as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+    await act(async () => { handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: confirm, target: confirm }) }); await flush()
+    expect(mocks.confirm).not.toHaveBeenCalled()
+  })
+
+  it('単頁でA/Bのまま予約を押すと確認窓を開かず理由を出す', async () => {
+    await render({ step: null, scheduled: true })
+    await click('B 案を追加', container)
+    await click('配信を予約する', container)
+    expect(dialog()).toBeNull()
+    expect(container.textContent).toContain('A/Bは送信未対応です')
+    expect(mocks.confirm).not.toHaveBeenCalled()
+  })
+
   it('内訳に対象・除外・配信日時・送信枠・計算時刻を並べる', async () => {
     await render()
     const rows = definitions(container.querySelector('#broadcast-step-confirm details')!)

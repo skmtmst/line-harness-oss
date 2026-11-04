@@ -19,6 +19,7 @@ const fixture = vi.hoisted(() => ({
   confirmImpl: null as null | (() => Promise<unknown>),
   statementImpl: null as null | (() => Promise<unknown>),
   confirmCalls: 0,
+  confirmKeys: [] as string[],
   statementCalls: 0,
 }))
 
@@ -27,8 +28,9 @@ vi.mock('@/lib/api', () => ({
     affiliates: {
       paymentPreview: () => fixture.previewImpl!(),
       get: () => fixture.getImpl!(),
-      confirmPayment: () => {
+      confirmPayment: (_id: string, body: { idempotencyKey: string }) => {
         fixture.confirmCalls += 1
+        fixture.confirmKeys.push(body.idempotencyKey)
         return fixture.confirmImpl!()
       },
       createStatement: () => {
@@ -79,6 +81,7 @@ function renderDialog(settlement: { bankProfileRegistered: boolean } | null) {
 
 beforeEach(() => {
   fixture.confirmCalls = 0
+  fixture.confirmKeys = []
   fixture.statementCalls = 0
   fixture.previewImpl = async () => ({ success: true, data: PREVIEW })
   fixture.getImpl = async () => ({
@@ -97,6 +100,42 @@ afterEach(() => {
 })
 
 describe('NEXT-22: 明細作成とLINE通知のチェック', () => {
+  test('窓を開いたままアカウントが変わったら、元に戻っても確定できない', async () => {
+    const props = { settlement: null, periodTo: PREVIEW.periodTo, onClose: vi.fn(), onConfirmed: vi.fn() }
+    const view = render(<AffiliatePaymentConfirmDialog {...props} accountId="acc-1" target={{ id: 'aff-1', name: '紹介者いち' }} />)
+    await screen.findByRole('checkbox')
+    view.rerender(<AffiliatePaymentConfirmDialog {...props} accountId="acc-2" target={{ id: 'aff-1', name: '紹介者いち' }} />)
+    view.rerender(<AffiliatePaymentConfirmDialog {...props} accountId="acc-1" target={{ id: 'aff-1', name: '紹介者いち' }} />)
+    expect(screen.getByText('アカウントが変わりました。窓を閉じて選び直してください')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /もう一度/ })).toBeNull()
+    expect(screen.queryByText(/読み直してから確定/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /で確定する/ })).toBeNull()
+    expect(fixture.confirmCalls).toBe(0)
+  })
+  test('窓を開いたまま対象オブジェクトが作り直されても鍵を保ち、連打しても一度だけ確定する', async () => {
+    const props = { accountId: 'acc-1', settlement: null, periodTo: PREVIEW.periodTo, onClose: vi.fn(), onConfirmed: vi.fn() }
+    let release!: (value: unknown) => void
+    const paidKeys = new Set<string>()
+    fixture.confirmImpl = () => {
+      paidKeys.add(fixture.confirmKeys[fixture.confirmKeys.length - 1])
+      return new Promise(resolve => { release = resolve })
+    }
+    const view = render(<AffiliatePaymentConfirmDialog {...props} target={{ id: 'aff-1', name: '紹介者いち' }} />)
+    const checkbox = await screen.findByRole('checkbox')
+    fireEvent.click(checkbox)
+    const first = screen.getByRole('button', { name: /で確定する/ })
+    fireEvent.click(first)
+    view.rerender(<AffiliatePaymentConfirmDialog {...props} target={{ id: 'aff-1', name: '紹介者いち' }} />)
+    await act(async () => { release({ success: false, error: 'retry' }) })
+    const retry = await screen.findByRole('button', { name: /で確定する/ })
+    await act(async () => { fireEvent.click(retry); fireEvent.click(retry) })
+    expect(fixture.confirmCalls).toBe(2)
+    expect(fixture.confirmKeys).toHaveLength(2)
+    expect(fixture.confirmKeys[0]).toBeTruthy()
+    expect(fixture.confirmKeys[1]).toBe(fixture.confirmKeys[0])
+    expect(paidKeys.size).toBe(1)
+    await act(async () => { release({ success: false, error: 'retry' }) })
+  })
   test('チェックは1つだけで、ON/OFFが操作・実状態で一致する', async () => {
     renderDialog({ bankProfileRegistered: true })
     // m21u: 素の input＋飾りアイコンを共通の Checkbox へ置き換えた。

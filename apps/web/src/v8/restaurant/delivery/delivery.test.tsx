@@ -1447,3 +1447,13 @@ it('停止後の一覧読み直し中に切り替えた時も前の店の成功�
   expect(screen.queryByText('1件のサービスの受付を停止しました。')).toBeNull()
   expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m')
 })
+
+it('受注画面の説明はできる操作を示す', async () => {
+  render(<DeliveryPage />)
+  await screen.findByText('#UE-1001')
+  const trigger = screen.getByRole('button', { name: 'デリバリー受注の説明' })
+  fireEvent.click(trigger)
+  const note = document.getElementById(trigger.getAttribute('aria-describedby')!)
+  expect(note?.textContent).toContain('新着注文を受け付け')
+  expect(note?.textContent).toContain('注文履歴')
+})

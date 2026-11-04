@@ -1,6 +1,8 @@
 'use client'
 
 import { terms } from '@/lib/terms'
+import { useEffect, useRef, useState } from 'react'
+import { api } from '@/lib/api'
 import TemplatePicker from '@/components/chats/template-picker';
 import Button from '@/components/shared/button';
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason';
@@ -26,6 +28,26 @@ import { MESSAGE_MAX_LENGTH, formatByteSize, formatJstScheduledAt, isoToJstDatet
 import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 type Props = Pick<ConversationProps, 'dropOver' | 'setDropOver' | 'handlePickAttachment' | 'chatPollStalled' | 'setChatPollRetryKey' | 'setShowTemplatePicker' | 'showComposerOptions' | 'setShowComposerOptions' | 'showMemoEditor' | 'setShowMemoEditor' | 'sendMode' | 'setSendMode' | 'memoPopoverRef' | 'memoDraft' | 'setMemoDraft' | 'memoError' | 'closeMemoEditor' | 'handleSaveMemo' | 'memoSaving' | 'chatDetail' | 'quotedMessage' | 'setQuotedMessage' | 'pendingImage' | 'setImagePreviewOpen' | 'pendingImageMeta' | 'imageInputRef' | 'imageUploading' | 'clearPendingImage' | 'pendingAttachment' | 'sending' | 'scheduling' | 'clearPendingAttachment' | 'retryAttachment' | 'textareaRef' | 'messageContent' | 'setMessageContent' | 'handleKeyDown' | 'isComposingRef' | 'messageOverLimit' | 'messageLength' | 'selectedChatId' | 'imageError' | 'staffRole' | 'selectedAccountId' | 'senderId' | 'setSenderId' | 'setShowSchedulePanel' | 'showSchedulePanel' | 'scheduledSends' | 'handleSendMessage' | 'scheduleInput' | 'setScheduleInput' | 'handleScheduleSend' | 'sendError' | 'error' | 'scheduledSendsFailed' | 'loadScheduledSends' | 'handleReschedule' | 'handleCancelScheduled' | 'showTemplatePicker' | 'setPendingPack' | 'pendingPack' | 'handleSendPack'>
 export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, chatDetail, quotedMessage, setQuotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, textareaRef, messageContent, setMessageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, selectedChatId, imageError, staffRole, selectedAccountId, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, sendError, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack }: Props) {
+  const friendId = chatDetail?.id === selectedChatId ? chatDetail.friendId : null
+  const scheduleContext = useRef({ accountId: selectedAccountId, chatId: selectedChatId, friendId, generation: 0 })
+  if (scheduleContext.current.accountId !== selectedAccountId || scheduleContext.current.chatId !== selectedChatId || scheduleContext.current.friendId !== friendId) {
+    scheduleContext.current = { accountId: selectedAccountId, chatId: selectedChatId, friendId, generation: scheduleContext.current.generation + 1 }
+  }
+  const scheduleScopeRef = useRef<{ generation: number } | null>(null)
+  if (!showSchedulePanel) scheduleScopeRef.current = null
+  else if (!scheduleScopeRef.current) scheduleScopeRef.current = { generation: scheduleContext.current.generation }
+  const scheduleScope = scheduleScopeRef.current
+  const [scheduleTarget, setScheduleTarget] = useState<{ scope: { generation: number }; chatId: string; friendId: string; accountId: string | null } | null>(null)
+  useEffect(() => {
+    if (!showSchedulePanel || !scheduleScope || !selectedChatId || !friendId) return
+    let active = true
+    void api.friends.get(friendId).then((response) => {
+      if (active) setScheduleTarget({ scope: scheduleScope, chatId: selectedChatId, friendId, accountId: response.success ? response.data.lineAccountId ?? null : null })
+    }).catch(() => {
+      if (active) setScheduleTarget({ scope: scheduleScope, chatId: selectedChatId, friendId, accountId: null })
+    })
+    return () => { active = false }
+  }, [showSchedulePanel, scheduleScope, selectedChatId, friendId])
   const canInsertTemplate = staffRole !== null && canEditFeature('/chats', staffRole)
   const templateLockReason = usePermissionLockReason(canInsertTemplate)
   return (<InboxComposer
@@ -373,14 +395,15 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
         {(
           <ScheduleSendDialog
             open={showSchedulePanel}
-            accountId={selectedAccountId}
-            onClose={() => setShowSchedulePanel(false)}
+            accountId={scheduleTarget?.scope === scheduleScope && scheduleTarget?.chatId === selectedChatId && scheduleTarget.friendId === friendId ? scheduleTarget.accountId : null}
+            targetStale={!scheduleScope || scheduleScope.generation !== scheduleContext.current.generation || !selectedChatId || !friendId}
+            onClose={() => { scheduleScopeRef.current = null; setShowSchedulePanel(false) }}
             content={messageContent}
             hasImage={Boolean(pendingImage)}
             attachmentLabel={pendingAttachment?.status === 'ready' ? `${pendingAttachment.kind === 'video' ? '動画' : 'ファイル'}「${pendingAttachment.name}」` : undefined}
             value={scheduleInput}
             onChange={setScheduleInput}
-            onConfirm={() => void handleScheduleSend()}
+            onConfirm={() => { if (scheduleScope && scheduleScopeRef.current === scheduleScope && scheduleScope.generation === scheduleContext.current.generation && selectedChatId && friendId) void handleScheduleSend() }}
             busy={scheduling}
             error={showSchedulePanel && error ? error : undefined}
             rows={scheduledSends.map((row) => ({

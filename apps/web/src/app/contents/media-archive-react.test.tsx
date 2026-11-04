@@ -20,6 +20,7 @@ const fixture = vi.hoisted(() => ({
   archiveResult: { success: true } as { success: boolean; error?: string; data?: unknown },
   archiveThrows: null as null | { status: number },
   archived: false,
+  folders: [] as Array<{ id: string; name: string; color: string | null; displayOrder: number }>,
 }))
 
 const MEDIA: MediaItem = {
@@ -59,7 +60,7 @@ vi.mock('@/lib/api', () => {
         me: () => Promise.resolve({ success: true, data: { role: fixture.role } }),
       },
       folders: {
-        list: () => Promise.resolve({ success: true, data: [], unfiledCount: 0 }),
+        list: () => Promise.resolve({ success: true, data: fixture.folders, unfiledCount: 0 }),
       },
       media: {
         counts: () => Promise.resolve({ success: true, data: { total: fixture.archived ? 0 : 1, byKind: { image: fixture.archived ? 0 : 1, video: 0, audio: 0, file: 0 }, unused: fixture.archived ? 0 : 1, archived: fixture.archived ? 1 : 0 } }),
@@ -161,6 +162,7 @@ beforeEach(() => {
   fixture.archiveResult = { success: true, data: MEDIA }
   fixture.archiveThrows = null
   fixture.archived = false
+  fixture.folders = []
   window.history.replaceState({}, '', '/contents')
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('localStorage', {
@@ -281,4 +283,34 @@ describe('登録メディアの退避と復帰（N-201）', () => {
     expect(document.body.textContent).toContain('既にアーカイブ済みです')
     expect(fixture.listCalls.length).toBeGreaterThan(callsBefore)
   })
+})
+
+async function tryLeave() {
+  const link = document.createElement('a'); link.href = '/events'; link.textContent = 'イベントへ'; document.body.append(link)
+  await act(async () => { link.click(); await settle() })
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  link.remove()
+}
+it('メディア名を編集中は移動前に確認する', async () => {
+  await renderPage(); await waitForText(MEDIA.filename); await openCardMenu()
+  await act(async () => { buttonByLabel('名前を変える').click(); await settle() })
+  const input = document.querySelector<HTMLInputElement>('input[aria-label="ファイル名"]')!
+  await act(async () => { setNativeValue(input, '編集中.png'); await settle() })
+  await tryLeave()
+})
+it('アーカイブ理由を入力中は移動前に確認する', async () => {
+  await renderPage(); await waitForText(MEDIA.filename); await openCardMenu()
+  await act(async () => { buttonByLabel('アーカイブ').click(); await settle() })
+  const input = document.querySelector<HTMLInputElement>('input[aria-label="理由"]')!
+  await act(async () => { setNativeValue(input, '整理'); await settle() })
+  await tryLeave()
+})
+it('移し先を選んだ後は移動前に確認する', async () => {
+  fixture.folders = [{ id: 'folder-1', name: '広告', color: null, displayOrder: 0 }]
+  await renderPage(); await waitForText(MEDIA.filename); await openCardMenu()
+  await act(async () => { buttonByLabel('フォルダへ移す').click(); await settle() })
+  await act(async () => { buttonByLabel('移し先のフォルダ').click(); await settle() })
+  const option = [...document.querySelectorAll('[role="option"]')].find(node => node.textContent?.includes('広告'))!
+  await act(async () => { (option.querySelector('button') as HTMLButtonElement).click(); await settle() })
+  await tryLeave()
 })

@@ -698,6 +698,7 @@ export default function AffiliatorsTab() {
         <ConfirmDialog open={resumeTarget !== null} title={`「${resumeTarget?.name ?? ''}」の紹介を再開しますか？`} description="紹介リンクからの成果を再び数えます。" confirmLabel="紹介を再開する" busy={resuming} error={resumeError} onConfirm={() => void resumeReferral()} onCancel={() => { if (!resuming) setResumeTarget(null) }} />
         <AffiliateArchiveDialog
           target={archiveTarget}
+          accountId={accountId}
           onClose={() => setArchiveTarget(null)}
           onChanged={() => { void loadList() }}
         />

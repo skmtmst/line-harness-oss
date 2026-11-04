@@ -2,14 +2,13 @@
 import { useEffect, useRef } from 'react'
 import { formInputSnapshot, useFormInputDirty } from './form-input-dirty'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
-/** 型に渡された未保存状態を、全画面共通の離脱確認へつなぐ。 */
-export function FormLeaveGuard({ dirty, busy }: { dirty: boolean; busy?: boolean }) {
-  const guard = useUnsavedGuard({ dirty, busy })
+/** 画面のキャンセルだけを捉え、子の入力も含めて離脱を確認する。 */
+function FormCancelCapture() {
   const marker = useRef<HTMLSpanElement>(null)
   useEffect(() => {
-    if (!dirty && !busy) return
     const frame = marker.current?.closest?.('[data-page-template]')
     let replaying = false
     const onClick = (event: MouseEvent) => {
@@ -18,12 +17,18 @@ export function FormLeaveGuard({ dirty, busy }: { dirty: boolean; busy?: boolean
       if (!button || !frame?.contains(button) || button.closest('[role="dialog"], [role="alertdialog"]')) return
       if (!/^(キャンセル|閉じる)$/.test(button.textContent?.trim() ?? '')) return
       event.preventDefault(); event.stopPropagation()
-      guard.guarded(() => { replaying = true; try { button.click() } finally { replaying = false } })
+      requestUnsavedAction(() => { replaying = true; try { button.click() } finally { replaying = false } })
     }
     document.addEventListener('click', onClick, true)
     return () => document.removeEventListener('click', onClick, true)
-  }, [dirty, busy, guard.guarded])
-  return <><span ref={marker} hidden /><UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></>
+  }, [])
+  return <span ref={marker} hidden />
+}
+
+/** 型に渡された未保存状態を、全画面共通の離脱確認へつなぐ。 */
+export function FormLeaveGuard({ dirty, busy, capture = true }: { dirty: boolean; busy?: boolean; capture?: boolean }) {
+  const guard = useUnsavedGuard({ dirty, busy })
+  return <>{capture ? <FormCancelCapture /> : null}<UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy} /></>
 }
 
 /** 初期値の読み込みでは警告せず、利用者が入力を変えたページだけを守る。 */
@@ -50,5 +55,5 @@ export function AutoFormLeaveGuard({ busy }: { busy?: boolean }) {
     window.addEventListener('lh:form-saved', saved)
     return () => { frame.removeEventListener('change', change, true); frame.removeEventListener('input', change, true); frame.removeEventListener('click', click, true); window.removeEventListener('lh:form-saved', saved) }
   })
-  return <><span hidden ref={(element) => { input.ref.current = element?.closest<HTMLElement>('[data-page-template],[data-create-variant]') ?? null }} />{input.dirty ? <FormLeaveGuard dirty busy={busy} /> : null}</>
+  return <><span hidden ref={(element) => { input.ref.current = element?.closest<HTMLElement>('[data-page-template],[data-create-variant]') ?? null }} /><FormCancelCapture />{input.dirty ? <FormLeaveGuard dirty busy={busy} capture={false} /> : null}</>
 }

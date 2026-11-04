@@ -55,3 +55,11 @@ it('フォルダ名の未入力は欄で知らせ、そこに戻して作成し�
 })
 
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+it('フォルダ名の入力中は画面移動前に確認する', async () => {
+  window.history.replaceState(null, '', '/tags/folders/new')
+  render(<><FolderPage /><a href="/events">イベントへ</a></>)
+  fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '購入' } })
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect(fx.push).not.toHaveBeenCalled()
+})

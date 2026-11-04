@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import HelpTip from './help-tip'
 
 const DIR = dirname(fileURLToPath(import.meta.url))
@@ -208,4 +208,18 @@ it('touchの離脱では操作表示を閉じず、次の操作で閉じる', ()
   fireEvent.click(button)
   expect(view.queryByRole('note')).toBeNull()
   expect(button.getAttribute('aria-expanded')).toBe('false')
+})
+
+it('説明が本文を覆わないよう、開いた間だけ実寸の余白を確保する', () => {
+  const original = HTMLElement.prototype.getBoundingClientRect
+  const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    if (this.getAttribute('role') === 'note') return { x: 0, y: 0, top: 0, left: 0, right: 300, bottom: 180, width: 300, height: 180, toJSON: () => ({}) }
+    return original.call(this)
+  })
+  const { getByRole, container } = render(<HelpTip label="説明" reserveSpace>補足</HelpTip>)
+  fireEvent.click(getByRole('button', { name: '説明' }))
+  expect((container.querySelector('[data-help-reserving]') as HTMLElement).style.marginBottom).toBe('192px')
+  fireEvent.click(getByRole('button', { name: '説明' }))
+  expect(container.querySelector('[data-help-reserving]')).toBeNull()
+  rect.mockRestore()
 })

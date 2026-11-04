@@ -70,6 +70,8 @@ export interface MessageComposerProps {
    * 渡さない画面は今までどおり。
    */
   bubblesOnly?: boolean
+  /** この入口ではテンプレート操作を使えない理由。 */
+  templateDisabledReason?: string
 }
 
 function ComposerText({ bubble, index, onChange, inserts, extraTokens, tokenNames }: Pick<MessageComposerProps, 'inserts' | 'extraTokens'> & { tokenNames: InsertTextFieldProps['tokenNames'] } & { bubble: BroadcastBubble; index: number; onChange: (next: BroadcastBubble) => void }) {
@@ -91,8 +93,9 @@ export default function MessageComposer(props: MessageComposerProps) {
   return <section className={styles.root} data-message-composer data-bubbles-only={props.bubblesOnly || undefined}>
     {props.bubblesOnly ? null : <div className={styles.heading}>
       <div className={styles.title}><h3>{`メッセージ（${bubbles.length} / ${MAX_BUBBLES}）`}</h3><HelpTip label="メッセージの説明">1回の配信に5つまで入れられます。上から順に届きます。</HelpTip></div>
-      <div className={styles.actions}><Button size="composer" disabled={busy} onClick={() => onPickTemplate(0)}><FileText size={16} aria-hidden />テンプレートから選ぶ</Button><Button size="composer" disabled={busy} onClick={() => onSaveTemplate(0)}><Save size={16} aria-hidden />保存してテンプレートにする</Button></div>
+      <div className={styles.actions}><Button size="composer" disabled={busy || Boolean(props.templateDisabledReason)} title={props.templateDisabledReason} onClick={() => onPickTemplate(0)}><FileText size={16} aria-hidden />テンプレートから選ぶ</Button><Button size="composer" disabled={busy || Boolean(props.templateDisabledReason)} title={props.templateDisabledReason} onClick={() => onSaveTemplate(0)}><Save size={16} aria-hidden />保存してテンプレートにする</Button></div>
     </div>}
+    {props.templateDisabledReason ? <p role="note">{props.templateDisabledReason}</p> : null}
     {bubbles.map((bubble, index) => {
       const tabs: ReadonlyArray<readonly [ComposerKind, string]> = unavailable.question ? [...COMPOSER_TYPES.slice(0, 10), ['question', '質問'], ...COMPOSER_TYPES.slice(10)] : COMPOSER_TYPES
       const activeType = tabs.some(([type]) => type === bubble.type) ? bubble.type : null

@@ -35,6 +35,7 @@ import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/com
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TemplateEditFrame } from '@/v8/template-edit/public/frame/index'
 import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
@@ -267,7 +268,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     setSnapshotTaken(true)
   }, [loading, snapshotTaken, name, panels, folderId, tapLimitMode, tapLimitText])
   const dirty = uploading || (savedSnapshot !== null && savedSnapshot !== carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText }))
-  const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing || uploading || Boolean(host?.busy) })
+  const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, subject: 'カルーセルの作成内容', busy: saving || publishing || uploading || Boolean(host?.busy) })
 
   const update = (index: number, patch: Partial<Panel>) => setPanels((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)))
   const moveTo = (from: number, to: number) => {
@@ -484,7 +485,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         )}
         footerActions={(
           <>
-            <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
+            <Button type="button" onClick={() => (host ? host.onCancel() : requestUnsavedAction(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => onSaveDraft()} disabled={busy || loadFailed} busy={saving && !publishing}>下書きを保存</Button>
             <Button type="button" variant="primary" onClick={() => onPublish()} disabled={busy || loadFailed || Boolean(inputReason)} disabledReason={inputReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>

@@ -14,6 +14,15 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
 }))
 
+const heldDelete = vi.hoisted(() => ({ confirm: null as null | (() => unknown) }))
+vi.mock('@/components/shared/confirm-dialog', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.title.startsWith('保存した検索') && props.onConfirm) heldDelete.confirm = props.onConfirm
+    return <actual.default {...props} />
+  } }
+})
+
 const net = vi.hoisted(() => ({
   list: vi.fn(),
   marks: vi.fn(),
@@ -178,10 +187,34 @@ describe('行', () => {
     expect((del as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(del)
     const dialog = await screen.findByRole('alertdialog')
+    expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
+    expect(within(dialog).getByText('環境')).toBeTruthy()
     expect(net.remove).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '削除する' })) })
     expect(net.remove).toHaveBeenCalledWith('s1', 'acc')
   })
+})
+
+it('アカウント切替後は古い確認から削除しない', async () => {
+  const view = render(<SearchesTab accountId="acc" canEdit />)
+  await screen.findByText('VIPかつ未契約')
+  fireEvent.click((await openMenu('VIPかつ未契約')).find(item => item.textContent?.includes('削除する'))!)
+  await screen.findByRole('alertdialog')
+  const previous = heldDelete.confirm!
+  view.rerender(<SearchesTab accountId="another" canEdit />)
+  await act(async () => { await previous() })
+  expect(net.remove).not.toHaveBeenCalled()
+})
+
+it('キャンセル後は古い確認から削除しない', async () => {
+  render(<SearchesTab accountId="acc" canEdit />)
+  await screen.findByText('VIPかつ未契約')
+  fireEvent.click((await openMenu('VIPかつ未契約')).find(item => item.textContent?.includes('削除する'))!)
+  const dialog = await screen.findByRole('alertdialog')
+  const previous = heldDelete.confirm!
+  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+  await act(async () => { await previous() })
+  expect(net.remove).not.toHaveBeenCalled()
 })
 
 describe('絞り込み', () => {
