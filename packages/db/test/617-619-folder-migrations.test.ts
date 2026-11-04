@@ -33,7 +33,13 @@ function seed(db:Database.Database) {
 describe('617〜619: 外部キーを有効にしたローカル移行',()=>{
  it('空の旧DBから3本が当たり、生成した空DBと同じ列を持つ',()=>{
   const db=old(),fresh=new Database(':memory:');try{migrate(db);fresh.exec(readFileSync(new URL('bootstrap.sql',root),'utf8'));
-   for(const table of ['folders','mileage_rewards','affiliates','affiliate_offers','friend_add_rules','hq_banner_folders','hq_template_folders','hq_broadcast_folders'])expect(db.prepare(`PRAGMA table_info(${table})`).all()).toEqual(fresh.prepare(`PRAGMA table_info(${table})`).all());
+   for(const table of ['folders','mileage_rewards','affiliates','affiliate_offers','friend_add_rules','hq_banner_folders','hq_template_folders','hq_broadcast_folders']) {
+    const latest=fresh.prepare(`PRAGMA table_info(${table})`).all() as Array<{name:string}>;
+    // 764 の4列は 619 より後に追加されたため、当時の列の比較からだけ除く。
+    const added=table==='mileage_rewards'?['hq_template_id','hq_template_version_id','hq_customized','hq_stock_cumulative']:[];
+    if(added.length) expect(latest.filter(column=>added.includes(column.name)).map(column=>column.name)).toEqual(added);
+    expect(db.prepare(`PRAGMA table_info(${table})`).all()).toEqual(latest.filter(column=>!added.includes(column.name)));
+   }
    expect(db.pragma('foreign_key_check')).toEqual([]);
   }finally{db.close();fresh.close();}
  });

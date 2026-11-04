@@ -33,7 +33,7 @@ export default function CatalogConsole({ type }: { type: HqCatalogTemplateType }
   const [view, setView] = useState<View>('list')
   const [rows, setRows] = useState<Detail['template'][]>([])
   const [detail, setDetail] = useState<Detail | null>(null)
-  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string; style?: string }>>([])
   const [selected, setSelected] = useState<string[]>([])
   const [choices, setChoices] = useState<Record<string, string>>({})
   const [preflight, setPreflight] = useState<Preflight | null>(null)
@@ -108,7 +108,7 @@ export default function CatalogConsole({ type }: { type: HqCatalogTemplateType }
   }
   const stateText: Record<string,string> = {current:'適用済み',update:'新版へ更新',approval_required:'店の確認待ち',kept:'店の版を維持',updated:'更新済み',version_conflict:'変更あり・再確認',succeeded:'配布済み',failed:'配布できませんでした'}
   return <DistributionPage boardId="meBRB" stats={null} toolbar={null} title={`${label(type)}を${isRedistribution ? '再配布' : '配布'}する`} help="確認した内容を各アカウントへ配ります。" notices={notices} actions={<><Button onClick={() => setView(view === 'confirm' ? 'accounts' : 'list')} disabled={busy}>戻る</Button>{canEdit && view !== 'result' && <Button variant="primary" disabled={busy || !selected.length} onClick={() => void (view === 'accounts' ? prepare() : distribute())}>{view === 'accounts' ? '配る先を確かめる' : '確認した内容で配る'}</Button>}{view === 'result' && <Button variant="primary" onClick={() => setView('list')}>完了</Button>}</>}>
-    {view === 'accounts' && <HqAccountPicker title="配るアカウント" allowed={accounts} selected={selected} onChange={setSelected} disabled={!canEdit || busy} />}
+    {view === 'accounts' && <HqAccountPicker title="配るアカウント" allowed={accounts.map(account => type === 'booking_menu' && account.style === 'ec' ? { ...account, name: `${account.name}（予約を使っていません）` } : account)} selected={selected} onChange={setSelected} disabled={!canEdit || busy} disabledIds={type === 'booking_menu' ? accounts.filter(account => account.style === 'ec').map(account => account.id) : []} />}
     {view === 'confirm' && redistribution?.stores.map(store => <Notice key={store.accountId} tone="info">{store.accountName}：{stateText[store.state]}</Notice>)}
     {view === 'confirm' && preflight && <Notice tone="info">{type === 'booking_menu' ? '担当スタッフは各店で決めます。予約の受付は止めた状態で入ります。' : '引換コードは配りません。各店で入れてください。交換の受付は止めた状態で入ります。'}</Notice>}
     {view === 'confirm' && preflight?.stores.map(store => <Notice key={store.accountId} tone="info">{store.accountName}{store.warnings?.map(warning => <p key={warning}>{({same_name_exists:'同じ名前があります。予約メニューは新しく作ります。',payment_downgraded:'決済が未接続のため、お店で払う設定で入ります。',booking_not_used:'この店は予約を使っていません。',booking_reception_stopped:'予約の受付は止めた状態で入ります。',staff_selection_required:'担当スタッフは各店で決めてください。'} as Record<string,string>)[warning] ?? '配布前に店の設定を確認してください。'}</p>)}{store.items.map(item => <Field key={item.sourceId} label={item.name}><Select aria-label={`${store.accountName}：${item.name}の配り方`} value={choices[`${store.accountId}:${item.sourceId}`] ?? ''} onChange={value => setChoices(old => ({ ...old, [`${store.accountId}:${item.sourceId}`]: value }))} options={[{value:'',label:'選んでください'},...item.allowedModes.map(mode => ({value:mode,label:mode === 'create' ? '新しく作る' : mode === 'overwrite' ? '上書きする' : '別名で作る'}))]} /></Field>)}</Notice>)}

@@ -13,7 +13,7 @@ import { formatNumber } from '@/lib/format'
 import styles from '../hq-broadcasts/create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 
-export default function HqAccountPicker({ title, help, allowed, selected, onChange, note, disabled, onFriendTotal }: {
+export default function HqAccountPicker({ title, help, allowed, selected, onChange, note, disabled, disabledIds, onFriendTotal }: {
   title: string
   /** 題の右の「？」の中身。 */
   help?: string
@@ -24,6 +24,7 @@ export default function HqAccountPicker({ title, help, allowed, selected, onChan
   /** 欄の下の説明。無いときは出さない。 */
   note?: string
   disabled?: boolean
+  disabledIds?: string[]
   /** 選んだアカウントの友だちの合計（読めないときは null）。 */
   onFriendTotal?: (total: number | null) => void
 }) {
@@ -51,7 +52,7 @@ export default function HqAccountPicker({ title, help, allowed, selected, onChan
   return (
     <div className={styles.accounts} data-design-node="gQabc-accounts">
       <SectionHeader title={title} help={help} helpLabel={help ? `${title}の説明` : undefined} />
-      <HqAccountPickerField label={title} accounts={accounts} value={selected} onChange={onChange} disabled={disabled}
+      <HqAccountPickerField label={title} accounts={accounts} value={selected} onChange={onChange} disabled={disabled} disabledIds={disabledIds}
         meta={(account) => `友だち ${account.friendCount == null ? emptyValue('unknown') : formatNumber(account.friendCount)}`} />
       {note ? <p className={styles.accountsNote} aria-live="polite">{selected.length === 0 ? `アカウントを選んでください。${note}` : `${formatNumber(selected.length)} アカウントを選んでいます。${note}`}</p> : null}
     </div>

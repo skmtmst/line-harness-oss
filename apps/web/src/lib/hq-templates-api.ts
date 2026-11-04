@@ -62,7 +62,7 @@ export type TemplateInput = {
 export type TemplateDetail = {
   [K in TemplateType]: { template: HqTemplate & { template_type: K }; definition: TemplateDefinitionByType[K] }
 }[TemplateType]
-export interface HqAccount { id: string; name: string }
+export interface HqAccount { id: string; name: string; style?: string }
 export interface PreflightItem {
   sourceId: string; itemKind: string; name: string; targetId?: string | null; operation?: 'reuse'
   expectedRevision?: string | number | null; duplicate: boolean; allowedModes: DistributionMode[]
