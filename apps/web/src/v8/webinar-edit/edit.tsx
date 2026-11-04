@@ -27,6 +27,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import TargetMissing from '@/components/shared/target-missing'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useStaffRole } from '@/lib/staff-role'
@@ -187,7 +188,7 @@ function EditInner() {
     return registrar
   }
 
-  const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({
     dirty: unsaved.size > 0,
     busy: savingForNav !== false || duplicating,
     samePage: (destination) => destination.pathname === pathname && destination.searchParams.get('id') === id,
@@ -385,7 +386,7 @@ function EditInner() {
     { id: 'analytics', label: '分析を見る', onSelect: () => goStep('analytics') },
     { id: 'comments', label: 'コメント演出を開く', onSelect: () => goStep('comments') },
     ...(!readOnly ? [
-      { id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) },
+      { id: 'duplicate', label: '複製する', onSelect: () => requestUnsavedAction(() => void duplicateSaved()) },
       ...(webinar.status === 'active' ? [{ id: 'pause', label: '停止', onSelect: () => { if (!id) return; pauseScope.current = { id, version: editor.version }; setPauseError(''); setPauseVersion(editor.version) } }] : []),
     ] : []),
   ]} />{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}</>

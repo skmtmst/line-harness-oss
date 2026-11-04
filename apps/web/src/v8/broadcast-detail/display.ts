@@ -72,3 +72,11 @@ export function formatShortDateTime(value: string | null | undefined): string {
 export function formatMonthDay(value: string | null | undefined): string {
   return polishFormatDate(value, { style: 'day' })
 }
+
+/** 予約取消の409に含まれる現在の配信状態を、次の行動が分かる言葉にする。 */
+export function cancelConflictMessage(data: unknown): string {
+  const status = data && typeof data === 'object' && 'status' in data ? data.status : undefined
+  if (status === 'sending' || status === 'sent') return '送信が始まったため取り消せません。読み直してください'
+  if (status === 'draft' || status === 'cancelled') return 'すでに取り消されています。読み直してください'
+  return 'ほかの人が予約を変えました。読み直してから、もう一度選んでください'
+}

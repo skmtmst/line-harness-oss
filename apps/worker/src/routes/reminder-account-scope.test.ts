@@ -104,10 +104,11 @@ describe('R349 履歴は実行行の送信元アカウントで絞る', () => {
     const response = await app().request('/api/reminders/rem-1/runs');
     const body = await response.json() as {
       success: boolean;
-      data: { items: Array<{ id: string; friendName: string }>; summary: { sent: number; scheduled: number } };
+      data: { reminder: { lineAccountId: string | null }; items: Array<{ id: string; friendName: string }>; summary: { sent: number; scheduled: number } };
     };
 
     expect(response.status).toBe(200);
+    expect(body.data.reminder.lineAccountId).toBe('acct-b');
     expect(body.data.items.map((row) => row.id)).toEqual(['run-b']);
     expect(body.data.summary).toMatchObject({ sent: 1, scheduled: 0 });
   });
@@ -128,7 +129,7 @@ describe('R349 履歴は実行行の送信元アカウントで絞る', () => {
     setScope(['acct-b']);
 
     const response = await app().request('/api/reminders/rem-1/runs?account_id=acct-b');
-    const body = await response.json() as { data: { items: Array<{ id: string }> } };
+    const body = await response.json() as { data: { reminder: { lineAccountId: string | null }; items: Array<{ id: string }> } };
 
     expect(response.status).toBe(200);
     expect(body.data.items.map((row) => row.id)).toEqual(['run-b']);
@@ -152,9 +153,10 @@ describe('R348 旧所属の送信待ちは見える担当が操作できる', ()
     setScope(['acct-a']);
 
     const response = await app().request('/api/reminders/rem-1/runs');
-    const body = await response.json() as { data: { items: Array<{ id: string }> } };
+    const body = await response.json() as { data: { reminder: { lineAccountId: string | null }; items: Array<{ id: string }> } };
 
     expect(response.status).toBe(200);
+    expect(body.data.reminder.lineAccountId).toBeNull();
     expect(body.data.items.map((row) => row.id)).toEqual(['run-a']);
   });
 

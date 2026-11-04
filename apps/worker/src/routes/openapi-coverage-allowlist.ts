@@ -394,7 +394,6 @@ export const ALLOWLIST = new Set<string>([
   'POST /api/broadcast-message-assets/upload',
   'POST /api/broadcasts/preflight',
   'POST /api/broadcasts/saved-views',
-  'POST /api/broadcasts/{id}/cancel',
   'POST /api/broadcasts/{id}/fetch-insight',
   'POST /api/broadcasts/{id}/send-segment',
   'POST /api/broadcasts/{id}/test-send',

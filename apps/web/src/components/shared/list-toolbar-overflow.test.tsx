@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { ListToolbarFrame, ListToolbarOptional, ListToolbarRow } from './list-toolbar'
+import { ListToolbarEnd, ListToolbarFrame, ListToolbarOptional, ListToolbarRow } from './list-toolbar'
 import { fitToolbarOverflowPanel } from './list-toolbar-fit.mjs'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
@@ -56,4 +56,12 @@ it('開閉・幅の変更でも入力と操作を残し、Escapeで閉じて見�
   expect(screen.getByRole<HTMLInputElement>('textbox', { name: '担当者の条件' }).value).toBe('高田')
   unmount()
   expect(disconnect).toHaveBeenCalled()
+})
+
+it('入れ子の操作を並べてもReactのkey警告を出さない', () => {
+  const warning = vi.spyOn(console, 'error').mockImplementation(() => {})
+  render(<ListToolbarFrame><ListToolbarRow><ListToolbarEnd><><button>操作一</button></><><button>操作二</button></></ListToolbarEnd></ListToolbarRow></ListToolbarFrame>)
+  expect(screen.getByRole('button', {name:'操作一'})).toBeTruthy()
+  expect(screen.getByRole('button', {name:'操作二'})).toBeTruthy()
+  expect(warning.mock.calls.filter(args => args.some(arg => /unique.*key|same key/i.test(String(arg))))).toEqual([])
 })

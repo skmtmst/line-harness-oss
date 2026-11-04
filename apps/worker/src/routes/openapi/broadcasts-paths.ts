@@ -46,6 +46,15 @@ export const broadcastsPaths = {
    * どれも `expectedVersion`（画面が読み込んだ版）が要る。版が食い違えば
    * 409 で断り、二重の適用を止める。
    */
+  '/api/broadcasts/{id}/cancel': {
+    post: {
+      tags: ['Broadcasts'], summary: '予約した配信を下書きへ戻す',
+      description: 'expectedVersion を指定すると、版が変わっていれば取消を断り現在の予約を返す。省略時は従来どおり予約中の配信を取り消す。',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      requestBody: { required: false, content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'integer', minimum: 1 } } } } } },
+      responses: { '200': { description: '取消して下書きへ戻した' }, '400': { description: '版の形式が不正' }, '404': { description: '対象を確認できない' }, '409': { description: '予約状態または版が変わった。版指定時は現在の配信をdataに返す' } },
+    },
+  },
   '/api/broadcasts/{id}/stop': {
     post: {
       tags: ['Broadcasts'],

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, api, describeSaveFailure, type CommonActionResources, type IncomingWebhookDetail } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ActionList from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
@@ -56,7 +56,7 @@ export default function IncomingActions({ detail, accountId, readOnly, onSaved, 
   const target = (action: Ref, id: string): Ref => ({ ...action, refId: id, displayName: items(action.refKind).find(item => item.id === id)?.name ?? '未設定',
     refVersionId: action.refKind === 'common_action' ? resources?.commonActions.find(item => item.id === id)?.currentPublishedVersionId ?? null : null })
   const dirty = JSON.stringify(draft) !== JSON.stringify(detail.actions)
-  const guard = useUnsavedGuard({ dirty, busy, onDiscard: () => setDraft(detail.actions) })
+  const guard = useUnsavedGuard({ dirty, busy, subject: '行うことの変更', onDiscard: () => setDraft(detail.actions) })
   useEffect(() => { onGuardReady(guard.guarded); return () => onGuardReady(null) }, [onGuardReady, guard.guarded])
   const save = async () => {
     if (!canChangeNow()) { setError(access.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
@@ -71,7 +71,7 @@ export default function IncomingActions({ detail, accountId, readOnly, onSaved, 
     finally { lock.current = false; if (active.current) setBusy(false) }
   }
   return <SaveErrorScope errors={saveErrors}>
-    <ConfirmDialog open={guard.leaveTarget !== null} title="入力を破棄しますか？" description="保存していない行うことの変更があります。" confirmLabel="破棄して移動する" busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+    <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="行うことの変更" busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     {loadError ? <Notice tone="danger" message="動きの対象を読み込めませんでした。" action={<Button onClick={() => setAttempt(n => n + 1)}>もう一度読み込む</Button>} /> : null}
     <ActionList<Ref> value={draft} onChange={setDraft} disabled={busy || (!access.allowed && !access.reason)} lockedReason={access.reason} canChangeNow={canChangeNow} idOf={(_, index) => String(index)} titleOf={action => action.displayName} iconOf={action => KIND_ICONS[action.refKind]} kindOf={action => KINDS.find(kind => kind.id === action.refKind)?.label ?? ({ automation: 'オートメーションを動かす', conversion: '成果を記録する' }[action.refKind] ?? '登録済みの操作')}
       choices={draft.length >= 20 ? [] : KINDS.map(kind => ({ id: kind.id, label: kind.label, disabled: !resources, disabledReason: loadError ? '候補を読み直してください' : '候補を読み込んでいます', make: () => ({ refKind: kind.id, refId: '', refVersionId: null, displayName: kind.label }),

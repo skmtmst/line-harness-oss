@@ -8,6 +8,7 @@ import type { FriendDetailState } from './use-friend-detail'
 import type { FriendDetailPermissions } from './permissions'
 
 const fixture = vi.hoisted(() => ({ accountId: 'account-a', tags: vi.fn(), add: vi.fn(), remove: vi.fn(), toast: vi.fn(), confirm: undefined as (() => void) | undefined }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()

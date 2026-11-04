@@ -75,7 +75,7 @@ const REFRESH_MS = 30_000
 const PAGE_META: Record<DeliveryView, { title: string; description: string }> = {
   orders: {
     title: 'デリバリー受注',
-    description: '保存済みの注文を確認し、利用可能なサービスの注文を操作できます',
+    description: '新着注文を受け付け、調理と受け渡しの状態を進められます。注文履歴と売上も確認できます。利用できる操作はサービスの接続状態によって異なります。',
   },
   history: {
     title: '注文履歴・売上',

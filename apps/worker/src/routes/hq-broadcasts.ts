@@ -20,12 +20,13 @@ import { dbFor } from '../services/db-router.js';
 import { requireRole, requireIrreversibleConfirmation } from '../middleware/role-guard.js';
 import { StampError } from '../services/visit-stamps.js';
 import { hqBroadcastAuthority, prepareHqBroadcast, getHqBroadcastRun, readHqBroadcastResult, preflightHqBroadcast,
-  excludeHqBroadcastTargets, dispatchHqBroadcast, stopHqBroadcast, retryHqBroadcastTarget } from '../services/hq-broadcasts.js';
+  excludeHqBroadcastTargets, dispatchHqBroadcast, stopHqBroadcast, retryHqBroadcastTarget, previewHqRetry, HqRetryConflict } from '../services/hq-broadcasts.js';
 export const hqBroadcasts=new Hono<Env>();
 const mediaRuntime = (c: import('hono').Context<Env>) => ({bucket:c.env.IMAGES,publicBaseUrl:c.env.WORKER_URL || new URL(c.req.url).origin});
 hqBroadcasts.onError((e, c) => {
   if (e instanceof HqAudienceConflict) return c.json({success:false,code:'HQ_AUDIENCE_CHANGED',error:e.message,data:e.current},409);
   if (e instanceof HqTestRecipientConflict) return c.json({success:false,code:'HQ_TEST_RECIPIENT_CHANGED',error:e.message,data:e.current},409);
+  if (e instanceof HqRetryConflict) return c.json({success:false,error:e.message,currentCount:e.currentCount,data:{currentCount:e.currentCount}},409);
   if (!(e instanceof StampError)) throw new UnexpectedRouteError(c, { success: false, error: '統括配信を確認できません' });
   return inputError(c, { success: false, ...((e.status === 400 || e.status === 422) ? { fields: e.fields } : {}), error: e.message }, e.status);
 });
@@ -143,9 +144,15 @@ hqBroadcasts.get('/api/hq/broadcasts/:id/reactions',async c=>{const db=dbFor(c.e
 for(const [suffix,followup] of [['duplicate',false],['followup',true]] as const)hqBroadcasts.post(`/api/hq/broadcasts/:id/${suffix}`,inputJsonBoundary({requestId:['string'],expectedVersion:['number'],title:['string']}),async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'));return c.json({success:true,data:await copyHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),a.actorId,await c.req.json(),followup)},201);
 });
-hqBroadcasts.post('/api/hq/broadcasts/:id/targets/:accountId/retry',requireIrreversibleConfirmation('broadcast-send'),inputJsonBoundary({"expectedVersion":["number"]}), async c=>{
-  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method)),b=await c.req.json<{expectedVersion:number}>();
-  return c.json({success:true,data:await retryHqBroadcastTarget(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),c.req.param('accountId'),a.actorId,b.expectedVersion)});
+hqBroadcasts.get('/api/hq/broadcasts/:id/targets/:accountId/retry-preview',async c=>{
+  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'));
+  return c.json({success:true,data:await previewHqRetry(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),c.req.param('accountId'))});
+});
+hqBroadcasts.post('/api/hq/broadcasts/:id/targets/:accountId/retry',requireIrreversibleConfirmation('broadcast-send'),inputJsonBoundary({"expectedVersion":["number"],"confirmedRecipientCount":["number"],"confirmedRecipientToken":["string"]}), async c=>{
+  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method)),b=await c.req.json<{expectedVersion:number;confirmedRecipientCount?:number;confirmedRecipientToken?:string}>();
+  const hasConfirmation=b.confirmedRecipientCount!==undefined||b.confirmedRecipientToken!==undefined;
+  if(hasConfirmation&&(!Number.isSafeInteger(b.confirmedRecipientCount)||b.confirmedRecipientCount!<0||typeof b.confirmedRecipientToken!=='string'||!/^([a-f0-9]{64})$/.test(b.confirmedRecipientToken)))throw new StampError('確認した人数と対象を指定してください',400);
+  return c.json({success:true,data:await retryHqBroadcastTarget(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),c.req.param('accountId'),a.actorId,b.expectedVersion,hasConfirmation?{count:b.confirmedRecipientCount!,token:b.confirmedRecipientToken!}:undefined)});
 });
 
 hqBroadcasts.patch('/api/hq/broadcasts/:id',inputJsonBoundary({"title":["string"],"messageContent":["string"],"messageType":["string"],"messageBubbles":["array"],"messageBubblesJson":["null","string"],"altText":["null","string"],"targetType":["string"],"targetTagId":["null","string"],"segmentConditions":["null","object"],"excludedTagIds":["array"],"savedSearchId":["null","string"],"scheduledAt":["null","string"],"status":["string"],"lineAccountId":["null","string"],"accountIds":["array"],"dedupPriority":["array"],"trackLinks":["boolean"],"stealthSpreadMinutes":["number"],"folderId":["null","string"],"measureOpens":["boolean"],"saveAsDraft":["boolean"],"draftStep":["null","string"],"internalMemo":["null","string"],"messageOptions":["null","object"],"afterActionVersionIds":["object"],"afterActionVersionId":["null","string"],"confirmedRecipientCount":["number"],"requestId":["string"],"accountTagIds":["array"],"excludedAccountIds":["array"],"audience":["object"],"expectedVersion":["number"]}), async c=>{

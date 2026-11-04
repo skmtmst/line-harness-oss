@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccount: { id: mocks.accountId, name: '本店' }, selectedAccountId: mocks.accountId, loading: false }),
+  useOptionalAccount: () => ({ selectedAccountId: mocks.accountId, loading: false }),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -539,7 +540,8 @@ describe('板の印とフォルダの列', () => {
     const view = render(<RichMenusListV8 />)
     await view.findByText('秋の下書き')
     await waitFor(() => expect(boardOf(view)).toBe('Y9ASp'))
-    expect(view.container.querySelector('[data-template-region="folders"]')).toBeNull()
+    // コンテナ幅の CSS で列を畳み、追加窓を開けるように部品は残す。
+    expect(view.container.querySelector('[data-template-region="folders"]')).not.toBeNull()
   })
 })
 

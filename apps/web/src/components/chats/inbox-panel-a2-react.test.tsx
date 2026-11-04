@@ -14,6 +14,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('next/navigation', async original => ({ ...await original<typeof import('next/navigation')>(), useRouter: () => ({ push: vi.fn(), back: vi.fn() }) }))
 
 const mocks = vi.hoisted(() => ({
   role: 'owner',

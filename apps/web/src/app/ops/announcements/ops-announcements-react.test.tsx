@@ -193,6 +193,7 @@ describe('一覧', () => {
     const items = await openRowMenu('料金改定のご案内（下書き）')
     await act(async () => { items.find((el) => el.textContent?.includes('削除する'))!.click() })
     expect(document.body.textContent).toContain('「料金改定のご案内（下書き）」を削除しますか？')
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('環境')
     await act(async () => { button('削除する')!.click() })
     await flush()
     expect(calls.some((c) => c.url.endsWith('/api/ops/announcements/a2') && c.method === 'DELETE')).toBe(true)
@@ -465,6 +466,7 @@ describe('作る画面', () => {
     await flush()
     const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
     expect(dialog.textContent).toContain('「料金改定のご案内（下書き）」を削除しますか？')
+    expect(dialog.textContent).toContain('環境')
     const confirmRemove = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent?.trim() === '削除する')!
     await act(async () => { confirmRemove.click() })
     await flush()
