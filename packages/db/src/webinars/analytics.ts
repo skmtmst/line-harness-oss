@@ -24,7 +24,7 @@ export async function getWebinarParticipantStats(
                 WHERE r.webinar_id = v.webinar_id AND r.friend_id = v.friend_id
               ) THEN 1 ELSE 0 END AS registered,
               (
-                SELECT MAX(fs.created_at)
+                SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('fs.created_at', 'sql')}))
                 FROM form_submissions fs
                 JOIN webinar_ctas wc ON wc.form_id = fs.form_id
                 JOIN webinars wf ON wf.id = wc.webinar_id

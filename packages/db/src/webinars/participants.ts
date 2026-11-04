@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { jstNow } from '../utils.js';
 import { type WebinarParticipantQueryOptions, type WebinarParticipantOperation, type WebinarMonitoringSummary, type Webinar } from './types.js';
 import { getWebinarById } from './definitions.js';
@@ -72,7 +73,7 @@ export async function getWebinarParticipantOperations(
                 SELECT 1 FROM webinar_registrations r
                 WHERE r.webinar_id = ? AND r.friend_id = i.friend_id AND r.status = 'active'
               ) AS registered,
-              (SELECT MAX(fs.created_at)
+              (SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('fs.created_at', 'sql')}))
                  FROM form_submissions fs
                  JOIN webinar_ctas wc ON wc.form_id = fs.form_id
                 WHERE wc.webinar_id = ? AND fs.friend_id = i.friend_id) AS form_submitted_at,
