@@ -197,6 +197,15 @@ afterEach(() => {
 })
 
 describe('読了率の母数', () => {
+  test.each(['owner', 'viewer'] as const)('一覧の説明は%sの操作に合う', async role => {
+    state.role = role
+    rememberStaffIdentity({ id: 'scenario-person', role, permissionKeys: [] } as unknown as StaffMember)
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
+    expect(screen.getByText(/きっかけ（友だち追加/)).toBeTruthy()
+    expect(Boolean(screen.queryByText(/まとめて止める・再開・フォルダへ移す/))).toBe(role === 'owner')
+    if (role === 'viewer') expect(screen.getByText(/配信結果を確認できます/)).toBeTruthy()
+  })
   test('いま途中と読み終えた人の合計を母数にし、購読中は重複を含むと書く', async () => {
     await mount()
     await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('全7件の合計'))

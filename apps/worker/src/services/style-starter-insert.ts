@@ -485,5 +485,6 @@ export async function insertStyleStarterItems(
         item.kind === 'rich_menu',
     });
   }
+  if (inserted.length) statements.push(db.prepare("UPDATE account_styles SET first_starter_at=COALESCE(first_starter_at,?) WHERE line_account_id=?").bind(now, account));
   return { set, inserted, updated, skipped, existing };
 }

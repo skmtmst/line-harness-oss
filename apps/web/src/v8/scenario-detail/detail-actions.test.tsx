@@ -615,7 +615,12 @@ describe('保存・開始のきっかけ・配信の3つの段', () => {
 
   it('板の頭の「対象を絞る」でシナリオ全体の配信対象の窓を開く', async () => {
     await render()
+    expect(screen.queryByRole('button', { name: 'その他の操作' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'このシナリオのその他操作' }))
+    expect(screen.getByRole('menuitem', { name: 'まとめて下見' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'まとめてテストを送る' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'このシナリオを複製' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'このシナリオを削除' })).toBeTruthy()
     await chooseMenuItem('対象を絞る')
     const dialog = await screen.findByRole('dialog')
     expect(dialog.textContent).toContain('対象の絞り込み')

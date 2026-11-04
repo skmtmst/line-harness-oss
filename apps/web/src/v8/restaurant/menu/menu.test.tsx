@@ -52,6 +52,14 @@ const openMenu = (name: string) => fireEvent.click(screen.getByRole('button', { 
 
 /* ★V8 メニュー管理（板 ・停止 ・追加と変更 ）の動き。 */
 describe('MJoJR メニュー管理', () => {
+  it('閲覧のみでは操作できると案内せずメニューの確認を案内する', async () => {
+    role.value = verifiedStaffRole('viewer')
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    fireEvent.click(screen.getByRole('button', { name: 'メニュー一覧の説明' }))
+    expect(await screen.findByText('メニューの内容と価格を確認できます。')).toBeTruthy()
+    expect(screen.queryByText(/「…」から変更・停止・再開・削除ができます/)).toBeNull()
+  })
   it('数5・一覧が出て、アーカイブだけ再開が出る（「…」の決まりは題の？へ）', async () => {
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')

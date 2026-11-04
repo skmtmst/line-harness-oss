@@ -668,7 +668,8 @@
     "754_conversion_approval_revision.sql",
     "755_restaurant_store_group_member_version.sql",
     "756_confirmation_revisions.sql",
-    "757_account_handover_moves.sql"
+    "757_account_handover_moves.sql",
+    "758_first_onboarding_times.sql"
   ],
-  "migrationCount": 669
+  "migrationCount": 670
 }

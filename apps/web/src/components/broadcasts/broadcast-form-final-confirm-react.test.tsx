@@ -17,6 +17,22 @@ import { fireEvent } from '@testing-library/react'
 import { formatDateTime } from '@/lib/format'
 import type { BroadcastPreflight } from '@/lib/api'
 
+const captured = vi.hoisted(() => ({ regular: undefined as undefined | (() => Promise<void>), single: undefined as undefined | (() => Promise<void>), closeRegular: undefined as undefined | ((value: boolean) => void), closeSingle: undefined as undefined | ((value: boolean) => void) }))
+vi.mock('./broadcast-confirm-dialogs', async original => {
+  const actual = await original<typeof import('./broadcast-confirm-dialogs')>()
+  return { ...actual, renderBroadcastConfirmDialogs: (props: Parameters<typeof actual.renderBroadcastConfirmDialogs>[0]) => {
+    if (props.confirmOpen && !props.needsApprovalSingle) { captured.regular = props.confirmMessage; captured.closeRegular = props.setConfirmOpen }
+    return actual.renderBroadcastConfirmDialogs(props)
+  } }
+})
+vi.mock('./broadcast-editor-dialogs', async original => {
+  const actual = await original<typeof import('./broadcast-editor-dialogs')>()
+  return { ...actual, renderBroadcastEditorDialogs: (props: Parameters<typeof actual.renderBroadcastEditorDialogs>[0]) => {
+    if (props.confirmOpen && props.needsApprovalSingle) { captured.single = props.save; captured.closeSingle = props.setConfirmOpen }
+    return actual.renderBroadcastEditorDialogs(props)
+  } }
+})
+
 const mocks = vi.hoisted(() => ({ account: 'acc-1', params: '', get: vi.fn(), preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -177,6 +193,52 @@ describe('人数は配信前チェックが数えた数だけを使う', () => {
     const inPage = definitions(container.querySelector('#broadcast-step-confirm details')!)
     expect(inPage['対象']).toMatch(/—$/)
     expect(inPage['対象']).not.toContain('0人')
+  })
+})
+
+describe('閉じた配信確認', () => {
+  it('通常の確認は開き直すと古い確定を受け付けない', async () => {
+    await render()
+    await click('今すぐ送る', container); await settle(200)
+    const firstAck = Array.from(dialog()!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))!
+    await act(async () => { fireEvent.click(firstAck) }); await flush()
+    const oldConfirm = captured.regular!, oldClose = captured.closeRegular!
+    expect(oldConfirm).toBeTypeOf('function')
+    await click('戻る', dialog()!)
+    await act(async () => { await oldConfirm() }); await flush()
+    expect(mocks.confirm).not.toHaveBeenCalled()
+    await click('今すぐ送る', container); await settle(200)
+    act(() => oldClose(false))
+    expect(dialog()).not.toBeNull()
+    await act(async () => { await oldConfirm() }); await flush()
+    expect(mocks.confirm).not.toHaveBeenCalled()
+    const acknowledgement = Array.from(dialog()!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))!
+    await act(async () => { fireEvent.click(acknowledgement) }); await flush()
+    await click('37 人に送る', dialog()!)
+    expect(mocks.confirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('一人運用の確認は開き直すと古い確定を受け付けない', async () => {
+    const opened = await openSingleOperatorDialog()
+    await act(async () => { fireEvent.change(opened.querySelector('input#approval-count')!, { target: { value: '37' } }) }); await flush()
+    const acknowledgement = Array.from(opened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))!
+    await act(async () => { fireEvent.click(acknowledgement) }); await flush()
+    const oldSave = captured.single!, oldClose = captured.closeSingle!
+    expect(oldSave).toBeTypeOf('function')
+    await click('戻って修正', opened)
+    await act(async () => { await oldSave() }); await flush()
+    expect(mocks.send).not.toHaveBeenCalled()
+    await click('今すぐ送る', container); await settle(200)
+    act(() => oldClose(false))
+    expect(dialog()).not.toBeNull()
+    await act(async () => { await oldSave() }); await flush()
+    expect(mocks.send).not.toHaveBeenCalled()
+    const reopened = dialog()!
+    await act(async () => { fireEvent.change(reopened.querySelector('input#approval-count')!, { target: { value: '37' } }) }); await flush()
+    const nextAck = Array.from(reopened.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))!
+    await act(async () => { fireEvent.click(nextAck) }); await flush()
+    await click('今すぐ送る', reopened)
+    expect(mocks.send).toHaveBeenCalledTimes(1)
   })
 })
 
