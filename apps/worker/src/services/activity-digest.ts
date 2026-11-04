@@ -1,4 +1,4 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { jstCalendar as japanCalendar, sqliteUtcTimestamp } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
   computeUnansweredInbox,
@@ -109,7 +109,7 @@ function normalizeJstTimestamp(value: string): string {
 }
 
 function normalizeUtcTimestamp(value: string): string {
-  const parsed = new Date(value);
+  const parsed = new Date(sqliteUtcTimestamp(value));
   return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
 }
 
@@ -243,9 +243,9 @@ export async function getActivityDigest(
          LEFT JOIN line_accounts la ON la.id = f.line_account_id
         WHERE julianday(fs.created_at) >= julianday(?)
           ${formsScope.clause}
-        ORDER BY fs.created_at DESC
+        ORDER BY julianday(fs.created_at) DESC
         LIMIT ?`,
-    ).bind(sinceJst, ...formsScope.bindings, queryLimit).all<RawFormSubmissionRow>(),
+    ).bind(sinceUtc, ...formsScope.bindings, queryLimit).all<RawFormSubmissionRow>(),
     db.prepare(
       `/* activity-digest:bookings */
        SELECT b.id, b.friend_id, f.display_name,
@@ -322,7 +322,7 @@ export async function getActivityDigest(
     displayName: row.display_name,
     ...accountRef(row),
     data: parseJsonObject(row.data),
-    occurredAt: normalizeJstTimestamp(row.created_at),
+    occurredAt: normalizeUtcTimestamp(row.created_at),
     })));
   const bookingRequests = takeCategory((bookingsResult.results ?? [])
     .filter((row) => isVisibleAccount(

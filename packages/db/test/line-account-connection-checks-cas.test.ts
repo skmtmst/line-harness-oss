@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
-import { getLineAccountConnectionChecksByIdempotencyKey, getLineAccountListStats, LineAccountRevisionConflictError, saveLineAccountConnectionChecks } from '../src/line-accounts.js';
+import { getLineAccountConnectionChecksByIdempotencyKey, getLineAccountListStats, updateLineAccount, LineAccountRevisionConflictError, saveLineAccountConnectionChecks } from '../src/line-accounts.js';
 import { type SaveLineAccountConnectionChecksInput } from '../src/line-accounts-types.js';
 import { asD1 } from './d1-test-helper.js';
 
@@ -75,6 +75,14 @@ describe('connection-check CAS owns every persisted result (PKG20)', () => {
     expect(await getLineAccountConnectionChecksByIdempotencyKey(db, 'account-a', 'first-key')).toEqual(first);
     expect(sqlite.prepare('SELECT revision FROM line_accounts WHERE id = ?').get('account-a'))
       .toEqual({ revision: 3 });
+  });
+
+  it('資格情報の更新で確認の版を進め、古い版の確認を保存させない', async () => {
+    const { sqlite, db } = setup();
+    await saveLineAccountConnectionChecks(db, input('before-update'));
+    await updateLineAccount(db, 'account-a', { channel_access_token: 'new-token' }, 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=');
+    expect(sqlite.prepare('SELECT revision FROM line_accounts WHERE id = ?').get('account-a')).toEqual({ revision: 3 });
+    await expect(saveLineAccountConnectionChecks(db, input('delayed-check', 2))).rejects.toBeInstanceOf(LineAccountRevisionConflictError);
   });
 
   it('rejects an archived account without persisting any checks', async () => {

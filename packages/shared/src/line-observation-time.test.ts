@@ -11,3 +11,9 @@ it('無受信の境界とJST保存・除外・不明な時刻を区別する',()
  expect(lineWebhookSilence({lastReceivedAt:'invalid'},now)).toBe(false);
  expect(lineWebhookSilence({},now)).toBe(false);
 });
+
+it('SQLite の UTC 既定値を受信なしの経過時間に使う', () => {
+ const created = '2026-10-30 09:00:00';
+ expect(lineWebhookSilence({createdAt: created}, Date.parse('2026-10-31T08:59:59Z'))).toBe(false);
+ expect(lineWebhookSilence({createdAt: created}, Date.parse('2026-10-31T09:00:01Z'))).toBe(true);
+});

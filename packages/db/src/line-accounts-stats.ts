@@ -1,4 +1,4 @@
-import { lineTokenExpiry, lineWebhookSilence, DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { lineTokenExpiry, lineWebhookSilence, LINE_CONNECTION_CHECK_TTL_MS, DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { type LineAccountConnectionIssue, type LineAccountListStats } from './line-accounts-types.js';
 
 
@@ -129,24 +129,24 @@ export async function getLineAccountListStats(
               WHERE recent.line_account_id = requested.line_account_id
               ORDER BY julianday(CASE WHEN substr(recent.created_at, -1) = 'Z'
                 OR substr(recent.created_at, -6, 1) IN ('+', '-') THEN recent.created_at
-                ELSE recent.created_at || '+09:00' END) DESC, recent.id DESC LIMIT 1
+                ELSE recent.created_at || 'Z' END) DESC, recent.id DESC LIMIT 1
            )
        ), combined_checks AS (
          SELECT id, line_account_id, check_kind, result, checked_at,
-                expected_url, registered_url, webhook_active, http_status FROM connection_events
+                expected_url, registered_url, webhook_active, http_status, account_revision FROM connection_events
          UNION ALL
          SELECT id, line_account_id, 'bot_info', CASE WHEN error_count > 0 OR error_code > 0 THEN 'failed' ELSE 'ok' END,
-                created_at, NULL, NULL, NULL, CASE WHEN error_code > 0 THEN error_code ELSE NULL END
+                created_at, NULL, NULL, NULL, CASE WHEN error_code > 0 THEN error_code ELSE NULL END, NULL
            FROM latest_bot_health
        ), normalized_checks AS (
          SELECT checks.*,
                 strftime('%Y-%m-%dT%H:%M:%fZ', CASE
                   WHEN substr(checked_at, -1) = 'Z' OR substr(checked_at, -6, 1) IN ('+', '-') THEN checked_at
-                  ELSE checked_at || '+09:00' END) AS checked_instant
+                  ELSE checked_at || 'Z' END) AS checked_instant
            FROM combined_checks checks
        ), ranked_checks AS (
          SELECT checks.line_account_id, checks.check_kind, checks.result, checks.checked_instant AS checked_at,
-                checks.expected_url, checks.registered_url, checks.webhook_active, checks.http_status,
+                checks.expected_url, checks.registered_url, checks.webhook_active, checks.http_status, checks.account_revision,
                 ROW_NUMBER() OVER (
                   PARTITION BY checks.line_account_id, checks.check_kind
                   ORDER BY checks.checked_instant DESC, checks.id DESC
@@ -157,6 +157,8 @@ export async function getLineAccountListStats(
                 COUNT(*) AS check_count,
                 MAX(CASE WHEN check_kind = 'bot_info' AND result IN ('ok', 'matched') THEN 1 ELSE 0 END) AS bot_confirmed,
                 MAX(CASE WHEN check_kind = 'webhook_endpoint' AND result IN ('ok', 'matched') THEN 1 ELSE 0 END) AS webhook_confirmed,
+                MAX(CASE WHEN check_kind = 'webhook_endpoint' AND result IN ('ok', 'matched') THEN checked_at END) AS webhook_checked_at,
+                MAX(CASE WHEN check_kind = 'webhook_endpoint' AND result IN ('ok', 'matched') THEN account_revision END) AS webhook_revision,
                 MAX(checked_at) AS checked_at,
                 MAX(CASE WHEN result IN ('mismatched', 'unconfigured', 'failed') THEN 1 ELSE 0 END) AS has_warning,
                 MAX(CASE WHEN result NOT IN ('matched', 'ok') THEN 1 ELSE 0 END) AS has_unconfirmed,
@@ -179,6 +181,8 @@ export async function getLineAccountListStats(
               account.is_active AS account_active,
               account.archived_at AS account_archived_at,
               connection.checked_at AS connection_checked_at,
+              connection.webhook_checked_at, connection.webhook_revision, account.revision,
+              account.channel_access_token_updated_at, account.channel_secret_updated_at,
               connection.issues AS connection_issues,
               account.token_expires_at, account.last_webhook_received_at,
               account.webhook_silence_exempt, account.created_at,
@@ -210,6 +214,11 @@ export async function getLineAccountListStats(
       account_archived_at: string | null;
       connection_status: 'ok' | 'warn' | 'unknown';
       connection_checked_at: string | null;
+      webhook_checked_at: string | null;
+      webhook_revision: number | null;
+      revision: number;
+      channel_access_token_updated_at: string | null;
+      channel_secret_updated_at: string | null;
       connection_issues: string | null;
       token_expires_at: string | null;
       last_webhook_received_at: string | null;
@@ -220,6 +229,15 @@ export async function getLineAccountListStats(
   return Object.fromEntries(result.results.map((row) => {
     const silent = lineWebhookSilence({ lastReceivedAt: row.last_webhook_received_at, createdAt: row.created_at, exempt: Boolean(row.webhook_silence_exempt) });
     const issues = parseConnectionIssues(row.connection_issues);
+    const checkedAt = row.webhook_checked_at ? Date.parse(row.webhook_checked_at) : NaN;
+    const credentialsChangedAfterCheck = [row.channel_access_token_updated_at, row.channel_secret_updated_at]
+      .some(value => {
+        if (!value) return false;
+        const instant = Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value.replace(' ', 'T')}Z`);
+        return !Number.isFinite(instant) || instant > checkedAt;
+      });
+    const age = Date.now() - checkedAt;
+    const webhookFresh = Number.isFinite(age) && age >= 0 && age < LINE_CONNECTION_CHECK_TTL_MS && !credentialsChangedAfterCheck && row.webhook_revision === row.revision;
     if (silent) issues.push({ kind: 'webhook_silence', result: 'failed', expectedUrl: null, registeredUrl: null, webhookActive: null, httpStatus: null });
     return [row.line_account_id, {
       friendCount: Number(row.friend_count),
@@ -227,7 +245,7 @@ export async function getLineAccountListStats(
       messagesThisMonth: Number(row.messages_this_month),
       staffCount: Number(row.staff_count),
       connection: {
-        status: silent ? 'warn' : row.connection_status,
+        status: silent ? 'warn' : row.connection_status === 'ok' && !webhookFresh ? 'unknown' : row.connection_status,
         isActive: Boolean(row.account_active), archivedAt: row.account_archived_at,
         checkedAt: row.connection_checked_at,
         tokenExpired: lineTokenExpiry(row.token_expires_at).status === 'expired',

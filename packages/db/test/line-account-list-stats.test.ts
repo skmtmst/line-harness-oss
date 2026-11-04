@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -9,7 +9,10 @@ import { asD1 } from './d1-test-helper.js';
 let sqlite: Database.Database;
 let db: D1Database;
 
+afterEach(() => vi.useRealTimers());
 beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-09-15T12:30:00Z'));
   sqlite = new Database(':memory:');
   sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'bootstrap.sql'), 'utf8'));
   sqlite.exec(`
@@ -141,7 +144,7 @@ describe('LINEアカウント一覧の一括集計', () => {
 
  test('手動確認と定期のbot確認を同じ時刻で比較し、復旧とWebhookの問題を別々に残す', async () => {
    sqlite.exec(`INSERT INTO account_health_logs (id,line_account_id,error_code,error_count,check_period,risk_level,created_at)
-     VALUES ('cron-a','account-a',401,1,'5m','normal','2026-09-15T19:05:00'),
+     VALUES ('cron-a','account-a',401,1,'5m','normal','2026-09-15T10:05:00'),
             ('cron-b','account-b',NULL,0,'5m','warning','2026-09-15T19:05:00+09:00');`);
    let stats = await getLineAccountListStats(db, ['account-a', 'account-b']);
    expect(stats['account-a'].connection).toMatchObject({ status: 'warn', checkedAt: '2026-09-15T10:05:00.000Z', issues: [{ kind: 'bot_info', httpStatus: 401 }] });
@@ -174,9 +177,9 @@ describe('LINEアカウント一覧の一括集計', () => {
    expect((await getLineAccountListStats(db,['account-a']))['account-a'].connection.status).toBe('ok');
  });
 
- test('定期ログの最新をUTC/JSTの文字順で取り違えず、期限の時差なしもJSTとして読む', async () => {
+ test('定期ログをUTC/JSTの文字順で取り違えず、入力されたトークン期限はJSTとして読む', async () => {
    sqlite.exec(`INSERT INTO account_health_logs(id,line_account_id,error_code,error_count,check_period,risk_level,created_at)
-     VALUES('jst-old','account-a',401,1,'5m','normal','2026-09-15T19:05:00'),
+     VALUES('jst-old','account-a',401,1,'5m','normal','2026-09-15T10:05:00'),
            ('utc-new','account-a',NULL,0,'5m','normal','2026-09-15T10:06:00Z');`);
    const deadline = new Date(Date.now()+8*60*60_000).toISOString().replace(/Z$/,'');
    sqlite.prepare('UPDATE line_accounts SET token_expires_at=? WHERE id=?').run(deadline,'account-a');
@@ -201,3 +204,15 @@ describe('LINEアカウント一覧の一括集計', () => {
    expect(plan.some(row=>/SEARCH health USING INDEX.*\(id=\?\)/.test(row.detail))).toBe(true)
 
  })
+
+ test('Webhook の照合は24時間で失効し、資格情報の変更でも無効になる', async () => {
+   sqlite.exec("UPDATE line_accounts SET webhook_silence_exempt=1 WHERE id='account-a'");
+   expect((await getLineAccountListStats(db,['account-a']))['account-a'].connection.status).toBe('ok');
+   vi.setSystemTime(new Date('2026-09-16T10:00:00Z'));
+   expect((await getLineAccountListStats(db,['account-a']))['account-a'].connection.status).toBe('unknown');
+   vi.setSystemTime(new Date('2026-09-15T12:30:00Z'));
+   sqlite.exec("UPDATE line_accounts SET revision=2 WHERE id='account-a'");
+   expect((await getLineAccountListStats(db,['account-a']))['account-a'].connection.status).toBe('unknown');
+   sqlite.exec("UPDATE line_accounts SET revision=1, channel_access_token_updated_at='2026-09-15T10:01:00Z' WHERE id='account-a'");
+   expect((await getLineAccountListStats(db,['account-a']))['account-a'].connection.status).toBe('unknown');
+ });

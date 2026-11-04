@@ -1206,10 +1206,10 @@ describe('POST /api/line-accounts/:id/connection-checks', () => {
       webhook_active: 1,
       http_status: 200,
       checked_by: 'test-staff',
-      checked_at: '2026-09-07T08:00:00.000+09:00',
+      checked_at: new Date(Date.now() - 60_000).toISOString(),
       correlation_id: 'old-correlation',
       idempotency_key: 'account-check-0001',
-      account_revision: 2,
+      account_revision: 1,
     }]);
     const res = await requestCheck(setupApp('owner'), 1);
 
@@ -1217,8 +1217,13 @@ describe('POST /api/line-accounts/:id/connection-checks', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(dbMocks.saveLineAccountConnectionChecks).not.toHaveBeenCalled();
     await expect(res.json()).resolves.toMatchObject({
-      data: { revision: 2, correlationId: 'old-correlation' },
+      data: { revision: 1, correlationId: 'old-correlation' },
     });
+    const saved = await dbMocks.getLineAccountConnectionChecksByIdempotencyKey.mock.results[0].value;
+    saved[0].checked_at = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+    const expired = await requestCheck(setupApp('owner'), 1);
+    expect(expired.status).toBe(409);
+    await expect(expired.json()).resolves.toMatchObject({ error: 'CONNECTION_CHECK_EXPIRED' });
   });
 
   test('staffは403、担当範囲外は404、入力不備は422', async () => {

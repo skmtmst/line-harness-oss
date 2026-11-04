@@ -15,8 +15,8 @@
  */
 export interface FormSubmissionPeriod { from?: string; until?: string }
 
-/** Older rows are JST without an offset; ISO rows carry an explicit zone. Compare in JST. */
+/** SQLite defaults without an offset are UTC; compare all instants in JST. */
 export function submissionPeriodSql(column: string, period: FormSubmissionPeriod = {}) {
-  const date = `datetime(${column}, CASE WHEN substr(${column},-1)='Z' OR substr(${column},-6,1) IN ('+','-') THEN '+9 hours' ELSE '+0 hours' END)`;
+  const date = `datetime(${column}, '+9 hours')`;
   return { sql: `${period.from ? ` AND ${date}>=datetime(?)` : ''}${period.until ? ` AND ${date}<datetime(?)` : ''}`, bindings: [...(period.from ? [period.from] : []), ...(period.until ? [period.until] : [])] };
 }

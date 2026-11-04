@@ -1,4 +1,5 @@
 import { starterCatalogRuntime } from './style-starter-runtime.js';
+import { isConnectionCheckFresh, serializeConnectionCheck } from '../services/line-connection-check-freshness.js';
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { readLineAccountListMetadata } from '../services/line-account-list-metadata.js';
 import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
@@ -244,17 +245,6 @@ function publicAccountUrls(c: Context<Env>, liffId: string | null, channelId: st
   };
 }
 
-function serializeConnectionCheck(row: LineAccountConnectionCheck) {
-  return {
-    kind: row.check_kind,
-    result: row.result,
-    expectedUrl: row.expected_url,
-    registeredUrl: row.registered_url,
-    webhookActive: row.webhook_active == null ? null : Boolean(row.webhook_active),
-    httpStatus: row.http_status,
-  };
-}
-
 function connectionCheckResponse(
   account: DbLineAccount,
   rows: LineAccountConnectionCheck[],
@@ -483,6 +473,7 @@ lineAccounts.post(
       const urls = publicAccountUrls(c, account.liff_id, account.channel_id);
       const existing = await getLineAccountConnectionChecksByIdempotencyKey(c.env.DB, id, idempotencyKey);
       if (existing.length > 0) {
+        if (!isConnectionCheckFresh(existing, account.revision ?? 1)) return c.json({ success: false, error: 'CONNECTION_CHECK_EXPIRED' }, 409);
         return c.json({ success: true, data: connectionCheckResponse(account, existing, urls) });
       }
       const currentRevision = account.revision ?? 1;

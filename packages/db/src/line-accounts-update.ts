@@ -118,6 +118,10 @@ export async function updateLineAccount(
 
   if (fields.length === 0) return getLineAccountById(db, id, encryptionKey);
 
+  if (updates.channel_access_token !== undefined || updates.channel_secret !== undefined) {
+    // Invalidate any connection check made with the old credentials.
+    fields.push('revision = revision + 1');
+  }
   fields.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);

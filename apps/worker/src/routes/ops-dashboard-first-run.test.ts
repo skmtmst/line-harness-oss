@@ -6,6 +6,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { jstIso, opsDashboard, resolvePeriod } from './ops-dashboard.js';
+import { firstRunTimes } from '../services/getting-started-first-run.js';
 
 /** 最初の10分の全アカウントのまとめ。運営だけが数だけを読む。 */
 
@@ -85,6 +86,15 @@ async function read(staff: AuthenticatedStaff = master, query = '') {
 }
 
 describe('最初の10分のまとめ', () => {
+  it('SQLite の UTC 作成日時で期間と所要時間を判定する', async () => {
+    account('legacy-utc', atUtc(0).replace('T', ' ').replace(/\.000Z$/, ''));
+    firstMessage('legacy-utc', at(4));
+    const detail = await firstRunTimes(testDb.db, 'legacy-utc');
+    expect(detail).toMatchObject({ startedAt: at(0), minutes: 4 });
+    const { body } = await read();
+    expect(body).toMatchObject({ accounts: 1, minutesToFirstMessage: { median: 4, reached: 1 } });
+  });
+
   it('各段まで進んだ数・分の中央値と75%点・10分以内・6段の全部を数える', async () => {
     // 全部終えた店：4 分で最初の1通。
     account('la-1', at(0));

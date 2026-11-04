@@ -159,6 +159,14 @@ describe('getDashboardComparisons', () => {
     expect(result.skipped.todayBookings).toBe('no_previous_record');
   });
 
+  it('UTC の既定作成日時が比較期間の開始後なら比較しない', async () => {
+    seedAccount('legacy-boundary', '2026-10-17 18:00:00');
+    seedBooking('legacy-boundary', '2026-10-25T01:00:00Z', 'confirmed', '2026-09-01T00:00:00Z');
+    const result = await getDashboardComparisons(db, { lineAccountId: 'legacy-boundary', now: NOW });
+    expect(result.comparisons.todayBookings).toBeNull();
+    expect(result.skipped.todayBookings).toBe('no_previous_record');
+  });
+
   it('アカウントを作ったのが先週の同じ曜日より後なら、どの数も比べない', async () => {
     seedAccount('account-new', '2026-10-20T09:00:00.000');
     seedBooking('account-new', '2026-10-25T01:00:00.000Z', 'confirmed', '2026-10-20T10:00:00.000');

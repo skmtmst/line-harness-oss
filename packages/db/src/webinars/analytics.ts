@@ -1,4 +1,5 @@
 import { type WebinarParticipantStat, type WebinarAnalyticsSummaryRow, type WebinarDailyStat } from './types.js';
+import { followTimeSql } from '../utils.js';
 
 
 /** 参加者を friend 単位にまとめる。再入場・複数セッションは1人として表示する。 */
@@ -28,7 +29,7 @@ export async function getWebinarParticipantStats(
                 JOIN webinars wf ON wf.id = wc.webinar_id
                 WHERE wc.webinar_id = v.webinar_id
                   AND fs.friend_id = v.friend_id
-                  AND fs.created_at >= wf.created_at
+                  AND julianday(fs.created_at) >= ${followTimeSql('wf.created_at')}
               ) AS form_submitted_at
        FROM webinar_viewers v
        LEFT JOIN friends f ON f.id = v.friend_id
@@ -60,7 +61,7 @@ export async function getWebinarAnalyticsSummary(
          FROM form_submissions fs
          JOIN webinar_ctas wc ON wc.form_id = fs.form_id
          JOIN webinars w ON w.id = wc.webinar_id
-         WHERE wc.webinar_id = ? AND fs.created_at >= w.created_at
+         WHERE wc.webinar_id = ? AND julianday(fs.created_at) >= ${followTimeSql('w.created_at')}
        )
        SELECT
          (SELECT COUNT(DISTINCT friend_id) FROM webinar_registrations
@@ -112,16 +113,16 @@ export async function getWebinarDailyStats(
        ), views AS (
          SELECT friend_id, joined_at, cta_clicked_at FROM webinar_viewers WHERE webinar_id = ?
        ), submissions AS (
-         SELECT fs.friend_id, fs.created_at
+         SELECT fs.friend_id, date(fs.created_at, '+9 hours') AS stat_date
          FROM form_submissions fs
          JOIN webinar_ctas wc ON wc.form_id = fs.form_id
          JOIN webinars w ON w.id = wc.webinar_id
-         WHERE wc.webinar_id = ? AND fs.created_at >= w.created_at
+         WHERE wc.webinar_id = ? AND julianday(fs.created_at) >= ${followTimeSql('w.created_at')}
        ), dates AS (
          SELECT substr(created_at, 1, 10) AS stat_date FROM regs
          UNION SELECT substr(joined_at, 1, 10) FROM views
          UNION SELECT substr(cta_clicked_at, 1, 10) FROM views WHERE cta_clicked_at IS NOT NULL
-         UNION SELECT substr(created_at, 1, 10) FROM submissions
+         UNION SELECT stat_date FROM submissions
        )
        SELECT d.stat_date,
               (SELECT COUNT(DISTINCT friend_id) FROM regs
@@ -131,7 +132,7 @@ export async function getWebinarDailyStats(
               (SELECT COUNT(DISTINCT friend_id) FROM views
                WHERE substr(cta_clicked_at, 1, 10) = d.stat_date) AS cta_clicks,
               (SELECT COUNT(DISTINCT friend_id) FROM submissions
-               WHERE substr(created_at, 1, 10) = d.stat_date) AS form_submissions
+               WHERE stat_date = d.stat_date) AS form_submissions
        FROM dates d
        WHERE d.stat_date IS NOT NULL AND d.stat_date <> ''
        ORDER BY d.stat_date ASC`,

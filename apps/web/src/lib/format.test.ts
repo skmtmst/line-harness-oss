@@ -29,6 +29,10 @@ describe('★管理画面 日付と数の書き方（板 ZzBqa §2）', () => {
     expect(formatDateTime('2024-04-03T01:00:00Z', '—', NOW)).toBe('2024年4月3日 10:00')
   })
 
+  it('SQLite の時差なし UTC 既定値を日本時間へ変換する', () => {
+    expect(formatDateTime('2026-09-29 15:48:00', '—', NOW)).toBe('9月30日 00:48')
+  })
+
   it('PCの地域に左右されない（UTC入力が必ずJSTで出る）', () => {
     expect(formatDateTime('2026-09-30T15:00:00Z', '—', NOW)).toBe('10月1日 00:00')
   })

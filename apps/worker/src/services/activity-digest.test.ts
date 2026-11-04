@@ -3,6 +3,7 @@ import {
   getActivityDigest,
   parseActivityDigestHours,
 } from './activity-digest.js';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import type { UnansweredInboxResult } from './unanswered-inbox.js';
 
 type ResultsByMarker = Record<string, unknown[]>;
@@ -121,7 +122,7 @@ describe('getActivityDigest', () => {
     expect(bindings).toEqual([
       ['2026-08-05T15:00:00.000', JSON.stringify(['account-1']), 501],
       ['2026-08-05T15:00:00.000', JSON.stringify(['account-1']), 501],
-      ['2026-08-05T15:00:00.000', JSON.stringify(['account-1']), 501],
+      ['2026-08-05T06:00:00.000Z', JSON.stringify(['account-1']), 501],
       ['2026-08-05T06:00:00.000Z', JSON.stringify(['account-1']), 501],
       ['2026-08-05T06:00:00.000Z', JSON.stringify(['account-1']), 501],
     ]);
@@ -199,3 +200,15 @@ describe('getActivityDigest', () => {
     expect(defaultTenant.summary.incomingMessages).toBe(3);
   });
 });
+
+ test('回答の UTC 既定日時を期間と表示で同じ瞬間として扱う', async () => {
+   const testDb = createTestD1();
+   testDb.raw.exec(`INSERT INTO line_accounts (id,channel_id,name,channel_access_token,channel_secret) VALUES ('account-1','ch','店','t','s');
+     INSERT INTO friends (id,line_user_id,line_account_id) VALUES ('friend-1','U1','account-1');
+     INSERT INTO forms (id,name) VALUES ('form-1','フォーム');
+     INSERT INTO form_submissions (id,form_id,friend_id,created_at) VALUES
+       ('old','form-1','friend-1','2026-08-05 05:59:59'),
+       ('new','form-1','friend-1','2026-08-05 06:00:00');`);
+   const result = await getActivityDigest(testDb.db, { allowedAccountIds: ['account-1'], canSeeUnassigned: false, hours: 3, now: new Date('2026-08-05T09:00:00Z'), unansweredLoader: async () => noUnanswered });
+   expect(result.newActions.formSubmissions.items.map(item => [item.id, item.occurredAt])).toEqual([['new', '2026-08-05T06:00:00.000Z']]);
+ });

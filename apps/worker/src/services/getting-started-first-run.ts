@@ -1,5 +1,6 @@
 import { firstDeliveredMessageAt, toJstString } from '@line-crm/db';
 import { instant } from './style-analytics-core.js';
+import { sqliteUtcTimestamp } from '@line-crm/shared';
 
 /** 保存の形がまちまち（Z・+09:00・時差なしの日本時間）な時刻を、日本時間の文字にそろえる。 */
 function jst(value: string | null | undefined): string | null {
@@ -28,7 +29,7 @@ export async function firstRunTimes(db: D1Database, accountId: string) {
     ).bind(accountId).first<{ at: string | null }>(),
     firstDeliveredMessageAt(db, accountId),
   ]);
-  const startedAt = jst(account?.at);
+  const startedAt = jst(account?.at ? sqliteUtcTimestamp(account.at) : null);
   const firstMessageAt = jst(firstMessage);
   const minutes = startedAt && firstMessageAt
     ? Math.max(0, Math.ceil((instant(firstMessageAt) - instant(startedAt)) / 60000))

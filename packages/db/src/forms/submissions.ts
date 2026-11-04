@@ -16,7 +16,7 @@ export async function getFormSubmissions(
     .prepare(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
-       WHERE fs.form_id = ? AND fs.is_test = 0${options.lineAccountId ? ' AND f.line_account_id=?' : ''}${period.sql} ORDER BY fs.created_at DESC LIMIT ?`,
+       WHERE fs.form_id = ? AND fs.is_test = 0${options.lineAccountId ? ' AND f.line_account_id=?' : ''}${period.sql} ORDER BY julianday(fs.created_at) DESC LIMIT ?`,
     )
     .bind(formId, ...(options.lineAccountId ? [options.lineAccountId] : []), ...period.bindings, boundedListLimit(limit, MAX_LIST_LIMIT))
     .all<FormSubmission & { friend_name: string | null }>();
@@ -65,7 +65,7 @@ export async function getFormSubmissionsPage(
       `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
        LEFT JOIN friends f ON f.id = fs.friend_id
        WHERE fs.form_id = ? AND fs.is_test = 0${accountClause}${searchClause}${period.sql}
-       ORDER BY fs.created_at DESC, fs.id DESC
+       ORDER BY julianday(fs.created_at) DESC, fs.id DESC
        LIMIT ? OFFSET ?`,
     )
     .bind(formId, ...accountBindings, ...searchBindings, ...period.bindings, limit, offset)
@@ -89,7 +89,7 @@ export async function getFormSubmissionsByFriend(
        JOIN forms f ON f.id = fs.form_id
        LEFT JOIN form_versions fv ON fv.id = fs.form_version_id AND fv.form_id = fs.form_id
        WHERE fs.friend_id = ? AND fs.is_test = 0
-       ORDER BY fs.created_at DESC
+       ORDER BY julianday(fs.created_at) DESC
        LIMIT ?`,
     )
     .bind(friendId, safeLimit)
@@ -134,7 +134,7 @@ export async function getFormSubmissionsByFriendCursor(
     const sep = input.cursor.lastIndexOf('|');
     const cursorCreatedAt = sep > 0 ? input.cursor.slice(0, sep) : input.cursor;
     const cursorId = sep > 0 ? input.cursor.slice(sep + 1) : '';
-    cursorClause = ' AND (fs.created_at < ? OR (fs.created_at = ? AND fs.id < ?))';
+    cursorClause = ' AND (julianday(fs.created_at) < julianday(?) OR (julianday(fs.created_at) = julianday(?) AND fs.id < ?))';
     bindings.push(cursorCreatedAt, cursorCreatedAt, cursorId);
   }
   const result = await db
@@ -146,7 +146,7 @@ export async function getFormSubmissionsByFriendCursor(
        JOIN forms f ON f.id = fs.form_id
        LEFT JOIN form_versions fv ON fv.id = fs.form_version_id AND fv.form_id = fs.form_id
        WHERE fs.friend_id = ? AND fs.is_test = 0${cursorClause}
-       ORDER BY fs.created_at DESC, fs.id DESC
+       ORDER BY julianday(fs.created_at) DESC, fs.id DESC
        LIMIT ?`,
     )
     .bind(...bindings, safeLimit + 1)
