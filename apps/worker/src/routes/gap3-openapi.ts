@@ -1,6 +1,9 @@
 // 第3弾の実装済みAPI。模擬・未提供の境界も契約に残す。
 const responses={'200':{description:'成功。dataはdescriptionを参照'},'201':{description:'作成済み'},'400':{description:'入力不正'},'401':{description:'本人確認・署名不正'},'403':{description:'権限不足・閲覧のみ・代理で禁止'},'404':{description:'対象なし・担当外'},'409':{description:'版競合・未提供・実送信/決済禁止'},'503':{description:'取得・保存できない'}};
 const entries:readonly (readonly [string,string,string,string])[]=[
+ ["GET", "/api/analytics/inbox-response", "返信の速さの分析", "店の担当範囲に限る。query:from,to（週の開始・終了）。管理者は全担当、その他は本人のみ。記録開始後の返信を集計し、削除された会話の匿名件数を含む。"],
+ ["GET", "/api/analytics/inbox-response/conversations", "返信の速さの対象会話", "店と会話の閲覧権限を確認。query:from,to,staffId,staffDeleted,kind,offset。管理者以外は本人のみ。削除された会話は含まず、50件ずつ返す。"],
+ ["GET", "/api/inbox/routing/apply-unassigned/{id}", "未割当への一括割当の進捗", "管理者が店の担当範囲内の処理を確認する。対象外の処理は404。"],
  ["GET", "/api/ai-answer-logs", "自動応答の記録", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。query:action,offset。data:{items,total,summary}、詳細はqa/afterNoteを含む。会話の閲覧権限。"],
  ["GET", "/api/ai-answer-logs/{id}", "自動応答の記録", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。query:action,offset。data:{items,total,summary}、詳細はqa/afterNoteを含む。会話の閲覧権限。"],
  ["GET", "/api/ai-features", "店別のAI利用設定", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。GET:{items,disclosure,disclosureVersion}、未設定はoff。PUT:{enabled,expectedVersion,consent:true,disclosureVersion}。owner/admin、代理不可、ai.settingsの本人再確認と同意記録。"],
