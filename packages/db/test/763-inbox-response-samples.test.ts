@@ -54,7 +54,7 @@ it('会話削除時は週単位の匿名の件数だけ残し、担当者と店�
    ('3','a','c2','s2','2026-11-05T00:00:00Z',NULL,'2026-11-05T00:20:00Z',1);
    INSERT INTO inbox_response_samples(id,account_id,chat_id,reply_kind,responded_at,is_first_response) VALUES('auto','a','c2','automatic','2026-11-05T00:22:00Z',0); DELETE FROM chats WHERE id IN ('c','c2');`);
   expect(raw.prepare('SELECT count(*) n FROM inbox_response_samples').get()).toEqual({n:0});
-  expect(raw.prepare('SELECT on_time,overdue,no_deadline FROM inbox_response_deleted_weekly WHERE staff_id=?').get('s')).toEqual({on_time:1,overdue:1,no_deadline:0});
+  expect(raw.prepare('SELECT week,on_time,overdue,no_deadline FROM inbox_response_deleted_weekly WHERE staff_id=?').get('s')).toEqual({week:'2026-11-02',on_time:1,overdue:1,no_deadline:0});
   raw.exec("DELETE FROM staff_members WHERE id IN ('s','s2')");
   expect(raw.prepare('SELECT staff_id,staff_deleted,on_time,overdue,no_deadline FROM inbox_response_deleted_weekly WHERE staff_deleted=1').all()).toEqual([{staff_id:null,staff_deleted:1,on_time:1,overdue:1,no_deadline:1}]);
   expect(raw.prepare('SELECT automatic FROM inbox_response_deleted_weekly WHERE staff_deleted=0 AND staff_id IS NULL').get()).toEqual({automatic:1});
