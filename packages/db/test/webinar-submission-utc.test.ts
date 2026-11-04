@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { expect, it } from 'vitest';
 import { getWebinarDailyStats, getWebinarParticipantStats } from '../src/webinars/analytics.js';
 import { getWebinarParticipantOperations } from '../src/webinars/participants.js';
+import { getWebinarFormFunnelStats } from '../src/webinars/engagement.js';
 import { asD1 } from './d1-test-helper.js';
 
 it('時差なし UTC の回答をウェビナーの開始と日本時間の日付で比較する', async () => {
@@ -17,6 +18,25 @@ it('時差なし UTC の回答をウェビナーの開始と日本時間の日�
       ('f','new','2026-10-31 15:00:00');`);
   const result = await getWebinarDailyStats(asD1(sqlite), 'w');
   expect(result).toEqual([{ stat_date: '2026-11-01', reservations: 0, viewers: 0, cta_clicks: 0, form_submissions: 1 }]);
+  sqlite.close();
+});
+
+it('フォームを開いた時と回答した時は有効化された実時刻と比較する', async () => {
+  const sqlite = new Database(':memory:');
+  sqlite.exec(`
+    CREATE TABLE webinar_followup_configs (webinar_id TEXT, enabled_at TEXT);
+    CREATE TABLE webinar_ctas (webinar_id TEXT, form_id TEXT, at_seconds INTEGER);
+    CREATE TABLE webinar_viewers (webinar_id TEXT, friend_id TEXT, joined_at TEXT, last_position_seconds INTEGER, cta_clicked_at TEXT);
+    CREATE TABLE webinar_funnel_events (webinar_id TEXT, friend_id TEXT, event_type TEXT, field_name TEXT);
+    CREATE TABLE form_submissions (form_id TEXT, friend_id TEXT, created_at TEXT);
+    CREATE TABLE form_opens (form_id TEXT, friend_id TEXT, opened_at TEXT);
+    INSERT INTO webinar_followup_configs VALUES ('w','2026-11-01T00:00:00Z');
+    INSERT INTO webinar_ctas VALUES ('w','f',0);
+    INSERT INTO form_submissions VALUES ('f','early','2026-11-01T08:59:59'), ('f','on-time','2026-11-01 00:00:00');
+    INSERT INTO form_opens VALUES ('f','early','2026-11-01T08:59:59'), ('f','on-time','2026-11-01 00:00:00');
+  `);
+  const result = await getWebinarFormFunnelStats(asD1(sqlite), 'w');
+  expect(result).toMatchObject({ form_opens: 1, submit_successes: 1 });
   sqlite.close();
 });
 

@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { jstNow } from '../utils.js';
 import { type WebinarComment, type WebinarFunnelEventType, type WebinarFormFunnelStats, type WebinarUserComment, type WebinarSessionStat } from './types.js';
 import { WEBINAR_RETENTION_BUCKET_SECONDS } from './playback.js';
@@ -151,7 +152,7 @@ export async function getWebinarFormFunnelStats(
             FROM form_opens fo, config
             WHERE fo.form_id IN (SELECT form_id FROM tracked_forms)
               AND fo.friend_id IS NOT NULL
-              AND datetime(fo.opened_at) >= datetime(config.enabled_at)) AS form_opens,
+              AND datetime(${storedTimestamp('fo.opened_at', 'sql')}) >= datetime(config.enabled_at)) AS form_opens,
            (SELECT COUNT(DISTINCT e.friend_id) FROM webinar_funnel_events e
             WHERE e.webinar_id = ? AND e.event_type = 'form_start') AS form_starts,
            (SELECT COUNT(DISTINCT e.friend_id) FROM webinar_funnel_events e
@@ -159,7 +160,7 @@ export async function getWebinarFormFunnelStats(
            (SELECT COUNT(DISTINCT fs.friend_id)
             FROM form_submissions fs, config
             WHERE fs.form_id IN (SELECT form_id FROM tracked_forms)
-              AND datetime(fs.created_at) >= datetime(config.enabled_at)) AS submit_successes,
+              AND datetime(${storedTimestamp('fs.created_at', 'sql')}) >= datetime(config.enabled_at)) AS submit_successes,
            (SELECT COUNT(DISTINCT e.friend_id) FROM webinar_funnel_events e
             WHERE e.webinar_id = ? AND e.event_type = 'submit_error') AS submit_errors`,
       )
