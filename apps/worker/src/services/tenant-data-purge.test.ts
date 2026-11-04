@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { processTenantDataPurge } from './tenant-data-purge.js';
+import { logger } from '@line-crm/shared/server';
 
 /*
  * 退会後の顧客データ削除（★36-2）。
@@ -130,6 +131,31 @@ describe('tenant data retention purge', () => {
     expect(count('staff_passkey_challenges', '1=1')).toBe(1);
     await processTenantDataPurge({ DB: sqlite.db }, { now: NOW });
     expect(count('staff_passkey_challenges', '1=1')).toBe(0);
+  });
+
+  test('チャレンジの掃除が失敗しても統括の削除を続け、固定の理由コードを記録する', async () => {
+    seedTenant('retired', { anchor: jst(-91) });
+    seedFriends('retired', 1);
+    const logged = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const db = { ...sqlite.db, prepare(sql: string) {
+      if (sql.includes('WHERE expires_at <= ?')) throw new Error('private challenge detail');
+      return sqlite.db.prepare(sql);
+    } } as D1Database;
+    try {
+      const result = await processTenantDataPurge({ DB: db, IMAGES: createR2() }, { now: NOW });
+      expect(result.completed).toBe(1);
+      expect(count('friends', 'line_account_id = ?', 'acc-retired')).toBe(0);
+      expect(logged).toHaveBeenCalledWith('tenant_data_purge.passkey_challenge_cleanup_failed');
+      expect(JSON.stringify(logged.mock.calls)).not.toContain('private challenge detail');
+    } finally { logged.mockRestore(); }
+  });
+
+  test('UTCの期限が現在時刻ちょうどなら掃除し、1ミリ秒後のものは残す', async () => {
+    const add = sqlite.raw.prepare("INSERT INTO staff_passkey_challenges(token_hash,challenge,purpose,staff_id,expires_at,created_at) VALUES (?, 'challenge', 'login', NULL, ?, ?)");
+    add.run('boundary', '2026-06-01T00:00:00.000Z', '2026-05-31T23:55:00.000Z');
+    add.run('future', '2026-06-01T00:00:00.001Z', '2026-05-31T23:55:00.000Z');
+    await processTenantDataPurge({ DB: sqlite.db }, { now: '2026-06-01T09:00:00+09:00' });
+    expect(sqlite.raw.prepare('SELECT token_hash FROM staff_passkey_challenges').all()).toEqual([{ token_hash: 'future' }]);
   });
 
   test('保存期限(90日)が過ぎた統括の顧客データとR2画像を消し、支払の記録は残す', async () => {

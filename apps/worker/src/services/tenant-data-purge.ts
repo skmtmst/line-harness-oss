@@ -67,10 +67,14 @@ export async function processTenantDataPurge(
 
   // 所属不明のチャレンジも、期限後は次回の定時処理で回収する。
   // 作成時と同じUTC表記で比較し、未期限のログイン・登録は残す。
-  const challengeCutoff = new Date(options.now ?? Date.now()).toISOString();
-  await env.DB.prepare(`DELETE FROM staff_passkey_challenges WHERE rowid IN (
-    SELECT rowid FROM staff_passkey_challenges WHERE expires_at <= ? ORDER BY expires_at, rowid LIMIT ?
-  )`).bind(challengeCutoff, EXPIRED_CHALLENGES_PER_RUN).run();
+  try {
+    const challengeCutoff = new Date(options.now ?? Date.now()).toISOString();
+    await env.DB.prepare(`DELETE FROM staff_passkey_challenges WHERE rowid IN (
+      SELECT rowid FROM staff_passkey_challenges WHERE expires_at <= ? ORDER BY expires_at, rowid LIMIT ?
+    )`).bind(challengeCutoff, EXPIRED_CHALLENGES_PER_RUN).run();
+  } catch {
+    logger.error('tenant_data_purge.passkey_challenge_cleanup_failed');
+  }
 
   // 無料体験の終了はStripeから通知が来ないので、ここで拾って起点を入れる。
   const anchoredTrials = await markExpiredTrialRetentionAnchors(env.DB, now);

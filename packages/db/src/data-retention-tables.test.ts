@@ -43,6 +43,21 @@ function columnsOf(table: string): Set<string> {
 }
 
 describe('保存期限の分類表', () => {
+  it('店舗の統括管理者の所属は担当者への依存が深くなっても先に消す', () => {
+    const original = RETENTION_TABLES.staff_members;
+    RETENTION_TABLES.test_retention_parent = { category: 'purge', scope: { by: 'tenant', column: 'tenant_id' } };
+    RETENTION_TABLES.test_retention_middle = { category: 'purge', scope: { by: 'parent', column: 'parent_id', parent: 'test_retention_parent', parentColumn: 'id' } };
+    RETENTION_TABLES.staff_members = { category: 'purge', scope: { by: 'parent', column: 'parent_id', parent: 'test_retention_middle', parentColumn: 'id' } };
+    try {
+      const order = purgeTablesChildFirst();
+      expect(order.indexOf('line_account_hq_admin_memberships')).toBeLessThan(order.indexOf('staff_members'));
+      expect(order.indexOf('line_account_hq_admin_memberships')).toBeLessThan(order.indexOf('line_accounts'));
+    } finally {
+      RETENTION_TABLES.staff_members = original;
+      delete RETENTION_TABLES.test_retention_parent;
+      delete RETENTION_TABLES.test_retention_middle;
+    }
+  });
   it('パスキーと統括管理者の所属を分類し、参照する親より先に消す', () => {
     const expected = {
       staff_passkeys: { category: 'purge', scope: { by: 'parent', column: 'staff_id', parent: 'staff_members', parentColumn: 'id' } },
