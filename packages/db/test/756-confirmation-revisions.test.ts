@@ -23,6 +23,18 @@ it('既存行を保ち、指定した版の列と購読の検索索引を追加�
     db.pragma('foreign_keys = OFF');
     db.pragma('ignore_check_constraints = ON');
     db.exec('DROP INDEX idx_friend_scenarios_scenario_status');
+    const originalTriggers = [
+      ['rt_menu_change_apply', '569_restaurant_booking_policy.sql'],
+      ['rt_menu_published_insert', '546_restaurant_menu_approval.sql'],
+      ['rt_menu_published_update', '546_restaurant_menu_approval.sql'],
+    ] as const;
+    for (const [name, file] of originalTriggers) {
+      db.exec(`DROP TRIGGER ${quote(name)}`);
+      const sql = readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8')
+        .split('\n').find((line) => line.startsWith(`CREATE TRIGGER ${name} `));
+      if (!sql) throw new Error(`元のトリガーが見つかりません: ${name}`);
+      db.exec(sql);
+    }
     // 最新 bootstrap から対象列を外し、直前の実スキーマを再現する。
     for (const table of tables) db.exec(`ALTER TABLE ${quote(table)} DROP COLUMN ${quote(revision(table))}`);
     const triggers = db.prepare("SELECT type, name, sql FROM sqlite_master WHERE type = 'trigger' AND sql IS NOT NULL").all() as SchemaObject[];
@@ -50,7 +62,15 @@ it('既存行を保ち、指定した版の列と購読の検索索引を追加�
     expect(addedIndex).toHaveLength(1);
     expect(addedIndex[0].type).toBe('index');
     expect(db.pragma('index_info(idx_friend_scenarios_scenario_status)')).toMatchObject([{ name: 'scenario_id' }, { name: 'status' }]);
-    expect(afterOtherObjects.filter((object) => object.name !== 'idx_friend_scenarios_scenario_status')).toEqual(beforeOtherObjects);
+    const changedNames = originalTriggers.map(([name]) => name as string);
+    const unrelated = (objects: SchemaObject[]) => objects.filter((object) => object.name !== 'idx_friend_scenarios_scenario_status' && !changedNames.includes(object.name));
+    expect(unrelated(afterOtherObjects)).toEqual(unrelated(beforeOtherObjects as SchemaObject[]));
+    for (const [name] of originalTriggers) {
+      const previous = (beforeOtherObjects as SchemaObject[]).find((object) => object.name === name)!;
+      const current = afterOtherObjects.find((object) => object.name === name)!;
+      const restored = current.sql.replace(/,\s*confirmation_revision\s*=\s*confirmation_revision\s*\+\s*1/i, '');
+      expect(restored).toBe(previous.sql);
+    }
     const plan = db.prepare("EXPLAIN QUERY PLAN SELECT id FROM friend_scenarios WHERE scenario_id = ? AND status = ?").all('scenario', 'active');
     expect(plan).toEqual(expect.arrayContaining([expect.objectContaining({ detail: expect.stringContaining('idx_friend_scenarios_scenario_status') })]));
     for (const table of tables) {
@@ -62,6 +82,22 @@ it('既存行を保ち、指定した版の列と購読の検索索引を追加�
       expect(db.prepare(`SELECT ${oldNames.join(', ')} FROM ${quote(table)}`).all()).toEqual(beforeRows.get(table));
       expect(db.prepare(`SELECT ${quote(revision(table))} AS revision FROM ${quote(table)}`).all()).toEqual([{ revision: 1 }]);
     }
+    db.exec(`INSERT INTO rt_menu_items(id, store_id, kind, name, price, status) VALUES ('menu-new','store-new','course','新',1000,'active');`);
+    expect(db.prepare("SELECT price, published_once, confirmation_revision FROM rt_menu_items WHERE id='menu-new'").get()).toEqual({ price: 1000, published_once: 1, confirmation_revision: 2 });
+    db.exec("UPDATE rt_menu_items SET status='active' WHERE id='menu-new'");
+    expect(db.prepare("SELECT published_once, confirmation_revision FROM rt_menu_items WHERE id='menu-new'").get()).toEqual({ published_once: 1, confirmation_revision: 3 });
+    db.exec(`INSERT INTO rt_menu_change_requests(id,approval_id,menu_id,store_id,before_price,after_price,requested_by,status) VALUES ('change-ok','approval-ok','menu-new','store-new',1000,1200,'staff','pending');
+      UPDATE rt_menu_change_requests SET status='approved' WHERE id='change-ok';`);
+    expect(db.prepare("SELECT price, confirmation_revision FROM rt_menu_items WHERE id='menu-new'").get()).toEqual({ price: 1200, confirmation_revision: 4 });
+    expect(db.prepare("SELECT status, failure_reason FROM rt_menu_change_requests WHERE id='change-ok'").get()).toEqual({ status: 'applied', failure_reason: null });
+    db.exec(`INSERT INTO rt_menu_change_requests(id,approval_id,menu_id,store_id,before_price,after_price,requested_by,status) VALUES ('change-old','approval-old','menu-new','store-new',1000,1500,'staff','pending');
+      UPDATE rt_menu_change_requests SET status='approved' WHERE id='change-old';`);
+    expect(db.prepare("SELECT price, confirmation_revision FROM rt_menu_items WHERE id='menu-new'").get()).toEqual({ price: 1200, confirmation_revision: 4 });
+    expect(db.prepare("SELECT status FROM rt_menu_change_requests WHERE id='change-old'").get()).toEqual({ status: 'failed' });
+    db.exec(`INSERT INTO rt_menu_change_requests(id,approval_id,menu_id,store_id,before_price,after_price,requested_by,status,effective_at) VALUES ('change-future','approval-future','menu-new','store-new',1200,1600,'staff','pending','2999-01-01');
+      UPDATE rt_menu_change_requests SET status='approved' WHERE id='change-future';`);
+    expect(db.prepare("SELECT price, confirmation_revision FROM rt_menu_items WHERE id='menu-new'").get()).toEqual({ price: 1200, confirmation_revision: 4 });
+    expect(db.prepare("SELECT status FROM rt_menu_change_requests WHERE id='change-future'").get()).toEqual({ status: 'approved' });
   } finally {
     db.close();
   }
