@@ -1,5 +1,7 @@
 'use client'
 
+import { isConflictResponse } from '@/components/shared/save-conflict'
+
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifyToast } from '@/components/shared/toast'
@@ -93,7 +95,7 @@ export function toggleAutoReply({ listContextKey, isCurrent = () => true, load, 
             saveErrors.capture(error);
 
             if (error instanceof ApiError && error.status === 403) forbidden = true
-            if (error instanceof ApiError && error.status === 409 && error.code === 'auto_reply_confirmation_conflict') changed = true
+            if (isConflictResponse(error) && error.code === 'auto_reply_confirmation_conflict') changed = true
             failed += 1
           }
         }

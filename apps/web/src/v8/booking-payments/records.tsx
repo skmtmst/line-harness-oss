@@ -1,5 +1,7 @@
 'use client'
 
+import { isConflictResponse } from '@/components/shared/save-conflict'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarDays, Download, FileText, Info, RotateCcw, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -158,16 +160,16 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
       })
     } catch (cause) {
       if (operationScope !== refundScope.current) return
-      if (cause instanceof ApiError && cause.status === 409 && cause.code === 'stale_confirmation') {
+      if (isConflictResponse(cause) && cause.code === 'stale_confirmation') {
         setRefundTarget(null)
         refundAttempt.current = null
         void reload()
         notifyToast('支払いの内容が変わりました。一覧を確認して、もう一度操作してください。', { tone: 'error' })
         return
       }
-      setRefundError(cause instanceof ApiError && cause.status === 409 && cause.code === 'simulation_only'
+      setRefundError(isConflictResponse(cause) && cause.code === 'simulation_only'
         ? 'この支払いは模擬返金できません。Stripe の管理画面で状態を確認してください。'
-        : cause instanceof ApiError && cause.status === 409 && cause.code === 'refund_idempotency_conflict'
+        : isConflictResponse(cause) && cause.code === 'refund_idempotency_conflict'
           ? '前の操作と返金内容が異なります。窓を閉じて、もう一度操作してください。'
           : cause instanceof ApiError && cause.status === 409 ? 'この支払いは返金できません。残額と状態を確認してください。'
             : cause instanceof ApiError && cause.status === 403 ? '返金する権限がありません。'

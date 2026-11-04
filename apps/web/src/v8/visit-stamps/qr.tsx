@@ -37,7 +37,6 @@ export function StorefrontQr({card,accountId,shop,canManage}: {card:VisitStampCa
   if(currentScope.current!==scope){currentScope.current=scope;confirmTicket.current=null}
   const renderedTicket=confirmTicket.current
   const [confirmScope,setConfirmScope]=useState('')
-  useEffect(()=>{setConfirm(false);setConfirmScope('')},[scope])
   const pending=useRef<VisitStampQrInput|null>(null),live=useRef(true)
   useEffect(()=>{let cancelled=false;live.current=true;setQr(null);setLoaded(false);setError('');pending.current=null;void visitStampsApi.storefrontQr(card.id,accountId).then(r=>{if(!cancelled){setQr(r.data);setLoaded(true)}}).catch(e=>{if(!cancelled){setError(reason(e));setLoaded(true)}});return()=>{cancelled=true;live.current=false}},[card.id,card.version,accountId])
   const image=useQrImage(qr?.status==='active'?qr.url:undefined,1024)

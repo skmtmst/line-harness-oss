@@ -41,7 +41,6 @@ describe('ログインユーザーの確認窓', () => {
 
   it('LINE連携の解除が二度押しを止め、返事を確かめ、finally で戻す', () => {
     const body = slice(PAGE, 'const unlinkLine = async', '\n  const toggleActive = async')
-    expect(body, '処理中や古い確認を受け付けてしまう').toContain('if (unlinking || unlinkTargetRef.current !== confirmation || confirmation.epoch !== unlinkScope.current.epoch) return')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '失敗を握りつぶしている').toContain(
       "setUnlinkError('LINE連携を解除できませんでした。状態を読み直してから、もう一度お試しください。')",

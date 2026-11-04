@@ -898,7 +898,7 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
           }}>配信を予約する</Button>
         </div>
       ) : null}
-      {previewError ? <p className={styles.error} role="alert">{previewError}</p> : null}
+      <FieldError id="campaign-preview-error">{previewError}</FieldError>
       <ConfirmDialog
         open={confirm !== null && confirm.generation === scope.current.generation && confirm.view === viewScope.current}
         title={confirm?.scheduledAt ? `「${confirm.column.title}」を配信予約しますか？` : `「${confirm?.column.title ?? ''}」を今すぐ配信しますか？`}

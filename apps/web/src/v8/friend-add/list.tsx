@@ -1,5 +1,7 @@
 'use client'
 
+import { isSaveConflict } from '@/components/shared/save-conflict'
+
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { RowNameLink } from '@/components/shared/table';
@@ -516,7 +518,7 @@ function FriendAddList() {
       await load()
     } catch (caught) {
       if (!current()) return
-      if ((caught as { status?: number })?.status === 409) { setDeleteConflict(true); setDeleteError('ほかの人が設定を変えました。読み直してから、もう一度選んでください。'); return }
+      if (isSaveConflict(caught)) { setDeleteConflict(true); setDeleteError('ほかの人が設定を変えました。読み直してから、もう一度選んでください。'); return }
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)

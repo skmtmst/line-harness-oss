@@ -165,6 +165,24 @@ it('LINE連携解除は開いたときの版を Worker に送る', async () => {
   } finally { state.members[0] = member({}) }
 })
 
+it('LINE連携解除の応答待ちには二度目を送らない', async () => {
+  state.members[0] = member({ lineLinked: true, policyVersion: 7 })
+  let finish!: (value: { success: boolean; data: StaffMember }) => void
+  fixture.updateStaff.mockReset().mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  try {
+    render(<StaffEditV8 />)
+    fireEvent.click(await screen.findByRole('button', { name: '連携解除' }))
+    const dialog = await screen.findByRole('dialog', { name: /LINE連携を解除しますか/ })
+    const confirm = within(dialog).getByRole('button', { name: '解除する' })
+    fireEvent.click(confirm)
+    await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledTimes(1))
+    fireEvent.click(confirm)
+    expect(fixture.updateStaff).toHaveBeenCalledTimes(1)
+    finish({ success: true, data: state.members[0] })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /LINE連携を解除しますか/ })).toBeNull())
+  } finally { state.members[0] = member({}) }
+})
+
 it('版が確認できないLINE連携は解除を送らない', async () => {
   state.members[0] = member({ lineLinked: true })
   fixture.updateStaff.mockReset()

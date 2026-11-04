@@ -1,5 +1,7 @@
 'use client'
 
+import { isConflictResponse } from '@/components/shared/save-conflict'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, type RichMenuTestApplyItem, type RichMenuTestApplyUserMenuAction } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -115,7 +117,7 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
       await load()
     } catch (e) {
       if (request !== generation.current) return
-      if (e instanceof ApiError && e.status === 409) {
+      if (isConflictResponse(e)) {
         confirmation.current = null
         const latest = await load()
         if (!mounted.current) return
@@ -124,7 +126,7 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
           keyRef.current = crypto.randomUUID()
         } else setConfirmKind(null)
       }
-      setActionError(e instanceof ApiError && e.status === 409
+      setActionError(isConflictResponse(e)
         ? 'ほかの操作と重なりました。状態を確認してから、もう一度お試しください。'
         : confirmKind === 'apply'
           ? 'テスト適用できませんでした。しばらくおいてから、もう一度お試しください。'

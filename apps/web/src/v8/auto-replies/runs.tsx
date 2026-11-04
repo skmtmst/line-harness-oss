@@ -1,4 +1,6 @@
 'use client'
+
+import { isConflictResponse } from '@/components/shared/save-conflict'
 import Card from '@/components/shared/card'
 import LogEntryDetails, { type LogEntryFacts } from '@/components/shared/log-entry-details'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
@@ -275,7 +277,7 @@ export default function AutoReplyRunsV8() {
       await load()
       return true
     } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 409 && caught.code === 'auto_reply_confirmation_conflict') {
+      if (isConflictResponse(caught) && caught.code === 'auto_reply_confirmation_conflict') {
         setStopAccount(null)
         await load()
         const latest = await api.autoReplies.get(data.rule.id).catch(() => null)

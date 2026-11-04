@@ -1,8 +1,10 @@
 'use client'
 
+import { isConflictResponse } from '@/components/shared/save-conflict'
+
 import { useEffect, useRef, useState } from 'react'
 import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
-import { ApiError, describeSaveFailure } from '@/lib/api/transport/errors'
+import { describeSaveFailure } from '@/lib/api/transport/errors'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
@@ -53,7 +55,7 @@ function MemberEditor({ target, onClose, onReload, onSave }: {
       guard.disarm(); onClose()
       return true
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) { setConflict(true); setError('ほかの人が案内設定を変えました。読み直してから、もう一度選んでください。'); return false }
+      if (isConflictResponse(error)) { setConflict(true); setError('ほかの人が案内設定を変えました。読み直してから、もう一度選んでください。'); return false }
       fields.capture(error)
       const reasonsByField = readSaveFieldErrors(error)
       setFieldReasons(reasonsByField)
