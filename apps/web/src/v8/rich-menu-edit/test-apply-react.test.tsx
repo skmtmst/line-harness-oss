@@ -147,7 +147,7 @@ describe('現役V8の本人LINEでのテスト', () => {
     expect(net.revert).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: '元のメニューに戻す' }))
     await screen.findByText(message)
-    expect(net.revert).toHaveBeenCalledExactlyOnceWith('g1', expect.any(String))
+    expect(net.revert).toHaveBeenCalledExactlyOnceWith('g1', expect.any(String), 'apply-1')
   })
   it.each([true, false])('失敗後の復元は以前の表示を記録できた場合だけ出す（%s）', async captured => {
     net.state.active = item('failed', captured)
@@ -188,4 +188,22 @@ describe('現役V8の本人LINEでのテスト', () => {
     await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
     expect(net.apply).not.toHaveBeenCalled()
   })
+})
+
+it.each(['apply', 'revert'] as const)('閉じたテスト確認の古い確定から%sを実行しない', async kind => {
+  let dialog: HTMLElement
+  if (kind === 'apply') dialog = await confirmApply()
+  else {
+    net.state.active = item('applied')
+    const panel = await openTest()
+    fireEvent.click(within(panel).getByRole('button', { name: '元のメニューに戻す' }))
+    dialog = await screen.findByRole('dialog', { name: 'テスト適用を取り消しますか？' })
+  }
+  const label = kind === 'apply' ? '自分のLINEに適用する' : '元のメニューに戻す'
+  const button = within(dialog).getByRole('button', { name: label })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+  await act(async () => { await oldClick({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
+  expect(kind === 'apply' ? net.apply : net.revert).not.toHaveBeenCalled()
 })

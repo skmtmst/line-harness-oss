@@ -82,10 +82,13 @@ function VersionsInner() {
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
-  const targetKey = JSON.stringify([id, selectedAccountId])
+  const targetKey = JSON.stringify([id, selectedAccountId, canEdit])
   const targetScope = useRef({ key: targetKey })
   if (targetScope.current.key !== targetKey) targetScope.current = { key: targetKey }
   const bindingScope = useRef<typeof targetScope.current | null>(null)
+  const bindingTicket = useRef<object | null>(null)
+  const renderedBindingTicket = bindingTicket.current
+  useEffect(() => () => { bindingTicket.current = null }, [])
   /* 画面のマニュアル（正本表の画面キー）。URL がある時だけ出す。 */
   const manualHref = useManualHref()
   const [detail, setDetail] = useState<CommonActionDetail | null>(null)
@@ -332,7 +335,8 @@ function VersionsInner() {
                     </Td>
                     <ActionCell className={styles.colOps}>
                       {canEdit && binding.hasNewerVersion && published ? (
-                        <Button disabled={Boolean(working)} onClick={() => { if (!published) return; bindingScope.current = targetScope.current; pendingSnapshot.current = { binding, target: published }; setPendingBindingId(binding.id); setDialogError('') }}>
+                        <Button disabled={Boolean(working)} onClick={() => { if (!published) return; bindingScope.current = targetScope.current; bindingTicket.current = {}; pendingSnapshot.current = { binding, target: published }; setPendingBindingId(binding.id); setDialogError('') }}>
+
                           {`第${published.versionNumber}版へ更新する`}
                         </Button>
                       ) : <EmptyCell />}
@@ -351,9 +355,10 @@ function VersionsInner() {
         description="実行中・待機中の処理は変えず、次に始まる処理から新版を使います。"
         confirmLabel={`第${pendingSnapshot.current?.target.versionNumber ?? ''}版へ更新`}
         busy={working.startsWith('binding:')}
-        onCancel={() => { setPendingBindingId(null); setDialogError('') }}
+        onCancel={() => { bindingTicket.current = null; setPendingBindingId(null); setDialogError('') }}
         onConfirm={() => {
-          if (!pendingBinding || !published || !pendingSnapshot.current || !Number.isSafeInteger(pendingBinding.confirmationRevision) || !selectedAccountId || bindingScope.current !== targetScope.current) return
+          if (!pendingBinding || !published || !pendingSnapshot.current || !Number.isSafeInteger(pendingBinding.confirmationRevision) || !selectedAccountId || !renderedBindingTicket || bindingTicket.current !== renderedBindingTicket || bindingScope.current !== targetScope.current) return
+
           const scope = targetScope.current
           const targetVersionId = pendingSnapshot.current.target.id
           setDialogError('')
@@ -364,7 +369,7 @@ function VersionsInner() {
             expectedConfirmationRevision: pendingBinding.confirmationRevision,
           })).then((result) => {
             if (scope !== targetScope.current) return
-            if (result === true) { setPendingBindingId(null); setDialogError('') }
+            if (result === true) { bindingTicket.current = null; setPendingBindingId(null); setDialogError('') }
             else { setDialogError(result); void load() }
           })
         }}

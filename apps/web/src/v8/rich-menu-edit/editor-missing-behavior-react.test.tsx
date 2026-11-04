@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RichMenuCreateV8 from '@/v8/rich-menus/new/create'
 import RichMenuDetailV8 from './detail'
 
-const net = vi.hoisted(() => ({ role: 'owner', get: vi.fn(), update: vi.fn(), unpublish: vi.fn(), push: vi.fn(), reconcile: vi.fn() }))
+const net = vi.hoisted(() => ({ role: 'owner', get: vi.fn(), update: vi.fn(), unpublish: vi.fn(), push: vi.fn(), reconcile: vi.fn(), runs: vi.fn(), retry: vi.fn() }))
 const account = { id: 'account-1', name: '店A' }
 const group = {
   id: 'g1', accountId: 'account-1', name: 'メニュー', chatBarText: 'メニュー',
@@ -41,7 +41,7 @@ vi.mock('@/lib/api', async importOriginal => {
       previewTargets: async () => ({ success: true, data: null }),
       audienceSummary: async () => ({ success: true, data: null }),
       publishProgress: async () => ({ success: true, data: { steps: [], run: null, message: null } }),
-      publishRuns: async () => ({ success: true, data: { runs: [] } }),
+      publishRuns: net.runs, retryPublishRun: net.retry,
       tapStats: async () => ({ success: true, data: { byGroup: [] } }),
       reconcile: net.reconcile,
     },
@@ -55,6 +55,8 @@ beforeEach(() => {
   net.get.mockReset().mockResolvedValue({ success: true, data: group })
   net.update.mockReset().mockImplementation(async (_id, input) => ({ success: true, data: { ...group, ...input } }))
   net.unpublish.mockReset().mockResolvedValue({ success: true, data: { warnings: [] } })
+  net.runs.mockReset().mockResolvedValue({ success: true, data: { runs: [] } })
+  net.retry.mockReset().mockResolvedValue({ success: true, data: {} })
   net.reconcile.mockReset().mockResolvedValue({ success: true, data: { dryRun: true, diffs: [] } })
   document.documentElement.dataset.theme = 'v8'
   window.history.replaceState(null, '', '/rich-menus/edit?id=g1&step=audience')
@@ -171,4 +173,27 @@ describe('現役V8へ残す旧編集の動き', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'LINEから取り下げる' }))
     await waitFor(() => expect(net.push).toHaveBeenCalledWith('/rich-menus'))
   })
+})
+
+it('閉じた取り下げ確認の古い確定からLINEへ操作しない', async () => {
+  const dialog = await openUnpublish()
+  const button = within(dialog).getByRole('button', { name: 'LINEから取り下げる' })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+  await act(async () => { await oldClick({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
+  expect(net.unpublish).not.toHaveBeenCalled()
+})
+
+it('閉じた公開再試行の古い確定からLINEへ操作しない', async () => {
+  net.runs.mockResolvedValue({ success: true, data: { runs: [{ id:'run-1', status:'failed', lastErrorCode:'line_unavailable', createdAt:'2026-10-01T00:00:00Z', updatedAt:'2026-10-01T01:00:00Z', version:{ name:'公開した版',chatBarText:'メニュー',pageCount:2,isDefaultForAll:true,targetingEnabled:false }, pages:[] }] } })
+  await act(async () => { root.render(<RichMenuDetailV8 groupId="g1" />) })
+  fireEvent.click(await screen.findByRole('button', { name: '失敗だけやり直す' }))
+  const dialog = await screen.findByRole('dialog', { name: '失敗した公開をやり直しますか？' })
+  const button = within(dialog).getByRole('button', { name: 'やり直す' })
+  const key = Object.keys(button).find(k => k.startsWith('__reactProps$'))!
+  const oldClick = (button as unknown as Record<string, { onClick: (event: unknown) => void }>)[key].onClick
+  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+  await act(async () => { await oldClick({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
+  expect(net.retry).not.toHaveBeenCalled()
 })

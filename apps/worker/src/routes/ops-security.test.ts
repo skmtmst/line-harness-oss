@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import { activatePlatformAdminIfAwaitingTotp } from '@line-crm/db';
+import { activatePlatformAdminIfAwaitingTotp, revealPiiForImpersonation, switchImpersonationToWrite } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
@@ -185,6 +185,27 @@ describe('契約先の機能パック（飲食店機能）', () => {
 });
 
 describe('代理ログイン', () => {
+  it('更新直前に終わった代理ログインは変更も個人情報の表示記録も作らない', async () => {
+    const first = await app(master).request('/api/ops/impersonation/start', json({ tenantId: 'tenant-a' }), environment());
+    const old = await first.json() as { data: { id: string } };
+    await app(master).request('/api/ops/impersonation/end', json({}), environment());
+    expect(await switchImpersonationToWrite(testDb.db, old.data.id, '問い合わせの確認')).toBe(false);
+    expect(await revealPiiForImpersonation(testDb.db, { impersonationSessionId: old.data.id, staffId: master.id, tenantId: 'tenant-a', reason: '問い合わせの確認' })).toBeNull();
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS c FROM pii_reveal_logs').get() as { c: number }).c).toBe(0);
+  });
+  it.each(['/api/ops/impersonation/write', '/api/ops/impersonation/pii-reveal'])('%s は確認時と別の代理ログインを変更しない', async (path) => {
+    const first = await app(master).request('/api/ops/impersonation/start', json({ tenantId: 'tenant-a' }), environment());
+    const old = await first.json() as { data: { id: string } };
+    const second = await app(master).request('/api/ops/impersonation/start', json({ tenantId: 'tenant-a' }), environment());
+    const current = await second.json() as { data: { id: string } };
+    const conflict = await app(master).request(path, json({ reason: '確認のため調べます', expectedSessionId: old.data.id }), environment());
+    expect(conflict.status).toBe(409);
+    const row = testDb.raw.prepare('SELECT mode, pii_revealed FROM impersonation_sessions WHERE id = ?').get(current.data.id) as { mode: string; pii_revealed: number };
+    expect(row).toEqual({ mode: 'read', pii_revealed: 0 });
+    expect((testDb.raw.prepare('SELECT COUNT(*) AS c FROM pii_reveal_logs').get() as { c: number }).c).toBe(0);
+    const accepted = await app(master).request(path, json({ reason: '確認のため調べます', expectedSessionId: current.data.id }), environment());
+    expect(accepted.status).toBe(200);
+  });
   it('既定は閲覧のみで始まり、契約先側の履歴には出ない', async () => {
     const res = await app(master).request('/api/ops/impersonation/start', json({ tenantId: 'tenant-a' }), environment());
     expect(res.status).toBe(200);

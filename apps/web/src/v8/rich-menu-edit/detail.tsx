@@ -61,8 +61,14 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   if (scope.current.id !== groupId) scope.current = { id: groupId, generation: scope.current.generation + 1 }
   const operationPermission = useRef(canOperate && canInspectOperations)
   operationPermission.current = canOperate && canInspectOperations
+  const confirmationContext = useRef({ groupId, permitted: operationPermission.current })
+  if (confirmationContext.current.groupId !== groupId || confirmationContext.current.permitted !== operationPermission.current) confirmationContext.current = { groupId, permitted: operationPermission.current }
+  const retryTicket = useRef<{ context: typeof confirmationContext.current } | null>(null)
+  const unpublishTicket = useRef<{ context: typeof confirmationContext.current } | null>(null)
+  const renderedRetryTicket = retryTicket.current
+  const renderedUnpublishTicket = unpublishTicket.current
   const alive = useRef(true)
-  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  useEffect(() => { alive.current = true; return () => { alive.current = false; retryTicket.current = null; unpublishTicket.current = null } }, [])
   const groupGeneration = useRef(-1)
   const runsGeneration = useRef(-1)
   const diffsGeneration = useRef(-1)
@@ -250,7 +256,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       const res = await api.richMenuGroups.retryPublishRun(retryScope.groupId, retryTarget.id)
       if (!alive.current || generation !== scope.current.generation) return
       if (!res.success) throw new Error(res.error)
-      setRetryTarget(null)
+      retryTicket.current = null; setRetryTarget(null)
       setNotice('失敗した公開をやり直しました。最新の状態を確かめてください。')
       await reloadAll()
     } catch (caught) {
@@ -306,7 +312,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         setDialogError(`LINE上のメニュー登録を取り下げました。ただし、${warningTexts.join(' / ')}。最新の状態を確認して、もう一度お試しください。`)
         return
       }
-      setUnpublishOpen(false)
+      unpublishTicket.current = null; setUnpublishOpen(false)
       router.push('/rich-menus')
     } catch (caught) {
       if (!alive.current || generation !== scope.current.generation) return
@@ -368,7 +374,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const failed = progress?.failed === true
   const menuItems: ActionMenuItem[] = [
     { id: 'duplicate', label: '複製する', onSelect: () => { setDialogError(''); setDuplicateOpen(true) } },
-    { id: 'unpublish', label: 'LINEから取り下げる', onSelect: () => { if (!group.accountId || group.id !== groupId || groupGeneration.current !== scope.current.generation || !operationPermission.current || !Number.isSafeInteger(group.publicationGeneration) || (group.publicationGeneration ?? -1) < 0 || !Number.isSafeInteger(group.confirmationRevision) || (group.confirmationRevision ?? 0) < 1) return; setDialogError(''); setUnpublishScope({ groupId, accountId: group.accountId, generation: scope.current.generation, publicationGeneration: group.publicationGeneration!, confirmationRevision: group.confirmationRevision! }); setUnpublishOpen(true) } },
+    { id: 'unpublish', label: 'LINEから取り下げる', onSelect: () => { if (!group.accountId || group.id !== groupId || groupGeneration.current !== scope.current.generation || !operationPermission.current || !Number.isSafeInteger(group.publicationGeneration) || (group.publicationGeneration ?? -1) < 0 || !Number.isSafeInteger(group.confirmationRevision) || (group.confirmationRevision ?? 0) < 1) return; setDialogError(''); unpublishTicket.current = { context: confirmationContext.current }; setUnpublishScope({ groupId, accountId: group.accountId, generation: scope.current.generation, publicationGeneration: group.publicationGeneration!, confirmationRevision: group.confirmationRevision! }); setUnpublishOpen(true) } },
+
     { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, disabled: true, disabledReason: '公開中は消せません。先にLINEから取り下げてください', onSelect: () => {} },
   ]
 
@@ -467,7 +474,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                       <span className={styles.runText} title={`${run.version.name ? `「${run.version.name}」・` : ''}${run.version.pageCount !== null ? `${run.version.pageCount}ページ・` : ''}LINE ID ${run.pages?.length ?? 0}件${run.status === 'failed' && run.lastErrorCode ? `・失敗理由: ${run.lastErrorCode.slice(0, 80)}` : ''}`}>{`${runStamp(run.createdAt)} ${runAudienceText(run)}`}</span>
                       <span className={styles.runSpacer} />
                       {run.status === 'failed' && canOperate && run.id === latestRun?.id ? (
-                        <button type="button" className={styles.linkButton} onClick={() => { if (!group || group.id !== groupId || !group.accountId || groupGeneration.current !== scope.current.generation || runsGeneration.current !== scope.current.generation || !operationPermission.current) return; setDialogError(''); setRetryScope({ groupId, accountId: group.accountId, generation: scope.current.generation }); setRetryTarget(run) }}>失敗だけやり直す</button>
+                        <button type="button" className={styles.linkButton} onClick={() => { if (!group || group.id !== groupId || !group.accountId || groupGeneration.current !== scope.current.generation || runsGeneration.current !== scope.current.generation || !operationPermission.current) return; setDialogError(''); retryTicket.current = { context: confirmationContext.current }; setRetryScope({ groupId, accountId: group.accountId, generation: scope.current.generation }); setRetryTarget(run) }}>失敗だけやり直す</button>
                       ) : null}
                       <span className={run.status === 'succeeded' ? styles.stateOk : run.status === 'failed' ? styles.stateNg : styles.stateQuiet}>
                         {run.status === 'succeeded' ? '成功' : run.status === 'failed' ? '失敗' : '実行中'}
@@ -488,8 +495,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         confirmLabel="やり直す"
         busy={retrying}
         error={dialogError || undefined}
-        onConfirm={() => retry()}
-        onCancel={() => { if (!retrying) setRetryTarget(null) }}
+        onConfirm={() => renderedRetryTicket && retryTicket.current === renderedRetryTicket && renderedRetryTicket.context === confirmationContext.current ? retry() : undefined}
+        onCancel={() => { if (!retrying) { retryTicket.current = null; setRetryTarget(null) } }}
       >
         {retryScope ? <OperationTargetSummary accounts={[{ id: retryScope.accountId }]} /> : null}
       </ConfirmDialog>
@@ -514,8 +521,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         destructive
         busy={unpublishing}
         error={dialogError || undefined}
-        onConfirm={() => unpublish()}
-        onCancel={() => { if (!unpublishing) setUnpublishOpen(false) }}
+        onConfirm={() => renderedUnpublishTicket && unpublishTicket.current === renderedUnpublishTicket && renderedUnpublishTicket.context === confirmationContext.current ? unpublish() : undefined}
+        onCancel={() => { if (!unpublishing) { unpublishTicket.current = null; setUnpublishOpen(false) } }}
       >
         {unpublishScope ? <OperationTargetSummary accounts={[{ id: unpublishScope.accountId }]} /> : null}
       </ConfirmDialog>

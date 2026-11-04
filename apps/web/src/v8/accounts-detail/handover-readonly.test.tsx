@@ -18,6 +18,7 @@ const handoversExecute = vi.hoisted(() => vi.fn())
 const handoversCancel = vi.hoisted(() => vi.fn())
 const handoversRollback = vi.hoisted(() => vi.fn())
 
+
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
@@ -34,6 +35,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         execute: handoversExecute,
         cancel: handoversCancel,
         rollback: handoversRollback,
+
       },
     },
   }
@@ -127,6 +129,7 @@ beforeEach(() => {
   handoversExecute.mockReset()
   handoversCancel.mockReset().mockResolvedValue({ success: true, data: {} })
   handoversRollback.mockReset().mockResolvedValue({ success: true, data: { restoredCount: 1 } })
+
   lineAccountsGet.mockResolvedValue({ success: true, data: { id: 'acc-1', name: '然-NEN-TEST' } })
   lineAccountsList.mockResolvedValue({ success: true, data: [{ id: 'acc-2', name: '然-NEN-本店' }] })
   staffMe.mockResolvedValue({ success: true, data: { role: 'owner' } })
@@ -219,3 +222,31 @@ it('WEB-136: 閲覧のみは友だちの判断を読めるが変更できない'
   expect(buttons.some((name) => name.includes('本実行する'))).toBe(false)
   expect(buttons.some((name) => name.includes('引き継ぎをやめる'))).toBe(false)
  })
+
+it('本実行と切り戻しの窓に人数の見込みを出す', async () => {
+  handoversGet.mockResolvedValue({ success: true, data: handoverDetail({ unresolvedReviews: 0 }) })
+  await renderV8()
+  await act(async () => { [...document.querySelectorAll('button')].find(el => el.textContent?.includes('本実行する'))?.click() })
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('約 2 人')
+})
+
+it('切り戻す人数が確定しないことを窓に出す', async () => {
+  handoversGet.mockResolvedValue({ success: true, data: handoverDetail({ status: 'completed', rollbackDeadline: '2099-01-01T00:00:00.000Z' }) })
+  await renderV8()
+  await act(async () => { [...document.querySelectorAll('button')].find(el => el.textContent?.includes('切り戻す'))?.click() })
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')?.textContent).toContain('人数は戻す時に決まります')
+})
+
+it('窓を閉じて再び開くと古い確認から取消しない', async () => {
+  await renderV8()
+  const opener = [...document.querySelectorAll('button')].find(el => el.textContent?.includes('引き継ぎをやめる'))!
+  await act(async () => { opener.click() })
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+  const oldButton = [...dialog.querySelectorAll('button')].find(el => el.textContent?.includes('引き継ぎを取り消す'))!
+  const propKey = Object.keys(oldButton).find(key => key.startsWith('__reactProps$'))!
+  const oldClick = (oldButton as unknown as Record<string, { onClick: (e: unknown) => void }>)[propKey].onClick
+  await act(async () => { [...dialog.querySelectorAll('button')].find(el => el.textContent?.includes('キャンセル'))?.click() })
+  await act(async () => { opener.click() })
+  await act(async () => { oldClick({ preventDefault() {}, stopPropagation() {} }) })
+  expect(handoversCancel).not.toHaveBeenCalled()
+})

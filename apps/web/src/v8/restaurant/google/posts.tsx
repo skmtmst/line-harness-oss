@@ -138,7 +138,10 @@ export function PostsBoard({ accountId, go, store, googleLocation, connection, o
   const [loadError, setLoadError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<GooglePost | null>(null)
+  const removeTicket = useRef<object | null>(null)
+  const renderedRemoveTicket = removeTicket.current
   const [removeScope, setRemoveScope] = useState<{ id: string; generation: number; store?: { id: string; name?: string | null }; googleLocation?: string | null; connectionId?: string; connectionRevision?: number } | null>(null)
+
   const [actionError, setActionError] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const { allowed: canPublish, lockedReason: publishReason, canView } = useGooglePermission('manager', data?.permissions?.canPublish ?? false)
@@ -185,15 +188,21 @@ export function PostsBoard({ accountId, go, store, googleLocation, connection, o
 
   const removePost = async () => {
     if (!canPublish || busyId || !confirmRemove) return
+    const requestScope = scope.current
+    const requestTicket = removeTicket.current
     setBusyId(confirmRemove.id)
     setActionError('')
     try {
       if (!Number.isSafeInteger(confirmRemove.confirmationRevision) || !Number.isSafeInteger(removeScope?.connectionRevision) || !removeScope?.connectionId) throw new Error('確認した版がありません')
       await restaurantGoogleApi.removePost(accountId, confirmRemove.id, { expectedPostRevision: confirmRemove.confirmationRevision!, expectedConnectionRevision: removeScope.connectionRevision!, expectedConnectionId: removeScope.connectionId })
+      if (!alive.current || requestScope !== scope.current || requestTicket !== removeTicket.current) return false
+      removeTicket.current = null
+
       setConfirmRemove(null)
       await load()
       return true
     } catch (err) {
+      if (!alive.current || requestScope !== scope.current || requestTicket !== removeTicket.current) return false
       setActionError(errorMessage(err, '削除できませんでした。'))
       if (err instanceof ApiError && err.status === 409) {
         const generation = scope.current.generation
@@ -242,7 +251,8 @@ export function PostsBoard({ accountId, go, store, googleLocation, connection, o
     if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', group: 'view', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
-    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation, connectionId: connection?.id, connectionRevision: connection?.confirmationRevision }); setConfirmRemove(post) } } })
+    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublishRef.current && loadedScope.current === scope.current.generation) { removeTicket.current = {}; setActionError(''); setRemoveScope({ id: accountId, generation: scope.current.generation, store, googleLocation, connectionId: connection?.id, connectionRevision: connection?.confirmationRevision }); setConfirmRemove(post) } } })
+
     if (!canView) return items.map(item => ({ ...item, disabled: true, lockedReason: undefined }))
     return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
   }
@@ -309,8 +319,8 @@ export function PostsBoard({ accountId, go, store, googleLocation, connection, o
         confirmLabel="削除する"
         destructive
         busy={busyId === confirmRemove?.id}
-        error={actionError || undefined} onSuccess={() => setConfirmRemove(null)} onConfirm={() => { if (alive.current && canPublishRef.current && removeScope?.generation === scope.current.generation) return removePost() }}
-        onCancel={() => setConfirmRemove(null)}
+        error={actionError || undefined} onSuccess={() => { removeTicket.current = null; setConfirmRemove(null) }} onConfirm={() => { if (renderedRemoveTicket && renderedRemoveTicket === removeTicket.current && alive.current && canPublishRef.current && removeScope?.generation === scope.current.generation) return removePost() }}
+        onCancel={() => { removeTicket.current = null; setConfirmRemove(null) }}
       >{removeScope ? <OperationTargetSummary accounts={[{ id: removeScope.id }]} store={removeScope.store} externalTarget={{ label: 'Googleの店舗', name: removeScope.googleLocation }} /> : null}</ConfirmDialog>
     </>
   )
