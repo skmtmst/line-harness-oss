@@ -462,6 +462,8 @@
 
 ## 反映履歴
 
+- [Googleビジネスのパフォーマンス取得](release-log/unreleased/2026-11-04-masato-google-performance-sync.md)
+- [保存前の確認と配信操作の安全修正](release-log/unreleased/2075-kenta-safety.md)
 - [統括・運営メンバー画面の本人パスキー設定と一覧配置](release-log/unreleased/2026-11-03-masato-hq-ops-passkeys-ui.md)
 - [統括メンバーの本人パスキー設定](release-log/unreleased/2026-11-03-masato-hq-passkeys.md)
 - [統括から引き継いだユーザーの一覧表示](release-log/unreleased/2069-masato-hq-inherited-users.md)
