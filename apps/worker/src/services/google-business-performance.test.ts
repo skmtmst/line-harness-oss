@@ -46,7 +46,7 @@ describe('fetchDailyMetrics', () => {
     expect(calls[0].init?.method ?? 'GET').toBe('GET');
   });
 
-  it('日付ごとに指標を束ね、値の無い日はnullのまま残す', async () => {
+  it('日付ごとに指標を束ね、Googleが省略した0件と未取得を区別する', async () => {
     const { fetch } = fetchFrom(() =>
       jsonResponse({
         multiDailyMetricTimeSeries: [
@@ -73,8 +73,8 @@ describe('fetchDailyMetrics', () => {
     expect(days['2026-09-01'].menuClicks).toBe(7);
     // 0件はnullではなく0として残る（「未取得」と区別する）
     expect(days['2026-09-02'].impressionsDesktopMaps).toBe(0);
-    // 値が省略された日はnull
-    expect(days['2026-09-02'].callClicks).toBeNull();
+    // Google は 0 件の datedValue から value を省略する。
+    expect(days['2026-09-02'].callClicks).toBe(0);
     // 応答に無い指標はnull
     expect(days['2026-09-01'].bookings).toBeNull();
     expect(days['2026-09-01'].foodOrders).toBeNull();
