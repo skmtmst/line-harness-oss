@@ -1,4 +1,5 @@
 import { Miniflare } from 'miniflare';
+import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { normalizePhone } from '@line-crm/shared';
 import { insertSeatWaitlistEntry } from '../routes/restaurant-test-definition.js';
@@ -15,6 +16,8 @@ it('実D1の深さ制限内でも旧番号の同時3件上限と別アカウン�
       db.prepare('CREATE TABLE rt_closures (id TEXT, store_id TEXT, archived_at TEXT, periods_json TEXT, start_date TEXT, start_time TEXT)'),
       db.prepare("INSERT INTO rt_stores VALUES ('a','account-a'),('b','account-b')"),
     ]);
+    const revisionMigration = readFileSync(new URL('../../../../packages/db/migrations/756_confirmation_revisions.sql', import.meta.url), 'utf8');
+    await db.prepare(revisionMigration.split('\n').find(line => line.startsWith('ALTER TABLE rt_seat_waitlist '))!).run();
     for (const input of ['０９０－１２３４－５６７８', '（０９０）１２３４ー５６７８', '090\u00a01234\u20095678', '⓪⑨⓪①②③④⑤⑥⑦⑧']) {
       expect(await db.prepare(`SELECT ${normalizedPhoneSql} AS phone FROM (SELECT ? AS customer_phone)`).bind(input).first()).toEqual({ phone: normalizePhone(input) });
     }

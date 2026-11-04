@@ -462,12 +462,16 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
     return fail(c, 404, 'NOT_FOUND');
   }
   const body=validatedInputBody(c)??{};
+  const expectedGeneration = body.expectedPublicationGeneration;
+  const expectedConfirmationRevision = body.expectedConfirmationRevision;
+  if (expectedGeneration !== undefined && (!Number.isSafeInteger(expectedGeneration) || Number(expectedGeneration) < 0)) return inputError(c, { success: false, error: '確認した公開の世代が不正です' }, 400, ['expectedPublicationGeneration']);
+  if (expectedConfirmationRevision !== undefined && (!Number.isSafeInteger(expectedConfirmationRevision) || Number(expectedConfirmationRevision) < 1)) return inputError(c, { success: false, error: '確認した版が不正です' }, 400, ['expectedConfirmationRevision']);
   const hasConfirmation=body.expectedVersion!==undefined||body.expectedPublishGeneration!==undefined||body.expectedIsDefaultForAll!==undefined||body.expectedPages!==undefined;
   if(hasConfirmation&&(!Number.isSafeInteger(body.expectedVersion)||Number(body.expectedVersion)<1||!Number.isSafeInteger(body.expectedPublishGeneration)||Number(body.expectedPublishGeneration)<0||typeof body.expectedIsDefaultForAll!=='boolean'||!Array.isArray(body.expectedPages)||body.expectedPages.length>RICH_MENU_MAX_PAGES||body.expectedPages.some((page:unknown)=>!page||typeof page!=='object'||typeof (page as {id?:unknown}).id!=='string'||!Number.isSafeInteger((page as {orderIndex?:unknown}).orderIndex)||Number((page as {orderIndex?:unknown}).orderIndex)<0||!((page as {lineRichMenuId?:unknown}).lineRichMenuId===null||typeof (page as {lineRichMenuId?:unknown}).lineRichMenuId==='string'))||new Set(body.expectedPages.map((page:{id:string})=>page.id)).size!==body.expectedPages.length))return inputError(c,{success:false,error:'確認した公開内容を指定してください'},400,[]);
   const expected=hasConfirmation?{version:Number(body.expectedVersion),generation:Number(body.expectedPublishGeneration),isDefaultForAll:body.expectedIsDefaultForAll as boolean,pages:body.expectedPages as Array<{id:string;orderIndex:number;lineRichMenuId:string|null}>}:undefined;
   const conflict=async(partial=false)=>{
     const latest=await getRichMenuGroupWithPages(c.env.DB,groupId);
-    return c.json({success:false,code:'RICH_MENU_CONFIRMATION_CHANGED',error:partial?'公開内容が変わりました。一部の取り下げが進んだ可能性があります。最新の状態を確認してください':'公開内容が変わりました。最新の状態を確認してください',data:latest?{partial,version:latest.version,publishingGeneration:latest.publishing_generation??0,status:latest.status,isDefaultForAll:latest.is_default_for_all===1,pages:latest.pages.map(page=>({id:page.id,orderIndex:page.order_index,lineRichMenuId:page.line_richmenu_id}))}:{partial}},409);
+    return c.json({success:false,code:'RICH_MENU_CONFIRMATION_CHANGED',error:partial?'公開内容が変わりました。一部の取り下げが進んだ可能性があります。最新の状態を確認してください':'公開内容が変わりました。最新の状態を確認してください',data:latest?{partial,version:latest.version,publishingGeneration:latest.publishing_generation??0,confirmationRevision:latest.confirmation_revision,status:latest.status,isDefaultForAll:latest.is_default_for_all===1,pages:latest.pages.map(page=>({id:page.id,orderIndex:page.order_index,lineRichMenuId:page.line_richmenu_id}))}:{partial}},409);
   };
 
   const account = await getLineAccountById(c.env.DB, group.account_id);
@@ -477,10 +481,10 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   // lease なしで畳むと、同じ group を公開中の実行の owner と期限を消してしまう。
   const unpublishOwner = `unpublish-${crypto.randomUUID()}`;
   const unpublishGeneration = await acquirePublishLease(
-    c.env.DB, groupId, unpublishOwner, new Date().toISOString(),undefined,expected,
+    c.env.DB, groupId, unpublishOwner, new Date().toISOString(),undefined,expected,undefined,expectedGeneration as number | undefined,expectedConfirmationRevision as number | undefined,
   );
   if (unpublishGeneration === null) {
-    if(expected)return conflict();
+    if(expected || expectedGeneration !== undefined || expectedConfirmationRevision !== undefined)return conflict();
     return c.json({ success: false, error: 'already publishing' }, 409);
   }
   const unpublishFence = { owner: unpublishOwner, generation: unpublishGeneration };
@@ -522,9 +526,10 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   };
   try {
     // ページ数ぶんの削除で時間がかかる。外部呼び出しの直前ごとに実時刻で延ばす。
+    const guardedRevision = expectedConfirmationRevision === undefined ? undefined : Number(expectedConfirmationRevision);
     const heartbeat = async () => {
       const alive = await renewPublishLease(
-        c.env.DB, groupId, unpublishFence, new Date().toISOString(),
+        c.env.DB, groupId, unpublishFence, new Date().toISOString(), undefined, guardedRevision,
       );
       if (!alive) throw new PublishLeaseLostError();
       if(expected){
@@ -549,7 +554,7 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
     });
     await releasePublishLease(c.env.DB, groupId, unpublishFence);
     if (e instanceof PublishLeaseLostError) {
-      if(expected)return conflict(true);
+      if(expected || expectedConfirmationRevision !== undefined || expectedGeneration !== undefined)return conflict(true);
       return c.json(
         { success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' },
         409,

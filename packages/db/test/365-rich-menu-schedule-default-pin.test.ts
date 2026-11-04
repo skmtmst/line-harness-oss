@@ -54,6 +54,7 @@ function setup() {
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/355_rich_menu_schedule_lease.sql'), 'utf8'))
   // 365は列追加だけのため、ALTERが素直に通ることもここで確かめる。
   sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/365_rich_menu_schedule_default_pin.sql'), 'utf8'))
+  sqlite.exec(readFileSync(join(import.meta.dirname, '../migrations/539_rich_menu_group_version.sql'), 'utf8'))
   return sqlite
 }
 
@@ -178,8 +179,16 @@ describe('365 default固定とlease所有権（実D1）', () => {
   test('確認から確保までに版が変わればleaseを取らない', async () => {
     const row = sqlite.prepare("SELECT publishing_generation, confirmation_revision FROM rich_menu_groups WHERE id='menu-1'").get() as { publishing_generation: number; confirmation_revision: number }
     sqlite.exec("UPDATE rich_menu_groups SET confirmation_revision=confirmation_revision+1 WHERE id='menu-1'")
-    expect(await acquirePublishLease(db, 'menu-1', 'run-A', NOW, undefined, row.publishing_generation, row.confirmation_revision)).toBeNull()
+    expect(await acquirePublishLease(db, 'menu-1', 'run-A', NOW, undefined, undefined, undefined, row.publishing_generation, row.confirmation_revision)).toBeNull()
     expect(sqlite.prepare("SELECT publishing_owner FROM rich_menu_groups WHERE id='menu-1'").get()).toEqual({ publishing_owner: null })
+  })
+
+  test('確認版と公開世代の両方を照合し、更新後の版変更も検知する', async () => {
+    const generation = await acquirePublishLease(db, 'menu-1', 'run-A', NOW, undefined, undefined, undefined, 0, 1)
+    expect(generation).toBe(1)
+    expect(sqlite.prepare("SELECT confirmation_revision FROM rich_menu_groups WHERE id='menu-1'").get()).toEqual({ confirmation_revision: 1 })
+    sqlite.exec("UPDATE rich_menu_groups SET confirmation_revision=confirmation_revision+1 WHERE id='menu-1'")
+    expect(await renewPublishLease(db, 'menu-1', { owner: 'run-A', generation: 1 }, NOW, undefined, 1)).toBe(false)
   })
 
   test('期限切れは別runが回収でき、旧所有者はrenewも解放もできない', async () => {

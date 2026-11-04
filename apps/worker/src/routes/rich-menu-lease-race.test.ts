@@ -242,6 +242,16 @@ describe('実の停止API × 別D1接続の割り込み', () => {
     expect(await response.json()).toMatchObject({code:'RICH_MENU_CONFIRMATION_CHANGED',data:{partial:false,version:2}});
     expect(groupRow().s).toBe('published');expect(groupRow().g).toBe(0);expect(pageRichMenuId()).toBe('line-old-1');expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
+  test('取り下げの確認版が古ければ公開内容が一致してもLINEへ触れない', async () => {
+    sqlite.prepare("UPDATE rich_menu_groups SET confirmation_revision=confirmation_revision+1 WHERE id='g1'").run();
+    const response = await setupApp(db).request('/api/rich-menu-groups/g1/unpublish', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedConfirmationRevision: 1, expectedPublicationGeneration: 0, expectedVersion: 1, expectedPublishGeneration: 0, expectedIsDefaultForAll: true, expectedPages: [{ id: 'p1', orderIndex: 0, lineRichMenuId: 'line-old-1' }] }),
+    });
+    expect(response.status).toBe(409);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(groupRow().s).toBe('published');
+  });
   test('公開処理の世代が進んで元に戻った確認はLINEへ触れない',async()=>{
     sqlite.prepare("UPDATE rich_menu_groups SET publishing_generation=1 WHERE id='g1'").run();
     const response=await setupApp(db).request('/api/rich-menu-groups/g1/unpublish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({expectedVersion:1,expectedPublishGeneration:0,expectedIsDefaultForAll:true,expectedPages:[{id:'p1',orderIndex:0,lineRichMenuId:'line-old-1'}]})});
