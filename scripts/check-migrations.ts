@@ -40,6 +40,7 @@
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argv, exit, stderr, stdout } from 'node:process';
@@ -290,6 +291,17 @@ const GRANDFATHERED_REBUILDS = new Set([
   '354_analytics_cross_lease_generation.sql',
 ]);
 
+/**
+ * These two SQL files were already applied before the D1 LIKE limit check was
+ * introduced. Applied migrations are immutable, so exempt only the exact
+ * historical bytes from this one newer check. Any edit loses the exemption;
+ * all other migration rules still run.
+ */
+const APPLIED_LONG_LIKE_SHA256: Readonly<Record<string, string>> = {
+  '382_tags_account_name_scope.sql': '90e8d8998269a87d5be65271a77bcc655cabc5d4946c6b7e663e928232c566d4',
+  '440_conversion_draft_and_ingest.sql': 'fd33d639fdf098bc11ef52874b93a976a9365da23aef18b93f41ed55bd2b7784',
+};
+
 export function checkMigration(sql: string, fileName?: string): CheckResult {
   const stripped = stripLineComments(sql);
 
@@ -306,7 +318,9 @@ export function checkMigration(sql: string, fileName?: string): CheckResult {
     };
   }
 
-  const longPattern = tooLongLikePattern(stripped);
+  const exactAppliedSql = fileName && APPLIED_LONG_LIKE_SHA256[fileName] ===
+    createHash('sha256').update(sql).digest('hex');
+  const longPattern = exactAppliedSql ? null : tooLongLikePattern(stripped);
   if (longPattern) {
     return {
       ok: false,

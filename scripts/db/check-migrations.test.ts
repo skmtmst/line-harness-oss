@@ -11,6 +11,7 @@ describe('382の参照退避表だけを同一ファイル内で片付ける', (
   const sql = readFileSync(new URL('../../packages/db/migrations/382_tags_account_name_scope.sql', import.meta.url), 'utf8');
   it('実migrationの復元後cleanupを許可する', () => {
     expect(checkMigration(sql, file)).toEqual({ ok: true });
+    expect(checkMigration(`${sql}\n-- changed after application`, file).ok).toBe(false);
   });
   it('他ファイル・印なし・任意のbackup表のDROPは拒否する', () => {
     expect(checkMigration(sql, '383_other.sql').ok).toBe(false);
@@ -31,6 +32,7 @@ describe('440のCASCADE子退避表だけを同一ファイル内で片付ける
   const sql = readFileSync(new URL('../../packages/db/migrations/440_conversion_draft_and_ingest.sql', import.meta.url), 'utf8');
   it('実migrationの退避表cleanupを許可する', () => {
     expect(checkMigration(sql, file)).toEqual({ ok: true });
+    expect(checkMigration(`${sql}\n-- changed after application`, file).ok).toBe(false);
   });
   it('他ファイル・印なし・任意のbackup表のDROPは拒否する', () => {
     expect(checkMigration(sql, '441_other.sql').ok).toBe(false);
