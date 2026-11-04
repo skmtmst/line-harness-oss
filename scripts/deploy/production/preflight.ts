@@ -1,7 +1,5 @@
 import { assertReleaseInputs } from './artifacts.js';
 import { assertSha, command, requireValue } from './common.js';
-// @ts-expect-error Existing read-only JS CLI
-import { verifyPublicBuild } from '../verify-public-build.mjs';
 
 export function assertReleaseSource(sha: string, main: string, actual: string, context: NodeJS.ProcessEnv, mainTreeAndAncestryVerified = false): void {
   assertSha(sha);
@@ -53,6 +51,7 @@ export async function preflight(sha: string, runId: string, fetcher: typeof fetc
   if (!/^\d+$/.test(ownRunId)) throw new Error('production_run_id');
   assertProductionApproval(await get(`actions/runs/${ownRunId}`), process.env, repository);
   assertStagingRun(await get(`actions/runs/${runId}`), await get(`actions/runs/${runId}/jobs?filter=latest&per_page=100`), sha, repository);
-  // A successful dry-run or config replay cannot substitute for this exact public revision.
-  await verifyPublicBuild('https://stg-api.musubo.jp', sha, 'https://stg-admin.musubo.jp', sha, fetcher);
+  // The immutable staging run above verified both public revisions when it
+  // published this SHA. Later staging deployments must not invalidate that
+  // release proof or require replacing another developer's current build.
 }

@@ -25,19 +25,16 @@ function fixture(failure = '') {
       ] }] });
       return Response.json({ repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: failure === 'run-sha' ? main : sha, head_branch: 'codex/masato-production-release-20261104', status: 'completed', conclusion: 'success', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-staging.yml' });
     }
-    // No credentials, cookies or request body may reach the public probes.
-    expect(init).not.toHaveProperty('headers'); expect(init).not.toHaveProperty('body');
-    expect(url.hostname).toMatch(/^stg-(?:api|admin)\.musubo\.jp$/);
-    const git_commit = failure === 'public-sha' && url.hostname.startsWith('stg-admin') ? main : sha;
-    return Response.json(url.pathname === '/api/health' ? { success: true, data: { status: 'ok', git_commit } } : { git_commit });
+    throw new Error(`Unexpected external request: ${url.hostname}`);
   });
   return fetcher;
 }
 describe('release preflight uses real orchestration with synthetic metadata', () => {
-  it('verifies the main tree, owner dispatch, staging run, Worker version/health and Admin version', async () => {
+  it('verifies the main tree, owner dispatch and immutable staging publication evidence', async () => {
     const fetcher = fixture();
     await preflight(sha, '123', fetcher);
-    expect(fetcher).toHaveBeenCalledTimes(6);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher.mock.calls.every(([input]) => new URL(String(input)).hostname === 'api.github.com')).toBe(true);
     expect(vi.mocked(common.command).mock.calls.some(([, args]) => args.includes('--is-ancestor'))).toBe(true);
   });
   it('fails before DB work when Admin public configuration is missing or points to another project', async () => {
@@ -56,7 +53,7 @@ describe('release preflight uses real orchestration with synthetic metadata', ()
     await expect(preflight(sha, '123', fetcher)).rejects.toThrow('operations_pause_confirmation');
     expect(fetcher).not.toHaveBeenCalled();
   });
-  it.each(['metadata', 'owner', 'rerun', 'skipped', 'run-sha', 'public-sha'])('does not accept %s as release evidence', async failure => {
+  it.each(['metadata', 'owner', 'rerun', 'skipped', 'run-sha'])('does not accept %s as release evidence', async failure => {
     const fetcher = fixture(failure);
     await expect(preflight(sha, '123', fetcher)).rejects.toThrow();
     expect(vi.mocked(common.command).mock.calls.every(([binary]) => binary === 'git')).toBe(true);

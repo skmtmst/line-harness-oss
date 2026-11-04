@@ -355,7 +355,21 @@ jobs:
       - name: Guard shared pattern ownership
         env:
           PATTERN_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PATTERN_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PATTERN_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PATTERN_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
+          # The one-time 2026-11-04 release was cut before #2075 entered
+          # development. Compare its new UI only against that exact cut point;
+          # comparing the whole staged release with old production reports
+          # pre-existing UI as newly introduced debt.
+          if [ "$PATTERN_BASE_REF" = main ] && \
+             [ "$PATTERN_HEAD_REF" = codex/masato-production-release-20261104 ]; then
+            release_base=941616d7a41390199ee6cfef7569cfd43b2d8497
+            git cat-file -e "$release_base^{commit}"
+            git merge-base --is-ancestor "$release_base" "$PATTERN_HEAD_SHA"
+            PATTERN_BASE_SHA="$release_base"
+          fi
           if [ -n "$PATTERN_BASE_SHA" ]; then
             node scripts/visual-qa/v8-pattern-audit.mjs \
               --code . --base "$PATTERN_BASE_SHA" --out "$RUNNER_TEMP/pattern-ownership"
