@@ -1,7 +1,7 @@
 'use client'
 
 import { Children, Fragment, cloneElement, isValidElement, useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
-import { Check, X } from 'lucide-react'
+import { Check, Info, X } from 'lucide-react'
 import HelpTip from './help-tip'
 import './notice-tokens.css'
 import styles from './notice.module.css'
@@ -180,7 +180,7 @@ export default function Notice({
       data-design-node={props['data-design-node'] ?? node}
     >
       <div className={styles.content}>
-        <span className={styles.dotLine} aria-hidden="true"><span className={styles.dot} data-notice-dot aria-hidden="true" /></span>
+        <span className={appearance === 'subtle' ? styles.subtleIcon : styles.dotLine} aria-hidden="true">{appearance === 'subtle' ? <Info size={16}/> : <span className={styles.dot} data-notice-dot aria-hidden="true" />}</span>
         <div className={styles.message} data-notice-message>
           {heading ? <><div className={styles.headingRow}><div className={styles.heading} data-notice-heading>{labeledLead}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{body}</div></>
             : <>{labeledLead}</>}

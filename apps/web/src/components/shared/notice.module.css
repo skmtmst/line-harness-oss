@@ -95,3 +95,8 @@
 }
 
 :root .notice[data-appearance='subtle'] { margin-block: 0; }
+
+@layer components {
+.subtleIcon { display: flex; flex: none; width: var(--space-16); height: var(--space-16); align-items: center; color: var(--color-ink-secondary); }
+.notice[data-appearance='subtle'] .content { align-items: center; gap: var(--space-8); min-height: 0; }
+}
