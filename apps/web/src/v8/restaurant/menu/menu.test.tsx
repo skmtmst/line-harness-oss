@@ -249,6 +249,7 @@ describe('mauOC コースの編集ページ', () => {
     fireEvent.click(within(picker).getByRole('button', { name: '日付' }))
     fireEvent.click(screen.getByRole('button', { name: '次の月' }))
     fireEvent.click(screen.getAllByRole('button').find((b) => (b.getAttribute('aria-label') ?? '').startsWith(`${next.getFullYear()}年${next.getMonth() + 1}月10日`))!)
+    fireEvent.click(screen.getByRole('button',{name:'確定'}))
     fireEvent.click(within(screen.getByRole('dialog', { name: '日時を選ぶ' })).getByRole('button', { name: '閉じる' }))
     fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
     expect(fixture.updateMenu).not.toHaveBeenCalled()

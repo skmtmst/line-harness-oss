@@ -8,6 +8,7 @@ export type NotificationDestinationContext = {
   accountId?: string | null
   /** 鍵を入れ直せる人（オーナー・管理者）。権限が分からない間は false。 */
   canManage?: boolean
+  hqOrigin?: boolean
 }
 
 /*
@@ -21,7 +22,8 @@ export function notificationDestination(item: NotificationCenterItem, context: N
     return context.accountId ? `/accounts/detail?id=${encodeURIComponent(context.accountId)}` : '/accounts'
   }
   if (item.eventType.startsWith('ec.') || item.eventType.startsWith('ec_')) return '/ec-commerce'
-  return dashboardNotificationDestination(item)
+  const destination = dashboardNotificationDestination(item)
+  return context.hqOrigin && (destination === '/updates' || destination === '/emergency') ? `${destination}?from=hq` : destination
 }
 
 /** 行の右に出す「どこへ移るか」の言葉（「EC連携を開く →」など）。 */

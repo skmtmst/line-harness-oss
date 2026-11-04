@@ -158,6 +158,7 @@ it.each(['2026-10-11T15:09:00Z','2026-10-11T23:59:00Z'])('日本時間00:09・08
  fireEvent.click(screen.getByRole('button',{name:'次の月'}))
  const next=new Date();next.setDate(1);next.setMonth(next.getMonth()+1)
  fireEvent.click(screen.getAllByRole('button').find(b=>(b.getAttribute('aria-label')??'').startsWith(`${next.getFullYear()}年${next.getMonth()+1}月10日`))!)
+ fireEvent.click(screen.getByRole('button',{name:'確定'}))
  fireEvent.click(within(screen.getByRole('dialog',{name:'日時を選ぶ'})).getByRole('button',{name:'閉じる'}))
  const ymd=`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-10`
  expect(screen.queryByRole('button',{name:'保存して申請する'})).toBeNull()

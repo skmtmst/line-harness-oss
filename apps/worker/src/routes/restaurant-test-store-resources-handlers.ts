@@ -325,6 +325,7 @@ export const post__api_restaurant_test_menu_10 = async (c: Context<Env, "/api/re
   const body = await c.req.json<{ storeId?: string; kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string; description?: string | null; imageMediaId?: string | null }>();
   if (!body.storeId || !await storeBelongsTo(c, organization.id, body.storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
   const price = Number(body.price);
+  if (price > 1_000_000) return inputError(c, { success: false, error: '値段は1,000,000円以下で入れてください。' }, 400, ['price']);
   if (!['course', 'a_la_carte'].includes(body.kind || '') || !body.name?.trim() || !Number.isInteger(price) || price < 0) return inputError(c, { success: false, error: 'メニューの入力内容が正しくありません' }, 400, ["kind","name","price"]);
   if (!validRestaurantMenuDescription(body.description)) return inputError(c, { success:false, error:'説明は2000文字以内で入力してください' }, 400, ['description']);
   if ((body.imageMediaId != null && (typeof body.imageMediaId !== 'string' || !body.imageMediaId)) || (!await validRestaurantMenuImage(dbFor(c.env, body.storeId), body.storeId, body.imageMediaId ?? null))) return inputError(c, { success:false, code:'MENU_IMAGE_UNAVAILABLE', error:'選択した画像を利用できません。登録メディアから選び直してください。' }, 400, ['imageMediaId']);

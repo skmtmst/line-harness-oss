@@ -85,10 +85,9 @@ export function mdhm(value: string): string {
   return `${civil.getUTCMonth() + 1}/${civil.getUTCDate()} ${hm(date)}`
 }
 
-/** 「10/2（金）」 */
+/** 予約台帳と詳細で同じ日付表記を使う。 */
 export function mdWeek(day: Date): string {
-  const date = civilDay(day)
-  return `${date.getUTCMonth() + 1}/${date.getUTCDate()}（${WEEKDAY[date.getUTCDay()]}）`
+  return dayTitle(day)
 }
 
 /** 電話番号は真ん中を伏せる（「090-****-1234」）。 */

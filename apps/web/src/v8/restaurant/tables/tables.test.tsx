@@ -520,3 +520,10 @@ it('稼働中の卓だけを総席数に数える', async () => {
   const value = document.querySelector('[data-kpi-label][title="総席数"]')?.closest('[data-kpi-presentation]')?.querySelector('[data-kpi-number]')?.textContent
   expect(value).toBe('20')
 })
+
+it('最新Penでは旧自動配席の説明カードを表示しない', async () => {
+  render(<TablesPage />)
+  await screen.findByText('卓の詳細')
+  expect(screen.queryByText('自動配席ルール')).toBeNull()
+  expect(screen.queryByText(/直接来店も同じ候補を使います/)).toBeNull()
+})

@@ -24,8 +24,8 @@ vi.mock('next/link', () => ({ default: (props: React.PropsWithChildren<{ href: s
   return <a {...anchorProps} />
 } }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', loading: false }) }))
+vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
-vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: null, statusText: '確認できませんでした' }) }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 import EventsCreate from './create'
 import EventsList from './list'

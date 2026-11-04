@@ -52,7 +52,7 @@ export default function NotificationsV8() {
   const role = useStaffRole()
   // 既読は自分の印なので担当者まで付けられる。閲覧のみ・権限が分からない間は操作を出さない。
   const canMarkRead = role === 'owner' || role === 'admin' || role === 'staff'
-  const destinationContext = { accountId: selectedAccountId, canManage: canManageRole(role) }
+  const destinationContext = { accountId: selectedAccountId, canManage: canManageRole(role), hqOrigin: params.get('from') === 'hq' }
   // タブ「すべて・未読・システム」。前の ?category=error はシステム、update はすべてとして読む。
   const filter: NotificationTab = notificationTabFromParam(params.get('category'))
   const [items, setItems] = useState<NotificationCenterItem[]>([])

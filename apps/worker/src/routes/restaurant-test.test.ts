@@ -1,6 +1,6 @@
 import { seedRestaurantFixture as seedRestaurantData } from '../test-utils/restaurant-fixture.js';
 import { publishScenarioVersion } from '@line-crm/db';
-import { checkRestaurantMenuMedia } from '../test-utils/restaurant-menu-media.js';
+import { checkRestaurantMenuMedia, checkRestaurantMenuPrice } from '../test-utils/restaurant-menu-media.js';
 import { seedNoticeFriend } from '../test-utils/restaurant-test-fixture-helpers.js';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { readFileSync } from 'node:fs';
@@ -1207,9 +1207,9 @@ describe('V8-B 卓から出す予約枠と週の営業時間', () => {
 describe('R2-18 飲食メニューの説明と登録画像', () => {
   it('登録済み画像と説明を保存し、読み直せる', () => checkRestaurantMenuMedia({ testDb, seedRestaurantFixture, request, requestWithMethod }));
 });
-
 describe('V8-B メニューの価格確定', () => {
   const menuPath = '/api/restaurant-test/menus/menu-ginza?account_id=account-1';
+  it('価格の上限は作成と更新の両方で守る', () => checkRestaurantMenuPrice({ testDb, seedRestaurantFixture, request, requestWithMethod }));
   it('権限者の保存で価格を即時確定し、二重承認を受け付けない', async () => {
     seedRestaurantFixture();
     const response = await requestWithMethod(menuPath, 'PATCH', { price: 9900 });
