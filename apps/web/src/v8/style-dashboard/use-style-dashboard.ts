@@ -1,5 +1,6 @@
 'use client'
 import { invalidateApiReads } from '@/lib/api/transport/read-cache'
+import { ApiError } from '@/lib/api/transport/errors'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { type CancelReservationInput } from '@/components/shared/booking-confirm-dialogs'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
@@ -334,24 +335,22 @@ export function useStyleDashboard(style: IndustryStyle) {
   const saveClosure = async (input: StyleClosureInput) => {
     setBusy('closure')
     try {
+      if (!input.expectedSnapshot) throw new Error('confirmation_unavailable')
       if (style === 'restaurant' && store.store) {
-        const res = await restaurantTestApi.createClosure(accountId, { storeId: store.store.id, startDate: input.date, endDate: input.date, allDay: input.allDay, startTime: input.from ?? null, endTime: input.to ?? null, kind: KIND[input.reason] ?? 'other', memo: input.reason, tableIds: input.target === 'seat' ? input.ids : [] })
+        const res = await restaurantTestApi.createClosure(accountId, { storeId: store.store.id, startDate: input.date, endDate: input.date, allDay: input.allDay, startTime: input.from ?? null, endTime: input.to ?? null, kind: KIND[input.reason] ?? 'other', memo: input.reason, tableIds: input.target === 'seat' ? input.ids : [], expectedSnapshot: input.expectedSnapshot })
         notifyToast(res.data.reservations.length ? `休みを入れました。重なる予約が ${formatNumber(res.data.reservations.length)}件あります（取り消していません）。` : '休みを入れました。')
       } else {
-        // 人の口は担当 1 人ずつ。途中で失敗した人をまとめて成功にしない。
-        const ids = input.target === 'staff' ? input.ids : [null]
-        const failedNames: string[] = []
-        for (const id of ids) {
-          try { await styleApi.closeHours(accountId, { date: input.date, target: id ? 'staff' : 'store', ...(id ? { staffId: id } : {}), allDay: input.allDay, startTime: input.from, endTime: input.to, reason: input.reason }) } catch (caught) {
-            failedNames.push(id ? today?.staff.find((x) => x.id === id)?.name ?? id : '店全体'); if (ids.length === 1) throw caught
-          }
-        }
-        notifyToast(failedNames.length ? `休みを入れました。${failedNames.join('・')}は入れられませんでした。` : '休みを入れました。予約は取り消していません。', failedNames.length ? { tone: 'error' } : undefined)
+        await styleApi.closeHoursConfirmed(accountId, { date: input.date, target: input.target === 'store' ? 'store' : 'staff', staffIds: input.target === 'staff' ? input.ids : [], allDay: input.allDay, startTime: input.from, endTime: input.to, reason: input.reason, expectedSnapshot: input.expectedSnapshot })
+        notifyToast('休みを入れました。予約は取り消していません。')
       }
       setClosureOpen(false)
       void reload()
     } catch (caught) {
-      notifyToast(japaneseDetailOf(caught) || '休みを入れられませんでした。', { tone: 'error' })
+      if (caught instanceof ApiError && caught.status === 409 && (caught.code === 'confirmation_changed' || caught.message === 'confirmation_changed')) {
+        const count = (caught.data as { count?: unknown } | null)?.count
+        setClosureOpen(false); void reload()
+        notifyToast(`予約が変わりました。${typeof count === 'number' ? `現在 ${formatNumber(count)} 件です。` : ''}最新の状態を確認してください。`, { tone: 'error' })
+      } else notifyToast(japaneseDetailOf(caught) || '休みを入れられませんでした。', { tone: 'error' })
     } finally { setBusy('') }
   }
 
