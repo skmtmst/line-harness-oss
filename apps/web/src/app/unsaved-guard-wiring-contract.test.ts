@@ -22,6 +22,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/hq-templates/catalog-console.tsx',
   'components/shared/folder-add-dialog.tsx',
   'components/shared/folder-select.tsx',
   // 顧客情報の編集は自身の未保存確認で画面離脱を守る。

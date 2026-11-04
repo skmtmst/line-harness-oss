@@ -18,6 +18,7 @@ import { hqCatalogTemplatesApi, type CatalogRedistributionPreview } from '@/lib/
 import HqAccountPicker from './account-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from '@/v8/hq-deliveries/console.module.css'
 
 type Detail = Awaited<ReturnType<typeof hqCatalogTemplatesApi.detail>>['data']
@@ -29,6 +30,7 @@ const initial = (type: HqCatalogTemplateType): HqCatalogTemplateDefinition => ty
 
 export default function CatalogConsole({ type }: { type: HqCatalogTemplateType }) {
   const router = useRouter()
+  const saveErrors = useSaveFormErrors()
   const role = useStaffRole(), canEdit = role !== null && canManageRole(role)
   const [view, setView] = useState<View>('list')
   const [rows, setRows] = useState<Detail['template'][]>([])
@@ -51,22 +53,22 @@ export default function CatalogConsole({ type }: { type: HqCatalogTemplateType }
   }, [type])
   useEffect(() => { void load(); void hqTemplatesApi.accounts().then(setAccounts).catch(() => setError('配布先を読み込めませんでした。')) }, [load])
   const open = async (row: Detail['template'], next: View = 'edit', redistribute = false) => {
-    setBusy(true); setError('')
+    setBusy(true); setError(''); saveErrors.reset()
     try { const loaded=(await hqCatalogTemplatesApi.detail(row.id)).data; savedSnapshot.current=JSON.stringify(loaded); setDetail(loaded); setSelected([]); setPreflight(null); setRedistribution(null); setIsRedistribution(redistribute); setView(next) }
     catch { setError('ひな形を開けませんでした。読み直してください。') }
     finally { setBusy(false) }
   }
-  const create = () => { requestId.current = crypto.randomUUID(); const created={ template: { id: '', name: '', template_type: type, revision: 0 }, definition: initial(type) }; savedSnapshot.current=JSON.stringify(created); setDetail(created); setView('edit'); setError('') }
+  const create = () => { saveErrors.reset(); requestId.current = crypto.randomUUID(); const created={ template: { id: '', name: '', template_type: type, revision: 0 }, definition: initial(type) }; savedSnapshot.current=JSON.stringify(created); setDetail(created); setView('edit'); setError('') }
   const settings = detail?.definition.settings as unknown as Record<string, unknown> | undefined
   const change = (key: string, value: unknown) => setDetail(old => old ? { ...old, definition: { ...old.definition, settings: { ...old.definition.settings, [key]: value } } as HqCatalogTemplateDefinition } : old)
   const save = async () => {
     if (!detail || !canEdit || busy) return
-    setBusy(true); setError('')
+    setBusy(true); setError(''); saveErrors.reset()
     try {
       const input = { name: detail.template.name, definition: detail.definition }
       const saved = detail.template.id ? await hqCatalogTemplatesApi.update(detail.template.id, { ...input, expectedRevision: detail.template.revision }) : await hqCatalogTemplatesApi.create({ ...input, type, requestId: requestId.current })
       savedSnapshot.current=JSON.stringify(saved.data); guard.disarm(); setDetail(saved.data); setView('accounts'); setSelected([]); setIsRedistribution(false); await load()
-    } catch { setError('保存できませんでした。入力と最新の版を確認してください。') }
+    } catch (cause) { if (!saveErrors.capture(cause)) setError('保存できませんでした。入力と最新の版を確認してください。') }
     finally { setBusy(false) }
   }
   const prepare = async () => {
@@ -100,11 +102,11 @@ export default function CatalogConsole({ type }: { type: HqCatalogTemplateType }
   const tabs = <Tabs label="ひな形の種類" items={[{ id: 'template', label: 'メッセージなど', onClick: () => router.push('/hq/templates') }, ...(['booking_menu','mileage_reward'] as const).map(id => ({ id, label: label(id), current: type === id, onClick: () => router.push(`/hq/templates?type=${id}`) }))]} />
   if (view === 'list') return <ListPage title={`${label(type)}を配る`} tabs={tabs} actions={canEdit ? <Button variant="primary" onClick={create}>ひな形を作る</Button> : undefined}>{notices}<ResourceTable canEdit={canEdit} updatedLabel="版" rows={rows.map(row => ({ id: row.id, name: <Button variant="text" onClick={() => void open(row)}>{row.name}</Button>, summary: label(type), references: null, updated: `版 ${row.revision}`, destinations: '—', actions: <><Button onClick={() => void open(row,'accounts',false)} disabled={busy}>配る</Button><Button onClick={() => void open(row,'accounts',true)} disabled={busy}>再配布</Button></> }))} /></ListPage>
   if (view === 'edit' && detail) {
-    const field = (key: string, text: string, numeric = false) => <Field label={text}><TextField disabled={!canEdit || busy} inputMode={numeric ? 'numeric' : undefined} value={String(settings?.[key] ?? '')} onChange={event => change(key, numeric ? Number(event.target.value) : event.target.value)} /></Field>
-    return <CreatePage title={`${label(type)}のひな形を${detail.template.id ? '編集する' : '作る'}`} notice={notices} dirty={false} busy={busy} footerActions={<><Button onClick={() => guard.guarded(() => setView('list'))} disabled={busy}>戻る</Button>{canEdit && <Button variant="primary" onClick={() => void save()} disabled={busy || !detail.template.name.trim() || !String(settings?.name ?? '').trim()}>保存する</Button>}</>}>
-      <div className={styles.fields}><Field label="統括での名前"><TextField value={detail.template.name} disabled={!canEdit || busy} onChange={event => setDetail({ ...detail, template: { ...detail.template, name: event.target.value } })} /></Field>{field('name','店に届く名前')}{field('description','説明')}
-      {type === 'booking_menu' ? <>{field('duration_minutes','所要時間（分）',true)}{field('base_price','金額（円）',true)}{field('image_url','画像URL')}<Field label="支払い"><Select aria-label="支払い" value={String(settings?.paymentMode ?? 'default')} onChange={value => change('paymentMode',value)} disabled={!canEdit || busy} options={[{value:'default',label:'店の設定に従う'},{value:'onsite',label:'店頭で支払う'},{value:'online',label:'オンライン決済'}]} /></Field></> : <>{field('requiredMiles','必要なマイル',true)}{field('imageUrl','画像URL')}<Field label="1人あたりの交換上限（回）"><TextField inputMode="numeric" value={String(settings?.perFriendLimit ?? '')} disabled={!canEdit || busy} onChange={event => change('perFriendLimit',event.target.value ? Number(event.target.value) : null)} /></Field>{field('startsAt','交換開始日時')}{field('endsAt','交換終了日時')}<Field label="景品の種類"><Select aria-label="景品の種類" value={String(settings?.rewardKind ?? 'coupon')} onChange={value => change('rewardKind',value)} disabled={!canEdit || busy} options={[{value:'coupon',label:'クーポン'},{value:'tag',label:'タグ'},{value:'scenario',label:'シナリオ'},{value:'template',label:'メッセージ'},{value:'early_access',label:'先にお知らせ'},{value:'rank',label:'ランク'}]} /></Field>{settings?.rewardKind !== 'coupon' && field('commonActionName','店の共通アクション名')}</>}</div>
-    </CreatePage>
+    const field = (key: string, text: string, numeric = false) => <Field label={text}><SaveErrorField names={[key, `definition.settings.${key}`]}><TextField disabled={!canEdit || busy} inputMode={numeric ? 'numeric' : undefined} value={String(settings?.[key] ?? '')} onChange={event => change(key, numeric ? Number(event.target.value) : event.target.value)} /></SaveErrorField></Field>
+    return <SaveErrorScope errors={saveErrors}><CreatePage title={`${label(type)}のひな形を${detail.template.id ? '編集する' : '作る'}`} notice={notices} dirty={false} busy={busy} footerActions={<><Button onClick={() => guard.guarded(() => setView('list'))} disabled={busy}>戻る</Button>{canEdit && <Button variant="primary" onClick={() => void save()} disabled={busy || !detail.template.name.trim() || !String(settings?.name ?? '').trim()}>保存する</Button>}</>}>
+      <div className={styles.fields}><Field label="統括での名前"><SaveErrorField names={['name']}><TextField value={detail.template.name} disabled={!canEdit || busy} onChange={event => setDetail({ ...detail, template: { ...detail.template, name: event.target.value } })} /></SaveErrorField></Field>{field('name','店に届く名前')}{field('description','説明')}
+      {type === 'booking_menu' ? <>{field('duration_minutes','所要時間（分）',true)}{field('base_price','金額（円）',true)}{field('image_url','画像URL')}<Field label="支払い"><SaveErrorField names={['paymentMode','definition.settings.paymentMode']}><Select aria-label="支払い" value={String(settings?.paymentMode ?? 'default')} onChange={value => change('paymentMode',value)} disabled={!canEdit || busy} options={[{value:'default',label:'店の設定に従う'},{value:'onsite',label:'店頭で支払う'},{value:'online',label:'オンライン決済'}]} /></SaveErrorField></Field></> : <>{field('requiredMiles','必要なマイル',true)}{field('imageUrl','画像URL')}<Field label="1人あたりの交換上限（回）"><SaveErrorField names={['perFriendLimit','definition.settings.perFriendLimit']}><TextField inputMode="numeric" value={String(settings?.perFriendLimit ?? '')} disabled={!canEdit || busy} onChange={event => change('perFriendLimit',event.target.value ? Number(event.target.value) : null)} /></SaveErrorField></Field>{field('startsAt','交換開始日時')}{field('endsAt','交換終了日時')}<Field label="景品の種類"><SaveErrorField names={['rewardKind','definition.settings.rewardKind']}><Select aria-label="景品の種類" value={String(settings?.rewardKind ?? 'coupon')} onChange={value => change('rewardKind',value)} disabled={!canEdit || busy} options={[{value:'coupon',label:'クーポン'},{value:'tag',label:'タグ'},{value:'scenario',label:'シナリオ'},{value:'template',label:'メッセージ'},{value:'early_access',label:'先にお知らせ'},{value:'rank',label:'ランク'}]} /></SaveErrorField></Field>{settings?.rewardKind !== 'coupon' && field('commonActionName','店の共通アクション名')}</>}</div>
+    </CreatePage></SaveErrorScope>
   }
   const stateText: Record<string,string> = {current:'適用済み',update:'新版へ更新',approval_required:'店の確認待ち',kept:'店の版を維持',updated:'更新済み',version_conflict:'変更あり・再確認',succeeded:'配布済み',failed:'配布できませんでした'}
   return <DistributionPage boardId="meBRB" stats={null} toolbar={null} title={`${label(type)}を${isRedistribution ? '再配布' : '配布'}する`} help="確認した内容を各アカウントへ配ります。" notices={notices} actions={<><Button onClick={() => setView(view === 'confirm' ? 'accounts' : 'list')} disabled={busy}>戻る</Button>{canEdit && view !== 'result' && <Button variant="primary" disabled={busy || !selected.length} onClick={() => void (view === 'accounts' ? prepare() : distribute())}>{view === 'accounts' ? '配る先を確かめる' : '確認した内容で配る'}</Button>}{view === 'result' && <Button variant="primary" onClick={() => setView('list')}>完了</Button>}</>}>

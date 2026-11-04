@@ -20,3 +20,9 @@ it.each(['booking_menu','mileage_reward'] as const)('%s の新版は確認した
   const [, options] = fetchApi.mock.calls[1]
   expect(JSON.parse(options.body)).toEqual({ decisionId: 'd', snapshot: 'a'.repeat(64), action: 'adopt' })
 })
+it('壊れた更新情報を受け取っても一覧を壊さず、確認できなかったことを示す', async () => {
+  fetchApi.mockResolvedValueOnce({ success: true, data: { id: 'incomplete' } })
+  render(<CatalogUpdate accountId="a" targetId="r" kind="booking_menu" canEdit onChanged={() => {}} />)
+  expect(await screen.findByText(/統括からの更新を確認できませんでした/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '統括の新版を採用' })).toBeNull()
+})

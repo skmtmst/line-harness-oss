@@ -19,7 +19,13 @@ export default function CatalogUpdate({ accountId, targetId, kind, canEdit, onCh
   useEffect(() => {
     let live = true
     setPending(null); setError(''); setChoice(null)
-    void fetchApi<{ success: true; data: Pending | null }>(path).then(result => { if (live) setPending(result.data) }).catch(() => { if (live) setError('統括からの更新を確認できませんでした。読み直してください。') })
+    void Promise.resolve().then(() => fetchApi<{ success: true; data: Pending | null }>(path)).then(result => {
+      if (!live) return
+      const data = result?.data
+      if (data === null) { setPending(null); return }
+      if (!data || typeof data.id !== 'string' || typeof data.name !== 'string' || typeof data.version !== 'number' || typeof data.snapshot !== 'string' || !data.definition || typeof data.definition.settings !== 'object' || data.definition.settings === null) throw new Error('invalid update response')
+      setPending(data)
+    }).catch(() => { if (live) setError('統括からの更新を確認できませんでした。読み直してください。') })
     return () => { live = false }
   }, [path])
   const decide = async () => {
