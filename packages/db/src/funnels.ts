@@ -1,4 +1,5 @@
-import { jstNow } from './utils.js';
+import { storedTimestamp } from '@line-crm/shared';
+import { jstNow, jstBoundToIso } from './utils.js';
 
 const LOOKUP_CHUNK = 90;
 
@@ -223,8 +224,8 @@ export async function countFunnelStep(
       return queryScoped(
         `SELECT DISTINCT friend_id FROM link_clicks
           WHERE tracked_link_id = ? AND friend_id IS NOT NULL
-            AND clicked_at >= ? AND clicked_at <= ?`,
-        [String(match.trackedLinkId), opts.from, opts.to],
+            AND julianday(${storedTimestamp('clicked_at', 'sql')}) >= julianday(?) AND julianday(${storedTimestamp('clicked_at', 'sql')}) <= julianday(?)`,
+        [String(match.trackedLinkId), jstBoundToIso(opts.from) ?? opts.from, jstBoundToIso(opts.to) ?? opts.to],
       );
     }
     case 'form': {

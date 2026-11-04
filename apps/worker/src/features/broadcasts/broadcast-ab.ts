@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import {DELIVERY_CONSENT_ALLOWED_SQL} from '@line-crm/db/src/friend-delivery-consents.js';
 import {buildSegmentWhere} from '../../services/segment-query.js';
 import {GapError} from '../../services/gap-common.js';
@@ -34,7 +35,7 @@ export async function abStats(db:D1Database,id:string,until=new Date().toISOStri
  const rows=(await db.prepare(`SELECT r.variant_key key,SUM(r.state='sent') sent,SUM(r.state='failed') failed,
  COUNT(DISTINCT CASE WHEN lc.id IS NOT NULL THEN r.friend_id END) clicks
  FROM broadcast_ab_recipients r LEFT JOIN broadcast_tracked_links bl ON bl.broadcast_id=r.broadcast_id
- LEFT JOIN link_clicks lc ON lc.tracked_link_id=bl.tracked_link_id AND lc.friend_id=r.friend_id AND julianday(lc.clicked_at)>=julianday(r.sent_at) AND julianday(lc.clicked_at)<=julianday(?)
+ LEFT JOIN link_clicks lc ON lc.tracked_link_id=bl.tracked_link_id AND lc.friend_id=r.friend_id AND julianday(${storedTimestamp('lc.clicked_at', 'sql')})>=julianday(r.sent_at) AND julianday(${storedTimestamp('lc.clicked_at', 'sql')})<=julianday(?)
  WHERE r.broadcast_id=? AND r.variant_key IN('A','B') GROUP BY r.variant_key`).bind(until,id).all<{key:'A'|'B';sent:number;failed:number;clicks:number}>()).results;
  // 同じ受信者が複数リンクを押せるため、配信数の分母はクリック数と別に数える。
  const denominators=(await db.prepare("SELECT variant_key key,SUM(state='sent') sent,SUM(state='failed') failed FROM broadcast_ab_recipients WHERE broadcast_id=? AND variant_key IN('A','B') GROUP BY variant_key").bind(id).all<{key:string;sent:number;failed:number}>()).results;

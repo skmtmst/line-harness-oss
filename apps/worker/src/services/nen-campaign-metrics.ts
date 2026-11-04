@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { getLineAccountById, jstNow } from '@line-crm/db';
 
 import { getNenCampaign, nenCampaignFormIssue } from './nen-engagement.js';
@@ -211,7 +212,7 @@ export async function getNenColumnMetrics(
        LEFT JOIN tracked_links tl ON tl.line_account_id = c.line_account_id
         AND tl.original_url = c.article_url AND tl.is_active = 1
        LEFT JOIN link_clicks lc ON lc.tracked_link_id = tl.id
-        AND datetime(lc.clicked_at) >= datetime(?) AND datetime(lc.clicked_at) < datetime(?)
+        AND datetime(${storedTimestamp('lc.clicked_at', 'sql')}) >= datetime(?) AND datetime(${storedTimestamp('lc.clicked_at', 'sql')}) < datetime(?)
       WHERE c.line_account_id = ?
       GROUP BY c.id
       ORDER BY COALESCE(c.published_at, c.created_at) DESC, c.id DESC`,

@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 /**
  * 集計。
  *
@@ -112,7 +113,7 @@ export async function getLinkClickSummary(
          FROM link_clicks c
          JOIN tracked_links l ON l.id = c.tracked_link_id
         WHERE l.line_account_id = ?
-          ${analyticsWindowWhere('c.clicked_at', true)}
+          ${analyticsWindowWhere('c.clicked_at', true, true)}
         GROUP BY c.tracked_link_id
         ORDER BY clicks DESC
         LIMIT ?`,
@@ -182,12 +183,12 @@ export async function getTrackedLinkStats(
               l.is_active AS is_active,
               COUNT(c.id) AS clicks,
               COUNT(DISTINCT c.friend_id) AS unique_friends,
-              MIN(c.clicked_at) AS first_clicked_at,
-              MAX(c.clicked_at) AS last_clicked_at
+              MIN(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('c.clicked_at', 'sql')})) AS first_clicked_at,
+              MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('c.clicked_at', 'sql')})) AS last_clicked_at
          FROM tracked_links l
          LEFT JOIN link_clicks c
                 ON c.tracked_link_id = l.id
-               ${analyticsWindowWhere('c.clicked_at', true)}
+               ${analyticsWindowWhere('c.clicked_at', true, true)}
          LEFT JOIN tags t ON t.id = l.tag_id
          LEFT JOIN scenarios s ON s.id = l.scenario_id
         WHERE l.line_account_id = ?

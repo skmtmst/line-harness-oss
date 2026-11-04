@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { parseJsonArray } from './broadcast-json.js';
@@ -32,7 +33,7 @@ export const get__api_broadcasts_id_insight_1 = async (c: Context<Env, "/api/bro
     `SELECT tl.id, btl.label, tl.original_url,
               COUNT(lc.id) AS click_count,
               COUNT(DISTINCT lc.friend_id) AS unique_click_count,
-              MAX(lc.clicked_at) AS last_clicked_at
+              MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('lc.clicked_at', 'sql')})) AS last_clicked_at
          FROM broadcast_tracked_links btl
          JOIN tracked_links tl ON tl.id = btl.tracked_link_id
          LEFT JOIN link_clicks lc ON lc.tracked_link_id = tl.id

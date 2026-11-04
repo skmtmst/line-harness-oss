@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { hqBroadcastBlocks } from './hq-broadcast-blocks.js';
 import type { HqBroadcastInput } from '@line-crm/shared';
 import { getHqBroadcastRun,prepareHqBroadcast,readHqBroadcastResult } from '../../services/hq-broadcasts.js';
@@ -9,9 +10,9 @@ type Run=Awaited<ReturnType<typeof getHqBroadcastRun>>;
 export async function hqBroadcastReactions(db:D1Database,run:Run) {
   const links=(await db.prepare(`SELECT t.line_account_id account_id,b.id broadcast_id,l.id link_id,l.name,l.original_url,lm.label,b.sent_at,
     (SELECT COUNT(DISTINCT c.friend_id) FROM link_clicks c JOIN broadcast_send_claims s ON s.friend_id=c.friend_id AND s.broadcast_id=b.id AND s.line_account_id=t.line_account_id AND s.state='sent'
-      WHERE c.tracked_link_id=l.id AND julianday(c.clicked_at)>=julianday(b.sent_at) AND julianday(c.clicked_at)<julianday(b.sent_at,'+14 days')) people,
+      WHERE c.tracked_link_id=l.id AND julianday(${storedTimestamp('c.clicked_at', 'sql')})>=julianday(b.sent_at) AND julianday(${storedTimestamp('c.clicked_at', 'sql')})<julianday(b.sent_at,'+14 days')) people,
     (SELECT COUNT(*) FROM link_clicks c JOIN broadcast_send_claims s ON s.friend_id=c.friend_id AND s.broadcast_id=b.id AND s.line_account_id=t.line_account_id AND s.state='sent'
-      WHERE c.tracked_link_id=l.id AND julianday(c.clicked_at)>=julianday(b.sent_at) AND julianday(c.clicked_at)<julianday(b.sent_at,'+14 days')) clicks,
+      WHERE c.tracked_link_id=l.id AND julianday(${storedTimestamp('c.clicked_at', 'sql')})>=julianday(b.sent_at) AND julianday(${storedTimestamp('c.clicked_at', 'sql')})<julianday(b.sent_at,'+14 days')) clicks,
     (SELECT COUNT(*) FROM broadcast_send_claims s WHERE s.broadcast_id=b.id AND s.line_account_id=t.line_account_id AND s.state='sent') sent
     FROM hq_broadcast_targets t JOIN line_accounts a ON a.id=t.line_account_id AND a.tenant_id=?
     JOIN broadcasts b ON b.id=t.broadcast_id AND b.line_account_id=t.line_account_id

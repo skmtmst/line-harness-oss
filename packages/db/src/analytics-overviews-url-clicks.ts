@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { getTrackedLinkStats } from './analytics.js';
 import { analyticsWindow, analyticsWindowWhere } from './utils.js';
 import { type AnalyticsOverviewContext, type AnalyticsMetricState } from './analytics-overviews-types.js';
@@ -56,8 +57,8 @@ export async function getAnalyticsUrlClicksOverview(
                 SELECT 1 FROM link_clicks c
                  WHERE c.tracked_link_id = e.tracked_link_id
                    AND c.friend_id = e.friend_id
-                   AND julianday(c.clicked_at) >= julianday(e.sent_at)
-                   ${analyticsWindowWhere('c.clicked_at')}
+                   AND julianday(${storedTimestamp('c.clicked_at', 'sql')}) >= julianday(e.sent_at)
+                   ${analyticsWindowWhere('c.clicked_at', false, true)}
               ) THEN e.friend_id END) AS clicked_people,
               SUM(CASE WHEN e.audience_state = 'unknown' THEN 1 ELSE 0 END) AS unknown_audiences,
               MIN(e.sent_at) AS first_sent_at,

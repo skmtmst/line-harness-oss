@@ -1,4 +1,4 @@
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, storedTimestamp } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 // =============================================================================
 // Tracked Links — URL click tracking with automatic actions
@@ -35,9 +35,9 @@ export interface LinkClick {
 
 export async function getTrackedLinks(db: D1Database): Promise<TrackedLink[]> {
   const result = await db
-    .prepare(`SELECT * FROM tracked_links ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM tracked_links ORDER BY julianday(${storedTimestamp('created_at', 'sql')}) DESC, id DESC`)
     .all<TrackedLink>();
-  return result.results;
+  return result.results.map(row => ({ ...row, created_at: storedTimestamp(row.created_at), updated_at: storedTimestamp(row.updated_at) }));
 }
 
 export async function getTrackedLinkById(
@@ -357,9 +357,9 @@ export async function getLinkClicks(
                WHERE exact_friend.line_user_id = f.line_user_id AND exact_friend.line_account_id = owner.id)))
          AND (tl.line_account_id IS NOT NULL OR tl.scenario_id IS NULL OR sc.id IS NOT NULL)
        WHERE lc.tracked_link_id = ?
-       ORDER BY lc.clicked_at DESC`,
+       ORDER BY julianday(${storedTimestamp('lc.clicked_at', 'sql')}) DESC, lc.id DESC`,
     )
     .bind(trackedLinkId)
     .all<LinkClickWithFriend>();
-  return result.results;
+  return result.results.map(row => ({ ...row, clicked_at: storedTimestamp(row.clicked_at) }));
 }

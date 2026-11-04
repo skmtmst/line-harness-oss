@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { analyticsWindow, analyticsWindowWhere } from './utils.js';
 import { type AnalyticsOverviewContext, type ReactionCampaign, type AnalyticsMetricState } from './analytics-overviews-types.js';
 import { getCoverage, hourInTimeZone } from './analytics-overviews-friends.js';
@@ -46,8 +47,8 @@ export async function getAnalyticsReactionsOverview(
       `SELECT c.clicked_at
          FROM link_clicks c JOIN tracked_links l ON l.id = c.tracked_link_id
         WHERE l.line_account_id = ?
-          ${analyticsWindowWhere('c.clicked_at')}
-        ORDER BY c.clicked_at LIMIT 50001`,
+          ${analyticsWindowWhere('c.clicked_at', false, true)}
+        ORDER BY julianday(${storedTimestamp('c.clicked_at', 'sql')}) LIMIT 50001`,
     ).bind(context.lineAccountId, win.lo, win.hi, win.fromIso, win.toIso).all<{ clicked_at: string }>(),
     getCoverage(db, context.lineAccountId, 'conversion_approved', context.from),
   ]);
@@ -105,7 +106,7 @@ export async function getAnalyticsReactionsOverview(
   const trackedClickLimitExceeded = clickRows.results.length > 50_000;
   const visibleClicks = clickRows.results.slice(0, 50_000);
   const clickHours = Array.from({ length: 24 }, (_, hour) => ({ hour, clicks: 0 }));
-  for (const row of visibleClicks) clickHours[hourInTimeZone(row.clicked_at, context.timeZone)].clicks += 1;
+  for (const row of visibleClicks) clickHours[hourInTimeZone(storedTimestamp(row.clicked_at), context.timeZone)].clicks += 1;
   const unavailableCampaigns = campaigns.filter((item) =>
     item.opened.state !== 'available' || item.lineClicked.state !== 'available').length;
   const sumMetric = (field: 'targetPeople' | 'delivered' | 'opened' | 'lineClicked') => {

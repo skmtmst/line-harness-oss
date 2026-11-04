@@ -1,4 +1,4 @@
-import { type FeatureId } from '@line-crm/shared';
+import { storedTimestamp, type FeatureId } from '@line-crm/shared';
 import { type FeatureUsageDefinition, type FeatureUsageMeasure } from './analytics-overviews-types.js';
 
 
@@ -159,8 +159,8 @@ export async function collectFeatureUsage(
       sql: `/* usage-feature-results */
         SELECT
           (SELECT COUNT(*) FROM link_clicks c JOIN tracked_links l ON l.id = c.tracked_link_id
-            WHERE l.line_account_id = ? AND datetime(c.clicked_at) >= datetime(?)) AS inflow_tracking_count,
-          (SELECT MAX(c.clicked_at) FROM link_clicks c JOIN tracked_links l ON l.id = c.tracked_link_id
+            WHERE l.line_account_id = ? AND datetime(${storedTimestamp('c.clicked_at', 'sql')}) >= datetime(?)) AS inflow_tracking_count,
+          (SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${storedTimestamp('c.clicked_at', 'sql')})) FROM link_clicks c JOIN tracked_links l ON l.id = c.tracked_link_id
             WHERE l.line_account_id = ?) AS inflow_tracking_last,
           (SELECT COUNT(*) FROM conversion_events e JOIN friends f ON f.id = e.friend_id
             WHERE f.line_account_id = ? AND datetime(e.created_at) >= datetime(?)) AS affiliates_count,

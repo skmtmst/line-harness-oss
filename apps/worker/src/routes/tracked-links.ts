@@ -1,3 +1,4 @@
+import { storedTimestamp } from '@line-crm/shared';
 import { issueTrackedLinkIdentity, verifyTrackedLinkIdentity, resolveTrackedLinkAccountId, trackedLinkSigningAccount } from '../services/tracked-link-identity.js';
 import { tracedFetch } from '@line-crm/shared/server';
 import { escapeHtml, scriptString } from '../lib/html-escape.js';
@@ -68,8 +69,8 @@ function serializeTrackedLink(row: TrackedLink, baseUrl: string) {
     ogTitle: row.og_title,
     ogDescription: row.og_description,
     ogImageUrl: row.og_image_url,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: storedTimestamp(row.created_at),
+    updatedAt: storedTimestamp(row.updated_at),
   };
 }
 

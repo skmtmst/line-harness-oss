@@ -1,3 +1,5 @@
+import { jstBoundToIso } from '../utils.js';
+import { storedTimestamp } from '@line-crm/shared';
 import { type RichMenuGroup, type RichMenuAudienceStat, type RichMenuTapStats, type RichMenuAreaTapCount } from './types.js';
 import { getRichMenuGroups } from './area-writes.js';
 
@@ -124,10 +126,10 @@ export async function getRichMenuTapStats(
            JOIN link_clicks      c ON c.tracked_link_id = a.tracked_link_id
           WHERE g.account_id = ?
             AND a.tracked_link_id IS NOT NULL
-            AND c.clicked_at >= ? AND c.clicked_at < ?
+            AND julianday(${storedTimestamp('c.clicked_at', 'sql')}) >= julianday(?) AND julianday(${storedTimestamp('c.clicked_at', 'sql')}) < julianday(?)
           GROUP BY a.id`,
       )
-      .bind(accountId, from, to)
+      .bind(accountId, jstBoundToIso(from) ?? from, jstBoundToIso(to) ?? to)
       .all<{
         area_id: string;
         group_id: string;

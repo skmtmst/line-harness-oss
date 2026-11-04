@@ -1,4 +1,4 @@
-import { jstTimestamp, jstDateOffset as japanDateOffset, jstMonthStart as japanMonthStart } from '@line-crm/shared';
+import { jstTimestamp, jstDateOffset as japanDateOffset, jstMonthStart as japanMonthStart, storedTimestamp } from '@line-crm/shared';
 import type { D1Database } from '@cloudflare/workers-types';
 
 export const MAX_LIST_LIMIT = 200;
@@ -140,9 +140,10 @@ export function analyticsWindow(
  * win.toIso` の順。上限は既定で開区間（<）。上限込みの窓には
  * `toInclusive: true`。
  */
-export function analyticsWindowWhere(column: string, toInclusive = false): string {
+export function analyticsWindowWhere(column: string, toInclusive = false, mixedStorage = false): string {
+  const instant = mixedStorage ? storedTimestamp(column, 'sql') : column;
   return `AND ${column} >= ? AND ${column} < ?
-          AND julianday(${column}) >= julianday(?) AND julianday(${column}) ${toInclusive ? '<=' : '<'} julianday(?)`;
+          AND julianday(${instant}) >= julianday(?) AND julianday(${instant}) ${toInclusive ? '<=' : '<'} julianday(?)`;
 }
 
 /**
