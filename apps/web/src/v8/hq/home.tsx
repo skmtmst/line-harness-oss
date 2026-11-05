@@ -58,6 +58,11 @@ import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { type StatusFilter, type View, UNFILED, ALL, STATUS_FILTERS, SORT_OPTIONS, PAGE_SIZES, isArchived, matchesStatus, statusOf, accountMeta } from "./home-gap-parts"
+function accountFriendCount(account: AccountWithStats) {
+  const count = account.stats?.friendCount
+  return typeof count !== 'number' || (isArchived(account) && count === 0) ? emptyValue('unknown') : formatNumber(count)
+}
+
 export default function HqHomeV8() {
   const saveErrors = useSaveFormErrors()
   // 左のメニューと同じ名前を見出しにする（バナー生成・課金プランなどと同じ書き方）。
@@ -672,7 +677,7 @@ export default function HqHomeV8() {
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>
-                    <dd>{typeof account.stats?.friendCount !== 'number' || (isArchived(account) && !account.stats.friendCount) ? emptyValue('unknown') : formatNumber(account.stats.friendCount)}</dd>
+                    <dd>{accountFriendCount(account)}</dd>
                   </div>
                   <div className={styles.stat}>
                     <dt>今月の配信</dt>
@@ -725,7 +730,7 @@ export default function HqHomeV8() {
                   return <StatusBadge tone={pay === 'live' ? 'success' : pay === 'test' ? 'warning' : 'neutral'}>{pay === 'live' ? 'つながっている' : pay === 'test' ? '試験モード' : 'つなぐ前'}</StatusBadge>
                 })()}</Td>
                 <Td>{attentionCounts?.[account.id] !== undefined ? `${formatNumber(attentionCounts[account.id])} 件` : emptyValue('unknown')}</Td>
-                <Td>{typeof account.stats?.friendCount === 'number' ? formatNumber(account.stats.friendCount) : emptyValue('unknown')}</Td>
+                <Td>{accountFriendCount(account)}</Td>
                 <Td>{typeof account.stats?.messagesThisMonth === 'number' ? formatNumber(account.stats.messagesThisMonth) : emptyValue('unknown')}</Td>
                 <Td>{tableMenu(account)}</Td>
               </Tr>

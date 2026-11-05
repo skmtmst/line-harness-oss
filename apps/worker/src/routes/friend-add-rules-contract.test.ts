@@ -162,6 +162,44 @@ describe('friend-add rule data contracts', () => {
 
   afterEach(() => testDb.raw.close());
 
+  it('友だち行がない履歴は一覧にも総数にも含めず、絞り込みとページ送りでも一致する', async () => {
+    seedRuleAndRun(testDb);
+    testDb.raw.pragma('foreign_keys = OFF');
+    testDb.raw.exec(`INSERT INTO friend_add_events
+      (id, line_account_id, friend_id, webhook_event_id, friend_kind, attribution_status, routing_status, occurred_at)
+      VALUES ('orphan', 'account-1', 'missing-friend', 'webhook-missing', 'first_time', 'captured', 'completed', '2026-09-07T11:00:00.000'),
+             ('run-2', 'account-1', 'friend-1', 'webhook-2', 'first_time', 'captured', 'completed', '2026-09-07T12:00:00.000')`);
+    testDb.raw.pragma('foreign_keys = ON');
+    const path = '/api/friend-add-runs?account_id=account-1&kind=first_time&limit=1';
+    const first = await app(testDb.db).request(path);
+    expect(first.status).toBe(200);
+    const firstBody = await first.json() as { data: { total: number; items: Array<{ id: string }>; nextCursor: string } };
+    expect(firstBody.data.total).toBe(2);
+    expect(firstBody.data.items.map(item => item.id)).toEqual(['run-2']);
+    expect(firstBody.data.nextCursor).toBeTruthy();
+    const second = await app(testDb.db).request(`${path}&cursor=${encodeURIComponent(firstBody.data.nextCursor)}`);
+    const secondBody = await second.json() as { data: { total: number; items: Array<{ id: string }>; nextCursor: string | null } };
+    expect(secondBody.data.total).toBe(2);
+    expect(secondBody.data.items.map(item => item.id)).toEqual(['run-1']);
+    expect(secondBody.data.nextCursor).toBeNull();
+  });
+
+  it('友だちが存在しないか所属が違う記録は、総数だけでなく上部集計と失敗内訳にも含めない', async () => {
+    seedRuleAndRun(testDb);
+    insertFriend(testDb.raw, 'other-friend', { line_account_id: 'account-2', display_name: '他店' });
+    testDb.raw.pragma('foreign_keys = OFF');
+    testDb.raw.exec(`INSERT INTO friend_add_events
+      (id, line_account_id, friend_id, webhook_event_id, friend_kind, attribution_status, routing_status, error_code, occurred_at, delivery_count)
+      VALUES ('orphan', 'account-1', 'missing', 'missing-webhook', 'first_time', 'captured', 'failed', 'invalid_reference', '2026-09-07T11:00:00.000', 7),
+             ('wrong-account', 'account-1', 'other-friend', 'other-webhook', 'first_time', 'captured', 'failed', 'invalid_reference', '2026-09-07T12:00:00.000', 9)`);
+    testDb.raw.pragma('foreign_keys = ON');
+    const response = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1&period=all');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ data: {
+      total: 1, items: [{ id: 'run-1' }], summary: { recentFriends: 1, recentEvents: 1, capturedFriends: 1, cumulativeDeliveries: 1, failed: 0, failureKinds: [] },
+    } });
+  });
+
   it('期間の絞り込みはJST境界・集計・ページ送りにも効く', async () => {
     seedRuleAndRun(testDb);
     testDb.raw.exec(`UPDATE friend_add_events SET occurred_at = '2026-09-07T00:00:00.000';

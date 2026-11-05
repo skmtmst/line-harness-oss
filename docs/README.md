@@ -414,6 +414,7 @@
 - [Lステップで確認できなかった箇所と、置いた想定](lstep-unverified-assumptions.md)
 - [musubo マニュアルサイトのCloudflare Pages初回設定](manual-site-pages-setup.md)
 - [D1 マイグレーション手順書](migration-runbook.md)
+- [テナント削除の保護と設計](tenant-purge-trigger-759-design.md)
 - [musubo サービスサイト（Xserver）](musubo-service-site.md)
 - [ランク削除時の会員別EC送信](nen-member-rank-sync.md)
 - [受信処理の再開と入力不足時の停止](operations/inbound-recovery.md)
@@ -462,6 +463,7 @@
 
 ## 反映履歴
 
+- [配信の取り消しとテナント削除の安全性](release-log/unreleased/2094-kenta-train-1102q.md)
 - [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)
 - [座席・卓管理のPenデザイン反映](release-log/unreleased/2074-masato-table-pen.md)
 - [Googleビジネスのパフォーマンス取得](release-log/unreleased/2026-11-04-masato-google-performance-sync.md)
@@ -1160,6 +1162,7 @@
 - [編集内容の保護と操作確認の改善](release-log/unreleased/2067-kenta-edit-confirmation.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [保存と操作確認の改善](release-log/unreleased/2068-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
 - [Googleビジネスの店舗選択](release-log/unreleased/2076-masato-google-store-selector.md) — 反映履歴、確認 2026-11-04。
+- [操作確認の改善](release-log/unreleased/2079-kenta-train-1102P.md) — 運用者向けの変更記録（確認日：2026-11-04）。
 
 - [営業時間のPen照合と操作確認](testing/google-hours-pen-qa.md) — 承認済み18画面と営業時間タブの検査。
 

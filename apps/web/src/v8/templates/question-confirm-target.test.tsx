@@ -53,3 +53,32 @@ it('取得した質問のアカウントが選択中と異なる場合は公開�
  fireEvent.click(button)
  expect(state.update).not.toHaveBeenCalled()
 })
+it('質問公開の窓を閉じた後は古い確定から公開しない', async () => {
+ render(<QuestionNewV8 />)
+ const dialog = within(await open())
+ const button = dialog.getByRole('button', { name:'公開する' })
+ const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
+ const held = (button as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ fireEvent.click(dialog.getByRole('button', { name:'キャンセル' }))
+ await act(async () => { await held({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
+ expect(state.update).not.toHaveBeenCalled()
+})
+it('質問公開には確認時の版を付ける', async () => {
+ state.update.mockResolvedValue({ success:true, data:{ publishedVersion:1, draftRevision:2 } })
+ render(<QuestionNewV8 />)
+ const dialog=within(await open())
+ await act(async () => { fireEvent.click(dialog.getByRole('button',{name:'公開する'})) })
+ expect(state.update).toHaveBeenCalledWith('question-1',expect.objectContaining({expectedVersion:1,expectedDraftRevision:1}))
+})
+it('質問の内容を変えて戻しても古い公開確認を使わない', async () => {
+ render(<QuestionNewV8 />)
+ const field=await screen.findByPlaceholderText('例：継続の意思をうかがう')
+ const dialog=within(await open())
+ const button=dialog.getByRole('button',{name:'公開する'})
+ const key=Object.keys(button).find(item=>item.startsWith('__reactProps$'))!
+ const held=(button as unknown as Record<string,{onClick:(e:unknown)=>unknown}>)[key].onClick
+ fireEvent.change(field,{target:{value:'別の質問'}})
+ fireEvent.change(field,{target:{value:'質問'}})
+ await act(async()=>{await held({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button})})
+ expect(state.update).not.toHaveBeenCalled()
+})

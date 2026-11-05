@@ -401,6 +401,13 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
     } finally { vi.unstubAllGlobals(); }
   });
 
+  test('管理画面から予約を編集すると確認専用の版が1進む', async () => {
+    insertBooking(sqlite, { id: 'B1', friend: 'f1' });
+    const { app, env } = makeApp(db);
+    expect((await patchBooking(app, env, 'B1', { lock_version: 0, customer_note: '変更' })).status).toBe(200);
+    expect(sqlite.prepare("SELECT confirmation_revision FROM bookings WHERE id='B1'").get()).toEqual({ confirmation_revision: 2 });
+  });
+
   test('lock_version 無しは400', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1' });
     const { app, env } = makeApp(db);

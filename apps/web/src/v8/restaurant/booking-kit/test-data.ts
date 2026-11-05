@@ -16,10 +16,10 @@ export const tables = [
 ]
 
 export const menuItems = [
-  { id: 'm1', store_id: 'store-1', kind: 'course', name: '秋の鹿肉コース', price: 8800, tax_mode: 'included', allergens_json: '["小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active' },
-  { id: 'm2', store_id: 'store-1', kind: 'a_la_carte', name: '鹿肉のロースト', price: 2400, tax_mode: 'included', allergens_json: '[]', service_periods_json: '["lunch","dinner"]', duration_minutes: null, status: 'active' },
-  { id: 'm3', store_id: 'store-1', kind: 'course', name: '夏の冷製コース', price: 6600, tax_mode: 'included', allergens_json: '["小麦"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'archived' },
-  { id: 'm4', store_id: 'store-1', kind: 'course', name: '春の下書きコース', price: 5000, tax_mode: 'included', allergens_json: '[]', service_periods_json: '["dinner"]', duration_minutes: 90, status: 'draft' },
+  { id: 'm1', confirmation_revision: 1, store_id: 'store-1', kind: 'course', name: '秋の鹿肉コース', price: 8800, tax_mode: 'included', allergens_json: '["小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active' },
+  { id: 'm2', confirmation_revision: 1, store_id: 'store-1', kind: 'a_la_carte', name: '鹿肉のロースト', price: 2400, tax_mode: 'included', allergens_json: '[]', service_periods_json: '["lunch","dinner"]', duration_minutes: null, status: 'active' },
+  { id: 'm3', confirmation_revision: 1, store_id: 'store-1', kind: 'course', name: '夏の冷製コース', price: 6600, tax_mode: 'included', allergens_json: '["小麦"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'archived' },
+  { id: 'm4', confirmation_revision: 1, store_id: 'store-1', kind: 'course', name: '春の下書きコース', price: 5000, tax_mode: 'included', allergens_json: '[]', service_periods_json: '["dinner"]', duration_minutes: 90, status: 'draft' },
 ]
 
 const at = (dayOffset: number, hour: number, minute = 0) => {

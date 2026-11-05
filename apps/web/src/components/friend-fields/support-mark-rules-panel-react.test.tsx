@@ -203,6 +203,25 @@ describe('保存と停止', () => {
     expect(net.create).toHaveBeenLastCalledWith('mk1', 'acc', expect.objectContaining({ name: '新しいきまり' }), expect.any(String))
   })
 
+  it('停止の窓に操作するアカウントと環境を表示する', async () => {
+    render(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
+    fireEvent.click(await screen.findByRole('button', { name: '停止する' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog.textContent).toContain('LINEアカウント')
+    expect(dialog.textContent).toContain('環境')
+    expect(dialog.textContent).toContain('対応中')
+  })
+
+  it('アカウントを変えて戻しても前の停止確認を復活させない', async () => {
+    const view = render(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
+    fireEvent.click(await screen.findByRole('button', { name: '停止する' }))
+    await screen.findByRole('alertdialog')
+    view.rerender(<SupportMarkRulesPanel accountId="acc-2" markId="mk1" markName="対応中" />)
+    view.rerender(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(net.archive).not.toHaveBeenCalled()
+  })
+
   it('停止の窓は履歴が残ると言い、確定で読んだ版つきの停止の口を呼ぶ', async () => {
     render(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
     fireEvent.click(await screen.findByRole('button', { name: '停止する' }))
