@@ -124,7 +124,8 @@ export default function ScenarioCreateV8() {
     const trimmed = name.trim()
     const nextFolder = nextFolderId || null
     if (!scenario || !trimmed) return Promise.resolve(false)
-    if (trimmed === scenario.name && nextFolder === (scenario.folderId ?? null)) {
+    const nameToSave = name === scenario.name ? scenario.name : trimmed
+    if (nameToSave === scenario.name && nextFolder === (scenario.folderId ?? null)) {
       return Promise.resolve(true)
     }
 
@@ -132,7 +133,7 @@ export default function ScenarioCreateV8() {
       setDetailsSaving(true)
       setError('')
       try {
-        const res = await api.scenarios.update(id, { name: trimmed, folderId: nextFolder })
+        const res = await api.scenarios.update(id, { name: nameToSave, folderId: nextFolder })
         if (!requireWrite()) return false
         if (!res.success) {
           setError('シナリオ情報を保存できませんでした。時間をおいてもう一度お試しください。')
@@ -301,7 +302,7 @@ export default function ScenarioCreateV8() {
       }
       // 名前と方式は同じ受け口で一度に保存する。
       const res = await api.scenarios.update(id, {
-        name: trimmed,
+        name: scenario && name === scenario.name ? scenario.name : trimmed,
         folderId: folderId || null,
         deliveryMode: mode,
       })
