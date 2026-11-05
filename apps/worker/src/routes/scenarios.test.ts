@@ -177,7 +177,7 @@ describe('シナリオ名の長さ', () => {
       body: JSON.stringify({ name, folderId: 'folder-1' }),
     });
     expect(response.status).toBe(200);
-    expect(dbMocks.updateScenario).toHaveBeenCalledWith(expect.anything(), 's-1', expect.objectContaining({ name: undefined, folder_id: 'folder-1' }), undefined);
+    expect(dbMocks.updateScenario).toHaveBeenCalledWith(expect.anything(), 's-1', expect.objectContaining({ name: undefined, folder_id: 'folder-1' }), { accountScope: undefined, expectedRevision: undefined, expectedSubscriptions: undefined });
   });
 });
 
