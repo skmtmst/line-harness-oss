@@ -234,7 +234,7 @@ it('画像を読み込み中に閉じても、選んだ画像を破棄する前�
   await act(async () => complete({ success: true, data: { url: 'https://example.com/a.png' } }))
 })
 
-it('同じ場所で画像を選び直したら、古い読み込みが終わっても新しい選択を守る', async () => {
+it('画像の同時選択で、後の選択を守る', async () => {
   let oldComplete!: (v: unknown) => void
   let newComplete!: (v: unknown) => void
   upload.mockImplementationOnce(() => new Promise(resolve => { oldComplete = resolve }))
