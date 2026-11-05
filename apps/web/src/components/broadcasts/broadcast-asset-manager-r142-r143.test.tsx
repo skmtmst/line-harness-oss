@@ -216,6 +216,7 @@ it('素材の名前を変更して閉じると、破棄する前に確認する'
   act(() => { setter.call(name, '変更した素材'); name.dispatchEvent(new Event('input', { bubbles: true })) })
   clickText('キャンセル')
   expect(document.body.textContent).toContain('保存していない変更があります')
+  expect(document.body.textContent).toContain('素材への変更')
   expect((container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement).value).toBe('変更した素材')
   const discard = [...document.body.querySelectorAll('button')].find(b => b.textContent === '保存せずに移る')!
   act(() => discard.click())
@@ -264,4 +265,41 @@ it('素材編集中に別画面へ移ると、入力を残して確認する', a
   expect(document.body.textContent).toContain('保存していない変更があります')
   expect(name.value).toBe('変更した素材')
   link.remove()
+})
+
+it.each(['種類', 'アカウント'] as const)('素材の未保存入力がある%s切替は確認してから進む', async target => {
+  const { requestUnsavedAction } = await import('@/lib/unsaved-action')
+  renderKind('card_message'); await flush(); clickText('編集')
+  const name = container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  act(() => { setter.call(name, '変更した素材'); name.dispatchEvent(new Event('input', { bubbles: true })) })
+  const changed = vi.fn(() => { if (target === 'アカウント') scope.account = 'acc-2'; root.render(<BroadcastAssetManager kind={target === '種類' ? 'coupon' : 'card_message'} />) })
+  act(() => requestUnsavedAction(changed))
+  expect(changed).not.toHaveBeenCalled()
+  expect(document.body.textContent).toContain('素材への変更')
+  const keep = [...document.body.querySelectorAll('button')].find(b => b.textContent === '編集を続ける')!
+  act(() => keep.click())
+  expect(name.value).toBe('変更した素材')
+  act(() => requestUnsavedAction(changed))
+  const discard = [...document.body.querySelectorAll('button')].find(b => b.textContent === '保存せずに移る')!
+  act(() => discard.click())
+  expect(changed).toHaveBeenCalledOnce()
+  await flush()
+  expect(container.querySelector('input[placeholder="カルーセルの管理名"]')).toBeNull()
+})
+it('素材の種類を変える親の操作も編集内容の確認を通す', async () => {
+  let protect: ((action: () => void) => void) | null = null
+  await act(async () => { root.render(<BroadcastAssetManager kind="card_message" onScopeGuardChange={value => { protect = value }} />) })
+  await flush(); clickText('編集')
+  const name = container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  act(() => { setter.call(name, '変更した素材'); name.dispatchEvent(new Event('input', { bubbles: true })) })
+  const switched = vi.fn()
+  expect(protect).not.toBeNull()
+  act(() => { protect!(switched) })
+  expect(switched).not.toHaveBeenCalled()
+  expect(document.body.textContent).toContain('素材への変更')
+  const discard = [...document.body.querySelectorAll('button')].find(b => b.textContent === '保存せずに移る')!
+  act(() => discard.click())
+  expect(switched).toHaveBeenCalledOnce()
 })

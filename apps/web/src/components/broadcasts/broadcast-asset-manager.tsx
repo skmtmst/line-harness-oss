@@ -62,9 +62,10 @@ export interface BroadcastAssetListLayout {
   deleteDialog: ReactNode
 }
 
-export default function BroadcastAssetManager({ kind, onChanged, renderLayout }: {
+export default function BroadcastAssetManager({ kind, onChanged, renderLayout, onScopeGuardChange }: {
   kind: BroadcastAssetKind
   onChanged?: () => void
+  onScopeGuardChange?: (guard: ((action: () => void) => void) | null) => void
   renderLayout?: (state: BroadcastAssetListLayout) => ReactNode
 }) {
   const saveErrors = useSaveFormErrors()
@@ -177,6 +178,7 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
     editorGeneration.current++; setPendingUploads(new Set()); setEditing(null); setShowForm(false); setName(''); setImageUrl(''); setImageFile(null); setDescription(''); setActionUrl(''); setCards(blankCards); setMoreCard(true); setError('')
   }, [])
   const guard = useUnsavedGuard({ dirty: showForm && (snapshot !== baseline.current || pendingUploads.size > 0), busy: saving, onDiscard: reset, subject: '素材への変更' })
+  useEffect(() => { onScopeGuardChange?.(guard.guarded); return () => onScopeGuardChange?.(null) }, [onScopeGuardChange, guard.guarded])
   /*
    * 種類・LINEアカウントが切り替わったら、編集中の対象を離す。
    * 離さないと、別種類の一覧の上で前の素材の編集欄が残り、保存が
@@ -302,7 +304,7 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
         <li>・戻せません: 同じ{meta.singular}が必要になったときは、作り直してください。</li>
       </ul>
     </ConfirmDialog>)
-  const leaveDialog = <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+  const leaveDialog = <UnsavedLeaveDialog subject="素材への変更" open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
   if (renderLayout) return <SaveErrorScope errors={saveErrors}>{renderLayout({
     items, loadState, reload: load, onEdit: startEdit,
     onDelete: item => { if (renderedGeneration !== scopeGeneration.current) return; setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId, generation: renderedGeneration }) },

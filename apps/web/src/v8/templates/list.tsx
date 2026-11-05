@@ -1001,12 +1001,18 @@ export default function TemplatesListV8() {
     <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} range={{ total: filteredTemplates.length, first: (safePage - 1) * pageSize + 1, last: Math.min(safePage * pageSize, filteredTemplates.length) }} />
   )
 
+  const assetScopeGuard = useRef<((action: () => void) => void) | null>(null)
+  const setAssetScopeGuard = useCallback((guard: ((action: () => void) => void) | null) => { assetScopeGuard.current = guard }, [])
   const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
-  const switchSection = (next: Section) => requestUnsavedAction(() => {
-    setUrlView({ tab: next, page: '1' })
-    if (next === 'message' || next === 'question' || next === 'rich_video') setFolderSection(next)
-    setSelectedIds(new Set())
-  })
+  const switchSection = (next: Section) => {
+    const change = () => requestUnsavedAction(() => {
+      setUrlView({ tab: next, page: '1' })
+      if (next === 'message' || next === 'question' || next === 'rich_video') setFolderSection(next)
+      setSelectedIds(new Set())
+    })
+    if (assetScopeGuard.current) assetScopeGuard.current(change)
+    else change()
+  }
 
   /* 種類のタブ（件数つき）。閲覧のみの帯（）はタブの上。 */
   const tabs = (
@@ -1042,7 +1048,7 @@ export default function TemplatesListV8() {
 
   if (!isTemplateSection && selectedAccountId) {
     return <>{detailGuard.dialog}<AssetTemplatesList key={`${selectedAccountId}:${activeSection}`} kind={activeSection}
-      accountId={selectedAccountId} tabs={tabs} canMutate={canMutateTemplates}
+      accountId={selectedAccountId} tabs={tabs} canMutate={canMutateTemplates} onScopeGuardChange={setAssetScopeGuard}
       lockedReason={lockedReason} onChanged={() => void loadAssetCounts()} /></>
   }
 
