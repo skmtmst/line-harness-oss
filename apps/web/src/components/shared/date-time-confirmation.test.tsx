@@ -30,7 +30,7 @@ it('Esc は選択を破棄する', () => {
   expect(screen.queryByRole('dialog')).toBeNull()
 })
 
-it('時刻を選び直した後でも日時を消して確定できる', () => {
+it('時刻を変更してから日時を消して確定できる', () => {
   render(<Example />)
   fireEvent.click(screen.getByRole('button', { name: '予定日時' }))
   const time = screen.getByRole('combobox', { name: '時刻' })
