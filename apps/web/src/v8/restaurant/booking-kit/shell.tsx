@@ -45,7 +45,7 @@ export interface RestaurantV8Context {
   selectedStoreId: string
   busy: boolean
   /** 書き込み操作の共通処理。成功したら取り直して帯を出す。 */
-  mutate: (action: () => Promise<unknown>, success: string, options?: { rethrow?: (error: unknown) => boolean; onCommitted?: () => boolean } | ((message: string) => void)) => Promise<boolean>
+  mutate: (action: () => Promise<unknown>, success: string, options?: { rethrow?: (error: unknown) => boolean; onCommitted?: () => boolean; onRefreshFailure?: () => void } | ((message: string) => void)) => Promise<boolean>
   reload: () => Promise<void>
 }
 
@@ -195,7 +195,7 @@ export default function RestaurantShell({ initialStoreId = '', boardId, title, d
   }, [selectedAccountId, query, begin, accept, initialStoreId])
   useEffect(() => { void load() }, [load])
 
-  const mutate = useCallback(async (action: () => Promise<unknown>, success: string, options?: { rethrow?: (error: unknown) => boolean; onCommitted?: () => boolean } | ((message: string) => void)) => {
+  const mutate = useCallback(async (action: () => Promise<unknown>, success: string, options?: { rethrow?: (error: unknown) => boolean; onCommitted?: () => boolean; onRefreshFailure?: () => void } | ((message: string) => void)) => {
     setBusy(true)
     try {
       await action()
@@ -207,7 +207,10 @@ export default function RestaurantShell({ initialStoreId = '', boardId, title, d
       if (refreshed) {
         if (typeof options !== 'function' && options?.onCommitted) setNotice(null)
         notifySaved(success)
-      } else setSavedButUnread(true)
+      } else {
+        setSavedButUnread(true)
+        if (typeof options !== 'function') options?.onRefreshFailure?.()
+      }
       return true
     } catch (error) {
       if (typeof options !== 'function' && options?.rethrow?.(error)) { setNotice(null); throw error }

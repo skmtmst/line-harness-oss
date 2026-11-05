@@ -15,7 +15,6 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import Notice from '@/components/shared/notice'
 import { RowActions } from '@/components/shared/row-actions'
 import TextLink from '@/components/shared/text-link'
-import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantTestApi,type ReservationQuery,type RestaurantClosure,type RestaurantReservation } from '@/lib/restaurant-test-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -218,21 +217,23 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     if (!canWrite || busy || attendanceWorking.current || !current() || detailReservation?.id !== id || !row) return
     attendanceWorking.current = true
     let failure: { error: unknown } | undefined
+    let savedButUnread = false
+    let stampNotice: string | null = null
     try {
       const ok = await mutate(async () => {
         try {
           if (!current()) throw new QuietError()
           const result = await restaurantTestApi.attendance(accountId, id, { action, expectedVersion: row.customer_version ?? 1, requestId: crypto.randomUUID() })
           if (!current()) throw new QuietError()
-          if (action === 'visited') notifyToast(result.data.stamp.status === 'recorded' ? `来店スタンプ ${result.data.stamp.count} 個を確認しました。` : 'スタンプは会計待ち・停止中・未連携の場合には増えません。')
+          if (action === 'visited') stampNotice = result.data.stamp.status === 'recorded' ? `来店スタンプ ${result.data.stamp.count} 個を確認しました。` : 'スタンプは会計待ち・停止中・未連携の場合には増えません。'
           return result
         } catch (error) {
           if (current() && !(error instanceof QuietError)) failure = { error }
           throw new QuietError()
         }
-      }, action === 'visited' ? '来店にしました。' : action === 'depart' ? '退店にしました。卓が空きました。' : action === 'no_show' ? '無断にしました。' : '来店・退店の記録を訂正しました。')
+      }, action === 'visited' ? '来店にしました。' : action === 'depart' ? '退店にしました。卓が空きました。' : action === 'no_show' ? '無断にしました。' : '来店・退店の記録を訂正しました。', { onRefreshFailure: () => { if (current()) savedButUnread = true } })
       if (!ok && current()) void reload()
-      return current() ? failure : undefined
+      return current() ? (savedButUnread ? { savedButUnread: true } : failure ?? (ok && stampNotice ? { stampNotice } : undefined)) : undefined
     } finally { attendanceWorking.current = false }
   }
 

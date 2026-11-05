@@ -498,3 +498,14 @@ it('来店の競合は詳細の中に示してから予約を読み直す', asyn
   await waitFor(() => expect(fixture.snapshot.mock.calls.length).toBeGreaterThan(beforeSnapshot))
   await waitFor(() => expect(fixture.reservationsDay.mock.calls.length).toBeGreaterThan(beforeDay))
 })
+
+it('来店が保存され再読込に失敗したら窓の中で知らせ、二重操作を防ぐ', async () => {
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fixture.snapshot.mockRejectedValue(new Error('offline'))
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  expect((await within(dialog).findByRole('alert')).textContent).toContain('保存しましたが、最新の予約を読み込めませんでした')
+  expect(fixture.attendance).toHaveBeenCalledTimes(1)
+  expect((within(dialog).getByRole('button', { name: '来店にする', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+})
