@@ -54,7 +54,7 @@ test('画面監査の既存測定だけを受け入れる', () => {
   assert.deepEqual(result, { routes: 789, knownFindings: 3, knownErrors: 1 })
 })
 
-test('画面監査の新しい指摘、取得失敗、画面不足を拒否する', () => {
+test('presentation audit rejects extra output and incomplete coverage', () => {
   const baseline = presentationRows()
   const extraFinding = structuredClone(baseline)
   extraFinding[0].findings.push({ ...finding })
