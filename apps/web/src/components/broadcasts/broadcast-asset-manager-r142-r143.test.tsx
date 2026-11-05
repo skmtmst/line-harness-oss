@@ -206,3 +206,33 @@ it('削除確認には素材のアカウントを示し、切替後の古い確�
   await act(async () => oldConfirm({ preventDefault() {}, stopPropagation() {} }))
   expect(remove).not.toHaveBeenCalled()
 })
+
+it('素材の名前を変更して閉じると、破棄する前に確認する', async () => {
+  renderKind('card_message')
+  await flush()
+  clickText('編集')
+  const name = container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  act(() => { setter.call(name, '変更した素材'); name.dispatchEvent(new Event('input', { bubbles: true })) })
+  clickText('キャンセル')
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  expect((container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement).value).toBe('変更した素材')
+  const discard = [...document.body.querySelectorAll('button')].find(b => b.textContent === '保存せずに移る')!
+  act(() => discard.click())
+  expect(container.querySelector('input[placeholder="カルーセルの管理名"]')).toBeNull()
+})
+
+it('素材編集中に別画面へ移ると、入力を残して確認する', async () => {
+  window.history.replaceState(null, '', '/templates')
+  renderKind('card_message')
+  await flush()
+  clickText('編集')
+  const name = container.querySelector('input[placeholder="カルーセルの管理名"]') as HTMLInputElement
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  act(() => { setter.call(name, '変更した素材'); name.dispatchEvent(new Event('input', { bubbles: true })) })
+  const link = document.createElement('a'); link.href = '/events'; document.body.appendChild(link)
+  act(() => link.click())
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  expect(name.value).toBe('変更した素材')
+  link.remove()
+})
