@@ -6,11 +6,11 @@ import scan from './edge-inset-browser.mjs'
 import { measurePage } from './layout-defects.mjs'
 
 // 板（幅 1000）・題は左 24。帯・カード・知らせを板の直下に置き、内側の余白の有無で判定を確かめる。
-const board = body => `<main><div data-page-template="list" style="width:1000px;margin:0;padding:0;background:#fff">
+const board = body => `<main style="font:16px/20px sans-serif"><div data-page-template="list" style="width:1000px;margin:0;padding:0;background:#fff">
   <header data-template-region="heading" style="padding:16px 24px;box-shadow:0 1px 0 #0001"><h1 data-page-title>タグ</h1></header>
   ${body}
 </div></main>`
-const band = style => `<div id="target" data-kpi-strip style="display:grid;grid-auto-flow:column;border-block:1px solid #0001;${style}"><div>未使用 63件</div><div>付けている友だち 5人</div></div>`
+const band = style => `<div id="target" data-kpi-strip style="min-height:40px;display:grid;grid-auto-flow:column;border-block:1px solid #0001;${style}"><div>未使用 63件</div><div>付けている友だち 5人</div></div>`
 const card = style => `<section id="target" style="border-radius:12px;box-shadow:0 0 0 1px #0001;height:80px;${style}">中身</section>`
 const notice = style => `<div id="target" role="status" style="background:#fff7ed;height:40px;${style}">お知らせ</div>`
 
