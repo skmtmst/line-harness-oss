@@ -213,6 +213,7 @@ it.each(['list', 'board'])('検索結果0は%sでも予約なしとせず、検�
   state.search = 'view=' + view
   render(<StyleDashboard style="salon" />)
   await screen.findByRole('searchbox')
+  await screen.findByText('予約者')
   // SearchField は入力後 300ms に絞り込む。実時間と CPU 負荷に依存させず、通知まで進める。
   vi.useFakeTimers()
   try {
