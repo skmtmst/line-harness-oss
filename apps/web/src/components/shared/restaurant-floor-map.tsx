@@ -53,15 +53,19 @@ export default function RestaurantFloorMap({floor,labels,onSelect,onChange,onFlo
  if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelect(t.id)}
  if(canEdit&&e.key.startsWith('Arrow')){e.preventDefault();move(t.id,false,t.x+(e.key==='ArrowLeft'?-10:e.key==='ArrowRight'?10:0),t.y+(e.key==='ArrowUp'?-10:e.key==='ArrowDown'?10:0))}
  }}>
- {penTableStyle&&selectedId===t.id?<rect className={styles.selection} x={-17} y={-18} width={t.width+34} height={t.height+42} rx={7}/>:null}
+ {penTableStyle&&selectedId===t.id?<rect className={styles.selection} x={-17} y={-18} width={t.width+34} height={t.height+32} rx={7}/>:null}
  {chairs.map((chair,index)=>{const horizontal=chair.side==='top'||chair.side==='bottom';const x=horizontal?chair.offset*t.width-10:chair.side==='left'?-10:t.width+4;const y=horizontal?chair.side==='top'?-10:t.height+4:chair.offset*t.height-10;return <rect key={index} className={styles.chair} x={x} y={y} width={horizontal?20:6} height={horizontal?6:20} rx="3"/>})}
  {t.shape==='circle'?<ellipse cx={t.width/2} cy={t.height/2} rx={t.width/2} ry={t.height/2}/>:<rect width={t.width} height={t.height} rx={penTableStyle?10:t.shape==='counter'?t.height/2:8}/>}
  <title>{r?.label??t.id}</title>
  {penTableStyle?<>
   {showCapacity?<text x={t.width/2} y={showMarks?t.height/2-8:t.height/2}>{r?`${t.minCapacity??1}〜${t.maxCapacity??r.capacity}名`:'—'}</text>:null}
-  {showMarks?<g transform={`translate(${t.width/2-19} ${t.height/2+2})`} className={styles.seatMarks}>
-   {t.smokingPolicy==='smoking'?<Cigarette x={0} y={0} width={16} height={16}/>:<CigaretteOff x={0} y={0} width={16} height={16} className={styles.prohibitedMark}/>}
-   {t.shoesAllowed===false?<Footprints x={23} y={0} width={16} height={16} className={styles.prohibitedMark}/>:<Footprints x={23} y={0} width={16} height={16}/>}
+  {showMarks?<g transform={`translate(${t.width/2-21.5} ${t.height/2+2})`} className={styles.seatMarks}>
+   <rect className={t.smokingPolicy==='smoking'?styles.seatMarkBox:styles.seatMarkBoxProhibited} x={0.5} y={0.5} width={19} height={19} rx={2}/>
+   {t.smokingPolicy==='smoking'?<Cigarette x={2.5} y={2.5} width={15} height={15} stroke="#9fa5aa"/>:<CigaretteOff x={2.5} y={2.5} width={15} height={15} stroke="#9fa5aa"/>}
+   {t.smokingPolicy!=='smoking'?<line className={styles.seatMarkSlash} x1={1} y1={19} x2={19} y2={1}/>:null}
+   <rect className={t.shoesAllowed===false?styles.seatMarkBoxProhibited:styles.seatMarkBox} x={23.5} y={0.5} width={19} height={19} rx={2}/>
+   <Footprints x={25.5} y={2.5} width={15} height={15} stroke="#9fa5aa"/>
+   {t.shoesAllowed===false?<line className={styles.seatMarkSlash} x1={24} y1={19} x2={42} y2={1}/>:null}
   </g>:null}
   {showCaption?<foreignObject x={0} y={t.height+15} width={t.width} height={18}><div className={`${styles.tableLabel} ${styles.tableCaption}`} title={r?.label??t.id}>{r?.label??t.id}</div></foreignObject>:null}
  </>:<><foreignObject x={0} y={t.height/2-12} width={t.width} height={18}><div className={styles.tableLabel} title={r?.label??t.id}>{r?.label??t.id}</div></foreignObject><text x={t.width/2} y={t.height/2+18}>{r?`${r.capacity}人卓${r.active===false?'・停止中':''}`:'—'}</text></>}
