@@ -87,6 +87,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     return content?.kind === 'question' && isEditableQuestion(content.question as unknown as ScenarioQuestion) ? { name: content.name, question: content.question as unknown as ScenarioQuestion } : null
   })
   const editVersion = useRef<{ expectedVersion: number; expectedDraftRevision: number } | null>(null)
+  const createdDraft = useRef<{ id: string; generation: number } | null>(null)
   const [name, setName] = useState(hostInitial?.name ?? '')
   const [category, setCategory] = useState('未分類')
   const [folderId, setFolderId] = useState<string | null>(null)
@@ -197,6 +198,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     if (fields.submit().length > 0) { setError(''); return false }
     setSaving(true)
     setError('')
+    const generation = scope.current.generation
+    const savedId = id ?? (createdDraft.current?.generation === generation ? createdDraft.current.id : null)
+    let saved = false
     const payload = {
       accountId: selectedAccountId,
       name: name.trim(),
@@ -208,16 +212,26 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       folderId,
     }
     try {
-      const result = id ? await api.templates.update(id, { ...payload, ...editVersion.current }) : await api.templates.create(payload)
+      const result = savedId ? await api.templates.update(savedId, { ...payload, ...editVersion.current }) : await api.templates.create(payload)
       if (!result.success) { setError(result.error || '保存できませんでした。時間をおいて、もう一度お試しください。'); return false }
+      if (!alive.current || generation !== scope.current.generation) return false
+      const templateId = result.data.id || savedId
+      if (!id && templateId) createdDraft.current = { id: templateId, generation }
       editVersion.current = { expectedVersion: result.data.publishedVersion, expectedDraftRevision: result.data.draftRevision }
+      saved = true
+      if (questionStatus === 'published') {
+        if (!templateId || !canMutateRef.current) { setError('下書きは保存しましたが、公開できませんでした。一覧で確認してください。'); return false }
+        const published = await api.templates.publish(templateId, editVersion.current)
+        if (!alive.current || generation !== scope.current.generation) return false
+        if (!published.success) { setError('下書きは保存しましたが、公開できませんでした。もう一度お試しください。'); return false }
+      }
       return true
     } catch (caught) {
       const extraError = tapExtraSaveError(caught)
       if (extraError) { fields.setServerErrors(Object.fromEntries(question.choices.map((_, ci) => [`extras-${ci}`, extraError]))); return false }
       if (!saveErrors.capture(caught, fields))
 
- setError(describeApiFailure(caught, '保存', { scope: 'store' }));
+ setError(saved && questionStatus === 'published' ? '下書きは保存しましたが、公開できませんでした。もう一度お試しください。' : describeApiFailure(caught, '保存', { scope: 'store' }));
 
       return false
     } finally {
