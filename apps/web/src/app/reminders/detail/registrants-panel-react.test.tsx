@@ -114,11 +114,6 @@ async function pickTargetDate(label: string, iso: string) {
     await Promise.resolve()
   })
   const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  await act(async () => {
-    picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
-    await Promise.resolve()
-    await Promise.resolve()
-  })
   for (let i = 0; i < 24; i += 1) {
     const grid = document.querySelector('[role="grid"]')
     if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
@@ -140,7 +135,6 @@ async function pickTargetDate(label: string, iso: string) {
     await Promise.resolve()
     await Promise.resolve()
   })
-  await act(async () => { Array.from(document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!.click() })
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
     const timeInput = reopened.querySelector('input') as HTMLInputElement
@@ -150,7 +144,7 @@ async function pickTargetDate(label: string, iso: string) {
     await Promise.resolve()
   })
   await act(async () => {
-    [...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!.click()
+    [...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '確定')!.click()
     await Promise.resolve()
     await Promise.resolve()
   })

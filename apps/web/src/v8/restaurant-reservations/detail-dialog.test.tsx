@@ -86,6 +86,34 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     fireEvent.click(within(panel).getByRole('button', { name: '来店にする' }))
     expect(attendance).toHaveBeenCalledWith('r1', 'visited')
   })
+  it('埋込の来店結果は操作の直前で知らせる', async () => {
+    const attendance = vi.fn().mockResolvedValue({ savedButUnread: true })
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    render(<ReservationDetailDialog inline reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
+      busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} onReload={() => {}} />)
+    const panel = await screen.findByRole('region', { name: '予約の詳細' })
+    fireEvent.click(within(panel).getByRole('button', { name: '来店にする' }))
+    const alert = await within(panel).findByRole('alert')
+    const footer = panel.querySelector('footer')!
+    expect(alert.textContent).toContain('保存しましたが、最新の予約を読み込めませんでした')
+    expect(alert.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alert.compareDocumentPosition(within(panel).getByText('来店')) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+  })
+  it('来店の保存後に再読込できなければ窓内に案内し、再操作を止める', async () => {
+    const attendance = vi.fn().mockResolvedValue({ savedButUnread: true })
+    const reload = vi.fn()
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    const props = { reservation: today[0], accountId: 'account-1', tables: data.tables, courses: data.menuItems, busy: false, canWrite: true, onClose: () => {}, onCancel: () => {}, onRestore: () => {}, onEdit: () => {}, onAttendance: attendance, onReload: reload }
+    const view = render(<ReservationDetailDialog {...props} />)
+    const dialog = screen.getByRole('dialog', { name: '鈴木 真理さん・4名' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '来店にする' }))
+    expect(await within(dialog).findByText('保存しましたが、最新の予約を読み込めませんでした。読み直してから続けてください。')).toBeTruthy()
+    expect((within(dialog).getByRole('button', { name: '来店にする' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(within(dialog).getByRole('button', { name: '読み直す' }))
+    expect(reload).toHaveBeenCalledOnce()
+    view.rerender(<ReservationDetailDialog {...props} reservation={{ ...today[0], customer_version: (today[0].customer_version ?? 1) + 1 }} />)
+    expect(within(dialog).queryByText('保存しましたが、最新の予約を読み込めませんでした。読み直してから続けてください。')).toBeNull()
+  })
   it('予約の箱で開き、日時と卓・コースと予約元・アレルギー・これまでの来店が出る', async () => {
     const dialog = await openDetail()
     const text = () => dialog.textContent ?? ''

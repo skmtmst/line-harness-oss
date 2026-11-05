@@ -320,11 +320,9 @@ describe('mauOC コースの編集ページ', () => {
     const ymd = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-10`
     fireEvent.click(screen.getByLabelText('新しい価格の開始日時'))
     const picker = screen.getByRole('dialog', { name: '日時を選ぶ' })
-    fireEvent.click(within(picker).getByRole('button', { name: '日付' }))
     fireEvent.click(screen.getByRole('button', { name: '次の月' }))
     fireEvent.click(screen.getAllByRole('button').find((b) => (b.getAttribute('aria-label') ?? '').startsWith(`${next.getFullYear()}年${next.getMonth() + 1}月10日`))!)
     fireEvent.click(screen.getByRole('button',{name:'確定'}))
-    fireEvent.click(within(screen.getByRole('dialog', { name: '日時を選ぶ' })).getByRole('button', { name: '閉じる' }))
     fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
     expect(fixture.updateMenu).not.toHaveBeenCalled()
     expect(screen.getByText('価格変更を確定しますか？')).toBeTruthy()

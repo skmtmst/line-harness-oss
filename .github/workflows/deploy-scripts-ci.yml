@@ -35,6 +35,11 @@ jobs:
           node-version: '22.23.4'
           cache: pnpm
 
+      - name: Install ripgrep for repository audit tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ripgrep
+
       - run: pnpm install --frozen-lockfile
 
       # scriptsの運用経路検査はDB経由でsharedのdistを読む。

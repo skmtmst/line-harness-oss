@@ -45,6 +45,7 @@ import { ApiError } from '@/lib/api'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { at, reservation, snapshotOf, tables } from '../booking-kit/test-data'
 
 /* 今日：佐藤（LINE・T1）・山田（食べログ・承認待ち・T3・乳）・押さえ（T4）。 */
@@ -76,7 +77,7 @@ beforeEach(() => {
   fixture.customerSearch.mockResolvedValue({ data: [] })
   fixture.customerHistory.mockResolvedValue({ data: { visitCount: 0, visits: [] } })
 })
-afterEach(() => { cleanup(); verifiedStaffRole(null); forgetSessionSnapshot(); vi.useRealTimers(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); clearToastsForTest(); verifiedStaffRole(null); forgetSessionSnapshot(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
   it('今日のこれからの予約を現在進行中と誤表示しない', async () => {
@@ -550,7 +551,7 @@ it('別の予約へ切り替えた後に古い来店操作を受け付けない'
   expect(mutationEntry.called).not.toHaveBeenCalled()
 })
 
-it('詳細を閉じた後に古い来店の成功が届いても成功通知しない', async () => {
+it('詳細を閉じただけなら来店の成功とスタンプを通知する', async () => {
   let finish!: (result: unknown) => void
   fixture.attendance.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
   render(<ReservationsPage />)
@@ -561,5 +562,78 @@ it('詳細を閉じた後に古い来店の成功が届いても成功通知し�
   act(() => detailAttendance.close!())
   notifications.mockClear()
   await act(async () => { finish({ success: true, data: { stamp: { status: 'recorded', count: 3 } } }) })
-  expect(notifications).not.toHaveBeenCalled()
+  expect(notifications).toHaveBeenCalledWith(expect.stringContaining('来店スタンプ 3 個を確認しました。'), undefined)
+})
+
+it('来店が保存され再読込に失敗したら窓の中で知らせ、二重操作を防ぐ', async () => {
+  fixture.attendance.mockResolvedValueOnce({ success: true, data: { stamp: { status: 'recorded', count: 2 } } })
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fixture.snapshot.mockRejectedValue(new Error('offline'))
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  expect((await within(dialog).findByRole('alert')).textContent).toContain('保存しましたが、最新の予約を読み込めませんでした')
+  expect(await within(dialog).findByText(/来店スタンプ 2 個を確認しました。/)).toBeTruthy()
+  expect(fixture.attendance).toHaveBeenCalledTimes(1)
+  expect((within(dialog).getByRole('button', { name: '来店にする', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+})
+
+it('来店処理中に詳細を閉じても、完了とスタンプを通知する', async () => {
+  let finish!: (value: unknown) => void
+  fixture.attendance.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(<><ReservationsPage /><ToastHost /></>)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  await act(async () => { finish({ success: true, data: { stamp: { status: 'recorded', count: 2 } } }) })
+  expect(await screen.findByText(/来店スタンプ 2 個を確認しました。/)).toBeTruthy()
+})
+
+it('来店処理中に一覧の詳細を閉じた後の競合はトーストで知らせる', async () => {
+  let fail!: (error: Error) => void
+  fixture.attendance.mockReturnValueOnce(new Promise((_, reject) => { fail = reject }))
+  render(<><ReservationsPage /><ToastHost /></>)
+  fireEvent.click(await screen.findByRole('button', { name: '一覧', exact: true }))
+  fireEvent.click(await screen.findByRole('button', { name: '来店にする', exact: true }))
+  fireEvent.click(screen.getByRole('button', { name: '予約の詳細を閉じる' }))
+  await act(async () => { fail(new ApiError(409, '最新の予約を確認してください。', 'version_conflict')) })
+  await waitFor(() => expect(within(screen.getByRole('status', { name: '知らせ' })).getByText('ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。')).toBeTruthy())
+})
+
+it('処理中に別の予約を開いて閉じた後は、前の予約の完了を通知しない', async () => {
+  let finish!: (value: unknown) => void
+  fixture.attendance.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(<><ReservationsPage /><ToastHost /></>)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  let dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  fireEvent.click(await screen.findByRole('button', { name: /^山田 太郎 4名/ }))
+  dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  await act(async () => { finish({ success: true, data: { stamp: { status: 'recorded', count: 2 } } }) })
+  expect(screen.queryByText(/来店スタンプ 2 個を確認しました。/)).toBeNull()
+})
+
+it('来店の保存と読み直しが終わった後、結果を窓の中で示す', async () => {
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  expect(await within(dialog).findByText(/来店にしました。/)).toBeTruthy()
+  expect(fixture.snapshot.mock.calls.length).toBeGreaterThan(1)
+})
+
+it('来店の処理が終わるまで窓の中に処理中を示す', async () => {
+  let finish!: (value: unknown) => void
+  fixture.attendance.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  expect(await within(dialog).findByText('予約を反映しています。完了するまでお待ちください。')).toBeTruthy()
+  expect(within(dialog).queryByText(/来店にしました。/)).toBeNull()
+  await act(async () => { finish({ data: { stamp: { status: 'recorded', count: 2 } } }) })
+  expect(await within(dialog).findByText(/来店スタンプ 2 個を確認しました。/)).toBeTruthy()
 })

@@ -68,6 +68,7 @@ permissions:
 
 concurrency:
   group: cloudflare-staging
+  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -277,6 +278,10 @@ jobs:
             exit 1
           fi
 
+      - name: Reject staging rollback after acquiring the shared lock
+        if: env.DELIVERY_MODE == 'apply'
+        run: node scripts/deploy/verify-staging-forward.mjs
+
       - name: Bind the staging Cloudflare account
         run: |
           worker_root="${{ steps.worker_source.outputs.root }}"
@@ -322,6 +327,10 @@ jobs:
             --var "BUILD_GIT_COMMIT:${{ steps.build_metadata.outputs.worker_sha }}" \
             --var "BUILD_VERSION:${{ steps.build_metadata.outputs.worker_version }}" \
             --var "BUILD_RELEASED_AT:${{ steps.build_metadata.outputs.released_at }}"
+
+      - name: Recheck forward revisions before Worker publish
+        if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'admin'
+        run: node scripts/deploy/verify-staging-forward.mjs
 
       - name: Deploy Worker to staging
         id: worker_deploy
@@ -412,6 +421,10 @@ jobs:
           NEXT_PUBLIC_PRIVACY_URL: 'https://musubo.jp/privacy/'
           NEXT_PUBLIC_COMMERCE_LAW_URL: 'https://musubo.jp/legal/'
           NEXT_PUBLIC_CONTACT_URL: 'https://musubo.jp/contact/'
+
+      - name: Recheck forward revisions before Admin publish
+        if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'worker'
+        run: node scripts/deploy/verify-staging-forward.mjs
 
       - name: Deploy Admin Panel to staging
         if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'worker'
