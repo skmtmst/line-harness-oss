@@ -184,6 +184,22 @@ describe('friend-add rule data contracts', () => {
     expect(secondBody.data.nextCursor).toBeNull();
   });
 
+  it('友だちが存在しないか所属が違う記録は、総数だけでなく上部集計と失敗内訳にも含めない', async () => {
+    seedRuleAndRun(testDb);
+    insertFriend(testDb.raw, 'other-friend', { line_account_id: 'account-2', display_name: '他店' });
+    testDb.raw.pragma('foreign_keys = OFF');
+    testDb.raw.exec(`INSERT INTO friend_add_events
+      (id, line_account_id, friend_id, webhook_event_id, friend_kind, attribution_status, routing_status, error_code, occurred_at, delivery_count)
+      VALUES ('orphan', 'account-1', 'missing', 'missing-webhook', 'first_time', 'captured', 'failed', 'invalid_reference', '2026-09-07T11:00:00.000', 7),
+             ('wrong-account', 'account-1', 'other-friend', 'other-webhook', 'first_time', 'captured', 'failed', 'invalid_reference', '2026-09-07T12:00:00.000', 9)`);
+    testDb.raw.pragma('foreign_keys = ON');
+    const response = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1&period=all');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ data: {
+      total: 1, items: [{ id: 'run-1' }], summary: { recentFriends: 1, recentEvents: 1, capturedFriends: 1, cumulativeDeliveries: 1, failed: 0, failureKinds: [] },
+    } });
+  });
+
   it('期間の絞り込みはJST境界・集計・ページ送りにも効く', async () => {
     seedRuleAndRun(testDb);
     testDb.raw.exec(`UPDATE friend_add_events SET occurred_at = '2026-09-07T00:00:00.000';
