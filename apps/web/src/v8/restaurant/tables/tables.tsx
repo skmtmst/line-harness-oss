@@ -322,7 +322,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
                   <p className={styles.detailName} title={`${item.code} · ${item.label}`}>{`${item.code} · ${item.label}`}</p>
                   <p className={styles.detailSub}>{`${seatTypeLabel(item.seat_detail_type??item.seat_type)} / ${item.min_capacity}〜${item.max_capacity}名 / ${item.smoking_policy==='smoking'?'喫煙':item.smoking_policy==='heated_tobacco'?'加熱式のみ':'禁煙'} / ${item.shoes_allowed===0?'土足不可':'土足可'}`}</p>
                 </div>
-                <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} /></span>
+                <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} label={item.is_active ? '受付中' : '停止中'} /></span>
                 <TableRowActions table={item} canEdit={canEdit} busy={busy} pendingAccount={!snapshotAccountCurrent} onEdit={openEdit} onDuplicate={table=>{setSelectedId(table.id);setDuplicateRequest(n=>n+1)}} onResume={resume}
                   onDelete={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteError(''); setDeleteId(table.id) }}
                   onStop={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket }); setStopError(''); stopProgressRef.current = false; setStopProgress(''); setMoveMode('move'); setStopId(table.id) }} />

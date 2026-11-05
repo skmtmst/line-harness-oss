@@ -113,6 +113,8 @@ describe('BERxg 座席・卓管理', () => {
     expect(icons).toHaveLength(4)
     for (const icon of icons) expect(icon.classList.contains('lucide-inbox')).toBe(true)
     for (const label of ['卓数', '受付中の卓', '受付中の定員', '個室', '卓一覧']) expect(board.textContent).toContain(label)
+    expect(screen.getByRole('button', { name: '卓の表示' }).textContent).toContain('すべて')
+    expect(board.textContent).toContain('受付中')
     expect(screen.queryByText('結合のルール')).toBeNull()
     expect(screen.getByText('T3 · 窓側4人卓')).not.toBeNull()
   })

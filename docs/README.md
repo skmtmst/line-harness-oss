@@ -1167,3 +1167,4 @@
 - [検証用 Google 投稿先の切替](release-log/unreleased/2086-masato-test2-google-post-test.md) — 反映履歴、確認 2026-11-04。
 - [Instagram投稿先IDの保存修正](release-log/unreleased/2088-masato-instagram-id-precision.md) — 反映履歴、確認 2026-11-04。
 - [TEST2投稿テスト後の検証設定復旧](release-log/unreleased/2089-masato-restore-google-test-gate.md) — 反映履歴、確認 2026-11-04。
+- [座席・卓管理を最新Penデザインにそろえる](release-log/unreleased/2091-masato-table-pen-design.md) — 卓の作成・複製、座席図と一覧の反映履歴。
