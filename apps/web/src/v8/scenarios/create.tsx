@@ -507,13 +507,13 @@ export default function ScenarioCreateV8() {
         <CardHeader size="stacked" title="シナリオ情報" />
         <SettingsFormRow layout="name-folder">
           <div ref={nameWrapRef}>
-            <Field label="シナリオ名" required count={{ value: name.length, max: 80 }} error={nameError} errorId="scenario-name-error">
+            <Field label="シナリオ名" required count={{ value: name.length, max: 60 }} error={nameError} errorId="scenario-name-error">
             <SaveErrorField names={["name"]}><TextField
               value={name}
               disabled={fieldsDisabled}
               onChange={(e) => { if (!canSaveNow()) return; setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
-              maxLength={80}
+              maxLength={60}
               placeholder="例：友だち追加ウェルカム"
               invalid={Boolean(nameError)}
               aria-label="シナリオ名"
