@@ -22,6 +22,7 @@ export type GridTableDesign = {
   headHeight?: string
   fontSize: string
   lineHeight?: string
+  headFontWeight?: string
   headFontSize?: string
   headLineHeight?: string
   color?: string

@@ -620,6 +620,23 @@ describe('営業時間ツールの店舗別下書きと変更確認', () => {
     const stale = await call('/api/restaurant-test/google/hours/workspace', { method: 'PUT', body: { expectedVersion: 0, data: workspace.data } });
     expect(stale.status).toBe(409);
   });
+  it.each(['pending_confirm','accepted','applied','missing'])('履歴の送信済みは実際の変更記録に従う（%s）', async status => {
+    const workspace = await draft();
+    workspace.data.draft.days = [{ date:'2026-12-14',closed:true,periods:[] }];
+    await call('/api/restaurant-test/google/hours/workspace', {method:'PUT',body:{expectedVersion:0,data:workspace.data,summary:'Googleへ営業時間の変更を送信'}});
+    const first = await (await call('/api/restaurant-test/google/hours/workspace')).json() as typeof workspace;
+    expect(first.history[0]).toMatchObject({googleState:'draft',description:'12月14日を休業'});
+    const reviewed = await (await call('/api/restaurant-test/google/hours/review',{body:{expectedVersion:1}})).json() as {changes:Array<{id:string}>};
+    const ids = reviewed.changes.map(change=>change.id);
+    workspace.data.draft.reviewIds=ids;
+    await call('/api/restaurant-test/google/hours/workspace',{method:'PUT',body:{expectedVersion:1,data:workspace.data}});
+    if(status==='missing') testDb.raw.prepare('DELETE FROM rt_google_changes WHERE id = ?').run(ids[0]);
+    else testDb.raw.prepare('UPDATE rt_google_changes SET status = ? WHERE id = ?').run(status,ids[0]);
+    workspace.data.draft = (await import('@line-crm/shared')).emptyHoursWorkspace().draft;
+    const cleared=await (await call('/api/restaurant-test/google/hours/workspace',{method:'PUT',body:{expectedVersion:2,data:workspace.data,summary:'Googleへ営業時間の変更を送信'}})).json() as typeof workspace;
+    expect(cleared.history[0].googleState).toBe(['accepted','applied'].includes(status)?'sent':'draft');
+    expect(patchCalls()).toHaveLength(0);
+  });
   it('曜日を休みに変えると、曜日優先の祝日と同じ営業日のサービスにも適用する', async () => {
     location.moreHours = [{ hoursTypeId: 'TAKEOUT', periods: [p('MONDAY', 17, 22), p('FRIDAY', 17, 22)] }];
     const workspace = await draft();

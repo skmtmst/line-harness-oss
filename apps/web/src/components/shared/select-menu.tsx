@@ -76,6 +76,7 @@ export function SelectValueText({ head, value, filterState }: { head: string; va
 }
 
 export interface SelectMenuProps {
+  textSize?: 'body'
   align?: 'start' | 'end'
   open: boolean
   getAnchor: () => HTMLElement | null
@@ -107,6 +108,7 @@ export interface SelectMenuProps {
 }
 
 export function SelectMenu({
+  textSize,
   align = 'start',
   open,
   getAnchor,
@@ -138,7 +140,7 @@ export function SelectMenu({
           ref={innerRef}
           id={listboxId}
           className={styles.panel}
-          data-select-menu=""
+          data-select-menu="" data-text-size={textSize}
           data-select-menu-panel=""
           // 入力欄の焦点を板の空き・ボタンを押しても動かさない（押した拍子に閉じない）。
           onMouseDown={(event: MouseEvent) => {
@@ -150,7 +152,7 @@ export function SelectMenu({
         </div>
       ) : (
       /* 欄に焦点を残したまま押せるよう、押す前に焦点を移さない。 */
-      <div ref={innerRef} className={styles.inner} onMouseDown={(event: MouseEvent) => event.preventDefault()} data-select-menu="">
+      <div ref={innerRef} className={styles.inner} onMouseDown={(event: MouseEvent) => event.preventDefault()} data-select-menu="" data-text-size={textSize}>
         {heading ? (
           <div className={styles.heading} aria-hidden="true">
             {heading}

@@ -19,7 +19,7 @@ import { usePermissionLockTip } from './permission-lock-tip'
  * 自動で付ける。呼ぶ側が直接渡した値はそのまま残し、足し合わせる。
  */
 
-type ControlOwnProps = ContentChangeAccess & { invalid?: boolean; className?: string; /** 計算値だけに使う読み取り専用の欄。 */ derived?: boolean }
+type ControlOwnProps = ContentChangeAccess & { invalid?: boolean; className?: string; /** 計算値だけに使う読み取り専用の欄。 */ derived?: boolean; textSize?: 'body' }
 
 /** 読む・選択する操作は残し、値の変更だけを描画時と現在の両方で拒む。 */
 function useTextControlAccess<T extends HTMLInputElement | HTMLTextAreaElement>(policy: ContentChangeAccess, ref: ForwardedRef<T>, describedBy?: string) {
@@ -64,7 +64,7 @@ function useControlA11y(props: {
 export const TextField = forwardRef<
   HTMLInputElement,
   ControlOwnProps & Omit<InputHTMLAttributes<HTMLInputElement>, 'className'>
->(function TextField({ derived, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, lockedReason, canChangeNow, ...rest }, ref) {
+>(function TextField({ textSize, derived, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, lockedReason, canChangeNow, ...rest }, ref) {
   const a11y = useControlA11y({ id, invalid, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired })
   const access = useTextControlAccess<HTMLInputElement>({ disabled: rest.disabled, lockedReason, canChangeNow }, ref, a11y['aria-describedby'])
   return (
@@ -72,6 +72,7 @@ export const TextField = forwardRef<
       ref={access.ref}
       type="text"
       data-design-node="Ume2U"
+      data-text-size={textSize}
       data-input-field
       {...rest}
       disabled={lockedReason ? false : rest.disabled || access.disabled}
@@ -118,14 +119,14 @@ export const AffixedTextField = forwardRef<
  */
 export const TextArea = forwardRef<
   HTMLTextAreaElement,
-  ControlOwnProps & { compact?: boolean; density?: 'regular' | 'compact'; height?: 'post' | 'reply'; size?: 'short' | 'single-row' } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'className'>
->(function TextArea({ derived, compact, density, height, size, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, lockedReason, canChangeNow, ...rest }, ref) {
+  ControlOwnProps & { action?: ReactNode; compact?: boolean; density?: 'regular' | 'compact'; height?: 'post' | 'reply'; size?: 'short' | 'single-row' } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'className'>
+>(function TextArea({ textSize, action, derived, compact, density, height, size, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, lockedReason, canChangeNow, ...rest }, ref) {
   const a11y = useControlA11y({ id, invalid, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired })
   const access = useTextControlAccess<HTMLTextAreaElement>({ disabled: rest.disabled, lockedReason, canChangeNow }, ref, a11y['aria-describedby'])
-  return (
-    <><textarea
+  const control = <textarea
       ref={access.ref}
       data-design-node="i5BW8b"
+      data-text-size={textSize}
       data-input-field
       data-density={density}
       data-height={height}
@@ -146,9 +147,9 @@ export const TextArea = forwardRef<
       aria-describedby={access.lock.handlers?.['aria-describedby'] ?? a11y['aria-describedby']}
       aria-invalid={a11y['aria-invalid']}
       aria-required={a11y['aria-required']}
-      className={[styles.field, styles.multi, compact && styles.multiCompact, size === 'short' && styles.multiShort, size === 'single-row' && styles.multiSingleRow, a11y.invalid && styles.invalid, className].filter(Boolean).join(' ')}
-    />{access.lock.node}</>
-  )
+      className={[styles.field, styles.multi, action && styles.composedControl, compact && styles.multiCompact, size === 'short' && styles.multiShort, size === 'single-row' && styles.multiSingleRow, a11y.invalid && styles.invalid, className].filter(Boolean).join(' ')}
+    />
+  return <>{action ? <div className={styles.composedArea} data-input-field>{control}<div className={styles.areaAction}>{action}</div></div> : control}{access.lock.node}</>
 })
 
 /** 札や補助ボタンを含む入力の外枠。文字欄の線は、この箱の1本にまとめる。 */

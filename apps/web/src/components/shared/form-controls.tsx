@@ -98,7 +98,7 @@ export function Field({
   optionalAppearance?: 'parentheses'
   /** 探す欄など自身に読み上げ名がある欄では、視覚上のラベル行を省く。 */
   labelHidden?: boolean
-  labelSize?: 'standard' | 'compact'
+  labelSize?: 'standard' | 'compact' | 'section'
   note?: ReactNode
   error?: ReactNode
   /** 既存の欄が使っている理由のIDを保つ。省略すると部品が作る。 */

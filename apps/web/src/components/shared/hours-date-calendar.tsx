@@ -25,7 +25,7 @@ export default function HoursDateCalendar({ month, onMonth, selected, onSelect, 
     <CalendarPeriod period={month}><div ref={ref} role="grid" aria-label={`${year}年${m}月`} className={styles.grid} data-detailed={Boolean(describe) || undefined}>
       <div role="row" className={styles.weekdays}>{['月','火','水','木','金','土','日'].map((d,i)=><span role="columnheader" data-weekend={i === 5 ? 'sat' : i === 6 ? 'sun' : undefined} key={d}>{d}</span>)}</div>
       {Array.from({length:count/7},(_,week)=><div role="row" className={styles.week} key={week}>{Array.from({length:7},(_,i)=>{const date=hoursDateAdd(start,week*7+i),outside=date.slice(0,7)!==month;return <div role="gridcell" aria-selected={selected.includes(date)} key={date} className={styles.cell} data-outside={outside || undefined}>
-        <button type="button" data-part="calendar-day" data-date={date} className={styles.day} aria-label={date} aria-pressed={selected.includes(date)} disabled={disabled || date<min || date>max} onClick={()=>onSelect(date)} onKeyDown={e=>key(e,date)}>{Number(date.slice(-2))}</button>{describe&&!outside?<span className={styles.detail}>{describe(date)}</span>:null}
+        <button type="button" data-part="calendar-day" data-date={date} className={styles.day} aria-label={date} aria-pressed={selected.includes(date)} disabled={disabled || date<min || date>max} onClick={()=>onSelect(date)} onKeyDown={e=>key(e,date)}>{outside?`${Number(date.slice(5,7))}/${Number(date.slice(-2))}`:Number(date.slice(-2))}</button>{describe&&!outside?<span className={styles.detail}>{describe(date)}</span>:null}
       </div>})}</div>)}
     </div></CalendarPeriod>
   </div>

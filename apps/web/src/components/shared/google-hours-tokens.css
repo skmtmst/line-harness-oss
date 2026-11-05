@@ -7,6 +7,10 @@
   --hours-confirm-footer-height: 70px;
   --hours-confirm-columns: minmax(100px,160px) minmax(0,1fr) 16px minmax(150px,200px);
   --hours-card-title-size: 16px;
+  --hours-service-title-size: 15px;
+  --hours-editor-body-size: 14px;
+  --hours-date-chip-padding: 5px 10px;
+  --hours-date-chip-background: #e8f5ed;
   --hours-aside-width: 350px;
   --hours-today-size: 20px;
   --hours-weekday-width: 76px;
@@ -19,5 +23,11 @@
   --hours-history-date-width: 60px;
   --hours-history-label-min: 100px;
   --hours-review-date-min: 80px;
+  --hours-proposal-background: #e8f5ed;
+  --hours-preview-background: #f5f6f8;
+  --hours-button-border: #dde0e5;
+  --hours-button-shadow: 0 2px 3px #00000012;
+  --hours-textarea-border: #d6dae1;
+  --hours-textarea-background: #fafafb;
   --hours-editor-backdrop: #1018283d;
 }

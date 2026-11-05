@@ -301,3 +301,6 @@
 :root .now { padding-block: 2px 1px; }
 
 html:root .field.field[data-appearance='business-hours'] { height: var(--space-40,40px); min-height: var(--space-40,40px); max-height: var(--space-40,40px); }
+
+html:root .field[data-appearance='business-hours'] { font-size:14px; font-weight:500; }
+html:root .field[data-appearance='business-hours'] .input { font-size:14px; font-weight:500; }
