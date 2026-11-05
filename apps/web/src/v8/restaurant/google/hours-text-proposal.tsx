@@ -29,7 +29,7 @@ export function HoursTextProposal({ change, data, workspace, holidays, onEditDat
    {caption ? <p className={styles.proposalDate}>{caption}</p> : null}
    <strong className={styles.proposalSummary}>{summary}</strong>
    {next ? <p className={styles.proposalNote}>{Number(next.slice(5,7))}月{Number(next.slice(8))}日{returnsToWeekly?'から毎週の営業時間に戻ります。':'以降の営業予定は変更しません。'}</p> : null}
-   {dates.length ? <div><Button variant="text" size="compact" onMouseDown={event=>event.preventDefault()} onClick={()=>onEditDates(dates)}>日付や時間を直す</Button></div> : null}
+   {dates.length ? <div><Button presentation="hours" variant="text" size="compact" onMouseDown={event=>event.preventDefault()} onClick={()=>onEditDates(dates)}>日付や時間を直す</Button></div> : null}
   </Card>
   <Notice tone="info" appearance="subtle">読み取った日付を確認してください。Googleにはまだ反映されません。</Notice>
  </section>

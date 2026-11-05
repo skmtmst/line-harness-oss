@@ -225,3 +225,5 @@ html:root .root .item[data-empty],
 html:root .root .item[data-empty] .count { color: var(--color-ink-faint); }
 
 html:root .root[data-equal-width][data-segmented-fit='content'] { grid-auto-columns: minmax(max-content, 1fr); flex-shrink: 0; }
+
+html:root .root[data-size='hours'] .item { font-size:13px; font-weight:600; }

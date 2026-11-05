@@ -19,7 +19,7 @@ import { usePermissionLockTip } from './permission-lock-tip'
  * 自動で付ける。呼ぶ側が直接渡した値はそのまま残し、足し合わせる。
  */
 
-type ControlOwnProps = ContentChangeAccess & { invalid?: boolean; className?: string; /** 計算値だけに使う読み取り専用の欄。 */ derived?: boolean }
+type ControlOwnProps = ContentChangeAccess & { invalid?: boolean; className?: string; /** 計算値だけに使う読み取り専用の欄。 */ derived?: boolean; textSize?: 'body' }
 
 /** 読む・選択する操作は残し、値の変更だけを描画時と現在の両方で拒む。 */
 function useTextControlAccess<T extends HTMLInputElement | HTMLTextAreaElement>(policy: ContentChangeAccess, ref: ForwardedRef<T>, describedBy?: string) {
@@ -64,7 +64,7 @@ function useControlA11y(props: {
 export const TextField = forwardRef<
   HTMLInputElement,
   ControlOwnProps & Omit<InputHTMLAttributes<HTMLInputElement>, 'className'>
->(function TextField({ derived, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, lockedReason, canChangeNow, ...rest }, ref) {
+>(function TextField({ textSize, derived, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, lockedReason, canChangeNow, ...rest }, ref) {
   const a11y = useControlA11y({ id, invalid, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired })
   const access = useTextControlAccess<HTMLInputElement>({ disabled: rest.disabled, lockedReason, canChangeNow }, ref, a11y['aria-describedby'])
   return (
@@ -72,6 +72,7 @@ export const TextField = forwardRef<
       ref={access.ref}
       type="text"
       data-design-node="Ume2U"
+      data-text-size={textSize}
       data-input-field
       {...rest}
       disabled={lockedReason ? false : rest.disabled || access.disabled}
@@ -119,12 +120,13 @@ export const AffixedTextField = forwardRef<
 export const TextArea = forwardRef<
   HTMLTextAreaElement,
   ControlOwnProps & { action?: ReactNode; compact?: boolean; density?: 'regular' | 'compact'; height?: 'post' | 'reply'; size?: 'short' | 'single-row' } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'className'>
->(function TextArea({ action, derived, compact, density, height, size, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, lockedReason, canChangeNow, ...rest }, ref) {
+>(function TextArea({ textSize, action, derived, compact, density, height, size, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, lockedReason, canChangeNow, ...rest }, ref) {
   const a11y = useControlA11y({ id, invalid, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired })
   const access = useTextControlAccess<HTMLTextAreaElement>({ disabled: rest.disabled, lockedReason, canChangeNow }, ref, a11y['aria-describedby'])
   const control = <textarea
       ref={access.ref}
       data-design-node="i5BW8b"
+      data-text-size={textSize}
       data-input-field
       data-density={density}
       data-height={height}

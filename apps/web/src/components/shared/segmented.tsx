@@ -51,7 +51,7 @@ export default function SegmentedControl<T extends string>({
    * 'panel' は脇のパネル内（★BG-B `SLgY5` つくる枚数：器 余白3・r8・
    * 横いっぱい・項目 5/12・文 12/17・選択中 700・つまみ r6）。v8 だけで効く。
    */
-  size?: 'medium' | 'small' | 'compact' | 'panel' | 'timing' | 'sticker' | 'booking'
+  size?: 'hours' | 'medium' | 'small' | 'compact' | 'panel' | 'timing' | 'sticker' | 'booking'
   /** 操作を止める（生成中など）。項目すべてを押せなくする。 */
   disabled?: boolean
   /**

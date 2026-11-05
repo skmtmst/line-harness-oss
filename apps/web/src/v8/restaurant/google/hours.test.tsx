@@ -33,6 +33,12 @@ describe('営業時間ツールの操作',()=>{
  it('日付の選択を全部解除すると、その編集で追加した下書きも取り除く',async()=>{
   await open();const dialog=await dates();await pick(dialog,'2026-11-14');fireEvent.click(within(dialog).getByRole('button',{name:'2026-11-14',exact:true}));await waitFor(()=>expect(stored.draft.days).toEqual([]));expect(within(dialog).getByRole('button',{name:'変更内容を確認'})).toHaveProperty('disabled',true)
  })
+ it('選択した複数の日付をまとめて解除すると、確認へ進めなくなる',async()=>{
+  await open();const dialog=await dates();await pick(dialog,'2026-11-14');await pick(dialog,'2026-11-18');expect(within(dialog).getByText('選択中 2日')).toBeTruthy();fireEvent.click(within(dialog).getByRole('button',{name:'すべて解除'}));await waitFor(()=>expect(stored.draft.days).toEqual([]));expect(within(dialog).getByRole('button',{name:'変更内容を確認'})).toHaveProperty('disabled',true)
+ })
+ it('メモは追加操作で開き、指定した日の下書きに保存する',async()=>{
+  await open();const dialog=await dates();await pick(dialog,'2026-11-14');expect(within(dialog).queryByRole('textbox',{name:'メモ'})).toBeNull();fireEvent.click(within(dialog).getByRole('button',{name:'メモを追加'}));fireEvent.change(within(dialog).getByRole('textbox',{name:'メモ'}),{target:{value:'振替営業'}});await waitFor(()=>expect(stored.notes['2026-11-14']).toBe('振替営業'));expect(mocks.sendChange).not.toHaveBeenCalled()
+ })
  it('読み取り前の文章を閉じるときは確認し、編集を続ければ入力を保つ',async()=>{
   await open();fireEvent.click(screen.getByRole('button',{name:'文章で入力'}));const panel=await screen.findByRole('dialog',{name:'文章で入力'});const field=within(panel).getByRole('textbox');fireEvent.change(field,{target:{value:'来週の月曜は休業'}});fireEvent.click(within(panel).getAllByRole('button',{name:'閉じる',exact:true}).at(-1)!);const check=await screen.findByRole('dialog',{name:'入力を破棄しますか？'});fireEvent.click(within(check).getByRole('button',{name:'編集を続ける'}));expect((field as HTMLTextAreaElement).value).toBe('来週の月曜は休業');expect(screen.getByRole('dialog',{name:'文章で入力'})).toBeTruthy()
  })
@@ -50,8 +56,8 @@ describe('営業時間ツールの操作',()=>{
   await open();const dialog=await dates();await pick(dialog,'2026-11-14');await waitFor(()=>expect(within(dialog).getByRole('button',{name:'変更内容を確認'})).toHaveProperty('disabled',false))
   fireEvent.click(within(dialog).getByRole('button',{name:'変更内容を確認'}));await screen.findByRole('heading',{name:'選択した2日の営業時間'});expect(mocks.sendChange).not.toHaveBeenCalled()
   mocks.sendChange.mockRejectedValueOnce(new Error('connection failed'));mocks.change.mockResolvedValue({change:{id:'change-a',kind:'special_hours',status:'pending_confirm',target:{dates:['2026-11-14']},before:[],after:[{date:'2026-11-14',closed:true,periods:[]}],reservationImpactCount:0}})
-  fireEvent.click(screen.getByRole('button',{name:'Googleに反映する'}));await screen.findByText(/Googleに送信できませんでした/);expect(stored.draft.reviewIds).toEqual(['change-a'])
-  fireEvent.click(screen.getByRole('button',{name:'Googleに反映する'}));await screen.findByText('Googleに営業時間の変更を送信しました');expect(mocks.sendChange).toHaveBeenLastCalledWith('a','change-a')
+  fireEvent.click(screen.getByRole('button',{name:'Googleに反映する'}));await screen.findByText(/Googleに送信できませんでした/);expect(screen.getByRole('heading',{name:'営業時間',exact:true})).toBeTruthy();expect(stored.draft.reviewIds).toEqual(['change-a'])
+  fireEvent.click(screen.getByRole('button',{name:'確認して再送する'}));await screen.findByRole('heading',{name:'選択した1日の営業時間'});fireEvent.click(screen.getByRole('button',{name:'Googleに反映する'}));await screen.findByText('Googleに営業時間の変更を送信しました');expect(mocks.sendChange).toHaveBeenLastCalledWith('a','change-a')
  })
  it('保存が競合したときに入力を上書きせず、送信も起動しない',async()=>{
   mocks.saveHoursWorkspace.mockRejectedValue(new Error('conflict'));await open();const dialog=await dates();fireEvent.click(within(dialog).getByRole('button',{name:'2026-11-14',exact:true}));await screen.findByText(/下書きを保存できませんでした/);expect(mocks.sendChange).not.toHaveBeenCalled();expect(within(dialog).getByRole('button',{name:'2026-11-14',exact:true}).getAttribute('aria-pressed')).toBe('true')

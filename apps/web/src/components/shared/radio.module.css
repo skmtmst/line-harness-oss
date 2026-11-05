@@ -30,3 +30,5 @@ html:root .root[data-row-height='comfortable']{min-height:var(--control-touch-h,
 html:root .root[data-size='body'] .label { font-size:14px; font-weight:500; }
 html:root .root[data-size='body']:has(.input:checked) .label { font-weight:600; }
 html:root .root[data-size='body'] { --choice-size:18px; gap:10px; }
+/* 44pxの行自体が当たりを持つ。拡張用の透明な面で丸を覆わない。 */
+html:root .root[data-size='body']::before { pointer-events:none; }

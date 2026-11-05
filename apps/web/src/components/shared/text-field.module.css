@@ -170,3 +170,5 @@ html:root .field:is(.single, .multi)[data-permission-locked]:not(.affixedControl
 html:root .composedArea .field.multi.composedControl { flex:1; min-height:0; width:100%; padding:0; border:0; outline:0; box-shadow:none; background:transparent; font-size:14px; line-height:1.55; }
 .composedArea:focus-within { outline:var(--focus-ring); outline-offset:var(--focus-ring-offset); }
 .areaAction { display:flex; justify-content:flex-end; }
+
+html:root .field[data-text-size='body'] { font-size:14px; font-weight:500; }
