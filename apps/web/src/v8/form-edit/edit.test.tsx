@@ -73,7 +73,7 @@ import { EMPTY_REFS } from '@/components/forms/form-refs'
 import type { FormEditHost, FormHostContent } from './host'
 import { readCreatedFormDraft } from '@/lib/form-draft-session'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
-import { ApiError,api } from '@/lib/api'
+import { ApiError,api,fetchApi } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -128,6 +128,28 @@ afterEach(() => {
 })
 
 describe('回答フォームの編集（V8）', () => {
+  it('フォーム用に予約候補を取得できたら予約管理の権限不足をエラーにしない', async () => {
+    const fetchMock = vi.mocked(fetchApi)
+    fetchMock.mockImplementation(async (path) => (String(path).includes('/routing/groups')
+      ? { success: true, data: { groups: [{ id: 'g1', name: '相談担当' }], menus: [{ id: 'bm-1', name: '相談', durationMinutes: 30 }], staff: [] } }
+      : { success: true, data: [{ id: 'tag-1', name: 'アンケート回答' }] }) as never)
+    menuStaff.mockRejectedValueOnce(new ApiError(403, 'forbidden'))
+    await render('id=form-1&page=2')
+    expect(await screen.findByRole('switch', { name: '答えで予約の行き先を分ける' })).toBeTruthy()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/routing/groups')))
+    await waitFor(() => expect(screen.queryByText('予約の担当を読み込めませんでした')).toBeNull())
+    fetchMock.mockImplementation(async () => ({ success: true, data: [{ id: 'tag-1', name: 'アンケート回答' }] }) as never)
+    menuStaff.mockReset().mockResolvedValue({ staff: [] })
+  })
+
+  it('他機能の候補を読む権限がなくてもフォームを表示する', async () => {
+    const blocked = vi.spyOn(api.scenarios, 'list').mockRejectedValueOnce(new ApiError(403, 'forbidden'))
+    await render('id=form-1')
+    expect(await screen.findByLabelText('フォーム名')).toBeTruthy()
+    expect(formsGet).toHaveBeenCalled()
+    blocked.mockRestore()
+  })
+
   it('中身から名前を変え、タブを替えても同じ値を保存して読み直せる', async () => {
     await render('id=form-1')
     const input = screen.getByLabelText('フォーム名') as HTMLInputElement

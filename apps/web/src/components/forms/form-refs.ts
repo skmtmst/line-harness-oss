@@ -18,6 +18,8 @@ export interface FormRefs {
   bookingMenus?: { id: string; name: string; durationMinutes: number }[]
   /** メニューごとの担当選び。読んでいないメニューは不在＝まだ読んでいない */
   bookingMenuStaff?: Record<string, { id: string; name: string }[]>
+  /** 振り分けの担当の組。null は権限不足または取得失敗。 */
+  bookingRoutingGroups?: { id: string; name: string }[] | null
 }
 
 export const EMPTY_REFS: FormRefs = {

@@ -50,6 +50,7 @@ import styles from './edit.module.css';
 import { useCreatedDraft } from './use-created-draft'
 import { readFormDraftCreation, rememberFormDraftCreation } from '@/lib/form-draft-session'
 import { routingError, routingOf, withRouting, type FormRouting } from './routing-model';
+import { formRoutingApi } from '@/lib/api/helpers/gap2';
 import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TextLink from '@/components/shared/text-link';
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -108,6 +109,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* 保存を押したか。押したあとだけ、欄の赤とタブの赤い印を出す。 */
   const [attempted, setAttempted] = useState(false)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
+  const [routingGroups, setRoutingGroups] = useState<{ accountId: string; groups: NonNullable<FormRefs['bookingRoutingGroups']>; menus: NonNullable<FormRefs['bookingMenus']>; staff: NonNullable<FormRefs['bookingMenuStaff']> } | null>(null)
   const [loading, setLoading] = useState(!host)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -284,6 +286,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     if (id && locallyCreatedId.current === id) return
     void (async () => {
       try {
+        // フォームの読み込みを、他機能の候補に対する権限とは独立させる。
+        if (!(draftToken && !id)) {
+          const ok = await loadForm()
+          if (!ok && id && selectedAccountId) setFormLoadFailed('missing')
+        }
         // 参照一覧は選んでいる公式アカウントに絞る（別アカウントのタグ等を混ぜない）。
         const tagPath = selectedAccountId ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}` : '/api/tags'
         const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
@@ -320,9 +327,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           const initial: Snapshot = { name: '', description: '', isActive: false, onSubmitTagId: '', ogTitle: '', ogDescription: '', ogImageUrl: '', layout }
           savedSnapshot.current = JSON.stringify(initial)
           setFormLoaded(true)
-        } else {
-          const ok = await loadForm()
-          if (!ok && id && selectedAccountId) setFormLoadFailed('missing')
         }
       } catch (caught) {
         const fieldFailure = saveErrors.capture(caught);
@@ -342,14 +346,31 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reloadKey, selectedAccountId, saveErrors])
 
+  useEffect(() => {
+    if (hostRef.current || !selectedAccountId || !id) return
+    let current = true
+    setRoutingGroups(null)
+    void formRoutingApi.formGroups(selectedAccountId, id).then(result => {
+      if (current) {
+        const staff: NonNullable<FormRefs['bookingMenuStaff']> = Object.fromEntries(result.data.menus.map(({ id }) => [id, []]))
+        for (const member of result.data.staff) (staff[member.menuId] ??= []).push({ id: member.id, name: member.name })
+        setRoutingGroups({ accountId: selectedAccountId, groups: result.data.groups, menus: result.data.menus, staff })
+        setBookingStaffError(false)
+      }
+    }).catch(() => { if (current) setRoutingGroups(null) })
+    return () => { current = false }
+  }, [selectedAccountId, id])
+
   // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
   useEffect(() => {
-    if (hostRef.current || !selectedAccountId || bookingStaffError) return
+    if (hostRef.current || !selectedAccountId || bookingStaffError || routingGroups?.accountId === selectedAccountId) return
     const menuIds = new Set<string>()
-    for (const section of layout.sections) {
-      for (const b of section.blocks) {
-        if (b.kind === 'input' && b.type === 'booking' && b.booking?.menuId) menuIds.add(b.booking.menuId)
-      }
+    for (const b of [...layout.header, ...layout.sections.flatMap((section) => section.blocks)]) {
+      if (b.kind !== 'input' || b.type !== 'booking' || !b.booking) continue
+      if (b.booking.menuId) menuIds.add(b.booking.menuId)
+      const routing = b.booking.routing
+      if (routing?.fallback.menuId) menuIds.add(routing.fallback.menuId)
+      for (const rule of routing?.rules ?? []) if (rule.target.menuId) menuIds.add(rule.target.menuId)
     }
     const missing = [...menuIds].filter((menuId) => refs.bookingMenuStaff?.[menuId] === undefined)
     if (missing.length === 0) return
@@ -369,7 +390,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId, layout, refs.bookingMenuStaff,bookingStaffError])
+  }, [selectedAccountId, layout, refs.bookingMenuStaff, bookingStaffError, routingGroups])
 
   /* ---------------- ページとブロック ---------------- */
 
@@ -1003,7 +1024,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             layout={layout}
             page={page}
             blocks={blocks}
-            refs={refs}
+            refs={{ ...refs, ...(routingGroups?.accountId === selectedAccountId ? { bookingRoutingGroups: routingGroups.groups, bookingMenus: routingGroups.menus, bookingMenuStaff: routingGroups.staff } : { bookingRoutingGroups: null }) }}
             selectedBlockId={selectedBlockId}
             inputCount={inputCount}
             accountId={host ? null : selectedAccountId}
@@ -1021,6 +1042,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onDuplicateBlock={duplicateBlock}
             onRemoveBlock={removeBlock}
             routing={routingOf(layout)}
+            previewScope={`${selectedAccountId ?? ''}:${id ?? ''}`}
+            onPreviewRouting={id && selectedAccountId ? async (answers) => (await formRoutingApi.preview(selectedAccountId, id, answers, undefined, layout)).data : undefined}
             onChangeRouting={host ? undefined : patchRouting}
           />
         ) : editTab === 'after' ? (

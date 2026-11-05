@@ -72,6 +72,8 @@ type Props = {
   /** 答えで予約の行き先を分ける（B6）。決まりは回答フォームの版に含める。 */
   routing?: FormRouting
   onChangeRouting?: (next: FormRouting) => void
+  onPreviewRouting?: (answers: Record<string, unknown>) => Promise<{ matchedIndex: number; fellBack: boolean; target: FormRouting['fallback']; usable: boolean }>
+  previewScope?: string
 }
 
 export function ContentTab(props: Props) {
@@ -127,7 +129,7 @@ export function ContentTab(props: Props) {
         </div>
       </Card>
 
-      {props.onChangeRouting ? <RoutingSection blocks={layout.sections.flatMap((s) => s.blocks)} refs={props.refs} routing={props.routing} readOnly={props.readOnly} onChange={props.onChangeRouting} /> : null}
+      {props.onChangeRouting ? <RoutingSection blocks={[...layout.header, ...layout.sections.flatMap((s) => s.blocks)]} refs={props.refs} routing={props.routing} readOnly={props.readOnly} onChange={props.onChangeRouting} onPreview={props.onPreviewRouting} previewScope={props.previewScope} /> : null}
 
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>

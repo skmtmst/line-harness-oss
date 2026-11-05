@@ -16,13 +16,13 @@ export const emptyRouting = (): FormRouting => ({ enabled: false, rules: [], fal
 
 /** 条件に使える質問（予約ブロックより前・同じフォームの選ぶ質問）。 */
 export function routingQuestions(blocks: FormBlock[]): FormInputBlock[] {
-  return blocks.filter((b): b is FormInputBlock => b.kind === 'input' && isChoiceType(b.type) && (b.choices?.length ?? 0) > 0)
+  return blocks.filter((b): b is FormInputBlock => b.kind === 'input' && (b.type === 'rating' || (isChoiceType(b.type) && (b.choices?.length ?? 0) > 0)))
 }
 export const hasBookingBlock = (blocks: FormBlock[]) => blocks.some((b) => b.kind === 'input' && b.type === 'booking')
-export const choiceModeLabel = (type: string) => (type === 'radio' ? '1 つ選ぶ' : type === 'checkbox' ? 'いくつでも選ぶ' : 'プルダウン')
+export const choiceModeLabel = (type: string) => (type === 'radio' ? '1 つ選ぶ' : type === 'checkbox' ? 'いくつでも選ぶ' : type === 'rating' ? '5 段階' : 'プルダウン')
 
-export function newRule(questionId: string, answer: string): RoutingRule {
-  return { conditions: [{ questionId, op: 'is', value: answer }], target: emptyTarget() }
+export function newRule(questionId: string, answer: string | [number, number]): RoutingRule {
+  return { conditions: [typeof answer === 'string' ? { questionId, op: 'is', value: answer } : { questionId, op: 'between', value: answer }], target: emptyTarget() }
 }
 const answerOf = (rule: RoutingRule) => String(rule.conditions[0]?.value ?? '')
 export const ruleAnswer = answerOf
