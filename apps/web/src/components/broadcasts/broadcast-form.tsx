@@ -1349,7 +1349,7 @@ export default function BroadcastForm({
       </p>
     ) : null}
     <CreateColumns>
-      <StepContent step={currentStep ? currentStepIndex : null} className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
+      <StepContent step={currentStep ? currentStepIndex : null} slide={false} className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
             <section className="rounded-card border content-card bg-canvas p-5">
