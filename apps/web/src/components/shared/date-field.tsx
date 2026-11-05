@@ -191,7 +191,7 @@ export default function DateField({
   const calendar = (
         <div
           id={dialogId}
-          role={inline ? undefined : "dialog"}
+          role={inline ? 'group' : 'dialog'}
           aria-label="日付を選ぶ"
           className={[styles.popover, inline ? styles.inlineCalendar : undefined].filter(Boolean).join(' ')}
           // 最上層では absolute 指定を無効にする（位置は器が決める）。

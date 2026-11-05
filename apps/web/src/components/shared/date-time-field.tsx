@@ -103,7 +103,8 @@ export default function DateTimeField({
   const draftParsed = parseDateTime(draft)
   const datePart = draftParsed ? draft.slice(0, 10) : ''
   const shownTime = timeDraft ?? (draftParsed ? { hours: draftParsed.hours, minutes: draftParsed.minutes } : null)
-  const confirmReason = current !== openedValue.current ? 'ほかで日時が変わりました。開き直してください。'
+  const comparable = (dateTime: string) => dateTime.replace(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}):00$/, '$1')
+  const confirmReason = comparable(current) !== comparable(openedValue.current) ? 'ほかで日時が変わりました。開き直してください。'
     : !datePart && (timeDraft || !clearable) ? '日付を選んでください。' : undefined
 
   const emit = (next: string) => {
@@ -275,7 +276,7 @@ export default function DateTimeField({
           <div className={styles.footer}>
             {clearable ? <button type="button" className={styles.clearBtn} onClick={() => { setDraft(''); setTimeDraft(null) }}>消す</button> : null}
             <button type="button" className={styles.closeBtn} onClick={close}>キャンセル</button>
-            <Button type="button" size="compact" variant="primary" disabled={Boolean(confirmReason)} disabledReason={confirmReason} onClick={() => { if (confirmReason) return; emit(draft); close() }}>確定</Button>
+            <Button type="button" size="compact" variant="primary" disabled={Boolean(confirmReason)} disabledReason={confirmReason} onClick={() => { if (confirmReason) return; if (comparable(draft) !== comparable(current)) emit(draft); close() }}>確定</Button>
           </div>
         </div>
         </MenuPortal>

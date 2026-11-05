@@ -38,6 +38,22 @@ function TimeHarness({ initial = '10:00' }: { initial?: string }) {
 }
 
 describe('日時の選択（V8）', () => {
+  it('親が秒0を整えても同じ日時なら確定でき、変更なしでは通知しない', () => {
+    const onChange = vi.fn()
+    const view = render(<DateTimeField value="2026-10-01T10:00:00" onChange={onChange} aria-label="送る日時" />)
+    fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
+    view.rerender(<DateTimeField value="2026-10-01T10:00" onChange={onChange} aria-label="送る日時" />)
+    const confirm = screen.getByRole('button', { name: '確定' }) as HTMLButtonElement
+    expect(confirm.disabled).toBe(false)
+    fireEvent.click(confirm)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('日時の窓の中の日付選択には名前付きのグループがある', () => {
+    render(<DateTimeHarness />)
+    fireEvent.click(screen.getByRole('button', { name: '送る日時' }))
+    expect(screen.getByRole('group', { name: '日付を選ぶ' })).toBeTruthy()
+  })
   it('表示は「2026年10月1日（木）10:00」、値は YYYY-MM-DDTHH:mm のまま', () => {
     render(<DateTimeHarness />)
     expect(screen.getByRole('button', { name: '送る日時' }).textContent).toContain('2026年10月1日（木）10:00')
