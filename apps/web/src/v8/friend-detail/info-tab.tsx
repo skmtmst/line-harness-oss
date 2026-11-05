@@ -1,6 +1,7 @@
 'use client'
 import TextLink from '@/components/shared/text-link'
 import FilterLink from '@/components/shared/filter-link'
+import HelpTip from '@/components/shared/help-tip'
 import Link from '@/components/shared/list-navigation'
 import { ArrowUpRight, Lock } from 'lucide-react'
 import { BASIC_FRIEND_FIELDS, ageFromBirthday, type FriendField } from '@line-crm/shared'
@@ -186,10 +187,10 @@ export default function InfoTab({ friendId, group, data, perms }: {
         <>
           {groups.map(groupKey => {
           const groupFields = ordered.filter(field => groupOf(field) === groupKey)
-          const allPersonal = groupFields.every(field => field.isPersonal)
+          const hasPersonal = groupFields.some(field => field.isPersonal)
           return <section key={groupKey} className={styles.infoGroup} aria-label={groupAria(groupKey)}>
           <div className={styles.infoGroupHead}>
-            <h3 className={styles.infoGroupTitle}>{groupName(groupKey)}<span className={styles.infoGroupNote}>{groupNote(groupKey)}</span>{allPersonal ? <span className={styles.faint}>個人情報</span> : null}</h3>
+            <h3 className={styles.infoGroupTitle}>{groupName(groupKey)}<HelpTip label={`${groupName(groupKey)}の説明`}>{groupNote(groupKey)}</HelpTip>{hasPersonal ? <span className={styles.faint}>個人情報を含む</span> : null}</h3>
             {groupKey === manageGroup ? <Link className={styles.manageLink} href="/tags?tab=fields">情報欄を管理<ArrowUpRight size={16} aria-hidden="true" /></Link> : null}
           </div>
           <div className={styles.fieldGrid}>
@@ -205,7 +206,6 @@ export default function InfoTab({ friendId, group, data, perms }: {
                   <label htmlFor={id} id={`${id}-label`} className={styles.fieldLabel} title={`${label}（${FIELD_TYPE_LABELS[field.type] ?? field.type}）`}>
                     {field.isStarred ? <span aria-label="★つき">★</span> : null}
                     <span className={styles.fieldLabelText}>{label}</span>
-                    {field.isPersonal && !allPersonal ? <span className={styles.faint}>個人情報</span> : null}
                     {/* 値の出どころ（手で入れた・回答フォーム…）は題の横に1行で（vX3wQ）。全文は title。 */}
                     {fixed?.label ? <span className={styles.fieldSource} title={fixed.source ?? undefined}>{fixed.label}</span> : null}
                   </label>

@@ -13,10 +13,14 @@ test('飲食の項目を分類で選べ、個人情報は分類ごとにまと�
  const view=render(<InfoTab {...props} group="all"/>);
  const dining=screen.getByRole('link',{name:'飲食 2'}); expect(dining.getAttribute('href')).toContain('group=__dining__');
  const basics=screen.getByRole('region',{name:'基本'});
- expect(within(basics).getByText('名前や連絡先などの基本情報')).toBeTruthy();
- expect(within(basics).getAllByText('個人情報')).toHaveLength(1);
+ expect(within(basics).queryByText('名前や連絡先などの基本情報')).toBeNull();
+ fireEvent.click(within(basics).getByRole('button',{name:'基本（決まった欄）の説明'}));
+ expect(screen.getByText('名前や連絡先などの基本情報')).toBeTruthy();
+ expect(within(basics).getAllByText('個人情報を含む')).toHaveLength(1);
  const diningSection=screen.getByRole('region',{name:'飲食の情報'});
- expect(within(diningSection).getByText('個人情報').closest('label')?.textContent).toContain('記念日');
+ expect(within(diningSection).getAllByText('個人情報を含む')).toHaveLength(1);
+ expect(within(diningSection).queryByText('個人情報')).toBeNull();
+ expect(screen.getByRole('link',{name:'すべて 5'})).toBeTruthy();
  view.rerender(<InfoTab {...props} group="__dining__"/>);
  expect(screen.getByRole('region',{name:'飲食の情報'})).toBeTruthy();
  expect(screen.queryByRole('region',{name:'基本'})).toBeNull();
