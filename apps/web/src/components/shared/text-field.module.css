@@ -166,9 +166,9 @@ html:root .field[data-permission-locked]:not(.affixedControl),
 html:root .field:is(.single, .multi)[data-permission-locked]:not(.affixedControl):not([data-look='derived']):not(:global([data-input-field] *)) { background: var(--color-canvas-sunken); }
 
 /* 補助操作を入力の右下に収める複数行欄。 */
-.composedArea { display:flex; flex-direction:column; gap:12px; height:140px; padding:16px; border:1px solid #d6dae1; border-radius:10px; background:#fafafb; min-width:0; }
-html:root .composedArea .field.multi.composedControl { flex:1; min-height:0; width:100%; padding:0; border:0; outline:0; box-shadow:none; background:transparent; font-size:14px; line-height:1.55; }
-.composedArea:focus-within { outline:var(--focus-ring); outline-offset:var(--focus-ring-offset); }
+.composedArea { display:flex; flex-direction:column; gap:12px; height:140px; padding:16px; border:1px solid var(--hours-textarea-border); border-radius:10px; background:var(--hours-textarea-background); min-width:0; }
+html:root .composedArea .field.multi.composedControl { flex:1; min-height:0; width:100%; padding:0; border:0; outline:1px solid transparent; box-shadow:none; background:transparent; font-size:14px; line-height:1.55; }
+.composedArea:focus-within { outline:2px solid var(--color-focus-ring); outline-offset:var(--focus-ring-offset); }
 .areaAction { display:flex; justify-content:flex-end; }
 
 html:root .field[data-text-size='body'] { font-size:14px; font-weight:500; }

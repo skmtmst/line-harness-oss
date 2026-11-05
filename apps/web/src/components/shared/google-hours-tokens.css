@@ -23,5 +23,11 @@
   --hours-history-date-width: 60px;
   --hours-history-label-min: 100px;
   --hours-review-date-min: 80px;
+  --hours-proposal-background: #e8f5ed;
+  --hours-preview-background: #f5f6f8;
+  --hours-button-border: #dde0e5;
+  --hours-button-shadow: 0 2px 3px #00000012;
+  --hours-textarea-border: #d6dae1;
+  --hours-textarea-background: #fafafb;
   --hours-editor-backdrop: #1018283d;
 }

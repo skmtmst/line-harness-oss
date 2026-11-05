@@ -73,7 +73,6 @@
 .proposalNote{font-size:var(--polish-text-body);color:var(--color-ink-secondary);}
 
 .holidayOverride{display:flex;flex-direction:column;border-top:1px solid var(--color-hairline);padding-top:var(--space-20);}
-.holidayPreview{font-size:var(--polish-text-body);}
 .previewClosed{color:var(--color-ink-secondary);}
 .historyTitle{font-size:var(--hours-service-title-size);font-weight:600;}
 .updateTitle{font-size:var(--hours-editor-body-size);font-weight:600;}

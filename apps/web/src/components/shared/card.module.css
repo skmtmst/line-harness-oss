@@ -262,5 +262,5 @@ html:root .card[data-card-variant='default']:not([data-card-frame]):not([data-ca
 html:root .card:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 /* 変更案と、その前提を確認する内側の面。指定したカードにのみ適用する。 */
-html:root .card[data-card-surface='proposal'] { background:#e8f5ed; box-shadow:none; border-radius:10px; }
-html:root .card[data-card-surface='preview'] { background:#f5f6f8; box-shadow:none; border-radius:10px; }
+html:root .card[data-card-surface='proposal'] { background:var(--hours-proposal-background); box-shadow:none; border-radius:10px; }
+html:root .card[data-card-surface='preview'] { font-size:var(--polish-text-body); background:var(--hours-preview-background); box-shadow:none; border-radius:10px; }
