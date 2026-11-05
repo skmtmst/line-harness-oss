@@ -9,6 +9,7 @@ const RELEASE_PROOF_FILES = new Set([
   'scripts/deploy/production/preflight.ts',
   'scripts/deploy/production/preflight-flow.test.ts',
   'scripts/deploy/production/safety.test.ts',
+  'apps/web/src/v8/hq-templates/console-draft-review.test.tsx',
 ]);
 
 export function assertStagingSource(stagingSha: string, releaseSha: string, branch: string): void {

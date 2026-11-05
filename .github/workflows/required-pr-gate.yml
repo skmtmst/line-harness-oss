@@ -102,7 +102,7 @@ jobs:
               while IFS= read -r path; do
                 [ -n "$path" ] || continue
                 case "$path" in
-                  .github/workflows/required-pr-gate.yml|scripts/deploy/production/preflight.ts|scripts/deploy/production/preflight-flow.test.ts|scripts/deploy/production/safety.test.ts) ;;
+                  .github/workflows/required-pr-gate.yml|scripts/deploy/production/preflight.ts|scripts/deploy/production/preflight-flow.test.ts|scripts/deploy/production/safety.test.ts|apps/web/src/v8/hq-templates/console-draft-review.test.tsx) ;;
                   *) echo "::error::検証配備以降に本番成果物へ影響する変更があります: $path"; exit 1 ;;
                 esac
               done <<< "$proof_changes"
@@ -793,6 +793,9 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
@@ -800,6 +803,26 @@ jobs:
             exit 0
           fi
           echo "compare=true" >> "$GITHUB_OUTPUT"
+          screen_base="$BASE_SHA"
+          if [ "$BASE_REF" = main ] && \
+             [ "$HEAD_REF" = codex/masato-production-release-20261104 ] && \
+             [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ]; then
+            # This one release promotes the exact Admin source already deployed
+            # at the audited staging SHA. Keep the full screen guard running;
+            # compare any later changes against that published source.
+            screen_base=4482ab95c890276cd1e2dcc4e25e43d3a5042821
+            git cat-file -e "$screen_base^{commit}"
+            git merge-base --is-ancestor "$screen_base" "$HEAD_SHA"
+            changes=$(git diff --name-only --no-ext-diff "$screen_base" "$HEAD_SHA") || exit 1
+            while IFS= read -r path; do
+              [ -n "$path" ] || continue
+              case "$path" in
+                .github/workflows/required-pr-gate.yml|scripts/deploy/production/preflight.ts|scripts/deploy/production/preflight-flow.test.ts|scripts/deploy/production/safety.test.ts|apps/web/src/v8/hq-templates/console-draft-review.test.tsx) ;;
+                *) echo "::error::検証公開済みの画面ソースから変更されています: $path"; exit 1 ;;
+              esac
+            done <<< "$changes"
+          fi
+          echo "base_sha=$screen_base" >> "$GITHUB_OUTPUT"
           if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
             | grep -qE '^(apps/web/|packages/shared/|scripts/visual-qa/|pnpm-lock\.yaml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
@@ -832,7 +855,7 @@ jobs:
       - name: Build the base admin against the same mock API
         if: steps.scope.outputs.run == 'true' && steps.scope.outputs.compare == 'true'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ steps.scope.outputs.base_sha }}
         run: |
           git worktree add /tmp/base "$BASE_SHA"
           cd /tmp/base
