@@ -90,9 +90,16 @@ export default function AccountEditModal({
   const modalTitleId = useId()
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
-  const initialSnapshot = useRef(JSON.stringify({ state, friendCapacity, capacityWarnAt, iconUrl, timezone }))
-  const dirty = JSON.stringify({ state, friendCapacity, capacityWarnAt, iconUrl, timezone }) !== initialSnapshot.current
-  const guard = useUnsavedGuard({ dirty, busy: saving, subject: 'アカウントの登録内容' })
+  const initialValues = useRef({ state, friendCapacity, capacityWarnAt, iconUrl, timezone })
+  const dirty = JSON.stringify({ state, friendCapacity, capacityWarnAt, iconUrl, timezone }) !== JSON.stringify(initialValues.current)
+  const guard = useUnsavedGuard({ dirty, busy: saving, subject: 'アカウントの登録内容', onDiscard: () => {
+    const initial = initialValues.current
+    setState(initial.state)
+    setFriendCapacity(initial.friendCapacity)
+    setCapacityWarnAt(initial.capacityWarnAt)
+    setIconUrl(initial.iconUrl)
+    setTimezone(initial.timezone)
+  } })
   const requestClose = () => guard.guarded(onClose)
 
 
