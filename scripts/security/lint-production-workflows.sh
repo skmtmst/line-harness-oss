@@ -17,7 +17,11 @@ actual=$(shasum -a 256 "$lint_temp/actionlint.tar.gz" | cut -d ' ' -f 1)
 test "$actual" = "$expected"
 tar -xzf "$lint_temp/actionlint.tar.gz" -C "$lint_temp" actionlint
 "$lint_temp/actionlint" -shellcheck='' \
-  .github/workflows/deploy-cloudflare-production.yml \
+  -ignore '^unexpected key "queue" for "concurrency" section\.' \
+  .github/workflows/deploy-cloudflare-production.yml
+# GitHubが受け付ける queue: max を固定版actionlintがまだ認識しない。
+# 値・組み合わせは check_production_workflows.py で厳密に確認する。
+"$lint_temp/actionlint" -shellcheck='' \
   .github/workflows/migrate-d1-production.yml \
   .github/workflows/deploy-cloudflare-worker.yml \
   .github/workflows/deploy-cloudflare-admin.yml \
