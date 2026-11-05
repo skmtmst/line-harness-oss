@@ -11,6 +11,20 @@ const workflow = readFileSync(
 );
 
 describe('Deploy Cloudflare Staging workflow', () => {
+  it('queues every request and checks both live revisions before either publish', () => {
+    expect(workflow).toMatch(/concurrency:\n\s+group: cloudflare-staging\n\s+queue: max\n\s+cancel-in-progress: false/);
+    for (const [check, publish] of [
+      ['Reject staging rollback after acquiring the shared lock', 'Bind the staging Cloudflare account'],
+      ['Recheck forward revisions before Worker publish', 'Deploy Worker to staging'],
+      ['Recheck forward revisions before Admin publish', 'Deploy Admin Panel to staging'],
+    ]) {
+      const start = workflow.indexOf(`- name: ${check}`);
+      const end = workflow.indexOf(`- name: ${publish}`);
+      expect(start).toBeGreaterThan(workflow.indexOf('pnpm deploy:lock acquire staging'));
+      expect(end).toBeGreaterThan(start);
+      expect(workflow.slice(start, end)).toContain('node scripts/deploy/verify-staging-forward.mjs');
+    }
+  });
   it.each([false, true])('passes source metadata to the actual Worker deploy command (replay=%s)', (replay) => {
     const sandbox = mkdtempSync(resolve(tmpdir(), 'staging-metadata-'));
     try {
@@ -95,7 +109,7 @@ describe('Deploy Cloudflare Staging workflow', () => {
     const sandbox = mkdtempSync(resolve(tmpdir(), 'staging-latest-'));
     try {
       const step = workflow.split('- name: Require latest development after acquiring the staging lock')[1]
-        .split('- name: Bind the staging Cloudflare account')[0];
+        .split('- name: Reject staging rollback after acquiring the shared lock')[0];
       const script = step.split('run: |\n')[1];
       writeFileSync(resolve(sandbox, 'git'), [
         '#!/bin/sh',

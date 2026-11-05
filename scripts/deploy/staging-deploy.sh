@@ -14,6 +14,7 @@
 # environment variables; a parent path we cannot confirm stops the run rather
 # than being guessed, because "the parent repo is clean" is one of the gates.
 #
+# ローカルはdry-run専用。--applyは共通Actionsへ案内して停止する。
 # Usage:
 #   scripts/deploy/staging-deploy.sh                      # dry-run
 #   scripts/deploy/staging-deploy.sh --apply              # actually deploy
@@ -75,6 +76,11 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+if [ "$APPLY" -eq 1 ]; then
+  echo "[停止] 共有検証環境への配備は共通Actionsの順番待ちを使用してください。ローカルの--applyは禁止です。" >&2
+  exit 1
+fi
 
 if [ -z "$PARENT_REPO" ]; then
   cat >&2 <<'EOS'
