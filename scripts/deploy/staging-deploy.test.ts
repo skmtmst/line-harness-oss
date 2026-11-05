@@ -62,11 +62,11 @@ describe('staging-deploy argument parsing', () => {
       expect(dryRunArgs).toMatch(/BUILD_RELEASED_AT:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/);
 
       const applied = spawnSync('bash', [resolve(sandbox, 'scripts/deploy/staging-deploy.sh'), '--apply', '--skip-admin', '--parent-repo', resolve(sandbox, 'parent')], { env, encoding: 'utf8' });
-      expect(applied.status, applied.stderr).toBe(0);
+      expect(applied.status).toBe(1);
+      expect(applied.stderr).toContain('共通Actionsの順番待ち');
       const applyArgs = readFileSync(resolve(sandbox, 'wrangler.args'), 'utf8');
-      expect(applyArgs).not.toContain('--dry-run');
-      expect(applyArgs).toContain('BUILD_GIT_COMMIT:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
-      expect(applyArgs).toContain('BUILD_VERSION:0.24.0');
+      // --apply must stop before wrangler is called; the prior dry-run record is unchanged.
+      expect(applyArgs).toBe(dryRunArgs);
     } finally {
       rmSync(sandbox, { recursive: true, force: true });
     }
