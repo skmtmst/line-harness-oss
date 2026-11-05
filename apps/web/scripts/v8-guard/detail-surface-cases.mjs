@@ -230,8 +230,7 @@ export const detailSurfaceCases = [
     "key": "restaurant-line-followup",
     "label": "飲食店のLINE通知見本",
     "path": "/restaurant-test/line-followup",
-    "kind": "DetailColumns",
-    "selector": "aside[aria-label=\"LINEでの見え方\"]"
+    "kind": "FollowupPreview"
   },
   {
     "key": "saved-analysis-history",
