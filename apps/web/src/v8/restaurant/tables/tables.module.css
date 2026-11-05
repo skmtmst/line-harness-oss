@@ -183,3 +183,6 @@
 :global([data-design-node='ljShF']):has(.editorFields) :global([data-window-actions]) > :first-child { gap: 10px; padding-right: 28px; }
 :global([data-design-node='ljShF']):has(.editorFields) :global([data-window-actions]) button:first-of-type { width: 100px; }
 :global([data-design-node='ljShF']):has(.editorFields) :global([data-window-actions]) button:last-of-type { width: 116px; }
+/* 行の操作メニューは Pen PXGLr の 146×162 にそろえる。ポータルは body の直下に置かれる。 */
+:global(body):has(.detailList) :global([data-design-part='action-menu'][role='menu']) { width: 146px; min-width: 146px; padding: 6px 6px 5px; margin: -1px 0 0 -2px; }
+:global(body):has(.detailList) :global([data-design-part='action-menu'] [role='menuitem']) { height: 36px; }
