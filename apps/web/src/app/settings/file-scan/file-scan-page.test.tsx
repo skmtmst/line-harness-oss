@@ -83,7 +83,7 @@ const scanOf = (overrides: Partial<FileScanItem> = {}): FileScanItem => ({
   status: 'quarantined',
   reasonCode: 'pdf_active_content',
   reasonLabel: '危険な仕掛けが見つかりました',
-  uploaderLabel: '川野',
+  uploaderLabel: '見本',
   attempts: 0,
   nextRetryAt: null,
   scannedAt: '2026-09-25T10:00:00+09:00',
@@ -203,7 +203,7 @@ describe('ファイルの安全確認の設定画面', () => {
     await waitFor(() => {
       expect(screen.getByText('invoice.pdf')).toBeTruthy()
     })
-    expect(screen.getByText('川野')).toBeTruthy()
+    expect(screen.getByText('見本')).toBeTruthy()
     expect(screen.getByText('危険な仕掛けが見つかりました')).toBeTruthy()
     // ★V8 ：件数は札「しまったファイル N」に出す。
     expect(screen.getByRole('button', { name: /^しまったファイル \d+$/ })).toBeTruthy()

@@ -538,19 +538,19 @@ const OPS_TENANTS = [
 const OPS_TENANT_SUMMARY = { active: 3, trialing: 1, suspended: 1, pastDue: 1 }
 const OPS_AUDIT = [
   {
-    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '河野',
+    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '見本',
     tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
     action: 'impersonation.start', reason: '問い合わせの確認', detail: null,
     ip: null, visible_to_tenant: 1, created_at: '2026-10-01T15:20:00+09:00',
   },
   {
-    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '河野',
+    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '見本',
     tenant_id: 'visual-tenant-3', tenant_name: 'サンプル商店',
     action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"active","to":"suspended"}',
     ip: null, visible_to_tenant: 1, created_at: '2026-09-30T09:12:00+09:00',
   },
   {
-    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '河野',
+    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '見本',
     tenant_id: 'visual-tenant-2', tenant_name: '見本物産',
     action: 'impersonation.write', reason: '初期設定の代行（本人の依頼）', detail: null,
     ip: null, visible_to_tenant: 1, created_at: '2026-09-28T18:40:00+09:00',
@@ -2998,8 +2998,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       row('mf-1', 'grant', 'available', 10, 'リンクをクリック', '秋の新商品のお知らせ', 'automatic', null, '2026-09-30T10:32:00+09:00', 1240),
       row('mf-2', 'spend', 'available', -500, '送料無料クーポンと交換', '使い道：送料無料クーポン', 'automatic', null, '2026-09-29T18:05:00+09:00', 1230),
       row('mf-3', 'grant', 'available', 48, '商品を買った', '購入 ¥4,800', 'automatic', null, '2026-09-28T21:40:00+09:00', 1730),
-      row('mf-4', 'adjustment', 'available', 100, 'おわびで付けた', '手で増やす', 'manual', '河野', '2026-09-27T12:10:00+09:00', 1682),
-      row('mf-5', 'reversal', 'available', -10, '付けすぎを取り消し', 'リンクをクリック（重複）', 'manual', '河野', '2026-09-20T09:00:00+09:00', 1582),
+      row('mf-4', 'adjustment', 'available', 100, 'おわびで付けた', '手で増やす', 'manual', '見本', '2026-09-27T12:10:00+09:00', 1682),
+      row('mf-5', 'reversal', 'available', -10, '付けすぎを取り消し', 'リンクをクリック（重複）', 'manual', '見本', '2026-09-20T09:00:00+09:00', 1582),
     ], pagination: { total: 5, limit: 100, offset: 0 } } }
   }
   if (method === 'GET' && pathname === '/api/hq/billing/summary') return { success: true, data: BILLING_SUMMARY }
@@ -5482,7 +5482,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
             actions: [
               { id: `${id}-action-1`, type: 'add_tag', params: { tagId: 'tag-trial' }, onFailure: 'stop' },
               { id: `${id}-action-2`, type: 'send_message', params: { messageType: 'text', content: '予約の受付をはじめます。ご希望の日時を送ってください。' }, onFailure: 'stop' },
-              { id: `${id}-action-3`, type: 'notify_staff', params: { notificationRuleId: 'notification-rule-booking', message: '河野・坂本に LINE で' }, onFailure: 'stop' },
+              { id: `${id}-action-3`, type: 'notify_staff', params: { notificationRuleId: 'notification-rule-booking', message: '見本・坂本に LINE で' }, onFailure: 'stop' },
             ],
             commonActionRefs: [],
             commonActionVersions: {},
