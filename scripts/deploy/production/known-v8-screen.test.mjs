@@ -15,12 +15,12 @@ function fixture() {
   return rows
 }
 
-test('同じ画面・幅・測定値の既知指摘だけをこの公開候補で認める', () => {
+test('同じ画面・幅・測定値だけを受け入れる', () => {
   const result = checkKnownV8Screen(fixture())
   assert.equal(result.findings, 1)
   assert.equal(result.redirects, WIDTHS.length)
 })
-test('新規指摘、件数の増加、測定値の悪化を止める', () => {
+test('追加・件数増加・測定値変化を拒否する', () => {
   for (const newFinding of [
     { ...finding, target: 'button.delete' },
     { ...finding, measure: { pixels: 24 } },
@@ -31,7 +31,7 @@ test('新規指摘、件数の増加、測定値の悪化を止める', () => {
     assert.throws(() => checkKnownV8Screen(rows), /v8_new_finding/)
   }
 })
-test('不足画面、比較元の欠落、想定外の測定失敗を止める', () => {
+test('画面不足・比較元欠落・想定外の測定失敗を拒否する', () => {
   const missing = fixture(); delete missing[`${WIDTHS[0]} /`]
   assert.throws(() => checkKnownV8Screen(missing), /v8_routes_incomplete/)
   const noBase = fixture(); delete noBase[`${WIDTHS[0]} /`].baseFindings
