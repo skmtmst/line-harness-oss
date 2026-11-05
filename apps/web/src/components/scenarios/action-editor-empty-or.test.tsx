@@ -132,6 +132,7 @@ describe('S4-OR 動作の条件は空のかたまりを黙って保存しない'
     fireEvent.click(orAddButton())
     fireEvent.click(screen.getByRole('button', { name: '戻る' }))
     expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('動作の条件への変更')
     expect(screen.getByRole('button', { name: '条件を保存する' })).toBeTruthy()
   })
 

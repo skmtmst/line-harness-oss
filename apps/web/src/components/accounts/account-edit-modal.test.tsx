@@ -85,6 +85,7 @@ it('入力した登録内容は、キャンセル時に捨てる前の確認を�
   fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
   expect(props.onClose).not.toHaveBeenCalled()
   expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('アカウントの登録内容への変更')
   expect((screen.getByDisplayValue('変更した名前') as HTMLInputElement).value).toBe('変更した名前')
   fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
   expect(props.onClose).toHaveBeenCalledOnce()

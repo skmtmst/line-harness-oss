@@ -241,6 +241,7 @@ it('自動変更ルールの入力後にキャンセルすると破棄を確認�
   fireEvent.change(field, { target: { value: '作りかけのルール' } })
   fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
   expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' }).textContent).toContain('自動変更ルールへの変更')
   expect(field.value).toBe('作りかけのルール')
 })
 

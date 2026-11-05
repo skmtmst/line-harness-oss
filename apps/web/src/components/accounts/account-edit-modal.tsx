@@ -347,6 +347,6 @@ export default function AccountEditModal({
         </form>
       </div>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </div><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></></SaveErrorScope>
+    </div><UnsavedLeaveDialog subject="アカウントの登録内容への変更" open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></></SaveErrorScope>
   )
 }

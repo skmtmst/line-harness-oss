@@ -929,7 +929,7 @@ export default function ActionEditor({
         {/* R242: キャンセルは開く前の値に戻して閉じる。反映は今の内容のまま閉じる。 */}
         {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" disabled={pendingCount > 0 || Boolean(error) || loading || !draftReady} onClick={closeWhenSaved}>このアクションを反映</Button></div>}
       </div>
-      <UnsavedLeaveDialog open={conditionGuard.leaveTarget !== null} busy={conditionSaving} onConfirm={conditionGuard.confirmLeave} onCancel={conditionGuard.cancelLeave} />
+      <UnsavedLeaveDialog subject="動作の条件への変更" open={conditionGuard.leaveTarget !== null} busy={conditionSaving} onConfirm={conditionGuard.confirmLeave} onCancel={conditionGuard.cancelLeave} />
     </InlineSettings>
   )
 }

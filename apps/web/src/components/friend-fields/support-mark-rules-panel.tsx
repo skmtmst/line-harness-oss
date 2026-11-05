@@ -440,7 +440,7 @@ export default function SupportMarkRulesPanel({
         error={failure?.message} onSuccess={() => setPendingArchive(null)} onConfirm={() => archive()}
         onCancel={() => { if (!saving) setPendingArchive(null) }}
       ><OperationTargetSummary accounts={[{ id: pendingArchive?.accountId ?? '' }]} externalTarget={{ label: '対応マーク', name: pendingArchive?.markName }} /></ConfirmDialog>
-      <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+      <UnsavedLeaveDialog subject="自動変更ルールへの変更" open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </section></SaveErrorScope>
   )
 }
