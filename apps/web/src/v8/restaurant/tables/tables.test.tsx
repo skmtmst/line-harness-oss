@@ -509,8 +509,7 @@ describe('卓の停止で移す予約と残す来店履歴', () => {
 it.each([400, 409, 500])('卓の追加が%sで失敗したら窓の中に理由を出し、入力を残したまま再試行できる', async (status) => {
   fixture.createTable.mockRejectedValueOnce(new ApiError(status)).mockResolvedValueOnce({ success: true })
   render(<TablesPage />)
-  await screen.findByText('卓一覧')
-  fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /卓を作る/ }))
   const dialog = document.querySelector('[data-design-node="ljShF"]') as HTMLElement
   fireEvent.change(within(dialog).getByLabelText('卓番'), { target: { value: 'K1' } })
   fireEvent.change(within(dialog).getByLabelText('表示名'), { target: { value: '試験卓' } })
