@@ -937,7 +937,15 @@ jobs:
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/store-compare-layout.test.mjs
       - name: Inventory edge insets, folder dots and page actions on all admin screens
         if: steps.scope.outputs.run == 'true'
-        run: node apps/web/scripts/v8-guard/presentation-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/presentation
+        run: |
+          result=0
+          node apps/web/scripts/v8-guard/presentation-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/presentation || result=$?
+          if [ '${{ steps.scope.outputs.release_known_baseline }}' = true ]; then
+            node apps/web/scripts/v8-guard/presentation-audit.mjs http://127.0.0.1:4311 /tmp/v8-guard/presentation-base || true
+            node scripts/deploy/production/known-v8-screen.mjs --presentation /tmp/v8-guard/presentation/presentation.json /tmp/v8-guard/presentation-base/presentation.json
+          else
+            exit "$result"
+          fi
       - name: List row rules
         if: steps.scope.outputs.run == 'true'
         run: |

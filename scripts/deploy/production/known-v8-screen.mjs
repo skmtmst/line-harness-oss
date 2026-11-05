@@ -49,9 +49,66 @@ export function checkKnownV8Screen(results) {
   return { routes: expected.size, findings, redirects }
 }
 
+/** The presentation inventory has its own route list and reports both scanner
+ * findings and load errors. Accept only measurements already present in the
+ * published staging build; a newly missing route or an extra finding fails. */
+export function checkKnownV8Presentation(current, baseline) {
+  if (!Array.isArray(current) || !Array.isArray(baseline)) throw new Error('v8_presentation_missing')
+  const expectedWidths = [1024, 1152, 1440]
+  function index(rows) {
+    const map = new Map()
+    for (const row of rows) {
+      if (!expectedWidths.includes(row?.width) || typeof row.route !== 'string') throw new Error('v8_presentation_invalid_row')
+      const key = `${row.width} ${row.route}`
+      if (map.has(key)) throw new Error(`v8_presentation_duplicate ${key}`)
+      map.set(key, row)
+    }
+    return map
+  }
+  const currentByRoute = index(current), baselineByRoute = index(baseline)
+  if (baselineByRoute.size !== 789 || currentByRoute.size !== baselineByRoute.size || [...currentByRoute.keys()].some(key => !baselineByRoute.has(key))) throw new Error('v8_presentation_routes_incomplete')
+  for (const width of expectedWidths) if ([...currentByRoute.keys()].filter(key => key.startsWith(`${width} `)).length !== 263) throw new Error('v8_presentation_width_incomplete')
+  let knownFindings = 0, knownErrors = 0
+  function assertNoNew(currentValues, baselineValues, key, kind) {
+    if (!Array.isArray(currentValues) || !Array.isArray(baselineValues)) throw new Error(`v8_presentation_measurement_missing ${key} ${kind}`)
+    const allowed = new Map()
+    for (const value of baselineValues) {
+      const signature = canonical(value)
+      allowed.set(signature, (allowed.get(signature) ?? 0) + 1)
+    }
+    for (const value of currentValues) {
+      const signature = canonical(value), count = allowed.get(signature) ?? 0
+      if (count === 0) throw new Error(`v8_presentation_new_${kind} ${key}`)
+      allowed.set(signature, count - 1)
+    }
+  }
+  for (const [key, row] of currentByRoute) {
+    const base = baselineByRoute.get(key)
+    if (row.error || base.error) {
+      if (!row.error || row.error !== base.error) throw new Error(`v8_presentation_new_error ${key}`)
+      knownErrors++
+      continue
+    }
+    if (row.finalPath !== base.finalPath) throw new Error(`v8_presentation_path_changed ${key}`)
+    assertNoNew(row.errors, base.errors, key, 'error')
+    assertNoNew(row.findings, base.findings, key, 'finding')
+    assertNoNew(row.missingDots, base.missingDots, key, 'missing_dot')
+    knownFindings += row.findings.length
+    knownErrors += row.errors.length
+  }
+  return { routes: currentByRoute.size, knownFindings, knownErrors }
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const path = process.argv[2]
-  if (!path) throw new Error('v8_result_path_missing')
-  const result = checkKnownV8Screen(JSON.parse(readFileSync(path, 'utf8')))
-  console.log(`検証公開版と同一の指摘: ${result.findings}件 / ${result.routes}画面。転送専用の旧入口: ${result.redirects}画面。新規指摘なし。`)
+  if (process.argv[2] === '--presentation') {
+    const [, , , currentPath, baselinePath] = process.argv
+    if (!currentPath || !baselinePath) throw new Error('v8_presentation_paths_missing')
+    const result = checkKnownV8Presentation(JSON.parse(readFileSync(currentPath, 'utf8')), JSON.parse(readFileSync(baselinePath, 'utf8')))
+    console.log(`検証公開版と同一の画面監査結果: ${result.knownFindings}件 / ${result.routes}画面。既知の取得失敗: ${result.knownErrors}件。新規指摘なし。`)
+  } else {
+    const path = process.argv[2]
+    if (!path) throw new Error('v8_result_path_missing')
+    const result = checkKnownV8Screen(JSON.parse(readFileSync(path, 'utf8')))
+    console.log(`検証公開版と同一の指摘: ${result.findings}件 / ${result.routes}画面。転送専用の旧入口: ${result.redirects}画面。新規指摘なし。`)
+  }
 }

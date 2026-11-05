@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DEFECT_ROUTES } from '../../../apps/web/scripts/v8-guard/layout-defects.mjs'
 import { WIDTHS } from '../../../apps/web/scripts/v8-guard/browser-env.mjs'
-import { checkKnownV8Screen } from './known-v8-screen.mjs'
+import { checkKnownV8Screen, checkKnownV8Presentation } from './known-v8-screen.mjs'
 
 const finding = { kind: 'overlap', target: 'button.save', text: '保存', measure: { pixels: 12 } }
 function fixture() {
@@ -38,4 +38,34 @@ test('画面不足・比較元欠落・想定外の測定失敗を拒否する',
   assert.throws(() => checkKnownV8Screen(noBase), /v8_comparison_missing/)
   const error = fixture(); error[`${WIDTHS[0]} /`] = { error: 'HTTP 500' }
   assert.throws(() => checkKnownV8Screen(error), /v8_measurement_error/)
+})
+
+function presentationRows() {
+  return [1024, 1152, 1440].flatMap(width => Array.from({ length: 263 }, (_, index) => ({
+    width, route: `/screen-${index}`, finalPath: `/screen-${index}`,
+    errors: [], findings: index === 0 ? [finding] : [], missingDots: [],
+  })))
+}
+
+test('画面監査の既存測定だけを受け入れる', () => {
+  const rows = presentationRows()
+  rows[1] = { width: 1024, route: '/screen-1', error: 'HTTP 404' }
+  const result = checkKnownV8Presentation(rows, structuredClone(rows))
+  assert.deepEqual(result, { routes: 789, knownFindings: 3, knownErrors: 1 })
+})
+
+test('画面監査の新しい指摘、取得失敗、画面不足を拒否する', () => {
+  const baseline = presentationRows()
+  const extraFinding = structuredClone(baseline)
+  extraFinding[0].findings.push({ ...finding })
+  assert.throws(() => checkKnownV8Presentation(extraFinding, baseline), /v8_presentation_new_finding/)
+  const newError = structuredClone(baseline)
+  newError[0].error = 'HTTP 500'
+  assert.throws(() => checkKnownV8Presentation(newError, baseline), /v8_presentation_new_error/)
+  const missingRoute = structuredClone(baseline)
+  missingRoute.pop()
+  assert.throws(() => checkKnownV8Presentation(missingRoute, baseline), /v8_presentation_routes_incomplete/)
+  const missingDot = structuredClone(baseline)
+  missingDot[0].missingDots.push('folder')
+  assert.throws(() => checkKnownV8Presentation(missingDot, baseline), /v8_presentation_new_missing_dot/)
 })
