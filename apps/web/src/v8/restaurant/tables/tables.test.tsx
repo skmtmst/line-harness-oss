@@ -93,7 +93,7 @@ describe('BERxg 座席・卓管理', () => {
   it('最小・最大人数は必須として読み上げ、空欄なら卓を作らない', async () => {
     render(<TablesPage />)
     await screen.findByText('卓一覧')
-    fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /卓を作る/ }))
     for (const label of ['最小人数', '最大人数']) {
       expect(screen.getByLabelText(label).getAttribute('aria-required')).toBe('true')
     }
@@ -304,7 +304,7 @@ describe('BERxg 座席・卓管理', () => {
   it('卓を作るは窓（ljShF）から createTable へ送る', async () => {
     render(<TablesPage />)
     await screen.findByText('卓一覧')
-    fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /卓を作る/ }))
     expect(document.querySelector('[data-design-node="ljShF"]')).not.toBeNull()
     fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'T5' } })
     fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '窓側2人卓' } })
@@ -322,7 +322,7 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.click(within(picker).getByRole('button', { name: 'キャンセル' }))
     expect(screen.getByRole('button', { name: '店舗' }).parentElement?.textContent).toContain('渋谷店')
     await pickEntity('店舗', '新宿店')
-    fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /卓を作る/ }))
     fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'S1' } })
     fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '新宿2人卓' } })
     fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: /^卓を作る$/ }))
@@ -337,7 +337,7 @@ describe('BERxg 座席・卓管理', () => {
     ] })
     render(<TablesPage />)
     await screen.findByRole('group', { name: '1階の座席表' })
-    fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /卓を作る/ }))
     fireEvent.change(screen.getByLabelText('卓番'), { target: { value: 'T5' } })
     fireEvent.change(screen.getByLabelText('表示名'), { target: { value: '2階2人卓' } })
     fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: '階・エリア' }))
@@ -368,7 +368,7 @@ describe('BERxg 座席・卓管理', () => {
   it('空の卓番で保存すると欄に理由を出して移動し、APIへ送らない', async () => {
     render(<TablesPage />)
     await screen.findByText('卓一覧')
-    fireEvent.click(screen.getByRole('button', { name: /卓を作る/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /卓を作る/ }))
     fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: /^卓を作る$/ }))
     const code = screen.getByLabelText('卓番')
     await waitFor(() => expect(document.activeElement).toBe(code))
@@ -430,7 +430,7 @@ it('共通タブを外し、tablesの画面内操作を保つ', async () => {
 
 it('長方形は縦長を選べ、最大人数に合わせる椅子のプレビューを示す',async()=>{
  render(<TablesPage />);await screen.findByText('卓一覧')
- fireEvent.click(screen.getByRole('button',{name:/卓を作る/}))
+ fireEvent.click(await screen.findByRole('button',{name:/卓を作る/}))
  const dialog=screen.getByRole('dialog',{name:'卓を作る'})
  fireEvent.change(within(dialog).getByLabelText('卓番'),{target:{value:'T9'}})
  fireEvent.change(within(dialog).getByLabelText('表示名'),{target:{value:'新しい卓'}})
@@ -444,7 +444,7 @@ it('長方形は縦長を選べ、最大人数に合わせる椅子のプレビ�
 
 it('卓を作るには古い位置入力とつまんで置くを出さない',async()=>{
  render(<TablesPage />);await screen.findByText('卓一覧')
- fireEvent.click(screen.getByRole('button',{name:/卓を作る/}))
+ fireEvent.click(await screen.findByRole('button',{name:/卓を作る/}))
  const dialog=screen.getByRole('dialog',{name:'卓を作る'})
  expect(within(dialog).queryByLabelText('横の位置')).toBeNull()
  expect(within(dialog).queryByLabelText('縦の位置')).toBeNull()

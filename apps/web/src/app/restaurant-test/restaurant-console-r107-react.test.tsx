@@ -42,7 +42,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 describe('R107 飲食店向け名簿・卓・メニューの操作', () => {
   it('卓を編集し、停止の確認を経て変更APIへ渡す', async () => {
     render(<RestaurantScreen view="tables" />)
-    const detail = await screen.findByRole('heading', { name: '卓の詳細' })
+    const detail = await screen.findByRole('heading', { name: '卓一覧' })
     const panel = detail.closest('section')!
     fireEvent.click(within(panel).getByRole('button', { name: /のその他操作$/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))

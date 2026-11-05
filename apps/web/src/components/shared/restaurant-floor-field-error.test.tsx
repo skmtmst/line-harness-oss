@@ -14,7 +14,7 @@ it('REM3-01 actual API fields.tables is displayed beside the editable seat map',
  render(<RestaurantFloorEditor accountId="a" storeId="s" resources={[]} canEdit onSelect={()=>{}} />)
  const table=await screen.findByRole('button',{name:'t'})
  fireEvent.keyDown(table,{key:'ArrowRight'})
- fireEvent.click(screen.getByRole('button',{name:'座席図を保存'}))
+ fireEvent.click(screen.getByRole('button',{name:'保存'}))
  const reason=await screen.findByText('卓の位置を確認してください')
  const map=screen.getByRole('group',{name:'1階の座席表'})
  expect(map.getAttribute('aria-invalid')).toBe('true')
