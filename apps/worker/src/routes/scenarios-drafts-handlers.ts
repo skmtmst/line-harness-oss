@@ -331,7 +331,7 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       if (existing.name !== name) {
         return inputError(c, { success: false, error: 'シナリオ名は60文字以内で入力してください' }, 400, ['name']);
       }
-      // 変更していない長い名前は書かず、同時に変更された名前を上書きしない。
+      // 未変更の長いシナリオ名を送らず、同時編集による上書きを防ぐ。
       name = undefined;
     }
     if (body.reason !== undefined && (
