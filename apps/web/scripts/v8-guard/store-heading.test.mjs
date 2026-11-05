@@ -20,7 +20,8 @@ const screens = [
   ['/restaurant-test/tables', '座席・卓管理'],
   ['/restaurant-test/tables?view=assign', '座席・卓管理'],
   ['/restaurant-test/line-followup', 'LINE来店フォロー'],
-  ['/restaurant-test/google', 'Googleビジネス'],
+  // Googleは右上の共通LINEアカウント選択を使い、店舗数にかかわらず独自の欄を出さない。
+  ['/restaurant-test/google', 'Googleビジネス', 0],
   ['/restaurant-test/delivery', 'デリバリー受注'],
   ['/settings/booking-media', '予約サイト・グルメ媒体'],
 ]
@@ -68,6 +69,12 @@ for (const width of [1152, 1440]) test(`店舗数と長い名前でも題を隠�
           const data = body.data ?? body
           if (new URL(path, base).pathname === '/api/restaurant-test/google/connection') data.stores ??= storeFixture
           if (data.stores?.length) {
+            // 媒体設定は選択中LINEアカウントに紐づく店だけを表示する。見本もその読取契約に合わせる。
+            if (new URL(path, base).pathname === '/api/restaurant-test/stores') {
+              const accountId = new URL(path, base).searchParams.get('account_id')
+              assert.ok(accountId, '店舗一覧は選択中アカウントで読む')
+              data.stores = data.stores.map(store => ({ ...store, line_account_id: accountId }))
+            }
             data.stores = state === 'single' ? data.stores.slice(0, 1) : data.stores
             if (state === 'long') data.stores = data.stores.map(store => ({ ...store, name: store.name + '・駅前の予約とお食事を承る店舗' }))
           }
@@ -76,7 +83,7 @@ for (const width of [1152, 1440]) test(`店舗数と長い名前でも題を隠�
         return response
       })
       try {
-        for (const [path, expected] of screens) {
+        for (const [path, expected, pickerCount] of screens) {
           const response = await page.goto(new URL(path, base).href, { waitUntil: 'domcontentloaded' })
           assert.ok(response?.ok(), path)
           await waitForNavigationContent(page, pending)
@@ -88,7 +95,7 @@ for (const width of [1152, 1440]) test(`店舗数と長い名前でも題を隠�
             await page.screenshot({ path: join(output, `${width}-${state}-${path.replace(/[^a-z0-9]/gi, '-')}.png`) })
           }
           assertHeading(row, expected)
-          assert.equal(row.pickers.length, state === 'single' ? 0 : 1, `${path}: 店舗欄の表示`)
+          assert.equal(row.pickers.length, pickerCount ?? (state === 'single' ? 0 : 1), `${path}: 店舗欄の表示`)
           if (path === '/restaurant-test/menu' && state === 'long') {
             await page.getByRole('button', { name: '店舗', exact: true }).click()
             const dialog = page.getByRole('dialog', { name: '店舗を選ぶ', exact: true })

@@ -81,6 +81,13 @@ async function checkFollowupPreview(page, width) {
   const footer = dialog.locator('[data-window-actions]')
   const check = () => page.evaluate(scanFollowupPreview)
   assert.deepEqual(await check(), [], `見本 ${width}`)
+  const measureTalk = () => talk.evaluate(el => el.scrollWidth > el.clientWidth + 1)
+  assert.equal(await measureTalk(), false, `本文のはみ出しなし ${width}`)
+  const wide = await talk.evaluateHandle(el=>{const child=document.createElement('div');child.style.width='3000px';child.textContent='はみ出す故障';el.append(child);return child})
+  assert.equal(await measureTalk(), true, `本文のはみ出し故障 ${width}`)
+  await wide.evaluate(el=>el.remove())
+  assert.equal(await measureTalk(), false, `本文の幅を復元 ${width}`)
+
   await talk.evaluate(el => { for (const child of [...el.children].slice(1)) { child.dataset.guardOldDisplay=child.style.display;child.style.display='none' } })
   assert.ok((await check()).includes('missing'), `見本が消えた故障 ${width}`)
   await talk.evaluate(el => { for (const child of [...el.children].slice(1)) { child.style.display=child.dataset.guardOldDisplay;delete child.dataset.guardOldDisplay } })
@@ -131,7 +138,8 @@ async function checkFollowupPreview(page, width) {
   await page.setViewportSize({width,height:1100})
 }
 
-for (const width of [1152,1440]) test(`実際の27種類と埋め込み6の右の面を測る ${width}`, async () => {
+for (const width of [1152,1440]) test(`実際の詳細面と届き方プレビューを測る ${width}`, async () => {
+
   assert.ok(existsSync(join(root,'version.json')), 'AIと飲食店の検査用フラグを有効にした本番形式buildが必要')
   const server = createServer((req,res) => {
     const path = resolve(root, `.${new URL(req.url,'http://localhost').pathname}`)
@@ -156,9 +164,7 @@ for (const width of [1152,1440]) test(`実際の27種類と埋め込み6の右�
         const ready = async () => { await page.waitForFunction(()=>window.__detailPending===0 && document.fonts.status==='loaded' && document.querySelector('main')) }
         await ready()
         for (const action of item.actions??[]) {await (typeof action === 'string' ? page.locator(action) : page.getByRole(action.role,{name:action.name,exact:true})).click();await ready()}
-        if (item.kind === 'FollowupPreview') {
-          await page.locator('article[aria-label="予約したとき"] button').filter({hasText:'変える'}).click()
-          await ready()
+        if (item.kind === 'MessagePreview') {
           await checkFollowupPreview(page, width)
           console.log(`detail surface ${item.key} ${width}: preview healthy / missing, overflow and footer overlap rejected / restored`)
           continue

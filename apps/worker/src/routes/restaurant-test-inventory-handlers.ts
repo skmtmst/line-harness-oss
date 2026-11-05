@@ -286,10 +286,19 @@ export const post__api_restaurant_test_floors_19 = async (c: Context<Env, "/api/
  if(!org||typeof b.storeId!=='string'||!await storeBelongsTo(c,org.id,b.storeId))return c.json({success:false,error:'店舗がありません'},404);
  if(typeof b.name!=='string'||!b.name.trim()||b.name.length>80)return inputError(c,{success:false,error:'階・エリアの名前を指定してください'},400,['name']);
  const kind=b.kind??'floor';
- if(!['floor','area'].includes(kind)||kind==='area'&&typeof b.parentFloorId!=='string'||kind==='floor'&&b.parentFloorId)return inputError(c,{success:false,error:'階・エリアの種類を確認してください'},400,['kind','parentFloorId']);
+ if(!['floor','area'].includes(kind)||kind==='area'&&b.parentFloorId!=null&&typeof b.parentFloorId!=='string'||kind==='floor'&&b.parentFloorId)return inputError(c,{success:false,error:'階・エリアの種類を確認してください'},400,['kind','parentFloorId']);
  const db=dbFor(c.env,b.storeId);
- if(kind==='area'&&!await db.prepare("SELECT id FROM rt_floors WHERE id=? AND store_id=? AND kind='floor' AND archived_at IS NULL").bind(b.parentFloorId,b.storeId).first())return inputError(c,{success:false,error:'親の階を確認してください'},400,['parentFloorId']);
- const id=crypto.randomUUID(),saved=await db.prepare('INSERT OR IGNORE INTO rt_floors(id,store_id,name,kind,parent_floor_id,sort_order) VALUES(?,?,?,?,?,(SELECT COUNT(*) FROM rt_floors WHERE store_id=?))').bind(id,b.storeId,b.name.trim(),kind,kind==='area'?b.parentFloorId:null,b.storeId).run();
+ if(kind==='area'&&b.parentFloorId&&!await db.prepare("SELECT id FROM rt_floors WHERE id=? AND store_id=? AND kind='floor' AND archived_at IS NULL").bind(b.parentFloorId,b.storeId).first())return inputError(c,{success:false,error:'親の階を確認してください'},400,['parentFloorId']);
+ if(b.afterFloorId!=null&&(kind!=='floor'||typeof b.afterFloorId!=='string'))return inputError(c,{success:false,error:'タブの表示位置を確認してください'},400,['afterFloorId']);
+ const ordered=(await db.prepare('SELECT id FROM rt_floors WHERE store_id=? AND archived_at IS NULL ORDER BY sort_order,name,id').bind(b.storeId).all<{id:string}>()).results;
+ const afterIndex=b.afterFloorId?ordered.findIndex(f=>f.id===b.afterFloorId):-1;
+ if(b.afterFloorId&&afterIndex<0)return inputError(c,{success:false,error:'タブの表示位置を確認してください'},400,['afterFloorId']);
+ const insertIndex=afterIndex<0?ordered.length:afterIndex+1;
+ const id=crypto.randomUUID();
+ const [saved]=await db.batch([
+  db.prepare('INSERT OR IGNORE INTO rt_floors(id,store_id,name,kind,parent_floor_id,sort_order) VALUES(?,?,?,?,?,?)').bind(id,b.storeId,b.name.trim(),kind,kind==='area'?b.parentFloorId:null,insertIndex*10),
+  ...ordered.map((f,index)=>db.prepare('UPDATE rt_floors SET sort_order=? WHERE id=? AND store_id=? AND EXISTS(SELECT 1 FROM rt_floors WHERE id=?)').bind((index<insertIndex?index:index+1)*10,f.id,b.storeId,id)),
+ ]);
  if(!saved.meta.changes)return c.json({success:false,error:'同じ名前の階があります'},409);
  return c.json({success:true,data:{id,version:1}},201);
 };

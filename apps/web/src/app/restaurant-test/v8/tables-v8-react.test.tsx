@@ -62,11 +62,10 @@ describe('BERxg 座席・卓管理のV8', () => {
     await screen.findByRole('group',{name:'1階の座席表'})
     const board = document.querySelector('[data-design-node="BERxg"]')!
     expect(board.textContent).toContain('卓数')
-    expect(board.textContent).toContain('総席数')
-    expect(board.textContent).toContain('結合可能')
+    expect(board.textContent).toContain('受付中の定員')
     expect(board.textContent).toContain('個室')
     expect(screen.getByRole('group',{name:'1階の座席表'})).toBeTruthy()
-    expect(board.textContent).toContain('卓の詳細')
+    expect(board.textContent).toContain('卓一覧')
     expect(board.textContent).toContain('卓を作る')
     expect(board.textContent).not.toContain('自動配席ルール')
   })
@@ -82,7 +81,7 @@ describe('BERxg 座席・卓管理のV8', () => {
 
   it('卓の詳細から変更・停止・再開が今の口へ届く', async () => {
     render(<TablesV8 />)
-    const detail = (await screen.findByRole('heading', { name: '卓の詳細' })).closest('section')!
+    const detail = (await screen.findByRole('heading', { name: '卓一覧' })).closest('section')!
     fireEvent.click(within(detail).getAllByRole('button', { name: /のその他操作$/ })[0])
     fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
     fireEvent.change(screen.getByDisplayValue('2人卓'), { target: { value: '奥の2人卓' } })
@@ -103,7 +102,7 @@ describe('BERxg 座席・卓管理のV8', () => {
 
   it('追加・変更の枠に板 gBrCz の印が付く', async () => {
     render(<TablesV8 />)
-    const detail = (await screen.findByRole('heading', { name: '卓の詳細' })).closest('section')!
+    const detail = (await screen.findByRole('heading', { name: '卓一覧' })).closest('section')!
     fireEvent.click(within(detail).getAllByRole('button', { name: /のその他操作$/ })[0])
     fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
     expect(document.querySelector('[data-design-node="ljShF"]')).not.toBeNull()
@@ -111,39 +110,40 @@ describe('BERxg 座席・卓管理のV8', () => {
 
   it('止める確認に板 eY9F3 の印が付く', async () => {
     render(<TablesV8 />)
-    const detail = (await screen.findByRole('heading', { name: '卓の詳細' })).closest('section')!
+    const detail = (await screen.findByRole('heading', { name: '卓一覧' })).closest('section')!
     fireEvent.click(within(detail).getAllByRole('button', { name: /のその他操作$/ })[0])
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     expect(document.querySelector('[data-design-node="eY9F3"]')).not.toBeNull()
   })
 })
 
-it('結合グループを変更して保存する',async()=>{
+it('席の条件を変更して保存する',async()=>{
  render(<TablesV8 />)
- const detail=(await screen.findByRole('heading',{name:'卓の詳細'})).closest('section')!
+ const detail=(await screen.findByRole('heading',{name:'卓一覧'})).closest('section')!
  fireEvent.click(within(detail).getAllByRole('button',{name:/のその他操作$/})[0])
  fireEvent.click(screen.getByRole('menuitem',{name:'変更'}))
- fireEvent.change(screen.getByPlaceholderText('なし'),{target:{value:'B'}})
+ fireEvent.click(screen.getByRole('button',{name:'変更 ›'}))
+ fireEvent.click(screen.getByRole('button',{name:'喫煙'}))
  fireEvent.click(screen.getByRole('button',{name:'変更を保存'}))
- await waitFor(()=>expect(fixture.updateTable).toHaveBeenCalledWith('account-1','t1',expect.objectContaining({joinGroup:'B'})))
+ await waitFor(()=>expect(fixture.updateTable).toHaveBeenCalledWith('account-1','t1',expect.objectContaining({smokingPolicy:'smoking'})))
 })
 it('ドラッグした配置をまとめて保存し、再取得した座標で表示する',async()=>{
  const saved={...floor,version:2,tables:floor.tables.map(t=>t.id==='t1'?{...t,x:60}:t)}
  floorApi.saveFloor.mockImplementation(async()=>{floorApi.floors.mockResolvedValue({data:[saved]});return {success:true}})
  const view=render(<TablesV8 />);dragTable(within(await screen.findByRole('group',{name:'1階の座席表'})).getAllByRole('button',{name:'2人卓'})[0])
- fireEvent.click(screen.getByRole('button',{name:'座席図を保存'}))
+ fireEvent.click(screen.getByRole('button',{name:'保存'}))
  await waitFor(()=>expect(floorApi.saveFloor).toHaveBeenCalledWith('account-1',expect.objectContaining({storeId:'store-1',expectedVersion:1,tables:[expect.objectContaining({id:'t1',x:60}),...floor.tables.slice(1)]})))
- await waitFor(()=>expect((screen.getByRole('button',{name:'座席図を保存'}) as HTMLButtonElement).disabled).toBe(true))
+ await waitFor(()=>expect((screen.getByRole('button',{name:'保存'}) as HTMLButtonElement).disabled).toBe(true))
  view.unmount();render(<TablesV8 />)
  expect(within(await screen.findByRole('group',{name:'1階の座席表'})).getAllByRole('button',{name:'2人卓'})[0].getAttribute('transform')).toContain('translate(60 50)')
 })
 it('配置の保存が失敗したら失敗を表示し、入力を保ち保存済みの配置は変えない',async()=>{
  floorApi.saveFloor.mockRejectedValue(new Error('409'))
  const view=render(<TablesV8 />);dragTable(within(await screen.findByRole('group',{name:'1階の座席表'})).getAllByRole('button',{name:'2人卓'})[0])
- fireEvent.click(screen.getByRole('button',{name:'座席図を保存'}))
+ fireEvent.click(screen.getByRole('button',{name:'保存'}))
  await screen.findByText(/保存できませんでした/)
  expect(within(screen.getByRole('group',{name:'1階の座席表'})).getAllByRole('button',{name:'2人卓'})[0].getAttribute('transform')).toContain('translate(60 50)')
- expect(screen.getByRole('button',{name:'座席図を保存'})).toBeTruthy()
+ expect(screen.getByRole('button',{name:'保存'})).toBeTruthy()
  view.unmount();render(<TablesV8 />)
  expect(within(await screen.findByRole('group',{name:'1階の座席表'})).getAllByRole('button',{name:'2人卓'})[0].getAttribute('transform')).toContain('translate(50 50)')
 })

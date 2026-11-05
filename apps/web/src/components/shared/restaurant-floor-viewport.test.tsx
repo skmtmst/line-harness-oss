@@ -2,7 +2,7 @@
 import {afterEach,expect,it,vi} from 'vitest'
 import {cleanup,fireEvent,render,screen} from '@testing-library/react'
 import RestaurantFloorEditor from './restaurant-floor-editor'
-import {floorTableViewBox} from './restaurant-floor-map'
+import RestaurantFloorMap,{floorTableViewBox} from './restaurant-floor-map'
 const api=vi.hoisted(()=>({floors:vi.fn(),saveFloor:vi.fn(),createFloor:vi.fn()}))
 vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn()})}))
 vi.mock('@/lib/api/helpers/reservation-board',()=>({reservationBoardApi:api}))
@@ -32,4 +32,14 @@ it('回転した卓の表示範囲の計算は維持する',()=>{
  const [x,y,w,h]=floorTableViewBox({...floor,tables:[{...floor.tables[0],rotation:90}]}).split(' ').map(Number)
  expect(x).toBeLessThanOrEqual(60);expect(y).toBeLessThanOrEqual(40)
  expect(x+w).toBeGreaterThanOrEqual(120);expect(y+h).toBeGreaterThanOrEqual(120)
+})
+it('広いフロアの縮小表示ではマークと椅子を隠し、卓の操作名は残す',()=>{
+ const wide={...floor,width:4000,height:4000,tables:[{...floor.tables[0],smokingPolicy:'non_smoking' as const,shoesAllowed:false,maxCapacity:2}]}
+ const view=render(<RestaurantFloorMap floor={wide} labels={props.resources} onSelect={props.onSelect} viewport="0 0 4000 4000" penTableStyle/>)
+ const table=screen.getByRole('button',{name:'T1'})
+ expect(table.querySelector('.lucide-cigarette-off')).toBeNull()
+ expect(table.querySelector('rect[class*="chair"]')).toBeNull()
+ expect(table.querySelector('title')?.textContent).toBe('T1')
+ view.rerender(<RestaurantFloorMap floor={wide} labels={props.resources} onSelect={props.onSelect} viewport="0 0 500 500" penTableStyle/>)
+ expect(screen.getByRole('button',{name:'T1'}).querySelector('.lucide-cigarette-off')).toBeTruthy()
 })
