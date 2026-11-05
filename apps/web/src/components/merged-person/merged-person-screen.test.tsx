@@ -42,6 +42,7 @@ vi.mock('./use-merged-person', () => ({
     setUnlinkReason: vi.fn(), unlink: vi.fn(), reload: vi.fn(), setDeliveryActive: vi.fn(),
   }),
 }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/friends' }))

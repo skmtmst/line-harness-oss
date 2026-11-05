@@ -192,7 +192,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     if (view === 'calendar') {
       if (range === 'month' && today.month) {
         main = <MonthCalendar month={today.month} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, 'month', s))} onDay={(d) => setDate(d)} />
-        aside = <DayList month={today.month} href={cfg.links.bookings} />
+        aside = <DayList month={today.month} href={cfg.links.bookings} canWrite={canWrite} />
       } else if (today.week) {
         main = <WeekCalendar empty={emptyBookings} week={today.week} period={range === 'today' ? 'day' : 'week'} canWrite={canWrite} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, range === 'today' ? 'today' : 'week', s))} onSlot={(day, time) => addNew({ date: day, time })} onOpen={(id) => { const row = today.rows.find((item) => item.id === id); if (row) openRow(row) }} />
         aside = null
@@ -239,7 +239,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
 
   return (
     <KpiValueMotionProvider scope={accountId ? JSON.stringify([accountId, style, date, range, days, staff, compare, tab, subTab, view]) : null}>
-    <DashboardPage boardId={`style-${style}`} initialContent={{ scope: JSON.stringify([accountId, style]), pending: start.status === 'loading' || setup.status === 'loading' || (!today && !failed) }} title={cfg.title} help={cfg.help} subtitle={subtitle} actions={headActions}>
+    <DashboardPage boardId={`style-${style}`} initialContent={{ scope: JSON.stringify([accountId, style]), pending: (style !== 'restaurant' && (start.status === 'loading' || setup.status === 'loading')) || (!today && !failed) }} title={cfg.title} help={cfg.help} subtitle={subtitle} actions={headActions}>
       <div className={styles.head}>{filters}</div>
       <div className={styles.inset}>
         {absence.notice}
@@ -247,7 +247,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         {setup.data ? <SetupWarningBands data={setup.data} configureAllowed={canManageRole(role)} role={role} /> : null}
         <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
-        {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'}
+        {role !== null && (style !== 'restaurant' || (start.status !== 'loading' && setup.status !== 'loading')) && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'}
           onRecheck={start.watchExpired ? start.rewatch : undefined}
           onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : !canManageRole(role) ? () => openSetupStep('style') : undefined} configureAllowed={canManageRole(role)}
           setupTasks={setupRest ? <SetupTasks heading summary={setupRest} onOpenStep={openSetupStep} configureAllowed={canManageRole(role)} role={role} /> : role !== null && !canManageRole(role) ? <SetupTasksUnavailable error={setup.error} onRetry={setup.reload} /> : undefined}
@@ -287,14 +287,15 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         targets={{ staff: style === 'restaurant' ? [] : (today?.staff ?? []), seats: style === 'restaurant' ? (today?.staff ?? []) : [] }}
         affectedNote="その時間の予約は取り消しません。重なる予約への連絡は自動では送られません。"
         onClose={() => setClosureOpen(false)}
-        onSave={(input) => void saveClosure(input)}
+        onSave={(input) => saveClosure(input)}
         preview={async (input) => {
-          const inRange = (t: string) => input.allDay || ((input.from ?? '00:00') <= t && t < (input.to ?? '24:00'))
           if (style === 'restaurant' && store.store) {
             const res = await restaurantTestApi.previewClosure(accountId, { storeId: store.store.id, startDate: input.date, endDate: input.date, allDay: input.allDay, startTime: input.from ?? null, endTime: input.to ?? null, kind: KIND[input.reason] ?? 'other', memo: input.reason, tableIds: input.target === 'seat' ? input.ids : [] })
-            return res.data.reservations.map((r) => ({ time: formatDate(r.startsAt, { style: 'time' }), name: `${withHonorific(r.customerName, 'さま')}`, sub: `${r.guestCount}名`, pay: null }))
+            if (!res.data.confirmationSnapshot) throw new Error('confirmation_unavailable')
+            return { snapshot: res.data.confirmationSnapshot, rows: res.data.reservations.map((r) => ({ time: formatDate(r.startsAt, { style: 'time' }), name: `${withHonorific(r.customerName, 'さま')}`, sub: `${r.guestCount}名`, pay: null })) }
           }
-          return input.date !== date ? [] : (today?.rows ?? []).filter((r) => r.live !== false && r.booking && inRange(r.time) && (input.target === 'store' || input.ids.length === 0 || input.ids.some((id) => r.staff === today?.staff.find((x) => x.id === id)?.name))).map((r) => ({ time: r.time, name: `${withHonorific(r.name, 'さま')}`, sub: [r.people ? `${formatNumber(r.people)}名` : null, r.course].filter(Boolean).join('・'), pay: null }))
+          const res = await styleApi.closureConfirmation(accountId, { date: input.date, target: input.target === 'store' ? 'store' : 'staff', staffIds: input.target === 'staff' ? input.ids : [], allDay: input.allDay, startTime: input.from, endTime: input.to, reason: input.reason })
+          return { snapshot: res.data.snapshot, rows: res.data.reservations.map((r) => ({ time: formatDate(r.startsAt, { style: 'time' }), name: `${withHonorific(r.name, 'さま')}`, sub: `${formatNumber(r.partySize)}名`, pay: null })) }
         }}
         mediaNote={style === 'restaurant' ? '他の予約サイトの同じ時間の枠は、それぞれの管理画面で閉じてください。' : null} />
       {start.arrived && accountId && canManageRole(role) ? <FirstRunDoneDialog accountId={accountId} style={style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
