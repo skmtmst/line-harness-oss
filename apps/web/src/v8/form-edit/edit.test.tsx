@@ -74,6 +74,7 @@ import type { FormEditHost, FormHostContent } from './host'
 import { readCreatedFormDraft } from '@/lib/form-draft-session'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { ApiError,api,fetchApi } from '@/lib/api'
+import { formRoutingApi } from '@/lib/api/helpers/gap2'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -140,6 +141,35 @@ describe('回答フォームの編集（V8）', () => {
     await waitFor(() => expect(screen.queryByText('予約の担当を読み込めませんでした')).toBeNull())
     fetchMock.mockImplementation(async () => ({ success: true, data: [{ id: 'tag-1', name: 'アンケート回答' }] }) as never)
     menuStaff.mockReset().mockResolvedValue({ staff: [] })
+  })
+
+  it('保存前に変えた振り分けの下書きを試行 API の第5引数に渡す', async () => {
+    const preview = vi.spyOn(formRoutingApi, 'preview').mockResolvedValue({ success: true, data: { matchedIndex: -1, fellBack: false, usable: true, target: { menuId: 'bm-1' }, blockId: 'q2' } })
+    await render('id=form-1&page=2')
+    fireEvent.click(await screen.findByRole('switch', { name: '答えで予約の行き先を分ける' }))
+    fireEvent.click(screen.getByRole('button', { name: '試しに答える' }))
+    fireEvent.click(screen.getByLabelText('試しの答え'))
+    fireEvent.click((await screen.findByRole('option', { name: 'ご相談' })).querySelector('button')!)
+    await waitFor(() => expect(preview).toHaveBeenCalledWith('acc-1', 'form-1', { purpose: 'ご相談' }, undefined, expect.any(Object)))
+    const draft = preview.mock.calls[0][4]!
+    const booking = draft.sections.flatMap(section => section.blocks).find(block => block.id === 'q2')
+    expect(booking).toMatchObject({ booking: { routing: { enabled: true } } })
+    expect(formsUpdate).not.toHaveBeenCalled()
+    preview.mockRestore()
+  })
+
+  it('予約メニューの閲覧権限がなければ行き先選択を理由付きでロックする', async () => {
+    const fetchMock = vi.mocked(fetchApi)
+    fetchMock.mockImplementation(async (path) => { if (String(path).includes('/routing/groups')) throw new ApiError(403, 'forbidden'); return { success: true, data: [{ id: 'tag-1', name: 'アンケート回答' }] } as never })
+    await render('id=form-1&page=2')
+    fireEvent.click(await screen.findByRole('switch', { name: '答えで予約の行き先を分ける' }))
+    const control = await screen.findByRole('button', { name: 'どれにも当たらないときの担当' })
+    await waitFor(() => expect(control.hasAttribute('data-permission-locked')).toBe(true))
+    fireEvent.focus(control)
+    expect((await screen.findByRole('tooltip')).textContent).toContain('予約メニューを閲覧する権限がありません')
+    fireEvent.click(control)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fetchMock.mockImplementation(async () => ({ success: true, data: [{ id: 'tag-1', name: 'アンケート回答' }] }) as never)
   })
 
   it('他機能の候補を読む権限がなくてもフォームを表示する', async () => {

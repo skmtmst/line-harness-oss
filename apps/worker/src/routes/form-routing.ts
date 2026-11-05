@@ -1,7 +1,7 @@
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapWrite,gapVersion} from '../services/gap-common.js';
-import {loadRoutingLayout,resolveRouting,issueRoutingToken} from '../features/forms/form-routing/index.js';
+import {loadRoutingLayout,resolveRouting,issueRoutingToken,validateLayoutRouting} from '../features/forms/form-routing/index.js';
 import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
 import {requireDeliveryAccess,requirePermission} from '../middleware/role-guard.js';
 import {normalizeLayout} from '@line-crm/shared';
@@ -12,9 +12,10 @@ formRouting.post('/api/forms/:id/routing/preview',requireDeliveryAccess('forms',
  if(!b.answers||typeof b.answers!=='object'||Array.isArray(b.answers))throw new GapError('invalid_answers');
  const draft=b.layout===undefined?layout.layout:normalizeLayout(b.layout);
  if(!draft)throw new GapError('routing_invalid');
+ if(b.layout!==undefined)await validateLayoutRouting(c.env.DB,a,draft,{checkTargets:false});
  return c.json({success:true,data:await resolveRouting(c.env.DB,a,draft,b.answers as Record<string,unknown>,b.blockId as string|undefined)});
 });
-formRouting.get('/api/forms/:id/routing/groups',requireDeliveryAccess('forms','view'),async(c)=>{
+formRouting.get('/api/forms/:id/routing/groups',requireDeliveryAccess('forms','view'),requirePermission('/booking/menus'),async(c)=>{
  const a=await gapAccount(c);await loadRoutingLayout(c.env.DB,c.req.param('id'),a,false);
  const groups=await c.env.DB.prepare('SELECT id,name FROM booking_routing_staff_groups WHERE line_account_id=? ORDER BY name,id').bind(a).all();
  const menus=await c.env.DB.prepare('SELECT id,name,duration_minutes AS durationMinutes FROM menus WHERE line_account_id=? AND is_active=1 AND deleted_at IS NULL AND addon_only=0 ORDER BY name,id').bind(a).all();

@@ -109,7 +109,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* 保存を押したか。押したあとだけ、欄の赤とタブの赤い印を出す。 */
   const [attempted, setAttempted] = useState(false)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
-  const [routingGroups, setRoutingGroups] = useState<{ accountId: string; groups: NonNullable<FormRefs['bookingRoutingGroups']>; menus: NonNullable<FormRefs['bookingMenus']>; staff: NonNullable<FormRefs['bookingMenuStaff']> } | null>(null)
+  const [routingPermissionDenied, setRoutingPermissionDenied] = useState<{ accountId: string; formId: string } | null>(null)
+  const [routingGroups, setRoutingGroups] = useState<{ accountId: string; formId: string; groups: NonNullable<FormRefs['bookingRoutingGroups']>; menus: NonNullable<FormRefs['bookingMenus']>; staff: NonNullable<FormRefs['bookingMenuStaff']> } | null>(null)
   const [loading, setLoading] = useState(!host)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -350,20 +351,21 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     if (hostRef.current || !selectedAccountId || !id) return
     let current = true
     setRoutingGroups(null)
+    setRoutingPermissionDenied(null)
     void formRoutingApi.formGroups(selectedAccountId, id).then(result => {
       if (current) {
         const staff: NonNullable<FormRefs['bookingMenuStaff']> = Object.fromEntries(result.data.menus.map(({ id }) => [id, []]))
         for (const member of result.data.staff) (staff[member.menuId] ??= []).push({ id: member.id, name: member.name })
-        setRoutingGroups({ accountId: selectedAccountId, groups: result.data.groups, menus: result.data.menus, staff })
+        setRoutingGroups({ accountId: selectedAccountId, formId: id, groups: result.data.groups, menus: result.data.menus, staff })
         setBookingStaffError(false)
       }
-    }).catch(() => { if (current) setRoutingGroups(null) })
+    }).catch((error: unknown) => { if (current) { setRoutingGroups(null); if (error instanceof ApiError && error.status === 403) setRoutingPermissionDenied({ accountId: selectedAccountId, formId: id }) } })
     return () => { current = false }
   }, [selectedAccountId, id])
 
   // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
   useEffect(() => {
-    if (hostRef.current || !selectedAccountId || bookingStaffError || routingGroups?.accountId === selectedAccountId) return
+    if (hostRef.current || !selectedAccountId || bookingStaffError || routingGroups?.accountId === selectedAccountId && routingGroups.formId === id) return
     const menuIds = new Set<string>()
     for (const b of [...layout.header, ...layout.sections.flatMap((section) => section.blocks)]) {
       if (b.kind !== 'input' || b.type !== 'booking' || !b.booking) continue
@@ -390,7 +392,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId, layout, refs.bookingMenuStaff, bookingStaffError, routingGroups])
+  }, [selectedAccountId, id, layout, refs.bookingMenuStaff, bookingStaffError, routingGroups])
 
   /* ---------------- ページとブロック ---------------- */
 
@@ -1024,7 +1026,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             layout={layout}
             page={page}
             blocks={blocks}
-            refs={{ ...refs, ...(routingGroups?.accountId === selectedAccountId ? { bookingRoutingGroups: routingGroups.groups, bookingMenus: routingGroups.menus, bookingMenuStaff: routingGroups.staff } : { bookingRoutingGroups: null }) }}
+            refs={{ ...refs, bookingRoutingLockedReason: !id ? '保存してから選べます' : routingPermissionDenied?.accountId === selectedAccountId && routingPermissionDenied.formId === id ? '予約メニューを閲覧する権限がありません' : undefined, ...(routingGroups?.accountId === selectedAccountId && routingGroups.formId === id ? { bookingRoutingGroups: routingGroups.groups, bookingMenus: routingGroups.menus, bookingMenuStaff: routingGroups.staff } : { bookingRoutingGroups: null }) }}
             selectedBlockId={selectedBlockId}
             inputCount={inputCount}
             accountId={host ? null : selectedAccountId}

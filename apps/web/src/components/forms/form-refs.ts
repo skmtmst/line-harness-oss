@@ -19,6 +19,7 @@ export interface FormRefs {
   /** メニューごとの担当選び。読んでいないメニューは不在＝まだ読んでいない */
   bookingMenuStaff?: Record<string, { id: string; name: string }[]>
   /** 振り分けの担当の組。null は権限不足または取得失敗。 */
+  bookingRoutingLockedReason?: string
   bookingRoutingGroups?: { id: string; name: string }[] | null
 }
 

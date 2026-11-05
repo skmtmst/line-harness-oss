@@ -189,3 +189,16 @@ it('質問を変える前に行の消去を確認し、取り消すと残す', (
   fireEvent.click(within(confirmation).getByRole('button', { name: '質問を変える' }))
   expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ rules: [] }))
 })
+
+
+it('新規フォームは担当を保存後に選べる理由を表示し、操作できない', async () => {
+ const onChange = vi.fn()
+ render(<RoutingSection blocks={[{ id: 'book', kind: 'input', type: 'booking' }] as never}
+   refs={{ bookingRoutingLockedReason: '保存してから選べます' }} routing={{ enabled: true, rules: [], fallback: { menuId: 'm1' } }} onChange={onChange} />)
+ const control = screen.getByRole('button', { name: 'どれにも当たらないときの担当' })
+ expect(control.hasAttribute('data-permission-locked')).toBe(true)
+ fireEvent.focus(control)
+ expect((await screen.findByRole('tooltip')).textContent).toContain('保存してから選べます')
+ fireEvent.click(control)
+ expect(onChange).not.toHaveBeenCalled()
+})

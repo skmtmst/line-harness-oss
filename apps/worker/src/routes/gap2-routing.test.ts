@@ -56,14 +56,14 @@ test('50行は受け付け、別店舗や停止中の行き先は拒む',async()
  d.raw.exec("UPDATE menus SET is_active=0 WHERE id='menu'");
  await expect(validateLayoutRouting(d.db,'a',l)).rejects.toThrow('routing_target_invalid:0');
 });
-test('フォームの閲覧権限で同じ店の担当の組だけを読める',async()=>{
+test('フォームと予約メニューの閲覧権限で同じ店の担当の組だけを読める',async()=>{
  d.raw.exec("INSERT INTO booking_routing_staff_groups(id,line_account_id,name,staff_ids_json) VALUES('g1','a','相談','[]'),('g2','b','他店','[]'); INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price,is_active) VALUES('closed','a','停止',30,0,0); INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('bs','closed',1),('bs2','menu',0)");
- const viewer={...gapOwner,role:'staff' as const,readOnly:true,permissionKeys:[],viewPermissionKeys:['/form-submissions']};
+ const viewer={...gapOwner,role:'staff' as const,readOnly:true,permissionKeys:[],viewPermissionKeys:['/form-submissions','/booking/menus']};
  const a=gapApp(d,[formRouting],viewer);
  const r=await gapCall(a,'/api/forms/form/routing/groups?account_id=a','GET');
  expect(r.status).toBe(200);expect((await r.json() as any).data).toEqual({groups:[{id:'g1',name:'相談'}],menus:[{id:'menu',name:'相談',durationMinutes:60}],staff:[{menuId:'menu',id:'bs',name:'担当'}]});
  expect((await gapCall(a,'/api/forms/form/routing/groups?account_id=b','GET')).status).toBe(404);
- const denied=gapApp(d,[formRouting],{...viewer,viewPermissionKeys:[]});
+ const denied=gapApp(d,[formRouting],{...viewer,viewPermissionKeys:['/form-submissions']});
  expect((await gapCall(denied,'/api/forms/form/routing/groups?account_id=a','GET')).status).toBe(403);
 });
 test('3つの回答をすべて満たすときだけ行き先が当たる',async()=>{
@@ -76,4 +76,21 @@ test('3つの回答をすべて満たすときだけ行き先が当たる',async
  expect(await preview({subject:'転職',area:'東京',rating:4})).toBe(0);
  expect(await preview({subject:'転職',area:'大阪',rating:4})).toBe(-1);
  expect(await preview({subject:'転職',area:'東京',rating:2})).toBe(-1);
+});
+
+
+test('両方入れる店でもフォームの所属と担当の店を分ける',async()=>{
+ d.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('c','ch3','同じ会社の別店','x','x','t'); INSERT INTO staff(id,line_account_id,name,display_name) VALUES('cs','c','別店担当','別店担当'); INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('cm','c','別店メニュー',30,0); INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('cs','cm',1),('cs','menu',1); INSERT INTO booking_routing_staff_groups(id,line_account_id,name,staff_ids_json) VALUES('cg','c','別店組','[]')");
+ const a=gapApp(d,[formRouting],gapOwner);
+ expect((await gapCall(a,'/api/forms/form/routing/groups?account_id=c')).status).toBe(404);
+ const r=await gapCall(a,'/api/forms/form/routing/groups?account_id=a');expect(r.status).toBe(200);
+ expect((await r.json() as any).data).toEqual({groups:[],menus:[{id:'menu',name:'相談',durationMinutes:60}],staff:[{menuId:'menu',id:'bs',name:'担当'}]});
+});
+test('試行は不正な条件を400で拒み、有効な配列を受け付ける',async()=>{
+ const a=gapApp(d,[formRouting],gapOwner),draft=layout(),condition=(draft.sections[0].blocks[1] as any).booking.routing.rules[0].conditions[0];
+ condition.op='in';condition.value='転職';
+ expect((await gapCall(a,'/api/forms/form/routing/preview?account_id=a','POST',{answers:{subject:'転職'},layout:draft})).status).toBe(400);
+ condition.value=['転職'];(draft.sections[0].blocks[1] as any).booking.routing.rules[0].target={menuId:7};
+ expect((await gapCall(a,'/api/forms/form/routing/preview?account_id=a','POST',{answers:{subject:'転職'},layout:draft})).status).toBe(400);
+ (draft.sections[0].blocks[1] as any).booking.routing.rules[0].target=target;expect((await gapCall(a,'/api/forms/form/routing/preview?account_id=a','POST',{answers:{subject:'転職'},layout:draft})).status).toBe(200);
 });
