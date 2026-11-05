@@ -13,6 +13,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import { RowActions } from '@/components/shared/row-actions'
 import TextLink from '@/components/shared/text-link'
 import { useAccount } from '@/contexts/account-context'
@@ -207,12 +208,15 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const attendanceKey = JSON.stringify([accountId, storeId, view, detailId, detailReservation?.id, page, period, status, source, canWrite, !!phone])
   const attendanceScope = useRef({ key: attendanceKey })
   if (attendanceScope.current.key !== attendanceKey) attendanceScope.current = { key: attendanceKey }
+  const attendanceLocation = useRef({ accountId, storeId, view, detailId })
+  attendanceLocation.current = { accountId, storeId, view, detailId }
   const scope = attendanceScope.current
   const attendanceActive = useRef(true)
   const attendanceWorking = useRef(false)
   useEffect(() => { attendanceActive.current = true; return () => { attendanceActive.current = false } }, [])
   const attendance = async (id: string, action: 'visited' | 'depart' | 'undo_departure' | 'undo_visit' | 'no_show') => {
     const current = () => attendanceActive.current && attendanceScope.current === scope
+    const closed = () => attendanceActive.current && attendanceLocation.current.accountId === accountId && attendanceLocation.current.storeId === storeId && attendanceLocation.current.view === view && attendanceLocation.current.detailId === (view === 'today' ? '' : 'closed')
     const row = rows.find(r => r.id === id) ?? data.reservations.find(r => r.id === id)
     if (!canWrite || busy || attendanceWorking.current || !current() || detailReservation?.id !== id || !row) return
     attendanceWorking.current = true
@@ -225,16 +229,17 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         try {
           if (!current()) throw new QuietError()
           const result = await restaurantTestApi.attendance(accountId, id, { action, expectedVersion: row.customer_version ?? 1, requestId: crypto.randomUUID() })
-          if (!current()) throw new QuietError()
+          if (!current() && !closed()) throw new QuietError()
           if (action === 'visited') stampNotice = result.data.stamp.status === 'recorded' ? `来店スタンプ ${result.data.stamp.count} 個を確認しました。` : 'スタンプは会計待ち・停止中・未連携の場合には増えません。'
           return result
         } catch (error) {
           if (current() && !(error instanceof QuietError)) failure = { error }
           throw new QuietError()
         }
-      }, success, { onRefreshFailure: () => { if (current()) savedButUnread = true }, suppressSuccessToast: true })
+      }, success, { onRefreshFailure: () => { if (current() || closed()) savedButUnread = true }, suppressSuccessToast: true })
       if (!ok && current()) void reload()
-      return current() ? (savedButUnread ? { savedButUnread: true } : failure ?? (ok ? { stampNotice: [success, stampNotice].filter(Boolean).join(' ') } : undefined)) : undefined
+      if (ok && closed()) notifyToast([success, stampNotice, savedButUnread ? '最新の予約を読み込めませんでした。読み直してください。' : null].filter(Boolean).join(' '), savedButUnread ? { tone: 'error' } : undefined)
+      return current() ? (failure ?? (ok ? { savedButUnread, stampNotice: [success, stampNotice].filter(Boolean).join(' ') } : undefined)) : undefined
     } finally { attendanceWorking.current = false }
   }
 
