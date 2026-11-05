@@ -103,8 +103,10 @@ describe('R1 通知', () => {
     expect(document.body.textContent).toContain(BANNER)
   })
   it('R1c 取消後の一覧に古い失敗通知を残さない', async () => {
+    // 一覧の初期取得と「作る」のクリックが競合しないよう、検査対象の作成状態から始める。
+    atCreate()
     render(<HqTemplatesV8 type="template" />)
-    const name = await openCreate()
+    const name = await screen.findByLabelText('テンプレート名')
     fireEvent.change(name, { target: { value: 'x'.repeat(201) } })
     await waitFor(() => expect(document.body.textContent).toContain(BANNER))
     fireEvent.click(await findPageAction({ name: 'キャンセル' }))
