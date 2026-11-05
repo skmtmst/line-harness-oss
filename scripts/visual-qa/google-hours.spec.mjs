@@ -34,7 +34,7 @@ async function seed(page,request,{readOnly=false}={}){
  await expect(page.getByRole('heading',{name:'毎週の営業時間',exact:true})).toBeVisible({timeout:120000})
 }
 async function shot(page,name){await page.mouse.move(0,0);await page.screenshot({path:`${output}/${name}.png`,fullPage:true,animations:'disabled'})}
-async function fits(page){expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);const broken=await page.locator('button:visible').evaluateAll(items=>items.filter(n=>{const r=n.getBoundingClientRect();return r.width>0&&(r.left< -2||r.right>innerWidth+2)}).map(n=>n.textContent));expect(broken).toEqual([])}
+async function fits(page,scope=page){expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);const broken=await scope.locator('button:visible').evaluateAll(items=>items.filter(n=>{const r=n.getBoundingClientRect();return r.width>0&&(r.left< -2||r.right>innerWidth+2)}).map(n=>n.textContent));expect(broken).toEqual([])}
 for(const width of [1152,1440,1920])test(`営業時間の主要操作と表示 ${width}`,async({page,request})=>{
  test.setTimeout(180000);await page.setViewportSize({width,height:1080});const errors=[];page.on('pageerror',e=>errors.push(e.message));await seed(page,request)
  await expect(page.getByRole('tab',{name:'営業時間',exact:true})).toHaveAttribute('aria-selected','true');await fits(page)
@@ -75,4 +75,17 @@ test('営業時間の操作はキーボード焦点と閲覧権限の灰色表�
  }
  await expect(page.getByRole('dialog')).toHaveCount(0);expect(changes).toEqual([])
  await fits(page);await shot(page,'1440-19-readonly')
+})
+
+
+test('狭い幅の営業予定はカレンダーと詳細を縦に並べる',async({page,request})=>{
+ await page.setViewportSize({width:900,height:1080});await seed(page,request)
+ await page.getByRole('button',{name:'カレンダーで営業予定を見る',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'営業予定',exact:true})).toBeInViewport()
+ const detail=page.getByText('11月4日（水）',{exact:true})
+ const calendar=page.getByRole('grid',{name:'2026年11月',exact:true})
+ await expect(calendar).toBeVisible();await expect(detail).toBeVisible()
+ const monthBox=await calendar.boundingBox(),detailBox=await detail.boundingBox()
+ expect(detailBox.y).toBeGreaterThan(monthBox.y+monthBox.height)
+ await fits(page,page.getByRole('main'));await shot(page,'900-20-calendar-stacked')
 })

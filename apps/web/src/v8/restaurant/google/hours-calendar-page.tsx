@@ -1,4 +1,5 @@
 'use client'
+import { useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { hoursDateAdd, hoursDateRange, type HoursWorkspace, type OpeningDate } from '@line-crm/shared'
 import { PageHeading } from '@/components/templates/page-frame'
@@ -10,6 +11,7 @@ import { hoursLongDateLabel, hoursText, workspaceDay } from './hours-model'
 import styles from './hours.module.css'
 
 export function HoursCalendarPage({data,workspace,holidays,month,onMonth,selected,onSelect,onBack,onEdit,onRemove,onReview,disabled,changed}:{data:GoogleProfileData;workspace:HoursWorkspace;holidays:Array<{date:string;name:string}>;month:string;onMonth:(m:string)=>void;selected:string;onSelect:(d:string)=>void;onBack:()=>void;onEdit:(dates:string[])=>void;onRemove:(dates:string[])=>void;onReview:()=>void;disabled:boolean;changed:boolean}) {
+ useEffect(()=>{window.scrollTo({top:0,left:0,behavior:'instant'})},[])
  const today=data.today.date
  const day=(d:string)=>workspaceDay(d,data,workspace,holidays)
  const current=day(selected),memo=workspace.notes[selected]??''

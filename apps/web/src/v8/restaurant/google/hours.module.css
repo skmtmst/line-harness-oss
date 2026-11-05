@@ -42,7 +42,7 @@
 @media(max-width:900px){.columns{grid-template-columns:minmax(0,1fr);}.content{padding:var(--space-16);}.tabs{padding:var(--space-16) var(--space-16) 0;}.context{padding-inline:var(--space-16);}.heading{flex-wrap:wrap;}.updateBar{flex-wrap:wrap;}.compareHead,.compareRow{grid-template-columns:minmax(var(--hours-review-date-min),1fr) minmax(0,1fr) auto minmax(0,1fr);gap:var(--space-8);padding-inline:0;}.todayLine{align-items:flex-start;}.twoFields{gap:var(--space-8);}}
 
 .calendarColumns{display:grid;grid-template-columns:minmax(0,1fr) var(--hours-calendar-detail-width);gap:var(--space-20);align-items:start;font-size:var(--polish-text-body);}
-@media(max-width:1var(--hours-history-label-min)){.calendarColumns{grid-template-columns:minmax(0,1fr);}}
+@media(max-width:1100px){.calendarColumns{grid-template-columns:minmax(0,1fr);}}
 
 .rangeSummary{font-size:var(--polish-text-body);font-weight:600;}
 
