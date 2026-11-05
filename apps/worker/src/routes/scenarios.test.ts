@@ -132,6 +132,43 @@ beforeEach(() => {
   });
 });
 
+describe('シナリオ名の長さ', () => {
+  test('新規作成で60文字は受け付ける', async () => {
+    const name = 'あ'.repeat(60);
+    dbMocks.createScenario.mockResolvedValue({ id: 's-1', name, ...rowBase });
+    const response = await setupApp({} as D1Database).request('/api/scenarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, triggerType: 'friend_add' }),
+    });
+    expect(response.status).toBe(201);
+    expect(dbMocks.createScenario).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ name }));
+  });
+
+  test('新規作成で61文字以上を受け付けない', async () => {
+    const response = await setupApp({} as D1Database).request('/api/scenarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'あ'.repeat(61), triggerType: 'friend_add' }),
+    });
+    expect(response.status).toBe(400);
+    expect(dbMocks.createScenario).not.toHaveBeenCalled();
+  });
+
+  test.each([60, 61])('名前の変更で %i 文字を検査する', async (length) => {
+    const name = 'あ'.repeat(length);
+    dbMocks.getScenarioById.mockResolvedValue({ id: 's-1', line_account_id: 'acc-1', ...rowBase });
+    dbMocks.updateScenario.mockResolvedValue({ id: 's-1', name, ...rowBase });
+    const response = await setupApp({} as D1Database).request('/api/scenarios/s-1', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    expect(response.status).toBe(length === 60 ? 200 : 400);
+    if (length > 60) expect(dbMocks.updateScenario).not.toHaveBeenCalled();
+  });
+});
+
 describe('GET /api/scenarios?lineAccountId=X', () => {
   test('includes both account-bound and global (NULL) scenarios', async () => {
     const rows: ScenarioRow[] = [

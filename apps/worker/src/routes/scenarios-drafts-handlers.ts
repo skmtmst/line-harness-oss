@@ -258,6 +258,9 @@ export const post__api_scenarios_6 = async (c: Context<Env, "/api/scenarios">) =
     if (!body.name || !body.triggerType) {
       return inputError(c, { success: false, error: 'name and triggerType are required' }, 400, ["name","triggerType"]);
     }
+    if (body.name.length > 60) {
+      return inputError(c, { success: false, error: 'シナリオ名は60文字以内で入力してください' }, 400, ['name']);
+    }
 
     if (body.lineAccountId
       && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
@@ -321,6 +324,9 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       onCompleteScenarioId?: string | null;
     }>();
 
+    if (body.name !== undefined && body.name.length > 60) {
+      return inputError(c, { success: false, error: 'シナリオ名は60文字以内で入力してください' }, 400, ['name']);
+    }
     if (body.reason !== undefined && (
       body.isActive !== false
       || typeof body.reason !== 'string'
