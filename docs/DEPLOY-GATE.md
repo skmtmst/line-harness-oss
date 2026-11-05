@@ -1,4 +1,4 @@
-> 文書：デプロイ安全ゲートと排他運用｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+> 文書：デプロイ安全ゲートと排他運用｜区分：今の正本｜最終確認：2026-11-05（日本時間）
 
 # デプロイ安全ゲートと排他運用
 
@@ -66,53 +66,28 @@ export LINE_HARNESS_PARENT_REPO="$HOME/path/to/nen-petfood-eccube"
 export LINE_HARNESS_DEPLOY_REMOTE=origin
 ```
 
-## 検証デプロイの手順
+## 全チャット共通の配備手順（2026-11-05 Masato指示）
 
-**この節は手元から `pnpm deploy:staging` で配るときの手順です。**
-GitHub Actions の `deploy-cloudflare-staging.yml` を使うときは
-ロックを自分で取らないでください（workflow が自分で取ります）。
-→「[GitHub Actions のロック](#github-actions-のロック2026-10-13-修正)」
+共有検証環境は **最新 `codex/development` の共通Actionsだけ**から配備する。
+本番準備用の固定版・個別ブランチ・旧workflowの再実行で上書きしない。
+以前の一度限りの例外や承認より、この巻き戻し禁止指示を優先する。
+固定版の検証は独立プレビューまたは専用環境で行い、環境の新設・認証変更は別途確認する。
 
-### 1. ロックを取得する（＝使用宣言）
+1. 最新開発版へPR統合し、必要な検査を成功させる。
+2. `deploy-cloudflare-staging.yml` を同じ開発SHAで `mode=dry-run`、その後 `mode=apply` として申請する。
+3. `cloudflare-staging` の `queue: max` で全チャット・開発者の申請を順に待つ。実行中・先行待機の依頼を取り消して割り込まない。GitHubの待機上限やActions予算で拒否されたら、未受付・未配備と報告する。
+4. 順番が来たらworkflowが `refs/deploy-locks/staging` を取得する。手元で先にロックを取らず、他人のロックを削除しない。取得できなければ停止・保持者確認とする。
+5. ロック取得後と各公開操作の直前に最新開発SHAとWorker・管理画面両方の公開SHAを確認する。候補は両公開版を祖先として含む必要がある。取得不能・不明SHA・古い候補・分岐版なら配備せず、差分統合と再検査からやり直す。
+6. ソース固定の設定再配備は、現在公開中と同一SHA・配備IDだけを許可する。履歴確認も省略しない。
+7. 公開後は両公開SHAと対象機能を確認し、ロックを解放した記録を共有する。一部失敗なら未完了として報告し、後続の統合版で回復する。
 
-```bash
-pnpm deploy:lock acquire staging --note "紹介リンク一覧の列幅修正"
-```
+ローカル `staging-deploy.sh` とWorkers Buildsの `cf-staging-deploy.sh` はdry-run／plan専用とし、`apply` は停止する。直接のwranglerや別のキューでこの手順を迂回しない。CI・課金停止は新しい有料利用や安全ゲート迂回の許可ではない。
 
-ロックは remote 上の git ref (`refs/deploy-locks/staging`) として保存されます。
-すでに誰かが持っていれば取得は失敗し、保持者・対象コミット・変更範囲・経過時間が表示されます。
+GitHub `staging` Environmentの許可元も `codex/development` のブランチだけに限定する。これは古いブランチ内のworkflowに書かれた一時例外より外側で拒否する設定である。公開中のSHAが既に開発版から分岐している場合も自動例外は作らず、差分を整理するまで停止する。
 
-先に宣言した人が優先です。空くまで待ってください。
+GitHubのキューは最大100件で、満杯時は新しい申請が拒否される。申請が失われたまま完了と扱わず、起動・待機・成功を区別する。本番の共通 `cloudflare-production` も `queue: max` で順番に処理し、既存の承認・固定候補・DBの安全確認を維持する。
 
-現在の状況だけ見たいとき:
-
-```bash
-pnpm deploy:lock status staging
-```
-
-### 2. デプロイする
-
-```bash
-# dry-run（既定）: ゲートとビルドまで。Cloudflare には触れない
-pnpm deploy:staging
-
-# 実際に反映する
-pnpm deploy:staging -- --apply
-```
-
-スクリプトは最初に事前確認（preflight）を実行し、1つでも違反があれば中止します。
-
-### 3. ロックを解放して結果を共有する
-
-```bash
-pnpm deploy:lock release staging
-```
-
-解放時に次を共有してください。
-
-- 反映コミット
-- 確認結果
-- 未確認事項
+仕様の根拠：[GitHubの順番待ち](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)、[Environmentの配備元制限](https://docs.github.com/en/rest/deployments/branch-policies)。
 
 ## ロックの仕組みと制限
 
@@ -148,13 +123,9 @@ run が終わる段で解放します。この解放の段は
 ロックは「空いているrefへのpush」で取るので、自分が先に取っていても
 workflow 側の取得は `lock-held-by-other` 相当で失敗します。
 自分のロックだから通るということはありません。
-**手元の `pnpm deploy:staging` と、workflow の `DELIVERY_MODE=apply` は、
-ロックの取り方が違う別経路です。混ぜて使えません。**
-
-| 配り方 | ロックを取るのは | 解放するのは |
-| --- | --- | --- |
-| 手元 `pnpm deploy:staging -- --apply` | **自分**（上の手順1） | **自分**（手順3） |
-| Actions `deploy-cloudflare-staging.yml` | **workflow**（`Acquire the shared staging lock`） | **workflow**（run終了時） |
+手元の `pnpm deploy:staging -- --apply` は2026-11-05から禁止している。
+共通Actionsだけが取得・配備・公開確認・解放を担当する。旧手順のロック取得や
+直接配備を復活させてはならない。
 
 run [38894823582](https://github.com/skmtmst/line-harness-oss/actions/runs/38894823582) が
 これで落ちました。手元のロックを取った状態で workflow を起動したため、
@@ -197,6 +168,12 @@ staging のロックが242分残留してその間の配備が全部止まりま
 ## 本番デプロイ
 
 原則として masato 専任です。
+
+本番候補の40桁SHAには、Workerと管理画面の両方を配備し、公開SHAを照合して成功した
+過去の検証Actions run IDを添えます。検証環境はその後も更新してよく、本番の事前検査は
+**現在公開中の検証SHAとの一致を要求しません**。候補を再確認するときに共有検証環境を
+古い版で上書きせず、独立プレビューを使います。本番用の`main`は候補を含み、
+ソース全体が同じ内容であることを引き続き確認します。
 
 Cloudflare の本番アクセス権限があること自体は、本番変更の承認ではありません。
 kenta は調査・差分確認・dry-run・手順準備まで進められますが、

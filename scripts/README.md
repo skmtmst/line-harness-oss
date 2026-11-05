@@ -46,3 +46,7 @@
 入口の待機と題は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/route-pending.test.mjs` で共有表の全入口を2幅・API遅延600msで開き、認証・ゲート・入口の全待機フレームの題と、固定の題の到着後の一致を確かめます。`V8_GUARD_ROUTE_PENDING_FAULT=1 ROUTE_PENDING_PATHS=/friends` は題をCSSで隠す故障で赤、旗を外すと緑です。
 
 スタイル切り替えの固定は同じ入口の `style-switcher.test.mjs` が、登録とはじめの設定を1152/1440/390で操作します。本文の上・下で切り替えが題の下に残り、見るだけでは保存せず、次の問から戻っても窓内に焦点が残ることを確かめます。本文へ移す故障で赤、元の帯へ戻して緑も必須です。390はオーナーが指定した狭い幅の範囲です。
+
+### 共有検証環境への配備
+
+配備は共通Actionsの順番待ちだけで行います。`deploy/verify-staging-forward.mjs` が最新開発版と両公開版のGit履歴をロック取得後・各公開直前に確認します。手元とWorkers Buildsの配備スクリプトはdry-run／plan専用です。動作試験は `pnpm test:scripts scripts/deploy/verify-staging-forward.test.ts`、運用の正本は [共通配備手順](../docs/DEPLOY-GATE.md) です。

@@ -1167,3 +1167,5 @@
 - [検証用 Google 投稿先の切替](release-log/unreleased/2086-masato-test2-google-post-test.md) — 反映履歴、確認 2026-11-04。
 - [Instagram投稿先IDの保存修正](release-log/unreleased/2088-masato-instagram-id-precision.md) — 反映履歴、確認 2026-11-04。
 - [TEST2投稿テスト後の検証設定復旧](release-log/unreleased/2089-masato-restore-google-test-gate.md) — 反映履歴、確認 2026-11-04。
+- [共有検証への反映順序と巻き戻し防止](release-log/unreleased/2090-masato-ordered-staging-delivery.md) — 反映履歴、確認 2026-11-05。
+- [本番候補の検証配備証拠の確認方法](release-log/unreleased/2093-masato-production-staging-proof.md) — 反映履歴、確認 2026-11-05。
