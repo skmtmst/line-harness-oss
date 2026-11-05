@@ -525,6 +525,21 @@ it('来店処理中に詳細を閉じても、完了とスタンプを通知す�
   expect(await screen.findByText(/来店スタンプ 2 個を確認しました。/)).toBeTruthy()
 })
 
+it('処理中に別の予約を開いて閉じた後は、前の予約の完了を通知しない', async () => {
+  let finish!: (value: unknown) => void
+  fixture.attendance.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(<><ReservationsPage /><ToastHost /></>)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  let dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  fireEvent.click(await screen.findByRole('button', { name: /^山田 太郎 4名/ }))
+  dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  await act(async () => { finish({ success: true, data: { stamp: { status: 'recorded', count: 2 } } }) })
+  expect(screen.queryByText(/来店スタンプ 2 個を確認しました。/)).toBeNull()
+})
+
 it('来店の保存と読み直しが終わった後、結果を窓の中で示す', async () => {
   render(<ReservationsPage />)
   fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))

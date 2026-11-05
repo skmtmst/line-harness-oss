@@ -208,15 +208,22 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const attendanceKey = JSON.stringify([accountId, storeId, view, detailId, detailReservation?.id, page, period, status, source, canWrite, !!phone])
   const attendanceScope = useRef({ key: attendanceKey })
   if (attendanceScope.current.key !== attendanceKey) attendanceScope.current = { key: attendanceKey }
-  const attendanceLocation = useRef({ accountId, storeId, view, detailId })
-  attendanceLocation.current = { accountId, storeId, view, detailId }
+  const locationKey = JSON.stringify([accountId, storeId, view, page, period, status, source, canWrite, !!phone])
+  const closedDetailId = view === 'today' ? '' : 'closed'
+  const attendanceLocation = useRef({ key: locationKey, detailId, token: {} })
+  if (attendanceLocation.current.key !== locationKey || attendanceLocation.current.detailId !== detailId) {
+    const previous = attendanceLocation.current
+    const onlyClosed = previous.key === locationKey && detailId === closedDetailId && previous.detailId !== closedDetailId
+    attendanceLocation.current = { key: locationKey, detailId, token: onlyClosed ? previous.token : {} }
+  }
   const scope = attendanceScope.current
   const attendanceActive = useRef(true)
   const attendanceWorking = useRef(false)
   useEffect(() => { attendanceActive.current = true; return () => { attendanceActive.current = false } }, [])
   const attendance = async (id: string, action: 'visited' | 'depart' | 'undo_departure' | 'undo_visit' | 'no_show') => {
     const current = () => attendanceActive.current && attendanceScope.current === scope
-    const closed = () => attendanceActive.current && attendanceLocation.current.accountId === accountId && attendanceLocation.current.storeId === storeId && attendanceLocation.current.view === view && attendanceLocation.current.detailId === (view === 'today' ? '' : 'closed')
+    const location = attendanceLocation.current
+    const closed = () => attendanceActive.current && attendanceLocation.current.token === location.token && attendanceLocation.current.key === locationKey && attendanceLocation.current.detailId === closedDetailId
     const row = rows.find(r => r.id === id) ?? data.reservations.find(r => r.id === id)
     if (!canWrite || busy || attendanceWorking.current || !current() || detailReservation?.id !== id || !row) return
     attendanceWorking.current = true
