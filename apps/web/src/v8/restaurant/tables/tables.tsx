@@ -226,6 +226,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
                   if(response.data?.id)created.push(response.data.id)
                 }
               }catch(cause){
+                saveErrors.capture(cause)
                 let rollbackFailed=false
                 for(const id of created.reverse())try{await restaurantTestApi.deleteTable(selectedAccountId,id)}catch{rollbackFailed=true}
                 if(rollbackFailed)throw new Error('一部の卓が残りました。卓一覧と座席図を確認してください。')
