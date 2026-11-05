@@ -14,6 +14,7 @@ import ListState from '@/components/shared/list-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
+import { describeApiFailure, isSaveConflict } from '@/components/shared/api-error-message'
 import { RowActions } from '@/components/shared/row-actions'
 import TextLink from '@/components/shared/text-link'
 import { useAccount } from '@/contexts/account-context'
@@ -240,11 +241,12 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           if (action === 'visited') stampNotice = result.data.stamp.status === 'recorded' ? `来店スタンプ ${result.data.stamp.count} 個を確認しました。` : 'スタンプは会計待ち・停止中・未連携の場合には増えません。'
           return result
         } catch (error) {
-          if (current() && !(error instanceof QuietError)) failure = { error }
+          if ((current() || closed()) && !(error instanceof QuietError)) failure = { error }
           throw new QuietError()
         }
       }, success, { onRefreshFailure: () => { if (current() || closed()) savedButUnread = true }, suppressSuccessToast: true })
       if (!ok && current()) void reload()
+      if (!ok && closed() && failure) notifyToast(isSaveConflict(failure.error) ? 'ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。' : describeApiFailure(failure.error, '来店・退店の記録'), { tone: 'error' })
       if (ok && closed()) notifyToast([success, stampNotice, savedButUnread ? '最新の予約を読み込めませんでした。読み直してください。' : null].filter(Boolean).join(' '), savedButUnread ? { tone: 'error' } : undefined)
       return current() ? (failure ?? (ok ? { savedButUnread, stampNotice: [success, stampNotice].filter(Boolean).join(' ') } : undefined)) : undefined
     } finally { attendanceWorking.current = false }

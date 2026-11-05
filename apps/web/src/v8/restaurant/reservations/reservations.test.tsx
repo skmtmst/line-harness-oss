@@ -525,6 +525,17 @@ it('来店処理中に詳細を閉じても、完了とスタンプを通知す�
   expect(await screen.findByText(/来店スタンプ 2 個を確認しました。/)).toBeTruthy()
 })
 
+it('来店処理中に一覧の詳細を閉じた後の競合はトーストで知らせる', async () => {
+  let fail!: (error: Error) => void
+  fixture.attendance.mockReturnValueOnce(new Promise((_, reject) => { fail = reject }))
+  render(<><ReservationsPage /><ToastHost /></>)
+  fireEvent.click(await screen.findByRole('button', { name: '一覧', exact: true }))
+  fireEvent.click(await screen.findByRole('button', { name: '来店にする', exact: true }))
+  fireEvent.click(screen.getByRole('button', { name: '予約の詳細を閉じる' }))
+  await act(async () => { fail(new ApiError(409, '最新の予約を確認してください。', 'version_conflict')) })
+  await waitFor(() => expect(within(screen.getByRole('status', { name: '知らせ' })).getByText('ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。')).toBeTruthy())
+})
+
 it('処理中に別の予約を開いて閉じた後は、前の予約の完了を通知しない', async () => {
   let finish!: (value: unknown) => void
   fixture.attendance.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
