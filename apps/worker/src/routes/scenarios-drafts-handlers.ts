@@ -324,8 +324,15 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
       onCompleteScenarioId?: string | null;
     }>();
 
-    if (body.name !== undefined && body.name.length > 60) {
-      return inputError(c, { success: false, error: 'シナリオ名は60文字以内で入力してください' }, 400, ['name']);
+    let name = body.name;
+    if (name !== undefined && name.length > 60) {
+      const existing = await getScenarioById(c.env.DB, id);
+      if (!existing) return fail(c, 404, 'SCENARIO_NOT_FOUND');
+      if (existing.name !== name) {
+        return inputError(c, { success: false, error: 'シナリオ名は60文字以内で入力してください' }, 400, ['name']);
+      }
+      // 変更していない長い名前は書かず、同時に変更された名前を上書きしない。
+      name = undefined;
     }
     if (body.reason !== undefined && (
       body.isActive !== false
@@ -387,7 +394,7 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
     }
 
     const updated = await updateScenario(c.env.DB, id, {
-      name: body.name,
+      name,
       description: body.description,
       trigger_type: body.triggerType,
       trigger_tag_id: body.triggerTagId,

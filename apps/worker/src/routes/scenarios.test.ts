@@ -167,6 +167,18 @@ describe('シナリオ名の長さ', () => {
     expect(response.status).toBe(length === 60 ? 200 : 400);
     if (length > 60) expect(dbMocks.updateScenario).not.toHaveBeenCalled();
   });
+
+  test('既存の長い名前を変えずに他の設定を保存できる', async () => {
+    const name = '既存'.repeat(40);
+    dbMocks.getScenarioById.mockResolvedValue({ id: 's-1', name, line_account_id: 'acc-1', ...rowBase });
+    dbMocks.updateScenario.mockResolvedValue({ id: 's-1', name, line_account_id: 'acc-1', ...rowBase });
+    const response = await setupApp({} as D1Database).request('/api/scenarios/s-1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, folderId: 'folder-1' }),
+    });
+    expect(response.status).toBe(200);
+    expect(dbMocks.updateScenario).toHaveBeenCalledWith(expect.anything(), 's-1', expect.objectContaining({ name: undefined, folder_id: 'folder-1' }), undefined);
+  });
 });
 
 describe('GET /api/scenarios?lineAccountId=X', () => {
