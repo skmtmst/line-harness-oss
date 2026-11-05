@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
+import { attentionFixture } from '@/test-utils/hq-attention-fixture'
 import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { flushListUrlState } from '@/components/shared/list-url-state'
@@ -168,6 +169,20 @@ it('表の対応が要る件数は同じアカウントの全種類の合計を�
   const row = container.querySelector('tbody tr')!
   expect(row.children[3].textContent).toContain('7 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
+})
+
+it('対応一覧と同じ口の５種類を合計する', async () => {
+  attention.mockResolvedValue({ success: true, data: { items: [attentionFixture] } })
+  await render()
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('15 件')
+})
+
+it('対応が要る数が０件なら、１件に補正しない', async () => {
+  attention.mockResolvedValue({ success: true, data: { items: [{ ...attentionFixture, counts: { unhandledChats: 0, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 0 } }] } })
+  await render()
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('0 件')
 })
 
 it('対応が要る数に欠けた種類がある場合は合計を不明にする', async () => {
