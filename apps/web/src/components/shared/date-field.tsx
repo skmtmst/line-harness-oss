@@ -45,7 +45,7 @@ export default function DateField({
   max?: string
   disabled?: boolean
   invalid?: boolean
-  size?: 'standard' | 'compact'
+  size?: 'standard' | 'compact' | 'hours'
   /** 狭い道具欄では月日だけを表示。年を含む全文はtitleと暦に残す。 */
   displayFormat?: 'full' | 'short' | 'day'
   /** false で「日付を消す」の×を出さない（日付が必ず要る欄。業種ダッシュボードの日付の段）。既定は出す。 */
