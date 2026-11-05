@@ -30,7 +30,7 @@ import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } f
 import { RestaurantShell, QuietError, StatRow, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { pickMoveTarget, reservationLine } from './move'
-import styles from './tables.module.css'
+import styles from '@/components/shared/restaurant-table-board.module.css'
 import TableRowActions from './table-row-actions'
 import StatusBadge from '@/components/shared/status-badge'
 import TablesAssignBoard from './assign'
