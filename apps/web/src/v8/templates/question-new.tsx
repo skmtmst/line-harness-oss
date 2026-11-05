@@ -191,7 +191,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionDraftSnapshot])
 
-  const save = async (questionStatus: 'draft' | 'published', confirmedVersion?: { expectedVersion: number; expectedDraftRevision: number }): Promise<boolean> => {
+  const save = async (questionStatus: 'draft' | 'published', confirmedVersion?: { expectedVersion: number; expectedDraftRevision: number }, onSaved?: () => void): Promise<boolean> => {
     if (host) {
       if (fields.submit().length > 0) { setError(''); return false }
       setError('')
@@ -224,6 +224,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       if (!id && templateId) createdDraft.current = { id: templateId, generation }
       editVersion.current = { expectedVersion: result.data.publishedVersion, expectedDraftRevision: result.data.draftRevision }
       saved = true
+      onSaved?.()
       if (questionStatus === 'published') {
         if (!templateId || !canMutateRef.current) { setError('下書きは保存しましたが、公開できませんでした。一覧で確認してください。'); return false }
         const published = await api.templates.publish(templateId, editVersion.current)
@@ -419,7 +420,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         title="この質問を公開しますか？"
         description={`この質問は ${usageCount}か所で使われています。公開すると、シナリオや一斉配信へ新しい内容が届きます。`}
         confirmLabel="公開する"
-        busy={saving}
+        busy={saving || publishing}
         confirmDisabled={publishTarget !== null && publishTarget.form !== publishFormScope.current}
         confirmDisabledReason="内容が変わりました。閉じて確認し直してください。"
         error={error || undefined}
@@ -428,7 +429,38 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           if (!alive.current || !canMutateRef.current || !publishTarget || !renderedPublishTicket || renderedPublishTicket !== publishTicket.current || publishTarget.generation !== scope.current.generation || publishTarget.form !== publishFormScope.current) return
           setPublishing(true)
           try {
-            if (await save('published', publishTarget.version)) { publishTicket.current = null; setPublishTarget(null); leaveToList() }
+            let savedBeforeFailure = false
+            if (await save('published', publishTarget.version, () => { savedBeforeFailure = true })) { publishTicket.current = null; setPublishTarget(null); leaveToList(); return }
+            // 保存が通ってから公開に失敗した場合、確認時の版は自分の保存で古くなる。
+            // 最新の対象・利用先と版を読み直して、あらためて確認してもらう。
+            if (savedBeforeFailure) {
+              const target = publishTarget
+              publishTicket.current = null
+              setPublishTarget(null)
+              editVersion.current = null
+              try {
+                const latest = await api.templates.get(id!)
+                if (!alive.current || target.generation !== scope.current.generation) return
+                if (!latest.success || !latest.data.question || !isEditableQuestion(latest.data.question) || target.form !== publishFormScope.current) {
+                  setError('最新の質問を確認できませんでした。読み直してから公開してください。')
+                  return
+                }
+                const latestQuestion = latest.data.question
+                const data = latest.data
+                editVersion.current = { expectedVersion: data.publishedVersion, expectedDraftRevision: data.draftRevision }
+                setTemplateAccountId(data.accountId ?? null)
+                setTemplateAccountKnown(Object.prototype.hasOwnProperty.call(data, 'accountId') && data.accountId !== undefined)
+                setName(data.name)
+                setCategory(data.category || '未分類')
+                setFolderId(data.folderId ?? null)
+                setQuestion(latestQuestion)
+                setSavedSnapshot(snapshotOf({ name: data.name, category: data.category || '未分類', folderId: data.folderId ?? null, question: latestQuestion }))
+                setUsageCount(Object.values(data.usedBy).reduce((total, items) => total + items.length, 0))
+                setError('下書きは保存しましたが、公開できませんでした。最新の内容を確認し、もう一度公開してください。')
+              } catch {
+                if (alive.current && target.generation === scope.current.generation) setError('最新の質問を読み直せませんでした。読み直してから公開してください。')
+              }
+            }
           } finally {
             setPublishing(false)
           }
