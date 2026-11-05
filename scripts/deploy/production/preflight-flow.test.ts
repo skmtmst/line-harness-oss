@@ -18,22 +18,22 @@ function fixture(failure = '') {
     if (url.hostname === 'api.github.com') {
       if (failure === 'metadata') return new Response('synthetic-provider-secret', { status: 403 });
       if (url.pathname.endsWith('/environments/production')) return Response.json({ protection_rules: failure === 'reviewers' ? [] : [{ type: 'required_reviewers', reviewers: [{ type: 'User' }] }] });
-      if (url.pathname.endsWith('/jobs')) return Response.json({ jobs: [{ conclusion: 'success', steps: [{ name: 'Verify public source revisions', conclusion: failure === 'skipped' ? 'skipped' : 'success' }] }] });
+      if (url.pathname.endsWith('/jobs')) return Response.json({ jobs: [{ conclusion: 'success', steps: [
+        { name: 'Deploy Worker to staging', conclusion: failure === 'worker-skipped' ? 'skipped' : 'success' },
+        { name: 'Deploy Admin Panel to staging', conclusion: failure === 'admin-skipped' ? 'skipped' : 'success' },
+        { name: 'Verify public source revisions', conclusion: failure === 'skipped' ? 'skipped' : 'success' },
+      ] }] });
       return Response.json({ repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: failure === 'run-sha' ? main : sha, status: 'completed', conclusion: 'success', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-staging.yml' });
     }
-    // No credentials, cookies or request body may reach the public probes.
-    expect(init).not.toHaveProperty('headers'); expect(init).not.toHaveProperty('body');
-    expect(url.hostname).toMatch(/^stg-(?:api|admin)\.musubo\.jp$/);
-    const git_commit = failure === 'public-sha' && url.hostname.startsWith('stg-admin') ? main : sha;
-    return Response.json(url.pathname === '/api/health' ? { success: true, data: { status: 'ok', git_commit } } : { git_commit });
+    throw new Error(`unexpected provider request: ${url.hostname}`);
   });
   return fetcher;
 }
 describe('release preflight uses real orchestration with synthetic metadata', () => {
-  it('verifies the main tree, protected environment, staging run, Worker version/health and Admin version', async () => {
+  it('verifies the main tree, protected environment and earlier full staging run without probing current staging', async () => {
     const fetcher = fixture();
     await preflight(sha, '123', fetcher);
-    expect(fetcher).toHaveBeenCalledTimes(6);
+    expect(fetcher).toHaveBeenCalledTimes(3);
     expect(vi.mocked(common.command).mock.calls.some(([, args]) => args.includes('--is-ancestor'))).toBe(true);
   });
   it('fails before DB work when Admin public configuration is missing or points to another project', async () => {
@@ -52,7 +52,7 @@ describe('release preflight uses real orchestration with synthetic metadata', ()
     await expect(preflight(sha, '123', fetcher)).rejects.toThrow('operations_pause_confirmation');
     expect(fetcher).not.toHaveBeenCalled();
   });
-  it.each(['metadata', 'reviewers', 'skipped', 'run-sha', 'public-sha'])('does not accept %s as staging evidence', async failure => {
+  it.each(['metadata', 'reviewers', 'skipped', 'worker-skipped', 'admin-skipped', 'run-sha'])('does not accept %s as staging evidence', async failure => {
     const fetcher = fixture(failure);
     await expect(preflight(sha, '123', fetcher)).rejects.toThrow();
     expect(vi.mocked(common.command).mock.calls.every(([binary]) => binary === 'git')).toBe(true);
