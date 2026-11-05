@@ -60,8 +60,8 @@ beforeEach(() => {
     { code: 'tabelog', name: '食べログ', acceptsReservations: 1, pageUrl: null, loginUrl: null, closeOnBooking: 1, version: 1 },
   ] })
   fixture.previewClosure.mockResolvedValue({ data: { reservations: [
-    { id: 'r1', startsAt: `${day(future)}T03:00:00.000Z`, endsAt: `${day(future)}T05:00:00.000Z`, guestCount: 2, customerName: '山田 花子', source: 'line', tableId: 't1', friendId: 'friend-9', isLineFriend: true },
-    { id: 'r2', startsAt: `${day(future)}T10:00:00.000Z`, endsAt: `${day(future)}T12:00:00.000Z`, guestCount: 4, customerName: '佐藤 美咲', source: 'hotpepper', tableId: 't4', friendId: null, isLineFriend: false },
+    { id: 'r1', startsAt: `${day(future)}T03:00:00.000Z`, endsAt: `${day(future)}T05:00:00.000Z`, guestCount: 2, customerName: '見本 143', source: 'line', tableId: 't1', friendId: 'friend-9', isLineFriend: true },
+    { id: 'r2', startsAt: `${day(future)}T10:00:00.000Z`, endsAt: `${day(future)}T12:00:00.000Z`, guestCount: 4, customerName: '見本 121', source: 'hotpepper', tableId: 't4', friendId: null, isLineFriend: false },
   ], waitlistCount: 0, conflicts: [] } })
   fixture.createClosure.mockImplementation(async (_a: string, body: Record<string, unknown>) => ({ data: { closure: { ...closure('cl-new', future), ...body, id: 'cl-new', version: 1 }, reservations: [{}, {}], waitlistCount: 0, conflicts: [] } }))
   fixture.deleteClosure.mockResolvedValue({ data: { id: 'cl-1', version: 4, archived: true } })
@@ -147,8 +147,8 @@ describe('UVnvR 休業日・貸切', () => {
 
   it('変える窓は自分を除いて preview を呼び、電話番号・連絡済みを preview から出す。閉じる知らせは外せる', async () => {
     fixture.previewClosure.mockResolvedValue({ data: { contactedCount: 1, reservations: [
-      { id: 'r1', startsAt: `${day(future)}T03:00:00.000Z`, endsAt: `${day(future)}T05:00:00.000Z`, guestCount: 2, customerName: '山田 花子', customerPhone: null, contacted: true, source: 'line', tableId: 't1', friendId: 'friend-9', isLineFriend: true },
-      { id: 'r2', startsAt: `${day(future)}T10:00:00.000Z`, endsAt: `${day(future)}T12:00:00.000Z`, guestCount: 4, customerName: '佐藤 美咲', customerPhone: '03-1234-5678', contacted: false, source: 'hotpepper', tableId: 't4', friendId: null, isLineFriend: false },
+      { id: 'r1', startsAt: `${day(future)}T03:00:00.000Z`, endsAt: `${day(future)}T05:00:00.000Z`, guestCount: 2, customerName: '見本 143', customerPhone: null, contacted: true, source: 'line', tableId: 't1', friendId: 'friend-9', isLineFriend: true },
+      { id: 'r2', startsAt: `${day(future)}T10:00:00.000Z`, endsAt: `${day(future)}T12:00:00.000Z`, guestCount: 4, customerName: '見本 121', customerPhone: '03-0000-5678', contacted: false, source: 'hotpepper', tableId: 't4', friendId: null, isLineFriend: false },
     ], waitlistCount: 0, conflicts: [] } })
     fixture.updateClosure.mockImplementation(async (_a: string, id: string, body: Record<string, unknown>) => ({ data: { closure: { ...closure(id, future), ...body, version: 4 }, reservations: [], contactedCount: 0, waitlistCount: 0, conflicts: [] } }))
     render(<InventoryPage />)
@@ -159,7 +159,7 @@ describe('UVnvR 休業日・貸切', () => {
     const dialog = await waitFor(() => document.querySelector('[data-design-node="nVvXy"]') as HTMLElement)
     await within(dialog).findByText(/予約が 2 件あります（保存しても取り消しません・連絡済み 1 件）/)
     expect(fixture.previewClosure).toHaveBeenCalledWith('account-1', expect.objectContaining({ excludeId: 'cl-1' }))
-    expect(within(dialog).getByRole('link', { name: /電話で連絡（03-1234-5678）/ })).not.toBeNull()
+    expect(within(dialog).getByRole('link', { name: /電話で連絡（03-0000-5678）/ })).not.toBeNull()
     expect(within(dialog).getByRole('link', { name: '連絡済み（会話を見る）' }).getAttribute('href')).toBe('/chats?friend=friend-9')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: /「閉じる知らせ」を出す/ }))
     fireEvent.click(within(dialog).getByRole('button', { name: '変更を保存' }))

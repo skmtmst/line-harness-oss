@@ -51,10 +51,10 @@ function personFixture(revision: number, linked: boolean) {
   return {
     success: true,
     data: {
-      id: 'user-a', status: 'active', revision, primaryDisplayName: '田中 花子',
+      id: 'user-a', status: 'active', revision, primaryDisplayName: '見本 171',
       linkedFriends: linked
         ? [{
-          friendId: 'friend-a', displayName: '田中 花子', lineAccountId: 'account-a',
+          friendId: 'friend-a', displayName: '見本 171', lineAccountId: 'account-a',
           lineAccountName: '本店', isFollowing: true, linkedAt: '2026-08-30T09:00:00.000Z',
           linkMethod: 'operator_review', confidence: 92, candidateId: 'candidate-a', candidateVersion: 2,
         }]

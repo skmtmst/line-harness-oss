@@ -32,8 +32,8 @@ import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 /* T3 に先の予約が2件：1件目は T4 が空いている、2件目は同じ時間の T4・個室A が埋まっている（4名は入る卓が無い）。 */
 const upcoming = [
-  reservation('r1', { customer_name: '山田 花子', guest_count: 4, starts_at: at(1, 19), ends_at: at(1, 21), table_id: 't3' }),
-  reservation('r2', { customer_name: '田中 明子', guest_count: 4, starts_at: at(2, 19), ends_at: at(2, 21), table_id: 't3' }),
+  reservation('r1', { customer_name: '見本 143', guest_count: 4, starts_at: at(1, 19), ends_at: at(1, 21), table_id: 't3' }),
+  reservation('r2', { customer_name: '見本 169', guest_count: 4, starts_at: at(2, 19), ends_at: at(2, 21), table_id: 't3' }),
   reservation('r3', { customer_name: '別の人', guest_count: 4, starts_at: at(2, 19), ends_at: at(2, 21), table_id: 't4' }),
   reservation('r4', { customer_name: '団体', guest_count: 6, starts_at: at(2, 18), ends_at: at(2, 22), table_id: 'pa' }),
 ]

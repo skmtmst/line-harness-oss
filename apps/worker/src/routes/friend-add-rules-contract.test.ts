@@ -93,7 +93,7 @@ function seedRuleAndRun(testDb: SqliteD1): void {
      VALUES ('version-1', 'rule-1', 3, ?, 'published', '2026-09-07T09:00:00.000'),
             ('version-2', 'rule-2', 1, ?, 'published', '2026-09-07T09:01:00.000')`,
   ).run(definition, definition);
-  insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '山田 太郎' });
+  insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '見本 141' });
   testDb.raw.prepare(
     `INSERT INTO friend_scenarios
       (id, friend_id, scenario_id, status, started_at, updated_at)
@@ -241,7 +241,7 @@ describe('friend-add rule data contracts', () => {
       data: { items: Array<{ friend: Record<string, unknown> }> };
     };
     expect(staffListBody.data.items[0].friend).toEqual({ displayName: '顧客名は非表示', redacted: true });
-    expect(JSON.stringify(staffListBody)).not.toContain('山田 太郎');
+    expect(JSON.stringify(staffListBody)).not.toContain('見本 141');
     expect(JSON.stringify(staffListBody)).not.toContain('friend-1');
 
     const staffDetail = await app(testDb.db, staff).request('/api/friend-add-runs/run-1?account_id=account-1');
@@ -252,7 +252,7 @@ describe('friend-add rule data contracts', () => {
     expect(staffDetailBody.data.friend).toEqual({ displayName: '顧客名は非表示', redacted: true });
     expect(staffDetailBody.data.rule).not.toHaveProperty('definition');
     expect(staffDetailBody.data).not.toHaveProperty('configuredActions');
-    expect(JSON.stringify(staffDetailBody)).not.toContain('山田 太郎');
+    expect(JSON.stringify(staffDetailBody)).not.toContain('見本 141');
     expect(JSON.stringify(staffDetailBody)).not.toContain('友だち追加ありがとうございます');
 
     const adminDetail = await app(testDb.db, admin).request('/api/friend-add-runs/run-1?account_id=account-1');
@@ -260,14 +260,14 @@ describe('friend-add rule data contracts', () => {
     const adminDetailBody = await adminDetail.json() as {
       data: { friend: { id: string; displayName: string | null; redacted: boolean }; rule: { definition: { messageText: string } }; configuredActions: unknown[] };
     };
-    expect(adminDetailBody.data.friend).toEqual({ id: 'friend-1', displayName: '山田 太郎', redacted: false });
+    expect(adminDetailBody.data.friend).toEqual({ id: 'friend-1', displayName: '見本 141', redacted: false });
     expect(adminDetailBody.data.rule.definition.messageText).toBe('友だち追加ありがとうございます');
     expect(adminDetailBody.data.configuredActions).toHaveLength(1);
 
     const ownerDetail = await app(testDb.db, owner).request('/api/friend-add-runs/run-1?account_id=account-1');
     expect(ownerDetail.status).toBe(200);
     await expect(ownerDetail.json()).resolves.toMatchObject({
-      data: { friend: { id: 'friend-1', displayName: '山田 太郎', redacted: false } },
+      data: { friend: { id: 'friend-1', displayName: '見本 141', redacted: false } },
     });
 
     const otherAccount = await app(testDb.db, staff).request('/api/friend-add-runs?account_id=account-2');
@@ -367,7 +367,7 @@ describe('friend-add rule data contracts', () => {
 
   it('実行結果の種類・経路の絞り込みをサーバ側で行い、不正な値は400にする', async () => {
     seedRuleAndRun(testDb);
-    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '佐藤 花子' });
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '見本 122' });
     testDb.raw.prepare(
       `INSERT INTO friend_add_events
         (id, line_account_id, friend_id, webhook_event_id, friend_kind, attribution_status,
@@ -410,9 +410,9 @@ describe('friend-add rule data contracts', () => {
    * 処理時刻ではない）。
    */
   it('実行結果の集計は28日窓・絞り込み・実送信日時と一致する', async () => {
-    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '山田 太郎' });
-    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '佐藤 花子' });
-    insertFriend(testDb.raw, 'friend-9', { line_account_id: 'account-2', display_name: '別店 客' });
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '見本 141' });
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '見本 122' });
+    insertFriend(testDb.raw, 'friend-9', { line_account_id: 'account-2', display_name: '見本 20' });
     const jst = (daysAgo: number, hour = 10) =>
       new Date(Date.now() - daysAgo * 86400000 + 9 * 3600000).toISOString().slice(0, 11) + `${String(hour).padStart(2, '0')}:00:00.000+09:00`;
     const insertRun = (row: {
@@ -465,7 +465,7 @@ describe('friend-add rule data contracts', () => {
 
   it('送れなかった実行はpartial_failedで絞れ、要確認に数える', async () => {
     seedRuleAndRun(testDb);
-    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '佐藤 花子' });
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '見本 122' });
     testDb.raw.prepare(
       `INSERT INTO friend_add_events
         (id, line_account_id, friend_id, webhook_event_id, friend_kind, attribution_status,
@@ -562,7 +562,7 @@ describe('friend-add rule data contracts', () => {
     await expect(hit.json()).resolves.toMatchObject({ success: true, data: { matched: true } });
 
     // 条件を満たさない友だち（タグ無し）→ 条件不一致の理由
-    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '佐藤 花子' });
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '見本 122' });
     const notMet = await app(testDb.db).request('/api/friend-add-rules/test', json(
       'POST', { ...inside, friendId: 'friend-2' },
     ));

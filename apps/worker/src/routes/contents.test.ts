@@ -442,7 +442,7 @@ beforeEach(() => {
   mocks.getCommonVarVersions.mockResolvedValue([{
     id: 'cv-1-v3', common_var_id: 'cv-1', version_no: 3,
     name: '営業時間', value: '10-19', memo: '店舗共通の営業時間',
-    change_reason: '営業時間を更新', actor_id: 'u-1', actor_name: '川野 健太', created_at: '2026-08-16',
+    change_reason: '営業時間を更新', actor_id: 'u-1', actor_name: '見本 145', created_at: '2026-08-16',
   }]);
   mocks.getCommonVarReplacementCandidates.mockResolvedValue([{
     ...VAR, id: 'cv-2', name: '新営業時間', var_key: 'new_hours', value: '11-20', version: 1,
@@ -540,14 +540,14 @@ describe('メディアのアップロード', () => {
   });
 
   it('R35: 一覧は入れた人の表示名を添え、IDをそのまま出さない', async () => {
-    mocks.getStaffNameMap.mockResolvedValueOnce(new Map([['u-1', '川野 健太']]));
+    mocks.getStaffNameMap.mockResolvedValueOnce(new Map([['u-1', '見本 145']]));
     const res = await req('/api/media?accountId=account-1', 'GET');
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       data: { items: Array<{ uploadedBy: string; uploadedByName: string | null }> };
     };
     expect(body.data.items[0]?.uploadedBy).toBe('u-1');
-    expect(body.data.items[0]?.uploadedByName).toBe('川野 健太');
+    expect(body.data.items[0]?.uploadedByName).toBe('見本 145');
   });
 
   it('R35: 退職・削除済みで引けない入れた人は null で返し、画面が言葉にする', async () => {
@@ -1690,7 +1690,7 @@ describe('共通情報', () => {
         usageCount: 1, usageByKind: { template: 1 },
         usages: [{ name: '予約案内', currentPreview: '営業時間は10-19です' }],
         usagePage: { total: 1, shown: 1, hasMore: false, unavailableCount: 0 },
-        history: [{ version: 3, changeReason: '営業時間を更新', actorName: '川野 健太' }],
+        history: [{ version: 3, changeReason: '営業時間を更新', actorName: '見本 145' }],
       },
     });
   });

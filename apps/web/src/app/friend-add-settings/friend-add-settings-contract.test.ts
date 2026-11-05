@@ -171,7 +171,7 @@ describe("管理画面 友だち追加時配信の監査修正", () => {
   })
 
   it('N-108: テスト確認面に固定の人名・方法を出さない', () => {
-    expect(EDITOR).not.toContain('Kenta Kawano')
+    expect(EDITOR).not.toContain('Demo Person')
   })
 
   it('N-109: 「二重送信」は再送防止の設定値を出し、テスト実施状態と分ける', () => {

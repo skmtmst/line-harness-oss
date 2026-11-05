@@ -67,8 +67,8 @@ const analytics = {
 }
 const participants = {
   items: [
-    { friendId: 'f-1', friendName: 'Kenta Kawano', pictureUrl: null, sessions: 2, registered: true, firstJoinedAt: '2026-09-30T01:12:00Z', latestJoinedAt: '2026-09-30T01:12:00Z', maxWatchedSeconds: 872, ctaClickedAt: '2026-09-30T01:20:00Z', formSubmittedAt: null, classification: 'completed' },
-    { friendId: 'f-2', friendName: '山田 太郎', pictureUrl: null, sessions: 0, registered: true, firstJoinedAt: null, latestJoinedAt: null, maxWatchedSeconds: 0, ctaClickedAt: null, formSubmittedAt: null, classification: 'unviewed' },
+    { friendId: 'f-1', friendName: 'Demo Person', pictureUrl: null, sessions: 2, registered: true, firstJoinedAt: '2026-09-30T01:12:00Z', latestJoinedAt: '2026-09-30T01:12:00Z', maxWatchedSeconds: 872, ctaClickedAt: '2026-09-30T01:20:00Z', formSubmittedAt: null, classification: 'completed' },
+    { friendId: 'f-2', friendName: '見本 141', pictureUrl: null, sessions: 0, registered: true, firstJoinedAt: null, latestJoinedAt: null, maxWatchedSeconds: 0, ctaClickedAt: null, formSubmittedAt: null, classification: 'unviewed' },
   ],
   nextCursor: null,
 }

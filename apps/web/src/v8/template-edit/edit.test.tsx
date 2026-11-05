@@ -613,7 +613,7 @@ describe('V8 メッセージを作る：フォルダ・読み込めないとき�
     expect(tracking.disabled).toBe(true)
     expect(tracking.parentElement?.textContent).toContain('短縮して数える（いつもオン・変更できません）')
     const preview = host.querySelector('[data-template-region="preview"]')!
-    expect(preview.textContent).toContain('山田 太郎さん、ご予約はこちら')
+    expect(preview.textContent).toContain('見本 141さん、ご予約はこちら')
     expect(preview.textContent).toContain('値を確認できない差し込みがあります：{{field.unknown_key}}')
   })
 })

@@ -35,7 +35,7 @@ const thisMonth = new Date().toISOString()
 function photo(id: string, petName: string, status: string, extra: Record<string, unknown> = {}) {
   return {
     id, pet_name: petName, pet_call_name: `${petName}ちゃん`, pet_gender: 'female',
-    owner_name: '田中 明子', customer_id: '10234', caption: '散歩のあと',
+    owner_name: '見本 169', customer_id: '10234', caption: '散歩のあと',
     status, created_at: '2026-09-30T01:00:00.000Z', review_version: 1, latest_risk_flag: 'safe',
     publication_consent_at: '2026-09-01T00:00:00.000Z', publication_withdrawn_at: null,
     review_notification_status: 'sent',
@@ -52,9 +52,9 @@ const PHOTOS = [
   photo('ph-6', 'むぎ', 'rejected', { review_reason_code: 'quality' }),
 ]
 const VERSIONS = [
-  { versionNumber: 4, policyKey: 'v4', points: 120, publicationPoints: 200, summary: '', effectiveFrom: '2026-10-15T00:00:00+09:00', createdBy: '高田 誠', createdAt: '2026-09-25T20:40:00+09:00', status: 'reserved' },
-  { versionNumber: 3, policyKey: 'v3', points: 100, publicationPoints: 200, summary: '', effectiveFrom: null, createdBy: '高田 誠', createdAt: '2026-09-20T10:00:00+09:00', status: 'in_use' },
-  { versionNumber: 2, policyKey: 'v2', points: 50, publicationPoints: 150, summary: '', effectiveFrom: null, createdBy: '中川 由美', createdAt: '2026-08-01T09:30:00+09:00', status: 'past' },
+  { versionNumber: 4, policyKey: 'v4', points: 120, publicationPoints: 200, summary: '', effectiveFrom: '2026-10-15T00:00:00+09:00', createdBy: '見本 18', createdAt: '2026-09-25T20:40:00+09:00', status: 'reserved' },
+  { versionNumber: 3, policyKey: 'v3', points: 100, publicationPoints: 200, summary: '', effectiveFrom: null, createdBy: '見本 18', createdAt: '2026-09-20T10:00:00+09:00', status: 'in_use' },
+  { versionNumber: 2, policyKey: 'v2', points: 50, publicationPoints: 150, summary: '', effectiveFrom: null, createdBy: '見本 30', createdAt: '2026-08-01T09:30:00+09:00', status: 'past' },
 ]
 
 const json = (data: unknown) => new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } })

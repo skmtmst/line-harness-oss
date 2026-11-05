@@ -40,8 +40,8 @@ function seed(raw: Database.Database): void {
     VALUES ('${ACCOUNT}', 'channel-nen', '然', 'token', 'secret'), ('account-other', 'channel-o', '別', 'token', 'secret'), ('account-empty', 'channel-e', '空', 'token', 'secret');
     INSERT INTO tenants (id, name) VALUES ('tenant-default', '既定') ON CONFLICT DO NOTHING;
     INSERT INTO friends (id, line_user_id, display_name, line_account_id, is_following, user_id, created_at, updated_at) VALUES
-      ('friend-a', 'U-a', '山田 太郎', '${ACCOUNT}', 1, 'ec-a', '2026-09-01', '2026-09-01'),
-      ('friend-b', 'U-b', '鈴木 一郎', '${ACCOUNT}', 1, 'ec-b', '2026-09-01', '2026-09-01'),
+      ('friend-a', 'U-a', '見本 141', '${ACCOUNT}', 1, 'ec-a', '2026-09-01', '2026-09-01'),
+      ('friend-b', 'U-b', '見本 176', '${ACCOUNT}', 1, 'ec-b', '2026-09-01', '2026-09-01'),
       ('friend-c', 'U-c', '別店', 'account-other', 1, 'ec-c', '2026-09-01', '2026-09-01');
     INSERT INTO nen_ec_member_snapshots (friend_id, customer_id, purchase_count, purchase_amount, point_balance, member_rank, synced_at,
       annual_miles_yen, lifetime_miles_yen, member_rank_key, mile_rate_percent, mile_balance) VALUES
@@ -569,8 +569,8 @@ describe('GET /api/nen/members', () => {
     expect(status).toBe(200);
     expect(body.data.total).toBe(2);
     expect(body.data.items.map((i: any) => [i.name, i.rankName, i.mileRatePercent, i.annualMilesYen])).toEqual([
-      ['山田 太郎', 'プラチナ', 3, 138600],
-      ['鈴木 一郎', '未設定', null, 72400],
+      ['見本 141', 'プラチナ', 3, 138600],
+      ['見本 176', '未設定', null, 72400],
     ]);
     expect(body.data.kpis.byRank).toEqual({ platinum: 1, '': 1 });
     expect(body.data.ranks).toHaveLength(4);
@@ -578,7 +578,7 @@ describe('GET /api/nen/members', () => {
 
   it('ランクで絞り込める', async () => {
     const { body } = await json(harness('staff'), 'GET', `/api/nen/members?accountId=${ACCOUNT}&rank=platinum`);
-    expect(body.data.items.map((i: any) => i.name)).toEqual(['山田 太郎']);
+    expect(body.data.items.map((i: any) => i.name)).toEqual(['見本 141']);
   });
 });
 

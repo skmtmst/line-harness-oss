@@ -518,7 +518,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const phone = (
     <LinePreview
       title={null}
-      note={messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
+      note={messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（見本 141さんの場合）'}
       accountName={sendName}
       caption="配信日 10:00"
     >
