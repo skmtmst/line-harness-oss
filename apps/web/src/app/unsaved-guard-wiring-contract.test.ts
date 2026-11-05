@@ -22,6 +22,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'components/friend-fields/support-mark-rules-panel.tsx',
   'components/accounts/account-edit-modal.tsx',
   'components/broadcasts/broadcast-asset-manager.tsx',
   'components/shared/folder-add-dialog.tsx',
@@ -469,8 +470,6 @@ const UNTRIAGED: Record<string, string> = {
   // お問い合わせの入口はV8だけを読む。現役の返信下書き/起票の扱いは上で点検する。
   'v8/webhooks/edit.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'components/friend-fields/support-mark-rules-panel.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/friends/advanced-search-dialog.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/friends/single-friend-actions.tsx':
