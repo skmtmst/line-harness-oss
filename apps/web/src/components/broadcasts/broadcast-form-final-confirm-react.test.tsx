@@ -494,3 +494,15 @@ describe('確認が残る配信の了承', () => {
     expect(rows.find(row => row.textContent?.includes('送信枠'))?.getAttribute('data-check-state')).toBe('pending')
   })
 })
+
+it('配信作成の段を切り替えても入力欄は横に移動しない', async () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: false }))
+  const animate = vi.spyOn(HTMLElement.prototype, 'animate')
+  container = document.createElement('div'); document.body.append(container); root = createRoot(container)
+  const props = { visualQaAugustCampaign: true, tags: [], onSuccess: mocks.success, onCancel: () => {} }
+  await act(async () => { root.render(<BroadcastForm {...props} currentStep="audience" />) }); await flush()
+  await act(async () => { root.render(<BroadcastForm {...props} currentStep="message" />) }); await flush()
+  const calls = animate.mock.calls.filter((_, index) => (animate.mock.contexts[index] as HTMLElement).hasAttribute('data-step-content'))
+  expect(calls.at(-1)?.[0]).toEqual([{ opacity: 0 }, { opacity: 1 }])
+  animate.mockRestore(); vi.unstubAllGlobals()
+})
