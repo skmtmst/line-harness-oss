@@ -75,3 +75,10 @@ it('複数店舗への配信は訂正できない理由を返す', async () => {
   db.raw.exec("UPDATE broadcasts SET status='sent',target_type='multi-account-dedup',line_account_id=NULL,account_ids='[\"a\"]' WHERE id='draft'; DELETE FROM broadcast_execution_contexts WHERE broadcast_id='draft'")
   expect(await (await request('/api/broadcasts/draft/sender')).json()).toMatchObject({ data: { correctionReason: '複数の店への配信は訂正できません。' } })
 })
+
+it('元配信に訂正の下書きがあればその ID を返し、送信済みなら訂正済みを返す', async () => {
+  db.raw.exec("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id) VALUES('origin','元','text','文','all','sent','a'); INSERT INTO broadcast_sender_corrections(broadcast_id,correction_of_broadcast_id,correction_request_key) VALUES('draft','origin','key')")
+  expect(await (await request('/api/broadcasts/origin/sender')).json()).toMatchObject({ data: { correctionDraftId: 'draft', correctionReason: null } })
+  db.raw.exec("UPDATE broadcasts SET status='sent' WHERE id='draft'")
+  expect(await (await request('/api/broadcasts/origin/sender')).json()).toMatchObject({ data: { correctionDraftId: null, correctionReason: 'この配信は訂正済みです。' } })
+})

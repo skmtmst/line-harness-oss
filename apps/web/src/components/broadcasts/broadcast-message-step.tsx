@@ -14,6 +14,7 @@ import { emptyBubble } from './broadcast-form-model'
 import styles from './broadcast-form-v8.module.css'
 
 type BroadcastMessageStepContext = {
+  correctionLocked: boolean
   ab: ReturnType<typeof useBroadcastAb>
   assets: BroadcastMessageAsset[]
   bubbles: BroadcastBubble[]
@@ -37,7 +38,7 @@ type BroadcastMessageStepContext = {
   updateBubble: (target: number | string, bubble: BroadcastBubble, restoreKind?: boolean) => void
 }
 
-export function BroadcastMessageStep({ ab, assets, bubbles, composerBusy, fields, moveBubble, selectedAccountId, selectedAccountIdRef, setBubbles, setComposerBusy, setComposerTemplateIndex, setComposerTemplateKind, setInlineComposer, setShowTemplatePicker, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, setTemplateSaveName, targetMode, title, updateBubble }: BroadcastMessageStepContext) {
+export function BroadcastMessageStep({ correctionLocked, ab, assets, bubbles, composerBusy, fields, moveBubble, selectedAccountId, selectedAccountIdRef, setBubbles, setComposerBusy, setComposerTemplateIndex, setComposerTemplateKind, setInlineComposer, setShowTemplatePicker, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, setTemplateSaveName, targetMode, title, updateBubble }: BroadcastMessageStepContext) {
   return (<section id="broadcast-step-message" className={ styles.section}>
           {targetMode !== 'all' || ab.hasB ? <BroadcastAbTabs ab={ab} aBubbles={bubbles} canEdit /> : null}
           {ab.tab === 'B' && ab.b ? (
@@ -53,7 +54,7 @@ export function BroadcastMessageStep({ ab, assets, bubbles, composerBusy, fields
           ) : null}
           <div className={ab.tab === 'B' && ab.b !== null ? 'hidden' : 'contents'}>
           <MessageComposer bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))} bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)} bubbles={bubbles} accountId={selectedAccountId} busy={composerBusy} onBusyChange={(value) => { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(value) }}
-            unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
+            unavailable={correctionLocked ? Object.fromEntries(COMPOSER_TYPES.filter(([type]) => type !== 'text').map(([type]) => [type, '訂正の模擬は文章だけです'])) : { intro: '紹介メッセージは現在利用できません。' }}
             onChange={updateBubble} onMove={moveBubble} onDelete={(index) => setBubbles((items) => items.filter((_, i) => i !== index))}
             onAdd={() => setBubbles((items) => [...items, emptyBubble()])}
             onPickTemplate={(index, kind) => { setComposerTemplateKind(kind); setComposerTemplateIndex(index); setShowTemplatePicker(true) }}

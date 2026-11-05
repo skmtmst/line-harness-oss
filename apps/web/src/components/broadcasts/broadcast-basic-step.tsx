@@ -21,6 +21,7 @@ import styles from './broadcast-form-v8.module.css'
 import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 type BroadcastBasicStepContext = {
+  correctionLocked: boolean
   canCreateFolder: boolean
   createFolder: FolderSelectCreate
   deliveryMethod: "new" | "template" | "duplicate"
@@ -43,7 +44,7 @@ type BroadcastBasicStepContext = {
   title: string
 }
 
-export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, recentState, retryRecent, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }: BroadcastBasicStepContext) {
+export function BroadcastBasicStep({ correctionLocked, canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, recentState, retryRecent, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }: BroadcastBasicStepContext) {
   return (<section id="broadcast-step-basic" className={shows('basic') ? styles.section : 'hidden'}>
           <h3>配信方法</h3>
               <SaveErrorField names={["broadcast-delivery-method","value","deliveryMethod"]}><RadioCardGroup legend="配信方法" className={styles.methodCards}>
@@ -93,7 +94,7 @@ export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMeth
               <div key={broadcast.id} className={styles.recentRow}>
                 <Send size={16} aria-hidden /><span className={styles.recentName} title={broadcast.title}>{broadcast.title}</span>
                 <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '下書き'}・{broadcast.totalCount == null ? '—' : `${formatNumber(broadcast.totalCount)}人`}</span>
-                <Button size="compact" onClick={() => duplicateRecent(broadcast)}>複製する</Button>
+                <Button size="compact" disabled={correctionLocked && (broadcast.messageType !== 'text' || Boolean(broadcast.messageBubbles?.some(bubble => bubble.type !== 'text')))} lockedReason={correctionLocked && (broadcast.messageType !== 'text' || Boolean(broadcast.messageBubbles?.some(bubble => bubble.type !== 'text'))) ? '訂正の模擬は文章だけです' : undefined} onClick={() => duplicateRecent(broadcast)}>複製する</Button>
               </div>
             )) : <p className="text-xs text-ink-faint">最近の配信はまだありません。</p>}
           </div>

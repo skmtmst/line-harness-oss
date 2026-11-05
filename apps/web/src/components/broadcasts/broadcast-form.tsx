@@ -1376,18 +1376,18 @@ export default function BroadcastForm({
             </section>
           </section>
         ) : null}
-        <BroadcastBasicStep {...{ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, recentState, retryRecent, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }} />
+        <BroadcastBasicStep correctionLocked={Boolean(correctionOrigin)} {...{ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, recentState, retryRecent, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }} />
         <BroadcastAudienceStep correctionLocked={Boolean(correctionOrigin)} {...{ audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }} />
         <div className={shows('message') ? 'contents' : 'hidden'}>{messageVisited && <>
-        <BroadcastMessageStep {...{ ab, assets, bubbles, composerBusy, fields, moveBubble, selectedAccountId, selectedAccountIdRef, setBubbles, setComposerBusy, setComposerTemplateIndex, setComposerTemplateKind, setInlineComposer, setShowTemplatePicker, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, setTemplateSaveName, targetMode, title, updateBubble }} />
+        <BroadcastMessageStep correctionLocked={Boolean(correctionOrigin)} {...{ ab, assets, bubbles, composerBusy, fields, moveBubble, selectedAccountId, selectedAccountIdRef, setBubbles, setComposerBusy, setComposerTemplateIndex, setComposerTemplateKind, setInlineComposer, setShowTemplatePicker, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, setTemplateSaveName, targetMode, title, updateBubble }} />
         {showTemplatePicker && (
           <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ" searchPlaceholder="テンプレート名・本文で探す"
             folders={templateFolders} busy={composerBusy} error={templateApplyError}
             state={templateCandidatesStatus === 'loading' ?
                 <p role="status">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><Notice tone="danger">テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。</Notice></SaveErrorField> : undefined}
             items={[
-                    ...assets.filter((asset) => (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:`${typeLabel(asset.kind)}・更新 ${formatListDay(asset.updatedAt)}`})),
-              ...messageTemplates.filter((template) => !composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, frequent: frequentTemplateIds.has(template.id), keywords: template.messageContent, meta : `${typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}・更新 ${formatListDay(template.updatedAt)}`}
+                    ...assets.filter((asset) => !correctionOrigin && (!composerTemplateKind || asset.kind === composerTemplateKind) && (!asset.lineAccountId || asset.lineAccountId === selectedAccountId)).map((asset) =>( { id: `asset:${asset.id}`, name:asset.name, folderId: null, meta:`${typeLabel(asset.kind)}・更新 ${formatListDay(asset.updatedAt)}`})),
+              ...messageTemplates.filter((template) => (!correctionOrigin || messageTemplateToBubble(template)?.type === 'text') && (!composerTemplateKind || messageTemplateToBubble(template)?.type === composerTemplateKind)).map((template) => ({ id:template.id, name:template.name, folderId: template.folderId, frequent: frequentTemplateIds.has(template.id), keywords: template.messageContent, meta : `${typeLabel(messageTemplateToBubble(template)?.type ?? 'unknown')}・更新 ${formatListDay(template.updatedAt)}`}
               )),
             ]}
             preview=
@@ -1398,7 +1398,7 @@ export default function BroadcastForm({
             <LinePreview accountName={selectedAccount?.name}><BubblePreview bubble={bubble} accountName={selectedAccount?.name}/>
           </LinePreview> : null }}
             onCancel={() => setShowTemplatePicker(false)}
-            onConfirm={(id) => { const asset = assets.find((row) => `asset:${row.id}` === id); if (asset) { placeTemplateBubble(contentTemplateToBubble(asset)); setShowTemplatePicker(false); return }; const template = messageTemplates.find((row) => row.id === id); if (template) void applyTemplate(template) }} />
+            onConfirm={(id) => { const asset = assets.find((row) => `asset:${row.id}` === id); if (asset && !correctionOrigin) { placeTemplateBubble(contentTemplateToBubble(asset)); setShowTemplatePicker(false); return }; const template = messageTemplates.find((row) => row.id === id); if (template && (!correctionOrigin || messageTemplateToBubble(template)?.type === 'text')) void applyTemplate(template) }} />
         )}
         {!showTemplatePicker && <section className="rounded-card border content-card bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">

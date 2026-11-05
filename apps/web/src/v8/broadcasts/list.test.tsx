@@ -36,7 +36,7 @@ vi.mock('@/components/broadcasts/broadcast-form', () => {
   return { default: (props: unknown) => { formImport.props = props; return <div data-loaded-broadcast-form /> } }
 })
 const createCorrection = vi.hoisted(() => vi.fn())
-const getCorrectionSender = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { correctionReason: null as string | null } })))
+const getCorrectionSender = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { correctionReason: null as string | null, correctionDraftId: null as string | null } })))
 vi.mock('@/lib/api/features/broadcast-corrections', () => ({ broadcastCorrectionApi: { create: createCorrection, getSender: getCorrectionSender } }))
 vi.mock('./sender-control', () => ({ BroadcastSenderControl: () => <span>送り手の控え</span> }))
 const listBroadcasts = vi.hoisted(() => vi.fn())
@@ -230,7 +230,7 @@ describe('V8 一斉配信一覧の結果の列', () => {
   })
 
   it.each(['模擬で送った配信は訂正できません。', '複数の店への配信は訂正できません。', '送達記録がない配信は訂正できません。'])('訂正できない理由を表示する: %s', async reason => {
-    getCorrectionSender.mockResolvedValueOnce({ success: true, data: { correctionReason: reason } })
+    getCorrectionSender.mockResolvedValueOnce({ success: true, data: { correctionReason: reason, correctionDraftId: null } })
     const { sent } = await renderRows()
     act(() => fireEvent.click(sent)); await flush()
     const panel = document.querySelector('[data-design-part="detail-panel"]')!
@@ -238,6 +238,26 @@ describe('V8 一斉配信一覧の結果の列', () => {
     expect(item.getAttribute('aria-disabled')).toBe('true')
     act(() => fireEvent.focus(item))
     expect(document.querySelector('[role="tooltip"]')?.textContent).toContain(reason)
+  })
+
+  it('訂正の下書きがあれば下書きを開くと表示する', async () => {
+    getCorrectionSender.mockResolvedValueOnce({ success: true, data: { correctionReason: null, correctionDraftId: 'existing' } })
+    createCorrection.mockResolvedValueOnce({ success: true, data: { broadcastId: 'existing', testMode: true } })
+    const { sent } = await renderRows()
+    act(() => fireEvent.click(sent)); await flush()
+    const item = await findDetailMenuItem('訂正の下書きを開く', document.querySelector('[data-design-part="detail-panel"]')!)
+    act(() => fireEvent.click(item)); await flush()
+    expect(routerPush.mock.calls.at(-1)?.[0]).toContain('draft=existing')
+  })
+
+  it('訂正済みなら操作を無効にして理由を表示する', async () => {
+    getCorrectionSender.mockResolvedValueOnce({ success: true, data: { correctionReason: 'この配信は訂正済みです。', correctionDraftId: null } })
+    const { sent } = await renderRows()
+    act(() => fireEvent.click(sent)); await flush()
+    const item = await findDetailMenuItem('訂正を作る', document.querySelector('[data-design-part="detail-panel"]')!)
+    expect(item.getAttribute('aria-disabled')).toBe('true')
+    act(() => fireEvent.focus(item))
+    expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('この配信は訂正済みです。')
   })
 
   it('閲覧のみの訂正操作は理由付きで残し、押しても作らない', async () => {

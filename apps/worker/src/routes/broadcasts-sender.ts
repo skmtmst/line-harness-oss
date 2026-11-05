@@ -21,9 +21,11 @@ export async function getBroadcastSender(c: Context<Env>) {
   const senderStale = Boolean(sender && (!current || current.name !== sender.name))
   const simulation = Boolean(await simulationContext(c.env.DB,id))
   let correctionReason: string | null = null
+  let correctionDraftId: string | null = null
   if (row.status === 'sent') {
-    const existingCorrection = await c.env.DB.prepare('SELECT broadcast_id FROM broadcast_sender_corrections WHERE correction_of_broadcast_id=?').bind(id).first()
-    if (existingCorrection) correctionReason = null
+    const existingCorrection = await c.env.DB.prepare('SELECT b.id, b.status FROM broadcast_sender_corrections m JOIN broadcasts b ON b.id=m.broadcast_id WHERE m.correction_of_broadcast_id=?').bind(id).first<{id:string;status:string}>()
+    if (existingCorrection?.status === 'draft') correctionDraftId = existingCorrection.id
+    else if (existingCorrection) correctionReason = 'この配信は訂正済みです。'
     else if (simulation) correctionReason = '模擬で送った配信は訂正できません。'
     else if (!row.line_account_id || !['all', 'tag', 'segment'].includes(row.target_type)) correctionReason = '複数の店への配信は訂正できません。'
     else {
@@ -32,7 +34,7 @@ export async function getBroadcastSender(c: Context<Env>) {
     }
   }
   return c.json({ success: true, data: { senderId: saved?.sender_id ?? null, sender: saved?.sender_snapshot_json ? JSON.parse(saved.sender_snapshot_json) : null,
-    sentByStaffId: saved?.sent_by_staff_id ?? null, sentByStaffName: saved?.sent_by_staff_name ?? null, correctionOfBroadcastId: saved?.correction_of_broadcast_id ?? null, correctionReason, senderStale, version: row.lock_version, testMode: simulation } })
+    sentByStaffId: saved?.sent_by_staff_id ?? null, sentByStaffName: saved?.sent_by_staff_name ?? null, correctionOfBroadcastId: saved?.correction_of_broadcast_id ?? null, correctionReason, correctionDraftId, senderStale, version: row.lock_version, testMode: simulation } })
 }
 
 /** 実送信はしない。送り手の変更は保存版を進め、古い確認を無効にする。 */

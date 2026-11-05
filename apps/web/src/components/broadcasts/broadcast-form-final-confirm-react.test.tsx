@@ -17,15 +17,15 @@ import { fireEvent } from '@testing-library/react'
 import { formatDateTime } from '@/lib/format'
 import type { BroadcastPreflight } from '@/lib/api'
 
-const mocks = vi.hoisted(() => ({ account: 'acc-1', params: '', get: vi.fn(), preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
+const mocks = vi.hoisted(() => ({ account: 'acc-1', params: '', get: vi.fn(), templates: vi.fn(), recent: vi.fn(), preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   const empty = async () => ({ success: true, data: [] })
   return { ...actual, api: { ...actual.api,
-    broadcasts: { ...actual.api.broadcasts, get: mocks.get, create: mocks.create, update: mocks.update, send: mocks.send, list: empty, preflight: mocks.preflight,
+    broadcasts: { ...actual.api.broadcasts, get: mocks.get, create: mocks.create, update: mocks.update, send: mocks.send, list: mocks.recent, preflight: mocks.preflight,
       approval: { config: mocks.config, request: mocks.request, candidates: async () => ({ success: true, data: [] }) } },
     folders: { list: empty }, scenarios: { list: empty }, commonVars: { list: empty }, friendFields: { list: empty },
-    broadcastMessageAssets: { list: empty }, templates: { list: empty },
+    broadcastMessageAssets: { list: empty }, templates: { list: mocks.templates },
     commonActions: { resources: async () => ({ success: true, data: { commonActions: [] } }) },
     accountSettings: { getTestRecipients: empty },
   } }
@@ -66,7 +66,7 @@ function definitions(scope: ParentNode): Record<string, string> {
   return Object.fromEntries(Array.from(scope.querySelectorAll('dt')).map((dt) => [dt.textContent?.trim() ?? '', dt.nextElementSibling?.textContent?.trim() ?? '']))
 }
 
-type RenderOptions = { step?: 'confirm' | 'audience' | null; scheduled?: boolean; filled?: boolean; untested?: boolean }
+type RenderOptions = { step?: 'confirm' | 'audience' | 'message' | null; scheduled?: boolean; filled?: boolean; untested?: boolean }
 async function render({ step = 'confirm', scheduled = false, filled = true, untested = false }: RenderOptions = {}) {
   if (untested) {
     mocks.params = 'duplicateFrom=source'
@@ -103,6 +103,8 @@ async function openSingleOperatorDialog(untested = false) {
 
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks(); mocks.params = ''; mocks.account = 'acc-1'
+  mocks.templates.mockResolvedValue({ success: true, data: [] })
+  mocks.recent.mockResolvedValue({ success: true, data: [] })
   mocks.get.mockResolvedValue({ success: true, data: { id: 'draft', version: 2, status: 'sending' } })
   mocks.create.mockResolvedValue({ success: true, data: { id: 'draft', version: 1 } })
   mocks.update.mockResolvedValue({ success: true, data: { id: 'draft', version: 2 } })
@@ -128,6 +130,47 @@ it('訂正では元の宛先を事前確認し、実際のテスト送信を開�
   await act(async () => { fireEvent.click(testButton) })
   expect(dialog()).toBeNull()
   expect(mocks.send).not.toHaveBeenCalled()
+})
+
+it('訂正では文章以外の形式を理由付きで選べない', async () => {
+  mocks.params = 'draft=correction'
+  mocks.get.mockResolvedValue({ success: true, data: { id: 'correction', version: 1, status: 'draft', lineAccountId: 'acc-1', title: '訂正', messageType: 'text', messageContent: '訂正します', targetType: 'all', draftPayload: { draftTargetMode: 'all' }, correctionOfBroadcastId: 'original' } })
+  await render({ step: 'message' })
+  for (const label of ['画像', 'カルーセル', 'リッチメッセージ']) {
+    const tab = Array.from(container.querySelectorAll('[role="tab"]')).find(item => item.textContent?.trim() === label) as HTMLButtonElement
+    expect(tab.getAttribute('aria-disabled')).toBe('true')
+    expect(tab.title).toBe('訂正の模擬は文章だけです')
+    await act(async () => fireEvent.click(tab))
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('テキスト')
+  }
+})
+
+it('訂正のテンプレート一覧には文章だけを表示する', async () => {
+  mocks.params = 'draft=correction'
+  mocks.get.mockResolvedValue({ success: true, data: { id: 'correction', version: 1, status: 'draft', lineAccountId: 'acc-1', title: '訂正', messageType: 'text', messageContent: '訂正します', targetType: 'all', draftPayload: { draftTargetMode: 'all' }, correctionOfBroadcastId: 'original' } })
+  mocks.templates.mockResolvedValue({ success: true, data: [
+    { id: 't', name: '文章用', kind: 'message', messageType: 'text', messageContent: '文章', accountId: 'acc-1', publishedAt: '2026-10-01', publishedVersion: 1 },
+    { id: 'f', name: 'フレックス用', kind: 'message', messageType: 'flex', messageContent: '{}', accountId: 'acc-1', publishedAt: '2026-10-01', publishedVersion: 1 },
+  ] })
+  await render({ step: 'message' })
+  await click('テンプレートから選ぶ', container)
+  await settle()
+  expect(dialog()?.textContent).toContain('文章用')
+  expect(dialog()?.textContent).not.toContain('フレックス用')
+})
+
+it('訂正では画像入りの過去配信を複製できない', async () => {
+  mocks.params = 'draft=correction'
+  mocks.get.mockResolvedValue({ success: true, data: { id: 'correction', version: 1, status: 'draft', lineAccountId: 'acc-1', title: '訂正', messageType: 'text', messageContent: '訂正します', targetType: 'all', draftPayload: { draftTargetMode: 'all' }, correctionOfBroadcastId: 'original' } })
+  mocks.recent.mockResolvedValue({ success: true, data: [{ id: 'photo', title: '画像の配信', messageType: 'image', messageContent: '画像', totalCount: 1 }] })
+  await render({ step: null })
+  const recent = [...container.querySelectorAll('div')].find(node => node.textContent?.includes('画像の配信') && node.querySelector('button')?.textContent === '複製する')!
+  const duplicate = button('複製する', recent)
+  expect(duplicate.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.focus(duplicate)
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('訂正の模擬は文章だけです')
+  await act(async () => fireEvent.click(duplicate))
+  expect(container.textContent).toContain('訂正')
 })
 
 describe('予約は確認を通し、下書き保存は通さない（段の無い作成画面）', () => {

@@ -1,6 +1,6 @@
 import { fetchApi } from '@/lib/api'
 
-type SenderState = { senderId: string | null; sender: { name: string } | null; sentByStaffId: string | null; sentByStaffName: string | null; correctionOfBroadcastId: string | null; correctionReason: string | null; senderStale: boolean; version: number; testMode: boolean }
+type SenderState = { senderId: string | null; sender: { name: string } | null; sentByStaffId: string | null; sentByStaffName: string | null; correctionOfBroadcastId: string | null; correctionReason: string | null; correctionDraftId: string | null; senderStale: boolean; version: number; testMode: boolean }
 type Result<T> = { success: true; data: T }
 const path = (id: string) => `/api/broadcasts/${encodeURIComponent(id)}`
 export const broadcastCorrectionApi = {

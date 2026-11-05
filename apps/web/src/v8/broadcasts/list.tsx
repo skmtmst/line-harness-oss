@@ -862,12 +862,12 @@ export default function BroadcastListV8() {
   const panelIndex = visibleBroadcasts.findIndex((b) => b.id === panelId)
   const panelRow = panelIndex >= 0 ? visibleBroadcasts[panelIndex] : null
 
-  const [correctionAvailability, setCorrectionAvailability] = useState<{id: string; reason: string | null} | null>(null)
+  const [correctionAvailability, setCorrectionAvailability] = useState<{id: string; reason: string | null; draftId?: string | null} | null>(null)
   useEffect(() => {
     if (!panelId) return
     let active = true
     void broadcastCorrectionApi.getSender(panelId).then(result => {
-      if (active) setCorrectionAvailability({ id: panelId, reason: result.data.correctionReason })
+      if (active) setCorrectionAvailability({ id: panelId, reason: result.data.correctionReason, draftId: result.data.correctionDraftId })
     }).catch(() => { if (active) setCorrectionAvailability({ id: panelId, reason: '訂正できるか確認できませんでした。' }) })
     return () => { active = false }
   }, [panelId])
@@ -1329,7 +1329,7 @@ secondary: ((canResume) ? <Button
                    busyLabel="移動中…">
                     編集を続ける
                   </Button> : null),
-menuItems: [...(panelRow.status === 'sent' && !fromHq ? [{ id: 'correction', label: '訂正を作る', disabled: !canEdit || correctionAvailability?.id !== panelRow.id || Boolean(correctionAvailability.reason), lockedReason: correctionReason ?? (correctionAvailability?.id === panelRow.id ? correctionAvailability.reason ?? undefined : '訂正できるか確認しています。'), onSelect: () => void makeCorrection(panelRow) }] : []), {id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))},
+menuItems: [...(panelRow.status === 'sent' && !fromHq ? [{ id: 'correction', label: correctionAvailability?.id === panelRow.id && correctionAvailability.draftId ? '訂正の下書きを開く' : '訂正を作る', disabled: !canEdit || correctionAvailability?.id !== panelRow.id || Boolean(correctionAvailability.reason), lockedReason: correctionReason ?? (correctionAvailability?.id === panelRow.id ? correctionAvailability.reason ?? undefined : '訂正できるか確認しています。'), onSelect: () => void makeCorrection(panelRow) }] : []), {id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))},
 ...((!(fromHq)) ? [{id: 'detail-1', label: "削除する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}] : [])]}}
              status={<StatusBadge broadcast={panelRow} />}>
 <DetailContent>
