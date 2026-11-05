@@ -32,7 +32,7 @@ async function fixture(method, path, screen) {
   return {...answer,body:JSON.stringify(data)}
 }
 
-for (const width of [1152,1440]) test(`実際の27種類と埋め込み6の右の面を測る ${width}`, async () => {
+for (const width of [1152,1440]) test(`実際の詳細面と届き方プレビューを測る ${width}`, async () => {
   assert.ok(existsSync(join(root,'version.json')), 'AIと飲食店の検査用フラグを有効にした本番形式buildが必要')
   const server = createServer((req,res) => {
     const path = resolve(root, `.${new URL(req.url,'http://localhost').pathname}`)
@@ -65,6 +65,21 @@ for (const width of [1152,1440]) test(`実際の27種類と埋め込み6の右�
         await panel.waitFor({state:'visible'})
         await page.waitForFunction(()=>document.getAnimations().filter(a=>a.effect?.getTiming().iterations!==Infinity).every(a=>a.playState!=='running'))
         assert.equal(await page.evaluate(()=>localStorage.getItem('lh_staff_role')),'owner',item.key)
+        if (item.kind === 'MessagePreview') {
+          const phone=panel.locator('[data-line-preview-part="phone"]');await phone.waitFor({state:'visible'})
+          const measure=()=>panel.evaluate(aside=>{
+            const phone=aside.querySelector('[data-line-preview-part="phone"]'),talk=phone?.querySelector('[data-line-preview-part="talk"]')
+            if(!phone||!talk)throw new Error('届き方のプレビューがありません')
+            const a=aside.getBoundingClientRect(),p=phone.getBoundingClientRect()
+            return {outside:p.left<a.left-1||p.right>a.right+1,overflow:talk.scrollWidth>talk.clientWidth+1}
+          })
+          assert.deepEqual(await measure(),{outside:false,overflow:false},`${item.key} ${width}`)
+          const fault=await phone.locator('[data-line-preview-part="talk"]').evaluateHandle(talk=>{const child=document.createElement('div');child.style.width='3000px';child.textContent='はみ出す故障';talk.append(child);return child})
+          assert.equal((await measure()).overflow,true,`${item.key} はみ出す本文の故障`)
+          await fault.evaluate(el=>el.remove());assert.deepEqual(await measure(),{outside:false,overflow:false},`${item.key} 復元`)
+          console.log(`message preview ${item.key} ${width}: healthy / overflow rejected / restored`)
+          continue
+        }
         assert.deepEqual(await page.evaluate(scanDetailSurfaces),[],`${item.key} ${width}`)
         if (item.key==='staff-calendar') {
           await panel.getByRole('textbox',{name:'固定の会議の URL'}).fill('https://meet.example.invalid/changed')

@@ -1,12 +1,14 @@
 import { RowActions } from '@/components/shared/row-actions'
 import type { RestaurantTable } from '@/lib/restaurant-test-api'
+import {Copy} from 'lucide-react'
 
-export default function TableRowActions({ table, canEdit, busy, pendingAccount, onEdit, onStop, onResume, onDelete }: {
+export default function TableRowActions({ table, canEdit, busy, pendingAccount, onEdit, onDuplicate, onStop, onResume, onDelete }: {
   table: RestaurantTable
   canEdit: boolean
   busy: boolean
   pendingAccount: boolean
   onEdit: (table: RestaurantTable) => void
+  onDuplicate: (table: RestaurantTable) => void
   onStop: (table: RestaurantTable) => void
   onResume: (table: RestaurantTable) => void
   onDelete: (table: RestaurantTable) => void
@@ -16,7 +18,7 @@ export default function TableRowActions({ table, canEdit, busy, pendingAccount, 
   return <RowActions subjectName={`${table.code}・${table.label}`}
     edit={{ label: '変更', disabled: busy, lockedReason: pendingAccount ? disabledReason : undefined, onClick: () => onEdit(table) }}
     menuButtonProps={{ disabled: busy }}
-    menuItems={[{
+    menuItems={[{id:'duplicate',label:'複製',icon:<Copy size={16} aria-hidden="true"/>,disabled:busy,lockedReason:pendingAccount?disabledReason:undefined,disabledReason,onSelect:()=>onDuplicate(table)},{
       id: table.is_active ? 'stop' : 'resume',
       label: table.is_active ? '停止' : '再開',
       disabled: busy,

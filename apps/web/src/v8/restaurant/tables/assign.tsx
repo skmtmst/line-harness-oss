@@ -17,7 +17,7 @@ import { jstDate } from '@/lib/jst-datetime'
 import type { RestaurantTable } from '@/lib/restaurant-test-api'
 import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '@/v8/booking-payments/public/assignment/index'
 import type { RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
-import styles from './tables.module.css'
+import styles from '@/components/shared/restaurant-table-board.module.css'
 
 /*
  * 座席・卓管理 › 卓の割り当て方（・絵 jmVYJ）。受け付ける指定：?view=assign。

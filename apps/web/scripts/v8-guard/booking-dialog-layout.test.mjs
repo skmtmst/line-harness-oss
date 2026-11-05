@@ -125,20 +125,25 @@ for (const width of [1152,1440]) test(`予約と窓の文字が切れず、状�
     await paint(page)
     assert.equal(await metaOverlap(),false,'配置を戻すと重なりも解消する')
     for(const tick of metrics.ticks) assert.ok(metrics.label.bottom<=tick.y || metrics.label.y>=tick.bottom || metrics.label.right<=tick.x || metrics.label.x>=tick.right,'今の時刻と時刻の見出しが重ならない')
-    // 色の見本は表に出ている状態だけ。重なりの無い日は「重なり」を出さず、全部は「印の見本」の窓で読む。
+    // 色の見本は表に出ている状態だけ。重なりの無い日は「重なり」を出さず、全部は「印の見方」で読む。
     assert.deepEqual(metrics.legend,['確定','仮押さえ','要対応（承認待ち）','無断キャンセル'])
-    await page.getByRole('button',{name:'予約の印の見本',exact:true}).click()
-    const all=await page.locator('[aria-label="予約の印の見本"] [role="listitem"]').allTextContents()
+    const legendHelp=page.getByRole('button',{name:'予約の印の見方',exact:true})
+    await legendHelp.click()
+    assert.equal(await legendHelp.getAttribute('aria-expanded'),'true')
+    const all=await page.locator('[aria-label="予約の印の見方"] [role="listitem"]').allTextContents()
     assert.equal(all.length,9)
     assert.ok(all.includes('重なり・受付数超過'))
     assert.equal(all.filter(x=>x.startsWith('要対応')).length,1)
     await page.keyboard.press('Escape')
+    assert.equal(await legendHelp.getAttribute('aria-expanded'),'false')
     await page.getByRole('button',{name:/承認を待つ予約/}).click()
     assert.equal(await page.locator('output').textContent(),'0')
     for (const kind of ['confirm','send','cancel','stacked','long-confirm','create','drawer','inset']) for (const lines of [1,2]) {
       await page.getByRole('button',{name:kind,exact:true}).click()
       const panel=page.locator('[data-design-part="dialog"],[data-design-part="drawer"]')
       await panel.waitFor()
+      // Drawer は初回マウント後に portal へ移る。接続先が確定してから寸法を測る。
+      await paint(page)
       const gap=await panel.evaluate(e=>{
         const desc=document.getElementById(e.getAttribute('aria-describedby')),header=desc.closest('header,[class*="headerRow"]')
         const h=(header??desc).getBoundingClientRect(),d=desc.getBoundingClientRect()
