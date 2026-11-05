@@ -26,3 +26,7 @@
 :root .input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); border-color: var(--color-selection-border); }
 
 html:root .root[data-row-height='comfortable']{min-height:var(--control-touch-h,44px);align-items:center;font-size:var(--text-body);}
+
+html:root .root[data-size='body'] .label { font-size:14px; font-weight:500; }
+html:root .root[data-size='body']:has(.input:checked) .label { font-weight:600; }
+html:root .root[data-size='body'] { --choice-size:18px; gap:10px; }

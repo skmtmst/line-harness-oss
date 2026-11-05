@@ -24,10 +24,12 @@ export default function Toggle({
   describedBy,
   onChange,
   className,
+  size,
 }: {
   id?: string
   invalid?: boolean
   checked: boolean
+  size?: 'large'
   /** 消せない項目。オンのまま押せない。 */
   locked?: boolean
   /** 一時的に押せない（保存中など）。見た目のオン・オフはそのまま。 */
@@ -54,6 +56,7 @@ export default function Toggle({
       style={bad ? { outline: '1px solid var(--color-danger)' } : undefined}
       type="button"
       role="switch"
+      data-size={size}
       aria-checked={on}
       aria-label={labelledBy ? undefined : label}
       aria-labelledby={labelledBy}
@@ -78,6 +81,7 @@ export function ToggleField({ id: controlId, children, description, 'aria-label'
   title?: string
   className?: string
   checked: boolean
+  size?: 'large'
   disabled?: boolean
   locked?: boolean
   lockedReason?: string
@@ -88,7 +92,7 @@ export function ToggleField({ id: controlId, children, description, 'aria-label'
   const field = useFieldContext()
   const switchId = controlId ?? field?.controlId ?? `${id}-switch`
   const descriptionId = `${id}-description`
-  return <span className={[styles.field, className].filter(Boolean).join(' ')} title={title}>
+  return <span className={[styles.field, className].filter(Boolean).join(' ')} data-size={props.size} title={title}>
     <span className={styles.fieldBody}><label id={id} htmlFor={switchId}>{children}</label>{description ? <span id={descriptionId} className={styles.description}>{description}</span> : null}</span>
     <Toggle {...props} id={switchId} label={label ?? ''} labelledBy={label ? undefined : id} describedBy={description ? descriptionId : undefined} />
   </span>

@@ -260,3 +260,7 @@ html:root .actionRow > :is(button, a) { grid-row: 1; padding-inline: var(--polis
 /* 通常の白いカードは影だけで浮かせ、枠の線を重ねない。 */
 html:root .card[data-card-variant='default']:not([data-card-frame]):not([data-card-surface]):not([data-appearance]):not(:focus-visible) { border: 0; outline-color: transparent; }
 html:root .card:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
+/* 変更案と、その前提を確認する内側の面。指定したカードにのみ適用する。 */
+html:root .card[data-card-surface='proposal'] { background:#e8f5ed; box-shadow:none; border-radius:10px; }
+html:root .card[data-card-surface='preview'] { background:#f5f6f8; box-shadow:none; border-radius:10px; }

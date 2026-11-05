@@ -39,3 +39,7 @@ export function workspaceDay(date: string, data: GoogleProfileData, workspace: H
 export function hasHoursDraft(w: HoursWorkspace): boolean {
   return Boolean(w.draft.weekly || w.draft.days.length || w.draft.holidayChanged || w.draft.serviceIds.length || w.draft.reviewIds.length)
 }
+
+export function hoursHistoryStamp(value: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('ja-JP', { month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23',timeZone }).format(new Date(value));
+}

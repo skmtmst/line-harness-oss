@@ -7,6 +7,8 @@
   --hours-confirm-footer-height: 70px;
   --hours-confirm-columns: minmax(100px,160px) minmax(0,1fr) 16px minmax(150px,200px);
   --hours-card-title-size: 16px;
+  --hours-service-title-size: 15px;
+  --hours-editor-body-size: 14px;
   --hours-aside-width: 350px;
   --hours-today-size: 20px;
   --hours-weekday-width: 76px;

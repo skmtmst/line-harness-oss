@@ -118,12 +118,11 @@ export const AffixedTextField = forwardRef<
  */
 export const TextArea = forwardRef<
   HTMLTextAreaElement,
-  ControlOwnProps & { compact?: boolean; density?: 'regular' | 'compact'; height?: 'post' | 'reply'; size?: 'short' | 'single-row' } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'className'>
->(function TextArea({ derived, compact, density, height, size, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, lockedReason, canChangeNow, ...rest }, ref) {
+  ControlOwnProps & { action?: ReactNode; compact?: boolean; density?: 'regular' | 'compact'; height?: 'post' | 'reply'; size?: 'short' | 'single-row' } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'className'>
+>(function TextArea({ action, derived, compact, density, height, size, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, lockedReason, canChangeNow, ...rest }, ref) {
   const a11y = useControlA11y({ id, invalid, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired })
   const access = useTextControlAccess<HTMLTextAreaElement>({ disabled: rest.disabled, lockedReason, canChangeNow }, ref, a11y['aria-describedby'])
-  return (
-    <><textarea
+  const control = <textarea
       ref={access.ref}
       data-design-node="i5BW8b"
       data-input-field
@@ -146,9 +145,9 @@ export const TextArea = forwardRef<
       aria-describedby={access.lock.handlers?.['aria-describedby'] ?? a11y['aria-describedby']}
       aria-invalid={a11y['aria-invalid']}
       aria-required={a11y['aria-required']}
-      className={[styles.field, styles.multi, compact && styles.multiCompact, size === 'short' && styles.multiShort, size === 'single-row' && styles.multiSingleRow, a11y.invalid && styles.invalid, className].filter(Boolean).join(' ')}
-    />{access.lock.node}</>
-  )
+      className={[styles.field, styles.multi, action && styles.composedControl, compact && styles.multiCompact, size === 'short' && styles.multiShort, size === 'single-row' && styles.multiSingleRow, a11y.invalid && styles.invalid, className].filter(Boolean).join(' ')}
+    />
+  return <>{action ? <div className={styles.composedArea} data-input-field>{control}<div className={styles.areaAction}>{action}</div></div> : control}{access.lock.node}</>
 })
 
 /** 札や補助ボタンを含む入力の外枠。文字欄の線は、この箱の1本にまとめる。 */

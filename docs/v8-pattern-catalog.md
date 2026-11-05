@@ -1254,3 +1254,10 @@
 持ち主は `components/shared/operation-target-summary.tsx`。呼び出し側が実際の操作先のIDと名前を渡し、既存の詳細項目の型でLINEアカウント・店舗（店舗の操作のみ）・動いている環境を表示する。名前と環境を推測しない。正本は [操作する対象の確認](v8-requirements/confirmation-targets.md)。
 
 - スタンプのマスの数と描画用データは visit-stamps/public/preview が公開し、既存displayのslotCount/previewSlotsを再利用する。別のマス数の計算を作らない。
+
+### 営業時間の編集パネルで使う共通変わり形（2026-11-05）
+
+- 正本：ユーザー作成 `musubo-google-business-v8-review-v01.pen` の祝日・サービス・文章入力。既定の他画面の部品は変えない。
+- `ToggleField size="large"` は右側40×24の軌道と14pxの名前。`Radio size="body"` は14px、選択中600。配置は`RadioGroup`へ縦列を渡す。
+- `TextArea action` は入力欄の右下に補助操作を含める。既定の入力のDOM・縦方向のリサイズ・権限制御は維持する。
+- `Card surface="proposal"` は読み取った変更案の薄緑、`surface="preview"` は前提を確認する薄灰の内側の面。余白と面の描画は共通部品が持つ。
