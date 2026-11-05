@@ -75,6 +75,7 @@ export const autoRepliesMethods = {
         conflictCount: number;
         receiveSourceCounts: Array<{ source: string; count: number }> | null;
         matchedLast28Days: number | null;
+        dispatchStopped: boolean | null;
       }>>(`/api/auto-replies/conflicts?accountId=${encodeURIComponent(accountId)}`),
     testDraft: (id: string, body: {
       friendId: string;

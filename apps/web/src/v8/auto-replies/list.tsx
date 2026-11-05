@@ -119,6 +119,7 @@ export default function AutoRepliesListV8() {
   const [templates, setTemplates] = useState<TemplateLite[]>([])
   const [templateListAvailable, setTemplateListAvailable] = useState(true)
   const [conflictCount, setConflictCount] = useState<number | null>(null)
+  const [dispatchStopped, setDispatchStopped] = useState<boolean | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
   const { folders, reload: loadFolders } = useManagedFolders('auto_reply', selectedAccountId)
@@ -186,6 +187,7 @@ export default function AutoRepliesListV8() {
     setLoadState('loading')
     setLoadError(null)
     setConflictCount(null)
+    setDispatchStopped(null)
     try {
       const [arRes, tplRes, summaryRes] = await Promise.all([
         api.autoReplies.list({ accountId: selectedAccountId || undefined }),
@@ -209,6 +211,7 @@ export default function AutoRepliesListV8() {
       loadedScope.current = requestScope
       setItems(arRes.data as AutoReply[])
       setConflictCount(summaryRes?.success ? summaryRes.data.conflictCount : null)
+      setDispatchStopped(summaryRes?.success ? summaryRes.data.dispatchStopped ?? null : null)
       setTemplateListAvailable(tplRes.success)
       setTemplates(tplRes.success
         ? tplRes.data.map((t) => ({
@@ -921,7 +924,10 @@ export default function AutoRepliesListV8() {
         {lockedReason && (
           <div className={styles.viewerBand}><ReadOnlyNotice need="feature" role="status" data-design-node="Q5lOCc"></ReadOnlyNotice></div>
         )}
-        {ready ? <Notice tone="info" role="status" message={rules.some((rule) => rule.isActive)
+        {ready ? <Notice tone={dispatchStopped ? 'warn' : 'info'} role="status" message={dispatchStopped === true
+          ? '停止中です。いま自動応答は送られません。'
+          : dispatchStopped === null ? '自動応答全体の送信状態を確認できません。'
+          : rules.some((rule) => rule.isActive)
           ? '確認できる自動応答に、有効なルールがあります。'
           : '確認できる自動応答に、有効なルールはありません。'} /> : null}
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
