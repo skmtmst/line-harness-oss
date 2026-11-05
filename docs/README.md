@@ -1170,3 +1170,4 @@
 - [座席・卓管理を最新Penデザインにそろえる](release-log/unreleased/2091-masato-table-pen-design.md) — 卓の作成・複製、座席図と一覧の反映履歴。
 - [共有検証への反映順序と巻き戻し防止](release-log/unreleased/2090-masato-ordered-staging-delivery.md) — 反映履歴、確認 2026-11-05。
 - [本番候補の検証配備証拠の確認方法](release-log/unreleased/2093-masato-production-staging-proof.md) — 反映履歴、確認 2026-11-05。
+- [座席図の表示を最新Penに合わせる](release-log/unreleased/2098-masato-table-pen-visual.md) — 卓マーク、選択枠、保存表示の修正履歴。確認 2026-11-06。
