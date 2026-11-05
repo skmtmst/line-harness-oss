@@ -142,7 +142,9 @@ export default function AdvancedSearchDialog({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [savedNotice, setSavedNotice] = useState('')
-  const guard = useUnsavedGuard({ dirty: open && saveName.trim() !== '', busy: open && saving, subject: '保存する検索条件', onDiscard: () => { setSaveName(''); setSaveOpen(false) } })
+  const conditionBaseline = useRef<string | null>(null)
+  const conditionSnapshot = JSON.stringify([blocks, any, extraAll, visibility, sort, limit])
+  const guard = useUnsavedGuard({ dirty: open && (saveName.trim() !== '' || (conditionBaseline.current !== null && conditionSnapshot !== conditionBaseline.current)), busy: open && saving, subject: '検索条件への変更', onDiscard: () => { setSaveName(''); setSaveOpen(false) } })
   const requestClose = () => guard.guarded(onClose)
   /*
     FRIEND-13: 共通ダイアログと同じ約束（role=dialog・aria-modal・
@@ -184,12 +186,18 @@ export default function AdvancedSearchDialog({
   useEffect(() => {
     if (open && !wasOpenRef.current) {
       const state = applied?.editorState
-      setBlocks(state?.blocks ?? defaultBlocks(fieldsFeatureEnabled))
-      setAny(state?.any ?? [])
-      setExtraAll(state?.extraAll ?? [])
-      setVisibility(state?.visibility ?? 'visible')
+      const initialBlocks = state?.blocks ?? defaultBlocks(fieldsFeatureEnabled)
+      const initialAny = state?.any ?? []
+      const initialExtraAll = state?.extraAll ?? []
+      const initialVisibility = state?.visibility ?? 'visible'
+      const safeLimit = PAGE_SIZE_OPTIONS.includes(initialLimit as (typeof PAGE_SIZE_OPTIONS)[number]) ? initialLimit : 20
+      conditionBaseline.current = JSON.stringify([initialBlocks, initialAny, initialExtraAll, initialVisibility, initialSort, safeLimit])
+      setBlocks(initialBlocks)
+      setAny(initialAny)
+      setExtraAll(initialExtraAll)
+      setVisibility(initialVisibility)
       setSort(initialSort)
-      setLimit(PAGE_SIZE_OPTIONS.includes(initialLimit as (typeof PAGE_SIZE_OPTIONS)[number]) ? initialLimit : 20)
+      setLimit(safeLimit)
       setSavedNotice('')
       setCountFailed(false)
     }
@@ -210,13 +218,14 @@ export default function AdvancedSearchDialog({
       const found = res.data.items.find((view) => view.id === savedId)
       if (!found) return
       const state = conditionsToEditorState(found.conditions)
+      conditionBaseline.current = JSON.stringify([state.blocks, state.any, state.extraAll, state.visibility, initialSort, PAGE_SIZE_OPTIONS.includes(initialLimit as (typeof PAGE_SIZE_OPTIONS)[number]) ? initialLimit : 20])
       setBlocks(state.blocks)
       setAny(state.any)
       setExtraAll(state.extraAll)
       setVisibility(state.visibility)
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [open, applied, accountId, savedSearchEnabled])
+  }, [open, applied, accountId, savedSearchEnabled, initialSort, initialLimit])
 
   const params = useMemo<AdvancedSearchResult['params']>(() => {
     /*
@@ -801,7 +810,7 @@ export default function AdvancedSearchDialog({
               type="button"
               variant="primary"
               className="px-5"
-              onClick={() => guard.guarded(() => onApply({ params, summary, editorState }))} busy={counting} busyLabel="再計算中…">
+              onClick={() => { const apply = () => onApply({ params, summary, editorState }); if (saveName.trim()) guard.guarded(apply); else apply() }} busy={counting} busyLabel="再計算中…">
               {count === null ? 'この条件で表示' : `${formatNumber(count)}人を表示`}
             </Button>
           </div>
@@ -838,7 +847,7 @@ export default function AdvancedSearchDialog({
           </section>
         </div>
       ) : null}
-    </div><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></></SaveErrorScope>
+    </div><UnsavedLeaveDialog subject="検索条件への変更" open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></></SaveErrorScope>
   )
 }
 
