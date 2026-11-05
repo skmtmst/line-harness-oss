@@ -414,6 +414,7 @@
 - [Lステップで確認できなかった箇所と、置いた想定](lstep-unverified-assumptions.md)
 - [musubo マニュアルサイトのCloudflare Pages初回設定](manual-site-pages-setup.md)
 - [D1 マイグレーション手順書](migration-runbook.md)
+- [テナント削除の保護と設計](tenant-purge-trigger-759-design.md)
 - [musubo サービスサイト（Xserver）](musubo-service-site.md)
 - [ランク削除時の会員別EC送信](nen-member-rank-sync.md)
 - [受信処理の再開と入力不足時の停止](operations/inbound-recovery.md)
