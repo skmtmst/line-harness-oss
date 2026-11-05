@@ -8,7 +8,7 @@ mkdirSync(output,{recursive:true})
 const weekly=Object.fromEntries(HOURS_WEEKDAYS.map(d=>[d,d==='WEDNESDAY'?[]:['TUESDAY','THURSDAY'].includes(d)?[{open:'17:00',close:'00:00'}]:[{open:'11:00',close:'15:00'},{open:'17:00',close:'00:00'}]]))
 const holidays=[{date:'2026-11-23',name:'勤労感謝の日'},{date:'2027-01-01',name:'元日'},{date:'2027-01-11',name:'成人の日'},{date:'2027-04-29',name:'昭和の日'},{date:'2027-05-03',name:'憲法記念日'},{date:'2027-05-04',name:'みどりの日'},{date:'2027-05-05',name:'こどもの日'}]
 let state,profile,version,failSend=false,changes=[]
-async function seed(page,request){
+async function seed(page,request,{readOnly=false}={}){
  const fixture=await(await request.get(`${mock}/api/restaurant-test/google/profile`)).json()
  profile={...fixture,writeEnabled:true,profile:{...fixture.profile,title:'THE SHED Bistro & Bar',regularHours:weekly,specialHours:[],moreHours:[],moreHoursTypes:[{id:'LUNCH',label:'ランチ'},{id:'DINNER',label:'ディナー'},{id:'TAKEOUT',label:'テイクアウト'}]},today:{date:'2026-11-04',weekday:'WEDNESDAY',closed:true,periods:[],special:false,holidayName:null},googleUpdates:null}
  state=emptyHoursWorkspace();version=1;failSend=false;changes=[]
@@ -18,6 +18,7 @@ async function seed(page,request){
  await page.addInitScript(()=>{localStorage.setItem('lh_selected_account','visual-qa-account');localStorage.setItem('lh_auth_selection_cleared','1');sessionStorage.setItem('lh_auth_selection_cleared','1')})
  await page.route('**/api/**',async route=>{
   const url=new URL(route.request().url()),path=url.pathname,method=route.request().method()
+  if(readOnly&&path.endsWith('/staff/me')){const identity=await(await route.fetch({url:`${mock}${path}${url.search}`})).json();return route.fulfill({json:{...identity,data:{...identity.data,role:'staff',readOnly:true,roleBundle:'view_only',permissionViewKeys:['/restaurant-test','/restaurant-test/google']}}})}
   if(path.endsWith('/google/profile'))return route.fulfill({json:profile})
   if(path.endsWith('/hours/workspace')){
    if(method==='PUT'){const body=route.request().postDataJSON();if(body.expectedVersion!==version)return route.fulfill({status:409,json:{error:'ほかの人が変更しました'}});state=body.data;version++}
@@ -58,4 +59,20 @@ for(const width of [1152,1440,1920])test(`営業時間の主要操作と表示 $
 
 test('サービスの営業時間とmusubo内の設定を分けて確認する',async({page,request})=>{
  await page.setViewportSize({width:1440,height:1080});await seed(page,request);state.draft.days=[];await page.reload();await expect(page.getByRole('heading',{name:'毎週の営業時間'})).toBeVisible();await page.getByRole('button',{name:'開く',exact:true}).click();await page.getByRole('button',{name:'編集',exact:true}).last().click();const service=page.getByRole('dialog',{name:'サービスの営業時間'});await service.getByRole('switch',{name:'店舗と同じ曜日に提供する'}).click();await expect(service.getByRole('button',{name:'変更内容を確認'})).toBeEnabled();await service.getByRole('button',{name:'変更内容を確認'}).click();await expect(page.getByRole('heading',{name:'テイクアウトの営業時間',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'musubo内で使う設定'})).toBeVisible();await expect(page.getByText('テイクアウトメニュー',{exact:true})).toBeVisible();await fits(page);await shot(page,'1440-18-service-confirm')
+})
+
+
+test('営業時間の操作はキーボード焦点と閲覧権限の灰色表示を保つ',async({page,request})=>{
+ await page.setViewportSize({width:1440,height:1080});await seed(page,request,{readOnly:true})
+ const secondary=page.getByRole('button',{name:'今日の時間を変更',exact:true}),primary=page.getByRole('button',{name:'変更内容を確認',exact:true})
+ for(const button of [secondary,primary]){
+  await expect(button).toHaveAttribute('data-permission-locked')
+  await expect(button).toHaveAttribute('aria-disabled','true')
+  await expect.poll(()=>button.evaluate(n=>{const probe=document.createElement('span');probe.style.backgroundColor='var(--color-canvas-sunken)';document.body.append(probe);const expected=getComputedStyle(probe).backgroundColor;probe.remove();return getComputedStyle(n).backgroundColor===expected})).toBe(true)
+  await button.focus();await expect(button).toBeFocused()
+  await expect.poll(()=>button.evaluate(n=>({width:getComputedStyle(n).outlineWidth,style:getComputedStyle(n).outlineStyle,color:getComputedStyle(n).outlineColor}))).toEqual({width:'2px',style:'solid',color:'rgb(37, 99, 235)'})
+  await page.keyboard.press('Enter');await page.keyboard.press('Space')
+ }
+ await expect(page.getByRole('dialog')).toHaveCount(0);expect(changes).toEqual([])
+ await fits(page);await shot(page,'1440-19-readonly')
 })
