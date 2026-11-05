@@ -107,26 +107,24 @@ describe('cf-staging-deploy', () => {
     expect(result.stdout).toContain('plan のため Cloudflare へは反映していません');
   });
 
-  it('apply: migrates with --apply, deploys without --dry-run, verifies /health commit', () => {
+  it('apply stops before any D1 or Worker command and requires the common queue', () => {
     const sandbox = makeSandbox({ healthCommit: SHA });
     sandboxes.push(sandbox);
     const result = run(sandbox, { CF_STAGING_DEPLOY_MODE: 'apply' });
-    expect(result.status, result.stderr).toBe(0);
-    expect(read(sandbox, 'tsx')).toContain('apply\nstaging\n--apply');
-    const wrangler = read(sandbox, 'wrangler');
-    expect(wrangler).toContain('deploy');
-    expect(wrangler).not.toContain('--dry-run');
-    expect(result.stdout).toContain(`/health の git_commit = ${SHA} を確認しました`);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('共通Actionsの順番待ち');
+    expect(read(sandbox, 'tsx')).toBe('');
+    expect(read(sandbox, 'wrangler')).toBe('');
   });
 
-  it('applies when the pending migration is additive', () => {
+  it('plans additive pending migrations without writing them', () => {
     const sandbox = makeSandbox({ newSql: 'packages/db/migrations/902_ok.sql', healthCommit: SHA });
     sandboxes.push(sandbox);
-    const result = run(sandbox, { CF_STAGING_DEPLOY_MODE: 'apply' });
+    const result = run(sandbox);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain('902_ok.sql');
     expect(result.stdout).toContain('追加のみの文です');
-    expect(read(sandbox, 'tsx')).toContain('apply\nstaging\n--apply');
+    expect(read(sandbox, 'tsx')).not.toContain('--apply');
   });
 
   it('stops before touching D1 when a pending migration is not additive', () => {
@@ -135,7 +133,7 @@ describe('cf-staging-deploy', () => {
       sqlBody: '-- comment with DROP TABLE is fine\nDROP TABLE friends;\n',
     });
     sandboxes.push(sandbox);
-    const result = run(sandbox, { CF_STAGING_DEPLOY_MODE: 'apply' });
+    const result = run(sandbox);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('追加のみではない文があります');
     expect(read(sandbox, 'tsx')).not.toContain('--apply');
@@ -148,7 +146,7 @@ describe('cf-staging-deploy', () => {
       sqlBody: '-- migration-policy: table-rebuild\nCREATE TABLE friends_new (id INTEGER);\n',
     });
     sandboxes.push(sandbox);
-    const result = run(sandbox, { CF_STAGING_DEPLOY_MODE: 'apply' });
+    const result = run(sandbox);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('table-rebuild');
   });
@@ -168,11 +166,11 @@ describe('cf-staging-deploy', () => {
       ].join('\n'),
       { mode: 0o755 },
     );
-    const result = run(sandbox, { CF_STAGING_DEPLOY_MODE: 'apply', CF_STAGING_RETRY_WAIT: '0' });
+    const result = run(sandbox, { CF_STAGING_RETRY_WAIT: '0' });
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toContain('失敗しました（1/4）');
     expect(read(sandbox, 'tsx').split('status\nstaging').length - 1).toBe(2);
-    expect(read(sandbox, 'wrangler')).not.toContain('--dry-run');
+    expect(read(sandbox, 'wrangler')).toContain('--dry-run');
   });
 
   it('rejects an unknown mode and a dirty tree', () => {

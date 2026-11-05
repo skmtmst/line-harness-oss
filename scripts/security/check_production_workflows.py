@@ -41,7 +41,7 @@ def ordered(job, commands):
 def check(workflows):
     parent = workflows[PARENT]
     need(set(triggers(parent)) == {'workflow_dispatch'}, 'manual_parent_only')
-    need(parent.get('concurrency') == {'group': 'cloudflare-production', 'cancel-in-progress': False}, 'whole_release_lock')
+    need(parent.get('concurrency') == {'group': 'cloudflare-production', 'queue': 'max', 'cancel-in-progress': False}, 'whole_release_lock')
     need(set(parent['jobs']) == {'authorize', *CHILDREN}, 'release_topology')
     gate = parent['jobs']['authorize']
     need(gate.get('environment') == 'production', 'approval_environment')

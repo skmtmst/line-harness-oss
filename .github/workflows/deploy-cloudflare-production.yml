@@ -29,6 +29,7 @@ permissions:
 
 concurrency:
   group: cloudflare-production
+  queue: max
   cancel-in-progress: false
 
 jobs:

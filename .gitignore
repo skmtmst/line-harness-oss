@@ -89,3 +89,6 @@ scripts/visual-qa/design-archive/
 
 # オーナー指定の比較画像・実測値（手元で作り直す撮影結果）。
 review/DESIGN-AUDIT-1023/
+
+# Pythonの構文・ワークフロー検査で生成されるローカルキャッシュ。
+__pycache__/
