@@ -222,6 +222,35 @@ it('素材の名前を変更して閉じると、破棄する前に確認する'
   expect(container.querySelector('input[placeholder="カルーセルの管理名"]')).toBeNull()
 })
 
+it('画像を読み込み中に閉じても、選んだ画像を破棄する前に確認する', async () => {
+  let complete!: (v: unknown) => void
+  upload.mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+  renderKind('card_message'); await flush(); clickText('編集')
+  const file = container.querySelector<HTMLInputElement>('input[type="file"]')!
+  Object.defineProperty(file, 'files', { value: [new File(['image'], 'a.png', { type: 'image/png' })] })
+  act(() => file.dispatchEvent(new Event('change', { bubbles: true })))
+  clickText('キャンセル')
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  await act(async () => complete({ success: true, data: { url: 'https://example.com/a.png' } }))
+})
+
+it('同じ場所で画像を選び直したら、古い読み込みが終わっても新しい選択を守る', async () => {
+  let oldComplete!: (v: unknown) => void
+  let newComplete!: (v: unknown) => void
+  upload.mockImplementationOnce(() => new Promise(resolve => { oldComplete = resolve }))
+    .mockImplementationOnce(() => new Promise(resolve => { newComplete = resolve }))
+  renderKind('card_message'); await flush(); clickText('編集')
+  const file = container.querySelector<HTMLInputElement>('input[type="file"]')!
+  Object.defineProperty(file, 'files', { configurable: true, value: [new File(['old'], 'old.png', { type: 'image/png' })] })
+  act(() => file.dispatchEvent(new Event('change', { bubbles: true })))
+  Object.defineProperty(file, 'files', { configurable: true, value: [new File(['new'], 'new.png', { type: 'image/png' })] })
+  act(() => file.dispatchEvent(new Event('change', { bubbles: true })))
+  await act(async () => oldComplete({ success: true, data: { url: 'https://example.com/old.png' } }))
+  clickText('キャンセル')
+  expect(document.body.textContent).toContain('保存していない変更があります')
+  await act(async () => newComplete({ success: true, data: { url: 'https://example.com/new.png' } }))
+})
+
 it('素材編集中に別画面へ移ると、入力を残して確認する', async () => {
   window.history.replaceState(null, '', '/templates')
   renderKind('card_message')

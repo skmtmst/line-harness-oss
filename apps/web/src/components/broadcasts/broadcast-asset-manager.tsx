@@ -100,6 +100,7 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
    */
   const [moreCard, setMoreCard] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [pendingUploads, setPendingUploads] = useState<Set<string>>(() => new Set())
   const [error, setError] = useState('')
   const snapshot = JSON.stringify({ name, imageUrl, description, actionUrl, cards, moreCard })
   const baseline = useRef(snapshot)
@@ -173,9 +174,9 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
   const reset = useCallback(() => {
     const blankCards = [newCard()]
     baseline.current = JSON.stringify({ name: '', imageUrl: '', description: '', actionUrl: '', cards: blankCards, moreCard: true })
-    editorGeneration.current++; setEditing(null); setShowForm(false); setName(''); setImageUrl(''); setImageFile(null); setDescription(''); setActionUrl(''); setCards(blankCards); setMoreCard(true); setError('')
+    editorGeneration.current++; setPendingUploads(new Set()); setEditing(null); setShowForm(false); setName(''); setImageUrl(''); setImageFile(null); setDescription(''); setActionUrl(''); setCards(blankCards); setMoreCard(true); setError('')
   }, [])
-  const guard = useUnsavedGuard({ dirty: showForm && snapshot !== baseline.current, busy: saving, onDiscard: reset, subject: '素材への変更' })
+  const guard = useUnsavedGuard({ dirty: showForm && (snapshot !== baseline.current || pendingUploads.size > 0), busy: saving, onDiscard: reset, subject: '素材への変更' })
   /*
    * 種類・LINEアカウントが切り替わったら、編集中の対象を離す。
    * 離さないと、別種類の一覧の上で前の素材の編集欄が残り、保存が
@@ -201,6 +202,9 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
     const target = cardId ?? 'main'
     const generation = (uploadGeneration.current.get(target) ?? 0) + 1
     uploadGeneration.current.set(target, generation)
+    const prefix = `${editor}:${target}:`
+    const token = `${prefix}${generation}`
+    setPendingUploads(previous => new Set([...previous].filter(item => !item.startsWith(prefix)).concat(token)))
     const current = () => scopeRef.current === key && editorGeneration.current === editor && uploadGeneration.current.get(target) === generation
     try {
       const res = await api.broadcastMessageAssets.upload(file)
@@ -212,6 +216,8 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
       const fieldFailure = saveErrors.capture(saveFailure)
 
       if (current()) { if (!fieldFailure) setError('画像をアップロードできませんでした。もう一度お試しください。') }
+    } finally {
+      setPendingUploads(previous => { const next = new Set(previous); next.delete(token); return next })
     }
   }
 
