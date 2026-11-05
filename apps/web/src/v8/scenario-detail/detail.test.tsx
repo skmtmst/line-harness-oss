@@ -205,7 +205,7 @@ describe('V8 シナリオ配信の編集', () => {
     await render()
     const preview = screen.getByRole('region', { name: 'LINEでの見え方' })
     expect(within(preview).getByText('選んだ通（1通目）の見え方')).toBeTruthy()
-    expect(within(preview).getByText('こんにちは、山田 花子さん。10月2日 18:00からです。')).toBeTruthy()
+    expect(within(preview).getByText('こんにちは、見本 143さん。10月2日 18:00からです。')).toBeTruthy()
     expect(document.querySelector('[data-preview-sample-note]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方の説明' }))
     expect(screen.getByText('名前や日時は見本の値です。')).toBeTruthy()

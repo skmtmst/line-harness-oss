@@ -262,7 +262,7 @@ describe('統括のテンプレートの詳細（pQ4fH）', () => {
 
 describe('統括のテンプレートの詳細の版（pQ4fH・API-18）', () => {
   it('配った先ごとの版と版の履歴を出し、前の版を比べる・この版に戻す', async () => {
-    const version = (n: number, draft: boolean, current: boolean) => ({ id: `v${n}`, version: n, created_by: 's', creator_name: n === 2 ? 'Masato' : 'Kenta Kawano', created_at: '2026-08-21T09:02:00Z', is_draft: draft, is_current: current })
+    const version = (n: number, draft: boolean, current: boolean) => ({ id: `v${n}`, version: n, created_by: 's', creator_name: n === 2 ? 'Masato' : 'Demo Person', created_at: '2026-08-21T09:02:00Z', is_draft: draft, is_current: current })
     calls.versions.mockResolvedValue([version(3, true, true), version(2, false, false), version(1, false, false)])
     calls.receivedVersions.mockResolvedValue([
       { accountId: 'a-1', accountName: '然 -NEN- 本店', receivedAt: null, targetVersion: { version: 2, latestVersion: 3, status: 'older', label: '版2' } },

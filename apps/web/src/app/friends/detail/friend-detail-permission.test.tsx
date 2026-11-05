@@ -67,7 +67,7 @@ const fixtures = vi.hoisted(() => ({
     isFollowing: true,
     tags: [],
     formSubmissions: [],
-    support: { status: 'in_progress' as const, operatorName: '佐藤 けん', notes: '折り返し予定' },
+    support: { status: 'in_progress' as const, operatorName: '見本 113', notes: '折り返し予定' },
   },
   chatDetail: {
     id: 'friend-1',
@@ -86,8 +86,8 @@ const fixtures = vi.hoisted(() => ({
     hasMoreMessages: false,
   },
   operators: [
-    { id: 'op-1', name: '佐藤 けん' },
-    { id: 'op-2', name: '田中 ゆい' },
+    { id: 'op-1', name: '見本 113' },
+    { id: 'op-2', name: '見本 163' },
   ],
 }))
 
@@ -351,7 +351,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     const [, personal] = inputs()
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
     await act(async () => {
-      setter.call(personal, '080-1111-2222')
+      setter.call(personal, '080-0000-2222')
       personal.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await act(async () => {
@@ -361,7 +361,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
       const call = net.calls.find((c) => c.name === 'friendFields.saveForFriend')
       expect(call).toBeTruthy()
       expect(call!.args[0]).toBe('friend-1')
-      expect(call!.args[1]).toEqual({ 'field-personal': '080-1111-2222' })
+      expect(call!.args[1]).toEqual({ 'field-personal': '080-0000-2222' })
     })
   })
 
@@ -431,7 +431,7 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
     expect(statusSelect.value).toBe('in_progress')
     expect(operatorSelect.value).toBe('op-1')
     // 選択肢には未割り当てと担当者一覧がある
-    expect(Array.from(operatorSelect.options).map((o) => o.textContent)).toEqual(['未割り当て', '佐藤 けん', '田中 ゆい'])
+    expect(Array.from(operatorSelect.options).map((o) => o.textContent)).toEqual(['未割り当て', '見本 113', '見本 163'])
 
     await setSelectValue(statusSelect, 'resolved')
     await setSelectValue(operatorSelect, 'op-2')

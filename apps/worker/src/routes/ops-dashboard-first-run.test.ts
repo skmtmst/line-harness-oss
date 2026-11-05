@@ -21,9 +21,9 @@ function app(staff: AuthenticatedStaff) {
   };
 }
 
-const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
+const master: AuthenticatedStaff = { id: 'master-1', name: '見本 25', role: 'owner', readOnly: false, tenantId: null };
 const readOnlyMaster: AuthenticatedStaff = { ...master, readOnly: true };
-const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '山田 太郎', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
+const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '見本 141', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
 
 type Funnel = {
   accounts: number;
@@ -75,7 +75,7 @@ function allSteps(accountId: string) {
 beforeEach(() => {
   testDb = createTestD1();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_status, created_at) VALUES ('tenant-a', '株式会社サンプル', 'active', 'trialing', ?)`).run(at(0));
-  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '坂本 真人', 'owner', 'k1', NULL)`).run();
+  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '見本 25', 'owner', 'k1', NULL)`).run();
   testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active) VALUES ('master-1', 1)`).run();
 });
 

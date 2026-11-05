@@ -59,7 +59,7 @@ const FLOWS = { flows: [
 const DELIVERIES = {
   summary: { pending: 1, processing: 0, sent: 5, skipped: 0, failed: 1, cancelled: 0 },
   deliveries: [
-    { id: 'd-1', campaignKey: 'review_request', label: '口コミのお願い', friendName: '大西 健一', lineAccountName: 'LINE 本店', scheduledAt: '2026-08-23T20:00:00+09:00', sentAt: '2026-08-23T20:00:04+09:00', status: 'sent', attempts: 1, unmetReason: null, unmetReasonCode: null, reaction: { value: null, state: 'unavailable', reason: '取れません' }, version: 1 },
+    { id: 'd-1', campaignKey: 'review_request', label: '口コミのお願い', friendName: '見本 19', lineAccountName: 'LINE 本店', scheduledAt: '2026-08-23T20:00:00+09:00', sentAt: '2026-08-23T20:00:04+09:00', status: 'sent', attempts: 1, unmetReason: null, unmetReasonCode: null, reaction: { value: null, state: 'unavailable', reason: '取れません' }, version: 1 },
   ],
   pagination: { total: 1, limit: 20, cursor: '0', nextCursor: null },
 } as unknown as NenDeliveryList

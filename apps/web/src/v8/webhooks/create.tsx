@@ -94,7 +94,7 @@ const RETRY_OPTIONS = [
 const SAMPLES: Record<string, { when: string; lines: string[] }> = {
   friend_add: {
     when: '友だちになったとき',
-    lines: ['{', '  "できごと": "友だちになった",', '  "友だちID": "U4af…",', '  "名前": "Kenta Kawano",', '  "タグ": ["Instagram"],', '  "日時": "2026-09-30T10:12"', '}'],
+    lines: ['{', '  "できごと": "友だちになった",', '  "友だちID": "U4af…",', '  "名前": "Demo Person",', '  "タグ": ["Instagram"],', '  "日時": "2026-09-30T10:12"', '}'],
   },
   booking_created: {
     when: '予約が入ったとき',
@@ -102,7 +102,7 @@ const SAMPLES: Record<string, { when: string; lines: string[] }> = {
   },
   'ec.order.confirmed': {
     when: '注文が確定したとき',
-    lines: ['{', '  "できごと": "注文が確定した",', '  "注文番号": "ord_123…",', '  "金額": 4980,', '  "友だち": "菅野 亮"', '}'],
+    lines: ['{', '  "できごと": "注文が確定した",', '  "注文番号": "ord_123…",', '  "金額": 4980,', '  "友だち": "見本 15"', '}'],
   },
 }
 

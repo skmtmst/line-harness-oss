@@ -44,7 +44,7 @@ const photo = {
   pet_name: 'こむぎ',
   pet_call_name: 'こむぎ',
   pet_gender: 'female',
-  owner_name: '田中 明子',
+  owner_name: '見本 169',
   customer_id: '10234',
   caption: '散歩のあと',
   created_at: '2026-09-30T10:00:00Z',
@@ -66,7 +66,7 @@ const metrics = {
 }
 
 const versions = [
-  { versionNumber: 3, policyKey: 'default', points: 100, summary: '', effectiveFrom: null, createdBy: '高田 誠', createdAt: '2026-09-20T10:00:00Z', status: 'in_use' },
+  { versionNumber: 3, policyKey: 'default', points: 100, summary: '', effectiveFrom: null, createdBy: '見本 18', createdAt: '2026-09-20T10:00:00Z', status: 'in_use' },
 ]
 
 const publication = {
