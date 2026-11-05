@@ -15,6 +15,8 @@ import AccountSetupUrls from './account-setup-urls'
 import Button from '@/components/shared/button'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 
 interface Props {
   accountId: string
@@ -88,6 +90,11 @@ export default function AccountEditModal({
   const modalTitleId = useId()
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+  const initialSnapshot = useRef(JSON.stringify({ state, friendCapacity, capacityWarnAt, iconUrl, timezone }))
+  const dirty = JSON.stringify({ state, friendCapacity, capacityWarnAt, iconUrl, timezone }) !== initialSnapshot.current
+  const guard = useUnsavedGuard({ dirty, busy: saving, subject: 'アカウントの登録内容' })
+  const requestClose = () => guard.guarded(onClose)
+
 
   /*
    * 本人確認（StepUpPrompt）の窓が重なっている間は、Escape を
@@ -98,7 +105,7 @@ export default function AccountEditModal({
   const stepUpOpenRef = useRef(false)
   stepUpOpenRef.current = stepUp != null
   const panelRef = useOverlayFocus(true, () => {
-    if (!stepUpOpenRef.current) onClose()
+    if (!stepUpOpenRef.current) requestClose()
   }, saving)
 
   const update = (partial: Partial<AccountFormState>) =>
@@ -175,6 +182,7 @@ export default function AccountEditModal({
     try {
       const res = await api.lineAccounts.update(accountId, payload, stepUpToken)
       if (res.success) {
+        guard.disarm()
         onSaved()
         onClose()
       } else {
@@ -195,9 +203,9 @@ export default function AccountEditModal({
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><div
+    <SaveErrorScope errors={saveErrors}><><div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim p-2 sm:p-4"
-      onClick={onClose}
+      onClick={requestClose}
     >
       <div
         ref={panelRef}
@@ -210,7 +218,7 @@ export default function AccountEditModal({
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-canvas px-4 py-4 sm:px-6">
           <h2 id={modalTitleId} className="text-base font-bold text-ink">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
-          <CloseButton onClick={onClose} />
+          <CloseButton onClick={requestClose} />
         </div>
 
         <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto p-4 sm:p-6">
@@ -317,7 +325,7 @@ export default function AccountEditModal({
           )}
 
           <div className="sticky bottom-0 -mx-4 flex justify-center gap-2 border-t border-divider-soft bg-canvas px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
-            <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl h-auto whitespace-normal" type="button" onClick={onClose}>
+            <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl h-auto whitespace-normal" type="button" onClick={requestClose}>
               キャンセル
             </Button>
             <button
@@ -332,6 +340,6 @@ export default function AccountEditModal({
         </form>
       </div>
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </div></SaveErrorScope>
+    </div><UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} /></></SaveErrorScope>
   )
 }

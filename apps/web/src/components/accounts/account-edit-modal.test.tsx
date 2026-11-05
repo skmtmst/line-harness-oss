@@ -8,6 +8,8 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 const update = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -75,4 +77,39 @@ describe('LINEアカウントの編集窓', () => {
     const grid = document.querySelector('label[for="acc-capacity"]')!.closest('.grid')!
     expect([...grid.classList]).toEqual(expect.arrayContaining(['grid-cols-1', 'sm:grid-cols-2']))
   })
+})
+
+it('入力した登録内容は、キャンセル時に捨てる前の確認を出す', async () => {
+  render(<AccountEditModal {...props} />)
+  fireEvent.change(screen.getByDisplayValue('然 本店'), { target: { value: '変更した名前' } })
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(props.onClose).not.toHaveBeenCalled()
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect((screen.getByDisplayValue('変更した名前') as HTMLInputElement).value).toBe('変更した名前')
+  fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
+  expect(props.onClose).toHaveBeenCalledOnce()
+})
+
+it('変更した内容は画面移動でも確認する', async () => {
+  window.history.replaceState(null, '', '/hq')
+  render(<><AccountEditModal {...props} /><a href="/events">イベントへ</a></>)
+  fireEvent.change(screen.getByDisplayValue('然 本店'), { target: { value: '変更した名前' } })
+  fireEvent.click(screen.getByRole('link', { name: 'イベントへ' }))
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  expect(props.onClose).not.toHaveBeenCalled()
+})
+
+it('未変更ならキャンセルで閉じる', () => {
+  render(<AccountEditModal {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(props.onClose).toHaveBeenCalledOnce()
+})
+
+it('資格情報の入力を変えた後の Escape でも確認する', async () => {
+  render(<AccountEditModal {...props} initialSection="credentials" />)
+  const secret = document.querySelector<HTMLInputElement>('[role="dialog"] input[type="password"]')!
+  fireEvent.change(secret, { target: { value: 'test-secret' } })
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(props.onClose).not.toHaveBeenCalled()
+  expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
 })
