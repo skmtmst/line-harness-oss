@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
 /*
  * ★V8 座席・卓管理（Pencil BERxg・止める ・追加と変更 ）。
  * 値は globals.css の --tpl-rs-*。
@@ -162,7 +164,7 @@
 }
 :global([data-design-node='BERxg']):has(.detailList) :global([data-kpi-strip]) > * > :first-child { min-height: 20px; }
 :global([data-design-node='BERxg']):has(.detailList) :global([data-kpi-strip]) > * > :last-child { line-height: 15px; }
-:global(:root) :global([data-design-node='BERxg']):has(.detailList) :global([data-kpi-strip][data-restaurant-fusion]) > * { padding: 10.5px 20px; gap: 3px; }
+:global(:root) :global([data-design-node='BERxg']):has(.detailList) :global([data-kpi-strip][data-restaurant-fusion]) > * { padding: 10.5px 20px !important; gap: 3px !important; }
 :global([data-design-node='BERxg']):has(.detailList) :global([data-detail-columns='restaurant-tables']) { margin-top: 7px; }
 :global([data-design-node='BERxg']):has(.detailList) :global([data-detail-columns='restaurant-tables']) > :nth-child(2),
 :global([data-design-node='BERxg']):has(.detailList) :global([data-detail-columns='restaurant-tables']) > aside { height: 820px; min-height: 820px; }
@@ -176,7 +178,7 @@
 .detailName { font-size: 16px; line-height: 19px; font-weight: 700; }
 .detailSub { font-size: 13px; line-height: 16px; }
 .detailStatus { flex: 0 0 57px; width: 57px; }
-.detailStatus > :global(span) { min-height: 27px; padding-inline: 10px; border-radius: 18px; }
+.detailStatus > :global(span) { min-height: 27px; padding-inline: 10px !important; border-radius: 18px !important; }
 .detailRow > :last-child, .detailRow > :last-child > button { width: 32px; height: 32px; min-width: 32px; }
 :global(:root) :global([data-design-node='ljShF']):has(.editorFields) :global([role='dialog'] h2) { font-size: 19px; }
 :global([data-design-node='ljShF']):has(.editorFields) :global([role='dialog'] h2) { margin-left: 4px; }
@@ -186,3 +188,5 @@
 /* 行の操作メニューは Pen PXGLr の 146×162 にそろえる。ポータルは body の直下に置かれる。 */
 :global(body):has(.detailList) :global([data-design-part='action-menu'][role='menu']) { width: 146px; min-width: 146px; padding: 6px 6px 5px; margin: -1px 0 0 -2px; }
 :global(body):has(.detailList) :global([data-design-part='action-menu'] [role='menuitem']) { height: 36px; }
+
+}
