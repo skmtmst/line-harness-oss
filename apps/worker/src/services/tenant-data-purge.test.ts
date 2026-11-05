@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { processTenantDataPurge } from './tenant-data-purge.js';
+import { logger } from '@line-crm/shared/server';
 
 /*
  * 退会後の顧客データ削除（★36-2）。
@@ -181,6 +182,72 @@ describe('tenant data retention purge', () => {
     expect(result.failedTenants).toBe(1);
     expect(result.completed).toBe(0);
     expect(count('tenant_purge_guard', '1 = 1')).toBe(0);
+  });
+
+  test('退会した統括のパスキーと所属だけを親より先に消し、期限切れの所属不明チャレンジも掃除する', async () => {
+    seedTenant('retired', { anchor: jst(-91) });
+    seedTenant('active', { planStatus: 'active' });
+    const addStaff = sqlite.raw.prepare('INSERT INTO staff_members (id,name,api_key,role,tenant_id) VALUES (?,?,?,\'owner\',?)');
+    addStaff.run('staff-retired', '退会', 'key-retired', 'retired');
+    addStaff.run('staff-active', '利用中', 'key-active', 'active');
+    const addKey = sqlite.raw.prepare("INSERT INTO staff_passkeys(credential_id,staff_id,public_key,device_type,created_at) VALUES (?,?, 'public', 'singleDevice', ?)");
+    addKey.run('key-retired', 'staff-retired', NOW);
+    addKey.run('key-active', 'staff-active', NOW);
+    const addMembership = sqlite.raw.prepare('INSERT INTO line_account_hq_admin_memberships(line_account_id,staff_id) VALUES (?,?)');
+    addMembership.run('acc-retired', 'staff-retired');
+    addMembership.run('acc-retired', 'staff-active');
+    addMembership.run('acc-active', 'staff-active');
+    const addChallenge = sqlite.raw.prepare("INSERT INTO staff_passkey_challenges(token_hash,challenge,purpose,staff_id,expires_at,created_at) VALUES (?, 'challenge', 'login', ?, ?, ?)");
+    addChallenge.run('retired', 'staff-retired', jst(2), NOW);
+    addChallenge.run('active', 'staff-active', jst(2), NOW);
+    addChallenge.run('orphan-expired', null, NOW, jst(-2));
+    addChallenge.run('orphan-current', null, jst(1), NOW);
+
+    expect((await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: '2026-06-01T09:00:00+09:00' })).completed).toBe(1);
+    expect(sqlite.raw.prepare('SELECT credential_id FROM staff_passkeys').all()).toEqual([{ credential_id: 'key-active' }]);
+    expect(sqlite.raw.prepare('SELECT line_account_id FROM line_account_hq_admin_memberships').all()).toEqual([{ line_account_id: 'acc-active' }]);
+    expect(sqlite.raw.prepare('SELECT token_hash FROM staff_passkey_challenges ORDER BY token_hash').all()).toEqual([
+      { token_hash: 'active' }, { token_hash: 'orphan-current' },
+    ]);
+    const audit = sqlite.raw.prepare('SELECT deleted_rows_by_table FROM tenant_data_purge_audit WHERE tenant_id=?').get('retired') as { deleted_rows_by_table: string };
+    expect(JSON.parse(audit.deleted_rows_by_table)).toMatchObject({ staff_passkeys: 1, staff_passkey_challenges: 1, line_account_hq_admin_memberships: 2 });
+
+    await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: jst(1) });
+    expect(sqlite.raw.prepare('SELECT token_hash FROM staff_passkey_challenges').all()).toEqual([{ token_hash: 'active' }]);
+  });
+
+  test('期限切れの所属不明チャレンジが多い場合も上限を守って次回に掃除する', async () => {
+    const add = sqlite.raw.prepare("INSERT INTO staff_passkey_challenges(token_hash,challenge,purpose,staff_id,expires_at,created_at) VALUES (?, 'challenge', 'login', NULL, ?, ?)");
+    for (let i = 0; i < 201; i++) add.run(`orphan-${i}`, jst(-1), jst(-2));
+    expect((await processTenantDataPurge({ DB: sqlite.db }, { now: NOW })).tenants).toBe(0);
+    expect(count('staff_passkey_challenges', '1=1')).toBe(1);
+    await processTenantDataPurge({ DB: sqlite.db }, { now: NOW });
+    expect(count('staff_passkey_challenges', '1=1')).toBe(0);
+  });
+
+  test('チャレンジの掃除が失敗しても統括の削除を続け、固定の理由コードを記録する', async () => {
+    seedTenant('retired', { anchor: jst(-91) });
+    seedFriends('retired', 1);
+    const logged = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const db = { ...sqlite.db, prepare(sql: string) {
+      if (sql.includes('WHERE expires_at <= ?')) throw new Error('private challenge detail');
+      return sqlite.db.prepare(sql);
+    } } as D1Database;
+    try {
+      const result = await processTenantDataPurge({ DB: db, IMAGES: createR2() }, { now: NOW });
+      expect(result.completed).toBe(1);
+      expect(count('friends', 'line_account_id = ?', 'acc-retired')).toBe(0);
+      expect(logged).toHaveBeenCalledWith('tenant_data_purge.passkey_challenge_cleanup_failed');
+      expect(JSON.stringify(logged.mock.calls)).not.toContain('private challenge detail');
+    } finally { logged.mockRestore(); }
+  });
+
+  test('UTCの期限が現在時刻ちょうどなら掃除し、1ミリ秒後のものは残す', async () => {
+    const add = sqlite.raw.prepare("INSERT INTO staff_passkey_challenges(token_hash,challenge,purpose,staff_id,expires_at,created_at) VALUES (?, 'challenge', 'login', NULL, ?, ?)");
+    add.run('boundary', '2026-06-01T00:00:00.000Z', '2026-05-31T23:55:00.000Z');
+    add.run('future', '2026-06-01T00:00:00.001Z', '2026-05-31T23:55:00.000Z');
+    await processTenantDataPurge({ DB: sqlite.db }, { now: '2026-06-01T09:00:00+09:00' });
+    expect(sqlite.raw.prepare('SELECT token_hash FROM staff_passkey_challenges').all()).toEqual([{ token_hash: 'future' }]);
   });
 
   test('保存期限(90日)が過ぎた統括の顧客データとR2画像を消し、支払の記録は残す', async () => {
