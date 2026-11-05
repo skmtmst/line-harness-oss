@@ -149,3 +149,37 @@
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-16);
 }
+
+/* 最新の Pen PXGLr の本文幅、数の帯、座席図と卓一覧の位置。 */
+:global([data-design-node='BERxg']):has(.detailList) {
+  width: calc(100% - 28px);
+  margin-left: 20px;
+  --tpl-band-cell-pad-block: 12px;
+  --tpl-band-cell-pad-side: 20px;
+  --tpl-band-cell-gap: 3px;
+  --tpl-band-number-size: 25px;
+  --tpl-band-number-lh: 30px;
+}
+:global([data-design-node='BERxg']):has(.detailList) :global([data-kpi-strip]) > * > :first-child { min-height: 20px; }
+:global([data-design-node='BERxg']):has(.detailList) :global([data-kpi-strip]) > * > :last-child { line-height: 15px; }
+:global(:root) :global([data-design-node='BERxg']):has(.detailList) :global([data-kpi-strip][data-restaurant-fusion]) > * { padding: 10.5px 20px; gap: 3px; }
+:global([data-design-node='BERxg']):has(.detailList) :global([data-detail-columns='restaurant-tables']) { margin-top: 7px; }
+:global([data-design-node='BERxg']):has(.detailList) :global([data-detail-columns='restaurant-tables']) > :nth-child(2),
+:global([data-design-node='BERxg']):has(.detailList) :global([data-detail-columns='restaurant-tables']) > aside { height: 820px; min-height: 820px; }
+:global([data-design-node='BERxg']):has(.detailList) :global([data-detail-columns='restaurant-tables']) > :nth-child(2) > :first-child { min-height: 820px; }
+:global([data-design-node='BERxg']):has(.detailList) :global([data-detail-columns='restaurant-tables']) > aside > :global([data-detail-preview]) > header { padding: 17px 18px 0; border-bottom: 0; }
+:global([data-design-node='BERxg']):has(.detailList) :global([data-detail-columns='restaurant-tables']) > aside > :global([data-detail-preview]) > :nth-child(2) { padding: 16px 17px 18px 18px; }
+.detailList { display: flex; flex-direction: column; gap: 16px; }
+.detailRow { flex: 0 0 70px; height: 70px; margin: 0; padding: 0 12px; border: 1px solid #dce2e6; border-radius: 8px; background: #fff; box-shadow: none; }
+.detailRowSelected { border: 2px solid #4b9ceb; background: #f3f8fd; }
+.detailMain { gap: 7px; }
+.detailName { font-size: 16px; line-height: 19px; font-weight: 700; }
+.detailSub { font-size: 13px; line-height: 16px; }
+.detailStatus { flex: 0 0 57px; width: 57px; }
+.detailStatus > :global(span) { min-height: 27px; padding-inline: 10px; border-radius: 18px; }
+.detailRow > :last-child, .detailRow > :last-child > button { width: 32px; height: 32px; min-width: 32px; }
+:global(:root) :global([data-design-node='ljShF']):has(.editorFields) :global([role='dialog'] h2) { font-size: 19px; }
+:global([data-design-node='ljShF']):has(.editorFields) :global([role='dialog'] h2) { margin-left: 4px; }
+:global([data-design-node='ljShF']):has(.editorFields) :global([data-window-actions]) > :first-child { gap: 10px; padding-right: 28px; }
+:global([data-design-node='ljShF']):has(.editorFields) :global([data-window-actions]) button:first-of-type { width: 100px; }
+:global([data-design-node='ljShF']):has(.editorFields) :global([data-window-actions]) button:last-of-type { width: 116px; }

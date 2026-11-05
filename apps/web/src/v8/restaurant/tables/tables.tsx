@@ -27,11 +27,12 @@ import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
-import { RestaurantShell, QuietError, StatRow, Status, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { RestaurantShell, QuietError, StatRow, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { pickMoveTarget, reservationLine } from './move'
 import styles from './tables.module.css'
 import TableRowActions from './table-row-actions'
+import StatusBadge from '@/components/shared/status-badge'
 import TablesAssignBoard from './assign'
 import { useSearchParams } from 'next/navigation'
 import { Map as MapIcon } from 'lucide-react'
@@ -304,7 +305,6 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const activeRows = rows.filter((item) => item.is_active)
   const visibleRows=rows.filter(item=>statusFilter==='all'||(statusFilter==='active'?!!item.is_active:!item.is_active))
   useEffect(()=>{if(rows.length&&!selectedId)setSelectedId(rows[0].id)},[rows,selectedId])
-  const refreshFloors=async()=>{if(!selectedAccountId||!store)return;const result=await reservationBoardApi.floors(selectedAccountId,store.id);setFloors(result.data)}
 
   return (
     <SaveErrorScope errors={saveErrors}><>
@@ -322,7 +322,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
                   <p className={styles.detailName} title={`${item.code} · ${item.label}`}>{`${item.code} · ${item.label}`}</p>
                   <p className={styles.detailSub}>{`${seatTypeLabel(item.seat_detail_type??item.seat_type)} / ${item.min_capacity}〜${item.max_capacity}名 / ${item.smoking_policy==='smoking'?'喫煙':item.smoking_policy==='heated_tobacco'?'加熱式のみ':'禁煙'} / ${item.shoes_allowed===0?'土足不可':'土足可'}`}</p>
                 </div>
-                <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} label={item.is_active ? '受付中' : '停止中'} /></span>
+                <span className={styles.detailStatus}><StatusBadge tone={item.is_active ? 'success' : 'neutral'} dot={false}>{item.is_active ? '受付中' : '停止中'}</StatusBadge></span>
                 <TableRowActions table={item} canEdit={canEdit} busy={busy} pendingAccount={!snapshotAccountCurrent} onEdit={openEdit} onDuplicate={table=>{setSelectedId(table.id);setDuplicateRequest(n=>n+1)}} onResume={resume}
                   onDelete={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; deleteTicket.current = ticket; setDeleteScope({ scope: renderedScope, ticket }); setDeleteError(''); setDeleteId(table.id) }}
                   onStop={(table) => { if (!selectedAccountId || !store || !snapshotAccountCurrent || !canEditRef.current || renderedScope !== scope.current) return; const ticket = {}; stopTicket.current = ticket; setStopScope({ scope: renderedScope, ticket }); setStopError(''); stopProgressRef.current = false; setStopProgress(''); setMoveMode('move'); setStopId(table.id) }} />
@@ -359,9 +359,9 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         actionsPlacement="footer"
         width={824}
         exactWidth
-        minHeight={840}
-        top={60}
-        headerHeight={64}
+        minHeight={650}
+        top={265}
+        headerHeight={62}
         busy={busy}
         designNode="ljShF"
         titleIcon={<Grid2X2 size={17} aria-hidden="true"/>}
@@ -372,7 +372,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
       >
         {draft && selectedAccountId && store ? <form id="rs-table-editor" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
           {editorError ? <Notice tone="danger" role="alert">{editorError}</Notice> : null}
-          <TablePenEditor draft={draft} onChange={setDraft} floors={floors} accountId={selectedAccountId} storeId={store.id} onFloorAdded={refreshFloors} errors={fieldErrors} onCapacity={changeCapacity} count={createCount} onCount={setCreateCount} canBatch={!editing}/>
+          <TablePenEditor draft={draft} onChange={setDraft} floors={floors} errors={fieldErrors} onCapacity={changeCapacity} count={createCount} onCount={setCreateCount} canBatch={!editing}/>
         </form> : null}
       </RsDialog>
       <RsDialog
