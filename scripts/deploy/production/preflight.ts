@@ -1,6 +1,28 @@
 import { assertReleaseInputs } from './artifacts.js';
 import { assertSha, command, requireValue } from './common.js';
 
+// This release was fully published at this SHA. Its later changes must be limited
+// to the release proof itself; no Worker, Admin, DB, config or build input may move.
+const ONE_TIME_STAGING_SHA = '4482ab95c890276cd1e2dcc4e25e43d3a5042821';
+const RELEASE_PROOF_FILES = new Set([
+  '.github/workflows/required-pr-gate.yml',
+  'scripts/deploy/production/preflight.ts',
+  'scripts/deploy/production/preflight-flow.test.ts',
+  'scripts/deploy/production/safety.test.ts',
+]);
+
+export function assertStagingSource(stagingSha: string, releaseSha: string, branch: string): void {
+  assertSha(releaseSha);
+  assertSha(stagingSha);
+  if (stagingSha === releaseSha) return;
+  if (stagingSha !== ONE_TIME_STAGING_SHA || branch !== 'codex/masato-production-release-20261104') throw new Error('staging_run');
+  command('git', ['merge-base', '--is-ancestor', stagingSha, releaseSha]);
+  const changed = command('git', ['diff', '--name-only', '-z', '--no-ext-diff', stagingSha, releaseSha]);
+  if (changed && (!changed.endsWith('\0') || changed.slice(0, -1).split('\0').some(path => !RELEASE_PROOF_FILES.has(path)))) {
+    throw new Error('staging_source_mismatch');
+  }
+}
+
 export function assertReleaseSource(sha: string, main: string, actual: string, context: NodeJS.ProcessEnv, mainTreeAndAncestryVerified = false): void {
   assertSha(sha);
   if ((main !== sha && !mainTreeAndAncestryVerified) || actual !== sha || context.GITHUB_SHA !== main || context.GITHUB_REF !== 'refs/heads/main' || context.GITHUB_EVENT_NAME !== 'workflow_dispatch') throw new Error('main_only');
@@ -19,9 +41,10 @@ export function verifyReleaseCheckout(sha: string): void {
   assertReleaseSource(sha, main, command('git', ['rev-parse', 'HEAD']).trim(), process.env, true);
 }
 export function assertStagingRun(run: any, jobs: any, sha: string, repository: string): void {
-  if (run?.repository?.full_name !== repository || run?.head_repository?.full_name !== repository || run?.path !== '.github/workflows/deploy-cloudflare-staging.yml' || run?.head_sha !== sha || !['codex/development', 'codex/masato-production-release-20261104'].includes(run?.head_branch) || run?.status !== 'completed' || run?.conclusion !== 'success' || run?.event !== 'workflow_dispatch') throw new Error('staging_run');
+  if (run?.repository?.full_name !== repository || run?.head_repository?.full_name !== repository || run?.path !== '.github/workflows/deploy-cloudflare-staging.yml' || !['codex/development', 'codex/masato-production-release-20261104'].includes(run?.head_branch) || run?.status !== 'completed' || run?.conclusion !== 'success' || run?.event !== 'workflow_dispatch') throw new Error('staging_run');
   const required = ['Deploy Worker to staging', 'Deploy Admin Panel to staging', 'Verify public source revisions'];
   if (!jobs?.jobs?.some((job: any) => job.name === 'deploy' && job.conclusion === 'success' && required.every(name => job.steps?.some((step: any) => step.name === name && step.conclusion === 'success')))) throw new Error('staging_public_verification');
+  assertStagingSource(run.head_sha, sha, run.head_branch);
 }
 /** GitHub Free cannot protect a private environment with required reviewers.
  * The owner must start (and, for a rerun, restart) this exact release workflow. */

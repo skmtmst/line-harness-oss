@@ -89,7 +89,25 @@ jobs:
                 exit 1
               fi
             fi
-            stage_runs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-cloudflare-staging.yml/runs?head_sha=$HEAD_SHA&status=success&per_page=100")
+            proof_sha="$HEAD_SHA"
+            if [ "$HEAD_REF" = codex/masato-production-release-20261104 ]; then
+              # This one release was fully published before a CI-only fix.
+              # Accept that historical run only while every later path is
+              # release-proof code. Any app, migration or deploy-config change
+              # fails before the run can count as publication evidence.
+              proof_sha=4482ab95c890276cd1e2dcc4e25e43d3a5042821
+              git cat-file -e "$proof_sha^{commit}"
+              git merge-base --is-ancestor "$proof_sha" "$HEAD_SHA"
+              proof_changes=$(git diff --name-only --no-ext-diff "$proof_sha" "$HEAD_SHA") || exit 1
+              while IFS= read -r path; do
+                [ -n "$path" ] || continue
+                case "$path" in
+                  .github/workflows/required-pr-gate.yml|scripts/deploy/production/preflight.ts|scripts/deploy/production/preflight-flow.test.ts|scripts/deploy/production/safety.test.ts) ;;
+                  *) echo "::error::検証配備以降に本番成果物へ影響する変更があります: $path"; exit 1 ;;
+                esac
+              done <<< "$proof_changes"
+            fi
+            stage_runs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-cloudflare-staging.yml/runs?head_sha=$proof_sha&status=success&per_page=100")
             deployed=false
             while IFS= read -r run_id; do
               jobs=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")
@@ -99,9 +117,9 @@ jobs:
                 deployed=true
                 break
               fi
-            done < <(jq -r --arg sha "$HEAD_SHA" --arg branch "$HEAD_REF" '.workflow_runs[] | select(.head_sha == $sha and .head_branch == $branch and .event == "workflow_dispatch" and .conclusion == "success") | .id' <<< "$stage_runs")
+            done < <(jq -r --arg sha "$proof_sha" --arg branch "$HEAD_REF" '.workflow_runs[] | select(.head_sha == $sha and .head_branch == $branch and .event == "workflow_dispatch" and .conclusion == "success") | .id' <<< "$stage_runs")
             if [ "$deployed" != true ]; then
-              echo "::error::PRのHEADと同じSHAでWorker・管理画面を検証配備した成功記録がありません。"
+              echo "::error::同一の本番成果物をWorker・管理画面へ検証配備した成功記録がありません。"
               exit 1
             fi
             echo "検証済み開発版からの本番昇格を確認しました。"

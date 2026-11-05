@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
-import { assertProductionApproval, assertReleaseSource, assertStagingRun } from './preflight.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as common from './common.js';
+import { assertProductionApproval, assertReleaseSource, assertStagingRun, assertStagingSource } from './preflight.js';
 import { assertBootstrap, assertHeaderRules, headerRules } from './artifacts.js';
 import { assertApproved, assertUnchanged } from './database.js';
 import { assertBackupPolicy, decryptBackup, encryptBackup } from './backup.js';
@@ -14,6 +15,9 @@ const jobs = { jobs: [{ name: 'deploy', conclusion: 'success', steps: [
   { name: 'Deploy Admin Panel to staging', conclusion: 'success' },
   { name: 'Verify public source revisions', conclusion: 'success' },
 ] }] };
+const historicalSha = '4482ab95c890276cd1e2dcc4e25e43d3a5042821';
+const releaseBranch = 'codex/masato-production-release-20261104';
+afterEach(() => vi.restoreAllMocks());
 
 describe('approved production source and staging proof', () => {
   it('requires the full current main revision and the authorized parent', () => {
@@ -31,6 +35,22 @@ describe('approved production source and staging proof', () => {
     for (const step of jobs.jobs[0].steps) {
       expect(() => assertStagingRun(run, { jobs: [{ ...jobs.jobs[0], steps: jobs.jobs[0].steps.map(current => current === step ? { ...current, conclusion: 'skipped' } : current) }] }, sha, repository)).toThrow();
     }
+  });
+  it('accepts the one-time published source only when later paths are release proof files', () => {
+    const releaseSha = 'b'.repeat(40);
+    const command = vi.spyOn(common, 'command').mockImplementation((_binary, args) =>
+      args.includes('--name-only') ? '.github/workflows/required-pr-gate.yml\0scripts/deploy/production/preflight.ts\0' : '');
+    expect(() => assertStagingSource(historicalSha, releaseSha, releaseBranch)).not.toThrow();
+    expect(() => assertStagingRun({ ...run, head_sha: historicalSha, head_branch: releaseBranch }, jobs, releaseSha, repository)).not.toThrow();
+    expect(command.mock.calls.some(([, args]) => args.includes('--is-ancestor'))).toBe(true);
+    expect(() => assertStagingSource(historicalSha, releaseSha, 'codex/development')).toThrow('staging_run');
+    expect(() => assertStagingSource('c'.repeat(40), releaseSha, releaseBranch)).toThrow('staging_run');
+    command.mockImplementation((_binary, args) => args.includes('--name-only') ? 'apps/worker/src/index.ts\0' : '');
+    expect(() => assertStagingSource(historicalSha, releaseSha, releaseBranch)).toThrow('staging_source_mismatch');
+    command.mockImplementation((_binary, args) => args.includes('--name-only') ? 'scripts/deploy/production/preflight.ts' : '');
+    expect(() => assertStagingSource(historicalSha, releaseSha, releaseBranch)).toThrow('staging_source_mismatch');
+    command.mockImplementation((_binary, args) => { if (args.includes('--is-ancestor')) throw new Error('not_ancestor'); return ''; });
+    expect(() => assertStagingSource(historicalSha, releaseSha, releaseBranch)).toThrow('not_ancestor');
   });
   it('requires GitHub to identify the owner as both initiator and rerun initiator', () => {
     const ownerRun = { id: 456, repository: { full_name: repository }, head_repository: { full_name: repository }, head_sha: sha, head_branch: 'main', event: 'workflow_dispatch', path: '.github/workflows/deploy-cloudflare-production.yml', actor: { login: 'skmtmst' }, triggering_actor: { login: 'skmtmst' } };
