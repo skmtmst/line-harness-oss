@@ -18,3 +18,16 @@ test('style summary and existing GET routes still complete', async () => {
     assert.equal(JSON.parse(response.body).success, true)
   }
 })
+
+
+test('来店フォローの現在の読取応答は編集可能な本文と予約フォームを持つ',async()=>{
+ const base='/api/restaurant-test/followups/visual-store?account_id=visual-qa-account'
+ const read=async suffix=>{const response=await mockFetch('GET',base.replace('?',`${suffix}?`));assert.equal(response.status,200);const body=JSON.parse(response.body);assert.equal(body.success,true);return body.data}
+ const page=await read(''),board=await read('/engines'),form=await read('/reservation-form')
+ assert.equal(page.setup.notUsing,false)
+ assert.deepEqual(board.legacyContents.map(row=>row.trigger),page.rows.map(row=>row.trigger))
+ assert.equal(board.legacyContents.length,7)
+ assert.ok(board.legacyContents.every(row=>row.content.messageParts.length>0&&row.content.messageParts.every(part=>part.messageType==='text'&&part.messageContent)))
+ assert.equal(form.version,0);assert.ok(form.definition.fields.some(field=>field.id==='name'&&field.required))
+ const history=await read('/review-history');assert.deepEqual(history.invitations,[])
+})
