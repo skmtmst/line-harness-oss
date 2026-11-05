@@ -14,7 +14,7 @@
 # environment variables; a parent path we cannot confirm stops the run rather
 # than being guessed, because "the parent repo is clean" is one of the gates.
 #
-# 2026-11-05: ローカルはdry-run専用。--applyは共通Actionsへ案内して停止する。
+# ローカルはdry-run専用。--applyは共通Actionsへ案内して停止する。
 # Usage:
 #   scripts/deploy/staging-deploy.sh                      # dry-run
 #   scripts/deploy/staging-deploy.sh --apply              # actually deploy

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# 2026-11-05: この入口はplan専用。applyは共通Actionsの順番待ちへ統一した。
+# この入口はplan専用。applyは共通Actionsの順番待ちへ統一する。
 # 以下の旧apply経路は入口で停止し、DB・Workerへ到達しない。
 # Cloudflare 側の Git 連携（Workers Builds）から呼ばれる、検証環境（nen-line-stg）
 # の配備コマンド。GitHub Actions も手元のターミナルも使わない経路のために置く。
