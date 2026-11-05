@@ -48,7 +48,7 @@ class ProductionWorkflowTest(unittest.TestCase):
                         check(changed)
 
     def test_failure_bypass_and_sha_drift_are_rejected(self):
-        for mutation in ['always', 'continue', 'sha', 'approval', 'lock', 'checkout', 'public_backup']:
+        for mutation in ['always', 'continue', 'sha', 'approval', 'lock', 'queue', 'checkout', 'public_backup']:
             with self.subTest(mutation=mutation):
                 changed = copy.deepcopy(self.workflows)
                 call = changed[PARENT]['jobs']['admin']
@@ -58,6 +58,7 @@ class ProductionWorkflowTest(unittest.TestCase):
                 elif mutation == 'sha': call['with']['release_sha'] = 'main'
                 elif mutation == 'approval': job.pop('environment')
                 elif mutation == 'lock': changed[PARENT]['concurrency']['cancel-in-progress'] = True
+                elif mutation == 'queue': changed[PARENT]['concurrency'].pop('queue')
                 elif mutation == 'checkout': job['steps'][0]['with']['ref'] = 'main'
                 elif mutation == 'public_backup': job['steps'].append({'uses': 'actions/upload-artifact@sha'})
                 with self.assertRaises(ValueError):
