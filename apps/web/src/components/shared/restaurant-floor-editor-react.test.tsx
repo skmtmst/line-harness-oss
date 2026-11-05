@@ -101,6 +101,14 @@ it('長い卓名は枠内で一行に省略し、全文を確認できる',async
  expect(label.closest('foreignObject')?.getAttribute('width')).toBe('80')
  expect(label.className).toContain('tableLabel')
 })
+it('密集した卓では隣の椅子に重なる卓名だけを省略する',async()=>{
+ api.floors.mockResolvedValue({data:[{...floor,tables:[floor.tables[0],{...floor.tables[0],id:'t2',y:130}]}]})
+ render(<RestaurantFloorEditor {...props} resources={[...props.resources,{id:'t2',label:'T2',active:true,capacity:2}]} canEdit={false}/>);
+ const first=await screen.findByRole('button',{name:'T1'})
+ const second=screen.getByRole('button',{name:'T2'})
+ expect(within(first).queryByTitle('T1')).toBeNull()
+ expect(within(second).getByTitle('T2')).toBeTruthy()
+})
 it('カウンター1名の椅子は設定した側だけに表示する',async()=>{
  api.floors.mockResolvedValue({data:[{...floor,tables:[{...floor.tables[0],seatType:'counter',maxCapacity:1,chairSide:'right'}]}]})
  render(<RestaurantFloorEditor {...props} canEdit={false}/>);
