@@ -9,6 +9,8 @@ const RELEASE_PROOF_FILES = new Set([
   'scripts/deploy/production/preflight.ts',
   'scripts/deploy/production/preflight-flow.test.ts',
   'scripts/deploy/production/safety.test.ts',
+  'scripts/deploy/production/known-v8-screen.mjs',
+  'scripts/deploy/production/known-v8-screen.test.mjs',
   'apps/web/src/v8/hq-templates/console-draft-review.test.tsx',
 ]);
 

@@ -817,10 +817,11 @@ jobs:
             while IFS= read -r path; do
               [ -n "$path" ] || continue
               case "$path" in
-                .github/workflows/required-pr-gate.yml|scripts/deploy/production/preflight.ts|scripts/deploy/production/preflight-flow.test.ts|scripts/deploy/production/safety.test.ts|apps/web/src/v8/hq-templates/console-draft-review.test.tsx) ;;
+                .github/workflows/required-pr-gate.yml|scripts/deploy/production/preflight.ts|scripts/deploy/production/preflight-flow.test.ts|scripts/deploy/production/safety.test.ts|scripts/deploy/production/known-v8-screen.mjs|scripts/deploy/production/known-v8-screen.test.mjs|apps/web/src/v8/hq-templates/console-draft-review.test.tsx) ;;
                 *) echo "::error::検証公開済みの画面ソースから変更されています: $path"; exit 1 ;;
               esac
             done <<< "$changes"
+            echo "release_known_baseline=true" >> "$GITHUB_OUTPUT"
           fi
           echo "base_sha=$screen_base" >> "$GITHUB_OUTPUT"
           if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
@@ -921,7 +922,16 @@ jobs:
         run: node apps/web/scripts/v8-guard/stgfix18-preview.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix18-preview
       - name: No new V8 layout or owner-rule defects
         if: steps.scope.outputs.run == 'true'
-        run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
+        run: |
+          rm -f /tmp/v8-guard/defects.json
+          result=0
+          node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}' || result=$?
+          if [ '${{ steps.scope.outputs.release_known_baseline }}' = true ]; then
+            node --test scripts/deploy/production/known-v8-screen.test.mjs
+            node scripts/deploy/production/known-v8-screen.mjs /tmp/v8-guard/defects.json
+          else
+            exit "$result"
+          fi
       - name: Store comparison delta labels stay inside their values
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/store-compare-layout.test.mjs
