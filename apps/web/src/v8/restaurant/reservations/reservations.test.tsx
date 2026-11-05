@@ -509,3 +509,25 @@ it('来店が保存され再読込に失敗したら窓の中で知らせ、二�
   expect(fixture.attendance).toHaveBeenCalledTimes(1)
   expect((within(dialog).getByRole('button', { name: '来店にする', exact: true }) as HTMLButtonElement).disabled).toBe(true)
 })
+
+it('来店の保存と読み直しが終わった後、結果を窓の中で示す', async () => {
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  expect(await within(dialog).findByText(/来店にしました。/)).toBeTruthy()
+  expect(fixture.snapshot.mock.calls.length).toBeGreaterThan(1)
+})
+
+it('来店の処理が終わるまで窓の中に処理中を示す', async () => {
+  let finish!: (value: unknown) => void
+  fixture.attendance.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /^佐藤 健 2名/ }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: '来店にする', exact: true }))
+  expect(await within(dialog).findByText('予約を反映しています。完了するまでお待ちください。')).toBeTruthy()
+  expect(within(dialog).queryByText(/来店にしました。/)).toBeNull()
+  await act(async () => { finish({ data: { stamp: { status: 'recorded', count: 2 } } }) })
+  expect(await within(dialog).findByText(/来店スタンプ 2 個を確認しました。/)).toBeTruthy()
+})

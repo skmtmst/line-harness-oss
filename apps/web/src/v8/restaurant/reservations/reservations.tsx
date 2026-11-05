@@ -219,6 +219,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     let failure: { error: unknown } | undefined
     let savedButUnread = false
     let stampNotice: string | null = null
+    const success = action === 'visited' ? '来店にしました。' : action === 'depart' ? '退店にしました。卓が空きました。' : action === 'no_show' ? '無断にしました。' : '来店・退店の記録を訂正しました。'
     try {
       const ok = await mutate(async () => {
         try {
@@ -231,9 +232,9 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           if (current() && !(error instanceof QuietError)) failure = { error }
           throw new QuietError()
         }
-      }, action === 'visited' ? '来店にしました。' : action === 'depart' ? '退店にしました。卓が空きました。' : action === 'no_show' ? '無断にしました。' : '来店・退店の記録を訂正しました。', { onRefreshFailure: () => { if (current()) savedButUnread = true } })
+      }, success, { onRefreshFailure: () => { if (current()) savedButUnread = true }, suppressSuccessToast: true })
       if (!ok && current()) void reload()
-      return current() ? (savedButUnread ? { savedButUnread: true } : failure ?? (ok && stampNotice ? { stampNotice } : undefined)) : undefined
+      return current() ? (savedButUnread ? { savedButUnread: true } : failure ?? (ok ? { stampNotice: [success, stampNotice].filter(Boolean).join(' ') } : undefined)) : undefined
     } finally { attendanceWorking.current = false }
   }
 

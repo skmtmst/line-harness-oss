@@ -129,6 +129,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const failureNotice = failure?.scope === scope ? <Notice tone="danger" role="alert" message={conflict ? 'ほかの操作で予約が変わりました。読み直してから、もう一度選んでください。' : describeApiFailure(failure.error, '来店・退店の記録')} action={onReload ? <Button type="button" variant="secondary" size="compact" onClick={onReload}>読み直す</Button> : undefined} /> : null
   const unreadNotice = waitingForReload ? <Notice tone="warn" role="alert" message="保存しましたが、最新の予約を読み込めませんでした。読み直してから続けてください。" action={onReload ? <Button type="button" variant="secondary" size="compact" onClick={onReload}>読み直す</Button> : undefined} /> : null
   const stampStatus = stampNotice?.scope === scope ? <Notice tone="info" role="status" message={stampNotice.message} /> : null
+  const workingStatus = busy ? <Notice tone="info" role="status" message="予約を反映しています。完了するまでお待ちください。" /> : null
 
   /* これまでの来店（来店済みの数と前回）。連絡先が無い予約は数えない。遅い応答は捨てる。 */
   useEffect(() => {
@@ -180,7 +181,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
       secondary: quickAttendance[1] ? buttonFor(quickAttendance[1]) : null,
       menuItems: [...undoAttendance.map(item => ({...item, allowed: canWrite})), {id: 'edit-reservation', label: '内容を変える', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (canWrite) onEdit(reservation.id) }}, ...(!inactive ? [{id: 'change-table', label: '卓を変える', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (canWrite) onEdit(reservation.id) }}] : []), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}],
     }}>
-    {failureNotice}{unreadNotice}{stampStatus}
+    {failureNotice}{unreadNotice}{stampStatus}{workingStatus}
     <DetailField label="状態">{currentStatus}</DetailField>
     <DetailField label="お客さま">{withHonorific(reservation.customer_name, 'さま', { space: true })}</DetailField>
     <DetailField label="予約元"><ReservationSource value={reservation.source} note={reservation.note} /></DetailField>
@@ -213,7 +214,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
         </>
       )}
     >
-      {failureNotice}{unreadNotice}{stampStatus}
+      {failureNotice}{unreadNotice}{stampStatus}{workingStatus}
       <DetailField label="状態">{currentStatus}</DetailField>
       {dining}
       <div className={styles.facts}>
