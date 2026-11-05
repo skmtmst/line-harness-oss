@@ -5,8 +5,6 @@ export function assertReleaseSource(sha: string, main: string, actual: string, c
   if ((main !== sha && !mainTreeAndAncestryVerified) || actual !== sha || context.GITHUB_SHA !== main || context.GITHUB_REF !== 'refs/heads/main' || context.GITHUB_EVENT_NAME !== 'workflow_dispatch') throw new Error('main_only');
   if (context.GITHUB_WORKFLOW_REF !== `${context.GITHUB_REPOSITORY}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main`) throw new Error('parent_only');
 }
-/** Staging is restricted to development. Promote its previously verified commit only
- * after main approves the identical tree (a merge commit may have another SHA). */
 export function verifyReleaseCheckout(sha: string): void {
   assertSha(sha);
   if (command('git', ['status', '--porcelain', '--untracked-files=all']).trim()) throw new Error('dirty_checkout');
@@ -41,5 +39,4 @@ export async function preflight(sha: string, runId: string, fetcher: typeof fetc
   };
   assertProductionApproval(await get('environments/production'));
   assertStagingRun(await get(`actions/runs/${runId}`), await get(`actions/runs/${runId}/jobs?filter=latest&per_page=100`), sha, repository);
-  // The successful run proves both surfaces were public at this SHA. Staging may advance later.
 }
