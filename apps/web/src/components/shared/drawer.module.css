@@ -419,3 +419,7 @@ html:root .panel[data-width='hours'] { border-radius: 0; }
 html:root .panel[data-width='hours'] .header { min-height: var(--hours-editor-header-height, 80px); padding: 0 var(--space-24); align-items: center; }
 html:root .panel[data-width='hours'] .title { font-size: var(--text-title); }
 html:root .panel[data-width='hours'] .footer { min-height: var(--hours-editor-footer-height, 92px); }
+
+/* 営業時間の正本は枠のない36pxの閉じる操作。ほかの引き出しは維持する。 */
+html:root .panel[data-width='hours'] .close { width:36px; height:36px; flex-basis:36px; border:0; border-radius:0; box-shadow:none; background:transparent; }
+html:root .panel[data-width='hours'] .close:not(:focus-visible) { outline-color:transparent; }

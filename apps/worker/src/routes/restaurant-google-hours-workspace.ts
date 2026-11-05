@@ -10,6 +10,7 @@ import { dbFor } from '../services/db-router.js';
 import { upcomingHolidays } from '../services/jp-holidays.js';
 import { getMoreHoursTypes, todayIn, type GoogleProfile } from '../services/google-business-profile.js';
 import { tracedFetch } from '@line-crm/shared/server';
+import { hoursWorkspaceEvent } from '../services/google-hours-history.js';
 import { GoogleBusinessError } from '../services/google-business.js';
 import { accessTokenFor, fail, requireConnectedStore, storeFor, type StoreContext } from './restaurant-google.js';
 
@@ -66,7 +67,14 @@ restaurantGoogleHoursWorkspace.put('/api/restaurant-test/google/hours/workspace'
   if (!isRecord(body) || !Number.isSafeInteger(body.expectedVersion) || Number(body.expectedVersion) < 0 || !validateHoursWorkspace(body.data, '2000-01-01')) return fail(c, 400, '営業時間の入力内容を確認してください', {}, ['data']);
   const previous = await readHoursWorkspace(c, store);
   const history = [...previous.history];
-  if (typeof body.summary === 'string' && body.summary.trim()) history.unshift({ at: new Date().toISOString(), staffName: c.get('staff')?.name ?? '', summary: body.summary.trim().slice(0, 200) });
+  let sent = false;
+  const ids = previous.data.draft.reviewIds;
+  if (ids.length && body.data.draft.reviewIds.length === 0 && body.data.draft.days.length === 0 && body.data.draft.weekly === null && !body.data.draft.holidayChanged && body.data.draft.serviceIds.length === 0) {
+    const records = await dbFor(c.env, store.id).prepare(`SELECT id, status FROM rt_google_changes WHERE store_id = ? AND id IN (${ids.map(() => '?').join(',')})`).bind(store.id, ...ids).all<{ id: string; status: string }>();
+    sent = records.results.length === ids.length && records.results.every(row => ['accepted','applied'].includes(row.status));
+  }
+  const event = hoursWorkspaceEvent(previous.data, body.data, sent);
+  if (event) history.unshift({ at: new Date().toISOString(), staffName: c.get('staff')?.name ?? '', ...event });
   const saved = await saveVersionedAccountSetting(dbFor(c.env, store.id), { accountId: store.lineAccountId, key: keyFor(store), expectedVersion: Number(body.expectedVersion), data: { workspace: body.data, history: history.slice(0, 50) } });
   if (saved.status === 'conflict') return fail(c, 409, 'ほかの担当者が営業時間を変更しました。再読み込みして確認してください。', { code: 'version_conflict' });
   auditLog(c, 'restaurant.google.hours.save', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
