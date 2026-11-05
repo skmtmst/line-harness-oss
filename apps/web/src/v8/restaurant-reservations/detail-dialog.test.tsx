@@ -86,6 +86,19 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     fireEvent.click(within(panel).getByRole('button', { name: '来店にする' }))
     expect(attendance).toHaveBeenCalledWith('r1', 'visited')
   })
+  it('埋込の来店結果は操作の直前で知らせる', async () => {
+    const attendance = vi.fn().mockResolvedValue({ savedButUnread: true })
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    render(<ReservationDetailDialog inline reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
+      busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} onReload={() => {}} />)
+    const panel = await screen.findByRole('region', { name: '予約の詳細' })
+    fireEvent.click(within(panel).getByRole('button', { name: '来店にする' }))
+    const alert = await within(panel).findByRole('alert')
+    const footer = panel.querySelector('footer')!
+    expect(alert.textContent).toContain('保存しましたが、最新の予約を読み込めませんでした')
+    expect(alert.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alert.compareDocumentPosition(within(panel).getByText('来店')) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+  })
   it('来店の保存後に再読込できなければ窓内に案内し、再操作を止める', async () => {
     const attendance = vi.fn().mockResolvedValue({ savedButUnread: true })
     const reload = vi.fn()

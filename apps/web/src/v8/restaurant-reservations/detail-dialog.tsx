@@ -181,7 +181,6 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
       secondary: quickAttendance[1] ? buttonFor(quickAttendance[1]) : null,
       menuItems: [...undoAttendance.map(item => ({...item, allowed: canWrite})), {id: 'edit-reservation', label: '内容を変える', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (canWrite) onEdit(reservation.id) }}, ...(!inactive ? [{id: 'change-table', label: '卓を変える', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (canWrite) onEdit(reservation.id) }}] : []), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}],
     }}>
-    {failureNotice}{unreadNotice}{stampStatus}{workingStatus}
     <DetailField label="状態">{currentStatus}</DetailField>
     <DetailField label="お客さま">{withHonorific(reservation.customer_name, 'さま', { space: true })}</DetailField>
     <DetailField label="予約元"><ReservationSource value={reservation.source} note={reservation.note} /></DetailField>
@@ -189,6 +188,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
     <DetailField label="電話">{maskPhone(reservation.customer_phone) || '電話未登録'}</DetailField>
     <ReservationDining dense presentation="detail" title="お客さまの食事情報" entry={seatBoardEntry(reservation as unknown as Record<string, unknown>)} />
     <DetailField label="来店"><span title={historyText(history)}>{history.state === 'ready' ? `${polishFormatNumber(history.count)}回` : '—'}</span></DetailField>
+    {failureNotice}{unreadNotice}{stampStatus}{workingStatus}
   </DetailPreview>{confirmation}</>
 
   return (
@@ -214,7 +214,6 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
         </>
       )}
     >
-      {failureNotice}{unreadNotice}{stampStatus}{workingStatus}
       <DetailField label="状態">{currentStatus}</DetailField>
       {dining}
       <div className={styles.facts}>
@@ -225,6 +224,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
         <p className={styles.fact}>{historyText(history)}</p>
         {inactive ? <p className={styles.fact}>{reservation.status === 'no_show' ? '無断で来なかった予約です' : '取り消した予約です'}</p> : null}
       </div>
+      {failureNotice}{unreadNotice}{stampStatus}{workingStatus}
     </RsDialog>{confirmation}</>
   )
 }
