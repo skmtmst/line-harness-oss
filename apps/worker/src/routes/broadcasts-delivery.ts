@@ -136,7 +136,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
 
   } catch (gateError) {
     if (gateError instanceof LimitedBroadcastError) return inputError(c,{success:false,error:gateError.message},409,["deliveryLimit"]);
-    if(gateError instanceof GapError)return c.json({success:false,error:gateError.code},gateError.status);
+    if(gateError instanceof GapError)return c.json({success:false,error:gateError.code,code:gateError.code},gateError.status);
     // 数えられない（DB到達不能など）ときは送らない。誤送信より停止を選ぶ。
     logger.error("broadcasts.broadcasts_id_send_post_failed");
     return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);

@@ -31,7 +31,7 @@ export async function confirmBroadcastMessage({ onSuccess, scheduledAtIso, sendP
       onSuccess(latest?.success ? latest.data : broadcast)
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
-        setError('送る相手や内容が変わりました。数え直しました。もう一度確かめてください。')
+        setError(caught.code === 'sender_snapshot_changed' ? '送り手の名前が変わりました。選び直してください。' : '送る相手や内容が変わりました。数え直しました。もう一度確かめてください。')
         setPreviewSeq((value) => value + 1)
         return
       }

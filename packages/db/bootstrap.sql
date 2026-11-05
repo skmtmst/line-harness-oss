@@ -10056,7 +10056,7 @@ CREATE INDEX idx_broadcast_asset_folders_account
 CREATE INDEX idx_broadcast_asset_versions_asset
   ON broadcast_asset_versions(asset_id, version_number DESC);
 
-CREATE INDEX idx_broadcast_correction_origin ON broadcast_sender_corrections(correction_of_broadcast_id)
+CREATE UNIQUE INDEX idx_broadcast_correction_origin ON broadcast_sender_corrections(correction_of_broadcast_id)
   WHERE correction_of_broadcast_id IS NOT NULL;
 
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);

@@ -44,3 +44,11 @@ it('読取に失敗したら店の名前と決めつけず、読み直せる', a
   fireEvent.click(screen.getByRole('button', { name: '読み直す' }))
   expect(await screen.findByRole('button', { name: '送り手' })).toBeTruthy()
 })
+
+it('同じ送り手でも名前の控えが古ければ保存し直せる', async () => {
+  mocks.get.mockResolvedValue({ success: true, data: { senderId: 'sender', sender: { name: '古い名前' }, senderStale: true, sentByStaffName: null, version: 3, testMode: true } })
+  render(<BroadcastSenderControl id="draft" accountId="account" isDraft allowed />)
+  expect(await screen.findByText('送り手の名前が変わりました。選び直してください。')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '送り手を保存' }))
+  await waitFor(() => expect(mocks.set).toHaveBeenCalledWith('draft', 'sender', 3))
+})

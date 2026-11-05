@@ -47,3 +47,31 @@ it('模擬でない配信には送り手を保存せず、失効した送り手�
   expect((await request('/api/broadcasts/draft/sender', 'PUT', { senderId: 'sender', expectedVersion: 1 })).status).toBe(404)
   expect(db.raw.prepare('SELECT count(*) AS n FROM broadcast_sender_corrections').get()).toEqual({ n: 0 })
 })
+
+it('名前が変更された送り手の控えは検出され、同じ送り手を保存して更新できる', async () => {
+  expect((await request('/api/broadcasts/draft/sender', 'PUT', { senderId: 'sender', expectedVersion: 1 })).status).toBe(200)
+  db.raw.exec("UPDATE line_senders SET name='新しい名前' WHERE id='sender'")
+  expect(await (await request('/api/broadcasts/draft/sender')).json()).toMatchObject({ data: { senderStale: true } })
+  expect((await request('/api/broadcasts/draft/sender', 'PUT', { senderId: 'sender', expectedVersion: 2 })).status).toBe(200)
+  expect(await (await request('/api/broadcasts/draft/sender')).json()).toMatchObject({ data: { senderStale: false, sender: { name: '新しい名前' } } })
+})
+
+it('送達記録のない配信と模擬配信を訂正できない理由を返す', async () => {
+  db.raw.exec("UPDATE broadcasts SET status='sent' WHERE id='draft'")
+  expect(await (await request('/api/broadcasts/draft/sender')).json()).toMatchObject({ data: { correctionReason: '模擬で送った配信は訂正できません。' } })
+  db.raw.exec("DELETE FROM broadcast_execution_contexts WHERE broadcast_id='draft'")
+  expect(await (await request('/api/broadcasts/draft/sender')).json()).toMatchObject({ data: { correctionReason: '送達記録がない配信は訂正できません。' } })
+})
+
+it('送り手が削除済みでも控えのずれを検出し店の名前を保存できる', async () => {
+  expect((await request('/api/broadcasts/draft/sender', 'PUT', { senderId: 'sender', expectedVersion: 1 })).status).toBe(200)
+  db.raw.exec("DELETE FROM line_senders WHERE id='sender'")
+  expect(await (await request('/api/broadcasts/draft/sender')).json()).toMatchObject({ data: { senderStale: true } })
+  expect((await request('/api/broadcasts/draft/sender', 'PUT', { senderId: null, expectedVersion: 2 })).status).toBe(200)
+  expect(await (await request('/api/broadcasts/draft/sender')).json()).toMatchObject({ data: { senderStale: false, senderId: null, sender: null } })
+})
+
+it('複数店舗への配信は訂正できない理由を返す', async () => {
+  db.raw.exec("UPDATE broadcasts SET status='sent',target_type='multi-account-dedup',line_account_id=NULL,account_ids='[\"a\"]' WHERE id='draft'; DELETE FROM broadcast_execution_contexts WHERE broadcast_id='draft'")
+  expect(await (await request('/api/broadcasts/draft/sender')).json()).toMatchObject({ data: { correctionReason: '複数の店への配信は訂正できません。' } })
+})

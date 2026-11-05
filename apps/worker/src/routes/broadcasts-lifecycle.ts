@@ -29,7 +29,10 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
-  if(await simulationContext(c.env.DB,existing.id))return c.json({success:false,error:'use_simulation_draft_endpoint'},409);
+  const simulation = await simulationContext(c.env.DB,existing.id);
+  const correction = await c.env.DB.prepare('SELECT correction_of_broadcast_id FROM broadcast_sender_corrections WHERE broadcast_id=?').bind(id).first<{correction_of_broadcast_id:string|null}>();
+  if (simulation && !correction?.correction_of_broadcast_id) return c.json({success:false,error:'use_simulation_draft_endpoint'},409);
+  if (simulation && (simulation.state !== 'draft' || existing.status !== 'draft')) return c.json({success:false,error:'simulation_draft_closed'},409);
   if (existing.status !== 'draft' && existing.status !== 'scheduled') {
     return inputError(c, { success: false, error: 'Only draft or scheduled broadcasts can be updated' }, 400, []);
   }
@@ -62,10 +65,10 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     confirmedRecipientCount?: unknown;
   }>();
 
-  const correction = await c.env.DB.prepare('SELECT correction_of_broadcast_id FROM broadcast_sender_corrections WHERE broadcast_id=?').bind(id).first<{correction_of_broadcast_id:string|null}>();
   if (correction?.correction_of_broadcast_id && ((body.targetType !== undefined && body.targetType !== 'all') || body.targetTagId || body.segmentConditions || (body.lineAccountId !== undefined && body.lineAccountId !== existing.line_account_id) || body.accountIds?.length)) {
     return c.json({success:false,error:'correction_audience_fixed'},409);
   }
+  if (simulation && (body.scheduledAt || body.messageType && body.messageType !== 'text')) return c.json({success:false,error:'simulation_draft_only'},409);
 
   // 版を必須化する。認可・境界・存在の判定は上で済ませてあるため、
   // 他アカウントIDは従来どおり404のまま、ここへは来ない。

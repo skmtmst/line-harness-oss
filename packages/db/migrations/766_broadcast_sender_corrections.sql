@@ -14,5 +14,5 @@ CREATE TABLE broadcast_sender_corrections (
   CHECK (correction_of_broadcast_id IS NULL OR correction_of_broadcast_id <> broadcast_id),
   UNIQUE (correction_of_broadcast_id, correction_request_key)
 );
-CREATE INDEX idx_broadcast_correction_origin ON broadcast_sender_corrections(correction_of_broadcast_id)
+CREATE UNIQUE INDEX idx_broadcast_correction_origin ON broadcast_sender_corrections(correction_of_broadcast_id)
   WHERE correction_of_broadcast_id IS NOT NULL;

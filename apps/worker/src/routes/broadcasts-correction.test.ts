@@ -58,7 +58,7 @@ it('全員向けでも送達記録にない友だちを含めず、記録がな�
   const id = ((await response.json()) as { data: { broadcastId: string } }).data.broadcastId
   expect(await simulationPreview(db.db, id)).toMatchObject({ matched: 2, recipients: 2 })
   db.raw.exec("UPDATE broadcast_send_claims SET state='failed'; UPDATE broadcast_ab_recipients SET state='failed'")
-  expect((await request('all-without-records')).status).toBe(409)
+  expect((await request('all-without-records')).status).toBe(200)
 })
 
 it('A/B の全員向けでも、試しと残りで送達済みの人だけを含める', async () => {
@@ -75,7 +75,7 @@ it('模擬の確定時に担当者と送り手の名前を控え、古い送り�
   db.raw.prepare("UPDATE broadcast_sender_corrections SET sender_id='sender',sender_snapshot_json=? WHERE broadcast_id=?").run('{"name":"配信係"}',id)
   const p = await simulationPreview(db.db, id)
   db.raw.exec("UPDATE line_senders SET name='新しい係' WHERE id='sender'")
-  await expect(scheduleSimulation(db.db,id,{expectedVersion:p.version,confirmedRecipientCount:p.recipients,testMode:true},'stale',new Date('2026-10-16T03:00:00Z'),owner)).rejects.toMatchObject({code:'version_conflict'})
+  await expect(scheduleSimulation(db.db,id,{expectedVersion:p.version,confirmedRecipientCount:p.recipients,testMode:true},'stale',new Date('2026-10-16T03:00:00Z'),owner)).rejects.toMatchObject({code:'sender_snapshot_changed'})
   expect(db.raw.prepare('SELECT status FROM broadcasts WHERE id=?').get(id)).toEqual({status:'draft'})
   db.raw.prepare("UPDATE broadcast_sender_corrections SET sender_snapshot_json=? WHERE broadcast_id=?").run('{"name":"新しい係"}',id)
   await scheduleSimulation(db.db,id,{expectedVersion:p.version,confirmedRecipientCount:p.recipients,testMode:true},'ok',new Date('2026-10-16T03:00:00Z'),owner)
@@ -109,4 +109,65 @@ it('模擬下書きの別の保存口でも宛先と元配信の目的を変更�
   await expect(saveSimulationDraft(db.db, 'a', 'owner', 'edit', { ...input, targetTagId: 'other' }, id)).rejects.toMatchObject({ code: 'correction_audience_or_purpose_fixed' })
   await expect(saveSimulationDraft(db.db, 'a', 'owner', 'edit', { ...input, purpose: 'notice' }, id)).rejects.toMatchObject({ code: 'correction_audience_or_purpose_fixed' })
   expect(db.raw.prepare('SELECT target_type, lock_version FROM broadcasts WHERE id=?').get(id)).toEqual({ target_type: 'all', lock_version: 1 })
+})
+
+it('実際の API で訂正を作成・本文保存・確認・模擬送信でき、宛先は変更できない', async () => {
+  const response = await request('end-to-end'); expect(response.status).toBe(201)
+  const id = ((await response.json()) as { data: { broadcastId: string } }).data.broadcastId
+  const { broadcasts } = await import('./broadcasts.js')
+  const { broadcastSimulation } = await import('./broadcast-simulation.js')
+  const app = new Hono<Env>()
+  app.use('*', async (c, next) => { c.env = { DB: db.db } as Env['Bindings']; c.set('staff', owner); await next() })
+  app.route('/', broadcasts); app.route('/', broadcastSimulation)
+  const put = (input:unknown) => app.request(`/api/broadcasts/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(input) })
+  const wrong = await put({expectedVersion:1,targetType:'tag',targetTagId:'different'})
+  expect(wrong.status).toBe(409); expect(await wrong.json()).toMatchObject({error:'correction_audience_fixed'})
+  const saved = await put({expectedVersion:1,title:'訂正',messageType:'text',messageContent:'正しい内容',targetType:'all',saveAsDraft:true})
+  expect(saved.status).toBe(200)
+  const preview=await app.request(`/api/broadcasts/${id}/send-preview`)
+  expect(preview.status).toBe(200)
+  const info=await preview.json() as {data:{expectedVersion:number;recipients:number}}
+  const sent=await app.request(`/api/broadcasts/${id}/send`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':'simulate-correction','X-Confirm-Irreversible':'broadcast-send'},body:JSON.stringify({testMode:true,expectedVersion:info.data.expectedVersion,confirmedRecipientCount:info.data.recipients})})
+  expect(sent.status).toBe(200);expect(await sent.json()).toMatchObject({success:true,data:{testMode:true,sent:0}})
+  expect(db.raw.prepare('SELECT message_content FROM broadcasts WHERE id=?').get(id)).toEqual({message_content:'正しい内容'})
+})
+
+it('操作キーが変わっても元配信の訂正は一件で、模擬で送った配信は訂正しない',async()=>{
+ const first=await request('first-key');expect(first.status).toBe(201)
+ const id=((await first.json()) as {data:{broadcastId:string}}).data.broadcastId
+ const second=await request('another-key');expect(second.status).toBe(200)
+ expect(await second.json()).toMatchObject({data:{broadcastId:id},replayed:true})
+ expect(db.raw.prepare('SELECT count(*) n FROM broadcast_sender_corrections').get()).toEqual({n:1})
+ db.raw.exec("INSERT INTO broadcast_execution_contexts(broadcast_id,account_id,purpose,created_via,created_by,request_key,request_fingerprint) VALUES('foreign','b','marketing','manual','owner','simulated','simulated')")
+ db.raw.exec("UPDATE broadcasts SET line_account_id='a' WHERE id='foreign'")
+ const denied=await request('simulated-key',owner,'foreign');expect(denied.status).toBe(409);expect(await denied.json()).toMatchObject({error:'correction_source_unavailable'})
+});
+
+it('既に訂正を受け取った友だちは再び対象にしない',async()=>{
+ const response=await request('prior'); const id=((await response.json()) as {data:{broadcastId:string}}).data.broadcastId
+ // 実配送を防ぐ trigger は維持したまま、過去の送達記録を作ってから模擬状態を再開する。
+ db.raw.prepare('DELETE FROM broadcast_execution_contexts WHERE broadcast_id=?').run(id)
+ db.raw.prepare("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state) VALUES(?,'sent','a','sent')").run(id)
+ db.raw.prepare("INSERT INTO broadcast_execution_contexts(broadcast_id,account_id,purpose,created_via,created_by,request_key,request_fingerprint) VALUES(?,'a','marketing','manual','owner','prior-context','prior-context')").run(id)
+ expect(await simulationPreview(db.db,id)).toMatchObject({recipients:1})
+ db.raw.prepare("INSERT INTO broadcast_ab_recipients(broadcast_id,friend_id,variant_key,state) VALUES(?,'ab','A','sent')").run(id)
+ expect(await simulationPreview(db.db,id)).toMatchObject({recipients:0})
+});
+
+it('元配信と別の店やブロックした人、元配信が未送信の場合は対象にしない',async()=>{
+ db.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id,is_following) VALUES('outside','outside','b',1),('blocked','blocked','a',0); INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state) VALUES('original','outside','b','sent'),('original','blocked','a','sent')")
+ const response=await request('boundaries');expect(response.status).toBe(201)
+ const id=((await response.json()) as {data:{broadcastId:string}}).data.broadcastId
+ expect(await simulationPreview(db.db,id)).toMatchObject({recipients:2,blocked:1})
+ db.raw.prepare("UPDATE broadcasts SET line_account_id='b' WHERE id=?").run(id)
+ expect(await simulationPreview(db.db,id)).toMatchObject({recipients:0})
+ db.raw.prepare("UPDATE broadcasts SET line_account_id='a' WHERE id=?").run(id)
+ db.raw.exec("UPDATE broadcasts SET status='draft' WHERE id='original'")
+ expect(await simulationPreview(db.db,id)).toMatchObject({recipients:0,blocked:0})
+});
+
+it('同じ元配信に別の操作キーで同時に二つ目を保存できない', async () => {
+  const first = await request('unique'); expect(first.status).toBe(201)
+  db.raw.exec("INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id) VALUES('duplicate','訂正','text','文','all','draft','a')")
+  expect(() => db.raw.prepare("INSERT INTO broadcast_sender_corrections(broadcast_id,correction_of_broadcast_id,correction_request_key) VALUES('duplicate','original','different')").run()).toThrow(/UNIQUE/)
 })

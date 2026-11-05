@@ -12,7 +12,7 @@ import { readStaffIdentity, staffIdentityGeneration } from '@/lib/staff-identity
 import { canEditBroadcastNow } from './write-access'
 
 type Sender = { id: string; name: string; status: string }
-type State = { senderId: string | null; sender: { name: string } | null; sentByStaffName: string | null; version: number; testMode: boolean }
+type State = { senderId: string | null; sender: { name: string } | null; sentByStaffName: string | null; senderStale: boolean; version: number; testMode: boolean }
 export function BroadcastSenderControl({ id, accountId, isDraft, allowed, lockedReason }: {
   id: string; accountId: string | null; isDraft: boolean; allowed: boolean; lockedReason?: string
 }) {
@@ -49,8 +49,9 @@ export function BroadcastSenderControl({ id, accountId, isDraft, allowed, locked
   if (!isDraft) return <span>{data.sender?.name ?? '店の名前'}{data.sentByStaffName ? `（担当：${data.sentByStaffName}）` : ''}</span>
   const reason = readPermissionSessionSnapshot()?.impersonation ? '代理ログイン中は変更できません。' : lockedReason ?? (!allowed ? '操作する権限を確認しています。' : !data.testMode ? '送り手の変更は模擬の配信で使えます。' : undefined)
   return <SaveErrorScope errors={saveErrors}>
+    {data.senderStale && <Notice tone="warn" message="送り手の名前が変わりました。選び直してください。" />}
     <SaveErrorField names={['senderId']}><Select aria-label="送り手" value={value} onChange={setValue} lockedReason={reason} disabled={!allowed || busy}
       options={[{ value: '', label: '店の名前' }, ...(data.senderId && !senders.some(sender => sender.id === data.senderId) ? [{ value: data.senderId, label: `${data.sender?.name ?? '不明'}（現在は選べません）`, disabled: true }] : []), ...senders.map(sender => ({ value: sender.id, label: sender.name }))]} /></SaveErrorField>
-    <Button lockedReason={reason} disabled={!allowed || busy || value === (data.senderId ?? '')} onClick={() => void save()}>送り手を保存</Button>
+    <Button lockedReason={reason} disabled={!allowed || busy || (!data.senderStale && value === (data.senderId ?? ''))} onClick={() => void save()}>送り手を保存</Button>
   </SaveErrorScope>
 }

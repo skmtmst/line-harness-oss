@@ -36,7 +36,8 @@ vi.mock('@/components/broadcasts/broadcast-form', () => {
   return { default: (props: unknown) => { formImport.props = props; return <div data-loaded-broadcast-form /> } }
 })
 const createCorrection = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api/features/broadcast-corrections', () => ({ broadcastCorrectionApi: { create: createCorrection } }))
+const getCorrectionSender = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { correctionReason: null as string | null } })))
+vi.mock('@/lib/api/features/broadcast-corrections', () => ({ broadcastCorrectionApi: { create: createCorrection, getSender: getCorrectionSender } }))
 vi.mock('./sender-control', () => ({ BroadcastSenderControl: () => <span>送り手の控え</span> }))
 const listBroadcasts = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
@@ -226,6 +227,17 @@ describe('V8 一斉配信一覧の結果の列', () => {
     expect(destination.pathname).toBe('/broadcasts/new')
     expect(destination.searchParams.get('draft')).toBe('correction-1')
     expect(destination.searchParams.get('returnTo')).toBe('/broadcasts?broadcast=bc-3')
+  })
+
+  it.each(['模擬で送った配信は訂正できません。', '複数の店への配信は訂正できません。', '送達記録がない配信は訂正できません。'])('訂正できない理由を表示する: %s', async reason => {
+    getCorrectionSender.mockResolvedValueOnce({ success: true, data: { correctionReason: reason } })
+    const { sent } = await renderRows()
+    act(() => fireEvent.click(sent)); await flush()
+    const panel = document.querySelector('[data-design-part="detail-panel"]')!
+    const item = await findDetailMenuItem('訂正を作る', panel)
+    expect(item.getAttribute('aria-disabled')).toBe('true')
+    act(() => fireEvent.focus(item))
+    expect(document.querySelector('[role="tooltip"]')?.textContent).toContain(reason)
   })
 
   it('閲覧のみの訂正操作は理由付きで残し、押しても作らない', async () => {

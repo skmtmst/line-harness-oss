@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import { getBroadcastById } from '@line-crm/db'
 import { BROADCAST_DEFINITION_EDIT_KEY } from '@line-crm/shared'
 import { assertChanged, clearAssertions } from '../features/booking/booking-series/index.js'
+import { simulationContext } from '../features/broadcasts/simulation-preview.js'
 import { broadcastAccountIds, broadcastWriteBoundary, canAccessBroadcast } from './broadcasts-definition.js'
 import type { Env } from '../worker-env.js'
 
@@ -16,11 +17,11 @@ export async function createBroadcastCorrection(c: Context<Env>) {
   if (!staff || staff.readOnly || c.get('impersonation')) return c.json({ success: false, error: 'forbidden' }, 403)
   const key = c.req.header('Idempotency-Key')?.trim()
   if (!key || !/^[-\w:]{1,128}$/.test(key)) return c.json({ success: false, error: 'idempotency_key_required' }, 400)
-  const replay = async () => c.env.DB.prepare('SELECT broadcast_id FROM broadcast_sender_corrections WHERE correction_of_broadcast_id=? AND correction_request_key=?')
-    .bind(origin, key).first<{ broadcast_id: string }>()
+  const replay = async () => c.env.DB.prepare('SELECT broadcast_id FROM broadcast_sender_corrections WHERE correction_of_broadcast_id=?')
+    .bind(origin).first<{ broadcast_id: string }>()
   const old = await replay()
   if (old) return c.json({ success: true, data: { broadcastId: old.broadcast_id, testMode: true }, replayed: true })
-  if (source.status !== 'sent' || !source.line_account_id || !['all', 'tag', 'segment'].includes(source.target_type)) return c.json({ success: false, error: 'correction_source_unavailable' }, 409)
+  if (source.status !== 'sent' || !source.line_account_id || !['all', 'tag', 'segment'].includes(source.target_type) || await simulationContext(c.env.DB, origin)) return c.json({ success: false, error: 'correction_source_unavailable' }, 409)
   {
     const count = await c.env.DB.prepare(`SELECT COUNT(*) n FROM friends f WHERE f.line_account_id=? AND
       (EXISTS(SELECT 1 FROM broadcast_send_claims c WHERE c.broadcast_id=? AND c.friend_id=f.id AND c.state='sent')
@@ -34,7 +35,8 @@ export async function createBroadcastCorrection(c: Context<Env>) {
     await c.env.DB.batch([
       c.env.DB.prepare(`INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id,draft_payload_json)
         SELECT ?,?,'text',?,'all','draft',line_account_id,'{"draftTargetMode":"all"}' FROM broadcasts
-        WHERE id=? AND line_account_id=? AND status='sent' AND target_type=?`)
+        WHERE id=? AND line_account_id=? AND status='sent' AND target_type=? AND NOT EXISTS
+          (SELECT 1 FROM broadcast_execution_contexts x WHERE x.broadcast_id=broadcasts.id AND x.execution_mode='simulation')`)
         .bind(id, `訂正：${source.title}`, content, origin, source.line_account_id, source.target_type),
       assertChanged(c.env.DB),
       c.env.DB.prepare(`INSERT INTO broadcast_sender_corrections(broadcast_id,correction_of_broadcast_id,correction_request_key)
