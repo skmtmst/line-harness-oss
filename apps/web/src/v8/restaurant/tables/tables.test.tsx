@@ -258,6 +258,7 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
     const editor = screen.getByRole('dialog')
+    fireEvent.click(within(editor).getByRole('button', { name: '変更 ›' }))
     fireEvent.click(within(editor).getByRole('button', { name: '停止中' }))
     fireEvent.click(within(editor).getByRole('button', { name: '変更を保存' }))
     await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledTimes(1))
@@ -273,7 +274,7 @@ describe('BERxg 座席・卓管理', () => {
 
   it('止めるときは先の予約を出し、入る卓へ移し、入らない予約は未配席にしてから止める', async () => {
     render(<TablesPage />)
-    await screen.findByText('卓一覧')
+    await screen.findByText('T3 · 窓側4人卓')
     fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     const dialog = document.querySelector('[data-design-node="eY9F3"]') as HTMLElement
@@ -286,7 +287,7 @@ describe('BERxg 座席・卓管理', () => {
   it.each(['closure_conflict', 'customer_table_conflict'])('卓停止の %s は理由を表示し、移動済みとは表示しない', async code => {
     fixture.stopTable.mockRejectedValueOnce(new ApiError(409, code, code, { reason: '卓の予約が重なっています' }))
     render(<TablesPage />)
-    await screen.findByText('卓の詳細')
+    await screen.findByText('T3 · 窓側4人卓')
     fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '予約を移して止める' }))
