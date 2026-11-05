@@ -926,7 +926,7 @@ export default function AutoRepliesListV8() {
         )}
         {ready ? <Notice tone={dispatchStopped ? 'warn' : 'info'} role="status" message={dispatchStopped === true
           ? '停止中です。いま自動応答は送られません。'
-          : dispatchStopped === null ? '自動応答全体の送信状態を確認できません。'
+          : selectedAccountId && dispatchStopped === null ? '自動応答全体の送信状態を確認できません。'
           : rules.some((rule) => rule.isActive)
           ? '確認できる自動応答に、有効なルールがあります。'
           : '確認できる自動応答に、有効なルールはありません。'} /> : null}
