@@ -33,3 +33,47 @@ test('B6-06: 公開の版を読んで下書きの変更を混ぜない',async()=
  expect((await resolveRouting(d.db,'a',(await loadRoutingLayout(d.db,'form','a',true)).layout,{subject:'転職'})).matchedIndex).toBe(0);
  expect((await resolveRouting(d.db,'a',(await loadRoutingLayout(d.db,'form','a',false)).layout,{subject:'転職'})).matchedIndex).toBe(-1);
 });
+test('保存前の振り分けを試せて、フォームは変更されない',async()=>{
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ const draft=layout();(draft.sections[0].blocks[1] as any).booking.routing.rules=[];
+ const a=gapApp(d,[formRouting],{...gapOwner,readOnly:true});
+ const r=await gapCall(a,'/api/forms/form/routing/preview?account_id=a','POST',{answers:{subject:'転職'},layout:draft});
+ expect(r.status).toBe(200);expect((await r.json() as any).data.matchedIndex).toBe(-1);
+ expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);
+});
+test('保存前の試行も別の店のフォームと不正な内容を拒む',async()=>{
+ const a=gapApp(d,[formRouting],gapOwner);
+ expect((await gapCall(a,'/api/forms/form/routing/preview?account_id=b','POST',{answers:{},layout:layout()})).status).toBe(404);
+ expect((await gapCall(a,'/api/forms/form/routing/preview?account_id=a','POST',{answers:{},layout:{sections:'invalid'}})).status).toBe(400);
+});
+test('50行は受け付け、別店舗や停止中の行き先は拒む',async()=>{
+ const l=layout(),routing=(l.sections[0].blocks[1] as any).booking.routing;
+ routing.rules=Array.from({length:50},()=>structuredClone(routing.rules[0]));
+ await expect(validateLayoutRouting(d.db,'a',l)).resolves.toBeUndefined();
+ routing.rules[49].target={menuId:'another-account-menu'};
+ await expect(validateLayoutRouting(d.db,'a',l)).rejects.toThrow('routing_target_invalid:49');
+ routing.rules[49].target=target;
+ d.raw.exec("UPDATE menus SET is_active=0 WHERE id='menu'");
+ await expect(validateLayoutRouting(d.db,'a',l)).rejects.toThrow('routing_target_invalid:0');
+});
+test('フォームの閲覧権限で同じ店の担当の組だけを読める',async()=>{
+ d.raw.exec("INSERT INTO booking_routing_staff_groups(id,line_account_id,name,staff_ids_json) VALUES('g1','a','相談','[]'),('g2','b','他店','[]'); INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price,is_active) VALUES('closed','a','停止',30,0,0); INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('bs','closed',1),('bs2','menu',0)");
+ const viewer={...gapOwner,role:'staff' as const,readOnly:true,permissionKeys:[],viewPermissionKeys:['/form-submissions']};
+ const a=gapApp(d,[formRouting],viewer);
+ const r=await gapCall(a,'/api/forms/form/routing/groups?account_id=a','GET');
+ expect(r.status).toBe(200);expect((await r.json() as any).data).toEqual({groups:[{id:'g1',name:'相談'}],menus:[{id:'menu',name:'相談',durationMinutes:60}],staff:[{menuId:'menu',id:'bs',name:'担当'}]});
+ expect((await gapCall(a,'/api/forms/form/routing/groups?account_id=b','GET')).status).toBe(404);
+ const denied=gapApp(d,[formRouting],{...viewer,viewPermissionKeys:[]});
+ expect((await gapCall(denied,'/api/forms/form/routing/groups?account_id=a','GET')).status).toBe(403);
+});
+test('3つの回答をすべて満たすときだけ行き先が当たる',async()=>{
+ const draft=layout();const blocks=draft.sections[0].blocks as any[];
+ blocks.splice(1,0,{id:'area',kind:'input',type:'radio',name:'area',label:'地域',choices:[{id:'tokyo',label:'東京'}]},{id:'rating',kind:'input',type:'rating',name:'rating',label:'評価'});
+ blocks[3].booking.routing.rules[0].conditions.push({questionId:'area',op:'is',value:'東京'},{questionId:'rating',op:'between',value:[3,5]});
+ await expect(validateLayoutRouting(d.db,'a',draft)).resolves.toBeUndefined();
+ const a=gapApp(d,[formRouting],{...gapOwner,readOnly:true});
+ const preview=async(answers:Record<string,unknown>)=>{const r=await gapCall(a,'/api/forms/form/routing/preview?account_id=a','POST',{answers,layout:draft});expect(r.status).toBe(200);return (await r.json() as any).data.matchedIndex;};
+ expect(await preview({subject:'転職',area:'東京',rating:4})).toBe(0);
+ expect(await preview({subject:'転職',area:'大阪',rating:4})).toBe(-1);
+ expect(await preview({subject:'転職',area:'東京',rating:2})).toBe(-1);
+});

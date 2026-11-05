@@ -4,12 +4,22 @@ import {GapError,gapAccount,gapBody,gapWrite,gapVersion} from '../services/gap-c
 import {loadRoutingLayout,resolveRouting,issueRoutingToken} from '../features/forms/form-routing/index.js';
 import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
 import {requireDeliveryAccess,requirePermission} from '../middleware/role-guard.js';
+import {normalizeLayout} from '@line-crm/shared';
 export const formRouting=new Hono<Env>();
 formRouting.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'routing_unavailable'},e instanceof GapError?e.status:503));
 formRouting.post('/api/forms/:id/routing/preview',requireDeliveryAccess('forms','view'),async(c)=>{
  const a=await gapAccount(c),b=await gapBody(c),layout=await loadRoutingLayout(c.env.DB,c.req.param('id'),a,false);
  if(!b.answers||typeof b.answers!=='object'||Array.isArray(b.answers))throw new GapError('invalid_answers');
- return c.json({success:true,data:await resolveRouting(c.env.DB,a,layout.layout,b.answers as Record<string,unknown>,b.blockId as string|undefined)});
+ const draft=b.layout===undefined?layout.layout:normalizeLayout(b.layout);
+ if(!draft)throw new GapError('routing_invalid');
+ return c.json({success:true,data:await resolveRouting(c.env.DB,a,draft,b.answers as Record<string,unknown>,b.blockId as string|undefined)});
+});
+formRouting.get('/api/forms/:id/routing/groups',requireDeliveryAccess('forms','view'),async(c)=>{
+ const a=await gapAccount(c);await loadRoutingLayout(c.env.DB,c.req.param('id'),a,false);
+ const groups=await c.env.DB.prepare('SELECT id,name FROM booking_routing_staff_groups WHERE line_account_id=? ORDER BY name,id').bind(a).all();
+ const menus=await c.env.DB.prepare('SELECT id,name,duration_minutes AS durationMinutes FROM menus WHERE line_account_id=? AND is_active=1 AND deleted_at IS NULL AND addon_only=0 ORDER BY name,id').bind(a).all();
+ const staff=await c.env.DB.prepare('SELECT sm.menu_id AS menuId,s.id,s.display_name AS name FROM staff s JOIN staff_menus sm ON sm.staff_id=s.id JOIN menus m ON m.id=sm.menu_id AND m.line_account_id=s.line_account_id WHERE s.line_account_id=? AND s.is_active=1 AND s.deleted_at IS NULL AND s.is_designation_optional=0 AND sm.is_offered=1 AND m.is_active=1 AND m.deleted_at IS NULL AND m.addon_only=0 ORDER BY s.display_name,s.id').bind(a).all();
+ return c.json({success:true,data:{groups:groups.results,menus:menus.results,staff:staff.results}});
 });
 formRouting.post('/api/liff/forms/:id/routing/resolve',async(c)=>{
  const a=await resolveAccountIdFromLiff(c),user=await verifyCallerLineUserId(c);if(!a||!user)throw new GapError('unauthorized',401);
