@@ -102,7 +102,7 @@ jobs:
               while IFS= read -r path; do
                 [ -n "$path" ] || continue
                 case "$path" in
-                  .github/workflows/required-pr-gate.yml|scripts/deploy/production/preflight.ts|scripts/deploy/production/preflight-flow.test.ts|scripts/deploy/production/safety.test.ts|scripts/deploy/production/known-v8-screen.mjs|scripts/deploy/production/known-v8-screen.test.mjs|apps/web/src/v8/hq-templates/console-draft-review.test.tsx) ;;
+                  .github/workflows/required-pr-gate.yml|scripts/deploy/production/preflight.ts|scripts/deploy/production/preflight-flow.test.ts|scripts/deploy/production/safety.test.ts|scripts/deploy/production/known-v8-screen.mjs|scripts/deploy/production/known-v8-screen.test.mjs|apps/web/src/v8/hq-templates/console-draft-review.test.tsx|apps/web/src/v8/restaurant/line-followup/followup-unsaved-navigation.test.tsx|apps/web/src/v8/form-edit/edit.test.tsx) ;;
                   *) echo "::error::検証配備以降に本番成果物へ影響する変更があります: $path"; exit 1 ;;
                 esac
               done <<< "$proof_changes"
