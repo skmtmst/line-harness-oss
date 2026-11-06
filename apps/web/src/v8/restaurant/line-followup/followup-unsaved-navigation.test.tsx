@@ -269,7 +269,11 @@ describe('編集窓とページの未保存変更', () => {
     clickLink(); const oldConfirm = f.confirm!
     f[key] = 'other'
     view.rerender(<LineFollowupV8 />)
-    await waitFor(() => expect(f.read).toHaveBeenCalledWith(f.account, f.store))
+    await waitFor(() => {
+      expect(f.read).toHaveBeenCalledWith(f.account, f.store)
+      expect(screen.queryByText('LINE来店フォローを読み込んでいます…')).toBeNull()
+      expect(card('reservation_created')).toBeTruthy()
+    })
     act(() => oldConfirm())
     expect(f.push).not.toHaveBeenCalled()
     await open()

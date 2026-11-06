@@ -705,7 +705,11 @@ describe('統括の保存結果と離脱', () => {
     const onSave = result === 'refused' ? vi.fn(async () => false) : vi.fn(async () => { throw new Error('offline') })
     const input = await openHost(onSave)
     await leaveBySaving()
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull())
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledOnce()
+      expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+      expect((getPageAction({ name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(false)
+    })
     expect(input.value).toBe('保存したい名前')
     expect(onCancel).not.toHaveBeenCalled()
     expect(navigation.push).not.toHaveBeenCalled()

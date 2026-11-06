@@ -12,6 +12,8 @@ const RELEASE_PROOF_FILES = new Set([
   'scripts/deploy/production/known-v8-screen.mjs',
   'scripts/deploy/production/known-v8-screen.test.mjs',
   'apps/web/src/v8/hq-templates/console-draft-review.test.tsx',
+  'apps/web/src/v8/restaurant/line-followup/followup-unsaved-navigation.test.tsx',
+  'apps/web/src/v8/form-edit/edit.test.tsx',
 ]);
 
 export function assertStagingSource(stagingSha: string, releaseSha: string, branch: string): void {
